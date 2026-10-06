@@ -43,6 +43,7 @@ return [
         'enrichment_compute_relations' => 'Computing product relations',
         'analytics_compute_scores' => 'Behaviour scores',
         'analytics_compute_popularity' => 'Product popularity',
+        'improvement_daily_review' => 'Daily review and suggestions for the site',
         'assistant_answer' => 'Answering a shopper\'s question',
         'retrieval_embed_queries' => 'A vector for a new search wording',
         'connections_test' => 'Testing the store connection',

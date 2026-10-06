@@ -1,0 +1,147 @@
+{
+    "name": "Improvement",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Runs",
+        "Ai",
+        "Catalog",
+        "Search",
+        "Assistant",
+        "Admin"
+    ],
+    "provider": "ImprovementServiceProvider",
+    "features": [
+        {
+            "name": "daily_review",
+            "default": true
+        },
+        {
+            "name": "auto_synonyms",
+            "default": false
+        }
+    ],
+    "settings": [
+        {
+            "name": "analyst_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "analyst_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "analyst_input_usd_per_million",
+            "type": "float",
+            "default": 2,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "analyst_output_usd_per_million",
+            "type": "float",
+            "default": 10,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "analyst_max_output_tokens",
+            "type": "int",
+            "default": 8000,
+            "min": 1000,
+            "max": 32000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "auditor_provider",
+            "type": "string",
+            "default": "openai",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "auditor_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "auditor_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "auditor_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "auditor_max_output_tokens",
+            "type": "int",
+            "default": 3000,
+            "min": 500,
+            "max": 16000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "max_proposals",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 30,
+            "scope": "shop",
+            "unit": "proposals"
+        },
+        {
+            "name": "evidence_days",
+            "type": "int",
+            "default": 7,
+            "min": 1,
+            "max": 60,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
+            "name": "min_searches",
+            "type": "int",
+            "default": 2,
+            "min": 1,
+            "max": 1000,
+            "scope": "shop",
+            "unit": "times"
+        },
+        {
+            "name": "digest_email",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 200,
+            "scope": "shop"
+        }
+    ]
+}

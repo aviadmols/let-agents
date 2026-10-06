@@ -53,6 +53,7 @@ final class Pipeline
         'nightly' => [
             'analytics.compute_scores' => ['model' => null],
             'analytics.compute_popularity' => ['model' => null],
+            'improvement.daily_review' => ['model' => 'improvement.analyst_model'],
         ],
         'live' => [
             'assistant.answer' => ['model' => 'assistant.answer_model'],
@@ -91,5 +92,6 @@ final class Pipeline
         'retrieval.match_products' => '02:45',
         'analytics.compute_scores' => '04:15',
         'analytics.compute_popularity' => '04:15',
+        'improvement.daily_review' => '04:30',
     ];
 }

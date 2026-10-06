@@ -29,7 +29,7 @@ final class CountSearch
 
         $this->ensure($shopId, $query);
 
-        SearchTerm::query()->where('day', now()->toDateString())->where('query', $query)->incrementEach(
+        SearchTerm::query()->whereDate('day', now()->toDateString())->where('query', $query)->incrementEach(
             ['searches' => 1, 'empty' => $results === 0 ? 1 : 0],
             ['last_results' => max(0, $results), 'updated_at' => now()],
         );
@@ -45,7 +45,7 @@ final class CountSearch
 
         $day = now()->toDateString();
         $this->ensure($shopId, $query);
-        SearchTerm::query()->where('day', $day)->where('query', $query)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
+        SearchTerm::query()->whereDate('day', $day)->where('query', $query)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
 
         SearchClick::query()->insertOrIgnore([
             'id' => (string) Str::ulid(),
@@ -58,7 +58,7 @@ final class CountSearch
             'updated_at' => now(),
         ]);
 
-        SearchClick::query()->where('day', $day)->where('query', $query)->where('item', $item)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
+        SearchClick::query()->whereDate('day', $day)->where('query', $query)->where('item', $item)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
     }
 
     private function query(string $raw): string

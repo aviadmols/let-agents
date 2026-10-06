@@ -76,6 +76,27 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   stages (`BuildPageBank` explain `trace`, read through `Widget\Contracts\ExplainsPages`).
   Runbook: `docs/runbooks/retrieval.md`.
 
+## Search, pictures and the daily review (apps/api, ADR 0008)
+
+- `Search` owns the store's search box. `Support/HebrewSearch.php` and `resources/search/rega-search.js`
+  are one algorithm in two languages; change both or neither, `HebrewSearchTest` runs them on one
+  fixture and requires identical ids in identical order. The index (`search_indexes`) is rebuilt at
+  02:40 and on demand; synonyms are applied at build time, never at query time.
+- `SearchCatalog` merges spelling (exact matches first), meaning (`SemanticSearch::nearText`) and
+  pictures (`picturesNearText`) by reciprocal rank. `CountSearch` counts once per tab; query text
+  only, nothing about the shopper. Day columns: compare with `whereDate` (SQLite stores a time).
+- `QueryVectors` embeds a new wording once per shop and model and adds its cost to one run per shop
+  per day (`retrieval.query_embedder`); the exact total lives in the run's output, the column is
+  rounded from it.
+- Pictures: `ImageEmbedder` / `ImageEmbeddingDriver` in Ai; `GeminiEmbeddings` (plain REST, key in
+  the `x-goog-api-key` header). `BuildImageIndex` embeds each product's main picture once per
+  address. `LookAlike` is a candidate source; `MatchCheck::likeness()` counts looks as similarity.
+  A fingerprint only gains the looks band when the signal exists, so old ones stay stable.
+- `Improvement` runs at 04:30: `Evidence` (code, fixed-length lists, an item is sent once unless it
+  doubled), analyst proposes, code gates, an auditor from another `AiProviderName::family()` checks.
+  Same family stops the review before any call. `Digest` is written in code.
+- Scripted edits from Git Bash: `node -e` and `awk` mangle `\` in PHP namespaces and `\x27`.
+  Use a small PHP script with `str_replace`, or the editor.
 ## Storefront widget and analytics (apps/api)
 
 - `Widget` serves `/api/v1/widget/rega.js` (source: `Widget/resources/widget/rega.js`, plain ES5-ish JS,

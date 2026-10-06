@@ -43,6 +43,7 @@ return [
         'enrichment_compute_relations' => 'חישוב קשרים בין מוצרים',
         'analytics_compute_scores' => 'ציוני התנהגות',
         'analytics_compute_popularity' => 'פופולריות מוצרים',
+        'improvement_daily_review' => 'בדיקה יומית והצעות לאתר',
         'assistant_answer' => 'מענה לשאלת גולש',
         'retrieval_embed_queries' => 'וקטור לחיפוש בניסוח חדש',
         'connections_test' => 'בדיקת חיבור לחנות',
