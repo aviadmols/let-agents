@@ -19,6 +19,7 @@ return [
     'minutes' => ':n דק׳',
     'stages' => [
         'intake' => ['title' => 'כשחנות מתחברת, ובכל סריקה מחדש', 'help' => 'הכל בקוד. אין כאן מודל.'],
+        'retrieval' => ['title' => 'אינדקס והתאמות, כל לילה', 'help' => 'וקטורים רק לטקסט שהשתנה. המודל בוחר מתוך מה שהקוד מצא, והקוד בודק כל בחירה.'],
         'enrichment' => ['title' => 'העשרה — כאן רצים המודלים', 'help' => 'באצווה, אף פעם לא בזמן טעינת עמוד. כל תשובה נבדקת בקוד לפני שנשמרת.'],
         'compute' => ['title' => 'חישוב מסקנות', 'help' => 'רץ אחרי כל שינוי בעובדות. בקוד בלבד.'],
         'nightly' => ['title' => 'כל לילה, לבד', 'help' => 'לפי שעון ישראל.'],
@@ -30,6 +31,8 @@ return [
         'enrichment_read_in_code' => 'קריאת המוצרים בקוד',
         'enrichment_read_promises' => 'מה החנות מבטיחה',
         'enrichment_match_article_products' => 'התאמת מאמרים למוצרים',
+        'retrieval_build_index' => 'בניית האינדקס לפי משמעות',
+        'retrieval_match_products' => 'התאמות בין מוצרים בעזרת מודל',
         'enrichment_import_vocabulary' => 'ייבוא אוצר מילים',
         'enrichment_create_task_file' => 'יצירת קובץ משימות',
         'enrichment_import_results' => 'ייבוא תשובות של סוכן',

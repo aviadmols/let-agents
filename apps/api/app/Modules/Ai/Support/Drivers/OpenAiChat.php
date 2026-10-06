@@ -1,40 +1,30 @@
 <?php
 
-namespace App\Modules\Ai\Support;
+namespace App\Modules\Ai\Support\Drivers;
 
-use App\Modules\Ai\Contracts\ChatModel;
+use App\Modules\Ai\Contracts\ChatDriver;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
-use App\Modules\Ai\Enums\ProviderStatus;
-use App\Modules\Ai\Models\AiProvider;
 use GuzzleHttp\Client;
 use OpenAI;
 use Throwable;
 
-/**
- * Chat completions through openai-php/client with the key saved in the panel, asking for a JSON
- * object. Anthropic calls go through the Batch API elsewhere and are not offered here yet.
- */
-final class SdkChatModel implements ChatModel
+/** Chat completions through openai-php/client, asking for a JSON object. */
+final class OpenAiChat implements ChatDriver
 {
     private const TIMEOUT_SECONDS = 45.0;
 
-    public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    public function provider(): AiProviderName
     {
-        if ($provider !== AiProviderName::OpenAi) {
-            throw new ModelCallFailed(ModelCallFailed::UNSUPPORTED);
-        }
+        return AiProviderName::OpenAi;
+    }
 
-        $key = AiProvider::query()->where('provider', $provider)->where('status', ProviderStatus::Connected)->first()?->api_key;
-
-        if ($key === null || $key === '') {
-            throw new ModelCallFailed(ModelCallFailed::NO_KEY);
-        }
-
+    public function json(string $apiKey, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    {
         try {
             $response = OpenAI::factory()
-                ->withApiKey($key)
+                ->withApiKey($apiKey)
                 ->withHttpClient(new Client(['timeout' => self::TIMEOUT_SECONDS, 'connect_timeout' => 10]))
                 ->make()
                 ->chat()

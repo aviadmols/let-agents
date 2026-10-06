@@ -6,7 +6,7 @@ namespace App\Modules\Runs\Support;
  * The order things happen in, so the panel can draw it.
  *
  * Runs record what ran, not what the shape of the work is. This is that shape, written down once:
- * five stages, each a list of actions in the order they follow one another, and for each action
+ * a few stages, each a list of actions in the order they follow one another, and for each action
  * whether a model is involved and which one. An action nobody has run yet still appears, greyed,
  * which is half the value of the screen.
  *
@@ -33,6 +33,10 @@ final class Pipeline
             'enrichment.read_in_code' => ['model' => null],
             'enrichment.read_promises' => ['model' => null],
             'enrichment.match_article_products' => ['model' => null],
+        ],
+        'retrieval' => [
+            'retrieval.build_index' => ['model' => 'retrieval.embedding_model'],
+            'retrieval.match_products' => ['model' => 'retrieval.match_model'],
         ],
         'enrichment' => [
             'enrichment.import_vocabulary' => ['model' => null],
@@ -78,6 +82,8 @@ final class Pipeline
     /** When the nightly work is due, as the schedule declares it. @return array<string, string> */
     public const CLOCK = [
         'catalog.sync' => '02:30',
+        'retrieval.build_index' => '02:45',
+        'retrieval.match_products' => '02:45',
         'analytics.compute_scores' => '04:15',
         'analytics.compute_popularity' => '04:15',
     ];

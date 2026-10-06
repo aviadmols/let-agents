@@ -4,6 +4,8 @@ namespace App\Modules\Widget;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Widget\Contracts\ExplainsPages;
+use App\Modules\Widget\Support\PageExplainer;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -12,7 +14,7 @@ final class WidgetServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
-        //
+        $this->app->bind(ExplainsPages::class, PageExplainer::class);
     }
 
     protected function bootModule(): void

@@ -9,6 +9,8 @@ const base = process.env.REGA_BASE_URL ?? 'http://127.0.0.1:9400';
 const fixtures = JSON.parse(fs.readFileSync(process.env.REGA_FIXTURES, 'utf8'));
 const token = fixtures.token;
 const P = fixtures.products;
+// The version the plugin declares, so this test does not need editing on every release.
+const pluginVersion = fs.readFileSync(new URL('../../rega.php', import.meta.url), 'utf8').match(/define\( 'REGA_VERSION', '([^']+)' \)/)[1];
 
 // ?rest_route= works with or without pretty permalinks.
 const url = (route, query = {}) => {
@@ -74,7 +76,7 @@ test('status describes the site, WooCommerce and active plugins', async () => {
   assert.equal(headers.get('cache-control'), 'no-store');
 
   const s = body.data;
-  assert.equal(s.plugin.version, '0.2.3');
+  assert.equal(s.plugin.version, pluginVersion);
   assert.equal(s.woocommerce.active, true);
   assert.equal(s.woocommerce.currency, 'ILS');
   assert.ok(s.plugins.some((p) => p.name === 'WooCommerce'));
@@ -299,6 +301,38 @@ test('product pages and shared articles load the widget, with a site key derived
   assert.deepEqual(guide.page, { type: 'content', id: String(fixtures.guide) });
 
   assert.equal(regaContext(await pageHtml({})), null, 'not on the home page');
+});
+
+test('past orders leave the store as summaries only: paid, from the last 24 months, never the customer', () => {
+  const { orders, requests, state, refs } = fixtures.history;
+
+  assert.equal(requests.length, 1, 'one page for a small store');
+  const [request] = requests;
+  assert.match(request.url, /\/api\/v1\/plugin\/[a-f0-9]{24}\/orders\/history$/);
+  assert.ok(request.headers.includes('X-Rega-Signature'), 'signed like every request to Rega');
+
+  const body = request.body;
+  assert.equal(body.first, true);
+  assert.equal(body.last, true);
+  assert.equal(body.expected, 2);
+  assert.deepEqual(body.orders.map((o) => o.order_ref).sort(), [refs.recent, refs.older].sort(), 'paid orders inside the window only');
+
+  for (const order of body.orders) {
+    assert.deepEqual(Object.keys(order).sort(), ['currency', 'items', 'order_ref', 'ordered_at', 'total']);
+    for (const item of order.items) {
+      assert.deepEqual(Object.keys(item).sort(), ['product_id', 'quantity', 'total']);
+    }
+  }
+
+  const text = JSON.stringify(body);
+  for (const secret of ['ישראל', 'buyer@example.com', '0501234567', 'להשאיר ליד הדלת', String(orders.recent)]) {
+    assert.ok(!text.includes(secret), `"${secret}" never leaves the store`);
+  }
+
+  const recent = body.orders.find((o) => o.order_ref === refs.recent);
+  assert.deepEqual(recent.items.map((i) => [i.product_id, i.quantity]), [[String(P.drill), 1], [String(P.bits), 2]]);
+  assert.equal(state.status, 'done');
+  assert.equal(state.sent, 2);
 });
 
 // Last: it locks this address out for ten minutes.

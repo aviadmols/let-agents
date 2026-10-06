@@ -122,6 +122,9 @@ final class BuildPageBank
     /** @var array<string, array<string, array<string, mixed>>> candidate => item id ('' for the section) => why */
     private array $why = [];
 
+    /** @var list<array{stage: string, sections: list<array<string, mixed>>}> the sections after each stage, when explaining */
+    private array $trace = [];
+
     public function __construct(private readonly TenantContext $tenant) {}
 
     /**
@@ -137,6 +140,7 @@ final class BuildPageBank
         $this->categories = null;
         $this->explain = $explain;
         $this->why = [];
+        $this->trace = [];
 
         $bank = [
             'v' => 1,
@@ -172,17 +176,20 @@ final class BuildPageBank
             : [...$this->contentSections($externalId, $pool), null]);
 
         $bank['enabled'] = true;
+        $this->traced('built', $sections);
         $sections = $this->allowed($shopId, $sections);
+        $this->traced('allowed', $sections);
         // The order before anything was learned, and the share of shoppers shown it, so a held-out
         // visitor can be served the untouched arrangement from this same cached bank.
         $bank['baseline_order'] = array_values(array_map(fn (array $s): string => (string) $s['candidate'], $sections));
         $bank['holdout_percent'] = (int) Settings::get('analytics.holdout_percent', $shopId);
-        $bank['sections'] = $this->tenant->run($shopId, fn (): array => $this->curated(
-            $type,
-            $externalId,
-            $this->learned($shopId, $type, $externalId, $sections, $maxProducts),
-            $maxProducts,
-        ));
+        $bank['sections'] = $this->tenant->run($shopId, function () use ($shopId, $type, $externalId, $sections, $maxProducts): array {
+            $learned = $this->learned($shopId, $type, $externalId, $sections, $maxProducts);
+            $this->traced('learned', $learned);
+
+            return $this->curated($type, $externalId, $learned, $maxProducts);
+        });
+        $this->traced('curated', $bank['sections']);
         $bank['bank_version'] = max(1, $version);
         $bank['teaser'] = $bank['sections'] === [] ? null : $this->teaser($bank['sections'][0]);
         $bank['compare'] = $compare;
@@ -213,9 +220,34 @@ final class BuildPageBank
 
         if ($this->explain) {
             $bank['explain'] = $this->why;
+            $bank['trace'] = $this->trace;
         }
 
         return $bank;
+    }
+
+    /**
+     * What the sections looked like after one stage, for the panel's picture of how a page is
+     * put together: built from relations (with spares), allowed by the shop's switches, ordered
+     * and trimmed by what shoppers did, and finally what the store team pinned or hid.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     */
+    private function traced(string $stage, array $sections): void
+    {
+        if (! $this->explain) {
+            return;
+        }
+
+        $this->trace[] = ['stage' => $stage, 'sections' => array_map(fn (array $section): array => [
+            'candidate' => (string) $section['candidate'],
+            'title' => (string) ($section['title'] ?? $section['candidate']),
+            'items' => array_values(array_map(
+                fn (array $item): array => ['id' => (string) ($item['id'] ?? ''), 'title' => (string) ($item['title'] ?? '')],
+                array_filter((array) ($section['products'] ?? $section['guides'] ?? []), 'is_array'),
+            )),
+            'count' => count((array) ($section['products'] ?? $section['guides'] ?? $section['items'] ?? $section['lines'] ?? [])),
+        ], $sections)];
     }
 
     /**

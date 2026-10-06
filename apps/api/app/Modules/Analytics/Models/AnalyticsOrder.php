@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $shop_id
  * @property string $order_ref a hash of the store's order number
+ * @property string $source live (reported at checkout) or history (sent once from past orders)
  * @property string $total
  * @property string $currency
  * @property int $items_count
@@ -23,6 +24,11 @@ use Illuminate\Support\Carbon;
 class AnalyticsOrder extends Model
 {
     use BelongsToTenant;
+
+    public const SOURCE_LIVE = 'live';
+
+    /** Past orders the plugin sent once: no visitor, no attribution, not in the report of what Rega did. */
+    public const SOURCE_HISTORY = 'history';
 
     protected $guarded = ['id'];
 

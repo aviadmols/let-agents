@@ -19,6 +19,7 @@ return [
     'minutes' => ':n min',
     'stages' => [
         'intake' => ['title' => 'When a store connects, and on every re-scan', 'help' => 'All in code. No model here.'],
+        'retrieval' => ['title' => 'Index and matching, every night', 'help' => 'Vectors only for text that changed. The model chooses from what code found, and code checks every choice.'],
         'enrichment' => ['title' => 'Enrichment — where the models run', 'help' => 'In batches, never while a page loads. Every answer is checked in code before it is kept.'],
         'compute' => ['title' => 'Working out the conclusions', 'help' => 'Runs after facts change. Code only.'],
         'nightly' => ['title' => 'Every night, on its own', 'help' => 'Israel time.'],
@@ -27,6 +28,8 @@ return [
     ],
     'actions' => [
         'catalog_sync' => 'Reading the catalog from the plugin',
+        'retrieval_build_index' => 'Building the index by meaning',
+        'retrieval_match_products' => 'Matching products with a model',
         'enrichment_read_in_code' => 'Reading products in code',
         'enrichment_read_promises' => 'What the store promises',
         'enrichment_match_article_products' => 'Matching guides to products',

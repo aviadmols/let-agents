@@ -7,7 +7,8 @@
         "Catalog",
         "Admin",
         "Ai",
-        "Analytics"
+        "Analytics",
+        "Retrieval"
     ],
     "provider": "EnrichmentServiceProvider",
     "features": [

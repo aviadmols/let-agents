@@ -187,6 +187,56 @@ $terms_id = wp_insert_post(
 
 $token = \Rega\Auth\AccessToken::issue();
 
+// Past orders: two paid ones inside the 24 months, one older, and one cancelled. Each carries
+// customer details, which must never reach Rega. The request to Rega is caught here instead of
+// sent, so the smoke test can read exactly what would have left the store.
+// Completing an order would take its products off the shelf, and the feed test checks stock.
+add_filter( 'woocommerce_can_reduce_order_stock', '__return_false' );
+
+$order = static function ( array $lines, string $status, string $when ): int {
+	$order = wc_create_order();
+	foreach ( $lines as $product_id => $quantity ) {
+		$order->add_product( wc_get_product( $product_id ), $quantity );
+	}
+	$order->set_billing_first_name( 'ישראל' );
+	$order->set_billing_email( 'buyer@example.com' );
+	$order->set_billing_phone( '0501234567' );
+	$order->set_customer_note( 'להשאיר ליד הדלת' );
+	$order->calculate_totals();
+	$order->set_status( $status );
+	$order->set_date_created( strtotime( $when ) );
+	$order->save();
+
+	return $order->get_id();
+};
+
+$history_orders = array(
+	'recent'    => $order( array( $drill_id => 1, $bits_id => 2 ), 'completed', '-3 months' ),
+	'older'     => $order( array( $pro_id => 1 ), 'processing', '-20 months' ),
+	'too_old'   => $order( array( $drill_id => 1 ), 'completed', '-30 months' ),
+	'cancelled' => $order( array( $bits_id => 1 ), 'cancelled', '-1 month' ),
+);
+
+$history_requests = array();
+add_filter(
+	'pre_http_request',
+	static function ( $response, $args, $url ) use ( &$history_requests ) {
+		if ( str_contains( $url, '/orders/history' ) ) {
+			$history_requests[] = array( 'url' => $url, 'headers' => array_keys( $args['headers'] ), 'body' => json_decode( $args['body'], true ) );
+
+			return array( 'headers' => array(), 'body' => '{"received":0,"stored":0}', 'response' => array( 'code' => 202, 'message' => 'Accepted' ), 'cookies' => array(), 'filename' => null );
+		}
+
+		return $response;
+	},
+	10,
+	3
+);
+
+\Rega\Storefront\OrderHistory::start();
+\Rega\Storefront\OrderHistory::send_page( 1, 0 );
+$history_state = \Rega\Storefront\OrderHistory::state();
+
 if ( ! is_dir( '/rega-out' ) ) {
 	mkdir( '/rega-out' );
 }
@@ -210,6 +260,15 @@ file_put_contents(
 			'long'        => $long_id,
 			'protected'   => $protected_id,
 			'terms'       => $terms_id,
+			'history'     => array(
+				'orders'   => $history_orders,
+				'requests' => $history_requests,
+				'state'    => $history_state,
+				'refs'     => array_map(
+					static fn ( int $id ): string => hash_hmac( 'sha256', 'order|' . $id, (string) \Rega\Storefront\SiteKeys::preview() ),
+					$history_orders
+				),
+			),
 			'woocommerce' => WC()->version,
 			'wordpress'   => get_bloginfo( 'version' ),
 			'php'         => PHP_VERSION,

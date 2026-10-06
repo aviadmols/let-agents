@@ -6,6 +6,7 @@ use Rega\Auth\AccessToken;
 use Rega\Auth\TokenGuard;
 use Rega\Plugin;
 use Rega\Settings;
+use Rega\Storefront\OrderHistory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,6 +30,7 @@ final class SettingsPage {
 		add_action( 'admin_post_rega_revoke_token', array( self::class, 'revoke_token' ) );
 		add_action( 'admin_post_rega_save_settings', array( self::class, 'save_settings' ) );
 		add_action( 'admin_post_rega_save_widget', array( self::class, 'save_widget' ) );
+		add_action( 'admin_post_rega_send_order_history', array( self::class, 'send_order_history' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( REGA_FILE ), array( self::class, 'action_links' ) );
 		add_action( 'admin_notices', array( self::class, 'woocommerce_missing_notice' ) );
 	}
@@ -95,6 +97,15 @@ final class SettingsPage {
 		Settings::save_widget_mode( isset( $_POST['widget_mode'] ) ? sanitize_key( wp_unslash( $_POST['widget_mode'] ) ) : 'preview' );
 
 		wp_safe_redirect( self::url( array( 'rega_notice' => 'saved' ) ) );
+		exit;
+	}
+
+	public static function send_order_history(): void {
+		self::authorize( 'rega_send_order_history' );
+
+		$started = OrderHistory::start();
+
+		wp_safe_redirect( self::url( array( 'rega_notice' => $started ? 'history' : 'history_unavailable' ) ) );
 		exit;
 	}
 
@@ -226,6 +237,36 @@ final class SettingsPage {
 				<?php submit_button( __( 'Save', 'rega' ) ); ?>
 			</form>
 
+			<h2><?php esc_html_e( 'Past orders', 'rega' ); ?></h2>
+			<p><?php esc_html_e( 'So Rega can learn what sells together from before it was installed, the store sends it its paid orders from the last 24 months, once. Only order totals, product IDs and quantities: never the customer.', 'rega' ); ?></p>
+			<?php
+			$history  = OrderHistory::state();
+			$statuses = array(
+				'not_started' => __( 'Not sent yet. It starts by itself once the store is connected.', 'rega' ),
+				'running'     => __( 'Sending in the background.', 'rega' ),
+				'done'        => __( 'Sent.', 'rega' ),
+				'failed'      => __( 'Rega could not be reached. Try again later.', 'rega' ),
+			);
+			?>
+			<p>
+				<strong><?php echo esc_html( $statuses[ $history['status'] ] ?? $history['status'] ); ?></strong>
+				<?php if ( 'not_started' !== $history['status'] ) : ?>
+					<?php
+					printf(
+						/* translators: 1: orders sent, 2: orders found */
+						esc_html__( '%1$d of %2$d orders sent.', 'rega' ),
+						(int) $history['sent'],
+						(int) $history['expected']
+					);
+					?>
+				<?php endif; ?>
+			</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="rega_send_order_history" />
+				<?php wp_nonce_field( 'rega_send_order_history' ); ?>
+				<?php submit_button( __( 'Send past orders again', 'rega' ), 'secondary', 'submit', false ); ?>
+			</form>
+
 			<h2><?php esc_html_e( 'Content Rega may read', 'rega' ); ?></h2>
 			<p><?php esc_html_e( 'Guides and articles Rega can show as related reading. Only published entries without a password are shared.', 'rega' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -260,6 +301,8 @@ final class SettingsPage {
 		$messages = array(
 			'revoked' => array( 'warning', __( 'The token was revoked. Rega can no longer read this store.', 'rega' ) ),
 			'saved'   => array( 'success', __( 'Settings saved.', 'rega' ) ),
+			'history' => array( 'success', __( 'Sending past orders to Rega. It runs in the background and can take a while in a large store.', 'rega' ) ),
+			'history_unavailable' => array( 'warning', __( 'Past orders can be sent only when the store is connected to Rega and the widget is not off.', 'rega' ) ),
 		);
 
 		if ( 'generated' === $notice && ! $token_shown ) {

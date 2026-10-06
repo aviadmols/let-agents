@@ -40,7 +40,9 @@ final class BuildShopReport
 
         return $this->tenant->run($shopId, function () use ($days, $since, $until): array {
             $events = fn (): Builder => AnalyticsEvent::query()->whereBetween('occurred_at', [$since, $until]);
-            $orders = fn (): Builder => AnalyticsOrder::query()->whereBetween('ordered_at', [$since, $until]);
+            // Past orders sent once from the store's history are for learning what sells together,
+            // not for a report of what Rega did: Rega was not there when they were placed.
+            $orders = fn (): Builder => AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->whereBetween('ordered_at', [$since, $until]);
 
             $counts = $events()->select('type', DB::raw('count(*) as n'))->groupBy('type')->pluck('n', 'type');
             $widgetAdds = $events()->where('type', 'add_to_cart')->where('source', 'widget')->where('result', 'added')->count();

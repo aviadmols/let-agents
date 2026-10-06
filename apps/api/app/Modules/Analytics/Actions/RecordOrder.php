@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Validator;
  *
  * Both within the shop's attribution window. The order carries no customer data: a hashed
  * order number, totals, product IDs and quantities, and the anonymous visitor ID.
+ *
+ * A past order ($history) is stored as it is, with no visitor and nothing attributed: Rega was
+ * not there when it was placed. It is what purchases are learned from.
  */
 final class RecordOrder
 {
@@ -27,8 +30,12 @@ final class RecordOrder
      * @param  array<string, mixed>  $payload
      * @return array{stored: bool, problems: list<string>, assisted?: bool}
      */
-    public function handle(StoreConnection $connection, array $payload): array
+    public function handle(StoreConnection $connection, array $payload, bool $history = false): array
     {
+        if ($history) {
+            unset($payload['vid']);
+        }
+
         $validator = Validator::make($payload, [
             'order_ref' => ['required', 'string', 'regex:/^[a-f0-9]{16,64}$/'],
             'total' => ['required', 'numeric', 'min:0', 'max:10000000'],
@@ -47,7 +54,7 @@ final class RecordOrder
 
         $shopId = $connection->shop_id;
 
-        return $this->tenant->run($shopId, function () use ($payload, $shopId): array {
+        return $this->tenant->run($shopId, function () use ($payload, $shopId, $history): array {
             $orderedAt = Carbon::createFromTimestamp((int) $payload['ordered_at']);
             $visitor = isset($payload['vid']) ? RecordBeacon::visitorHash($shopId, (string) $payload['vid']) : null;
             $windowStart = $orderedAt->copy()->subDays((int) Settings::get('analytics.attribution_days', $shopId));
@@ -77,6 +84,7 @@ final class RecordOrder
             $order = AnalyticsOrder::query()->firstOrCreate(
                 ['shop_id' => $shopId, 'order_ref' => $payload['order_ref']],
                 [
+                    'source' => $history ? AnalyticsOrder::SOURCE_HISTORY : AnalyticsOrder::SOURCE_LIVE,
                     'total' => round((float) $payload['total'], 2),
                     'currency' => strtoupper((string) $payload['currency']),
                     'items_count' => array_sum(array_column($payload['items'], 'quantity')),

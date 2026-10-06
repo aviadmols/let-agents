@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsOrder;
+use App\Modules\Analytics\Models\AnalyticsOrderImport;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -128,6 +129,45 @@ final class AnalyticsFlowTest extends TestCase
         $this->signed('POST', "/api/v1/plugin/{$this->site}/orders", json_encode($order), signature: str_repeat('0', 64))->assertStatus(401);
         $this->signed('POST', "/api/v1/plugin/{$this->site}/orders", json_encode($order), timestamp: (string) (time() - 3600))->assertStatus(401);
         $this->signed('POST', "/api/v1/plugin/{$this->site}/orders", json_encode(['order_ref' => 'Robert Smith'] + $order))->assertStatus(422);
+    }
+
+    public function test_past_orders_arrive_in_pages_without_a_visitor_and_stay_out_of_the_report(): void
+    {
+        $order = fn (int $n, int $at, array $extra = []): array => $extra + [
+            'order_ref' => hash('sha256', "order-{$n}"),
+            'total' => 100,
+            'currency' => 'ILS',
+            'ordered_at' => $at,
+            'vid' => self::VID,
+            'items' => [['product_id' => '10', 'quantity' => 1, 'total' => 60], ['product_id' => '55', 'quantity' => 2, 'total' => 40]],
+        ];
+        $old = now()->subMonths(14)->getTimestamp();
+        $recent = now()->subDays(2)->getTimestamp();
+
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode([
+            'first' => true, 'expected' => 3, 'orders' => [$order(1, $old), $order(2, $recent)],
+        ]))->assertStatus(202)->assertJson(['received' => 2, 'stored' => 2]);
+
+        // The last page, with one order sent again and one the validation refuses.
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode([
+            'last' => true, 'orders' => [$order(2, $recent), $order(3, $recent, ['currency' => 'shekels'])],
+        ]))->assertStatus(202)->assertJson(['received' => 2, 'stored' => 0]);
+
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode(['orders' => [$order(4, $recent)]]), signature: str_repeat('0', 64))->assertStatus(401);
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode(['orders' => array_fill(0, 101, $order(5, $recent))]))->assertStatus(422);
+
+        [$orders, $import] = app(TenantContext::class)->run($this->shop->id, fn () => [AnalyticsOrder::query()->get(), AnalyticsOrderImport::query()->sole()]);
+
+        $this->assertCount(2, $orders);
+        $this->assertSame([AnalyticsOrder::SOURCE_HISTORY], $orders->pluck('source')->unique()->values()->all());
+        $this->assertSame([null], $orders->pluck('visitor_hash')->unique()->values()->all());
+        $this->assertFalse($orders->contains('assisted', true));
+        $this->assertSame([3, 4, 2, 1], [$import->expected, $import->received, $import->stored, $import->refused]);
+        $this->assertNotNull($import->finished_at);
+        $this->assertSame(date('Y-m', $old), $import->oldest_ordered_at->format('Y-m'));
+
+        $report = $this->signed('GET', "/api/v1/plugin/{$this->site}/reports?days=7", '')->assertOk()->json('data');
+        $this->assertSame(0, $report['totals']['orders']);
     }
 
     public function test_the_plugin_and_the_operator_see_the_same_report(): void

@@ -56,6 +56,26 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - Hebrew text: never `trim($s, '•…')` with multibyte characters (PHP trims bytes and cuts letters);
   use a `/u` regex. Hebrew final letters (ן ם ך ף ץ) differ from their regular forms in patterns.
 
+## Index and matching (apps/api, ADR 0007)
+
+- `Retrieval` builds a per-shop index by meaning (`retrieval_chunks`, pgvector on Postgres, JSON
+  text compared in PHP on SQLite) from every `DocumentSource` tagged `retrieval.sources`: products,
+  pages and posts, and per-product purchase documents. Text is built in code, price and stock left
+  out; only changed pieces are embedded. A vector keeps its model name and is never compared with
+  another model's. `SemanticSearch::similarTo()` compares stored vectors, no model call.
+- `MatchProducts`: every `CandidateSource` tagged `retrieval.candidates` offers in-stock products
+  (bought together with lift, similar vectors, named together in guides), the model picks by ref,
+  `MatchCheck` accepts or refuses. Accepted picks reach `ComputeProductRelations` as source
+  `ai_match`. The request fingerprint bands the evidence so a new order does not re-ask the shop.
+  Matching stops at `retrieval.match_max_share_of_cap` of the monthly AI cap.
+- Providers are drivers: `Ai\Contracts\ChatDriver` / `EmbeddingDriver`, listed in
+  `AiServiceProvider`. Callers name a provider and model from settings, never in code.
+- Past orders: plugin 0.4.0 sends 24 months once (`orders/history`); they are stored with
+  `source = history`, no attribution, and `BuildShopReport` leaves them out.
+- The operator page "System map" (Knowledge) draws the index, the matching and one product page's
+  stages (`BuildPageBank` explain `trace`, read through `Widget\Contracts\ExplainsPages`).
+  Runbook: `docs/runbooks/retrieval.md`.
+
 ## Storefront widget and analytics (apps/api)
 
 - `Widget` serves `/api/v1/widget/rega.js` (source: `Widget/resources/widget/rega.js`, plain ES5-ish JS,

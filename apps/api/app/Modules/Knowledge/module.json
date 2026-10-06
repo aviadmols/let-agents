@@ -9,7 +9,9 @@
         "Analytics",
         "Widget",
         "Assistant",
-        "Admin"
+        "Admin",
+        "Retrieval",
+        "Ai"
     ],
     "provider": "KnowledgeServiceProvider",
     "features": [

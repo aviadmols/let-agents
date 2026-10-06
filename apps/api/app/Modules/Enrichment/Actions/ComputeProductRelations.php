@@ -15,6 +15,9 @@ use App\Modules\Enrichment\Models\EnrichmentProductRelation;
 use App\Modules\Enrichment\Models\EnrichmentRelationRules;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Relations\RelationRuleSet;
+use App\Modules\Retrieval\Enums\MatchKind;
+use App\Modules\Retrieval\Enums\MatchStatus;
+use App\Modules\Retrieval\Models\RetrievalMatch;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Models\Run;
@@ -31,6 +34,8 @@ use Illuminate\Support\Str;
  *                oil for wood meant for outdoor jobs)
  *   family       the same product in other sizes (see ProductFamily)
  *   alternative  the same product type and power source, at a similar price
+ *   both         what the matching model chose from code's candidates and code accepted
+ *                (Retrieval), with the model's few words of why
  *
  * Stock is checked here and again, live, in the widget.
  */
@@ -69,6 +74,12 @@ final class ComputeProductRelations
 
     /** An order with more lines than this is a restock, not a decision about what goes together. */
     private const TOGETHER_MAX_LINES = 12;
+
+    /** Below the merchant's cross-sells (150) and what was bought together (200), above the rules (100). */
+    private const MODEL_COMPLEMENT_SCORE = 120;
+
+    /** Between a shared vocabulary type (100) and a shared store category (80). */
+    private const MODEL_ALTERNATIVE_SCORE = 95;
 
     /** @var array<string, array<string, mixed>> key "product|related|kind" => row */
     private array $rows = [];
@@ -129,6 +140,11 @@ final class ComputeProductRelations
         // 2b. What shoppers actually bought together. Evidence rather than anybody's opinion,
         // so it outranks both the merchant's pairings and the rules.
         $ruleStats['bought_together'] = $this->applyBoughtTogether($shopId, $byExternal);
+
+        // 2c. What the matching model chose from code's candidates, after code checked every pick
+        // (Retrieval). A judgement on evidence, so below the evidence itself and the merchant's
+        // own pairings, above the rules' general patterns.
+        $ruleStats['ai_match'] = $this->applyModelMatches($products->keyBy('id'));
 
         // 3. The shop's rules.
         $rules = EnrichmentRelationRules::query()->where('active', true)->orderByDesc('version')->first();
@@ -513,6 +529,45 @@ final class ComputeProductRelations
         }
 
         return ['orders' => $orders, 'pairs' => count($pairs), 'written' => $written];
+    }
+
+    /**
+     * Picks the matching model made and code accepted. Stock is checked again here: a match
+     * accepted last night may be sold out tonight.
+     *
+     * @param  Collection<string, CatalogProduct>  $byId
+     * @return array<string, int>
+     */
+    private function applyModelMatches(Collection $byId): array
+    {
+        $written = ['complement' => 0, 'alternative' => 0];
+
+        $matches = RetrievalMatch::query()
+            ->where('status', MatchStatus::Accepted)
+            ->whereNotNull('related_product_id')
+            ->orderBy('product_id')->orderBy('kind')->orderBy('position')
+            ->get(['product_id', 'related_product_id', 'kind', 'position', 'reason', 'signals']);
+
+        foreach ($matches as $match) {
+            $related = $byId->get($match->related_product_id);
+
+            if (! $byId->has($match->product_id) || $related === null || ! $related->in_stock || ! $related->purchasable) {
+                continue;
+            }
+
+            $complement = $match->kind === MatchKind::Complement;
+            $this->add(
+                $match->product_id,
+                $related->id,
+                $complement ? RelationKind::Complement : RelationKind::Alternative,
+                'ai_match',
+                ($complement ? self::MODEL_COMPLEMENT_SCORE : self::MODEL_ALTERNATIVE_SCORE) - $match->position,
+                array_filter(['ai_match' => $match->reason ?? '', 'evidence' => $match->signals]),
+            );
+            $written[$match->kind->value]++;
+        }
+
+        return $written;
     }
 
     private function applyCategoryAffinity(Collection $products, array $profiles, array $rules): array

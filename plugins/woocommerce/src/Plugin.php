@@ -6,6 +6,7 @@ use Rega\Admin\ReportsPage;
 use Rega\Admin\SettingsPage;
 use Rega\Rest\Routes;
 use Rega\Storefront\CallToAction;
+use Rega\Storefront\OrderHistory;
 use Rega\Storefront\OrderReporter;
 use Rega\Storefront\Widget;
 
@@ -24,6 +25,8 @@ final class Plugin {
 		Widget::register();
 		CallToAction::register();
 		OrderReporter::register();
+		// Outside is_admin(): its pages are sent by Action Scheduler, which also runs from cron.
+		OrderHistory::register();
 
 		if ( is_admin() ) {
 			SettingsPage::register();
