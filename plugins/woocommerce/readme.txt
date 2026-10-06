@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,9 @@ WooCommerce > Rega reports shows page views, visitors, hot pages, hot display mo
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.5.0 =
+* Rega search in the store's own search box, on every page: suggestions while typing that forgive spelling mistakes, plural and singular, and a keyboard left in English; results grouped into products, guides and categories, with live prices and add to cart. When the store keeps its own results page, that page lists the same results in the same order. Off until turned on under WooCommerce > Rega; preview first shows it to the store team only. If Rega does not answer, the store's own search runs as before.
 
 = 0.4.0 =
 * Past orders: the store sends Rega its paid orders from the last 24 months once, in the background, so Rega can learn what sells together from before it was installed. The same order summary as at checkout: totals, product IDs and quantities, never the customer. WooCommerce > Rega shows how far it has got and can send them again.

@@ -1,0 +1,68 @@
+<?php
+
+namespace App\Modules\Search\Http\Controllers;
+
+use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Search\Http\StorefrontSite;
+use App\Modules\Search\Models\SearchIndex;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+
+/**
+ * GET /api/v1/search/{site}/index?locale=he
+ *
+ * Everything the search box needs to suggest as the shopper types, with no call per keystroke:
+ * the shop's records (titles and their extra words, links and pictures), the shop's settings,
+ * and the labels in the page's language. Public data, cached by version.
+ */
+final class SearchIndexController
+{
+    public function __invoke(Request $request, TenantContext $tenant, string $site): JsonResponse|Response
+    {
+        $connection = StorefrontSite::resolve($request, $site);
+
+        if ($connection instanceof JsonResponse) {
+            return $connection;
+        }
+
+        $shopId = $connection->shop_id;
+        $locale = in_array($request->query('locale'), ['he', 'en'], true) ? (string) $request->query('locale') : 'he';
+
+        if (! Features::enabled('search.storefront', $shopId)) {
+            return response()->json(['enabled' => false])->header('Cache-Control', 'public, max-age=300');
+        }
+
+        $index = $tenant->run($shopId, fn () => SearchIndex::query()->where('shop_id', $shopId)->first(['hash', 'items']));
+
+        if ($index === null) {
+            return response()->json(['enabled' => false, 'reason' => 'not_built'])->header('Cache-Control', 'public, max-age=60');
+        }
+
+        $config = [
+            'selector' => (string) Settings::get('search.input_selector', $shopId),
+            'results' => (string) Settings::get('search.results', $shopId),
+            'suggestions' => (int) Settings::get('search.suggestions', $shopId),
+            'perGroup' => (int) Settings::get('search.results_per_group', $shopId),
+        ];
+        $labels = trans('search::storefront', [], $locale);
+        $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';
+        $headers = ['ETag' => $etag, 'Cache-Control' => 'public, max-age=300'];
+
+        if ($request->header('If-None-Match') === $etag) {
+            return response('', 304, $headers);
+        }
+
+        $data = json_decode((string) $index->items, true);
+
+        return response()->json([
+            'enabled' => true,
+            'hash' => $index->hash,
+            'config' => $config,
+            'labels' => $labels,
+            'items' => $data['items'] ?? [],
+        ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}

@@ -33,6 +33,22 @@ final class Settings {
 		update_option( self::OPTION, $stored, false );
 	}
 
+	/** Whether Rega search runs in the store's search box, and for whom. Off until the store turns it on. */
+	public static function search_mode(): string {
+		$stored = get_option( self::OPTION, array() );
+		$mode   = is_array( $stored ) && isset( $stored['search_mode'] ) ? (string) $stored['search_mode'] : 'off';
+
+		return in_array( $mode, self::MODES, true ) ? $mode : 'off';
+	}
+
+	public static function save_search_mode( string $mode ): void {
+		$stored                = get_option( self::OPTION, array() );
+		$stored                = is_array( $stored ) ? $stored : array();
+		$stored['search_mode'] = in_array( $mode, self::MODES, true ) ? $mode : 'off';
+
+		update_option( self::OPTION, $stored, false );
+	}
+
 	/** Base URL of the Rega API, without a trailing slash. HTTPS only, except on this machine. */
 	public static function api_url(): string {
 		$url = defined( 'REGA_API_URL' ) ? (string) constant( 'REGA_API_URL' ) : self::DEFAULT_API_URL;

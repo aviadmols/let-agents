@@ -36,6 +36,27 @@ final class VectorSearch implements SemanticSearch
             return [];
         }
 
+        return $this->nearest($vector, $model, $sources, $limit, $source, $sourceId);
+    }
+
+    public function nearText(string $shopId, string $text, array $sources, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $vector = app(QueryVectors::class)->for($shopId, $text);
+
+        return $vector === null ? [] : $this->nearest($vector, ModelChoice::for('embedding')->model, $sources, $limit);
+    }
+
+    /**
+     * @param  list<float>  $vector
+     * @param  list<string>  $sources
+     * @return list<array{source: string, source_id: string, external_id: string|null, title: string, similarity: float}>
+     */
+    private function nearest(array $vector, string $model, array $sources, int $limit, ?string $source = null, ?string $sourceId = null): array
+    {
         $rows = DB::connection()->getDriverName() === 'pgsql'
             ? $this->nearestInPostgres($vector, $model, $sources, $source, $sourceId, $limit * self::OVERFETCH)
             : $this->nearestInPhp($vector, $model, $sources, $source, $sourceId);
@@ -95,7 +116,7 @@ final class VectorSearch implements SemanticSearch
      * @param  list<string>  $sources
      * @return list<array{source: string, source_id: string, external_id: string|null, title: string, similarity: float}>
      */
-    private function nearestInPostgres(array $vector, string $model, array $sources, string $source, string $sourceId, int $take): array
+    private function nearestInPostgres(array $vector, string $model, array $sources, ?string $source, ?string $sourceId, int $take): array
     {
         $literal = self::literal($vector);
 
@@ -105,7 +126,7 @@ final class VectorSearch implements SemanticSearch
             ->where('embedding_model', $model)
             ->whereNotNull('embedding')
             ->whereIn('source', $sources)
-            ->where(fn ($q) => $q->where('source', '!=', $source)->orWhere('source_id', '!=', $sourceId))
+            ->when($source !== null, fn ($query) => $query->where(fn ($q) => $q->where('source', '!=', $source)->orWhere('source_id', '!=', $sourceId)))
             ->orderByRaw('embedding <=> ?::vector', [$literal])
             ->limit($take)
             ->get()
@@ -124,7 +145,7 @@ final class VectorSearch implements SemanticSearch
      * @param  list<string>  $sources
      * @return list<array{source: string, source_id: string, external_id: string|null, title: string, similarity: float}>
      */
-    private function nearestInPhp(array $vector, string $model, array $sources, string $source, string $sourceId): array
+    private function nearestInPhp(array $vector, string $model, array $sources, ?string $source, ?string $sourceId): array
     {
         $seed = self::normalize($vector);
         $rows = [];

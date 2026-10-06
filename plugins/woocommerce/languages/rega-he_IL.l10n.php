@@ -110,5 +110,10 @@ return array(
 		'Send past orders again' => 'שליחה מחדש של הזמנות העבר',
 		'Sending past orders to Rega. It runs in the background and can take a while in a large store.' => 'הזמנות העבר נשלחות ל־Rega. זה רץ ברקע, ובחנות גדולה זה יכול לקחת זמן.',
 		'Past orders can be sent only when the store is connected to Rega and the widget is not off.' => 'אפשר לשלוח הזמנות עבר רק כשהחנות מחוברת ל־Rega והרכיב לא כבוי.',
+		'Search on the store' => 'החיפוש באתר',
+		'Rega search in the store\'s own search box: suggestions while typing that forgive spelling mistakes, and results grouped into products, guides and categories. Which search fields it attaches to is set in Rega. If Rega does not answer, the store\'s own search runs as before.' => 'החיפוש של Rega בתיבת החיפוש של האתר: הצעות בזמן ההקלדה שסולחות לשגיאות כתיב, ותוצאות מקובצות למוצרים, מדריכים וקטגוריות. לאילו שדות חיפוש הוא מתחבר נקבע ב־Rega. אם Rega לא עונה, החיפוש הרגיל של האתר עובד כמו קודם.',
+		'The store\'s search stays as it is.' => 'החיפוש של האתר נשאר כמו שהוא.',
+		'Only the store team sees Rega search: managers logged in to WordPress, or a browser that opened a preview link from Rega.' => 'רק צוות החנות רואה את החיפוש של Rega: מנהלים שמחוברים ל־WordPress, או דפדפן שנפתח בו קישור תצוגה מקדימה מ־Rega.',
+		'Every visitor searches with Rega.' => 'כל הגולשים מחפשים עם Rega.',
 	),
 );

@@ -1,0 +1,106 @@
+{
+    "name": "Search",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Runs",
+        "Ai",
+        "Connections",
+        "Catalog",
+        "Retrieval",
+        "Admin"
+    ],
+    "provider": "SearchServiceProvider",
+    "features": [
+        {
+            "name": "storefront",
+            "default": true
+        },
+        {
+            "name": "semantic",
+            "default": true
+        }
+    ],
+    "settings": [
+        {
+            "name": "input_selector",
+            "type": "string",
+            "default": "input[name=\"s\"], input[type=\"search\"]",
+            "min": 1,
+            "max": 300,
+            "scope": "shop"
+        },
+        {
+            "name": "results",
+            "type": "enum",
+            "options": [
+                "panel",
+                "page"
+            ],
+            "default": "panel",
+            "scope": "shop"
+        },
+        {
+            "name": "suggestions",
+            "type": "int",
+            "default": 6,
+            "min": 1,
+            "max": 12,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "results_per_group",
+            "type": "int",
+            "default": 12,
+            "min": 1,
+            "max": 48,
+            "scope": "shop",
+            "unit": "results"
+        },
+        {
+            "name": "semantic_results",
+            "type": "int",
+            "default": 24,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "results"
+        },
+        {
+            "name": "semantic_min_similarity",
+            "type": "float",
+            "default": 0.3,
+            "min": 0,
+            "max": 1,
+            "scope": "global"
+        },
+        {
+            "name": "semantic_min_chars",
+            "type": "int",
+            "default": 3,
+            "min": 1,
+            "max": 50,
+            "scope": "global",
+            "unit": "characters"
+        },
+        {
+            "name": "requests_per_minute",
+            "type": "int",
+            "default": 120,
+            "min": 10,
+            "max": 5000,
+            "scope": "global",
+            "unit": "requests"
+        },
+        {
+            "name": "keep_days",
+            "type": "int",
+            "default": 365,
+            "min": 30,
+            "max": 1095,
+            "scope": "global",
+            "unit": "days"
+        }
+    ]
+}

@@ -23,6 +23,7 @@ final class Plugin {
 		add_action( 'rest_api_init', array( Routes::class, 'register' ) );
 
 		Widget::register();
+		Search::register();
 		CallToAction::register();
 		OrderReporter::register();
 		// Outside is_admin(): its pages are sent by Action Scheduler, which also runs from cron.

@@ -44,9 +44,10 @@ final class RegaApi {
 
 	/**
 	 * @param array<string, scalar> $query
+	 * @param int                   $timeout seconds; the storefront waits two at most, the admin fifteen
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public static function get( string $route, array $query = array() ) {
+	public static function get( string $route, array $query = array(), int $timeout = 15 ) {
 		$site = SiteKeys::site();
 
 		if ( null === $site ) {
@@ -57,7 +58,7 @@ final class RegaApi {
 		$response = wp_remote_get(
 			$url,
 			array(
-				'timeout' => 15,
+				'timeout' => $timeout,
 				'headers' => array( 'Accept' => 'application/json' ) + SiteKeys::signed_headers( 'GET', self::path( $url ), '' ),
 			)
 		);

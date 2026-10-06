@@ -1,0 +1,172 @@
+<?php
+
+namespace App\Modules\Search\Actions;
+
+use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Search\Support\HebrewSearch;
+use App\Modules\Search\Support\LoadedIndex;
+
+/**
+ * One search in a shop: by spelling and by meaning, merged, grouped by what was found.
+ *
+ *   1. spelling   HebrewSearch over the nightly index: typos, plural and singular, full and
+ *                 defective spelling, an English keyboard. No model, a few milliseconds.
+ *   2. meaning    Retrieval's index by meaning, for words that say what the shopper wants
+ *                 rather than what the product is called ("משהו לחבר קרשים"). One small
+ *                 embedding per new wording, kept, so a repeated query costs nothing.
+ *   3. merge      records that hold every word as typed come first, in spelling order; the
+ *                 rest are merged by reciprocal rank, so a record both ways found rises.
+ *   4. group      products (what was in stock last night first), guides and pages, categories.
+ *   5. count      the query, normalized, is counted for the day, with how many results it had.
+ *
+ * Nothing about the shopper is kept.
+ */
+final class SearchCatalog
+{
+    public const GROUPS = ['product', 'content', 'category'];
+
+    /** Reciprocal rank constant: how much a lower rank still counts. */
+    private const RRF_K = 60;
+
+    public function __construct(
+        private readonly TenantContext $tenant,
+        private readonly SemanticSearch $semantic,
+        private readonly CountSearch $counter,
+    ) {}
+
+    /**
+     * @param  list<string>|null  $only  groups to return; null for all
+     * @return array{query: string, total: int, semantic: bool, groups: array<string, list<array<string, mixed>>>, counts: array<string, int>}
+     */
+    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null): array
+    {
+        return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup): array {
+            $query = HebrewSearch::normalize(mb_substr($raw, 0, 120));
+            $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
+            $index = $query === '' ? null : LoadedIndex::for($shopId);
+
+            if ($index === null) {
+                return $empty;
+            }
+
+            $spelling = HebrewSearch::search($index['engine'], $query);
+            $meaning = $this->meaning($shopId, $query, $index['records']);
+            $ranked = $this->merge($spelling, $meaning);
+            $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
+
+            $groups = array_fill_keys(self::GROUPS, []);
+
+            foreach ($ranked as $id) {
+                $record = $index['records'][$id] ?? null;
+                $type = $record['t'] ?? null;
+
+                if ($record !== null && isset($groups[$type])) {
+                    $groups[$type][] = $record;
+                }
+            }
+
+            // What was in stock last night ahead of what was not, otherwise in rank order.
+            $groups['product'] = array_merge(
+                array_values(array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) === 1)),
+                array_values(array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) !== 1)),
+            );
+
+            $counts = array_map('count', $groups);
+            $total = array_sum($counts);
+
+            if ($count) {
+                $this->counter->search($shopId, $query, $total);
+            }
+
+            foreach ($groups as $type => $records) {
+                $groups[$type] = $only === null || in_array($type, $only, true)
+                    ? array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $perGroup))
+                    : [];
+            }
+
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [], 'groups' => $groups, 'counts' => $counts];
+        });
+    }
+
+    /**
+     * Record ids found by meaning, nearest first.
+     *
+     * @param  array<string, array<string, mixed>>  $records
+     * @return list<string>
+     */
+    private function meaning(string $shopId, string $query, array $records): array
+    {
+        if (! Features::enabled('search.semantic', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
+            return [];
+        }
+
+        $limit = (int) Settings::get('search.semantic_results');
+        $floor = (float) Settings::get('search.semantic_min_similarity');
+        $ids = [];
+
+        foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {
+            $id = ($hit['source'] === 'product' ? 'p:' : 'c:').$hit['external_id'];
+
+            if ($hit['similarity'] >= $floor && isset($records[$id])) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  list<array{id: string, title: string, score: float, exact: bool}>  $spelling
+     * @param  list<string>  $meaning
+     * @return list<string>
+     */
+    private function merge(array $spelling, array $meaning): array
+    {
+        $exact = [];
+        $scores = [];
+
+        foreach ($spelling as $rank => $hit) {
+            if ($hit['exact']) {
+                $exact[] = $hit['id'];
+
+                continue;
+            }
+
+            $scores[$hit['id']] = ($scores[$hit['id']] ?? 0) + 1 / (self::RRF_K + $rank);
+        }
+
+        foreach ($meaning as $rank => $id) {
+            if (! in_array($id, $exact, true)) {
+                $scores[$id] = ($scores[$id] ?? 0) + 1 / (self::RRF_K + $rank);
+            }
+        }
+
+        arsort($scores);
+
+        return array_values(array_unique([...$exact, ...array_map('strval', array_keys($scores))]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function present(array $record): array
+    {
+        [$prefix, $externalId] = explode(':', (string) $record['id'], 2);
+
+        return array_filter([
+            'id' => $record['id'],
+            'type' => $record['t'],
+            'external_id' => $externalId,
+            'title' => $record['title'],
+            'url' => $record['url'] ?? null,
+            'image' => $record['img'] ?? null,
+            'kind' => $record['kind'] ?? null,
+            'products' => $record['n'] ?? null,
+            'buy' => isset($record['buy']) ? $record['buy'] === 1 : null,
+        ], fn ($value): bool => $value !== null);
+    }
+}

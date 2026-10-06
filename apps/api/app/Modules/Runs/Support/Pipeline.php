@@ -30,6 +30,7 @@ final class Pipeline
     public const STAGES = [
         'intake' => [
             'catalog.sync' => ['model' => null],
+            'search.build_index' => ['model' => null],
             'enrichment.read_in_code' => ['model' => null],
             'enrichment.read_promises' => ['model' => null],
             'enrichment.match_article_products' => ['model' => null],
@@ -54,6 +55,7 @@ final class Pipeline
         ],
         'live' => [
             'assistant.answer' => ['model' => 'assistant.answer_model'],
+            'retrieval.embed_queries' => ['model' => 'retrieval.embedding_model'],
         ],
         'checks' => [
             'connections.test' => ['model' => null],
@@ -82,6 +84,7 @@ final class Pipeline
     /** When the nightly work is due, as the schedule declares it. @return array<string, string> */
     public const CLOCK = [
         'catalog.sync' => '02:30',
+        'search.build_index' => '02:40',
         'retrieval.build_index' => '02:45',
         'retrieval.match_products' => '02:45',
         'analytics.compute_scores' => '04:15',

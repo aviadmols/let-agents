@@ -30,6 +30,7 @@ final class SettingsPage {
 		add_action( 'admin_post_rega_revoke_token', array( self::class, 'revoke_token' ) );
 		add_action( 'admin_post_rega_save_settings', array( self::class, 'save_settings' ) );
 		add_action( 'admin_post_rega_save_widget', array( self::class, 'save_widget' ) );
+		add_action( 'admin_post_rega_save_search', array( self::class, 'save_search' ) );
 		add_action( 'admin_post_rega_send_order_history', array( self::class, 'send_order_history' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( REGA_FILE ), array( self::class, 'action_links' ) );
 		add_action( 'admin_notices', array( self::class, 'woocommerce_missing_notice' ) );
@@ -95,6 +96,15 @@ final class SettingsPage {
 		self::authorize( 'rega_save_widget' );
 
 		Settings::save_widget_mode( isset( $_POST['widget_mode'] ) ? sanitize_key( wp_unslash( $_POST['widget_mode'] ) ) : 'preview' );
+
+		wp_safe_redirect( self::url( array( 'rega_notice' => 'saved' ) ) );
+		exit;
+	}
+
+	public static function save_search(): void {
+		self::authorize( 'rega_save_search' );
+
+		Settings::save_search_mode( isset( $_POST['search_mode'] ) ? sanitize_key( wp_unslash( $_POST['search_mode'] ) ) : 'off' );
 
 		wp_safe_redirect( self::url( array( 'rega_notice' => 'saved' ) ) );
 		exit;
@@ -234,6 +244,30 @@ final class SettingsPage {
 				<?php if ( null === $token ) : ?>
 					<p class="description"><?php esc_html_e( 'The widget loads only after a token is created and connected in Rega.', 'rega' ); ?></p>
 				<?php endif; ?>
+				<?php submit_button( __( 'Save', 'rega' ) ); ?>
+			</form>
+
+			<h2><?php esc_html_e( 'Search on the store', 'rega' ); ?></h2>
+			<p><?php esc_html_e( 'Rega search in the store\'s own search box: suggestions while typing that forgive spelling mistakes, and results grouped into products, guides and categories. Which search fields it attaches to is set in Rega. If Rega does not answer, the store\'s own search runs as before.', 'rega' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="rega_save_search" />
+				<?php wp_nonce_field( 'rega_save_search' ); ?>
+				<?php
+				$search_mode  = Settings::search_mode();
+				$search_modes = array(
+					'off'     => array( __( 'Off', 'rega' ), __( 'The store\'s search stays as it is.', 'rega' ) ),
+					'preview' => array( __( 'Preview', 'rega' ), __( 'Only the store team sees Rega search: managers logged in to WordPress, or a browser that opened a preview link from Rega.', 'rega' ) ),
+					'live'    => array( __( 'Live', 'rega' ), __( 'Every visitor searches with Rega.', 'rega' ) ),
+				);
+				?>
+				<fieldset>
+					<?php foreach ( $search_modes as $value => $text ) : ?>
+						<label style="display:block;margin-block:6px">
+							<input type="radio" name="search_mode" value="<?php echo esc_attr( $value ); ?>" <?php checked( $search_mode, $value ); ?> />
+							<strong><?php echo esc_html( $text[0] ); ?></strong> — <?php echo esc_html( $text[1] ); ?>
+						</label>
+					<?php endforeach; ?>
+				</fieldset>
 				<?php submit_button( __( 'Save', 'rega' ) ); ?>
 			</form>
 
