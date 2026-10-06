@@ -30,6 +30,7 @@ return [
         'catalog_sync' => 'Reading the catalog from the plugin',
         'search_build_index' => 'Updating the site search',
         'retrieval_build_index' => 'Building the index by meaning',
+        'retrieval_build_image_index' => 'Vectors for product pictures',
         'retrieval_match_products' => 'Matching products with a model',
         'enrichment_read_in_code' => 'Reading products in code',
         'enrichment_read_promises' => 'What the store promises',

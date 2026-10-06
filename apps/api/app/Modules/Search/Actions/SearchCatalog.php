@@ -14,7 +14,7 @@ use App\Modules\Search\Support\LoadedIndex;
  *
  *   1. spelling   HebrewSearch over the nightly index: typos, plural and singular, full and
  *                 defective spelling, an English keyboard. No model, a few milliseconds.
- *   2. meaning    Retrieval's index by meaning, for words that say what the shopper wants
+ *   2. meaning    Retrieval's index by meaning, and its pictures where they are indexed, for words that say what the shopper wants
  *                 rather than what the product is called ("משהו לחבר קרשים"). One small
  *                 embedding per new wording, kept, so a repeated query costs nothing.
  *   3. merge      records that hold every word as typed come first, in spelling order; the
@@ -54,7 +54,8 @@ final class SearchCatalog
 
             $spelling = HebrewSearch::search($index['engine'], $query);
             $meaning = $this->meaning($shopId, $query, $index['records']);
-            $ranked = $this->merge($spelling, $meaning);
+            $pictures = $this->pictures($shopId, $query, $index['records']);
+            $ranked = $this->merge($spelling, [$meaning, $pictures]);
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
 
             $groups = array_fill_keys(self::GROUPS, []);
@@ -87,7 +88,7 @@ final class SearchCatalog
                     : [];
             }
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [], 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'groups' => $groups, 'counts' => $counts];
         });
     }
 
@@ -119,11 +120,38 @@ final class SearchCatalog
     }
 
     /**
-     * @param  list<array{id: string, title: string, score: float, exact: bool}>  $spelling
-     * @param  list<string>  $meaning
+     * Products whose picture matches the words, nearest first: "חולצת פסים" finds striped shirts
+     * whose names never say so. Only where the shop's pictures are indexed.
+     *
+     * @param  array<string, array<string, mixed>>  $records
      * @return list<string>
      */
-    private function merge(array $spelling, array $meaning): array
+    private function pictures(string $shopId, string $query, array $records): array
+    {
+        if (! Features::enabled('search.pictures', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
+            return [];
+        }
+
+        $floor = (float) Settings::get('search.picture_min_similarity');
+        $ids = [];
+
+        foreach ($this->semantic->picturesNearText($shopId, $query, (int) Settings::get('search.semantic_results')) as $hit) {
+            $id = 'p:'.$hit['external_id'];
+
+            if ($hit['similarity'] >= $floor && isset($records[$id])) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  list<array{id: string, title: string, score: float, exact: bool}>  $spelling
+     * @param  list<list<string>>  $others  ranked ids by meaning, by picture
+     * @return list<string>
+     */
+    private function merge(array $spelling, array $others): array
     {
         $exact = [];
         $scores = [];
@@ -138,9 +166,11 @@ final class SearchCatalog
             $scores[$hit['id']] = ($scores[$hit['id']] ?? 0) + 1 / (self::RRF_K + $rank);
         }
 
-        foreach ($meaning as $rank => $id) {
-            if (! in_array($id, $exact, true)) {
-                $scores[$id] = ($scores[$id] ?? 0) + 1 / (self::RRF_K + $rank);
+        foreach ($others as $list) {
+            foreach ($list as $rank => $id) {
+                if (! in_array($id, $exact, true)) {
+                    $scores[$id] = ($scores[$id] ?? 0) + 1 / (self::RRF_K + $rank);
+                }
             }
         }
 

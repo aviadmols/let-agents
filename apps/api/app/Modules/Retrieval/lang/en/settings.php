@@ -83,4 +83,36 @@ return [
         'label' => 'Least similarity for an alternative',
         'description' => 'An alternative the model chose is refused when its text is too far in meaning, from 0 to 1. A complement need not be similar.',
     ],
+    'image_provider' => [
+        'label' => 'Picture vector provider',
+        'description' => 'gemini today. A provider that puts pictures and words in one space is a driver in the AI module.',
+    ],
+    'image_model' => [
+        'label' => 'Picture vector model',
+        'description' => 'For example gemini-embedding-2. Changing it rebuilds every picture vector.',
+    ],
+    'image_dimensions' => [
+        'label' => 'Picture vector dimensions',
+        'description' => '768 is enough for visual likeness and cheap to store. 0 keeps the model\x27s default.',
+    ],
+    'image_usd_per_image' => [
+        'label' => 'Price per picture',
+        'description' => 'From the provider\x27s price list. Used to estimate before each call and to record the cost.',
+    ],
+    'image_text_usd_per_million' => [
+        'label' => 'Price of words for picture search, per million tokens',
+        'description' => 'From the provider\x27s price list.',
+    ],
+    'max_images_per_run' => [
+        'label' => 'New pictures in one run',
+        'description' => 'The rest wait for the next night.',
+    ],
+    'image_max_kb' => [
+        'label' => 'Largest picture',
+        'description' => 'A bigger picture is skipped and marked.',
+    ],
+    'min_look_alike' => [
+        'label' => 'Minimum visual likeness',
+        'description' => 'Below this a product is not offered as looking alike.',
+    ],
 ];

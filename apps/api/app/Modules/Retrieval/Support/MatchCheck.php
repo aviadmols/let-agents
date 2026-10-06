@@ -63,7 +63,7 @@ final class MatchCheck
                     $candidate === null => self::UNKNOWN,
                     isset($chosen[$productId]) => self::BOTH_KINDS,
                     ! ($available[$productId] ?? false) => self::UNAVAILABLE,
-                    $kind === MatchKind::Alternative && (float) ($candidate['signals']['similarity'] ?? 0) < $minSimilarity => self::NOT_SIMILAR,
+                    $kind === MatchKind::Alternative && self::likeness($candidate['signals']) < $minSimilarity => self::NOT_SIMILAR,
                     ($accepted[$kind->value] ?? 0) >= ($limits[$kind->value] ?? 0) => self::OVER_LIMIT,
                     default => null,
                 };
@@ -94,5 +94,17 @@ final class MatchCheck
         $why = trim((string) preg_replace('/\s+/u', ' ', strip_tags(is_scalar($why) ? (string) $why : '')));
 
         return $why === '' ? null : mb_substr($why, 0, self::REASON_CHARS);
+    }
+
+    /**
+     * How alike two products are: in meaning, or in their pictures, whichever is stronger. A shirt
+     * in the same cut and another colour may share almost no words with this one and still be
+     * the alternative a shopper wants.
+     *
+     * @param  array<string, mixed>  $signals
+     */
+    public static function likeness(array $signals): float
+    {
+        return max((float) ($signals['similarity'] ?? 0), (float) ($signals['looks_alike'] ?? 0));
     }
 }

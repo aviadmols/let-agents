@@ -37,6 +37,7 @@ final class Pipeline
         ],
         'retrieval' => [
             'retrieval.build_index' => ['model' => 'retrieval.embedding_model'],
+            'retrieval.build_image_index' => ['model' => 'retrieval.image_model'],
             'retrieval.match_products' => ['model' => 'retrieval.match_model'],
         ],
         'enrichment' => [
@@ -86,6 +87,7 @@ final class Pipeline
         'catalog.sync' => '02:30',
         'search.build_index' => '02:40',
         'retrieval.build_index' => '02:45',
+        'retrieval.build_image_index' => '02:45',
         'retrieval.match_products' => '02:45',
         'analytics.compute_scores' => '04:15',
         'analytics.compute_popularity' => '04:15',

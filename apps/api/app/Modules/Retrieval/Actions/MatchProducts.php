@@ -244,6 +244,9 @@ final class MatchProducts
             $band((float) ($c['signals']['lift'] ?? 0), [1, 2, 5, 10]),
             $band((float) ($c['signals']['guides_together'] ?? 0), [1, 2, 5]),
             round((float) ($c['signals']['similarity'] ?? 0) * 20) / 20,
+            // Only when there is one, so a shop without picture vectors keeps its fingerprints and
+            // is not asked about every product again.
+            ...(isset($c['signals']['looks_alike']) ? [round((float) $c['signals']['looks_alike'] * 20) / 20] : []),
         ], array_values($candidates));
 
         usort($offered, fn (array $a, array $b): int => $a[0] <=> $b[0]);

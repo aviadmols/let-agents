@@ -10,6 +10,8 @@ use Anthropic\RequestOptions;
 use App\Modules\Ai\Contracts\ListsProviderModels;
 use App\Modules\Ai\Enums\AiProviderName;
 use GuzzleHttp\Client;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use OpenAI;
 use OpenAI\Exceptions\ErrorException as OpenAiErrorException;
 use OpenAI\Exceptions\TransporterException as OpenAiTransporterException;
@@ -28,6 +30,7 @@ final class SdkModelLister implements ListsProviderModels
         return match ($provider) {
             AiProviderName::Anthropic => $this->anthropic($apiKey),
             AiProviderName::OpenAi => $this->openAi($apiKey),
+            AiProviderName::Gemini => $this->gemini($apiKey),
         };
     }
 
@@ -87,6 +90,39 @@ final class SdkModelLister implements ListsProviderModels
         );
 
         usort($models, fn (array $a, array $b): int => strcmp((string) $b['created_at'], (string) $a['created_at']));
+
+        return $models;
+    }
+
+    /**
+     * Google's Gemini API has no PHP SDK of its own, so a plain request: GET models with the key in
+     * a header, never in the address, so it stays out of access logs.
+     *
+     * @return list<array{id: string, name: string, created_at: ?string}>
+     */
+    private function gemini(string $apiKey): array
+    {
+        try {
+            $response = Http::timeout((int) self::TIMEOUT_SECONDS)
+                ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->get('https://generativelanguage.googleapis.com/v1beta/models', ['pageSize' => 1000]);
+        } catch (ConnectionException $e) {
+            throw new ProviderCheckFailed(ProviderCheckFailed::UNREACHABLE, null, $e);
+        }
+
+        if (! $response->successful()) {
+            throw ProviderCheckFailed::fromStatus($response->status());
+        }
+
+        $models = [];
+
+        foreach ((array) $response->json('models', []) as $model) {
+            $id = preg_replace('#^models/#', '', (string) ($model['name'] ?? ''));
+
+            if ($id !== '') {
+                $models[] = ['id' => $id, 'name' => (string) ($model['displayName'] ?? $id), 'created_at' => null];
+            }
+        }
 
         return $models;
     }

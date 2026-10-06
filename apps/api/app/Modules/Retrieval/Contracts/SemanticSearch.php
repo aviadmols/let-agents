@@ -27,6 +27,25 @@ interface SemanticSearch
      */
     public function nearText(string $shopId, string $text, array $sources, int $limit): array;
 
+    /**
+     * Products whose main picture looks like this product's. No model call: it compares the
+     * picture vectors the image index already holds. Empty when pictures are not indexed.
+     *
+     * @return list<array{product_id: string, external_id: string, title: string, similarity: float}> nearest first
+     */
+    public function lookAlike(string $productId, int $limit): array;
+
+    /**
+     * Products whose picture matches words a shopper typed ("חולצת פסים"). The words cost one
+     * small embedding the first time and nothing after, like nearText.
+     *
+     * @return list<array{product_id: string, external_id: string, title: string, similarity: float}> nearest first
+     */
+    public function picturesNearText(string $shopId, string $text, int $limit): array;
+
+    /** Whether this shop has picture vectors from the model the settings name now. */
+    public function picturesReady(): bool;
+
     /** Whether this shop has vectors from the model the settings name now. */
     public function ready(): bool;
 }

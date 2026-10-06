@@ -18,6 +18,10 @@
         {
             "name": "ai_matching",
             "default": true
+        },
+        {
+            "name": "image_index",
+            "default": false
         }
     ],
     "settings": [
@@ -184,6 +188,74 @@
             "name": "min_alternative_similarity",
             "type": "float",
             "default": 0.5,
+            "min": 0,
+            "max": 1,
+            "scope": "global"
+        },
+        {
+            "name": "image_provider",
+            "type": "string",
+            "default": "gemini",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "image_model",
+            "type": "string",
+            "default": "gemini-embedding-2",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "image_dimensions",
+            "type": "int",
+            "default": 768,
+            "min": 0,
+            "max": 4096,
+            "scope": "global"
+        },
+        {
+            "name": "image_usd_per_image",
+            "type": "float",
+            "default": 0.00012,
+            "min": 0,
+            "max": 1,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "image_text_usd_per_million",
+            "type": "float",
+            "default": 0.2,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "max_images_per_run",
+            "type": "int",
+            "default": 2000,
+            "min": 0,
+            "max": 100000,
+            "scope": "shop",
+            "unit": "images"
+        },
+        {
+            "name": "image_max_kb",
+            "type": "int",
+            "default": 4096,
+            "min": 100,
+            "max": 20000,
+            "scope": "global",
+            "unit": "kilobytes"
+        },
+        {
+            "name": "min_look_alike",
+            "type": "float",
+            "default": 0.75,
             "min": 0,
             "max": 1,
             "scope": "global"

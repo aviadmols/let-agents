@@ -4,6 +4,7 @@ namespace App\Modules\Retrieval\Support;
 
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalChunk;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 
@@ -74,6 +75,30 @@ final class VectorSearch implements SemanticSearch
         usort($best, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
 
         return array_slice(array_values($best), 0, $limit);
+    }
+
+    public function lookAlike(string $productId, int $limit): array
+    {
+        $model = ModelChoice::for('image')->model;
+        $vector = RetrievalImage::query()->where('product_id', $productId)->where('embedding_model', $model)->first()?->vector();
+
+        return $vector === null || $limit < 1 ? [] : $this->nearestPictures($vector, $model, $limit, $productId);
+    }
+
+    public function picturesNearText(string $shopId, string $text, int $limit): array
+    {
+        if ($limit < 1 || ! $this->picturesReady()) {
+            return [];
+        }
+
+        $vector = app(QueryVectors::class)->for($shopId, $text, 'image');
+
+        return $vector === null ? [] : $this->nearestPictures($vector, ModelChoice::for('image')->model, $limit);
+    }
+
+    public function picturesReady(): bool
+    {
+        return RetrievalImage::query()->where('embedding_model', ModelChoice::for('image')->model)->whereNotNull('embedding')->exists();
     }
 
     public function ready(): bool
@@ -185,5 +210,62 @@ final class VectorSearch implements SemanticSearch
             });
 
         return $rows;
+    }
+
+    /**
+     * @param  list<float>  $vector
+     * @return list<array{product_id: string, external_id: string, title: string, similarity: float}>
+     */
+    private function nearestPictures(array $vector, string $model, int $limit, ?string $exceptProductId = null): array
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $literal = self::literal($vector);
+
+            return RetrievalImage::query()
+                ->select(['product_id', 'external_id', 'title'])
+                ->selectRaw('1 - (embedding <=> ?::vector) as similarity', [$literal])
+                ->where('embedding_model', $model)->whereNotNull('embedding')
+                ->when($exceptProductId !== null, fn ($q) => $q->where('product_id', '!=', $exceptProductId))
+                ->orderByRaw('embedding <=> ?::vector', [$literal])
+                ->limit($limit)
+                ->get()
+                ->map(fn (RetrievalImage $i): array => [
+                    'product_id' => $i->product_id,
+                    'external_id' => $i->external_id,
+                    'title' => $i->title,
+                    'similarity' => round((float) $i->getAttribute('similarity'), 4),
+                ])
+                ->all();
+        }
+
+        $seed = self::normalize($vector);
+        $rows = [];
+
+        RetrievalImage::query()
+            ->where('embedding_model', $model)->whereNotNull('embedding')
+            ->when($exceptProductId !== null, fn ($q) => $q->where('product_id', '!=', $exceptProductId))
+            ->select(['id', 'product_id', 'external_id', 'title', 'embedding'])
+            ->chunkById(500, function ($images) use (&$rows, $seed): void {
+                foreach ($images as $image) {
+                    $other = $image->vector();
+
+                    if ($other === null || count($other) !== count($seed)) {
+                        continue;
+                    }
+
+                    $other = self::normalize($other);
+                    $dot = 0.0;
+
+                    foreach ($seed as $i => $value) {
+                        $dot += $value * $other[$i];
+                    }
+
+                    $rows[] = ['product_id' => $image->product_id, 'external_id' => $image->external_id, 'title' => $image->title, 'similarity' => round($dot, 4)];
+                }
+            });
+
+        usort($rows, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
+
+        return array_slice($rows, 0, $limit);
     }
 }

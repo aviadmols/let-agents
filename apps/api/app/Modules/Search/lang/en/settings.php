@@ -29,6 +29,10 @@ return [
         'label' => 'Minimum similarity by meaning',
         'description' => 'A result by meaning below this is left out. Depends on the embedding model: about 0.3 for text-embedding-3-small.',
     ],
+    'picture_min_similarity' => [
+        'label' => 'Minimum likeness between words and a picture',
+        'description' => 'Below this a product is left out of the results by picture. Depends on the model: about 0.35 for gemini-embedding-2.',
+    ],
     'semantic_min_chars' => [
         'label' => 'Minimum length for search by meaning',
         'description' => 'A shorter query is searched by spelling only.',

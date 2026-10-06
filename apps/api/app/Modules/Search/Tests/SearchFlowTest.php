@@ -45,6 +45,9 @@ final class SearchFlowTest extends TestCase
     /** @var list<array<string, mixed>> what the fake index by meaning answers */
     private array $meaning = [];
 
+    /** @var list<array<string, mixed>> what the fake picture index answers */
+    private array $pictures = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -69,6 +72,21 @@ final class SearchFlowTest extends TestCase
             public function nearText(string $shopId, string $text, array $sources, int $limit): array
             {
                 return $this->test->askedByMeaning($text, $sources);
+            }
+
+            public function lookAlike(string $productId, int $limit): array
+            {
+                return [];
+            }
+
+            public function picturesNearText(string $shopId, string $text, int $limit): array
+            {
+                return $this->test->askedByPicture($text);
+            }
+
+            public function picturesReady(): bool
+            {
+                return true;
             }
 
             public function ready(): bool
@@ -99,6 +117,29 @@ final class SearchFlowTest extends TestCase
         $this->meaningAsked[] = ['text' => $text, 'sources' => $sources];
 
         return $this->meaning;
+    }
+
+    /** Called by the fake picture index. */
+    public function askedByPicture(string $text): array
+    {
+        return $this->pictures;
+    }
+
+    public function test_a_picture_can_find_what_no_name_says(): void
+    {
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->pictures = [
+            ['product_id' => 'x', 'external_id' => '104', 'title' => 'עץ אורן מוקצע 42X142', 'similarity' => 0.41],
+            ['product_id' => 'y', 'external_id' => '102', 'title' => 'בורג איסכורית 6X40', 'similarity' => 0.2],
+        ];
+
+        $result = $this->search('קורה בהירה')->json();
+
+        $this->assertTrue($result['semantic']);
+        $this->assertSame(['104'], array_column($result['groups']['product'], 'external_id'), 'a picture below the floor stays out');
+
+        Features::override('search.pictures', false, $this->shop->id);
+        $this->assertSame(0, $this->search('קורה בהירה')->json('total'));
     }
 
     public function test_the_index_holds_what_the_store_publishes_and_nothing_else(): void

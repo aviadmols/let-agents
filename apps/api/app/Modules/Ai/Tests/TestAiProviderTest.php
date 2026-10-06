@@ -147,7 +147,7 @@ final class TestAiProviderTest extends TestCase
 
         // Anthropic is taken now, so only OpenAI is offered.
         Livewire::test(CreateAiProvider::class)
-            ->assertFormFieldExists('provider', fn ($field): bool => array_keys($field->getOptions()) === ['openai']);
+            ->assertFormFieldExists('provider', fn ($field): bool => array_keys($field->getOptions()) === ['openai', 'gemini']);
 
         foreach (['he', 'en'] as $locale) {
             $this->withHeader('Accept-Language', $locale)->get('/operator/ai-providers')

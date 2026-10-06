@@ -33,6 +33,7 @@ return [
         'enrichment_read_promises' => 'מה החנות מבטיחה',
         'enrichment_match_article_products' => 'התאמת מאמרים למוצרים',
         'retrieval_build_index' => 'בניית האינדקס לפי משמעות',
+        'retrieval_build_image_index' => 'וקטורים לתמונות המוצרים',
         'retrieval_match_products' => 'התאמות בין מוצרים בעזרת מודל',
         'enrichment_import_vocabulary' => 'ייבוא אוצר מילים',
         'enrichment_create_task_file' => 'יצירת קובץ משימות',

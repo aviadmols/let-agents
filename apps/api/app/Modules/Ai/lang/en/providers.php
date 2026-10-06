@@ -6,6 +6,7 @@ return [
     'roles' => [
         'openai' => 'Writes all visitor-facing text and answers in chat.',
         'anthropic' => 'Analyzes: attribute extraction, classification, review and planning.',
+        'gemini' => 'Vectors for product pictures, to find products that look alike and search pictures by words.',
     ],
     'statuses' => [
         'untested' => 'Not tested',

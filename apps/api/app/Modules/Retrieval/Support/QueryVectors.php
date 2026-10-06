@@ -4,6 +4,7 @@ namespace App\Modules\Retrieval\Support;
 
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\Embedder;
+use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
@@ -31,22 +32,32 @@ final class QueryVectors
 
     public function __construct(
         private readonly Embedder $embedder,
+        private readonly ImageEmbedder $imageEmbedder,
         private readonly SpendGuard $spend,
     ) {}
 
-    /** @return list<float>|null */
-    public function for(string $shopId, string $text): ?array
+    /**
+     * The words' vector in the index by meaning ('text') or in the picture space ('image'),
+     * which are different models and never compared with each other.
+     *
+     * @return list<float>|null
+     */
+    public function for(string $shopId, string $text, string $space = 'text'): ?array
     {
         $text = mb_substr(trim($text), 0, self::MAX_CHARS);
-        $choice = ModelChoice::for('embedding');
+        $images = $space === 'image';
+        $choice = ModelChoice::for($images ? 'image' : 'embedding');
 
         if ($text === '' || $choice->provider === null || $choice->model === '') {
             return null;
         }
 
+        // Pictures are searched with words embedded as a query, so the same model can hold both
+        // kinds of row without one being read as the other.
+        $stored = $images ? 'image:'.$choice->model : $choice->model;
         $hash = hash('sha256', $text);
         $saved = RetrievalQueryVector::query()
-            ->where('embedding_model', $choice->model)->where('text_hash', $hash)
+            ->where('embedding_model', $stored)->where('text_hash', $hash)
             ->first();
 
         if ($saved !== null) {
@@ -55,12 +66,14 @@ final class QueryVectors
             return $saved->vector();
         }
 
-        $price = (float) Settings::get('retrieval.embedding_usd_per_million');
-        $dimensions = (int) Settings::get('retrieval.embedding_dimensions') ?: null;
+        $price = (float) Settings::get($images ? 'retrieval.image_text_usd_per_million' : 'retrieval.embedding_usd_per_million');
+        $dimensions = (int) Settings::get($images ? 'retrieval.image_dimensions' : 'retrieval.embedding_dimensions') ?: null;
 
         try {
             $this->spend->assertCanSpend(mb_strlen($text) * $price / 1_000_000);
-            $embeddings = $this->embedder->embed($choice->provider, $choice->model, [$text], $dimensions);
+            $embeddings = $images
+                ? $this->imageEmbedder->embedTextsForImages($choice->provider, $choice->model, [$text], $dimensions)
+                : $this->embedder->embed($choice->provider, $choice->model, [$text], $dimensions);
         } catch (SpendCapReached|ModelCallFailed) {
             return null;
         }
@@ -73,7 +86,7 @@ final class QueryVectors
 
         RetrievalQueryVector::query()->create([
             'shop_id' => $shopId,
-            'embedding_model' => $choice->model,
+            'embedding_model' => $stored,
             'text_hash' => $hash,
             'text' => $text,
             'dimensions' => count($vector),

@@ -4,6 +4,7 @@ namespace App\Modules\Retrieval;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Retrieval\Candidates\BoughtTogether;
+use App\Modules\Retrieval\Candidates\LookAlike;
 use App\Modules\Retrieval\Candidates\MentionedTogether;
 use App\Modules\Retrieval\Candidates\SimilarProducts;
 use App\Modules\Retrieval\Console\RetrievalCommand;
@@ -25,7 +26,7 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
     public const SOURCES = [ProductDocuments::class, ContentDocuments::class, PurchaseDocuments::class];
 
     /** Where the matcher looks for candidates. Same idea: tag a CandidateSource `retrieval.candidates`. */
-    public const CANDIDATES = [BoughtTogether::class, SimilarProducts::class, MentionedTogether::class];
+    public const CANDIDATES = [BoughtTogether::class, SimilarProducts::class, LookAlike::class, MentionedTogether::class];
 
     protected function registerModule(): void
     {

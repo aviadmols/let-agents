@@ -19,6 +19,10 @@
         {
             "name": "semantic",
             "default": true
+        },
+        {
+            "name": "pictures",
+            "default": true
         }
     ],
     "settings": [
@@ -71,6 +75,14 @@
             "name": "semantic_min_similarity",
             "type": "float",
             "default": 0.3,
+            "min": 0,
+            "max": 1,
+            "scope": "global"
+        },
+        {
+            "name": "picture_min_similarity",
+            "type": "float",
+            "default": 0.35,
             "min": 0,
             "max": 1,
             "scope": "global"

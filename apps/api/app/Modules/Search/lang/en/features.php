@@ -9,4 +9,8 @@ return [
         'label' => 'Search by meaning',
         'description' => 'Also finds what is not called by the typed words, like "something to join boards". Each new wording costs one small vector; a repeated one costs nothing.',
     ],
+    'pictures' => [
+        'label' => 'Search in pictures',
+        'description' => 'Words like "striped shirt" also find products whose names do not say so, by their picture. Works only once the shop\x27s pictures have vectors.',
+    ],
 ];

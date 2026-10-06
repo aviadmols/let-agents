@@ -4,8 +4,10 @@ namespace App\Modules\Retrieval\Console;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Retrieval\Actions\BuildImageIndex;
 use App\Modules\Retrieval\Actions\BuildIndex;
 use App\Modules\Retrieval\Actions\MatchProducts;
+use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
@@ -15,13 +17,14 @@ use Illuminate\Console\Command;
  * Build a shop's index, match its products, or both in that order.
  *
  *   retrieval index gueta-avigdor
+ *   retrieval images gueta-avigdor   the pictures, when retrieval.image_index is on
  *   retrieval match gueta-avigdor
  *   retrieval nightly --all          what the schedule runs
  */
 final class RetrievalCommand extends Command
 {
     protected $signature = 'retrieval
-        {step : index, match or nightly}
+        {step : index, images, match or nightly}
         {target? : shop slug or ID}
         {--all : every active shop}';
 
@@ -31,9 +34,11 @@ final class RetrievalCommand extends Command
     {
         return $tenant->runUnscoped(fn (): int => match ($this->argument('step')) {
             'index' => $this->each(fn (Shop $shop): array => [app(BuildIndex::class)->handle($shop->id)]),
+            'images' => $this->each(fn (Shop $shop): array => [app(BuildImageIndex::class)->handle($shop->id)]),
             'match' => $this->each(fn (Shop $shop): array => [app(MatchProducts::class)->handle($shop->id)]),
             'nightly' => $this->each(fn (Shop $shop): array => array_values(array_filter([
                 Features::enabled('retrieval.index', $shop->id) ? app(BuildIndex::class)->handle($shop->id) : null,
+                Features::enabled('retrieval.image_index', $shop->id) ? app(BuildImageIndex::class)->handle($shop->id, RunTrigger::Schedule) : null,
                 Features::enabled('retrieval.ai_matching', $shop->id) ? app(MatchProducts::class)->handle($shop->id) : null,
             ]))),
             default => $this->failWith('Unknown step.'),
