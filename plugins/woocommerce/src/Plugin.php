@@ -8,6 +8,7 @@ use Rega\Rest\Routes;
 use Rega\Storefront\CallToAction;
 use Rega\Storefront\OrderHistory;
 use Rega\Storefront\OrderReporter;
+use Rega\Storefront\Search;
 use Rega\Storefront\Widget;
 
 defined( 'ABSPATH' ) || exit;

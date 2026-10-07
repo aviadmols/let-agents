@@ -159,7 +159,9 @@ final class DailyReviewTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('operator'));
         $this->actingAs(User::factory()->operator()->create());
         Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])
-            ->assertSeeInOrder(['ממתינות להחלטה', 'קרש = עץ', 'פרקט למרפסת'])
+            ->assertSeeInOrder(['ממתינות להחלטה', 'החלטות אחרונות'])
+            ->assertSee('קרש = עץ')
+            ->assertSee('פרקט למרפסת')
             ->call('approve', $pending['synonym']->id)
             ->call('reject', $pending['content_gap']->id);
 

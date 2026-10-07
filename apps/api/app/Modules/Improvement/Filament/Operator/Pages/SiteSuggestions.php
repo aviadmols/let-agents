@@ -74,7 +74,7 @@ class SiteSuggestions extends Page
         }
 
         return app(TenantContext::class)->run($this->shop, fn (): array => [
-            'pending' => ImprovementProposal::query()->where('status', ImprovementProposal::PENDING)->latest()->get(),
+            'pending' => ImprovementProposal::query()->where('status', ImprovementProposal::PENDING)->latest()->orderBy('id')->get(),
             'decided' => ImprovementProposal::query()->whereIn('status', [ImprovementProposal::APPLIED, ImprovementProposal::APPROVED, ImprovementProposal::REJECTED])->latest('updated_at')->limit(30)->get(),
             'latest' => ImprovementReview::query()->latest('day')->first(),
         ]);
