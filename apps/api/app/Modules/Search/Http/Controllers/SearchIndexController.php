@@ -5,6 +5,7 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
 use Illuminate\Http\JsonResponse;
@@ -46,6 +47,9 @@ final class SearchIndexController
             'results' => (string) Settings::get('search.results', $shopId),
             'suggestions' => (int) Settings::get('search.suggestions', $shopId),
             'perGroup' => (int) Settings::get('search.results_per_group', $shopId),
+            // The camera shows only where the shop's pictures already have vectors.
+            'photos' => Features::enabled('search.photos', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
+            'photoMaxKb' => (int) Settings::get('search.photo_max_kb'),
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';

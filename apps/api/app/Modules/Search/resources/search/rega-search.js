@@ -14,6 +14,9 @@
  *      the shop prefers its own results page, lets the form submit and the plugin orders that page.
  *   4. Shows live prices and stock from the store's own Store API, never last night's.
  *   5. Counts searches and clicks without anything about the shopper: one count per query per tab.
+ *   6. Where the shop's pictures are indexed, adds a camera beside the box: a shopper uploads or
+ *      takes a photo, it is shrunk in the browser, and the products that look most like it show.
+ *      The photo goes to Rega once and is not kept.
  *
  * Everything renders in a shadow root. Text is always set with textContent; links and images must
  * be http(s). The engine below must stay identical to HebrewSearch.php: change both or neither.
@@ -556,6 +559,17 @@
       '.btn[disabled]{opacity:.6;cursor:default}',
       '.list{display:grid;gap:4px}',
       '.foot{padding:12px 20px 20px;display:flex;gap:12px;flex-wrap:wrap}',
+      '.cam{display:inline-grid;place-items:center;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--rs-fg);cursor:pointer;padding:0}',
+      '.cam:hover,.cam:focus-visible{background:var(--rs-soft);outline:none}',
+      '.cam svg{width:20px;height:20px}',
+      '.zone{display:grid;gap:8px;justify-items:center;text-align:center;margin:12px;padding:22px 14px;border:1.5px dashed var(--rs-line);border-radius:12px;cursor:pointer}',
+      '.zone.over,.zone:hover{border-color:var(--rs-accent);background:var(--rs-soft)}',
+      '.zone svg{width:34px;height:34px;opacity:.6}',
+      '.zone .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}',
+      '.yours{display:flex;gap:14px;align-items:center;padding:16px 20px 0}',
+      '.yours img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--rs-line)}',
+      '.card{position:relative}',
+      '.badge{position:absolute;top:8px;inset-inline-start:8px;background:var(--rs-bg);color:var(--rs-fg);font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}',
       '@media (max-width:600px){.overlay{padding:0}.sheet{max-height:100vh;height:100vh;border-radius:0}.grid{grid-template-columns:repeat(2,1fr);gap:12px}}',
       '@media (prefers-reduced-motion:no-preference){.sheet{animation:in .25s ease}@keyframes in{from{transform:translateY(8px);opacity:0}}}'
     ].join('');
@@ -647,6 +661,7 @@
       if (!dropdown) {
         dropdown = shadowHost('rega-search-suggest');
       }
+      dropdown.upload = false;
       var rootNode = dropdown.root;
       while (rootNode.childNodes.length > 1) {
         rootNode.removeChild(rootNode.lastChild);
@@ -786,6 +801,39 @@
       if (current) {
         current.focus();
       }
+    }
+
+    /** An empty results sheet over the page, with a title and a close button. Returns the sheet. */
+    function openSheet(titleText) {
+      if (!panel) {
+        panel = shadowHost('rega-search-results');
+      }
+      var rootNode = panel.root;
+      while (rootNode.childNodes.length > 1) {
+        rootNode.removeChild(rootNode.lastChild);
+      }
+      var overlay = el('div', 'overlay');
+      overlay.addEventListener('click', function (event) {
+        if (event.target === overlay) {
+          closePanel();
+        }
+      });
+      var sheet = el('div', 'sheet');
+      sheet.setAttribute('role', 'dialog');
+      sheet.setAttribute('aria-modal', 'true');
+      var top = el('div', 'top');
+      top.appendChild(el('h2', null, titleText));
+      var x = el('button', 'x', '\u00D7');
+      x.type = 'button';
+      x.setAttribute('aria-label', label('close'));
+      x.addEventListener('click', closePanel);
+      top.appendChild(x);
+      sheet.appendChild(top);
+      overlay.appendChild(sheet);
+      rootNode.appendChild(overlay);
+      doc.documentElement.style.overflow = 'hidden';
+      x.focus();
+      return sheet;
     }
 
     function openPanel(raw) {
@@ -984,6 +1032,213 @@
       }
     }
 
+    // ---------------------------------------------------------------- search by photo
+
+    var CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+    var PICTURE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>';
+    var MAX_SIDE = 1024;
+
+    /** A camera beside the box, in its own shadow root, so the theme's buttons do not restyle it. */
+    function addCamera(input) {
+      if (!(state.config && state.config.photos) || input.__regaCamera) {
+        return;
+      }
+      input.__regaCamera = true;
+      var host = doc.createElement('span');
+      host.className = 'rega-search-camera';
+      host.style.display = 'inline-block';
+      host.style.verticalAlign = 'middle';
+      theme(host);
+      var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+      var style = doc.createElement('style');
+      style.textContent = CSS;
+      shadow.appendChild(style);
+      var button = el('button', 'cam');
+      button.type = 'button';
+      button.innerHTML = CAMERA;
+      button.setAttribute('aria-label', label('photo_search'));
+      button.title = label('photo_search');
+      button.addEventListener('click', function () {
+        current = input;
+        openUpload();
+      });
+      shadow.appendChild(button);
+      input.insertAdjacentElement('afterend', host);
+    }
+
+    function fileInput(capture) {
+      var picker = doc.createElement('input');
+      picker.type = 'file';
+      picker.accept = 'image/jpeg,image/png,image/webp';
+      if (capture) {
+        picker.setAttribute('capture', 'environment');
+      }
+      picker.addEventListener('change', function () {
+        if (picker.files && picker.files[0]) {
+          searchPhoto(picker.files[0]);
+        }
+      });
+      return picker;
+    }
+
+    function openUpload() {
+      if (!dropdown) {
+        dropdown = shadowHost('rega-search-suggest');
+      }
+      var rootNode = dropdown.root;
+      while (rootNode.childNodes.length > 1) {
+        rootNode.removeChild(rootNode.lastChild);
+      }
+      shown = [];
+      active = -1;
+      dropdown.upload = true;
+      var box = el('div', 'box');
+      var zone = el('div', 'zone');
+      zone.tabIndex = 0;
+      zone.setAttribute('role', 'button');
+      zone.innerHTML = PICTURE;
+      zone.appendChild(el('strong', null, label('photo_drop')));
+      zone.appendChild(el('span', 'muted', label('photo_formats')));
+      var buttons = el('div', 'btns');
+      var choose = el('button', 'btn', label('photo_choose'));
+      choose.type = 'button';
+      var take = el('button', 'btn ghost', label('photo_take'));
+      take.type = 'button';
+      buttons.appendChild(choose);
+      buttons.appendChild(take);
+      zone.appendChild(buttons);
+      choose.addEventListener('click', function (event) {
+        event.stopPropagation();
+        fileInput(false).click();
+      });
+      take.addEventListener('click', function (event) {
+        event.stopPropagation();
+        fileInput(true).click();
+      });
+      zone.addEventListener('click', function () { fileInput(false).click(); });
+      zone.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput(false).click();
+        }
+      });
+      ['dragenter', 'dragover'].forEach(function (name) {
+        zone.addEventListener(name, function (event) {
+          event.preventDefault();
+          zone.classList.add('over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (name) {
+        zone.addEventListener(name, function (event) {
+          event.preventDefault();
+          zone.classList.remove('over');
+        });
+      });
+      zone.addEventListener('drop', function (event) {
+        var dropped = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (dropped) {
+          searchPhoto(dropped);
+        }
+      });
+      box.appendChild(zone);
+      box.appendChild(el('p', 'muted', label('photo_private'))).style.margin = '0 12px 12px';
+      rootNode.appendChild(box);
+      position();
+      zone.focus();
+    }
+
+    /** The photo, at most MAX_SIDE pixels on its long side, as JPEG: smaller to send, same to compare. */
+    function shrink(file) {
+      return new Promise(function (resolve) {
+        if (!win.createImageBitmap || !win.HTMLCanvasElement) {
+          resolve(file);
+          return;
+        }
+        win.createImageBitmap(file).then(function (bitmap) {
+          var scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+          var canvas = doc.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+          canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+          canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/jpeg', 0.85);
+        }).catch(function () { resolve(file); });
+      });
+    }
+
+    function searchPhoto(file) {
+      if (!file || !/^image\//.test(file.type || '')) {
+        return;
+      }
+      closeDropdown();
+      var sheet = openSheet(label('photo_results'));
+      var preview = el('div', 'yours');
+      var thumb = el('img');
+      thumb.alt = label('photo_yours');
+      try {
+        thumb.src = win.URL.createObjectURL(file);
+      } catch (e) { /* no preview */ }
+      preview.appendChild(thumb);
+      preview.appendChild(el('strong', null, label('photo_results')));
+      sheet.appendChild(preview);
+      var status = el('div', 'section', label('photo_searching'));
+      sheet.appendChild(status);
+
+      shrink(file).then(function (blob) {
+        var maxBytes = ((state.config && state.config.photoMaxKb) || 5120) * 1024;
+        if (blob.size > maxBytes) {
+          status.textContent = label('photo_too_big');
+          return null;
+        }
+        var form = new FormData();
+        form.append('photo', blob, 'photo.jpg');
+        return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/photo', { method: 'POST', body: form, mode: 'cors', credentials: 'omit' });
+      }).then(function (response) {
+        if (!response) {
+          return null;
+        }
+        if (response.status === 413) {
+          status.textContent = label('photo_too_big');
+          return null;
+        }
+        return response.ok ? response.json() : (status.textContent = label('photo_failed'), null);
+      }).then(function (result) {
+        if (!result) {
+          return;
+        }
+        var products = (result.groups && result.groups.product) || [];
+        if (!products.length) {
+          status.textContent = label('photo_none');
+          return;
+        }
+        sheet.removeChild(status);
+        var section = el('div', 'section');
+        var grid = el('div', 'grid');
+        var ids = [];
+        for (var i = 0; i < products.length; i++) {
+          var node = card(products[i], '');
+          if (products[i].match) {
+            node.appendChild(el('span', 'badge', label('photo_match', { match: products[i].match })));
+          }
+          grid.appendChild(node);
+          ids.push(products[i].external_id);
+        }
+        section.appendChild(grid);
+        sheet.appendChild(section);
+        liveProducts(ids).then(function () { updateCards(grid); });
+        var foot = el('div', 'foot');
+        var again = el('button', 'btn ghost', label('photo_again'));
+        again.type = 'button';
+        again.addEventListener('click', function () {
+          closePanel();
+          openUpload();
+        });
+        foot.appendChild(again);
+        sheet.appendChild(foot);
+      }).catch(function () {
+        status.textContent = label('photo_failed');
+      });
+    }
+
     // ---------------------------------------------------------------- wiring
 
     function matches(node) {
@@ -1001,6 +1256,7 @@
       }
       input.__regaSearch = true;
       attached.push(input);
+      addCamera(input);
       input.setAttribute('autocomplete', 'off');
 
       input.addEventListener('input', function () {
@@ -1016,7 +1272,7 @@
       });
       input.addEventListener('blur', function () {
         setTimeout(function () {
-          if (doc.activeElement !== input) {
+          if (doc.activeElement !== input && !(dropdown && dropdown.upload)) {
             closeDropdown();
           }
         }, 150);
@@ -1088,8 +1344,16 @@
     doc.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && panel) {
         closePanel();
+      } else if (event.key === 'Escape' && dropdown && dropdown.upload) {
+        closeDropdown();
       }
     });
+    doc.addEventListener('pointerdown', function (event) {
+      var target = event.target;
+      if (dropdown && dropdown.upload && target !== dropdown.host && !(target.closest && target.closest('.rega-search-camera'))) {
+        closeDropdown();
+      }
+    }, true);
   }
 
   return {

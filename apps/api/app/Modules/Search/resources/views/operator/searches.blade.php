@@ -97,7 +97,7 @@
                         <tbody>
                             @foreach ($r['top'] as $row)
                                 <tr>
-                                    <td style="{{ $cell }}">{{ $row->query }}</td>
+                                    <td style="{{ $cell }}">{{ $row->query === '[photo]' ? __('search::ui.photo_query') : $row->query }}</td>
                                     <td style="{{ $cell }}" dir="ltr">{{ number_format((int) $row->searches) }}</td>
                                     <td style="{{ $cell }}" dir="ltr">{{ number_format((int) $row->clicks) }}</td>
                                     <td style="{{ $cell }}" dir="ltr">{{ number_format((int) $row->results) }}</td>

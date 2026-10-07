@@ -55,4 +55,5 @@ return [
         'built' => 'Search updated',
         'failed' => 'The update failed. Details are in the activity log.',
     ],
+    'photo_query' => 'Search by photo',
 ];

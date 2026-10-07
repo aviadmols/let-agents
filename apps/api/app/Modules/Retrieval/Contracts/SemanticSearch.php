@@ -43,6 +43,15 @@ interface SemanticSearch
      */
     public function picturesNearText(string $shopId, string $text, int $limit): array;
 
+    /**
+     * Products whose picture looks like a photo a shopper uploaded. One picture embedding (asks
+     * SpendGuard first, counts against the cap); the same photo again costs nothing. The photo
+     * is not kept. Empty when pictures are not indexed or there is no budget.
+     *
+     * @return list<array{product_id: string, external_id: string, title: string, similarity: float}> nearest first
+     */
+    public function picturesNearPhoto(string $shopId, string $mime, string $bytes, int $limit): array;
+
     /** Whether this shop has picture vectors from the model the settings name now. */
     public function picturesReady(): bool;
 

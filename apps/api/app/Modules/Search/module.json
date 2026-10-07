@@ -23,6 +23,10 @@
         {
             "name": "pictures",
             "default": true
+        },
+        {
+            "name": "photos",
+            "default": true
         }
     ],
     "settings": [
@@ -113,6 +117,41 @@
             "max": 1095,
             "scope": "global",
             "unit": "days"
+        },
+        {
+            "name": "photo_max_kb",
+            "type": "int",
+            "default": 5120,
+            "min": 100,
+            "max": 20000,
+            "scope": "global",
+            "unit": "kilobytes"
+        },
+        {
+            "name": "photos_per_day",
+            "type": "int",
+            "default": 500,
+            "min": 0,
+            "max": 100000,
+            "scope": "shop",
+            "unit": "searches"
+        },
+        {
+            "name": "photo_requests_per_minute",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 600,
+            "scope": "global",
+            "unit": "requests"
+        },
+        {
+            "name": "photo_min_similarity",
+            "type": "float",
+            "default": 0.5,
+            "min": 0,
+            "max": 1,
+            "scope": "global"
         }
     ]
 }

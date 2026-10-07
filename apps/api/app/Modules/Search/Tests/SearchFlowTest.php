@@ -84,6 +84,11 @@ final class SearchFlowTest extends TestCase
                 return $this->test->askedByPicture($text);
             }
 
+            public function picturesNearPhoto(string $shopId, string $mime, string $bytes, int $limit): array
+            {
+                return [];
+            }
+
             public function picturesReady(): bool
             {
                 return true;

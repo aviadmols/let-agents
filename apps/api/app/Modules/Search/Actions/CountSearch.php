@@ -19,6 +19,20 @@ final class CountSearch
 {
     public const MAX_QUERY = 120;
 
+    /** How a search by photo is counted: one row a day, never the photo. */
+    public const PHOTO = '[photo]';
+
+    /** A search by an uploaded photo. */
+    public function photo(string $shopId, int $results): void
+    {
+        $this->ensure($shopId, self::PHOTO);
+
+        SearchTerm::query()->whereDate('day', now()->toDateString())->where('query', self::PHOTO)->incrementEach(
+            ['searches' => 1, 'empty' => $results === 0 ? 1 : 0],
+            ['last_results' => max(0, $results), 'updated_at' => now()],
+        );
+    }
+
     public function search(string $shopId, string $raw, int $results): void
     {
         $query = $this->query($raw);

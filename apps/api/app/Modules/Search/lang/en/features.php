@@ -13,4 +13,8 @@ return [
         'label' => 'Search in pictures',
         'description' => 'Words like "striped shirt" also find products whose names do not say so, by their picture. Works only once the shop\x27s pictures have vectors.',
     ],
+    'photos' => [
+        'label' => 'Search by photo',
+        'description' => 'A camera button in the search box: a shopper uploads or takes a photo, and the store shows products that look alike. Shows only once the shop\'s pictures have vectors. Each photo costs one vector, and the photo is not kept.',
+    ],
 ];

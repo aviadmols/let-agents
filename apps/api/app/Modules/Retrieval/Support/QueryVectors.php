@@ -99,6 +99,60 @@ final class QueryVectors
         return $vector;
     }
 
+    /**
+     * The vector of a photo a shopper uploaded to search by. Priced per picture. The photo itself
+     * is never kept: only a hash of its bytes, so the same photo sent again is free.
+     *
+     * @return list<float>|null
+     */
+    public function forPhoto(string $shopId, string $mime, string $bytes): ?array
+    {
+        $choice = ModelChoice::for('image');
+
+        if ($bytes === '' || $choice->provider === null || $choice->model === '') {
+            return null;
+        }
+
+        $stored = 'photo:'.$choice->model;
+        $hash = hash('sha256', $bytes);
+        $saved = RetrievalQueryVector::query()->where('embedding_model', $stored)->where('text_hash', $hash)->first();
+
+        if ($saved !== null) {
+            RetrievalQueryVector::query()->whereKey($saved->id)->update(['uses' => DB::raw('uses + 1'), 'last_used_at' => now()]);
+
+            return $saved->vector();
+        }
+
+        $price = (float) Settings::get('retrieval.image_usd_per_image');
+
+        try {
+            $this->spend->assertCanSpend($price);
+            $embeddings = $this->imageEmbedder->embedImages($choice->provider, $choice->model, [['mime' => $mime, 'data' => $bytes]], (int) Settings::get('retrieval.image_dimensions') ?: null);
+        } catch (SpendCapReached|ModelCallFailed) {
+            return null;
+        }
+
+        $vector = $embeddings->vectors[0] ?? null;
+
+        if ($vector === null || $vector === []) {
+            return null;
+        }
+
+        RetrievalQueryVector::query()->create([
+            'shop_id' => $shopId,
+            'embedding_model' => $stored,
+            'text_hash' => $hash,
+            'text' => '',
+            'dimensions' => count($vector),
+            'embedding' => VectorSearch::column($vector),
+            'last_used_at' => now(),
+        ]);
+
+        $this->record($shopId, $choice->providerName, $choice->model, $embeddings->inputTokens, $price);
+
+        return $vector;
+    }
+
     /** Today's one run for this shop's query vectors, grown by every new query. */
     private function record(string $shopId, string $provider, string $model, int $tokens, float $cost): void
     {

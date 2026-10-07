@@ -93,6 +93,37 @@ final class SearchCatalog
     }
 
     /**
+     * Products that look like a photo the shopper uploaded, most alike first, each with how alike
+     * in percent. One picture embedding, or none when the same photo was searched before. The
+     * photo is not kept; the search is counted, without it.
+     *
+     * @return array{total: int, groups: array{product: list<array<string, mixed>>}, searched: bool}
+     */
+    public function photo(string $shopId, string $mime, string $bytes): array
+    {
+        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes): array {
+            $index = LoadedIndex::for($shopId);
+            $floor = (float) Settings::get('search.photo_min_similarity');
+            $products = [];
+
+            $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, (int) Settings::get('search.semantic_results') ?: 24);
+
+            foreach ($hits as $hit) {
+                $record = $index['records']['p:'.$hit['external_id']] ?? null;
+
+                if ($record !== null && $hit['similarity'] >= $floor) {
+                    $products[] = $this->present($record) + ['match' => (int) round(max(0, min(1, $hit['similarity'])) * 100)];
+                }
+            }
+
+            $products = array_slice($products, 0, (int) Settings::get('search.results_per_group', $shopId));
+            $this->counter->photo($shopId, count($products));
+
+            return ['total' => count($products), 'groups' => ['product' => $products], 'searched' => $hits !== [] || $index !== null];
+        });
+    }
+
+    /**
      * Record ids found by meaning, nearest first.
      *
      * @param  array<string, array<string, mixed>>  $records

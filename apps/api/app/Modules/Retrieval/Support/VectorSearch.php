@@ -96,6 +96,17 @@ final class VectorSearch implements SemanticSearch
         return $vector === null ? [] : $this->nearestPictures($vector, ModelChoice::for('image')->model, $limit);
     }
 
+    public function picturesNearPhoto(string $shopId, string $mime, string $bytes, int $limit): array
+    {
+        if ($limit < 1 || ! $this->picturesReady()) {
+            return [];
+        }
+
+        $vector = app(QueryVectors::class)->forPhoto($shopId, $mime, $bytes);
+
+        return $vector === null ? [] : $this->nearestPictures($vector, ModelChoice::for('image')->model, $limit);
+    }
+
     public function picturesReady(): bool
     {
         return RetrievalImage::query()->where('embedding_model', ModelChoice::for('image')->model)->whereNotNull('embedding')->exists();
