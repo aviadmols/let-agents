@@ -13,7 +13,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 
 /**
- * Calls the store plugin's /rega/v1/status with the saved token and records what happened,
+ * Calls the store plugin's /let-agents/v1/status with the saved token and records what happened,
  * both on the connection and as a run in the activity log.
  */
 final class TestStoreConnection

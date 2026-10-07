@@ -1,21 +1,21 @@
 <?php
 
-namespace Rega\Feed;
+namespace LetAgents\Feed;
 
-use Rega\Support\PlainText;
-use Rega\Support\Records;
-use Rega\Support\SensitiveFields;
+use LetAgents\Support\PlainText;
+use LetAgents\Support\Records;
+use LetAgents\Support\SensitiveFields;
 use WC_Product;
 use WC_Product_Attribute;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Reads products into the feed shape Rega ingests.
+ * Reads products into the feed shape Let Agents ingests.
  *
  * Attributes are exported raw, as the store has them. Mapping them to normalized keys with
- * units ("550W" to power_w = 550) happens in Rega, where the mapping can be reviewed.
- * Price and stock are included for filtering and calculation only; Rega shows visitors live
+ * units ("550W" to power_w = 550) happens in Let Agents, where the mapping can be reviewed.
+ * Price and stock are included for filtering and calculation only; Let Agents shows visitors live
  * values, never these.
  */
 final class ProductExporter {
@@ -325,7 +325,7 @@ final class ProductExporter {
 	}
 
 	/**
-	 * Relations the merchant declared in WooCommerce. Rega treats these as the most trusted
+	 * Relations the merchant declared in WooCommerce. Let Agents treats these as the most trusted
 	 * source for complementary and alternative products.
 	 *
 	 * @return list<array{type: string, target: string, source: string}>

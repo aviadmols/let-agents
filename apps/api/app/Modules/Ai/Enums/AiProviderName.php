@@ -26,7 +26,7 @@ enum AiProviderName: string
         return $this->value;
     }
 
-    /** What this provider does in Rega. See docs/ADR/0003. */
+    /** What this provider does in Let Agents. See docs/ADR/0003. */
     public function role(): string
     {
         return __("ai::providers.roles.{$this->value}");

@@ -35,7 +35,7 @@ final class BundlePluginCommand extends Command
             return self::FAILURE;
         }
 
-        $zips = glob($plugin.'/dist/rega-*.zip') ?: [];
+        $zips = glob($plugin.'/dist/let-agents-*.zip') ?: [];
 
         if ($zips === []) {
             $this->components->error('The build produced no zip.');

@@ -3,8 +3,8 @@
 namespace App\Modules\Connections\Support;
 
 /**
- * Keys derived from the plugin's access token, computed the same way in the Rega plugin
- * (Rega\Storefront\SiteKeys). The plugin stores only the token's SHA-256; the server holds the
+ * Keys derived from the plugin's access token, computed the same way in the Let Agents plugin
+ * (LetAgents\Storefront\SiteKeys). The plugin stores only the token's SHA-256; the server holds the
  * token itself. Both reach the same values without any extra secret or setting.
  *
  *   site key      public: in every storefront page, identifies the store to the widget API
@@ -25,12 +25,12 @@ final class SiteKeys
 
     public static function site(string $token): string
     {
-        return substr(hash('sha256', 'rega-site|'.self::tokenHash($token)), 0, 24);
+        return substr(hash('sha256', 'let-agents-site|'.self::tokenHash($token)), 0, 24);
     }
 
     public static function preview(string $token): string
     {
-        return substr(hash_hmac('sha256', 'rega-preview', self::tokenHash($token)), 0, 32);
+        return substr(hash_hmac('sha256', 'let-agents-preview', self::tokenHash($token)), 0, 32);
     }
 
     public static function signature(string $token, string $timestamp, string $method, string $path, string $body): string

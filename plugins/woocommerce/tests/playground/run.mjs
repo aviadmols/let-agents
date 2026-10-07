@@ -1,7 +1,7 @@
-// Boots WordPress + WooCommerce + Rega in Playground, loads fixtures, runs the smoke tests,
+// Boots WordPress + WooCommerce + Let Agents in Playground, loads fixtures, runs the smoke tests,
 // and always shuts the server down, including its child processes.
 //   node tests/playground/run.mjs            (from plugins/woocommerce)
-//   REGA_PHP=8.4 node tests/playground/run.mjs
+//   LET_AGENTS_PHP=8.4 node tests/playground/run.mjs
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,18 +9,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const pluginDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rega-playground-'));
+const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'let-agents-playground-'));
 const fixtures = path.join(outDir, 'fixtures.json');
-const port = Number(process.env.REGA_PORT ?? 9500 + Math.floor(Math.random() * 400));
-const php = process.env.REGA_PHP ?? '8.1';
+const port = Number(process.env.LET_AGENTS_PORT ?? 9500 + Math.floor(Math.random() * 400));
+const php = process.env.LET_AGENTS_PHP ?? '8.1';
 const cliVersion = '3.1.54';
 const bootTimeoutMs = 10 * 60 * 1000;
 
 const serverArgs = [
   '-y', `@wp-playground/cli@${cliVersion}`, 'server',
   `--port=${port}`, `--php=${php}`, '--wp=latest',
-  '--mount-dir', pluginDir, '/wordpress/wp-content/plugins/rega',
-  '--mount-dir', outDir, '/rega-out',
+  '--mount-dir', pluginDir, '/wordpress/wp-content/plugins/let-agents',
+  '--mount-dir', outDir, '/let-agents-out',
   '--blueprint=tests/playground/blueprint.json',
 ];
 
@@ -69,16 +69,16 @@ while (!(fs.existsSync(fixtures) && /Ready!/.test(log))) {
 const info = JSON.parse(fs.readFileSync(fixtures, 'utf8'));
 console.log(`Ready in ${Math.round((Date.now() - started) / 1000)}s: WordPress ${info.wordpress}, WooCommerce ${info.woocommerce}`);
 
-// REGA_KEEP=1 leaves the site running for manual or browser checks (admin / password).
-if (process.env.REGA_KEEP === '1') {
-  console.log(`KEEP http://127.0.0.1:${port}/wp-admin/admin.php?page=rega  server pid ${server.pid}`);
+// LET_AGENTS_KEEP=1 leaves the site running for manual or browser checks (admin / password).
+if (process.env.LET_AGENTS_KEEP === '1') {
+  console.log(`KEEP http://127.0.0.1:${port}/wp-admin/admin.php?page=let-agents  server pid ${server.pid}`);
   await new Promise(() => {});
 }
 
 const result = spawnSync(process.execPath, ['--test', '--test-reporter=spec', 'tests/playground/smoke.test.mjs'], {
   cwd: pluginDir,
   stdio: 'inherit',
-  env: { ...process.env, REGA_BASE_URL: `http://127.0.0.1:${port}`, REGA_FIXTURES: fixtures },
+  env: { ...process.env, LET_AGENTS_BASE_URL: `http://127.0.0.1:${port}`, LET_AGENTS_FIXTURES: fixtures },
 });
 
 stop();

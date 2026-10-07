@@ -6,7 +6,7 @@
 
 | שירות | מקור | הגדרות עיקריות |
 |---|---|---|
-| api | GitHub `aviadmols/Rega`, ענף `main` | Root directory `/`, Dockerfile `apps/api/Dockerfile`, watch paths `/apps/api/**` ו־`/plugins/woocommerce/**`, healthcheck `/up` עם 300 שניות, הפעלה מחדש בכישלון עד 5 פעמים, דומיין ציבורי על פורט 8080 |
+| api | GitHub `aviadmols/Let Agents`, ענף `main` | Root directory `/`, Dockerfile `apps/api/Dockerfile`, watch paths `/apps/api/**` ו־`/plugins/woocommerce/**`, healthcheck `/up` עם 300 שניות, הפעלה מחדש בכישלון עד 5 פעמים, דומיין ציבורי על פורט 8080 |
 | worker | אותו repo | אותן הגדרות בנייה, הפעלה מחדש תמיד |
 | scheduler | אותו repo | אותן הגדרות בנייה, הפעלה מחדש תמיד |
 | Postgres | image `pgvector/pgvector:pg17` | volume ב־`/var/lib/postgresql/data`, `PGDATA` בתת־תיקייה, בלי דומיין ציבורי |
@@ -27,9 +27,9 @@ docker build -f apps/api/Dockerfile .
 **Postgres**
 
 ```
-POSTGRES_USER=rega
+POSTGRES_USER=let-agents
 POSTGRES_PASSWORD=<אקראי>
-POSTGRES_DB=rega
+POSTGRES_DB=let-agents
 PGDATA=/var/lib/postgresql/data/pgdata
 DATABASE_URL=postgresql://${{POSTGRES_USER}}:${{POSTGRES_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:5432/${{POSTGRES_DB}}
 ```
@@ -50,7 +50,7 @@ Start command:
 **api, worker, scheduler, משותפים**
 
 ```
-APP_NAME=Rega
+APP_NAME=Let Agents
 APP_ENV=production
 APP_DEBUG=false
 APP_KEY=base64:<אקראי, זהה בשלושת השירותים>

@@ -9,7 +9,7 @@ use Generator;
 use Illuminate\Http\Client\ConnectionException;
 
 /**
- * The feed as the WooCommerce Rega plugin serves it: /rega/v1/feed/*, paged by ascending ID
+ * The feed as the WooCommerce Let Agents plugin serves it: /let-agents/v1/feed/*, paged by ascending ID
  * with an "after" cursor.
  */
 final class PluginStoreFeed implements StoreFeed

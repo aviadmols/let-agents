@@ -18,7 +18,7 @@ use Livewire\Attributes\Url;
 
 /**
  * Where the widget shows on a store, and links that show it to the store team before it is
- * live for everyone: the page address plus ?rega_preview=<key>. The key stays in a cookie for
+ * live for everyone: the page address plus ?let_agents_preview=<key>. The key stays in a cookie for
  * 30 days, so the team can keep browsing the store.
  */
 final class StorefrontPreview extends Page
@@ -127,6 +127,6 @@ final class StorefrontPreview extends Page
             return $url;
         }
 
-        return $url.(str_contains($url, '?') ? '&' : '?').'rega_preview='.$key;
+        return $url.(str_contains($url, '?') ? '&' : '?').'let_agents_preview='.$key;
     }
 }

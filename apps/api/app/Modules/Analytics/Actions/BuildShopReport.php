@@ -41,7 +41,7 @@ final class BuildShopReport
         return $this->tenant->run($shopId, function () use ($days, $since, $until): array {
             $events = fn (): Builder => AnalyticsEvent::query()->whereBetween('occurred_at', [$since, $until]);
             // Past orders sent once from the store's history are for learning what sells together,
-            // not for a report of what Rega did: Rega was not there when they were placed.
+            // not for a report of what Let Agents did: Let Agents was not there when they were placed.
             $orders = fn (): Builder => AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->whereBetween('ordered_at', [$since, $until]);
 
             $counts = $events()->select('type', DB::raw('count(*) as n'))->groupBy('type')->pluck('n', 'type');
@@ -85,7 +85,7 @@ final class BuildShopReport
     private function daily(Builder $events, Builder $orders, Carbon $since, Carbon $until): array
     {
         // Adds from the store's own button are counted too (for product popularity); this report
-        // is about what Rega did, so the line counts the widget's own adds only.
+        // is about what Let Agents did, so the line counts the widget's own adds only.
         $byDay = (clone $events)
             ->select(DB::raw('DATE(occurred_at) as day'), 'type', DB::raw('count(*) as n'))
             ->whereIn('type', ['page_view', 'open', 'add_to_cart'])

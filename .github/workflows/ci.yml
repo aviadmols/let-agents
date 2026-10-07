@@ -132,7 +132,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: rega-plugin
+          name: let-agents-plugin
           path: plugins/woocommerce/dist/*.zip
           if-no-files-found: error
 
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Boot WordPress + WooCommerce + Rega on PHP 8.1 and run the API tests
+      - name: Boot WordPress + WooCommerce + Let Agents on PHP 8.1 and run the API tests
         run: node tests/playground/run.mjs
 
   packages:
@@ -175,7 +175,7 @@ jobs:
           file: apps/api/Dockerfile
           push: false
           load: true
-          tags: rega-api:ci
+          tags: let-agents-api:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -185,7 +185,7 @@ jobs:
             -e APP_KEY="base64:$(openssl rand -base64 32)" \
             -e APP_ENV=production -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: \
             -e CACHE_STORE=array -e SESSION_DRIVER=array -e QUEUE_CONNECTION=sync \
-            --entrypoint sh rega-api:ci -c '
+            --entrypoint sh let-agents-api:ci -c '
               set -e
               php artisan config:cache
               php artisan route:cache
@@ -193,5 +193,5 @@ jobs:
               php artisan event:cache
               php artisan module:list
               test -f public/js/filament/filament/app.js
-              ls resources/plugins/rega-*.zip
+              ls resources/plugins/let-agents-*.zip
             '

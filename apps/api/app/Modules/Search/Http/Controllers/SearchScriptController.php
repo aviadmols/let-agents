@@ -6,12 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * GET /api/v1/search/rega-search.js — the storefront search. Served by the app, like the widget,
+ * GET /api/v1/search/let-agents-search.js — the storefront search. Served by the app, like the widget,
  * so every store runs the newest version minutes after a deploy, without a plugin update.
  */
 final class SearchScriptController
 {
-    public const PATH = __DIR__.'/../../resources/search/rega-search.js';
+    public const PATH = __DIR__.'/../../resources/search/let-agents-search.js';
 
     public function __invoke(Request $request): Response
     {

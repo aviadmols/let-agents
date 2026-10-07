@@ -1,14 +1,14 @@
 <?php
 
-namespace Rega\Feed;
+namespace LetAgents\Feed;
 
-use Rega\Support\PlainText;
-use Rega\Support\Records;
+use LetAgents\Support\PlainText;
+use LetAgents\Support\Records;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Categories and attributes: the vocabulary Rega builds comparison sets and mappings from.
+ * Categories and attributes: the vocabulary Let Agents builds comparison sets and mappings from.
  */
 final class TaxonomyExporter {
 

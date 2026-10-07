@@ -1,12 +1,12 @@
 /*!
- * Rega storefront widget v1.
+ * Let Agents storefront widget v1.
  *
- * Loaded by the Rega WordPress plugin, which sets window.RegaContext:
+ * Loaded by the Let Agents WordPress plugin, which sets window.LetAgentsContext:
  *   { site, api, script, mode: 'live'|'preview', preview, page: {type, id}, locale,
  *     storeApi, nonce, cartUrl }
  *
  * What it does, in order:
- *   1. Reads the page content from the Rega API (cached, public data).
+ *   1. Reads the page content from the Let Agents API (cached, public data).
  *   2. In preview mode, shows the widget only to the store team (a valid preview key).
  *   3. Replaces prices and stock with live values from the store's own Store API, and drops
  *      anything that is not in stock, not on sale where a sale is promised, or whose price
@@ -18,17 +18,17 @@
  *   6. Reports anonymous events (packages/event-spec) with navigator.sendBeacon.
  *
  * Everything renders in a shadow root, so the theme's CSS does not leak in and ours does not
- * leak out. Stores can still set --rega-accent, --rega-radius and --rega-surface on .rega-widget.
+ * leak out. Stores can still set --let-agents-accent, --let-agents-radius and --let-agents-surface on .let-agents-widget.
  * Text is always set with textContent; links and images must be http(s).
  */
 (function () {
   'use strict';
 
-  var ctx = window.RegaContext;
-  if (!ctx || !ctx.site || !ctx.api || !ctx.page || window.__regaWidget) {
+  var ctx = window.LetAgentsContext;
+  if (!ctx || !ctx.site || !ctx.api || !ctx.page || window.__letAgentsWidget) {
     return;
   }
-  window.__regaWidget = true;
+  window.__letAgentsWidget = true;
 
   var API = String(ctx.api).replace(/\/+$/, '');
   var STORE_API = ctx.storeApi ? String(ctx.storeApi).replace(/\/?$/, '/') : null;
@@ -36,7 +36,7 @@
   var PAGE_ID = String(ctx.page.id || '');
   var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   var MAX_BATCH = 50;
-  var SEEN_KEY = 'rega_seen';
+  var SEEN_KEY = 'let_agents_seen';
   var MAX_SEEN = 8;
   var CHIP_SLOTS = ['teaser', 'chip_1', 'chip_2', 'chip_3', 'chip_4', 'chip_5', 'chip_6', 'chip_7', 'chip_8'];
 
@@ -80,14 +80,16 @@
     }
   }
 
-  // The plugin reads rega_vid at checkout to link an order to widget use, so it lives in a cookie too.
-  var vid = readCookie('rega_vid');
+  // The plugin reads let_agents_vid at checkout to link an order to widget use, so it lives in a cookie too.
+  // A shopper first seen before the rename keeps the same anonymous id, so learning and
+  // attribution carry over.
+  var vid = readCookie('let_agents_vid') || readCookie('rega_vid');
   if (!/^anon-[A-Za-z0-9_-]{16,64}$/.test(vid || '')) {
-    vid = storage('localStorage', 'rega_vid', function () { return 'anon-' + randomId(22); }) || 'anon-' + randomId(22);
+    vid = storage('localStorage', 'let_agents_vid', function () { return 'anon-' + randomId(22); }) || 'anon-' + randomId(22);
   }
-  writeCookie('rega_vid', vid, 31536000);
+  writeCookie('let_agents_vid', vid, 31536000);
 
-  var session = storage('sessionStorage', 'rega_sid', function () { return randomId(22); }) || randomId(22);
+  var session = storage('sessionStorage', 'let_agents_sid', function () { return randomId(22); }) || randomId(22);
 
   /**
    * Which side of the measurement this visitor is on, decided from their own id alone.
@@ -115,14 +117,14 @@
   (function () {
     var fromUrl = null;
     try {
-      fromUrl = new URLSearchParams(location.search).get('rega_preview');
+      fromUrl = new URLSearchParams(location.search).get('let_agents_preview');
     } catch (e) { /* old browser */ }
 
     if (fromUrl && /^[a-f0-9]{32}$/.test(fromUrl)) {
-      writeCookie('rega_preview', fromUrl, 30 * 86400);
+      writeCookie('let_agents_preview', fromUrl, 30 * 86400);
     }
 
-    var candidate = ctx.preview || fromUrl || readCookie('rega_preview');
+    var candidate = ctx.preview || fromUrl || readCookie('let_agents_preview');
     previewKey = /^[a-f0-9]{32}$/.test(candidate || '') ? candidate : null;
   })();
 
@@ -431,19 +433,19 @@
   var CSS = [
     // inline-size containment: the widget takes its column's width and a long line never widens the column.
     ':host{all:initial;display:block;contain:inline-size;max-width:100%;margin:16px 0;font-family:inherit;color:inherit;font-size:15px;line-height:1.5;',
-    '--accent:var(--rega-accent,#1f2933);--surface:var(--rega-surface,#fff);--radius:var(--rega-radius,14px);--line:rgba(17,24,39,.12);--muted:rgba(17,24,39,.62);',
-    // The soft glow: three RGB triplets a store can retune (--rega-glow-1/2/3), a hairline gradient and a faint wash.
-    '--g1:var(--rega-glow-1,66,133,244);--g2:var(--rega-glow-2,168,85,247);--g3:var(--rega-glow-3,236,72,153);',
+    '--accent:var(--let-agents-accent,#1f2933);--surface:var(--let-agents-surface,#fff);--radius:var(--let-agents-radius,14px);--line:rgba(17,24,39,.12);--muted:rgba(17,24,39,.62);',
+    // The soft glow: three RGB triplets a store can retune (--let-agents-glow-1/2/3), a hairline gradient and a faint wash.
+    '--g1:var(--let-agents-glow-1,66,133,244);--g2:var(--let-agents-glow-2,168,85,247);--g3:var(--let-agents-glow-3,236,72,153);',
     '--hairline:linear-gradient(135deg,rgba(var(--g1),.55),rgba(var(--g2),.4) 50%,rgba(var(--g3),.35));',
     '--wash:radial-gradient(120% 90% at 100% 0%,rgba(var(--g1),.08),transparent 55%),radial-gradient(90% 70% at 0% 100%,rgba(var(--g3),.06),transparent 55%);',
     '--grad:linear-gradient(135deg,rgb(var(--g1)),rgb(var(--g2)) 60%,rgb(var(--g3)))}',
-    '@keyframes rega-drift{0%{background-position:0 0,0 0,0% 50%}100%{background-position:0 0,0 0,100% 50%}}',
-    '@keyframes rega-dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}',
-    '@keyframes rega-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}',
-    '@media (prefers-reduced-motion:reduce){.rega *{animation:none!important}}',
+    '@keyframes let-agents-drift{0%{background-position:0 0,0 0,0% 50%}100%{background-position:0 0,0 0,100% 50%}}',
+    '@keyframes let-agents-dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}',
+    '@keyframes let-agents-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}',
+    '@media (prefers-reduced-motion:reduce){.let-agents *{animation:none!important}}',
     ':host(.is-floating){contain:none;position:fixed;bottom:16px;inset-inline-start:16px;z-index:2147483000;margin:0;max-width:calc(100vw - 32px)}',
     '*{box-sizing:border-box}',
-    '.rega{position:relative}',
+    '.let-agents{position:relative}',
     '.note{display:block;width:fit-content;margin:0 0 6px;padding:2px 8px;border-radius:999px;background:#fff4d6;color:#7a5200;font-size:12px}.note a{color:inherit;text-decoration:underline}',
     '.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
     ':host(.is-floating) .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}',
@@ -542,18 +544,18 @@
     '.quick{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 10px}.quick[hidden]{display:none}',
     '.quick .pill{height:30px;padding:0 10px;font-size:12px;gap:5px;color:var(--muted)}',
     '.quick .count{min-width:16px;height:16px;padding:0 4px;font-size:10px}',
-    '@keyframes rega-caret{0%,50%{opacity:1}51%,100%{opacity:0}}',
+    '@keyframes let-agents-caret{0%,50%{opacity:1}51%,100%{opacity:0}}',
     '.spark-g{flex:none;width:20px;height:20px}',
     // The banner: one card that changes what it holds, the way an ad board does. Compact on purpose.
     '.bn{margin:0 0 8px;padding:9px 11px;border:1px solid transparent;border-radius:16px;',
     'background:var(--wash) padding-box,linear-gradient(#fff,#fff) padding-box,var(--hairline) border-box;background-size:auto,auto,220% 220%;',
-    'animation:rega-drift 9s ease-in-out infinite alternate;box-shadow:0 10px 30px rgba(var(--g2),.09)}',
+    'animation:let-agents-drift 9s ease-in-out infinite alternate;box-shadow:0 10px 30px rgba(var(--g2),.09)}',
     '.bn[hidden]{display:none}',
     '.bn-head{display:flex;align-items:center;gap:6px;margin-bottom:5px}',
     '.bn-head .spark-g{width:15px;height:15px}',
     '.bn-who{font-size:10.5px;font-weight:500;color:#9ca3af}',
     '.bn-stage{min-height:54px}',
-    '.bn-frame{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;text-align:start;animation:rega-in .34s ease-out}',
+    '.bn-frame{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;text-align:start;animation:let-agents-in .34s ease-out}',
     '.bn-frame[hidden]{display:none}',
     '.bn-frame:focus-visible{outline:2px solid rgba(var(--g2),.5);outline-offset:3px;border-radius:10px}',
     '.bn-row{display:flex;align-items:center;gap:9px}',
@@ -575,7 +577,7 @@
     '.bn-title{font-size:13px;font-weight:600;line-height:1.3}.bn-title.is-plain{font-weight:500}',
     '.bn-sub{margin-top:1px;font-size:11px;color:var(--muted);line-height:1.35}',
     '.bn-type{font-size:13px;line-height:1.45;min-height:1.45em}',
-    '.bn-type.is-typing:after{content:"";display:inline-block;width:2px;height:1em;margin-inline-start:2px;background:currentColor;vertical-align:-2px;animation:rega-caret 1s steps(1) infinite}',
+    '.bn-type.is-typing:after{content:"";display:inline-block;width:2px;height:1em;margin-inline-start:2px;background:currentColor;vertical-align:-2px;animation:let-agents-caret 1s steps(1) infinite}',
     '.bn-feet{display:flex;align-items:center;gap:6px;margin-top:6px}',
     '.bn-dot{all:unset;box-sizing:border-box;cursor:pointer;width:4px;height:4px;border-radius:999px;background:rgba(17,24,39,.16);transition:width .3s,background .3s}',
     '.bn-dot[aria-current="true"]{width:20px;background:var(--grad)}',
@@ -583,20 +585,20 @@
     '.bn-play{all:unset;box-sizing:border-box;margin-inline-start:auto;cursor:pointer;font-size:10.5px;color:#a1a1aa}',
     '.bn-play:focus-visible{outline:2px solid rgba(var(--g2),.5);outline-offset:2px}',
     // The offer stands on its own, under the banner, never inside what the assistant found.
-    '.rega>.signup{margin:0 0 10px;padding:10px 11px}',
+    '.let-agents>.signup{margin:0 0 10px;padding:10px 11px}',
     '.chat{position:relative;padding:12px;border:1px solid transparent;border-radius:20px;background:var(--wash) padding-box,linear-gradient(#fff,#fff) padding-box,var(--hairline) border-box;',
-    'background-size:auto,auto,220% 220%;animation:rega-drift 9s ease-in-out infinite alternate;box-shadow:0 14px 40px rgba(var(--g2),.10)}',
+    'background-size:auto,auto,220% 220%;animation:let-agents-drift 9s ease-in-out infinite alternate;box-shadow:0 14px 40px rgba(var(--g2),.10)}',
     '.chat[hidden]{display:none}',
     '.chat-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.chat-head .who{font-weight:500}.chat-head .aside{margin-inline-start:auto;font-size:11px;color:#a1a1aa}',
     '.thread{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:46vh;overflow-y:auto;scrollbar-width:thin;overscroll-behavior:contain}',
     '.bubble[hidden]{display:none}',
     '.earlier{all:unset;box-sizing:border-box;align-self:center;cursor:pointer;padding:4px 12px;border-radius:999px;background:rgba(17,24,39,.05);font-size:12px;color:var(--muted)}',
     '.earlier:hover,.earlier:focus-visible{background:rgba(17,24,39,.1)}',
-    '.bubble{align-self:flex-start;max-width:94%;box-sizing:border-box;padding:9px 12px;border-radius:16px 16px 16px 4px;background:#fff;border:1px solid #ececee;font-size:14px;line-height:1.5;animation:rega-in .3s ease-out}',
+    '.bubble{align-self:flex-start;max-width:94%;box-sizing:border-box;padding:9px 12px;border-radius:16px 16px 16px 4px;background:#fff;border:1px solid #ececee;font-size:14px;line-height:1.5;animation:let-agents-in .3s ease-out}',
     '.bubble.me{align-self:flex-end;max-width:78%;border-radius:16px 16px 4px 16px;background:#f4f4f5;border:0}',
     '.bubble .mark{font-family:Georgia,serif;font-size:22px;line-height:.5;color:rgba(var(--g2),.85);margin-inline-end:6px;vertical-align:-4px}',
     '.bubble-lead{font-weight:600;margin-bottom:6px}.bubble .body{margin-top:0}.bubble .ask-form,.bubble .ask-note{display:none}',
-    '.dots{display:flex;gap:5px;padding:12px 14px}.dots span{width:6px;height:6px;border-radius:50%;background:rgb(var(--g2));animation:rega-dot 1.1s infinite ease-in-out}',
+    '.dots{display:flex;gap:5px;padding:12px 14px}.dots span{width:6px;height:6px;border-radius:50%;background:rgb(var(--g2));animation:let-agents-dot 1.1s infinite ease-in-out}',
     '.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}',
     '.more{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}.more .lead{font-size:12px;color:#a1a1aa}',
     '.more .pill{height:32px;padding:0 11px;font-size:12.5px}.more .count{min-width:17px;height:17px;padding:0 4px;font-size:10px}',
@@ -604,7 +606,7 @@
     '.composer input{flex:1;min-width:0;box-sizing:border-box;height:40px;padding:0 14px;border:0;border-radius:999px;background:#f4f4f5;color:inherit;font:inherit;font-size:16px}',
     '.composer input:focus{outline:2px solid rgba(var(--g2),.5);outline-offset:1px}',
     '.composer button{all:unset;box-sizing:border-box;flex:none;width:40px;height:40px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 16px rgba(var(--g2),.25)}',
-    '.composer button svg{width:18px;height:18px}.rega[dir="ltr"] .composer button svg{transform:scaleX(-1)}',
+    '.composer button svg{width:18px;height:18px}.let-agents[dir="ltr"] .composer button svg{transform:scaleX(-1)}',
     '.chat .signup{margin-top:10px;padding:10px}',
     '.ask-q{font-weight:600;margin-bottom:3px}.ask-a{line-height:1.55}.ask-a.is-loading{color:var(--muted)}',
     '.ask-heading{margin:14px 0 4px;font-size:13px;font-weight:600;color:var(--muted)}',
@@ -634,8 +636,8 @@
     '.contact-badge:before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:#c4c4c8}',
     '.contact-wrap.is-online .contact-badge{color:#146c43}',
     // A slow breath, not a blink: enough to read as live, never enough to nag.
-    '.contact-wrap.is-online .contact-badge:before{background:#16a34a;animation:rega-alive 2.4s ease-in-out infinite}',
-    '@keyframes rega-alive{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(22,163,74,.5)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(22,163,74,0)}}',
+    '.contact-wrap.is-online .contact-badge:before{background:#16a34a;animation:let-agents-alive 2.4s ease-in-out infinite}',
+    '@keyframes let-agents-alive{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(22,163,74,.5)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(22,163,74,0)}}',
     '.contact{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}',
     '.contact-title{flex:1 1 180px;min-width:0;font-size:14px;line-height:1.45}',
     '.contact-button{flex:none;display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:999px;background:#25d366;color:#fff;text-decoration:none;font-size:14px;font-weight:600}',
@@ -644,7 +646,7 @@
     '.contact-note{margin:6px 2px 0;font-size:12px;color:var(--muted)}',
     '.browse{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}',
     '.browse a{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;color:inherit;text-decoration:none;font-size:13px}',
-    '.browse a:after{content:"\\203A"}.rega[dir="rtl"] .browse a:after{content:"\\2039"}',
+    '.browse a:after{content:"\\203A"}.let-agents[dir="rtl"] .browse a:after{content:"\\2039"}',
     '.browse a:hover,.browse a:focus-visible{border-color:var(--accent)}',
     '.guides a{display:flex;align-items:center;gap:10px;padding:6px 0;color:inherit;text-decoration:none}',
     '.guides img{width:56px;height:42px;object-fit:cover;border-radius:6px;flex:none;background:#f6f6f7}',
@@ -1086,12 +1088,12 @@
    * and reads as part of the article rather than as something bolted on.
    */
   function fillCtaSlot(cta, labels, open) {
-    var slot = document.querySelector('.rega-cta[data-rega-cta]');
+    var slot = document.querySelector('.let-agents-cta[data-let-agents-cta]');
 
-    if (!slot || !cta || slot.dataset.regaFilled) {
+    if (!slot || !cta || slot.dataset.letAgentsFilled) {
       return;
     }
-    slot.dataset.regaFilled = '1';
+    slot.dataset.letAgentsFilled = '1';
 
     var card = document.createElement('div');
     card.setAttribute('dir', document.documentElement.dir || 'rtl');
@@ -1656,7 +1658,7 @@
 
   // ---------------------------------------------------------------- products as a slider or a list
 
-  var VIEW_KEY = 'rega_view';
+  var VIEW_KEY = 'let_agents_view';
   var viewers = [];
 
   function savedView() {
@@ -1910,15 +1912,15 @@
       return;
     }
 
-    var host = el('div', 'rega-widget');
-    host.setAttribute('data-rega', PAGE_TYPE);
+    var host = el('div', 'let-agents-widget');
+    host.setAttribute('data-let-agents', PAGE_TYPE);
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
 
     var style = el('style');
     style.textContent = CSS;
     root.appendChild(style);
 
-    var wrap = el('div', 'rega');
+    var wrap = el('div', 'let-agents');
     wrap.setAttribute('dir', bank.dir || 'rtl');
     wrap.setAttribute('lang', bank.locale || 'he');
 
@@ -1938,7 +1940,7 @@
 
     var chips = el('div', 'chips');
     var panel = el('div', 'panel');
-    panel.id = 'rega-panel';
+    panel.id = 'let-agents-panel';
     panel.hidden = true;
     panel.setAttribute('role', 'region');
 
@@ -2047,7 +2049,7 @@
       if (quoteIndex !== -1) {
         quote = el('button', 'quote');
         quote.type = 'button';
-        quote.setAttribute('aria-controls', 'rega-panel');
+        quote.setAttribute('aria-controls', 'let-agents-panel');
         quote.appendChild(el('span', 'mark', '”'));
         var words = el('span', 'quote-text');
         if (quoteItem) {
@@ -2064,7 +2066,7 @@
         var pill = el('button', 'pill');
         pill.type = 'button';
         pill.setAttribute('aria-expanded', 'false');
-        pill.setAttribute('aria-controls', 'rega-panel');
+        pill.setAttribute('aria-controls', 'let-agents-panel');
 
         if (index === 0) {
           pill.innerHTML = SPARK;
@@ -2882,7 +2884,7 @@
 
   var WHATSAPP = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.33 4.96L2 22l5.25-1.37c1.44.79 3.07 1.2 4.72 1.2h.01c5.46 0 9.91-4.45 9.91-9.91C21.89 6.45 17.5 2 12.04 2zm0 18.06h-.01c-1.48 0-2.93-.4-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.39c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.41a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24zm4.52-6.17c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.79.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.85.84-.85 2.04 0 1.2.87 2.36.99 2.53.12.16 1.71 2.62 4.15 3.67.58.25 1.03.4 1.39.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.22-.16-.47-.28z"/></svg>';
 
-  var SPARK_G = '<svg class="spark-g" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="rega-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4285F4"/><stop offset=".6" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs><path fill="url(#rega-g)" d="M12 2l2.3 6.4 6.4 2.3-6.4 2.3L12 19.4l-2.3-6.4L3.3 10.7l6.4-2.3z"/><path fill="url(#rega-g)" opacity=".7" d="M19 15l.9 2.4 2.4.9-2.4.9L19 21.6l-.9-2.4-2.4-.9 2.4-.9z"/></svg>';
+  var SPARK_G = '<svg class="spark-g" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="let-agents-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4285F4"/><stop offset=".6" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs><path fill="url(#let-agents-g)" d="M12 2l2.3 6.4 6.4 2.3-6.4 2.3L12 19.4l-2.3-6.4L3.3 10.7l6.4-2.3z"/><path fill="url(#let-agents-g)" opacity=".7" d="M19 15l.9 2.4 2.4.9-2.4.9L19 21.6l-.9-2.4-2.4-.9 2.4-.9z"/></svg>';
 
   var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>';
 

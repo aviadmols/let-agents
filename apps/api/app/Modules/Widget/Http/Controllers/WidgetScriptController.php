@@ -6,12 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * GET /api/v1/widget/rega.js — the storefront widget. Served by the app rather than as a static
+ * GET /api/v1/widget/let-agents.js — the storefront widget. Served by the app rather than as a static
  * file so every store gets a new version within minutes of a deploy, without a plugin update.
  */
 final class WidgetScriptController
 {
-    public const PATH = __DIR__.'/../../resources/widget/rega.js';
+    public const PATH = __DIR__.'/../../resources/widget/let-agents.js';
 
     public function __invoke(Request $request): Response
     {

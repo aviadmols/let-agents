@@ -33,7 +33,7 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 
 ## Catalog and product knowledge (apps/api)
 
-- `Catalog` reads the store feed through `Connections\Contracts\StoreFeed` (the Rega plugin today).
+- `Catalog` reads the store feed through `Connections\Contracts\StoreFeed` (the Let Agents plugin today).
   Records are never deleted by a sync; `removed_at` marks what the store stopped publishing, and
   only after a complete read. Costs and internal notes are stripped before storing
   (`Catalog\Support\SensitiveFields`), even if an old plugin sends them.
@@ -78,7 +78,7 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 
 ## Search, pictures and the daily review (apps/api, ADR 0008)
 
-- `Search` owns the store's search box. `Support/HebrewSearch.php` and `resources/search/rega-search.js`
+- `Search` owns the store's search box. `Support/HebrewSearch.php` and `resources/search/let-agents-search.js`
   are one algorithm in two languages; change both or neither, `HebrewSearchTest` runs them on one
   fixture and requires identical ids in identical order. The index (`search_indexes`) is rebuilt at
   02:40 and on demand; synonyms are applied at build time, never at query time.
@@ -99,14 +99,14 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   Use a small PHP script with `str_replace`, or the editor.
 ## Storefront widget and analytics (apps/api)
 
-- `Widget` serves `/api/v1/widget/rega.js` (source: `Widget/resources/widget/rega.js`, plain ES5-ish JS,
+- `Widget` serves `/api/v1/widget/let-agents.js` (source: `Widget/resources/widget/let-agents.js`, plain ES5-ish JS,
   no build step) and `/api/v1/widget/{site}/page`, built in code from approved facts only. Placement
   is a per-shop CSS selector setting. Shopper-facing sentences are templates in `widget::bank`.
   Two layouts from one bank (`widget.layout`): `circles` (the row of circles, one panel) and
   `chat` (one closed teaser line that opens into a conversation whose suggestions are the same
   sections; a chosen section's rendered body is moved into an assistant bubble after a short
   "thinking" pause — no model call, only a typed question reaches the Assistant). Both use the soft
-  look: gradient hairlines from `--rega-glow-1/2/3`, the store's `--rega-accent` only on buttons.
+  look: gradient hairlines from `--let-agents-glow-1/2/3`, the store's `--let-agents-accent` only on buttons.
 - `Analytics` stores beacons validated against `packages/event-spec` (copied to
   `resources/event-spec` in the image) and plugin order summaries; `BuildShopReport` is the one
   report for the plugin, the operator panel and later the merchant panel.
@@ -114,7 +114,7 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   section order, clicked items first, never-clicked products dropped after enough openings. Sections
   carry spare products for that, so trim to `widget.max_products` only there.
 - `ComputePopularity` (same nightly command) writes `analytics_popularity`: adds to the cart and
-  orders per product. rega.js reports the store's own add-to-cart button as `source: page`. The
+  orders per product. let-agents.js reports the store's own add-to-cart button as `source: page`. The
   widget's popularity line reads the table (`BuildPageBank::popularity()`), never the events.
 - `Assistant` answers shoppers' questions (`/widget/{site}/ask`, `/widget/{site}/questions`): saved
   answers first, contact details and daily limits in code, a small model checks the question is
@@ -145,15 +145,15 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 ## WooCommerce plugin (plugins/woocommerce)
 
 - Plain WordPress PHP, no Composer runtime deps, minimum PHP 8.1 (CI lints on 8.1: no readonly
-  classes, no typed class constants). Namespace `Rega\`, text domain `rega`, REST `rega/v1`.
+  classes, no typed class constants). Namespace `LetAgents\`, text domain `let-agents`, REST `let-agents/v1`.
 - Read-only toward the store: no write routes, nothing about customers or users. ADR 0005.
   Outgoing only: order summaries without customer data and signed report requests (ADR 0006).
 - Keys the plugin and the API share are derived from the token hash, never stored twice:
-  `RegaStorefrontSiteKeys` must stay identical to `ConnectionsSupportSiteKeys`.
-- Translations: `languages/rega-he_IL.l10n.php` (WP 6.5+ PHP format). `php bin/i18n.php check`.
+  `LetAgentsStorefrontSiteKeys` must stay identical to `ConnectionsSupportSiteKeys`.
+- Translations: `languages/let-agents-he_IL.l10n.php` (WP 6.5+ PHP format). `php bin/i18n.php check`.
 - Integration tests boot real WordPress + WooCommerce in Playground:
-  `node tests/playground/run.mjs` (about 3-5 minutes; `REGA_KEEP=1` leaves the site running,
-  login admin / password). Zip: `php bin/build.php` -> `dist/rega-<version>.zip`.
+  `node tests/playground/run.mjs` (about 3-5 minutes; `LET_AGENTS_KEEP=1` leaves the site running,
+  login admin / password). Zip: `php bin/build.php` -> `dist/let-agents-<version>.zip`.
 - From Git Bash, Playground VFS paths need `MSYS_NO_PATHCONV=1`; `run.mjs` avoids the issue.
 
 ## Commands (run from apps/api)

@@ -8,7 +8,7 @@
  */
 
 const FUNCTIONS = array( '__', '_e', 'esc_html__', 'esc_html_e', 'esc_attr__', 'esc_attr_e' );
-const DOMAIN    = 'rega';
+const DOMAIN    = 'let-agents';
 
 $root = dirname( __DIR__ );
 
@@ -16,7 +16,7 @@ $root = dirname( __DIR__ );
  * @return array<string, list<string>> string => locations
  */
 function extract_strings( string $root ): array {
-	$files = array( $root . '/rega.php' );
+	$files = array( $root . '/let-agents.php' );
 	$it    = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root . '/src', FilesystemIterator::SKIP_DOTS ) );
 
 	foreach ( $it as $file ) {
@@ -68,7 +68,7 @@ function extract_strings( string $root ): array {
 				$relative              = substr( str_replace( '\\', '/', $file ), strlen( str_replace( '\\', '/', $root ) ) + 1 );
 				$strings[ $args[0] ][] = $relative . ':' . $line;
 			} elseif ( count( $args ) < 2 ) {
-				fwrite( STDERR, "Not a literal string with the rega domain: {$file}:{$line}\n" );
+				fwrite( STDERR, "Not a literal string with the let-agents domain: {$file}:{$line}\n" );
 				exit( 1 );
 			}
 		}
@@ -91,7 +91,7 @@ if ( 'list' === $command ) {
 
 $problems = array();
 
-foreach ( glob( $root . '/languages/rega-*.l10n.php' ) as $file ) {
+foreach ( glob( $root . '/languages/let-agents-*.l10n.php' ) as $file ) {
 	$data     = require $file;
 	$messages = $data['messages'] ?? array();
 	$locale   = $data['language'] ?? basename( $file );
@@ -109,7 +109,7 @@ foreach ( glob( $root . '/languages/rega-*.l10n.php' ) as $file ) {
 	}
 }
 
-if ( array() === glob( $root . '/languages/rega-*.l10n.php' ) ) {
+if ( array() === glob( $root . '/languages/let-agents-*.l10n.php' ) ) {
 	$problems[] = 'No translation files in languages/.';
 }
 

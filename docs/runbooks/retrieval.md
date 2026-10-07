@@ -32,11 +32,11 @@ share of it (`retrieval.match_max_share_of_cap`), or found no key stops, says wh
 
 Plugin 0.4.0 and later sends the store's paid orders from the last 24 months once, by itself,
 the first time an admin opens WordPress with the store connected and the widget not off.
-WooCommerce > Rega shows how far it has got and can send them again. Rega already has an order
+WooCommerce > Let Agents shows how far it has got and can send them again. Let Agents already has an order
 with the same hash, so sending again stores nothing twice. On the API side:
 `POST /api/v1/plugin/{site}/orders/history`, and progress in `analytics_order_imports` (shown on
 the map). History orders have `source = history`: they count for learning, not in the report of
-what Rega did.
+what Let Agents did.
 
 ## Changing models
 

@@ -38,11 +38,11 @@ RUN composer dump-autoload --optimize --no-dev \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # The downloadable WooCommerce plugin, built from the same commit as the app that serves it.
-COPY plugins/woocommerce /tmp/rega-plugin
-RUN php /tmp/rega-plugin/bin/build.php \
+COPY plugins/woocommerce /tmp/let-agents-plugin
+RUN php /tmp/let-agents-plugin/bin/build.php \
     && mkdir -p resources/plugins \
-    && cp /tmp/rega-plugin/dist/rega-*.zip resources/plugins/ \
-    && rm -rf /tmp/rega-plugin
+    && cp /tmp/let-agents-plugin/dist/let-agents-*.zip resources/plugins/ \
+    && rm -rf /tmp/let-agents-plugin
 
 COPY apps/api/docker/php.ini "$PHP_INI_DIR/conf.d/zz-upsell.ini"
 COPY apps/api/docker/entrypoint.sh /usr/local/bin/upsell-entrypoint

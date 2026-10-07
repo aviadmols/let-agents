@@ -2,7 +2,7 @@
 
 return [
     'title' => 'התוסף לחנויות',
-    'subheading' => 'תוסף WooCommerce שמחבר חנות ל־Rega. הקובץ נבנה מאותה גרסה של הקוד שרצה כאן.',
+    'subheading' => 'תוסף WooCommerce שמחבר חנות ל־Let Agents. הקובץ נבנה מאותה גרסה של הקוד שרצה כאן.',
     'download' => 'הורדת התוסף',
     'download_version' => 'הורדת התוסף :version',
     'missing' => 'קובץ התוסף לא נמצא בשרת. בפריסה הוא נבנה אוטומטית. בסביבת פיתוח מריצים: php artisan connections:bundle-plugin',
@@ -20,8 +20,8 @@ return [
     // Menu paths are written out in words: "A > B" with English names reorders itself in RTL text.
     'steps' => [
         'upload' => 'בניהול WordPress נכנסים ל״תוספים״, בוחרים ״הוספת תוסף״ ואז ״העלאת תוסף״, מעלים את הקובץ ומפעילים.',
-        'token' => 'בתפריט WooCommerce בוחרים Rega ולוחצים על ״יצירת טוקן״.',
-        'copy' => 'מעתיקים את הטוקן, שמתחיל ב־rgt_. הוא מוצג פעם אחת בלבד.',
+        'token' => 'בתפריט WooCommerce בוחרים Let Agents ולוחצים על ״יצירת טוקן״.',
+        'copy' => 'מעתיקים את הטוקן, שמתחיל ב־lat_. הוא מוצג פעם אחת בלבד.',
         'connect' => 'כאן במערכת נכנסים ל״חיבור חנויות״, בוחרים חנות ומדביקים את כתובת האתר ואת הטוקן. החיבור נבדק מיד.',
     ],
     'access' => [

@@ -3,7 +3,7 @@
 return [
     'attribution_days' => [
         'label' => 'Attribution window',
-        'description' => 'An order counts toward Rega when the visitor used the widget within this many days before ordering.',
+        'description' => 'An order counts toward Let Agents when the visitor used the widget within this many days before ordering.',
     ],
     'beacons_per_minute' => [
         'label' => 'Event batches per minute, per visitor address',

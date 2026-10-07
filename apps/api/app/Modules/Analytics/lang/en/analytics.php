@@ -11,10 +11,10 @@ return [
         'visitors' => 'Visitors',
         'impressions' => 'Widget seen',
         'opens' => 'Widget opened',
-        'widget_add_to_cart' => 'Added to cart from Rega',
+        'widget_add_to_cart' => 'Added to cart from Let Agents',
         'orders' => 'Orders',
-        'assisted_orders' => 'Orders after using Rega',
-        'attributed_revenue' => 'Revenue from products added via Rega',
+        'assisted_orders' => 'Orders after using Let Agents',
+        'attributed_revenue' => 'Revenue from products added via Let Agents',
     ],
     'sections' => [
         'hot_pages' => 'Hot pages',

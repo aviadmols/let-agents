@@ -4,8 +4,8 @@
  * titles and custom fields, a variable product on a global attribute, merchant-set upsells
  * and cross-sells, a draft, and a guide that mentions products three different ways.
  *
- * Runs inside WordPress Playground after WooCommerce and Rega are active. Writes the access
- * token and the created IDs to /rega-out/fixtures.json for the smoke test.
+ * Runs inside WordPress Playground after WooCommerce and Let Agents are active. Writes the access
+ * token and the created IDs to /let-agents-out/fixtures.json for the smoke test.
  */
 
 require '/wordpress/wp-load.php';
@@ -175,7 +175,7 @@ $protected_id = wp_insert_post(
 	)
 );
 
-// What the shop promises lives on a page, not in a guide. Rega reads pages too.
+// What the shop promises lives on a page, not in a guide. Let Agents reads pages too.
 $terms_id = wp_insert_post(
 	array(
 		'post_type'    => 'page',
@@ -185,10 +185,10 @@ $terms_id = wp_insert_post(
 	)
 );
 
-$token = \Rega\Auth\AccessToken::issue();
+$token = \LetAgents\Auth\AccessToken::issue();
 
 // Past orders: two paid ones inside the 24 months, one older, and one cancelled. Each carries
-// customer details, which must never reach Rega. The request to Rega is caught here instead of
+// customer details, which must never reach Let Agents. The request to Let Agents is caught here instead of
 // sent, so the smoke test can read exactly what would have left the store.
 // Completing an order would take its products off the shelf, and the feed test checks stock.
 add_filter( 'woocommerce_can_reduce_order_stock', '__return_false' );
@@ -233,16 +233,16 @@ add_filter(
 	3
 );
 
-\Rega\Storefront\OrderHistory::start();
-\Rega\Storefront\OrderHistory::send_page( 1, 0 );
-$history_state = \Rega\Storefront\OrderHistory::state();
+\LetAgents\Storefront\OrderHistory::start();
+\LetAgents\Storefront\OrderHistory::send_page( 1, 0 );
+$history_state = \LetAgents\Storefront\OrderHistory::state();
 
-if ( ! is_dir( '/rega-out' ) ) {
-	mkdir( '/rega-out' );
+if ( ! is_dir( '/let-agents-out' ) ) {
+	mkdir( '/let-agents-out' );
 }
 
 file_put_contents(
-	'/rega-out/fixtures.json',
+	'/let-agents-out/fixtures.json',
 	json_encode(
 		array(
 			'token'       => $token,
@@ -265,7 +265,7 @@ file_put_contents(
 				'requests' => $history_requests,
 				'state'    => $history_state,
 				'refs'     => array_map(
-					static fn ( int $id ): string => hash_hmac( 'sha256', 'order|' . $id, (string) \Rega\Storefront\SiteKeys::preview() ),
+					static fn ( int $id ): string => hash_hmac( 'sha256', 'order|' . $id, (string) \LetAgents\Storefront\SiteKeys::preview() ),
 					$history_orders
 				),
 			),

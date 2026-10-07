@@ -1,19 +1,19 @@
 <?php
 
-namespace Rega\Storefront;
+namespace LetAgents\Storefront;
 
-use Rega\Settings;
+use LetAgents\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Sends Rega the store's past orders once, so it can learn what sells together from before it
+ * Sends Let Agents the store's past orders once, so it can learn what sells together from before it
  * was installed.
  *
  * Each order has exactly the shape OrderReporter sends at checkout — a keyed hash of the order
  * ID, totals, product IDs with quantities and line totals — without the visitor ID, which a
  * past order never had. Names, emails, phones, addresses, payment details, notes and coupons are
- * never read. An order Rega already has (the same hash) is not stored twice.
+ * never read. An order Let Agents already has (the same hash) is not stored twice.
  *
  * Paid orders (processing, completed) from the last MONTHS months, PER_PAGE at a time, each page
  * in its own Action Scheduler job, so a store with years of orders never blocks a request.
@@ -21,9 +21,9 @@ defined( 'ABSPATH' ) || exit;
  */
 final class OrderHistory {
 
-	public const ACTION = 'rega_order_history_page';
+	public const ACTION = 'let_agents_order_history_page';
 
-	public const OPTION = 'rega_order_history';
+	public const OPTION = 'let_agents_order_history';
 
 	public const MONTHS = 24;
 
@@ -63,14 +63,14 @@ final class OrderHistory {
 		}
 	}
 
-	/** From the start, again: an order Rega already has is not stored twice. */
+	/** From the start, again: an order Let Agents already has is not stored twice. */
 	public static function start(): bool {
 		if ( ! self::can_send() ) {
 			return false;
 		}
 
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( self::ACTION, array(), 'rega' );
+			as_unschedule_all_actions( self::ACTION, array(), 'let-agents' );
 		}
 
 		$first = self::query( 1, 1 );
@@ -121,7 +121,7 @@ final class OrderHistory {
 		}
 
 		$last = $page >= (int) $result->max_num_pages;
-		$sent = RegaApi::post(
+		$sent = LetAgentsApi::post(
 			'orders/history',
 			array(
 				'orders'   => $orders,
@@ -165,12 +165,12 @@ final class OrderHistory {
 
 	private static function schedule( int $page, int $tries, int $delay = 0 ): void {
 		if ( $delay > 0 && function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action( time() + $delay, self::ACTION, array( $page, $tries ), 'rega' );
+			as_schedule_single_action( time() + $delay, self::ACTION, array( $page, $tries ), 'let-agents' );
 
 			return;
 		}
 
-		as_enqueue_async_action( self::ACTION, array( $page, $tries ), 'rega' );
+		as_enqueue_async_action( self::ACTION, array( $page, $tries ), 'let-agents' );
 	}
 
 	/**

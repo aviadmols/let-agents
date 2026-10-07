@@ -20,7 +20,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-/** Articles and guides the store shares with Rega. Read-only. */
+/** Articles and guides the store shares with Let Agents. Read-only. */
 final class CatalogContentResource extends Resource
 {
     use NeedsShopContext;

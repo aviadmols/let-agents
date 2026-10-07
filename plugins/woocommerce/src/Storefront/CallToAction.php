@@ -1,8 +1,8 @@
 <?php
 
-namespace Rega\Storefront;
+namespace LetAgents\Storefront;
 
-use Rega\Settings;
+use LetAgents\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 final class CallToAction {
 
 	/** The element the widget looks for. Only the first on a page is filled. */
-	public const SLOT = 'rega-cta';
+	public const SLOT = 'let-agents-cta';
 
 	public static function register(): void {
 		add_shortcode( 'lets_cta', array( self::class, 'shortcode' ) );
@@ -74,6 +74,6 @@ final class CallToAction {
 	}
 
 	private static function slot(): string {
-		return '<div class="' . esc_attr( self::SLOT ) . '" data-rega-cta="1"></div>';
+		return '<div class="' . esc_attr( self::SLOT ) . '" data-let-agents-cta="1"></div>';
 	}
 }

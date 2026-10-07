@@ -40,12 +40,12 @@ final class TestStoreConnectionTest extends TestCase
     public function test_a_working_plugin_connects_and_the_site_info_is_saved(): void
     {
         Http::fake([
-            'guetaavigdor.test/wp-json/rega/v1/status' => Http::response(['data' => $this->statusPayload()]),
+            'guetaavigdor.test/wp-json/let-agents/v1/status' => Http::response(['data' => $this->statusPayload()]),
         ]);
 
         $run = app(TestStoreConnection::class)->handle($this->connection);
 
-        Http::assertSent(fn (Request $request): bool => $request->hasHeader('X-Rega-Token', self::TOKEN));
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader('X-LetAgents-Token', self::TOKEN));
 
         $this->connection->refresh();
         $this->assertSame(ConnectionStatus::Connected, $this->connection->status);
@@ -102,10 +102,10 @@ final class TestStoreConnectionTest extends TestCase
     public static function failures(): array
     {
         return [
-            'wrong token' => [['code' => 'rega_invalid_token'], 401, 'invalid_token'],
-            'locked out' => [['code' => 'rega_rate_limited'], 429, 'locked_out'],
+            'wrong token' => [['code' => 'let_agents_invalid_token'], 401, 'invalid_token'],
+            'locked out' => [['code' => 'let_agents_rate_limited'], 429, 'locked_out'],
             'plugin not installed' => [['code' => 'rest_no_route'], 404, 'plugin_missing'],
-            'woocommerce off' => [['code' => 'rega_woocommerce_inactive'], 503, 'woocommerce_inactive'],
+            'woocommerce off' => [['code' => 'let_agents_woocommerce_inactive'], 503, 'woocommerce_inactive'],
             'server error' => ['oops', 500, 'http_error'],
             'something else answered' => [['hello' => 'world'], 200, 'unexpected_response'],
         ];

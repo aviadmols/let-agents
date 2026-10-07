@@ -3,13 +3,13 @@
 return [
     'input_selector' => [
         'label' => 'Search boxes on the site',
-        'description' => 'CSS selector of the search fields Rega search attaches to. Several, separated by commas.',
+        'description' => 'CSS selector of the search fields Let Agents search attaches to. Several, separated by commas.',
     ],
     'results' => [
         'label' => 'Where full results show',
-        'description' => 'In Rega\'s panel over the page, or on the site\'s own search results page in Rega\'s order.',
+        'description' => 'In LetAgents\'s panel over the page, or on the site\'s own search results page in LetAgents\'s order.',
         'options' => [
-            'panel' => 'In Rega\'s panel',
+            'panel' => 'In LetAgents\'s panel',
             'page' => 'On the site\'s search page',
         ],
     ],

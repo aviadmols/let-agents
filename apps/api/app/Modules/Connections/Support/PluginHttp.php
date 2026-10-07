@@ -7,7 +7,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
- * One GET to the store's Rega plugin, with the saved token.
+ * One GET to the store's Let Agents plugin, with the saved token.
  *
  * Pretty permalinks first. Sites without them answer only on ?rest_route=, so that is tried
  * when, and only when, the first answer did not come from the WordPress REST API at all.
@@ -23,11 +23,11 @@ final class PluginHttp
     public static function get(StoreConnection $connection, string $route, array $query = [], int $timeoutSeconds = 30): array
     {
         $client = Http::acceptJson()
-            ->withHeaders(['X-Rega-Token' => $connection->access_token, 'User-Agent' => 'Rega/'.config('app.name')])
+            ->withHeaders(['X-LetAgents-Token' => $connection->access_token, 'User-Agent' => 'Let Agents/'.config('app.name')])
             ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
             ->timeout($timeoutSeconds);
 
-        $route = '/rega/v1/'.ltrim($route, '/');
+        $route = '/let-agents/v1/'.ltrim($route, '/');
         $url = $connection->site_url.'/wp-json'.$route.self::queryString($query);
         $response = $client->get($url);
 
@@ -58,8 +58,8 @@ final class PluginHttp
         return match (true) {
             $response->status() === 401 => 'invalid_token',
             $response->status() === 429 => 'locked_out',
-            $response->status() === 404 && ! str_starts_with($code, 'rega_') => 'plugin_missing',
-            $response->status() === 503 && $code === 'rega_woocommerce_inactive' => 'woocommerce_inactive',
+            $response->status() === 404 && ! str_starts_with($code, 'let_agents_') => 'plugin_missing',
+            $response->status() === 503 && $code === 'let_agents_woocommerce_inactive' => 'woocommerce_inactive',
             ! $response->successful() => 'http_error',
             default => null,
         };

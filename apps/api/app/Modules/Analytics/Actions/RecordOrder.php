@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Stores an order the store's plugin reported, and works out what Rega had to do with it:
+ * Stores an order the store's plugin reported, and works out what Let Agents had to do with it:
  *
  *   attributed   products in the order the same visitor added to the cart from the widget
  *   assisted     the visitor opened or used the widget before ordering
@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Validator;
  * Both within the shop's attribution window. The order carries no customer data: a hashed
  * order number, totals, product IDs and quantities, and the anonymous visitor ID.
  *
- * A past order ($history) is stored as it is, with no visitor and nothing attributed: Rega was
+ * A past order ($history) is stored as it is, with no visitor and nothing attributed: Let Agents was
  * not there when it was placed. It is what purchases are learned from.
  */
 final class RecordOrder

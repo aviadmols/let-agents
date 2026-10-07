@@ -26,13 +26,13 @@ final readonly class PluginPackage
         return (string) config('upsell.plugin.path', resource_path('plugins'));
     }
 
-    /** The newest rega-{version}.zip, or null when none has been bundled. */
+    /** The newest let-agents-{version}.zip, or null when none has been bundled. */
     public static function latest(): ?self
     {
         $candidates = [];
 
-        foreach (glob(self::directory().DIRECTORY_SEPARATOR.'rega-*.zip') ?: [] as $file) {
-            if (preg_match('/rega-(\d+\.\d+\.\d+(?:[-+][\w.]+)?)\.zip$/', $file, $m)) {
+        foreach (glob(self::directory().DIRECTORY_SEPARATOR.'let-agents-*.zip') ?: [] as $file) {
+            if (preg_match('/let-agents-(\d+\.\d+\.\d+(?:[-+][\w.]+)?)\.zip$/', $file, $m)) {
                 $candidates[$m[1]] = $file;
             }
         }

@@ -34,7 +34,7 @@ final class SystemCheckCommandTest extends TestCase
     public function test_production_refuses_debug_mode_and_plain_http(): void
     {
         $this->app['env'] = 'production';
-        config(['app.debug' => true, 'app.url' => 'http://rega.example']);
+        config(['app.debug' => true, 'app.url' => 'http://let-agents.example']);
 
         $result = $this->runJson();
 

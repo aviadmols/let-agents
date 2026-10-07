@@ -192,7 +192,7 @@ final class SyncCatalogTest extends TestCase
     private function respond(Request $request): mixed
     {
         if ($this->rejectToken) {
-            return Http::response(['code' => 'rega_invalid_token'], 401);
+            return Http::response(['code' => 'let_agents_invalid_token'], 401);
         }
 
         if ($this->failuresLeft > 0) {

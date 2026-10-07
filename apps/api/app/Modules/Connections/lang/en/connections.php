@@ -10,7 +10,7 @@ return [
     ],
     'sections' => [
         'connection' => 'Connection details',
-        'connection_help' => 'Rega reads the catalog through the Rega plugin installed in the store. The plugin issues the token; it is stored here encrypted.',
+        'connection_help' => 'Let Agents reads the catalog through the Let Agents plugin installed in the store. The plugin issues the token; it is stored here encrypted.',
         'site' => 'Site status',
     ],
     'fields' => [
@@ -19,7 +19,7 @@ return [
         'site_url' => 'Site address',
         'site_url_help' => 'The site\'s main address, for example https://store.com',
         'access_token' => 'Plugin token',
-        'access_token_help' => 'In WordPress: WooCommerce > Rega > Create token. Starts with rgt_.',
+        'access_token_help' => 'In WordPress: WooCommerce > Let Agents > Create token. Starts with lat_.',
         'access_token_keep' => 'Leave empty to keep the current token.',
         'status' => 'Status',
         'last_checked_at' => 'Last check',
@@ -52,6 +52,6 @@ return [
     ],
     'empty' => [
         'heading' => 'No connected stores yet',
-        'description' => 'Install the Rega plugin in the store, create a token and add a connection here.',
+        'description' => 'Install the Let Agents plugin in the store, create a token and add a connection here.',
     ],
 ];

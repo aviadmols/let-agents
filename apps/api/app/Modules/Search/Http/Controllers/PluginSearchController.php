@@ -28,11 +28,11 @@ final class PluginSearchController
         }
 
         $valid = $connection->verifyPluginSignature(
-            (string) $request->header('X-Rega-Timestamp'),
+            (string) $request->header('X-LetAgents-Timestamp'),
             $request->method(),
             $request->getRequestUri(),
             (string) $request->getContent(),
-            (string) $request->header('X-Rega-Signature'),
+            (string) $request->header('X-LetAgents-Signature'),
         );
 
         if (! $valid) {

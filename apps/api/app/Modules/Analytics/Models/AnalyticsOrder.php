@@ -27,7 +27,7 @@ class AnalyticsOrder extends Model
 
     public const SOURCE_LIVE = 'live';
 
-    /** Past orders the plugin sent once: no visitor, no attribution, not in the report of what Rega did. */
+    /** Past orders the plugin sent once: no visitor, no attribution, not in the report of what Let Agents did. */
     public const SOURCE_HISTORY = 'history';
 
     protected $guarded = ['id'];

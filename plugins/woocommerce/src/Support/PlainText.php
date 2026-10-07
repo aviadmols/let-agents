@@ -1,6 +1,6 @@
 <?php
 
-namespace Rega\Support;
+namespace LetAgents\Support;
 
 defined( 'ABSPATH' ) || exit;
 

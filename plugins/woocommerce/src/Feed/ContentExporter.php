@@ -1,9 +1,9 @@
 <?php
 
-namespace Rega\Feed;
+namespace LetAgents\Feed;
 
-use Rega\Support\PlainText;
-use Rega\Support\Records;
+use LetAgents\Support\PlainText;
+use LetAgents\Support\Records;
 use WP_Post;
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * merchant allowed in the settings.
  *
  * Each record lists the products it mentions, found from links to product pages, product
- * shortcodes and the hand-picked products block. Rega uses that to connect a guide to the
+ * shortcodes and the hand-picked products block. Let Agents uses that to connect a guide to the
  * products it explains.
  */
 final class ContentExporter {

@@ -1,9 +1,9 @@
 <?php
 
-namespace Rega\Feed;
+namespace LetAgents\Feed;
 
-use Rega\Support\PlainText;
-use Rega\Support\SensitiveFields;
+use LetAgents\Support\PlainText;
+use LetAgents\Support\SensitiveFields;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -79,6 +79,6 @@ class EnrichmentBatch extends Model
 
     public function fileName(): string
     {
-        return sprintf('rega-%s-%s-%s.jsonl', $this->task->value, $this->created_at->format('Ymd-His'), strtolower(substr($this->id, -6)));
+        return sprintf('let-agents-%s-%s-%s.jsonl', $this->task->value, $this->created_at->format('Ymd-His'), strtolower(substr($this->id, -6)));
     }
 }

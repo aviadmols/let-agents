@@ -1,20 +1,23 @@
 <?php
 
-namespace Rega\Auth;
+namespace LetAgents\Auth;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The one token that lets Rega read this store.
+ * The one token that lets Let Agents read this store.
  *
  * Only a SHA-256 hash is stored. The plaintext exists once, when it is created, and is shown
  * to the admin who created it. Creating a new token replaces the old one immediately.
  */
 final class AccessToken {
 
-	public const OPTION = 'rega_access_token';
+	public const OPTION = 'let_agents_access_token';
 
-	public const PREFIX = 'rgt_';
+	public const PREFIX = 'lat_';
+
+	/** Tokens created before the plugin was renamed, carried over by Legacy::migrate(). */
+	public const LEGACY_PREFIX = 'rgt_';
 
 	/** Writing last_used_at on every request would turn every read into a database write. */
 	private const TOUCH_INTERVAL = 300;
@@ -56,7 +59,7 @@ final class AccessToken {
 	public static function verify( string $plaintext ): bool {
 		$current = self::current();
 
-		if ( null === $current || ! str_starts_with( $plaintext, self::PREFIX ) ) {
+		if ( null === $current || ! ( str_starts_with( $plaintext, self::PREFIX ) || str_starts_with( $plaintext, self::LEGACY_PREFIX ) ) ) {
 			return false;
 		}
 

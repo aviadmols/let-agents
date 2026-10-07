@@ -1,15 +1,15 @@
 <?php
 
-namespace Rega\Feed;
+namespace LetAgents\Feed;
 
-use Rega\Auth\AccessToken;
-use Rega\Plugin;
-use Rega\Settings;
+use LetAgents\Auth\AccessToken;
+use LetAgents\Plugin;
+use LetAgents\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * What Rega needs to know about the site before reading it: versions, store settings,
+ * What Let Agents needs to know about the site before reading it: versions, store settings,
  * active plugins (which ones hold specs, FAQs or guides), and how much there is to read.
  */
 final class SiteStatus {
@@ -24,14 +24,14 @@ final class SiteStatus {
 
 		return array(
 			'plugin'      => array(
-				'version' => REGA_VERSION,
+				'version' => LET_AGENTS_VERSION,
 				'token'   => $this->token_summary(),
 				'content_post_types' => Settings::content_post_types(),
 			),
 			'site'        => array(
 				'name'             => get_bloginfo( 'name' ),
 				'home_url'         => home_url( '/' ),
-				'rest_url'         => rest_url( 'rega/v1/' ),
+				'rest_url'         => rest_url( 'let-agents/v1/' ),
 				'locale'           => get_locale(),
 				'rtl'              => is_rtl(),
 				'timezone'         => wp_timezone_string(),

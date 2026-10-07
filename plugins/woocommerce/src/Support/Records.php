@@ -1,6 +1,6 @@
 <?php
 
-namespace Rega\Support;
+namespace LetAgents\Support;
 
 use WP_Error;
 use WP_REST_Request;
@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 final class Records {
 
 	/**
-	 * Adds "hash": the SHA-256 of the record without it. Rega compares hashes to process only
+	 * Adds "hash": the SHA-256 of the record without it. Let Agents compares hashes to process only
 	 * what changed.
 	 *
 	 * @param array<string, mixed> $record
@@ -57,7 +57,7 @@ final class Records {
 		$timestamp = strtotime( (string) $since );
 
 		if ( false === $timestamp ) {
-			return new WP_Error( 'rega_invalid_since', __( 'The "since" parameter must be a date, for example 2026-09-17T00:00:00Z.', 'rega' ), array( 'status' => 400 ) );
+			return new WP_Error( 'let_agents_invalid_since', __( 'The "since" parameter must be a date, for example 2026-09-17T00:00:00Z.', 'let-agents' ), array( 'status' => 400 ) );
 		}
 
 		return gmdate( 'Y-m-d H:i:s', $timestamp );

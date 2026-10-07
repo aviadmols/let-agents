@@ -339,17 +339,17 @@ final class PageBankTest extends TestCase
         $this->get('/api/v1/widget/000000000000000000000000/page?type=product&id=10')->assertStatus(404);
 
         $key = StoreConnection::forSite($this->site)->previewKey();
-        $this->assertSame(substr(hash_hmac('sha256', 'rega-preview', hash('sha256', self::TOKEN)), 0, 32), $key);
+        $this->assertSame(substr(hash_hmac('sha256', 'let-agents-preview', hash('sha256', self::TOKEN)), 0, 32), $key);
         $this->assertTrue($this->page('product', '10', preview: $key)->json('preview'));
         $this->assertFalse($this->page('product', '10', preview: str_repeat('a', 32))->json('preview'));
     }
 
     public function test_the_script_is_served_with_a_version_tag(): void
     {
-        $response = $this->get('/api/v1/widget/rega.js')->assertOk()->assertHeader('Content-Type', 'application/javascript; charset=utf-8');
-        $this->assertStringContainsString('RegaContext', (string) $response->getContent());
+        $response = $this->get('/api/v1/widget/let-agents.js')->assertOk()->assertHeader('Content-Type', 'application/javascript; charset=utf-8');
+        $this->assertStringContainsString('LetAgentsContext', (string) $response->getContent());
 
-        $this->get('/api/v1/widget/rega.js', ['If-None-Match' => $response->headers->get('ETag')])->assertStatus(304);
+        $this->get('/api/v1/widget/let-agents.js', ['If-None-Match' => $response->headers->get('ETag')])->assertStatus(304);
     }
 
     public function test_the_operator_gets_preview_links_and_the_placement(): void
@@ -365,8 +365,8 @@ final class PageBankTest extends TestCase
             $this->withHeader('Accept-Language', $locale)
                 ->get('/operator/storefront-preview?shop='.$this->shop->id)
                 ->assertOk()
-                ->assertSee('https://store.test/product/jigsaw/?rega_preview='.$key, false)
-                ->assertSee('https://store.test/guide/?rega_preview='.$key, false)
+                ->assertSee('https://store.test/product/jigsaw/?let_agents_preview='.$key, false)
+                ->assertSee('https://store.test/guide/?let_agents_preview='.$key, false)
                 ->assertSee('form.cart');
         }
     }

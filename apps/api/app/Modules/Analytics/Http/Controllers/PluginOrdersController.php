@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Requests from the store's Rega plugin, signed with a key derived from its access token:
+ * Requests from the store's Let Agents plugin, signed with a key derived from its access token:
  *
  *   POST /api/v1/plugin/{site}/orders    an order was placed (no customer data)
  *   POST /api/v1/plugin/{site}/orders/history   a page of past orders, sent once (same shape)
@@ -82,11 +82,11 @@ final class PluginOrdersController
         }
 
         $valid = $connection->verifyPluginSignature(
-            (string) $request->header('X-Rega-Timestamp'),
+            (string) $request->header('X-LetAgents-Timestamp'),
             $request->method(),
             $request->getRequestUri(),
             (string) $request->getContent(),
-            (string) $request->header('X-Rega-Signature'),
+            (string) $request->header('X-LetAgents-Signature'),
         );
 
         return $valid ? $connection : response()->json(['error' => 'bad_signature'], 401);

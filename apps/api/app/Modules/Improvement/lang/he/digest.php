@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Rega · סיכום יומי · :shop · :date',
+    'title' => 'Let Agents · סיכום יומי · :shop · :date',
     'searches' => 'אתמול: :searches חיפושים, :empty בלי תוצאות, :clicks לחיצות על תוצאות.',
     'evidence' => 'נבדקו: :empty חיפושים שלא מצאו כלום, :unclicked חיפושים שאף אחד לא לחץ עליהם, :questions שאלות בלי תשובה באתר.',
     'quiet' => 'אין משהו חדש היום.',

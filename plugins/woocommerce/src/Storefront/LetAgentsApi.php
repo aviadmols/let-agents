@@ -1,16 +1,16 @@
 <?php
 
-namespace Rega\Storefront;
+namespace LetAgents\Storefront;
 
-use Rega\Settings;
+use LetAgents\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Signed calls from this store to the Rega API. Nothing here reads a request from Rega:
+ * Signed calls from this store to the Let Agents API. Nothing here reads a request from Let Agents:
  * these are outgoing only.
  */
-final class RegaApi {
+final class LetAgentsApi {
 
 	/**
 	 * @param array<string, mixed> $payload
@@ -51,7 +51,7 @@ final class RegaApi {
 		$site = SiteKeys::site();
 
 		if ( null === $site ) {
-			return new \WP_Error( 'rega_no_token', __( 'Create an access token first.', 'rega' ) );
+			return new \WP_Error( 'let_agents_no_token', __( 'Create an access token first.', 'let-agents' ) );
 		}
 
 		$url      = add_query_arg( $query, Settings::api_url() . '/plugin/' . $site . '/' . ltrim( $route, '/' ) );
@@ -71,16 +71,16 @@ final class RegaApi {
 		$data   = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 
 		if ( 404 === $status ) {
-			return new \WP_Error( 'rega_unknown_site', __( 'Rega does not know this store yet. Connect it in Rega with the current token.', 'rega' ) );
+			return new \WP_Error( 'let_agents_unknown_site', __( 'Let Agents does not know this store yet. Connect it in Let Agents with the current token.', 'let-agents' ) );
 		}
 
 		if ( 401 === $status ) {
-			return new \WP_Error( 'rega_bad_signature', __( 'Rega refused the request. Check that the token connected in Rega is the current one and that the site clock is correct.', 'rega' ) );
+			return new \WP_Error( 'let_agents_bad_signature', __( 'Let Agents refused the request. Check that the token connected in Let Agents is the current one and that the site clock is correct.', 'let-agents' ) );
 		}
 
 		if ( 200 !== $status || ! is_array( $data ) ) {
 			/* translators: %d: HTTP status code */
-			return new \WP_Error( 'rega_api_status', sprintf( __( 'Rega answered with status %d.', 'rega' ), $status ) );
+			return new \WP_Error( 'let_agents_api_status', sprintf( __( 'Let Agents answered with status %d.', 'let-agents' ), $status ) );
 		}
 
 		return $data;

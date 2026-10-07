@@ -7,7 +7,7 @@ namespace App\Modules\Search\Support;
  * spelling stem and a sound key, compared by cosine.
  *
  * The algorithm, its thresholds and its weights come unchanged from the search that was built and
- * measured on the pilot store (docs/search-mechanism.md there). resources/search/rega-search.js
+ * measured on the pilot store (docs/search-mechanism.md there). resources/search/let-agents-search.js
  * runs the same algorithm in the browser for instant suggestions; the two must return the same
  * ids in the same order, so a change here is a change there, and SearchEngineParityTest checks
  * both against the same fixture.

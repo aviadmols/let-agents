@@ -1,6 +1,6 @@
 <?php
 
-namespace Rega;
+namespace LetAgents;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -10,11 +10,11 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Settings {
 
-	public const OPTION = 'rega_settings';
+	public const OPTION = 'let_agents_settings';
 
 	public const MODES = array( 'off', 'preview', 'live' );
 
-	/** The Rega server. A site can point elsewhere with the REGA_API_URL constant in wp-config.php. */
+	/** The Let Agents server. A site can point elsewhere with the LET_AGENTS_API_URL constant in wp-config.php. */
 	public const DEFAULT_API_URL = 'https://api-production-dfb8a.up.railway.app/api/v1';
 
 	/** Whether the storefront widget loads, and for whom. New installs start in preview. */
@@ -33,7 +33,7 @@ final class Settings {
 		update_option( self::OPTION, $stored, false );
 	}
 
-	/** Whether Rega search runs in the store's search box, and for whom. Off until the store turns it on. */
+	/** Whether Let Agents search runs in the store's search box, and for whom. Off until the store turns it on. */
 	public static function search_mode(): string {
 		$stored = get_option( self::OPTION, array() );
 		$mode   = is_array( $stored ) && isset( $stored['search_mode'] ) ? (string) $stored['search_mode'] : 'off';
@@ -49,9 +49,9 @@ final class Settings {
 		update_option( self::OPTION, $stored, false );
 	}
 
-	/** Base URL of the Rega API, without a trailing slash. HTTPS only, except on this machine. */
+	/** Base URL of the Let Agents API, without a trailing slash. HTTPS only, except on this machine. */
 	public static function api_url(): string {
-		$url = defined( 'REGA_API_URL' ) ? (string) constant( 'REGA_API_URL' ) : self::DEFAULT_API_URL;
+		$url = defined( 'LET_AGENTS_API_URL' ) ? (string) constant( 'LET_AGENTS_API_URL' ) : self::DEFAULT_API_URL;
 		$url = untrailingslashit( esc_url_raw( $url ) );
 
 		$scheme = wp_parse_url( $url, PHP_URL_SCHEME );
@@ -65,7 +65,7 @@ final class Settings {
 	}
 
 	/**
-	 * Post types whose published entries Rega may read as guides and articles.
+	 * Post types whose published entries Let Agents may read as guides and articles.
 	 *
 	 * Posts and pages by default: the guides a shopper reads are usually posts, and what the shop
 	 * promises — returns, shipping, warranty — is usually a page. A shop that wants neither turns

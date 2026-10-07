@@ -1,20 +1,20 @@
-// End-to-end test of the Rega plugin against real WordPress and WooCommerce in Playground.
-//   REGA_BASE_URL=http://127.0.0.1:9400 REGA_FIXTURES=/path/fixtures.json node --test tests/playground/smoke.test.mjs
+// End-to-end test of the Let Agents plugin against real WordPress and WooCommerce in Playground.
+//   LET_AGENTS_BASE_URL=http://127.0.0.1:9400 LET_AGENTS_FIXTURES=/path/fixtures.json node --test tests/playground/smoke.test.mjs
 import { before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 
-const base = process.env.REGA_BASE_URL ?? 'http://127.0.0.1:9400';
-const fixtures = JSON.parse(fs.readFileSync(process.env.REGA_FIXTURES, 'utf8'));
+const base = process.env.LET_AGENTS_BASE_URL ?? 'http://127.0.0.1:9400';
+const fixtures = JSON.parse(fs.readFileSync(process.env.LET_AGENTS_FIXTURES, 'utf8'));
 const token = fixtures.token;
 const P = fixtures.products;
 // The version the plugin declares, so this test does not need editing on every release.
-const pluginVersion = fs.readFileSync(new URL('../../rega.php', import.meta.url), 'utf8').match(/define\( 'REGA_VERSION', '([^']+)' \)/)[1];
+const pluginVersion = fs.readFileSync(new URL('../../let-agents.php', import.meta.url), 'utf8').match(/define\( 'LET_AGENTS_VERSION', '([^']+)' \)/)[1];
 
 // ?rest_route= works with or without pretty permalinks.
 const url = (route, query = {}) => {
-  const params = new URLSearchParams({ rest_route: `/rega/v1${route}`, ...query });
+  const params = new URLSearchParams({ rest_route: `/let-agents/v1${route}`, ...query });
   return `${base}/?${params}`;
 };
 
@@ -31,7 +31,7 @@ const get = async (route, { query, headers } = {}) => {
   return { status: res.status, body, headers: res.headers };
 };
 
-const authed = (route, query) => get(route, { query, headers: { 'X-Rega-Token': token } });
+const authed = (route, query) => get(route, { query, headers: { 'X-LetAgents-Token': token } });
 
 // Playground answers the very first request to a fresh site with a redirect of its own.
 before(async () => {
@@ -55,18 +55,18 @@ test('every route refuses requests without a token', async () => {
   for (const route of ['/status', '/feed/manifest', '/feed/products', '/feed/categories', '/feed/attributes', '/feed/content', '/meta-keys']) {
     const { status, body } = await get(route);
     assert.equal(status, 401, route);
-    assert.equal(body.code, 'rega_missing_token', route);
+    assert.equal(body.code, 'let_agents_missing_token', route);
   }
 });
 
 test('a wrong token is refused', async () => {
-  const { status, body } = await get('/status', { headers: { 'X-Rega-Token': 'rgt_' + 'x'.repeat(48) } });
+  const { status, body } = await get('/status', { headers: { 'X-LetAgents-Token': 'lat_' + 'x'.repeat(48) } });
   assert.equal(status, 401);
-  assert.equal(body.code, 'rega_invalid_token');
+  assert.equal(body.code, 'let_agents_invalid_token');
 });
 
 test('there is no write route', async () => {
-  const res = await fetch(url('/feed/products'), { method: 'POST', headers: { 'X-Rega-Token': token } });
+  const res = await fetch(url('/feed/products'), { method: 'POST', headers: { 'X-LetAgents-Token': token } });
   assert.ok([404, 405].includes(res.status), `POST returned ${res.status}`);
 });
 
@@ -80,10 +80,10 @@ test('status describes the site, WooCommerce and active plugins', async () => {
   assert.equal(s.woocommerce.active, true);
   assert.equal(s.woocommerce.currency, 'ILS');
   assert.ok(s.plugins.some((p) => p.name === 'WooCommerce'));
-  assert.ok(s.plugins.some((p) => p.file === 'rega/rega.php'));
+  assert.ok(s.plugins.some((p) => p.file === 'let-agents/let-agents.php'));
   assert.ok(s.counts.products.publish >= 4);
   assert.equal(s.counts.products.draft, 1);
-  assert.match(s.plugin.token.prefix, /^rgt_/);
+  assert.match(s.plugin.token.prefix, /^lat_/);
   assert.ok(s.plugin.token.last_used_at, 'last_used_at is recorded');
   assert.equal(JSON.stringify(s).includes(token), false, 'the token itself is never returned');
 });
@@ -194,7 +194,7 @@ test('since filters to changed products', async () => {
 
   const bad = await authed('/feed/products', { since: 'not a date' });
   assert.equal(bad.status, 400);
-  assert.equal(bad.body.code, 'rega_invalid_since');
+  assert.equal(bad.body.code, 'let_agents_invalid_since');
 });
 
 test('categories come with their full path', async () => {
@@ -238,7 +238,7 @@ test('pages are shared too, so what the shop promises can be read', async () => 
 test('content types the merchant did not allow are refused', async () => {
   const { status, body } = await authed('/feed/content', { type: 'shop_order' });
   assert.equal(status, 400);
-  assert.equal(body.code, 'rega_content_type_not_allowed');
+  assert.equal(body.code, 'let_agents_content_type_not_allowed');
 });
 
 test('meta keys show product custom fields with samples, and refuse other post types', async () => {
@@ -274,33 +274,33 @@ const pageHtml = async (query) => {
   return res.text();
 };
 
-const regaContext = (html) => {
+const letAgentsContext = (html) => {
   // WordPress appends "//# sourceURL=..." to inline scripts, so match the JSON line only.
-  const match = html.match(/window\.RegaContext = (\{.*\});\n/);
+  const match = html.match(/window\.LetAgentsContext = (\{.*\});\n/);
   return match ? JSON.parse(match[1]) : null;
 };
 
 test('product pages and shared articles load the widget, with a site key derived from the token', async () => {
   const hash = crypto.createHash('sha256').update(token).digest('hex');
-  const site = crypto.createHash('sha256').update(`rega-site|${hash}`).digest('hex').slice(0, 24);
+  const site = crypto.createHash('sha256').update(`let-agents-site|${hash}`).digest('hex').slice(0, 24);
 
   const html = await pageHtml({ post_type: 'product', p: String(P.drill) });
-  const product = regaContext(html);
-  assert.ok(product, 'RegaContext on a product page');
-  assert.equal(product.site, site, 'the same formula as the Rega server');
+  const product = letAgentsContext(html);
+  assert.ok(product, 'LetAgentsContext on a product page');
+  assert.equal(product.site, site, 'the same formula as the Let Agents server');
   assert.equal(product.mode, 'preview', 'new installs start in preview');
   assert.equal(product.preview, null, 'visitors never get the preview key');
   assert.deepEqual(product.page, { type: 'product', id: String(P.drill) });
-  assert.match(product.script, /^https:\/\/.+\/api\/v1\/widget\/rega\.js$/);
+  assert.match(product.script, /^https:\/\/.+\/api\/v1\/widget\/let-agents\.js$/);
   assert.match(product.storeApi, /wc\/store\/v1\/$/);
-  const tag = html.match(/<script[^>]*src="https:\/\/[^"]+\/widget\/rega\.js"[^>]*>/);
-  assert.ok(tag, 'the widget script is loaded from Rega');
+  const tag = html.match(/<script[^>]*src="https:\/\/[^"]+\/widget\/let-agents\.js"[^>]*>/);
+  assert.ok(tag, 'the widget script is loaded from Let Agents');
   assert.match(tag[0], /\sdefer[\s>=]/, 'deferred, so it never blocks the page');
 
-  const guide = regaContext(await pageHtml({ p: String(fixtures.guide) }));
+  const guide = letAgentsContext(await pageHtml({ p: String(fixtures.guide) }));
   assert.deepEqual(guide.page, { type: 'content', id: String(fixtures.guide) });
 
-  assert.equal(regaContext(await pageHtml({})), null, 'not on the home page');
+  assert.equal(letAgentsContext(await pageHtml({})), null, 'not on the home page');
 });
 
 test('past orders leave the store as summaries only: paid, from the last 24 months, never the customer', () => {
@@ -309,7 +309,7 @@ test('past orders leave the store as summaries only: paid, from the last 24 mont
   assert.equal(requests.length, 1, 'one page for a small store');
   const [request] = requests;
   assert.match(request.url, /\/api\/v1\/plugin\/[a-f0-9]{24}\/orders\/history$/);
-  assert.ok(request.headers.includes('X-Rega-Signature'), 'signed like every request to Rega');
+  assert.ok(request.headers.includes('X-LetAgents-Signature'), 'signed like every request to Let Agents');
 
   const body = request.body;
   assert.equal(body.first, true);
@@ -347,32 +347,32 @@ test('repeated wrong tokens lock the address out, even for the right token', asy
   let last;
   do {
     attempts++;
-    last = await get('/status', { headers: { 'X-Rega-Token': `rgt_wrong${attempts}` } });
+    last = await get('/status', { headers: { 'X-LetAgents-Token': `lat_wrong${attempts}` } });
   } while (last.status === 401 && attempts < 25);
 
   assert.equal(last.status, 429, 'locked out');
-  assert.equal(last.body.code, 'rega_rate_limited');
+  assert.equal(last.body.code, 'let_agents_rate_limited');
   assert.ok(attempts <= 20, `locked after at most 20 wrong tokens, took ${attempts}`);
 
   const locked = await authed('/status');
   assert.equal(locked.status, 429);
-  assert.equal(locked.body.code, 'rega_rate_limited');
+  assert.equal(locked.body.code, 'let_agents_rate_limited');
 });
 
 test('the call to action is placed where the author asked for it', async () => {
   // Preview mode by default, and the widget only loads for the team — but the slot itself is
   // written by the plugin, so a visitor's HTML carries it either way.
   const html = await pageHtml({ p: String(fixtures.cta) });
-  const slots = html.match(/class="rega-cta"/g) ?? [];
+  const slots = html.match(/class="let-agents-cta"/g) ?? [];
 
   assert.equal(slots.length, 1, 'one slot, where the shortcode was');
-  assert.ok(html.indexOf('פסקה ראשונה') < html.indexOf('rega-cta'), 'after the first paragraph');
-  assert.ok(html.indexOf('rega-cta') < html.indexOf('פסקה שנייה'), 'and before the second');
+  assert.ok(html.indexOf('פסקה ראשונה') < html.indexOf('let-agents-cta'), 'after the first paragraph');
+  assert.ok(html.indexOf('let-agents-cta') < html.indexOf('פסקה שנייה'), 'and before the second');
   assert.ok(!html.includes('[lets_cta]'), 'the shortcode itself is never printed');
 });
 
 test('a post with no shortcode gets nothing until a shop asks for a paragraph', async () => {
   const html = await pageHtml({ p: String(fixtures.long) });
 
-  assert.ok(!html.includes('rega-cta'), 'nothing is added to a post nobody asked about');
+  assert.ok(!html.includes('let-agents-cta'), 'nothing is added to a post nobody asked about');
 });

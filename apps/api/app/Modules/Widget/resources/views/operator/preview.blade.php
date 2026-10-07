@@ -19,7 +19,7 @@
                 <li>{{ __('widget::ui.preview.step_open') }}</li>
             </ol>
             <p style="margin-top:12px;font-size:13px;opacity:.8">{{ __('widget::ui.preview.any_page') }}</p>
-            <code dir="ltr" style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(0,0,0,.05);border-radius:6px">?rega_preview={{ $d['preview_key'] }}</code>
+            <code dir="ltr" style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(0,0,0,.05);border-radius:6px">?let_agents_preview={{ $d['preview_key'] }}</code>
         </x-filament::section>
 
         <x-filament::section :heading="__('widget::ui.preview.placement_heading')">

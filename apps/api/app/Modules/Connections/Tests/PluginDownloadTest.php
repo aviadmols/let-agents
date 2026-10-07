@@ -18,7 +18,7 @@ final class PluginDownloadTest extends TestCase
     {
         parent::setUp();
 
-        $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'rega-plugin-'.bin2hex(random_bytes(4));
+        $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'let-agents-plugin-'.bin2hex(random_bytes(4));
         mkdir($this->directory);
         config(['upsell.plugin.path' => $this->directory]);
     }
@@ -31,29 +31,29 @@ final class PluginDownloadTest extends TestCase
 
     public function test_the_newest_version_is_picked_by_version_not_by_name(): void
     {
-        foreach (['rega-0.9.0.zip', 'rega-0.10.0.zip', 'rega-0.2.1.zip', 'other.zip'] as $name) {
+        foreach (['let-agents-0.9.0.zip', 'let-agents-0.10.0.zip', 'let-agents-0.2.1.zip', 'other.zip'] as $name) {
             file_put_contents($this->directory.DIRECTORY_SEPARATOR.$name, 'PK');
         }
 
         $this->assertSame('0.10.0', PluginPackage::latest()?->version);
-        $this->assertSame('rega-0.10.0.zip', PluginPackage::latest()?->filename);
+        $this->assertSame('let-agents-0.10.0.zip', PluginPackage::latest()?->filename);
     }
 
     public function test_an_operator_downloads_the_zip(): void
     {
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'rega-0.1.0.zip', 'PK-zip-bytes');
+        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'let-agents-0.1.0.zip', 'PK-zip-bytes');
 
         $response = $this->actingAs(User::factory()->operator()->create())->get('/operator/plugin/download');
 
         $response->assertOk();
         $response->assertHeader('Content-Type', 'application/zip');
-        $this->assertStringContainsString('rega-0.1.0.zip', (string) $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('let-agents-0.1.0.zip', (string) $response->headers->get('Content-Disposition'));
         $this->assertSame('PK-zip-bytes', $response->streamedContent() ?: file_get_contents($response->getFile()->getPathname()));
     }
 
     public function test_only_operators_can_download(): void
     {
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'rega-0.1.0.zip', 'PK');
+        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'let-agents-0.1.0.zip', 'PK');
 
         $this->get('/operator/plugin/download')->assertRedirect('/operator/login');
         $this->actingAs(User::factory()->create())->get('/operator/plugin/download')->assertForbidden();
@@ -69,7 +69,7 @@ final class PluginDownloadTest extends TestCase
 
     public function test_the_page_shows_version_and_install_steps_in_both_languages(): void
     {
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'rega-0.1.0.zip', str_repeat('x', 2048));
+        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'let-agents-0.1.0.zip', str_repeat('x', 2048));
         $operator = User::factory()->operator()->create();
 
         foreach (['he', 'en'] as $locale) {
@@ -77,7 +77,7 @@ final class PluginDownloadTest extends TestCase
                 ->withHeader('Accept-Language', $locale)
                 ->get('/operator/store-plugin')
                 ->assertOk()
-                ->assertSee('rega-0.1.0.zip')
+                ->assertSee('let-agents-0.1.0.zip')
                 ->assertSee(__('connections::plugin.download_version', ['version' => '0.1.0'], $locale))
                 ->assertSee(__('connections::plugin.steps.token', [], $locale))
                 ->assertSee(route('connections.plugin.download'), false);

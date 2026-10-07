@@ -1,45 +1,45 @@
 <?php
 
-namespace Rega\Admin;
+namespace LetAgents\Admin;
 
-use Rega\Plugin;
-use Rega\Storefront\RegaApi;
+use LetAgents\Plugin;
+use LetAgents\Storefront\LetAgentsApi;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * WooCommerce > Rega reports. What visitors did on the store and with the widget, as Rega
+ * WooCommerce > Let Agents reports. What visitors did on the store and with the widget, as Let Agents
  * counted it: page views, hot pages, hot display models, add to cart from the widget, orders
- * and the part of them that came through Rega. Counts only, no visitor-level data.
+ * and the part of them that came through Let Agents. Counts only, no visitor-level data.
  */
 final class ReportsPage {
 
-	public const SLUG = 'rega-reports';
+	public const SLUG = 'let-agents-reports';
 
 	private const PERIODS = array( 7, 30, 90 );
 
-	/** Reports are cached briefly so reloading the page does not call Rega every time. */
+	/** Reports are cached briefly so reloading the page does not call Let Agents every time. */
 	private const CACHE_SECONDS = 600;
 
-	private const TRANSIENT = 'rega_report_';
+	private const TRANSIENT = 'let_agents_report_';
 
 	public static function register(): void {
 		add_action( 'admin_menu', array( self::class, 'menu' ), 100 );
-		add_action( 'admin_post_rega_refresh_report', array( self::class, 'refresh' ) );
+		add_action( 'admin_post_let_agents_refresh_report', array( self::class, 'refresh' ) );
 	}
 
 	public static function menu(): void {
 		$parent = Plugin::woocommerce_active() ? 'woocommerce' : 'options-general.php';
 
-		add_submenu_page( $parent, __( 'Rega reports', 'rega' ), __( 'Rega reports', 'rega' ), self::capability(), self::SLUG, array( self::class, 'render' ) );
+		add_submenu_page( $parent, __( 'Let Agents reports', 'let-agents' ), __( 'Let Agents reports', 'let-agents' ), self::capability(), self::SLUG, array( self::class, 'render' ) );
 	}
 
 	public static function refresh(): void {
 		if ( ! current_user_can( self::capability() ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage Rega.', 'rega' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to manage Let Agents.', 'let-agents' ), '', array( 'response' => 403 ) );
 		}
 
-		check_admin_referer( 'rega_refresh_report' );
+		check_admin_referer( 'let_agents_refresh_report' );
 
 		$days = self::days( isset( $_POST['days'] ) ? (int) $_POST['days'] : 30 );
 		delete_transient( self::TRANSIENT . $days );
@@ -50,45 +50,45 @@ final class ReportsPage {
 
 	public static function render(): void {
 		if ( ! current_user_can( self::capability() ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage Rega.', 'rega' ) );
+			wp_die( esc_html__( 'You do not have permission to manage Let Agents.', 'let-agents' ) );
 		}
 
 		$days   = self::days( isset( $_GET['days'] ) ? (int) $_GET['days'] : 30 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
 		$report = self::report( $days );
 		?>
-		<div class="wrap rega-reports">
+		<div class="wrap let-agents-reports">
 			<style>
-				.rega-reports .rega-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 16px}
-				.rega-reports .rega-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
-				.rega-reports .rega-card{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:12px 14px}
-				.rega-reports .rega-card .label{color:#50575e;font-size:12px}
-				.rega-reports .rega-card .value{font-size:24px;font-weight:600;margin-top:4px;direction:ltr;unicode-bidi:isolate}
-				.rega-reports .rega-card .hint{color:#50575e;font-size:12px;margin-top:2px}
-				.rega-reports .rega-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:12px 16px;margin-bottom:20px}
-				.rega-reports .rega-panel h2{margin:4px 0 12px;font-size:15px}
-				.rega-reports .rega-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px}
-				.rega-reports table.widefat td,.rega-reports table.widefat th{vertical-align:middle}
-				.rega-reports .num{text-align:center;direction:ltr}
-				.rega-reports .rega-legend{display:flex;gap:16px;font-size:12px;color:#50575e;margin-top:6px}
-				.rega-reports .rega-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:4px;vertical-align:middle}
+				.let-agents-reports .let-agents-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 16px}
+				.let-agents-reports .let-agents-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+				.let-agents-reports .let-agents-card{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:12px 14px}
+				.let-agents-reports .let-agents-card .label{color:#50575e;font-size:12px}
+				.let-agents-reports .let-agents-card .value{font-size:24px;font-weight:600;margin-top:4px;direction:ltr;unicode-bidi:isolate}
+				.let-agents-reports .let-agents-card .hint{color:#50575e;font-size:12px;margin-top:2px}
+				.let-agents-reports .let-agents-panel{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:12px 16px;margin-bottom:20px}
+				.let-agents-reports .let-agents-panel h2{margin:4px 0 12px;font-size:15px}
+				.let-agents-reports .let-agents-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px}
+				.let-agents-reports table.widefat td,.let-agents-reports table.widefat th{vertical-align:middle}
+				.let-agents-reports .num{text-align:center;direction:ltr}
+				.let-agents-reports .let-agents-legend{display:flex;gap:16px;font-size:12px;color:#50575e;margin-top:6px}
+				.let-agents-reports .let-agents-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:4px;vertical-align:middle}
 			</style>
 
-			<h1><?php esc_html_e( 'Rega reports', 'rega' ); ?></h1>
+			<h1><?php esc_html_e( 'Let Agents reports', 'let-agents' ); ?></h1>
 
-			<div class="rega-toolbar">
+			<div class="let-agents-toolbar">
 				<?php foreach ( self::PERIODS as $period ) : ?>
 					<a class="button <?php echo $period === $days ? 'button-primary' : ''; ?>" href="<?php echo esc_url( self::url( $period ) ); ?>">
 						<?php
 						/* translators: %d: number of days */
-						echo esc_html( sprintf( __( 'Last %d days', 'rega' ), $period ) );
+						echo esc_html( sprintf( __( 'Last %d days', 'let-agents' ), $period ) );
 						?>
 					</a>
 				<?php endforeach; ?>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<input type="hidden" name="action" value="rega_refresh_report" />
+					<input type="hidden" name="action" value="let_agents_refresh_report" />
 					<input type="hidden" name="days" value="<?php echo esc_attr( (string) $days ); ?>" />
-					<?php wp_nonce_field( 'rega_refresh_report' ); ?>
-					<button type="submit" class="button-link"><?php esc_html_e( 'Refresh', 'rega' ); ?></button>
+					<?php wp_nonce_field( 'let_agents_refresh_report' ); ?>
+					<button type="submit" class="button-link"><?php esc_html_e( 'Refresh', 'let-agents' ); ?></button>
 				</form>
 			</div>
 
@@ -102,20 +102,20 @@ final class ReportsPage {
 			$totals   = $report['totals'];
 			$currency = (string) ( $report['currency'] ?? '' );
 			$cards    = array(
-				array( __( 'Page views', 'rega' ), self::number( $totals['page_views'] ), __( 'Product pages and articles', 'rega' ) ),
-				array( __( 'Visitors', 'rega' ), self::number( $totals['visitors'] ), '' ),
-				array( __( 'Widget seen', 'rega' ), self::number( $totals['impressions'] ), '' ),
-				array( __( 'Widget opened', 'rega' ), self::number( $totals['opens'] ), null === $totals['open_rate'] ? '' : self::percent( $totals['open_rate'] ) ),
-				array( __( 'Added to cart from Rega', 'rega' ), self::number( $totals['widget_add_to_cart'] ), '' ),
-				array( __( 'Orders', 'rega' ), self::number( $totals['orders'] ), self::money( $totals['revenue'], $currency ) ),
-				array( __( 'Orders after using Rega', 'rega' ), self::number( $totals['assisted_orders'] ), '' ),
-				array( __( 'Revenue from products added via Rega', 'rega' ), self::money( $totals['attributed_revenue'], $currency ), '' ),
+				array( __( 'Page views', 'let-agents' ), self::number( $totals['page_views'] ), __( 'Product pages and articles', 'let-agents' ) ),
+				array( __( 'Visitors', 'let-agents' ), self::number( $totals['visitors'] ), '' ),
+				array( __( 'Widget seen', 'let-agents' ), self::number( $totals['impressions'] ), '' ),
+				array( __( 'Widget opened', 'let-agents' ), self::number( $totals['opens'] ), null === $totals['open_rate'] ? '' : self::percent( $totals['open_rate'] ) ),
+				array( __( 'Added to cart from Let Agents', 'let-agents' ), self::number( $totals['widget_add_to_cart'] ), '' ),
+				array( __( 'Orders', 'let-agents' ), self::number( $totals['orders'] ), self::money( $totals['revenue'], $currency ) ),
+				array( __( 'Orders after using Let Agents', 'let-agents' ), self::number( $totals['assisted_orders'] ), '' ),
+				array( __( 'Revenue from products added via Let Agents', 'let-agents' ), self::money( $totals['attributed_revenue'], $currency ), '' ),
 			);
 			?>
 
-			<div class="rega-cards">
+			<div class="let-agents-cards">
 				<?php foreach ( $cards as $card ) : ?>
-					<div class="rega-card">
+					<div class="let-agents-card">
 						<div class="label"><?php echo esc_html( $card[0] ); ?></div>
 						<div class="value"><?php echo esc_html( $card[1] ); ?></div>
 						<?php if ( '' !== $card[2] ) : ?>
@@ -129,22 +129,22 @@ final class ReportsPage {
 				<p class="description">
 					<?php
 					/* translators: %s: number of events */
-					echo esc_html( sprintf( __( 'Includes %s events from preview visits by the store team.', 'rega' ), self::number( $totals['preview_events'] ) ) );
+					echo esc_html( sprintf( __( 'Includes %s events from preview visits by the store team.', 'let-agents' ), self::number( $totals['preview_events'] ) ) );
 					?>
 				</p>
 			<?php endif; ?>
 
-			<div class="rega-panel">
-				<h2><?php esc_html_e( 'Day by day', 'rega' ); ?></h2>
+			<div class="let-agents-panel">
+				<h2><?php esc_html_e( 'Day by day', 'let-agents' ); ?></h2>
 				<?php self::chart( (array) $report['daily'] ); ?>
 			</div>
 
-			<div class="rega-grid">
-				<div class="rega-panel">
-					<h2><?php esc_html_e( 'Hot pages', 'rega' ); ?></h2>
+			<div class="let-agents-grid">
+				<div class="let-agents-panel">
+					<h2><?php esc_html_e( 'Hot pages', 'let-agents' ); ?></h2>
 					<?php
 					self::table(
-						array( __( 'Page', 'rega' ), __( 'Views', 'rega' ), __( 'Widget seen', 'rega' ), __( 'Opened', 'rega' ), __( 'Added to cart', 'rega' ) ),
+						array( __( 'Page', 'let-agents' ), __( 'Views', 'let-agents' ), __( 'Widget seen', 'let-agents' ), __( 'Opened', 'let-agents' ), __( 'Added to cart', 'let-agents' ) ),
 						array_map(
 							static fn ( array $page ): array => array( array( $page['title'], $page['url'] ?? null ), $page['views'], $page['impressions'], $page['opens'], $page['add_to_cart'] ),
 							(array) $report['hot_pages']
@@ -153,11 +153,11 @@ final class ReportsPage {
 					?>
 				</div>
 
-				<div class="rega-panel">
-					<h2><?php esc_html_e( 'Hot display models', 'rega' ); ?></h2>
+				<div class="let-agents-panel">
+					<h2><?php esc_html_e( 'Hot display models', 'let-agents' ); ?></h2>
 					<?php
 					self::table(
-						array( __( 'Display model', 'rega' ), __( 'Seen', 'rega' ), __( 'Opened', 'rega' ), __( 'Clicks', 'rega' ), __( 'Added to cart', 'rega' ) ),
+						array( __( 'Display model', 'let-agents' ), __( 'Seen', 'let-agents' ), __( 'Opened', 'let-agents' ), __( 'Clicks', 'let-agents' ), __( 'Added to cart', 'let-agents' ) ),
 						array_map(
 							static fn ( array $model ): array => array( self::model_label( (string) $model['model'] ), $model['impressions'], $model['opens'], $model['clicks'], $model['add_to_cart'] ),
 							(array) $report['hot_models']
@@ -166,11 +166,11 @@ final class ReportsPage {
 					?>
 				</div>
 
-				<div class="rega-panel">
-					<h2><?php esc_html_e( 'Products added to cart from Rega', 'rega' ); ?></h2>
+				<div class="let-agents-panel">
+					<h2><?php esc_html_e( 'Products added to cart from Let Agents', 'let-agents' ); ?></h2>
 					<?php
 					self::table(
-						array( __( 'Product', 'rega' ), __( 'Added to cart', 'rega' ), __( 'Bought', 'rega' ) ),
+						array( __( 'Product', 'let-agents' ), __( 'Added to cart', 'let-agents' ), __( 'Bought', 'let-agents' ) ),
 						array_map(
 							static fn ( array $product ): array => array( array( $product['title'], get_permalink( (int) $product['id'] ) ?: null ), $product['add_to_cart'], $product['purchased'] ),
 							(array) $report['top_products']
@@ -193,14 +193,14 @@ final class ReportsPage {
 			return $cached;
 		}
 
-		$response = RegaApi::get( 'reports', array( 'days' => $days ) );
+		$response = LetAgentsApi::get( 'reports', array( 'days' => $days ) );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
 
 		if ( ! isset( $response['data']['totals'] ) || ! is_array( $response['data'] ) ) {
-			return new \WP_Error( 'rega_report_shape', __( 'Rega sent a report this version of the plugin cannot read. Update the plugin.', 'rega' ) );
+			return new \WP_Error( 'let_agents_report_shape', __( 'Let Agents sent a report this version of the plugin cannot read. Update the plugin.', 'let-agents' ) );
 		}
 
 		set_transient( self::TRANSIENT . $days, $response['data'], self::CACHE_SECONDS );
@@ -215,7 +215,7 @@ final class ReportsPage {
 	 */
 	private static function chart( array $days ): void {
 		if ( array() === $days ) {
-			echo '<p>' . esc_html__( 'No data yet.', 'rega' ) . '</p>';
+			echo '<p>' . esc_html__( 'No data yet.', 'let-agents' ) . '</p>';
 			return;
 		}
 
@@ -226,7 +226,7 @@ final class ReportsPage {
 		$step   = $width / count( $days );
 		$bar    = max( 2, $step * 0.7 );
 
-		echo '<svg viewBox="0 0 ' . esc_attr( (string) $width ) . ' ' . esc_attr( (string) ( $height + 20 ) ) . '" style="width:100%;height:auto;direction:ltr" role="img" aria-label="' . esc_attr__( 'Day by day', 'rega' ) . '">';
+		echo '<svg viewBox="0 0 ' . esc_attr( (string) $width ) . ' ' . esc_attr( (string) ( $height + 20 ) ) . '" style="width:100%;height:auto;direction:ltr" role="img" aria-label="' . esc_attr__( 'Day by day', 'let-agents' ) . '">';
 
 		foreach ( $days as $i => $day ) {
 			$x      = $i * $step + ( $step - $bar ) / 2;
@@ -236,7 +236,7 @@ final class ReportsPage {
 			$h      = $height * $views / $max;
 			$ho     = $height * min( $opens, $views ) / $max;
 			/* translators: 1: date, 2: page views, 3: widget opens, 4: added to cart, 5: orders */
-			$title = sprintf( __( '%1$s: %2$d views, %3$d opens, %4$d added to cart, %5$d orders', 'rega' ), $day['date'], $views, $opens, (int) $day['add_to_cart'], $orders );
+			$title = sprintf( __( '%1$s: %2$d views, %3$d opens, %4$d added to cart, %5$d orders', 'let-agents' ), $day['date'], $views, $opens, (int) $day['add_to_cart'], $orders );
 
 			echo '<g><title>' . esc_html( $title ) . '</title>';
 			printf( '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#c3c4c7" rx="2"/>', $x, $height - $h, $bar, $h );
@@ -251,10 +251,10 @@ final class ReportsPage {
 		printf( '<text x="%d" y="%d" font-size="11" fill="#50575e" text-anchor="end">%s</text>', (int) $width, (int) ( $height + 16 ), esc_html( (string) end( $days )['date'] ) );
 		echo '</svg>';
 		?>
-		<div class="rega-legend">
-			<span><i style="background:#c3c4c7"></i><?php esc_html_e( 'Page views', 'rega' ); ?></span>
-			<span><i style="background:#2271b1"></i><?php esc_html_e( 'Widget opened', 'rega' ); ?></span>
-			<span><i style="background:#00a32a;border-radius:50%"></i><?php esc_html_e( 'Orders', 'rega' ); ?></span>
+		<div class="let-agents-legend">
+			<span><i style="background:#c3c4c7"></i><?php esc_html_e( 'Page views', 'let-agents' ); ?></span>
+			<span><i style="background:#2271b1"></i><?php esc_html_e( 'Widget opened', 'let-agents' ); ?></span>
+			<span><i style="background:#00a32a;border-radius:50%"></i><?php esc_html_e( 'Orders', 'let-agents' ); ?></span>
 		</div>
 		<?php
 	}
@@ -265,7 +265,7 @@ final class ReportsPage {
 	 */
 	private static function table( array $headings, array $rows ): void {
 		if ( array() === $rows ) {
-			echo '<p>' . esc_html__( 'No data yet.', 'rega' ) . '</p>';
+			echo '<p>' . esc_html__( 'No data yet.', 'let-agents' ) . '</p>';
 			return;
 		}
 
@@ -293,17 +293,17 @@ final class ReportsPage {
 
 	private static function model_label( string $model ): string {
 		$labels = array(
-			'position'         => __( 'Superlatives', 'rega' ),
-			'specs'            => __( 'Specs in brief', 'rega' ),
-			'complement'       => __( 'Goes well with it', 'rega' ),
-			'guide_card'       => __( 'Guides', 'rega' ),
-			'article_products' => __( 'Products for an article', 'rega' ),
-			'family'           => __( 'Other sizes', 'rega' ),
-			'alternative'      => __( 'Similar products', 'rega' ),
-			'on_sale'          => __( 'Similar on sale', 'rega' ),
-			'good_for'         => __( 'Good for jobs', 'rega' ),
-			'explainer'        => __( 'Good to know', 'rega' ),
-			'compare'          => __( 'Comparison with a viewed product', 'rega' ),
+			'position'         => __( 'Superlatives', 'let-agents' ),
+			'specs'            => __( 'Specs in brief', 'let-agents' ),
+			'complement'       => __( 'Goes well with it', 'let-agents' ),
+			'guide_card'       => __( 'Guides', 'let-agents' ),
+			'article_products' => __( 'Products for an article', 'let-agents' ),
+			'family'           => __( 'Other sizes', 'let-agents' ),
+			'alternative'      => __( 'Similar products', 'let-agents' ),
+			'on_sale'          => __( 'Similar on sale', 'let-agents' ),
+			'good_for'         => __( 'Good for jobs', 'let-agents' ),
+			'explainer'        => __( 'Good to know', 'let-agents' ),
+			'compare'          => __( 'Comparison with a viewed product', 'let-agents' ),
 		);
 
 		return $labels[ $model ] ?? $model;

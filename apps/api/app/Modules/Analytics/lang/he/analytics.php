@@ -11,10 +11,10 @@ return [
         'visitors' => 'גולשים',
         'impressions' => 'הרכיב נצפה',
         'opens' => 'הרכיב נפתח',
-        'widget_add_to_cart' => 'הוספות לסל מ־Rega',
+        'widget_add_to_cart' => 'הוספות לסל מ־Let Agents',
         'orders' => 'הזמנות',
-        'assisted_orders' => 'הזמנות אחרי שימוש ב־Rega',
-        'attributed_revenue' => 'הכנסה ממוצרים שנוספו דרך Rega',
+        'assisted_orders' => 'הזמנות אחרי שימוש ב־Let Agents',
+        'attributed_revenue' => 'הכנסה ממוצרים שנוספו דרך Let Agents',
     ],
     'sections' => [
         'hot_pages' => 'עמודים חמים',

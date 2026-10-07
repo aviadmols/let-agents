@@ -14,7 +14,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
-/** What Rega read from each store. Read-only: the store is the source of truth. */
+/** What Let Agents read from each store. Read-only: the store is the source of truth. */
 final class CatalogProductResource extends Resource
 {
     use NeedsShopContext;

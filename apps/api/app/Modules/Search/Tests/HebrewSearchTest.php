@@ -16,7 +16,7 @@ final class HebrewSearchTest extends TestCase
 {
     private const FIXTURE = __DIR__.'/fixtures/catalog.json';
 
-    private const SCRIPT = __DIR__.'/../resources/search/rega-search.js';
+    private const SCRIPT = __DIR__.'/../resources/search/let-agents-search.js';
 
     /** @return array<string, mixed> */
     private static function fixture(): array

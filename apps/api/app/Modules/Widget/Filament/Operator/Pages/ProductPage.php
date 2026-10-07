@@ -184,7 +184,7 @@ class ProductPage extends Page
             'pinned_sections' => $curations->where('action', WidgetCuration::PIN)->where('item_external_id', '')->pluck('candidate')->all(),
             'hidden_items' => $curations->where('action', WidgetCuration::HIDE)->where('item_external_id', '!=', '')->groupBy('candidate')->map(fn (Collection $c) => $c->pluck('item_external_id')->all())->all(),
             'pinned_items' => $curations->where('action', WidgetCuration::PIN)->where('item_external_id', '!=', '')->groupBy('candidate')->map(fn (Collection $c) => $c->pluck('item_external_id')->all())->all(),
-            'preview_url' => $subject?->url && $connection ? $subject->url.(str_contains($subject->url, '?') ? '&' : '?').'rega_preview='.$connection->previewKey() : $subject?->url,
+            'preview_url' => $subject?->url && $connection ? $subject->url.(str_contains($subject->url, '?') ? '&' : '?').'let_agents_preview='.$connection->previewKey() : $subject?->url,
             'titles' => $this->titles($curations->pluck('item_external_id')->filter()->all()),
             'activity' => $this->activity(),
             'extras' => $this->extras($bank),

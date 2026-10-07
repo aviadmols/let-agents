@@ -1,15 +1,15 @@
 <?php
 
-namespace Rega;
+namespace LetAgents;
 
-use Rega\Admin\ReportsPage;
-use Rega\Admin\SettingsPage;
-use Rega\Rest\Routes;
-use Rega\Storefront\CallToAction;
-use Rega\Storefront\OrderHistory;
-use Rega\Storefront\OrderReporter;
-use Rega\Storefront\Search;
-use Rega\Storefront\Widget;
+use LetAgents\Admin\ReportsPage;
+use LetAgents\Admin\SettingsPage;
+use LetAgents\Rest\Routes;
+use LetAgents\Storefront\CallToAction;
+use LetAgents\Storefront\OrderHistory;
+use LetAgents\Storefront\OrderReporter;
+use LetAgents\Storefront\Search;
+use LetAgents\Storefront\Widget;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,6 +20,7 @@ defined( 'ABSPATH' ) || exit;
 final class Plugin {
 
 	public static function boot(): void {
+		Legacy::migrate();
 		add_action( 'init', array( self::class, 'load_translations' ) );
 		add_action( 'rest_api_init', array( Routes::class, 'register' ) );
 
@@ -37,7 +38,7 @@ final class Plugin {
 	}
 
 	public static function load_translations(): void {
-		load_plugin_textdomain( 'rega', false, dirname( plugin_basename( REGA_FILE ) ) . '/languages' );
+		load_plugin_textdomain( 'let-agents', false, dirname( plugin_basename( LET_AGENTS_FILE ) ) . '/languages' );
 	}
 
 	public static function woocommerce_active(): bool {

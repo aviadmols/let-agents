@@ -1,16 +1,16 @@
 <?php
 
-namespace Rega\Rest;
+namespace LetAgents\Rest;
 
-use Rega\Auth\TokenGuard;
-use Rega\Feed\ContentExporter;
-use Rega\Feed\MetaKeyExplorer;
-use Rega\Feed\ProductExporter;
-use Rega\Feed\SiteStatus;
-use Rega\Feed\TaxonomyExporter;
-use Rega\Plugin;
-use Rega\Settings;
-use Rega\Support\Records;
+use LetAgents\Auth\TokenGuard;
+use LetAgents\Feed\ContentExporter;
+use LetAgents\Feed\MetaKeyExplorer;
+use LetAgents\Feed\ProductExporter;
+use LetAgents\Feed\SiteStatus;
+use LetAgents\Feed\TaxonomyExporter;
+use LetAgents\Plugin;
+use LetAgents\Settings;
+use LetAgents\Support\Records;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -19,21 +19,21 @@ use WP_REST_Server;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The read-only API Rega uses. Every route needs the access token. There is no write route,
+ * The read-only API Let Agents uses. Every route needs the access token. There is no write route,
  * and no route for customers or orders.
  *
- *   GET /rega/v1/status
- *   GET /rega/v1/feed/manifest
- *   GET /rega/v1/feed/products?per_page=&after=&since=&status=
- *   GET /rega/v1/feed/products/{id}
- *   GET /rega/v1/feed/categories
- *   GET /rega/v1/feed/attributes
- *   GET /rega/v1/feed/content?type=&per_page=&after=&since=
- *   GET /rega/v1/meta-keys?post_type=
+ *   GET /let-agents/v1/status
+ *   GET /let-agents/v1/feed/manifest
+ *   GET /let-agents/v1/feed/products?per_page=&after=&since=&status=
+ *   GET /let-agents/v1/feed/products/{id}
+ *   GET /let-agents/v1/feed/categories
+ *   GET /let-agents/v1/feed/attributes
+ *   GET /let-agents/v1/feed/content?type=&per_page=&after=&since=
+ *   GET /let-agents/v1/meta-keys?post_type=
  */
 final class Routes {
 
-	public const NAMESPACE = 'rega/v1';
+	public const NAMESPACE = 'let-agents/v1';
 
 	public static function register(): void {
 		$read  = WP_REST_Server::READABLE;
@@ -172,7 +172,7 @@ final class Routes {
 		$product = wc_get_product( (int) $request->get_param( 'id' ) );
 
 		if ( ! $product || $product->is_type( 'variation' ) ) {
-			return new WP_Error( 'rega_not_found', __( 'Product not found.', 'rega' ), array( 'status' => 404 ) );
+			return new WP_Error( 'let_agents_not_found', __( 'Product not found.', 'let-agents' ), array( 'status' => 404 ) );
 		}
 
 		$response = new WP_REST_Response( array( 'data' => ( new ProductExporter() )->export( $product ) ) );
@@ -222,9 +222,9 @@ final class Routes {
 
 		if ( ! in_array( $type, $allowed, true ) ) {
 			return new WP_Error(
-				'rega_content_type_not_allowed',
+				'let_agents_content_type_not_allowed',
 				/* translators: %s: comma-separated list of post types */
-				sprintf( __( 'This content type is not shared with Rega. Allowed types: %s. Change this in WooCommerce > Rega.', 'rega' ), implode( ', ', $allowed ) ?: '-' ),
+				sprintf( __( 'This content type is not shared with Let Agents. Allowed types: %s. Change this in WooCommerce > Let Agents.', 'let-agents' ), implode( ', ', $allowed ) ?: '-' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -260,9 +260,9 @@ final class Routes {
 
 		if ( ! in_array( $post_type, $allowed, true ) ) {
 			return new WP_Error(
-				'rega_post_type_not_allowed',
+				'let_agents_post_type_not_allowed',
 				/* translators: %s: comma-separated list of post types */
-				sprintf( __( 'Custom fields can be listed only for: %s.', 'rega' ), implode( ', ', $allowed ) ),
+				sprintf( __( 'Custom fields can be listed only for: %s.', 'let-agents' ), implode( ', ', $allowed ) ),
 				array( 'status' => 400 )
 			);
 		}
@@ -275,6 +275,6 @@ final class Routes {
 	private static function require_woocommerce(): ?WP_Error {
 		return Plugin::woocommerce_active()
 			? null
-			: new WP_Error( 'rega_woocommerce_inactive', __( 'WooCommerce is not active on this site.', 'rega' ), array( 'status' => 503 ) );
+			: new WP_Error( 'let_agents_woocommerce_inactive', __( 'WooCommerce is not active on this site.', 'let-agents' ), array( 'status' => 503 ) );
 	}
 }

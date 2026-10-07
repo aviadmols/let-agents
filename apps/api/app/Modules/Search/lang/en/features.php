@@ -2,7 +2,7 @@
 
 return [
     'storefront' => [
-        'label' => 'Rega search in the store\'s search box',
+        'label' => 'Let Agents search in the store\'s search box',
         'description' => 'Typo-tolerant suggestions while typing, and results grouped into products, guides and categories. The store also turns it on in the plugin.',
     ],
     'semantic' => [

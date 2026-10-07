@@ -1,6 +1,6 @@
 <?php
 
-namespace Rega\Support;
+namespace LetAgents\Support;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
  * check looks for the words, in English and Hebrew, anywhere in the key.
  *
  * Excluding a harmless field by mistake costs little. Sharing a cost price does not, so the
- * list leans wide. Sites can add their own keys with the "rega_is_sensitive_meta_key" filter.
+ * list leans wide. Sites can add their own keys with the "let_agents_is_sensitive_meta_key" filter.
  */
 final class SensitiveFields {
 
@@ -53,11 +53,11 @@ final class SensitiveFields {
 		}
 
 		/**
-		 * Whether a custom field key is kept out of everything Rega reads.
+		 * Whether a custom field key is kept out of everything Let Agents reads.
 		 *
 		 * @param bool   $sensitive
 		 * @param string $key
 		 */
-		return (bool) apply_filters( 'rega_is_sensitive_meta_key', $sensitive, $key );
+		return (bool) apply_filters( 'let_agents_is_sensitive_meta_key', $sensitive, $key );
 	}
 }

@@ -1,7 +1,7 @@
 /*!
- * Rega storefront search v1.
+ * Let Agents storefront search v1.
  *
- * Loaded by the Rega WordPress plugin on every page, which sets window.RegaSearchContext:
+ * Loaded by the Let Agents WordPress plugin on every page, which sets window.LetAgentsSearchContext:
  *   { site, api, locale, storeApi, nonce, cartUrl, searchUrl }
  *
  * What it does:
@@ -16,7 +16,7 @@
  *   5. Counts searches and clicks without anything about the shopper: one count per query per tab.
  *   6. Where the shop's pictures are indexed, adds a camera beside the box: a shopper uploads or
  *      takes a photo, it is shrunk in the browser, and the products that look most like it show.
- *      The photo goes to Rega once and is not kept.
+ *      The photo goes to Let Agents once and is not kept.
  *
  * Everything renders in a shadow root. Text is always set with textContent; links and images must
  * be http(s). The engine below must stay identical to HebrewSearch.php: change both or neither.
@@ -311,16 +311,16 @@
 
   function boot(win) {
     var doc = win.document;
-    var ctx = win.RegaSearchContext;
-    if (!ctx || !ctx.site || !ctx.api || win.__regaSearch) {
+    var ctx = win.LetAgentsSearchContext;
+    if (!ctx || !ctx.site || !ctx.api || win.__letAgentsSearch) {
       return;
     }
-    win.__regaSearch = true;
+    win.__letAgentsSearch = true;
 
     var API = String(ctx.api).replace(/\/+$/, '');
     var STORE_API = ctx.storeApi ? String(ctx.storeApi).replace(/\/?$/, '/') : null;
     var LOCALE = ctx.locale === 'en' ? 'en' : 'he';
-    var COUNTED_KEY = 'rega_search_counted';
+    var COUNTED_KEY = 'let_agents_search_counted';
     var PAUSE_MS = 2000;
     var TYPE_MS = 60;
 
@@ -512,7 +512,7 @@
           if (win.jQuery) {
             win.jQuery(doc.body).trigger('wc_fragment_refresh');
           }
-          doc.body.dispatchEvent(new CustomEvent('rega:added_to_cart', { detail: { id: externalId } }));
+          doc.body.dispatchEvent(new CustomEvent('let-agents:added_to_cart', { detail: { id: externalId } }));
         }
       }).catch(function () {
         button.textContent = label('add_failed');
@@ -659,7 +659,7 @@
       }
 
       if (!dropdown) {
-        dropdown = shadowHost('rega-search-suggest');
+        dropdown = shadowHost('let-agents-search-suggest');
       }
       dropdown.upload = false;
       var rootNode = dropdown.root;
@@ -806,7 +806,7 @@
     /** An empty results sheet over the page, with a title and a close button. Returns the sheet. */
     function openSheet(titleText) {
       if (!panel) {
-        panel = shadowHost('rega-search-results');
+        panel = shadowHost('let-agents-search-results');
       }
       var rootNode = panel.root;
       while (rootNode.childNodes.length > 1) {
@@ -838,7 +838,7 @@
 
     function openPanel(raw) {
       if (!panel) {
-        panel = shadowHost('rega-search-results');
+        panel = shadowHost('let-agents-search-results');
       }
       var rootNode = panel.root;
       while (rootNode.childNodes.length > 1) {
@@ -1040,12 +1040,12 @@
 
     /** A camera beside the box, in its own shadow root, so the theme's buttons do not restyle it. */
     function addCamera(input) {
-      if (!(state.config && state.config.photos) || input.__regaCamera) {
+      if (!(state.config && state.config.photos) || input.__letAgentsCamera) {
         return;
       }
-      input.__regaCamera = true;
+      input.__letAgentsCamera = true;
       var host = doc.createElement('span');
-      host.className = 'rega-search-camera';
+      host.className = 'let-agents-search-camera';
       host.style.display = 'inline-block';
       host.style.verticalAlign = 'middle';
       theme(host);
@@ -1083,7 +1083,7 @@
 
     function openUpload() {
       if (!dropdown) {
-        dropdown = shadowHost('rega-search-suggest');
+        dropdown = shadowHost('let-agents-search-suggest');
       }
       var rootNode = dropdown.root;
       while (rootNode.childNodes.length > 1) {
@@ -1251,10 +1251,10 @@
     }
 
     function attach(input) {
-      if (input.__regaSearch) {
+      if (input.__letAgentsSearch) {
         return;
       }
-      input.__regaSearch = true;
+      input.__letAgentsSearch = true;
       attached.push(input);
       addCamera(input);
       input.setAttribute('autocomplete', 'off');
@@ -1300,8 +1300,8 @@
           }
         }
       });
-      if (input.form && !input.form.__regaSearch) {
-        input.form.__regaSearch = true;
+      if (input.form && !input.form.__letAgentsSearch) {
+        input.form.__letAgentsSearch = true;
         input.form.addEventListener('submit', function (event) {
           if ((state.config && state.config.results) !== 'page' && input.value.trim()) {
             event.preventDefault();
@@ -1350,7 +1350,7 @@
     });
     doc.addEventListener('pointerdown', function (event) {
       var target = event.target;
-      if (dropdown && dropdown.upload && target !== dropdown.host && !(target.closest && target.closest('.rega-search-camera'))) {
+      if (dropdown && dropdown.upload && target !== dropdown.host && !(target.closest && target.closest('.let-agents-search-camera'))) {
         closeDropdown();
       }
     }, true);

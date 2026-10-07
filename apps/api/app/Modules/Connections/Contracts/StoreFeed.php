@@ -8,7 +8,7 @@ use Generator;
 /**
  * Reads a connected store's catalog in the feed shape, whatever the platform.
  *
- * WooCommerce reads it from the Rega plugin today. A Shopify reader implements the same
+ * WooCommerce reads it from the Let Agents plugin today. A Shopify reader implements the same
  * contract later, and nothing that consumes the feed changes.
  *
  * Every method throws StoreFeedUnavailable when the store cannot be read.

@@ -3,7 +3,7 @@
 namespace App\Modules\Catalog\Support;
 
 /**
- * Custom fields Rega never stores: costs, supplier details, margins and internal notes.
+ * Custom fields Let Agents never stores: costs, supplier details, margins and internal notes.
  *
  * The store plugin already leaves these out (from version 0.1.1). This is the second lock, for
  * older plugins and for platforms that do not filter at the source.

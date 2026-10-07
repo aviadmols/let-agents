@@ -1,6 +1,6 @@
 {
   "$schema": "https://playground.wordpress.net/blueprint-schema.json",
-  "landingPage": "/wp-admin/admin.php?page=rega",
+  "landingPage": "/wp-admin/admin.php?page=let-agents",
   "steps": [
     {
       "step": "setSiteLanguage",
@@ -13,7 +13,7 @@
     },
     {
       "step": "activatePlugin",
-      "pluginPath": "rega/rega.php"
+      "pluginPath": "let-agents/let-agents.php"
     },
     {
       "step": "setSiteOptions",
@@ -25,7 +25,7 @@
     },
     {
       "step": "runPHP",
-      "code": "<?php require '/wordpress/wp-content/plugins/rega/tests/playground/fixtures.php';"
+      "code": "<?php require '/wordpress/wp-content/plugins/let-agents/tests/playground/fixtures.php';"
     }
   ]
 }

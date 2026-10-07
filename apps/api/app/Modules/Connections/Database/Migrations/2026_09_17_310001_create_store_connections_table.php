@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignUlid('shop_id')->unique()->constrained('shops')->cascadeOnDelete();
             $table->string('platform', 20)->default('woocommerce');
             $table->string('site_url');
-            // Encrypted with APP_KEY. Holds the token the store's Rega plugin issued.
+            // Encrypted with APP_KEY. Holds the token the store's Let Agents plugin issued.
             $table->text('access_token');
             $table->string('token_prefix', 16)->nullable();
             $table->string('status', 20)->default('untested')->index();

@@ -44,7 +44,7 @@ final class AnalyticsFlowTest extends TestCase
     {
         $hash = hash('sha256', self::TOKEN);
 
-        $this->assertSame(substr(hash('sha256', 'rega-site|'.$hash), 0, 24), $this->site);
+        $this->assertSame(substr(hash('sha256', 'let-agents-site|'.$hash), 0, 24), $this->site);
         $this->assertSame($this->site, StoreConnection::forSite($this->site)?->site_key);
         $this->assertNull(StoreConnection::forSite('not-a-key'));
         $this->assertTrue(StoreConnection::forSite($this->site)->allowsOrigin('https://store.test'));
@@ -260,8 +260,8 @@ final class AnalyticsFlowTest extends TestCase
         $signature ??= SiteKeys::signature(self::TOKEN, $timestamp, $method, $path, $body);
 
         return $this->call($method, $path, server: [
-            'HTTP_X_REGA_TIMESTAMP' => $timestamp,
-            'HTTP_X_REGA_SIGNATURE' => $signature,
+            'HTTP_X_LETAGENTS_TIMESTAMP' => $timestamp,
+            'HTTP_X_LETAGENTS_SIGNATURE' => $signature,
             'CONTENT_TYPE' => 'application/json',
         ], content: $body);
     }

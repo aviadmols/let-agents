@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Validator;
 
 /**
  * One page of a store's past orders, sent once by the plugin so purchases can be learned from
- * before Rega was installed.
+ * before Let Agents was installed.
  *
  * Each order has the same shape as a live one and nothing more: a keyed hash of the order
  * number, totals, product IDs, quantities and line totals. Never a customer, never a visitor.

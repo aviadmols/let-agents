@@ -2,7 +2,7 @@
 
 return [
     'title' => 'Suggestions for the site',
-    'subheading' => 'Every day Rega looks at what shoppers searched and asked and did not find on the site. The suggestions that came of it wait here, each with the searches and questions behind it.',
+    'subheading' => 'Every day Let Agents looks at what shoppers searched and asked and did not find on the site. The suggestions that came of it wait here, each with the searches and questions behind it.',
     'no_shop' => 'No shop yet.',
     'review_now' => 'Check now',
     'reviewed' => 'The check is done',

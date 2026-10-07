@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 // Prefixed /api/v1 by the module loader. Public: the storefront calls these from every visitor,
 // except the plugin route, which the store's own server signs.
-Route::get('search/rega-search.js', SearchScriptController::class)->name('api.search.script');
+Route::get('search/let-agents-search.js', SearchScriptController::class)->name('api.search.script');
 
 Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/index', SearchIndexController::class)->name('api.search.index');

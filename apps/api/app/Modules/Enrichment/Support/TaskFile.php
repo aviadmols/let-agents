@@ -7,7 +7,7 @@ use App\Modules\Enrichment\Models\EnrichmentBatchItem;
 use Generator;
 
 /**
- * The file format for running a batch with any model outside Rega (JSON Lines).
+ * The file format for running a batch with any model outside Let Agents (JSON Lines).
  *
  * Download:  {"type":"header", "system": "...", ...}
  *            {"type":"request", "custom_id": "px-30254-1a2b3c4d5e", "input": {...}}
@@ -20,7 +20,7 @@ use Generator;
  */
 final class TaskFile
 {
-    public const FORMAT = 'rega-tasks/1';
+    public const FORMAT = 'let-agents-tasks/1';
 
     /** @return Generator<int, string> one JSON line at a time, without loading every item */
     public static function lines(EnrichmentBatch $batch): Generator

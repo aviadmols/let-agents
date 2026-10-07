@@ -329,7 +329,7 @@ final class SearchFlowTest extends TestCase
         $timestamp = (string) time();
         $signature ??= SiteKeys::signature(self::TOKEN, $timestamp, 'GET', $path, '');
 
-        return $this->call('GET', $path, server: ['HTTP_X_REGA_TIMESTAMP' => $timestamp, 'HTTP_X_REGA_SIGNATURE' => $signature]);
+        return $this->call('GET', $path, server: ['HTTP_X_LETAGENTS_TIMESTAMP' => $timestamp, 'HTTP_X_LETAGENTS_SIGNATURE' => $signature]);
     }
 
     private function inShop(callable $callback): mixed

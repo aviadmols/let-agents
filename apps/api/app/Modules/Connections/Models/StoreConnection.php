@@ -14,7 +14,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 
 /**
- * How Rega reaches one store: the site address and the token its Rega plugin issued.
+ * How Let Agents reaches one store: the site address and the token its Let Agents plugin issued.
  *
  * @property string $id
  * @property string $shop_id

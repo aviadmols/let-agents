@@ -1,24 +1,24 @@
 <?php
 
-namespace Rega\Storefront;
+namespace LetAgents\Storefront;
 
-use Rega\Settings;
+use LetAgents\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Tells Rega an order was placed, so the reports can show purchases and which of them came
+ * Tells Let Agents an order was placed, so the reports can show purchases and which of them came
  * after using the widget.
  *
  * Sent: a keyed hash of the order ID, the total and currency, product IDs with quantities and
- * line totals, and the anonymous visitor ID the widget set in the rega_vid cookie.
+ * line totals, and the anonymous visitor ID the widget set in the let_agents_vid cookie.
  * Never sent: names, emails, phone numbers, addresses, payment details, notes or coupons.
  *
- * The request runs in the background (Action Scheduler), so checkout never waits for Rega.
+ * The request runs in the background (Action Scheduler), so checkout never waits for Let Agents.
  */
 final class OrderReporter {
 
-	public const ACTION = 'rega_report_order';
+	public const ACTION = 'let_agents_report_order';
 
 	private const MAX_ITEMS = 200;
 
@@ -52,14 +52,14 @@ final class OrderReporter {
 			return;
 		}
 
-		$payload = self::payload( $order, isset( $_COOKIE['rega_vid'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['rega_vid'] ) ) : null );
+		$payload = self::payload( $order, isset( $_COOKIE['let_agents_vid'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['let_agents_vid'] ) ) : null );
 
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
-			as_enqueue_async_action( self::ACTION, array( $payload ), 'rega' );
+			as_enqueue_async_action( self::ACTION, array( $payload ), 'let-agents' );
 			return;
 		}
 
-		RegaApi::post( 'orders', $payload, false );
+		LetAgentsApi::post( 'orders', $payload, false );
 	}
 
 	/**
@@ -67,7 +67,7 @@ final class OrderReporter {
 	 */
 	public static function send( $payload ): void {
 		if ( is_array( $payload ) ) {
-			RegaApi::post( 'orders', $payload );
+			LetAgentsApi::post( 'orders', $payload );
 		}
 	}
 
