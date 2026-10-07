@@ -325,8 +325,13 @@ test('past orders leave the store as summaries only: paid, from the last 24 mont
   }
 
   const text = JSON.stringify(body);
-  for (const secret of ['ישראל', 'buyer@example.com', '0501234567', 'להשאיר ליד הדלת', String(orders.recent)]) {
+  for (const secret of ['ישראל', 'buyer@example.com', '0501234567', 'להשאיר ליד הדלת']) {
     assert.ok(!text.includes(secret), `"${secret}" never leaves the store`);
+  }
+  // The store's own order number is not the reference. Compared field by field: a short number
+  // like 22 can turn up inside a date or a total by chance.
+  for (const order of body.orders) {
+    assert.notEqual(String(order.order_ref), String(orders.recent), 'the order number never leaves the store');
   }
 
   const recent = body.orders.find((o) => o.order_ref === refs.recent);
