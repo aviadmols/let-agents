@@ -4,12 +4,12 @@ namespace App\Modules\Leads\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
-use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Leads\Models\LeadCta;
 use App\Modules\Leads\Models\LeadFlow;
 use App\Modules\Leads\Models\LeadReview;
@@ -280,24 +280,26 @@ final class WriteCallsToAction
      */
     private function ask(RunContext $run, string $model, string $prompt, array $input, string $key = 'lines'): array
     {
+        $role = $prompt === 'write_cta' ? 'writer' : 'reviewer';
+        $provider = AgentModel::provider("leads.{$role}_provider");
         $reply = $this->models->json(
-            AiProviderName::OpenAi,
+            $provider,
             $model,
             (string) file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v1.md'),
             (string) json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             (int) Settings::get('leads.model_tokens'),
         );
 
-        $this->record($run, $model, $reply);
+        $this->record($run, $model, $reply, $role, $provider->value);
 
         return array_values(array_filter((array) ($reply->data[$key] ?? []), 'is_array'));
     }
 
-    private function record(RunContext $run, string $model, ModelReply $reply): void
+    private function record(RunContext $run, string $model, ModelReply $reply, string $role, string $provider): void
     {
-        $run->usage('openai', $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd(
-            (float) Settings::get('assistant.scope_input_usd_per_million'),
-            (float) Settings::get('assistant.scope_output_usd_per_million'),
+        $run->usage($provider, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd(
+            (float) Settings::get("leads.{$role}_input_usd_per_million"),
+            (float) Settings::get("leads.{$role}_output_usd_per_million"),
         ));
     }
 
@@ -306,7 +308,7 @@ final class WriteCallsToAction
     {
         $tokens = (int) Settings::get('leads.model_tokens');
 
-        return 2 * $tokens * (float) Settings::get('assistant.scope_output_usd_per_million') / 1_000_000;
+        return $tokens * ((float) Settings::get('leads.writer_output_usd_per_million') + (float) Settings::get('leads.reviewer_output_usd_per_million')) / 1_000_000;
     }
 
     /**

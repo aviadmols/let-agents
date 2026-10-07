@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Panels;
 use App\Modules\Admin\Http\Middleware\EnterOperatorScope;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\CurrentShop;
+use App\Modules\Tenancy\Models\Shop;
 use Filament\Actions\Action;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -48,6 +49,7 @@ final class OperatorPanelProvider extends PanelProvider
     {
         return new HtmlString(Blade::render(
             <<<'BLADE'
+            <div class="flex items-center gap-3" data-shop-bar>
             <form method="POST" action="{{ route('admin.shop') }}" class="flex items-center gap-2">
                 @csrf
                 <input type="hidden" name="back" value="{{ $back }}">
@@ -69,6 +71,10 @@ final class OperatorPanelProvider extends PanelProvider
                     @endforeach
                 </select>
             </form>
+            @if ($viewAs)
+                <x-filament::button tag="a" :href="$viewAs" size="sm" color="gray" icon="heroicon-o-eye" data-view-as-shop>{{ $viewAsLabel }}</x-filament::button>
+            @endif
+            </div>
             BLADE,
             [
                 'options' => CurrentShop::options(),
@@ -76,7 +82,18 @@ final class OperatorPanelProvider extends PanelProvider
                 'chosen' => CurrentShop::effective() !== null,
                 'label' => __('admin::panels.shop.label'),
                 'back' => '/'.ltrim(Request::path(), '/'),
+                'viewAs' => self::viewAsUrl(),
+                'viewAsLabel' => __('admin::panels.view_as_shop'),
             ],
         ));
+    }
+
+    /** The chosen shop's own panel, as its manager sees it; null while every shop is shown. */
+    private static function viewAsUrl(): ?string
+    {
+        $id = CurrentShop::effective();
+        $slug = $id === null ? null : Shop::query()->whereKey($id)->value('slug');
+
+        return $slug === null ? null : url('/'.User::MERCHANT_PANEL.'/'.$slug);
     }
 }

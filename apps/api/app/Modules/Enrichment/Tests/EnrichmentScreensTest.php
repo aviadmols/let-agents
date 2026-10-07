@@ -59,13 +59,13 @@ final class EnrichmentScreensTest extends TestCase
         foreach (['he', 'en'] as $locale) {
             $this->withHeader('Accept-Language', $locale);
 
-            foreach (['/operator/catalog/products', '/operator/catalog/content', '/operator/enrichment/tasks', '/operator/enrichment/facts', '/operator/enrichment/vocabularies', '/operator/enrichment/rankings', '/operator/enrichment/prompts'] as $url) {
+            foreach (['/operator/catalog/products', '/operator/catalog/content', '/operator/enrichment/tasks', '/operator/enrichment/facts', '/operator/enrichment/vocabularies', '/operator/enrichment/rankings', '/operator/agents'] as $url) {
                 $this->get($url)->assertOk();
             }
         }
 
         // The released template, with the place where each shop's vocabulary goes.
-        $this->get('/operator/enrichment/prompts')->assertSee('# Rules', false)->assertSee('{{vocabulary}}', false);
+        $this->get('/operator/agents')->assertSee('# Rules', false)->assertSee('{{vocabulary}}', false);
     }
 
     public function test_merchants_cannot_open_the_agent_screens_or_download_task_files(): void

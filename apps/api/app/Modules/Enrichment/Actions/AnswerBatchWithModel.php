@@ -39,7 +39,7 @@ final class AnswerBatchWithModel
     /**
      * @return array{asked: int, applied: int, rejected: int, stale: int, stopped: ?string}
      */
-    public function handle(RunContext $run, EnrichmentBatch $batch, string $model, int $limit): array
+    public function handle(RunContext $run, EnrichmentBatch $batch, string $model, int $limit, AiProviderName $provider = AiProviderName::OpenAi): array
     {
         $task = $this->tasks->for($batch->task);
         $maxOutput = (int) Settings::get('enrichment.model_answer_tokens', $batch->shop_id);
@@ -67,7 +67,7 @@ final class AnswerBatchWithModel
                 $this->spend->assertCanSpend($this->estimate($batch->system_prompt, $user, $maxOutput));
 
                 $reply = $this->models->json(
-                    AiProviderName::OpenAi,
+                    $provider,
                     $model,
                     (string) $batch->system_prompt,
                     $user,
@@ -84,9 +84,9 @@ final class AnswerBatchWithModel
                 break;
             }
 
-            $run->usage('openai', $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd(
-                $this->price('scope_input'),
-                $this->price('scope_output'),
+            $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd(
+                $this->price('input'),
+                $this->price('output'),
             ));
             $counts['asked']++;
 
@@ -121,12 +121,12 @@ final class AnswerBatchWithModel
     {
         $input = (mb_strlen($system) + mb_strlen($user)) / 3;
 
-        return $input * $this->price('scope_input') / 1_000_000
-            + $maxOutput * $this->price('scope_output') / 1_000_000;
+        return $input * $this->price('input') / 1_000_000
+            + $maxOutput * $this->price('output') / 1_000_000;
     }
 
     private function price(string $name): float
     {
-        return (float) Settings::get("assistant.{$name}_usd_per_million");
+        return (float) Settings::get("enrichment.reader_{$name}_usd_per_million");
     }
 }

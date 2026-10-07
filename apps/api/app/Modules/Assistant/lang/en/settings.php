@@ -91,4 +91,12 @@ return [
         'label' => '"Not found" is asked again after',
         'description' => 'Days. So a page the store added since makes it into the answer.',
     ],
+    'answer_provider' => [
+        'label' => 'Provider of the answering model',
+        'description' => 'openai by default.',
+    ],
+    'scope_provider' => [
+        'label' => 'Provider of the small checking model',
+        'description' => 'Checks the question is about the page and the answer rests on it. Best from another family than the answering model.',
+    ],
 ];

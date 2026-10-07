@@ -29,4 +29,28 @@ return [
         'label' => 'Pages a model writes each night',
         'description' => 'How many pages go to the models nightly. 0 turns model writing off and leaves the versions code writes.',
     ],
+    'writer_provider' => [
+        'label' => 'Provider of the model that writes offers to readers',
+        'description' => 'openai by default.',
+    ],
+    'writer_input_usd_per_million' => [
+        'label' => 'Input price of the writer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'writer_output_usd_per_million' => [
+        'label' => 'Output price of the writer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'reviewer_provider' => [
+        'label' => 'Provider of the model that reviews the offers',
+        'description' => 'Best from another family than the writer.',
+    ],
+    'reviewer_input_usd_per_million' => [
+        'label' => 'Input price of the reviewer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'reviewer_output_usd_per_million' => [
+        'label' => 'Output price of the reviewer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
 ];

@@ -41,4 +41,52 @@ return [
         'label' => 'Orders needed before two products are linked',
         'description' => 'Below this it is a coincidence rather than a pattern, and no relation is made.',
     ],
+    'reader_provider' => [
+        'label' => 'Provider of the nightly product and article reader',
+        'description' => 'openai by default.',
+    ],
+    'reader_model' => [
+        'label' => 'The model that reads products and articles at night',
+        'description' => 'Reads facts, key points and article matches.',
+    ],
+    'reader_input_usd_per_million' => [
+        'label' => 'Input price of the reader, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'reader_output_usd_per_million' => [
+        'label' => 'Output price of the reader, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'audit_writer_provider' => [
+        'label' => 'Provider of the model that proposes reading rules',
+        'description' => 'openai by default.',
+    ],
+    'audit_writer_model' => [
+        'label' => 'The model that proposes article reading rules',
+        'description' => 'Proposes what code missed when reading articles.',
+    ],
+    'audit_writer_input_usd_per_million' => [
+        'label' => 'Input price of the proposer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'audit_writer_output_usd_per_million' => [
+        'label' => 'Output price of the proposer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'audit_checker_provider' => [
+        'label' => 'Provider of the model that checks article reading',
+        'description' => 'Best from another family than the proposer.',
+    ],
+    'audit_checker_model' => [
+        'label' => 'The model that checks article reading',
+        'description' => 'Checks a sample of articles and the proposed rules.',
+    ],
+    'audit_checker_input_usd_per_million' => [
+        'label' => 'Input price of the checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'audit_checker_output_usd_per_million' => [
+        'label' => 'Output price of the checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
 ];

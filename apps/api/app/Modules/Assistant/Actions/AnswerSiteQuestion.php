@@ -5,6 +5,7 @@ namespace App\Modules\Assistant\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
@@ -132,7 +133,8 @@ final class AnswerSiteQuestion
             trigger: RunTrigger::Webhook,
             input: ['question' => $question],
             work: function (RunContext $run) use ($shopId, $question, $locale, &$result): void {
-                $writer = ['provider' => AiProviderName::OpenAi, 'name' => 'openai', 'model' => (string) Settings::get('assistant.answer_model')];
+                $writerProvider = AgentModel::provider('assistant.answer_provider');
+                $writer = ['provider' => $writerProvider, 'name' => $writerProvider->value, 'model' => (string) Settings::get('assistant.answer_model')];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
                 $checker = ['provider' => AiProviderName::tryFrom($checkerName), 'name' => $checkerName, 'model' => (string) Settings::get('assistant.site_check_model')];
 

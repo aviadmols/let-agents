@@ -36,6 +36,6 @@ return [
     ],
     'actions' => [
         'configure' => 'Settings and flags',
-        'merchant_view' => 'Merchant view',
+        'merchant_view' => 'Enter as the shop manager',
     ],
 ];

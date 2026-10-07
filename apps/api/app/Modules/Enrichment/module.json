@@ -119,6 +119,175 @@
             "max": 100,
             "scope": "shop",
             "unit": "orders"
+        },
+        {
+            "name": "reader_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "reader_model",
+            "type": "string",
+            "default": "gpt-5.4-nano",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "reader_input_usd_per_million",
+            "type": "float",
+            "default": 0.3,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "reader_output_usd_per_million",
+            "type": "float",
+            "default": 2.5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "audit_writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "audit_writer_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "audit_writer_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "audit_writer_output_usd_per_million",
+            "type": "float",
+            "default": 8.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "audit_checker_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "audit_checker_model",
+            "type": "string",
+            "default": "gpt-5.4-nano",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "audit_checker_input_usd_per_million",
+            "type": "float",
+            "default": 0.3,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "audit_checker_output_usd_per_million",
+            "type": "float",
+            "default": 2.5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        }
+    ],
+    "agents": [
+        {
+            "name": "nightly_model",
+            "action": "nightly_model",
+            "when": "03:10",
+            "features": [],
+            "roles": [
+                {
+                    "role": "reader",
+                    "provider": "reader_provider",
+                    "model": "reader_model",
+                    "prices": [
+                        "reader_input_usd_per_million",
+                        "reader_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "product_extraction",
+                        "fact_review",
+                        "content_mapping",
+                        "product_highlights"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "auditor",
+            "action": "audit_content",
+            "when": "weekly",
+            "features": [],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "audit_writer_provider",
+                    "model": "audit_writer_model",
+                    "prices": [
+                        "audit_writer_input_usd_per_million",
+                        "audit_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "propose_rules"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "audit_checker_provider",
+                    "model": "audit_checker_model",
+                    "prices": [
+                        "audit_checker_input_usd_per_million",
+                        "audit_checker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "audit_article",
+                        "review_rules"
+                    ]
+                }
+            ]
         }
     ]
 }

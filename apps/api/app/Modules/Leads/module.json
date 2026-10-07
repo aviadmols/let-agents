@@ -77,6 +77,100 @@
             "max": 500,
             "scope": "shop",
             "unit": "pages"
+        },
+        {
+            "name": "writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "writer_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "writer_output_usd_per_million",
+            "type": "float",
+            "default": 8.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "reviewer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "reviewer_input_usd_per_million",
+            "type": "float",
+            "default": 0.3,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "reviewer_output_usd_per_million",
+            "type": "float",
+            "default": 2.5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        }
+    ],
+    "agents": [
+        {
+            "name": "writer",
+            "action": "write_ctas",
+            "when": "01:20",
+            "features": [
+                "enabled"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "writer_provider",
+                    "model": "writer_model",
+                    "prices": [
+                        "writer_input_usd_per_million",
+                        "writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "write_cta"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "reviewer_provider",
+                    "model": "reviewer_model",
+                    "prices": [
+                        "reviewer_input_usd_per_million",
+                        "reviewer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "review_cta"
+                    ]
+                }
+            ]
         }
     ]
 }

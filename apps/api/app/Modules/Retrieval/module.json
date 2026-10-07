@@ -260,5 +260,82 @@
             "max": 1,
             "scope": "global"
         }
+    ],
+    "agents": [
+        {
+            "name": "indexer",
+            "action": "build_index",
+            "when": "02:45",
+            "features": [
+                "index"
+            ],
+            "roles": [
+                {
+                    "role": "embedder",
+                    "provider": "embedding_provider",
+                    "model": "embedding_model",
+                    "prices": [
+                        "embedding_usd_per_million"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "image_indexer",
+            "action": "build_image_index",
+            "when": "02:45",
+            "features": [
+                "image_index"
+            ],
+            "roles": [
+                {
+                    "role": "embedder",
+                    "provider": "image_provider",
+                    "model": "image_model",
+                    "prices": [
+                        "image_usd_per_image",
+                        "image_text_usd_per_million"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "query_embedder",
+            "action": "embed_queries",
+            "when": "live",
+            "features": [],
+            "roles": [
+                {
+                    "role": "embedder",
+                    "provider": "embedding_provider",
+                    "model": "embedding_model",
+                    "prices": [
+                        "embedding_usd_per_million"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "matcher",
+            "action": "match_products",
+            "when": "02:45",
+            "features": [
+                "ai_matching"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "match_provider",
+                    "model": "match_model",
+                    "prices": [
+                        "match_input_usd_per_million",
+                        "match_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "match"
+                    ]
+                }
+            ]
+        }
     ]
 }

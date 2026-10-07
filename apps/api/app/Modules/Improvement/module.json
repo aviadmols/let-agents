@@ -143,5 +143,41 @@
             "max": 200,
             "scope": "shop"
         }
+    ],
+    "agents": [
+        {
+            "name": "reviewer",
+            "action": "daily_review",
+            "when": "04:30",
+            "features": [
+                "daily_review"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "analyst_provider",
+                    "model": "analyst_model",
+                    "prices": [
+                        "analyst_input_usd_per_million",
+                        "analyst_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "review"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "auditor_provider",
+                    "model": "auditor_model",
+                    "prices": [
+                        "auditor_input_usd_per_million",
+                        "auditor_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "audit"
+                    ]
+                }
+            ]
+        }
     ]
 }

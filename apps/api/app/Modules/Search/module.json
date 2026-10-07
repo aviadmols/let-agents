@@ -372,5 +372,75 @@
             "scope": "shop",
             "unit": "answers"
         }
+    ],
+    "agents": [
+        {
+            "name": "tagger",
+            "action": "write_tags",
+            "when": "03:30",
+            "features": [
+                "page_tags"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "tags_provider",
+                    "model": "tags_model",
+                    "prices": [
+                        "tags_input_usd_per_million",
+                        "tags_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "tags"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "check_provider",
+                    "model": "check_model",
+                    "prices": [
+                        "check_input_usd_per_million",
+                        "check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "tags_check"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "resolver",
+            "action": "resolve",
+            "when": "04:00",
+            "features": [
+                "resolve_empty"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "resolve_provider",
+                    "model": "resolve_model",
+                    "prices": [
+                        "resolve_input_usd_per_million",
+                        "resolve_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "resolve"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "check_provider",
+                    "model": "check_model",
+                    "prices": [
+                        "check_input_usd_per_million",
+                        "check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "resolve_check"
+                    ]
+                }
+            ]
+        }
     ]
 }

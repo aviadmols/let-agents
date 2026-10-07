@@ -41,4 +41,52 @@ return [
         'label' => 'כמה הזמנות נדרשות כדי לקשר שני מוצרים',
         'description' => 'מתחת למספר הזה זו לא תבנית אלא צירוף מקרים, ולא ייווצר קשר.',
     ],
+    'reader_provider' => [
+        'label' => 'ספק המודל שקורא מוצרים ומאמרים בלילה',
+        'description' => 'openai כברירת מחדל.',
+    ],
+    'reader_model' => [
+        'label' => 'המודל שקורא מוצרים ומאמרים בלילה',
+        'description' => 'קורא עובדות, נקודות חשובות והתאמות למאמרים.',
+    ],
+    'reader_input_usd_per_million' => [
+        'label' => 'מחיר קלט של הקורא, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'reader_output_usd_per_million' => [
+        'label' => 'מחיר פלט של הקורא, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'audit_writer_provider' => [
+        'label' => 'ספק המודל שמציע כללי קריאה',
+        'description' => 'openai כברירת מחדל.',
+    ],
+    'audit_writer_model' => [
+        'label' => 'המודל שמציע כללי קריאה למאמרים',
+        'description' => 'מציע מה הקוד פספס בקריאת מאמרים.',
+    ],
+    'audit_writer_input_usd_per_million' => [
+        'label' => 'מחיר קלט של המציע, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'audit_writer_output_usd_per_million' => [
+        'label' => 'מחיר פלט של המציע, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'audit_checker_provider' => [
+        'label' => 'ספק המודל שבודק קריאת מאמרים',
+        'description' => 'כדאי ממשפחה אחרת מהמציע.',
+    ],
+    'audit_checker_model' => [
+        'label' => 'המודל שבודק קריאת מאמרים',
+        'description' => 'בודק מדגם מאמרים ואת הכללים שהוצעו.',
+    ],
+    'audit_checker_input_usd_per_million' => [
+        'label' => 'מחיר קלט של הבודק, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'audit_checker_output_usd_per_million' => [
+        'label' => 'מחיר פלט של הבודק, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
 ];

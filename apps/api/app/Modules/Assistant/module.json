@@ -213,6 +213,103 @@
             "max": 90,
             "scope": "shop",
             "unit": "days"
+        },
+        {
+            "name": "answer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "scope_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        }
+    ],
+    "agents": [
+        {
+            "name": "answerer",
+            "action": "answer",
+            "when": "live",
+            "features": [
+                "on_products",
+                "on_content"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "answer_provider",
+                    "model": "answer_model",
+                    "prices": [
+                        "answer_input_usd_per_million",
+                        "answer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "answer",
+                        "answer_article"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "scope_provider",
+                    "model": "scope_model",
+                    "prices": [
+                        "scope_input_usd_per_million",
+                        "scope_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "scope",
+                        "scope_article",
+                        "verify",
+                        "verify_article"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "site_answerer",
+            "action": "answer_site",
+            "when": "live",
+            "features": [
+                "on_search"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "answer_provider",
+                    "model": "answer_model",
+                    "prices": [
+                        "answer_input_usd_per_million",
+                        "answer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "answer_site"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "site_check_provider",
+                    "model": "site_check_model",
+                    "prices": [
+                        "site_check_input_usd_per_million",
+                        "site_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "verify_site"
+                    ]
+                }
+            ]
         }
     ]
 }

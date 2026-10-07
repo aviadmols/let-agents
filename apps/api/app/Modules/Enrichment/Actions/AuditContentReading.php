@@ -5,12 +5,12 @@ namespace App\Modules\Enrichment\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
-use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Enrichment\Models\EnrichmentContentRules;
 use App\Modules\Enrichment\Models\EnrichmentRuleProposal;
@@ -92,8 +92,8 @@ final class AuditContentReading
             return;
         }
 
-        $checker = (string) Settings::get('assistant.scope_model');
-        $writer = (string) Settings::get('assistant.answer_model');
+        $checker = (string) Settings::get('enrichment.audit_checker_model');
+        $writer = (string) Settings::get('enrichment.audit_writer_model');
         $effort = (string) Settings::get('assistant.reasoning_effort');
         $effort = $effort === 'model_default' ? null : $effort;
 
@@ -343,8 +343,10 @@ final class AuditContentReading
     /** @param array<string, mixed> $input */
     private function call(RunContext $run, string $model, string $prompt, array $input, ?string $effort, string $prices = 'scope'): ModelReply
     {
+        // "answer" prices are the proposer's, "scope" the checker's: each calls its own provider.
+        $provider = AgentModel::provider('enrichment.audit_'.($prices === 'answer' ? 'writer' : 'checker').'_provider');
         $reply = $this->models->json(
-            AiProviderName::OpenAi,
+            $provider,
             $model,
             (string) file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v'.self::PROMPT_VERSION.'.md'),
             (string) json_encode($input, JSON_UNESCAPED_UNICODE),
@@ -352,7 +354,7 @@ final class AuditContentReading
             $effort,
         );
 
-        $run->usage('openai', $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
+        $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
 
         return $reply;
     }
@@ -374,9 +376,12 @@ final class AuditContentReading
         return $lists;
     }
 
+    /** "answer_input" is the proposer's input price, "scope_output" the checker's output price. */
     private function price(string $name): float
     {
-        return (float) Settings::get("assistant.{$name}_usd_per_million");
+        [$role, $side] = explode('_', $name, 2);
+
+        return (float) Settings::get('enrichment.audit_'.($role === 'answer' ? 'writer' : 'checker')."_{$side}_usd_per_million");
     }
 
     /**

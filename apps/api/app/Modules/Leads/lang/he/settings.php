@@ -29,4 +29,28 @@ return [
         'label' => 'כמה עמודים מודל כותב בלילה',
         'description' => 'מספר העמודים שיישלחו למודלים בכל לילה. 0 מכבה את הכתיבה במודל ומשאיר רק את הגרסאות שהקוד כותב.',
     ],
+    'writer_provider' => [
+        'label' => 'ספק המודל שכותב הצעות לקוראים',
+        'description' => 'openai כברירת מחדל.',
+    ],
+    'writer_input_usd_per_million' => [
+        'label' => 'מחיר קלט של הכותב, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'writer_output_usd_per_million' => [
+        'label' => 'מחיר פלט של הכותב, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'reviewer_provider' => [
+        'label' => 'ספק המודל שבודק את ההצעות',
+        'description' => 'כדאי ממשפחה אחרת מהכותב.',
+    ],
+    'reviewer_input_usd_per_million' => [
+        'label' => 'מחיר קלט של הבודק, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'reviewer_output_usd_per_million' => [
+        'label' => 'מחיר פלט של הבודק, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
 ];

@@ -35,4 +35,5 @@ return [
         'on_page' => 'On-page module',
         'settings' => 'Settings',
     ],
+    'view_as_shop' => 'View as the shop manager',
 ];

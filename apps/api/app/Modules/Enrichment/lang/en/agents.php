@@ -10,4 +10,6 @@ return [
     'matcher' => 'Article product matcher',
     'code_reader' => 'Code reader',
     'relator' => 'Product relations calculator',
+    'nightly_model' => 'Reads products and articles',
+    'auditor' => 'Checks how articles are read',
 ];

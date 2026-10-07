@@ -4,6 +4,7 @@ namespace App\Modules\Enrichment\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
 use App\Modules\Enrichment\Enums\TaskType;
@@ -56,7 +57,8 @@ final class RunNightlyModelReading
                     return;
                 }
 
-                $model = (string) Settings::get('assistant.scope_model');
+                $model = (string) Settings::get('enrichment.reader_model');
+                $provider = AgentModel::provider('enrichment.reader_provider');
 
                 // A shop's catalogue is divided between several vocabularies, and a product can
                 // only be read against the one its branch belongs to. Taking the first would mean
@@ -92,7 +94,7 @@ final class RunNightlyModelReading
                     return;
                 }
 
-                $counts = $this->tenant->run($shopId, fn (): array => $this->answers->handle($run, $batch, $model, $limit));
+                $counts = $this->tenant->run($shopId, fn (): array => $this->answers->handle($run, $batch, $model, $limit, $provider));
 
                 $run->output($counts + ['batch' => $batch->id, 'task' => $batch->task->value, 'model' => $model])
                     ->summary('enrichment::runs.nightly_model', [
