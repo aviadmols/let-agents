@@ -2,7 +2,10 @@
 
 namespace App\Modules\Search\Filament\Operator\Pages;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
+use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\ResolveEmptySearches;
@@ -16,11 +19,13 @@ use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * What shoppers searched in one store: the most searched, the searches that found nothing (the
@@ -31,7 +36,9 @@ class ShopSearches extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMagnifyingGlass;
 
-    protected static ?int $navigationSort = 16;
+    protected static string|UnitEnum|null $navigationGroup = 'discovery';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'search/terms';
 
@@ -82,6 +89,33 @@ class ShopSearches extends Page
     }
 
     /** @return array<string, mixed>|null */
+    /** Only the system operator decides which sites search by photo; the shop's own screen never shows the switch. */
+    public function operatorView(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === User::OPERATOR_PANEL;
+    }
+
+    /** @return array{on: bool, ready: bool}|null */
+    public function photos(): ?array
+    {
+        if ($this->shop === null || ! $this->operatorView()) {
+            return null;
+        }
+
+        return [
+            'on' => Features::enabled('search.photos', $this->shop),
+            'ready' => app(TenantContext::class)->run($this->shop, fn (): bool => app(SemanticSearch::class)->picturesReady()),
+        ];
+    }
+
+    public function setPhotos(bool $on): void
+    {
+        abort_unless($this->operatorView() && $this->shop !== null, 403);
+
+        Features::override('search.photos', $on, $this->shop);
+        Notification::make()->success()->title(__('search::ui.photos.'.($on ? 'turned_on' : 'turned_off')))->send();
+    }
+
     public function report(): ?array
     {
         if ($this->shop === null) {

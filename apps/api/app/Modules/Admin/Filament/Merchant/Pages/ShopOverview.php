@@ -11,6 +11,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Carbon;
+use UnitEnum;
 
 /**
  * The merchant's home screen. For now: is the shop connected and is it live. Results,
@@ -20,7 +21,9 @@ final class ShopOverview extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
-    protected static ?int $navigationSort = -2;
+    protected static string|UnitEnum|null $navigationGroup = 'overview';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'overview';
 

@@ -2,6 +2,7 @@
 
 return [
     'questions' => [
+        'from_search' => 'Questions from the search box, about the whole site',
         'title' => 'Shopper questions',
         'subheading' => 'Everything shoppers asked about products, by product. Unanswered questions first: an answer the team writes is what the next shopper gets, and no model replaces it.',
         'no_shop' => 'No shop yet.',

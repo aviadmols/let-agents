@@ -8,11 +8,13 @@ use App\Modules\Retrieval\Candidates\LookAlike;
 use App\Modules\Retrieval\Candidates\MentionedTogether;
 use App\Modules\Retrieval\Candidates\SimilarProducts;
 use App\Modules\Retrieval\Console\RetrievalCommand;
+use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Sources\ContentDocuments;
 use App\Modules\Retrieval\Sources\ProductDocuments;
 use App\Modules\Retrieval\Sources\PurchaseDocuments;
+use App\Modules\Retrieval\Support\PassageSearch;
 use App\Modules\Retrieval\Support\RetrievalRunner;
 use App\Modules\Retrieval\Support\VectorSearch;
 use Illuminate\Console\Scheduling\Schedule;
@@ -31,6 +33,7 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->bind(SemanticSearch::class, VectorSearch::class);
+        $this->app->bind(Passages::class, PassageSearch::class);
         $this->app->bind(RunsRetrieval::class, RetrievalRunner::class);
         $this->app->tag(self::SOURCES, 'retrieval.sources');
         $this->app->tag(self::CANDIDATES, 'retrieval.candidates');

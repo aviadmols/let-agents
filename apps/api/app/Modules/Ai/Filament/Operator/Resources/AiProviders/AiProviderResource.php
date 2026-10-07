@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 final class AiProviderResource extends Resource
 {
@@ -20,7 +21,9 @@ final class AiProviderResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
 
-    protected static ?int $navigationSort = 35;
+    protected static string|UnitEnum|null $navigationGroup = 'system';
+
+    protected static ?int $navigationSort = 10;
 
     public static function getNavigationLabel(): string
     {

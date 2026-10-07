@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * One page of the store as the widget builds it, with why each circle and each product is there,
@@ -37,9 +38,11 @@ class ProductPage extends Page
 
     private const QUESTIONS = 20;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSquares2x2;
 
-    protected static ?int $navigationSort = 14;
+    protected static string|UnitEnum|null $navigationGroup = 'discovery';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'widget/page';
 

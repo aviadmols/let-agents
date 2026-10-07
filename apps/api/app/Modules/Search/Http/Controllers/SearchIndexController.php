@@ -50,6 +50,10 @@ final class SearchIndexController
             // The camera shows only where the shop's pictures already have vectors.
             'photos' => Features::enabled('search.photos', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
             'photoMaxKb' => (int) Settings::get('search.photo_max_kb'),
+            // A question may be sent to the assistant, only when the shopper presses Enter.
+            'ask' => Features::enabled('assistant.on_search', $shopId),
+            // What the site does not answer goes to the shop's WhatsApp, when the shop has one.
+            'whatsapp' => self::whatsapp($shopId),
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';
@@ -68,5 +72,17 @@ final class SearchIndexController
             'labels' => $labels,
             'items' => $data['items'] ?? [],
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /** The number the on-page module offers, read from the same settings; null when the shop has none. */
+    private static function whatsapp(string $shopId): ?string
+    {
+        try {
+            $number = (string) preg_replace('/\D/', '', (string) Settings::get('widget.whatsapp_number', $shopId));
+
+            return Features::enabled('widget.whatsapp', $shopId) && strlen($number) >= 8 ? $number : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

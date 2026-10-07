@@ -21,4 +21,18 @@ return [
         'label' => 'Store',
         'every' => 'Every store',
     ],
+    // Sidebar groups. Operator: overview, shops, content, discovery, shoppers, analytics, system.
+    // Merchant: overview, analytics, search, on_page, shoppers, settings.
+    'nav' => [
+        'overview' => 'Overview',
+        'shops' => 'Stores',
+        'content' => 'Content & knowledge',
+        'discovery' => 'Search & discovery',
+        'shoppers' => 'Shoppers',
+        'analytics' => 'Analytics',
+        'system' => 'System',
+        'search' => 'Search',
+        'on_page' => 'On-page module',
+        'settings' => 'Settings',
+    ],
 ];

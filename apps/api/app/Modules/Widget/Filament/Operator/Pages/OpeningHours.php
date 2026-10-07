@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Carbon;
+use UnitEnum;
 
 /**
  * When the store team answers, a day at a time.
@@ -33,7 +34,9 @@ class OpeningHours extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
-    protected static ?int $navigationSort = 62;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 60;
 
     protected static ?string $slug = 'opening-hours';
 

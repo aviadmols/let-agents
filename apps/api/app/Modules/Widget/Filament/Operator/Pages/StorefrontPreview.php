@@ -15,6 +15,7 @@ use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * Where the widget shows on a store, and links that show it to the store team before it is
@@ -29,7 +30,9 @@ final class StorefrontPreview extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedEye;
 
-    protected static ?int $navigationSort = 13;
+    protected static string|UnitEnum|null $navigationGroup = 'discovery';
+
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'storefront-preview';
 

@@ -11,6 +11,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * Every question shoppers asked in one store, by the page it was asked on: the ones nobody could answer first, so
@@ -25,7 +26,9 @@ class ShopQuestions extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
 
-    protected static ?int $navigationSort = 15;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'assistant/questions';
 

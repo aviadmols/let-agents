@@ -19,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 /** Articles and guides the store shares with Let Agents. Read-only. */
 final class CatalogContentResource extends Resource
@@ -29,7 +30,9 @@ final class CatalogContentResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedNewspaper;
 
-    protected static ?int $navigationSort = 18;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'catalog/content';
 

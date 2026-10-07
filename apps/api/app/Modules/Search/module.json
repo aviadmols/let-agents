@@ -8,7 +8,8 @@
         "Connections",
         "Catalog",
         "Retrieval",
-        "Admin"
+        "Admin",
+        "Assistant"
     ],
     "provider": "SearchServiceProvider",
     "features": [
@@ -26,7 +27,7 @@
         },
         {
             "name": "photos",
-            "default": true
+            "default": false
         },
         {
             "name": "resolve_empty",
@@ -361,6 +362,15 @@
             "max": 20,
             "scope": "global",
             "unit": "results"
+        },
+        {
+            "name": "answers_in_index",
+            "type": "int",
+            "default": 300,
+            "min": 0,
+            "max": 3000,
+            "scope": "shop",
+            "unit": "answers"
         }
     ]
 }

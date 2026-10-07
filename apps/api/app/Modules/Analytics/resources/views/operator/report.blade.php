@@ -2,15 +2,15 @@
     @php($report = $this->report())
     @php($pct = fn ($v) => $v === null ? '–' : number_format($v * 100, 1).'%')
 
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+    <div class="la-toolbar">
         @if ($this->picksShop())
-        <select wire:model.live="shop" style="padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px;min-width:220px">
-            @foreach ($this->shops() as $id => $name)
-                <option value="{{ $id }}">{{ $name }}</option>
-            @endforeach
-        </select>
+            <select wire:model.live="shop" class="la-select" aria-label="{{ __('analytics::analytics.shop') }}" style="min-width:220px">
+                @foreach ($this->shops() as $id => $name)
+                    <option value="{{ $id }}">{{ $name }}</option>
+                @endforeach
+            </select>
         @endif
-        <select wire:model.live="days" style="padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px">
+        <select wire:model.live="days" class="la-select" aria-label="{{ __('analytics::analytics.period') }}">
             @foreach (\App\Modules\Analytics\Actions\BuildShopReport::PERIODS as $period)
                 <option value="{{ $period }}">{{ __('analytics::analytics.last_days', ['days' => $period]) }}</option>
             @endforeach
@@ -21,76 +21,96 @@
         <x-filament::section>{{ __('analytics::analytics.no_shop') }}</x-filament::section>
     @else
         @php($t = $report['totals'])
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+        @php($money = ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][$report['currency']] ?? $report['currency'].' ')
+
+        {{-- The summary row: one tile per total, above the charts. --}}
+        <div class="la-stats" data-analytics-stats>
             @foreach ([
-                'page_views' => number_format($t['page_views']),
-                'visitors' => number_format($t['visitors']),
-                'impressions' => number_format($t['impressions']),
-                'opens' => number_format($t['opens']).' · '.$pct($t['open_rate']),
-                'widget_add_to_cart' => number_format($t['widget_add_to_cart']),
-                'orders' => number_format($t['orders']),
-                'assisted_orders' => number_format($t['assisted_orders']),
-                'attributed_revenue' => '₪'.number_format($t['attributed_revenue'], 2),
-            ] as $key => $value)
-                <x-filament::section compact>
-                    <div style="font-size:12px;opacity:.7">{{ __("analytics::analytics.totals.{$key}") }}</div>
-                    <div style="font-size:22px;font-weight:600;margin-top:4px" dir="ltr">{{ $value }}</div>
-                </x-filament::section>
+                'page_views' => [number_format($t['page_views']), null],
+                'visitors' => [number_format($t['visitors']), null],
+                'impressions' => [number_format($t['impressions']), null],
+                'opens' => [number_format($t['opens']), $pct($t['open_rate'])],
+                'clicks' => [number_format($t['clicks']), null],
+                'widget_add_to_cart' => [number_format($t['widget_add_to_cart']), null],
+                'orders' => [number_format($t['orders']), null],
+                'assisted_orders' => [number_format($t['assisted_orders']), null],
+                'attributed_revenue' => [$money.number_format($t['attributed_revenue'], 2), null],
+            ] as $key => [$value, $note])
+                <div class="la-stat">
+                    <div class="la-stat-label">{{ __("analytics::analytics.totals.{$key}") }}</div>
+                    <div class="la-stat-value"><bdi>{{ $value }}@if ($note) <small>· {{ $note }}</small>@endif</bdi></div>
+                </div>
             @endforeach
         </div>
 
         @if ($t['preview_events'] > 0)
-            <p style="font-size:13px;opacity:.75">{{ __('analytics::analytics.preview_note', ['count' => number_format($t['preview_events'])]) }}</p>
+            <p class="la-note">{{ __('analytics::analytics.preview_note', ['count' => number_format($t['preview_events'])]) }}</p>
         @endif
 
+        <div class="la-charts" data-analytics-charts>
+            @foreach ($this->charts($report) as $name => $chart)
+                <div @class(['la-wide' => $chart['wide']]) data-chart="{{ $name }}">
+                    @livewire(\App\Modules\Analytics\Filament\Widgets\ReportChart::NAME, [
+                        'kind' => $chart['kind'],
+                        'horizontal' => $chart['horizontal'],
+                        'title' => $chart['title'],
+                        'subtitle' => $chart['subtitle'],
+                        'prefix' => $chart['prefix'],
+                        'labels' => $chart['labels'],
+                        'series' => $chart['series'],
+                    ], key('analytics-chart-'.$name))
+                </div>
+            @endforeach
+        </div>
+
         <x-filament::section :heading="__('analytics::analytics.sections.hot_pages')">
-            <table style="width:100%;font-size:14px;border-collapse:collapse">
-                <thead><tr style="text-align:start;opacity:.7">
-                    <th style="text-align:start;padding:6px">{{ __('analytics::analytics.columns.page') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.views') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.impressions') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.opens') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.add_to_cart') }}</th>
-                </tr></thead>
-                <tbody>
-                @forelse ($report['hot_pages'] as $page)
-                    <tr style="border-top:1px solid #e4e4e7">
-                        <td style="padding:6px">{{ $page['title'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $page['views'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $page['impressions'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $page['opens'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $page['add_to_cart'] }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" style="padding:6px;opacity:.7">{{ __('analytics::analytics.empty') }}</td></tr>
-                @endforelse
-                </tbody>
-            </table>
+            <div class="la-table-wrap">
+                <table class="la-table">
+                    <thead><tr>
+                        <th>{{ __('analytics::analytics.columns.page') }}</th>
+                        <th class="la-num">{{ __('analytics::analytics.columns.views') }}</th>
+                        <th class="la-num">{{ __('analytics::analytics.columns.impressions') }}</th>
+                        <th class="la-num">{{ __('analytics::analytics.columns.opens') }}</th>
+                        <th class="la-num">{{ __('analytics::analytics.columns.add_to_cart') }}</th>
+                    </tr></thead>
+                    <tbody>
+                    @forelse ($report['hot_pages'] as $page)
+                        <tr>
+                            <td>{{ $page['title'] }}</td>
+                            <td class="la-num">{{ number_format($page['views']) }}</td>
+                            <td class="la-num">{{ number_format($page['impressions']) }}</td>
+                            <td class="la-num">{{ number_format($page['opens']) }}</td>
+                            <td class="la-num">{{ number_format($page['add_to_cart']) }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="la-note">{{ __('analytics::analytics.empty') }}</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
         </x-filament::section>
 
-        <x-filament::section :heading="__('analytics::analytics.sections.hot_models')">
-            <table style="width:100%;font-size:14px;border-collapse:collapse">
-                <thead><tr style="opacity:.7">
-                    <th style="text-align:start;padding:6px">{{ __('analytics::analytics.columns.model') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.impressions') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.opens') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.clicks') }}</th>
-                    <th style="padding:6px">{{ __('analytics::analytics.columns.add_to_cart') }}</th>
-                </tr></thead>
-                <tbody>
-                @forelse ($report['hot_models'] as $model)
-                    <tr style="border-top:1px solid #e4e4e7">
-                        <td style="padding:6px">{{ \Illuminate\Support\Facades\Lang::has("analytics::analytics.models.{$model['model']}") ? __("analytics::analytics.models.{$model['model']}") : $model['model'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $model['impressions'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $model['opens'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $model['clicks'] }}</td>
-                        <td style="padding:6px;text-align:center">{{ $model['add_to_cart'] }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" style="padding:6px;opacity:.7">{{ __('analytics::analytics.empty') }}</td></tr>
-                @endforelse
-                </tbody>
-            </table>
+        <x-filament::section :heading="__('analytics::analytics.sections.top_products')">
+            <div class="la-table-wrap">
+                <table class="la-table">
+                    <thead><tr>
+                        <th>{{ __('analytics::analytics.columns.product') }}</th>
+                        <th class="la-num">{{ __('analytics::analytics.columns.add_to_cart') }}</th>
+                        <th class="la-num">{{ __('analytics::analytics.columns.purchased') }}</th>
+                    </tr></thead>
+                    <tbody>
+                    @forelse ($report['top_products'] as $product)
+                        <tr>
+                            <td>{{ $product['title'] }}</td>
+                            <td class="la-num">{{ number_format($product['add_to_cart']) }}</td>
+                            <td class="la-num">{{ number_format($product['purchased']) }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="3" class="la-note">{{ __('analytics::analytics.empty') }}</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
         </x-filament::section>
     @endif
 </x-filament-panels::page>

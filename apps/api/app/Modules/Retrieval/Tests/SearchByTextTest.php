@@ -5,6 +5,7 @@ namespace App\Modules\Retrieval\Tests;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Retrieval\Actions\BuildIndex;
+use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalQueryVector;
 use App\Modules\Retrieval\Support\QueryVectors;
@@ -92,5 +93,20 @@ final class SearchByTextTest extends TestCase
         $this->assertSame([], $hits);
         $this->assertSame($calls, $this->embedder->calls);
         $this->assertSame(0, $this->inShop(fn () => RetrievalQueryVector::query()->count()));
+    }
+
+    public function test_passages_carry_their_text_and_share_the_query_vector(): void
+    {
+        $calls = $this->embedder->calls;
+
+        $passages = $this->inShop(fn () => app(Passages::class)->near($this->shop->id, 'קידוח בבטון', ['product', 'content'], 3));
+
+        $this->assertSame('20', $passages[0]['external_id']);
+        $this->assertStringContainsString('בבטון', $passages[0]['text'], 'the piece of text itself, for an answer to cite');
+        $this->assertLessThanOrEqual(3, count($passages));
+        $this->assertSame($calls + 1, $this->embedder->calls);
+
+        $this->inShop(fn () => app(SemanticSearch::class)->nearText($this->shop->id, 'קידוח בבטון', ['product'], 3));
+        $this->assertSame($calls + 1, $this->embedder->calls, 'one vector for the same words, whichever search asks');
     }
 }

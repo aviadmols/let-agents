@@ -9,6 +9,7 @@ use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Modules\Admin\Filament\Operator\Pages\Configuration as OperatorConfiguration;
 use BackedEnum;
 use Filament\Support\Icons\Heroicon;
+use UnitEnum;
 
 /**
  * What a shop owner may change about their own widget: whether it shows at all, where on the page
@@ -26,7 +27,9 @@ final class DisplaySettings extends OperatorConfiguration
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSwatch;
 
-    protected static ?int $navigationSort = 60;
+    protected static string|UnitEnum|null $navigationGroup = 'on_page';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'display';
 

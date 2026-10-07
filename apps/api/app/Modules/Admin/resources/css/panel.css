@@ -1,0 +1,496 @@
+/*
+ * The LETS look for both admin panels (operator and merchant), on top of Filament's stylesheet.
+ *
+ * Off-white page, white cards with 20px corners and quiet borders, a black/white base, a purple
+ * accent (the panel's primary color) and lime pill buttons with black text. Outfit carries Latin
+ * and digits, Rubik the Hebrew. Filament marks dark mode with `.dark` on <html>.
+ *
+ * Inlined by App\Modules\Admin\Panels\PanelTheme. Plain CSS, no build step: target fi-* classes
+ * and Filament's color variables only, and keep everything direction-neutral (logical properties)
+ * so it reads the same in RTL and LTR.
+ */
+
+:root,
+html.fi {
+    --font-family: 'Outfit', 'Rubik', ui-sans-serif, system-ui, sans-serif;
+
+    --la-plane: #fafafa;
+    --la-paper: #ffffff;
+    --la-ink: #0d0d0d;
+    --la-ink-2: #555555;
+    --la-muted: #8a8a8a;
+    --la-line: #ebebeb;
+    --la-axis: #d6d6d6;
+    --la-soft: #f5f0fb;
+    --la-lime: #e2ff78;
+    --la-lime-ink: #0d0d0d;
+    --la-purple: #7e22ce;
+    --la-r: 20px;
+    --la-r2: 12px;
+    --la-shadow: 0 12px 40px -24px rgb(13 13 13 / 18%), 0 1px 2px rgb(13 13 13 / 4%);
+
+    /* Chart series, in this order, always. One y-axis per chart. */
+    --la-s1: #7e22ce;
+    --la-s2: #eb6834;
+    --la-s3: #1baf7a;
+    --la-s4: #2a78d6;
+}
+
+html.dark {
+    --la-plane: #0d0d0d;
+    --la-paper: #1a1a1a;
+    --la-ink: #ffffff;
+    --la-ink-2: #c3c2b7;
+    --la-muted: #8f8f8f;
+    --la-line: #2a2a2a;
+    --la-axis: #3a3a3a;
+    --la-soft: #231f2c;
+    --la-purple: #a855f7;
+    --la-shadow: 0 12px 40px -24px rgb(0 0 0 / 70%);
+
+    --la-s1: #a855f7;
+    --la-s2: #d95926;
+    --la-s3: #199e70;
+    --la-s4: #3987e5;
+}
+
+/* ------------------------------------------------------------------ page and type */
+
+.fi-body,
+.fi-simple-layout {
+    background-color: var(--la-plane);
+    color: var(--la-ink);
+    font-family: var(--font-family);
+}
+
+.fi-body:where(.dark, .dark *) {
+    background-color: var(--la-plane);
+}
+
+.fi-header-heading,
+.fi-simple-header-heading {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--la-ink);
+}
+
+.fi-header-subheading,
+.fi-simple-header-subheading,
+.fi-section-header-description {
+    color: var(--la-ink-2);
+}
+
+/* ------------------------------------------------------------------ top bar */
+
+.fi-topbar,
+.fi-topbar:where(.dark, .dark *) {
+    background-color: var(--la-paper);
+    box-shadow: none;
+    border-block-end: 1px solid var(--la-line);
+}
+
+/* The shop picker in the operator top bar (OperatorPanelProvider::shopPicker). */
+.fi-topbar form:has([data-operator-shop]) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fi-topbar form:has([data-operator-shop]) > span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--la-purple);
+    flex: none;
+}
+
+.fi-topbar form:has([data-operator-shop]) label {
+    font-size: 12px;
+    color: var(--la-muted);
+}
+
+[data-operator-shop] {
+    appearance: auto;
+    min-width: 180px;
+    padding: 6px 14px;
+    border: 1px solid var(--la-line);
+    border-radius: 999px;
+    background: var(--la-paper);
+    color: var(--la-ink);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+[data-operator-shop]:focus-visible {
+    outline: 2px solid var(--la-purple);
+    outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ sidebar */
+
+.fi-sidebar,
+.fi-sidebar:where(.dark, .dark *) {
+    background-color: var(--la-paper);
+}
+
+@media (min-width: 1024px) {
+    .fi-sidebar {
+        border-inline-end: 1px solid var(--la-line);
+    }
+}
+
+.fi-body-has-topbar .fi-sidebar-header,
+.fi-body-has-topbar .fi-sidebar-header:where(.dark, .dark *) {
+    background-color: var(--la-paper);
+    box-shadow: none;
+    border-block-end: 1px solid var(--la-line);
+}
+
+.fi-sidebar-nav {
+    padding-inline: 12px;
+}
+
+.fi-sidebar-nav-groups {
+    row-gap: 14px;
+}
+
+.fi-sidebar-group-btn {
+    padding-block: 2px 4px;
+    padding-inline: 12px;
+}
+
+.fi-sidebar-group-label,
+.fi-sidebar-group-label:where(.dark, .dark *) {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--la-muted);
+}
+
+/* Hebrew is not tracked: spaced-out letters break its word shapes. */
+[dir='rtl'] .fi-sidebar-group-label,
+[dir='rtl'] .fi-ta-header-cell,
+[dir='rtl'] .la-table th {
+    letter-spacing: 0;
+}
+
+.fi-sidebar-item-btn {
+    border-radius: 999px;
+    padding: 7px 12px;
+    column-gap: 10px;
+}
+
+.fi-sidebar-item-label,
+.fi-sidebar-item-label:where(.dark, .dark *) {
+    color: var(--la-ink-2);
+    font-weight: 500;
+}
+
+.fi-sidebar-item-icon {
+    color: var(--la-muted);
+}
+
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover,
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:focus-visible,
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:where(.dark, .dark *):hover,
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:where(.dark, .dark *):focus-visible {
+    background-color: var(--la-soft);
+}
+
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover .fi-sidebar-item-label {
+    color: var(--la-ink);
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn:where(.dark, .dark *),
+.fi-sidebar-item.fi-active.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover {
+    background-color: var(--la-lime);
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label:where(.dark, .dark *),
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon:where(.dark, .dark *) {
+    color: var(--la-lime-ink);
+    font-weight: 700;
+}
+
+.fi-sidebar-item-badge-ctn .fi-badge {
+    background: var(--la-ink);
+    color: var(--la-paper);
+    box-shadow: none;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+.fi-section:not(.fi-section-not-contained):not(.fi-aside),
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat {
+    border-radius: var(--la-r);
+    background-color: var(--la-paper);
+    box-shadow: var(--la-shadow), 0 0 0 1px var(--la-line);
+}
+
+.fi-section:not(.fi-section-not-contained):not(.fi-aside):where(.dark, .dark *),
+.fi-ta-ctn:where(.dark, .dark *),
+.fi-wi-stats-overview-stat:where(.dark, .dark *) {
+    background-color: var(--la-paper);
+    box-shadow: var(--la-shadow), 0 0 0 1px var(--la-line);
+}
+
+.fi-section-header-heading {
+    font-weight: 700;
+}
+
+.fi-section:not(.fi-section-not-contained) > .fi-section-content-ctn > .fi-section-footer,
+.fi-section:not(.fi-section-not-contained) > .fi-section-header {
+    border-color: var(--la-line);
+}
+
+.fi-simple-main,
+.fi-simple-main:where(.dark, .dark *) {
+    border-radius: var(--la-r);
+    background-color: var(--la-paper);
+    box-shadow: var(--la-shadow), 0 0 0 1px var(--la-line);
+}
+
+/* The language links under the sign-in form (PanelDefaults::loginLocaleLinks). */
+.fi-simple-main nav[aria-label='Language'] {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-block-start: 16px;
+    font-size: 13px;
+}
+
+.fi-simple-main nav[aria-label='Language'] a {
+    color: var(--la-purple);
+}
+
+.fi-simple-main nav[aria-label='Language'] [aria-current] {
+    font-weight: 700;
+}
+
+.fi-modal-window {
+    border-radius: var(--la-r);
+}
+
+.fi-dropdown-panel {
+    border-radius: 14px;
+}
+
+/* ------------------------------------------------------------------ buttons, badges, inputs */
+
+.fi-btn {
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+/* Primary actions: lime pill, black text; black on hover (white in dark mode). */
+.fi-btn.fi-color-primary:not(.fi-outlined) {
+    --bg: var(--la-lime);
+    --text: var(--la-lime-ink);
+    --hover-bg: #0d0d0d;
+    --hover-text: #ffffff;
+    --dark-bg: var(--la-lime);
+    --dark-text: var(--la-lime-ink);
+    --dark-hover-bg: #ffffff;
+    --dark-hover-text: #0d0d0d;
+}
+
+.fi-btn.fi-color-primary:not(.fi-outlined) > .fi-icon {
+    color: currentColor;
+}
+
+.fi-icon-btn {
+    border-radius: 999px;
+}
+
+.fi-badge {
+    border-radius: 999px;
+    padding-inline: 10px;
+}
+
+.fi-input-wrp {
+    border-radius: var(--la-r2);
+}
+
+.fi-tabs-item {
+    border-radius: 999px;
+}
+
+.fi-tabs-item.fi-active,
+.fi-tabs-item.fi-active:where(.dark, .dark *) {
+    background-color: var(--la-ink);
+}
+
+.fi-tabs-item.fi-active .fi-tabs-item-label,
+.fi-tabs-item.fi-active .fi-icon {
+    color: var(--la-paper);
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.fi-ta-header-cell {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--la-muted);
+}
+
+/* ------------------------------------------------------------------ charts (Chart.js reads these colors) */
+
+.fi-wi-chart .fi-wi-chart-text-color { color: var(--la-muted); }
+.fi-wi-chart .fi-wi-chart-grid-color { color: var(--la-line); }
+.fi-wi-chart .fi-wi-chart-tooltip-bg-color { color: var(--la-ink); }
+.fi-wi-chart .fi-wi-chart-tooltip-text-color { color: var(--la-paper); }
+.fi-wi-chart .fi-wi-chart-tooltip-border-color { color: var(--la-ink); }
+
+/* ------------------------------------------------------------------ merchant panel: whose shop this is */
+
+.fi-section[data-shop-banner]:not(.fi-section-not-contained):not(.fi-aside),
+[data-shop-banner] {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-block-end: 16px;
+    padding: 10px 16px;
+    border-radius: var(--la-r2);
+    font-size: 13px;
+    background: var(--la-soft);
+    color: var(--la-ink-2);
+    box-shadow: none;
+}
+
+[data-shop-banner] svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+}
+
+/* ------------------------------------------------------------------ building blocks for report screens */
+
+.la-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.la-select {
+    appearance: auto;
+    padding: 7px 14px;
+    border: 1px solid var(--la-line);
+    border-radius: 999px;
+    background: var(--la-paper);
+    color: var(--la-ink);
+    font: inherit;
+    font-size: 13px;
+    min-width: 0;
+}
+
+.la-select:focus-visible {
+    outline: 2px solid var(--la-purple);
+    outline-offset: 1px;
+}
+
+.la-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.la-stat {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    min-width: 0;
+    padding: 16px 18px;
+    border-radius: var(--la-r);
+    background: var(--la-paper);
+    box-shadow: var(--la-shadow), 0 0 0 1px var(--la-line);
+}
+
+.la-stat-label {
+    font-size: 12px;
+    color: var(--la-muted);
+}
+
+.la-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--la-ink);
+}
+
+.la-stat-value bdi small {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--la-muted);
+}
+
+.la-charts {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+.la-charts > .la-wide {
+    grid-column: 1 / -1;
+}
+
+.la-note {
+    font-size: 12px;
+    color: var(--la-muted);
+}
+
+.la-table-wrap {
+    overflow-x: auto;
+}
+
+.la-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.la-table th {
+    text-align: start;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--la-muted);
+    padding: 6px 10px;
+    border-block-end: 1px solid var(--la-line);
+}
+
+.la-table td {
+    padding: 10px;
+    border-block-end: 1px solid var(--la-line);
+    color: var(--la-ink);
+}
+
+.la-table tr:last-child td {
+    border-block-end: 0;
+}
+
+.la-table .la-num {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+}
+
+.la-table tbody tr:hover td {
+    background: var(--la-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fi-sidebar-item-btn,
+    .fi-btn {
+        transition: none;
+    }
+}

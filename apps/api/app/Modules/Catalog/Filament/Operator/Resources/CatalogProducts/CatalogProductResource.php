@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 /** What Let Agents read from each store. Read-only: the store is the source of truth. */
 final class CatalogProductResource extends Resource
@@ -23,7 +24,9 @@ final class CatalogProductResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingBag;
 
-    protected static ?int $navigationSort = 17;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'catalog/products';
 

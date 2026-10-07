@@ -6,6 +6,7 @@ use App\Core\Localization\Locales;
 use App\Core\Modules\ModuleRepository;
 use App\Modules\Admin\Http\Middleware\ApplyAdminLocale;
 use Filament\Actions\Action;
+use Filament\FontProviders\GoogleFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -39,19 +40,20 @@ final class PanelDefaults
         $panel
             ->login()
             ->brandName((string) config('app.name'))
-            ->font('Heebo')
+            ->font('Rubik', url: PanelTheme::FONT_URL, provider: GoogleFontProvider::class)
             ->maxContentWidth(Width::Full)
             ->colors([
-                'primary' => Color::hex('#4F46E5'),
+                'primary' => Color::hex('#7e22ce'),
                 'success' => Color::hex('#16A34A'),
                 'danger' => Color::hex('#DC2626'),
                 'warning' => Color::hex('#D97706'),
                 'info' => Color::hex('#2563EB'),
-                'gray' => Color::Slate,
+                'gray' => Color::Neutral,
             ])
             ->userMenuItems([
                 'locale' => self::localeSwitchAction(),
             ])
+            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): HtmlString => PanelTheme::styles())
             ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): HtmlString => self::loginLocaleLinks())
             ->middleware([
                 EncryptCookies::class,

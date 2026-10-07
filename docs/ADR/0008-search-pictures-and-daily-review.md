@@ -50,3 +50,22 @@
   search fills them, and checked by the other family against what they show. Widget reads them
   through `Search\Contracts\PageTags`, which searches each tag when the bank is built, so results
   follow stock. Tags the team takes off stay off.
+
+## Addendum (2026-10-07): questions in the search box and in the module
+
+- **A question typed in the search box is answered from the whole site, only on Enter.** While
+  typing, code only: the search index now holds answers shoppers already got (page answers and
+  site answers, `search.answers_in_index`), so a matching question shows its answer at once.
+  On Enter, `POST /api/v1/search/{site}/ask` runs `Assistant\Actions\AnswerSiteQuestion`: saved
+  answer first; else the nearest passages by meaning (`Retrieval\Contracts\Passages`); none near
+  enough means "not found" with no writing model; else OpenAI writes from the passages and cites
+  them, code refuses uncited answers, prices, contact details and numbers not in the cited text,
+  and Claude checks every fact is in the cited passages. Site answers have neither `product_id`
+  nor `content_id` and carry `sources` (the pages, with links). "Not found" is retried after
+  `assistant.site_retry_days`. No answer: the shop's WhatsApp, with the question filled in.
+- **The on-page module has a search-and-ask field** (`widget.find_field`, default on). Typing
+  filters the circles or tags and shows the page's saved answers, products and guides already in
+  the bank; no request is made. Enter sends a question to the existing question box (same limits
+  and handover to the shop) and plain words to the store's search.
+- **Search by photo is off by default and the system operator turns it on per site** from the
+  searches screen. The shop's own screen never shows the switch.

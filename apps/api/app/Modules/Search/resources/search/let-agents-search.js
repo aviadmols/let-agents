@@ -309,6 +309,22 @@
 
   // ---------------------------------------------------------------- storefront
 
+  /**
+   * A question rather than words to look up: it ends with a question mark, or it is two words or
+   * more and opens like a question. Code only; nothing is asked while the shopper types.
+   */
+  var QUESTION_WORDS = ['איך', 'כמה', 'האם', 'למה', 'מדוע', 'מה', 'מהו', 'מהי', 'מהם', 'איפה', 'היכן', 'מתי', 'מי', 'איזה', 'איזו', 'אילו',
+    'אפשר', 'ניתן', 'יש', 'צריך', 'כדאי', 'מותר', 'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
+
+  function isQuestion(raw) {
+    var text = String(raw || '').trim();
+    if (/[?？]\s*$/.test(text)) {
+      return text.replace(/[?？\s]/g, '').length >= 3;
+    }
+    var words = text.toLowerCase().split(/\s+/).filter(Boolean);
+    return words.length >= 2 && QUESTION_WORDS.indexOf(words[0]) !== -1;
+  }
+
   function boot(win) {
     var doc = win.document;
     var ctx = win.LetAgentsSearchContext;
@@ -335,6 +351,7 @@
     var shown = [];
     var typeTimer = null;
     var pauseTimer = null;
+    var visitorId = null;
 
     function label(key, params) {
       var text = String(state.labels[key] || key);
@@ -540,6 +557,19 @@
       'background:transparent;color:var(--rs-accent-text);cursor:pointer}',
       '.all[aria-selected="true"],.all:hover{background:var(--rs-soft)}',
       '.empty{padding:14px 12px;font-size:14px}',
+      '.answer{margin:8px;padding:12px 14px;border-radius:12px;background:var(--rs-soft);display:grid;gap:6px;font-size:14px;line-height:1.55}',
+      '.answer .tag{font-size:11px;letter-spacing:.04em;opacity:.65}',
+      '.answer .q{font-weight:600}',
+      '.answer .a{white-space:pre-line}',
+      '.answer .src{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}',
+      '.answer .src a{color:var(--rs-accent-text);text-decoration:none;border:1px solid var(--rs-line);border-radius:999px;padding:2px 9px;background:var(--rs-bg)}',
+      '.ask{display:flex;align-items:center;justify-content:space-between;gap:10px;width:calc(100% - 16px);margin:8px;padding:10px 12px;border:1.5px dashed var(--rs-accent-text);',
+      'border-radius:12px;background:transparent;color:inherit;font:inherit;font-size:14px;cursor:pointer;text-align:start}',
+      '.ask[aria-selected="true"],.ask:hover{background:var(--rs-soft)}',
+      '.ask b{color:var(--rs-accent-text);white-space:nowrap}',
+      '.btn.wa{background:#1f9d55;border-color:#1f9d55;color:#fff;display:inline-block;justify-self:start}',
+      '.section.answer-box{display:grid;gap:10px}',
+      '.section.answer-box .answer{margin:0}',
       '.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;justify-content:center;align-items:flex-start;padding:min(8vh,64px) 16px 16px;z-index:2147483000}',
       '.sheet{width:min(1100px,100%);max-height:calc(100vh - min(8vh,64px) - 16px);overflow:auto;background:var(--rs-bg);color:var(--rs-fg);border-radius:14px;',
       'box-shadow:0 30px 80px -20px rgba(0,0,0,.45);font:inherit}',
@@ -644,9 +674,17 @@
       var max = state.config.suggestions || 6;
       var products = [];
       var others = [];
+      var answers = [];
+      var question = isQuestion(raw);
       for (var i = 0; i < hits.length; i++) {
         var record = state.records[hits[i].id];
         if (!record) {
+          continue;
+        }
+        if (record.t === 'answer') {
+          if (answers.length < 1) {
+            answers.push(record);
+          }
           continue;
         }
         if (record.t === 'product') {
@@ -671,7 +709,25 @@
       shown = [];
       active = -1;
 
-      if (!products.length && !others.length) {
+      // A question: the answer the site already gave, or a way to ask it. Asking happens only on
+      // Enter or a click; typing never reaches a model.
+      if (answers.length && (question || normalize(raw).split(' ').length >= 3)) {
+        box.appendChild(answerBlock(answers[0].title, answers[0].ans, answers[0].src, raw, answers[0]));
+      } else if (question && state.config.ask) {
+        var askRow = el('button', 'ask');
+        askRow.type = 'button';
+        askRow.setAttribute('role', 'option');
+        askRow.appendChild(el('span', null, label('ask_hint')));
+        askRow.appendChild(el('b', null, label('ask_button')));
+        askRow.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+          askSite(input);
+        });
+        shown.push({ node: askRow, ask: true });
+        box.appendChild(askRow);
+      }
+
+      if (!products.length && !others.length && !answers.length && !question) {
         box.appendChild(el('div', 'empty', label('no_results', { query: raw.trim() })));
       }
 
@@ -769,6 +825,121 @@
       }
       active = (active + step + shown.length) % shown.length;
       shown[active].node.setAttribute('aria-selected', 'true');
+    }
+
+    // ---------------------------------------------------------------- questions
+
+    /** The same anonymous id the on-page module uses, so a shopper's daily questions add up once. */
+    function visitor() {
+      if (visitorId) {
+        return visitorId;
+      }
+      var match = doc.cookie.match(/(?:^|; )let_agents_vid=([^;]*)/);
+      var id = match ? decodeURIComponent(match[1]) : null;
+      if (!/^anon-[A-Za-z0-9_-]{16,64}$/.test(id || '')) {
+        try {
+          id = win.localStorage.getItem('let_agents_vid');
+        } catch (e) {
+          id = null;
+        }
+      }
+      if (!/^anon-[A-Za-z0-9_-]{16,64}$/.test(id || '')) {
+        var alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+        var bytes = new Uint8Array(22);
+        (win.crypto || win.msCrypto).getRandomValues(bytes);
+        id = 'anon-';
+        for (var i = 0; i < bytes.length; i++) {
+          id += alphabet.charAt(bytes[i] % alphabet.length);
+        }
+        try {
+          win.localStorage.setItem('let_agents_vid', id);
+        } catch (e) { /* the cookie still carries it */ }
+        doc.cookie = 'let_agents_vid=' + encodeURIComponent(id) + '; max-age=31536000; path=/; samesite=lax';
+      }
+      visitorId = id;
+      return id;
+    }
+
+    /** An answer with the site's pages it came from. */
+    function answerBlock(question, text, sources, raw, record) {
+      var block = el('div', 'answer');
+      block.appendChild(el('span', 'tag', label('answer_from_site')));
+      if (question) {
+        block.appendChild(el('span', 'q', question));
+      }
+      block.appendChild(el('span', 'a', text || ''));
+      var links = (sources || []).filter(function (source) { return safeUrl(source && source.url); });
+      if (links.length) {
+        var src = el('div', 'src');
+        src.appendChild(el('span', null, label('sources')));
+        links.forEach(function (source) {
+          var link = el('a', null, source.title);
+          link.href = source.url;
+          if (record) {
+            link.addEventListener('mousedown', function () { countClick(raw, record); });
+          }
+          src.appendChild(link);
+        });
+        block.appendChild(src);
+      }
+      return block;
+    }
+
+    /**
+     * The shopper asked: the assistant answers from the site's pages, or says it did not find it and
+     * offers the shop's WhatsApp. What the search finds for the same words shows under it.
+     */
+    function askSite(input) {
+      var raw = input.value.trim();
+      if (!raw) {
+        return;
+      }
+      closeDropdown();
+      clearTimeout(pauseTimer);
+      var sheet = openSheet(raw);
+      var box = el('div', 'section answer-box');
+      box.appendChild(el('p', 'muted', label('asking')));
+      sheet.appendChild(box);
+      var below = el('div');
+      sheet.appendChild(below);
+
+      win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/ask', {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ question: raw, vid: visitor(), locale: LOCALE })
+      })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (json) { showAnswer(box, json && json.data, raw); })
+        .catch(function () { showAnswer(box, null, raw); });
+
+      var normalized = normalize(raw);
+      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
+      markCounted(normalized);
+      win.fetch(url, { mode: 'cors', credentials: 'omit' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (result) { renderResults(below, result, raw, true); })
+        .catch(function () { /* the answer stands alone */ });
+    }
+
+    function showAnswer(box, data, raw) {
+      box.textContent = '';
+      if (data && data.outcome === 'answered') {
+        box.appendChild(answerBlock(null, data.answer, data.sources, raw, null));
+        return;
+      }
+      var none = el('div', 'answer');
+      none.appendChild(el('span', 'a', (data && data.answer) || label('no_answer')));
+      var number = state.config && state.config.whatsapp;
+      if (number && /^\d{8,15}$/.test(String(number))) {
+        var wa = el('a', 'btn wa', label('whatsapp'));
+        wa.href = 'https://wa.me/' + number + '?text=' + encodeURIComponent(label('wa_message', { question: raw, url: win.location.href }));
+        wa.target = '_blank';
+        wa.rel = 'noopener';
+        none.appendChild(wa);
+      }
+      box.appendChild(none);
     }
 
     // ---------------------------------------------------------------- full results
@@ -884,13 +1055,29 @@
         });
     }
 
-    function renderResults(sheet, result, raw) {
+    function renderResults(sheet, result, raw, quiet) {
       var groups = (result && result.groups) || {};
       var products = groups.product || [];
       var content = groups.content || [];
       var categories = groups.category || [];
+      var answers = groups.answer || [];
+
+      if (answers.length && !quiet && isQuestion(raw)) {
+        var said = el('div', 'section answer-box');
+        said.appendChild(answerBlock(answers[0].title, answers[0].answer, answers[0].sources, raw, answers[0]));
+        sheet.appendChild(said);
+      }
+
+      if (quiet && (products.length || content.length)) {
+        var related = el('div', 'section');
+        related.appendChild(el('h3', null, label('related')));
+        sheet.appendChild(related);
+      }
 
       if (!products.length && !content.length && !categories.length) {
+        if (quiet) {
+          return;
+        }
         var empty = el('div', 'section');
         empty.appendChild(el('p', null, label('no_results', { query: raw })));
         empty.appendChild(el('p', 'muted', label('try_other')));
@@ -1288,7 +1475,10 @@
           closeDropdown();
         } else if (event.key === 'Enter') {
           var picked = active >= 0 ? shown[active] : null;
-          if (picked && picked.record && picked.node.href) {
+          if ((picked && picked.ask) || (!picked && state.config && state.config.ask && isQuestion(input.value))) {
+            event.preventDefault();
+            askSite(input);
+          } else if (picked && picked.record && picked.node.href) {
             event.preventDefault();
             countClick(input.value, picked.record);
             win.location.href = picked.node.href;
@@ -1364,6 +1554,7 @@
     build: build,
     closeWords: closeWords,
     search: search,
+    isQuestion: isQuestion,
     boot: boot
   };
 }));

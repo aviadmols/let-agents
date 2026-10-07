@@ -11,6 +11,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
+use UnitEnum;
 
 /**
  * Where the operator downloads the WooCommerce plugin and reads how to install it.
@@ -19,7 +20,9 @@ final class StorePlugin extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowDownTray;
 
-    protected static ?int $navigationSort = 16;
+    protected static string|UnitEnum|null $navigationGroup = 'shops';
+
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'store-plugin';
 

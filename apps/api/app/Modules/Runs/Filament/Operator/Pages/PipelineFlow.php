@@ -12,6 +12,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * What runs on this platform, in the order it runs, and which model each step uses.
@@ -29,7 +30,9 @@ final class PipelineFlow extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleGroup;
 
-    protected static ?int $navigationSort = 85;
+    protected static string|UnitEnum|null $navigationGroup = 'overview';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'pipeline';
 

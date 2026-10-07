@@ -16,6 +16,7 @@ use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Lang;
+use UnitEnum;
 
 /** What shows next to each product, and why: complements, other sizes, alternatives. */
 final class EnrichmentProductRelationResource extends Resource
@@ -26,7 +27,9 @@ final class EnrichmentProductRelationResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSquare2Stack;
 
-    protected static ?int $navigationSort = 23;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'enrichment/relations';
 

@@ -5,6 +5,7 @@ namespace App\Modules\Widget\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Contracts\PageTags;
@@ -72,5 +73,31 @@ final class TagBankTest extends TestCase
 
         Settings::set('widget.layout', 'circles', $this->shop->id);
         $this->assertSame([], app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he')['tags']);
+    }
+
+    public function test_the_field_gets_the_answers_this_page_already_gave_and_nothing_else(): void
+    {
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $page = CatalogProduct::query()->where('external_id', '201')->value('id');
+            $other = CatalogProduct::query()->where('external_id', '202')->value('id');
+            $answer = fn (array $extra) => AssistantAnswer::query()->create(array_merge([
+                'shop_id' => $this->shop->id, 'outcome' => AssistantAnswer::ANSWERED, 'prompt_version' => 3, 'last_asked_at' => now(),
+            ], $extra));
+
+            $answer(['product_id' => $page, 'question_key' => 'k1', 'question' => 'כל כמה זמן לשמן?', 'answer' => 'פעם בשנה.', 'asked_count' => 5]);
+            $answer(['product_id' => $page, 'question_key' => 'k2', 'question' => 'מוסתר?', 'answer' => 'כן.', 'status' => AssistantAnswer::HIDDEN]);
+            $answer(['product_id' => $other, 'question_key' => 'k3', 'question' => 'על מוצר אחר?', 'answer' => 'כן.']);
+        });
+
+        $bank = app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he');
+
+        $this->assertTrue($bank['find']);
+        $this->assertSame([['q' => 'כל כמה זמן לשמן?', 'a' => 'פעם בשנה.']], $bank['answers']);
+        $this->assertSame('חפשו או שאלו על המוצר…', $bank['labels']['find_placeholder']);
+
+        Features::override('widget.find_field', false, $this->shop->id);
+        $off = app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he');
+        $this->assertFalse($off['find']);
+        $this->assertSame([], $off['answers']);
     }
 }

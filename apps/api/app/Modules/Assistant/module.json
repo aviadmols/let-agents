@@ -8,7 +8,8 @@
         "Connections",
         "Catalog",
         "Enrichment",
-        "Admin"
+        "Admin",
+        "Retrieval"
     ],
     "provider": "AssistantServiceProvider",
     "features": [
@@ -18,6 +19,10 @@
         },
         {
             "name": "on_content",
+            "default": true
+        },
+        {
+            "name": "on_search",
             "default": true
         }
     ],
@@ -148,6 +153,66 @@
             "max": 8,
             "scope": "shop",
             "unit": "questions"
+        },
+        {
+            "name": "site_check_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "site_check_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "site_check_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "site_check_output_usd_per_million",
+            "type": "float",
+            "default": 5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "site_passages",
+            "type": "int",
+            "default": 6,
+            "min": 2,
+            "max": 20,
+            "scope": "shop",
+            "unit": "passages"
+        },
+        {
+            "name": "site_min_similarity",
+            "type": "float",
+            "default": 0.35,
+            "min": 0,
+            "max": 1,
+            "scope": "shop"
+        },
+        {
+            "name": "site_retry_days",
+            "type": "int",
+            "default": 7,
+            "min": 1,
+            "max": 90,
+            "scope": "shop",
+            "unit": "days"
         }
     ]
 }

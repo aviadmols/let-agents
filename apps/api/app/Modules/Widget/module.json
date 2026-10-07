@@ -74,6 +74,10 @@
         {
             "name": "show_article_products",
             "default": true
+        },
+        {
+            "name": "find_field",
+            "default": true
         }
     ],
     "settings": [

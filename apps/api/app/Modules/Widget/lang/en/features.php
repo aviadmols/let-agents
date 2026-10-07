@@ -61,4 +61,8 @@ return [
         'label' => 'Products from the article',
         'description' => 'The products the article talks about.',
     ],
+    'find_field' => [
+        'label' => 'Search and ask field in the module',
+        'description' => 'A field above the circles or tags. While typing it filters what is shown, and shows a ready answer when there is one. A question goes to the assistant only on Enter.',
+    ],
 ];

@@ -32,4 +32,13 @@ return [
     'photo_failed' => 'We could not search by this photo. Try again later.',
     'photo_match' => ':match% alike',
     'photo_yours' => 'Your photo',
+    'answer_from_site' => 'Answer from the site',
+    'sources' => 'From:',
+    'ask_hint' => 'No ready answer yet. It can be looked up on the site pages.',
+    'ask_button' => 'Get an answer ↵',
+    'asking' => 'Looking for an answer on the site pages…',
+    'no_answer' => 'We could not find that on the site.',
+    'whatsapp' => 'Ask the store on WhatsApp',
+    'wa_message' => 'A question from the site: :question',
+    'related' => 'Related results',
 ];

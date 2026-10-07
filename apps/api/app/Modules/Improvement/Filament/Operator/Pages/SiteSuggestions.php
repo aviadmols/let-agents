@@ -15,6 +15,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * What the daily review proposes for the site, waiting for the team: words shoppers use that the
@@ -25,7 +26,9 @@ class SiteSuggestions extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLightBulb;
 
-    protected static ?int $navigationSort = 17;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'improvement/suggestions';
 

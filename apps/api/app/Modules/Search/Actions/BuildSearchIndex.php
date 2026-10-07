@@ -2,7 +2,9 @@
 
 namespace App\Modules\Search\Actions;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -92,6 +94,13 @@ final class BuildSearchIndex
             $counts['category']++;
         }
 
+        $counts['answer'] = 0;
+
+        foreach ($this->answers($shopId) as $answer) {
+            $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources']]);
+            $counts['answer']++;
+        }
+
         $json = (string) json_encode(['v' => self::VERSION, 'items' => $items], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
@@ -111,6 +120,39 @@ final class BuildSearchIndex
     }
 
     /** @return list<string> */
+    /**
+     * Answers shoppers already got and the team did not hide, the most asked first: a question
+     * typed in the search box finds its answer before anything is asked. A page's answer points to
+     * its page; an answer from the search box to the pages it was written from.
+     *
+     * @return list<array{id: string, question: string, answer: string, sources: list<array{title: string, url: string|null}>}>
+     */
+    private function answers(string $shopId): array
+    {
+        $limit = (int) Settings::get('search.answers_in_index', $shopId);
+
+        if ($limit < 1) {
+            return [];
+        }
+
+        return AssistantAnswer::query()
+            ->with(['product:id,title,url,removed_at', 'content:id,title,url'])
+            ->where('outcome', AssistantAnswer::ANSWERED)->where('status', AssistantAnswer::SHOWN)->whereNotNull('answer')
+            ->orderByDesc('asked_count')->orderBy('id')
+            ->limit($limit)
+            ->get()
+            ->filter(fn (AssistantAnswer $a): bool => $a->product === null || $a->product->removed_at === null)
+            ->map(fn (AssistantAnswer $a): array => [
+                'id' => $a->id,
+                'question' => $a->question,
+                'answer' => mb_substr((string) $a->answer, 0, 400),
+                'sources' => $a->product !== null
+                    ? [['title' => $a->product->title, 'url' => $a->product->url]]
+                    : ($a->content !== null ? [['title' => $a->content->title, 'url' => $a->content->url]] : array_map(fn (array $s): array => ['title' => $s['title'], 'url' => $s['url'] ?? null], (array) $a->sources)),
+            ])
+            ->values()->all();
+    }
+
     private function productWords(CatalogProduct $product): array
     {
         $words = array_filter([(string) $product->brand, (string) $product->sku]);

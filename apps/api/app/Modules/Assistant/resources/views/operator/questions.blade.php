@@ -41,8 +41,8 @@
                         @php($product = $rows->first()->page())
                         <div>
                             <div style="font-weight:600;margin-bottom:6px">
-                                @if ($product?->url)<a href="{{ $product->url }}" target="_blank" rel="noopener" style="text-decoration:underline">{{ $product->title }}</a>@else{{ $product?->title }}@endif
-                                <span style="{{ $small }}">#{{ $product?->external_id }}</span>
+                                @if ($product === null){{ __('assistant::ui.questions.from_search') }}@elseif ($product->url)<a href="{{ $product->url }}" target="_blank" rel="noopener" style="text-decoration:underline">{{ $product->title }}</a>@else{{ $product->title }}@endif
+                                @if ($product)<span style="{{ $small }}">#{{ $product->external_id }}</span>@endif
                             </div>
                             <div style="display:grid;gap:8px">
                                 @foreach ($rows as $row)
@@ -71,8 +71,8 @@
                         @php($product = $rows->first()->page())
                         <div>
                             <div style="font-weight:600;margin-bottom:6px">
-                                @if ($product?->url)<a href="{{ $product->url }}" target="_blank" rel="noopener" style="text-decoration:underline">{{ $product->title }}</a>@else{{ $product?->title }}@endif
-                                <span style="{{ $small }}">#{{ $product?->external_id }} · {{ trans_choice('assistant::ui.questions.asked_times', $rows->sum('asked_count'), ['count' => $rows->sum('asked_count')]) }}</span>
+                                @if ($product === null){{ __('assistant::ui.questions.from_search') }}@elseif ($product->url)<a href="{{ $product->url }}" target="_blank" rel="noopener" style="text-decoration:underline">{{ $product->title }}</a>@else{{ $product->title }}@endif
+                                <span style="{{ $small }}">@if ($product)#{{ $product->external_id }} · @endif{{ trans_choice('assistant::ui.questions.asked_times', $rows->sum('asked_count'), ['count' => $rows->sum('asked_count')]) }}</span>
                             </div>
                             <div style="display:grid;gap:8px">
                                 @foreach ($rows as $row)

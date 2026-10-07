@@ -95,4 +95,32 @@ final class HebrewSearchTest extends TestCase
             $this->assertSame($server, $browser[$query] ?? null, "\"{$query}\" differs between the server and the browser");
         }
     }
+
+    public function test_the_box_tells_a_question_from_words_to_look_up(): void
+    {
+        $node = (new ExecutableFinder)->find('node');
+
+        if ($node === null) {
+            $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
+        }
+
+        $cases = [
+            'כמה ברגים צריך למטר דק?' => true,
+            'האם איפאה מתאים ליד בריכה' => true,
+            'איך מתקינים דק' => true,
+            'how do I oil a deck' => true,
+            'ברגים לדק' => false,
+            'מקיטה' => false,
+            'איך' => false,
+            '??' => false,
+        ];
+        $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const out={};'
+            .'for(const q of '.json_encode(array_keys($cases), JSON_UNESCAPED_UNICODE).'){out[q]=e.isQuestion(q);}'
+            .'process.stdout.write(JSON.stringify(out));';
+
+        $process = new Process([$node, '-e', $harness]);
+        $process->mustRun();
+
+        $this->assertSame($cases, json_decode($process->getOutput(), true));
+    }
 }

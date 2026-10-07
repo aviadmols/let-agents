@@ -11,6 +11,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
+use UnitEnum;
 
 /**
  * The instructions each agent receives, as released. Read-only: a prompt changes through a new
@@ -20,7 +21,9 @@ final class AgentPrompts extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static ?int $navigationSort = 24;
+    protected static string|UnitEnum|null $navigationGroup = 'system';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'enrichment/prompts';
 

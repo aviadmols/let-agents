@@ -28,6 +28,7 @@ final class OperatorPanelProvider extends PanelProvider
             ->default()
             ->id(User::OPERATOR_PANEL)
             ->path('operator')
+            ->navigationGroups(PanelNavigation::groups(PanelNavigation::OPERATOR))
             ->userMenuItems([
                 'merchant_view' => Action::make('merchantView')
                     ->label(fn (): string => __('admin::panels.switch.merchant'))

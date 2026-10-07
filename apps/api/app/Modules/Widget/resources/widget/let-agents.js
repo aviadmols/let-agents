@@ -448,6 +448,20 @@
     '.let-agents{position:relative}',
     '.note{display:block;width:fit-content;margin:0 0 6px;padding:2px 8px;border-radius:999px;background:#fff4d6;color:#7a5200;font-size:12px}.note a{color:inherit;text-decoration:underline}',
     '.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
+    // The field above the module: search the page, ask on Enter.
+    '.pill[hidden]{display:none}',
+    '.find{display:flex;gap:6px;align-items:center;margin:0 0 10px;padding:4px;padding-inline-start:12px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}',
+    '.find:focus-within{border-color:var(--accent)}',
+    '.find-input{all:unset;flex:1;min-width:0;padding:7px 4px;font:inherit;font-size:14px;color:inherit}',
+    '.find-input::placeholder{color:var(--muted)}',
+    '.find-send{all:unset;cursor:pointer;padding:7px 14px;border-radius:999px;background:var(--grad);color:#fff;font-size:13px;font-weight:600}',
+    '.find-send:focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
+    '.find-answer{display:grid;gap:4px;margin:8px 0;padding:10px 12px;border-radius:12px;background:rgba(var(--g2),.06)}',
+    '.find-answer p{margin:0;white-space:pre-line}',
+    '.find-tag{font-size:11px;color:var(--muted)}',
+    '.find-ask{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;margin:8px 0;padding:10px 12px;border:1.5px dashed var(--accent);border-radius:12px;cursor:pointer;font-size:14px}',
+    '.find-ask b{color:var(--accent);white-space:nowrap}',
+    '.find-none{margin:8px 0;color:var(--muted);font-size:14px}',
     // The tag bank: a quiet heading over soft tags, each opening its results in the same panel.
     '.tagbank-title{margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--muted)}',
     '.tagbank{gap:6px}',
@@ -719,6 +733,66 @@
     }
 
     return false;
+  }
+
+  /**
+   * A question rather than words to look up: it ends with a question mark, or it is two words or
+   * more and opens like a question. The same rule as the store's search box.
+   */
+  var QUESTION_WORDS = ['איך', 'כמה', 'האם', 'למה', 'מדוע', 'מה', 'מהו', 'מהי', 'מהם', 'איפה', 'היכן', 'מתי', 'מי', 'איזה', 'איזו', 'אילו',
+    'אפשר', 'ניתן', 'יש', 'צריך', 'כדאי', 'מותר', 'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
+
+  function isQuestion(raw) {
+    var text = String(raw || '').trim();
+    if (/[?？]\s*$/.test(text)) {
+      return text.replace(/[?？\s]/g, '').length >= 3;
+    }
+    var words = text.toLowerCase().split(/\s+/).filter(Boolean);
+    return words.length >= 2 && QUESTION_WORDS.indexOf(words[0]) !== -1;
+  }
+
+  /** Lower case, Hebrew final letters as regular ones, no punctuation: for matching words, not for showing. */
+  function findNormalize(text) {
+    return String(text || '').toLowerCase()
+      .replace(/ך/g, 'כ').replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ף/g, 'פ').replace(/ץ/g, 'צ')
+      .replace(/[\u0591-\u05C7]/g, '')
+      .replace(/[^\w\u05D0-\u05EA\s]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  var FIND_STOP = QUESTION_WORDS.map(findNormalize).concat(['של', 'על', 'עם', 'את', 'זה', 'זו', 'לי', 'הוא', 'היא', 'the', 'a', 'an', 'of', 'for', 'to', 'it']);
+
+  function findWords(text) {
+    return findNormalize(text).split(' ').filter(function (word) { return word.length > 1 && FIND_STOP.indexOf(word) === -1; });
+  }
+
+  /**
+   * A word's skeleton: no plural ending, no vav or yod after the first letter. "ברגים" and "בורג"
+   * are both "ברג", so full and defective spelling, singular and plural meet.
+   */
+  function findStem(word) {
+    var w = word;
+    if (w.length > 4 && /(ימ|ות)$/.test(w)) {
+      w = w.slice(0, -2);
+    }
+    return w.charAt(0) + w.slice(1).replace(/[וי]/g, '');
+  }
+
+  /** The share of the typed words a text holds, each compared by its skeleton. */
+  function findCovers(text, words) {
+    if (!words.length) {
+      return 0;
+    }
+    var hay = ' ' + findNormalize(text).split(' ').map(findStem).join(' ') + ' ';
+    var hit = 0;
+    words.forEach(function (word) {
+      var stem = findStem(word);
+      var probe = stem.length > 3 ? stem.slice(0, -1) : stem;
+      if (hay.indexOf(probe.length >= 3 ? probe : ' ' + probe) !== -1) {
+        hit++;
+      }
+    });
+    return hit / words.length;
   }
 
   function productCard(section, product, live, labels) {
@@ -2114,10 +2188,183 @@
       if (pop) {
         wrap.appendChild(pop);
       }
+      if (bank.find) {
+        wrap.appendChild(findField());
+      }
       wrap.appendChild(chips);
       wrap.appendChild(panel);
       if (strip) {
         wrap.appendChild(strip);
+      }
+
+      /**
+       * The field above the circles or tags. Typing matches what this page already holds: the
+       * circles, their products and guides, and the answers this page gave. Nothing is fetched
+       * and no model is asked while typing. Enter asks the question in the question box, with
+       * its handover to the shop, or searches the whole site for words.
+       */
+      function findField() {
+        var findSection = { candidate: 'find', model: 'find', title: labels.find_title };
+        var form = el('form', 'find');
+        form.setAttribute('role', 'search');
+        var input = el('input', 'find-input');
+        input.type = 'search';
+        input.maxLength = 200;
+        input.placeholder = labels.find_placeholder || '';
+        input.setAttribute('aria-label', labels.find_placeholder || '');
+        input.setAttribute('autocomplete', 'off');
+        var send = el('button', 'find-send', labels.find_send || '');
+        send.type = 'submit';
+        form.appendChild(input);
+        form.appendChild(send);
+
+        var timer = null;
+        input.addEventListener('input', function () {
+          clearTimeout(timer);
+          timer = setTimeout(function () { match(input.value); }, 80);
+        });
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          clearTimeout(timer);
+          submitFind(input.value);
+        });
+
+        function showFind(title, body) {
+          if (open !== null) {
+            rendered[open].pill.setAttribute('aria-expanded', 'false');
+            open = null;
+          }
+          heading.textContent = title;
+          holder.textContent = '';
+          holder.appendChild(body);
+          panel.hidden = false;
+        }
+
+        function match(raw) {
+          var text = String(raw || '').trim();
+          var words = findWords(text);
+          rendered.forEach(function (item) {
+            if (!item.pill) {
+              return;
+            }
+            var products = (item.section.products || []).map(function (p) { return p.title; }).join(' ');
+            var hay = (item.section.chip || '') + ' ' + (item.section.title || '') + ' ' + products;
+            item.pill.hidden = !!text && item.section.candidate !== 'ask' && words.length > 0 && findCovers(hay, words) < 0.5;
+          });
+
+          if (!text) {
+            if (open === null) {
+              panel.hidden = true;
+            }
+            return;
+          }
+
+          var body = el('div', 'body find-body');
+          var question = isQuestion(text);
+          var saved = null;
+          (bank.answers || []).forEach(function (answer) {
+            var score = findCovers(answer.q, words);
+            if (score >= 0.6 && (!saved || score > saved.score)) {
+              saved = { answer: answer, score: score };
+            }
+          });
+
+          if (saved && (question || words.length >= 2)) {
+            var box = el('div', 'find-answer');
+            box.appendChild(el('span', 'find-tag', labels.find_saved || ''));
+            box.appendChild(el('strong', null, saved.answer.q));
+            box.appendChild(el('p', null, saved.answer.a));
+            body.appendChild(box);
+          } else if (question && bank.ask) {
+            var ask = el('button', 'find-ask');
+            ask.type = 'button';
+            ask.appendChild(el('span', null, labels.find_ask_hint || ''));
+            ask.appendChild(el('b', null, labels.find_ask || ''));
+            ask.addEventListener('click', function () { submitFind(text); });
+            body.appendChild(ask);
+          }
+
+          var seen = {};
+          var cards = el('div', 'cards');
+          rendered.forEach(function (item) {
+            (item.section.products || []).forEach(function (product) {
+              if (cards.childNodes.length >= 4 || seen[product.id] || findCovers(product.title, words) < 0.5) {
+                return;
+              }
+              var card = productCard(findSection, product, live, labels);
+              if (card) {
+                seen[product.id] = true;
+                cards.appendChild(card);
+              }
+            });
+          });
+          if (cards.firstChild) {
+            productViews(body, cards, labels);
+          }
+
+          var guides = [];
+          rendered.forEach(function (item) {
+            (item.section.guides || []).forEach(function (guide) {
+              if (guides.length < 3 && guides.indexOf(guide) === -1 && findCovers(guide.title, words) >= 0.5) {
+                guides.push(guide);
+              }
+            });
+          });
+          var guideNodes = guides.length ? guideList(findSection, guides) : null;
+          if (guideNodes) {
+            body.appendChild(guideNodes);
+          }
+
+          if (!body.firstChild) {
+            body.appendChild(el('p', 'find-none', labels.find_none || ''));
+          }
+          showFind(labels.find_title || text, body);
+        }
+
+        function submitFind(raw) {
+          var text = String(raw || '').trim();
+          if (!text) {
+            return;
+          }
+
+          var askIndex = -1;
+          rendered.forEach(function (item, index) {
+            if (item.section.candidate === 'ask') {
+              askIndex = index;
+            }
+          });
+
+          // A question goes to the question box: the same answer, limits and way to the shop.
+          if (isQuestion(text) && askIndex !== -1 && typeof rendered[askIndex].body.ask === 'function') {
+            if (open !== askIndex) {
+              setOpen(askIndex, 'closed');
+            }
+            rendered[askIndex].body.ask(text);
+            return;
+          }
+
+          // Words: what the store's own search finds, one request on Enter.
+          var body = el('div', 'body find-body');
+          body.appendChild(el('p', 'find-none', labels.find_searching || ''));
+          showFind(text, body);
+          fetch(API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(text), { credentials: 'omit' })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (result) {
+              var groups = (result && result.groups) || {};
+              var items = (groups.product || []).slice(0, 6).concat((groups.content || []).slice(0, 3)).map(function (item) {
+                return { id: item.external_id, title: item.title, url: item.url, image: item.image };
+              });
+              body.textContent = '';
+              var list = items.length ? guideList(findSection, items) : null;
+              body.appendChild(list || el('p', 'find-none', labels.find_nothing || ''));
+            })
+            .catch(function () {
+              body.textContent = '';
+              body.appendChild(el('p', 'find-none', labels.find_nothing || ''));
+            });
+        }
+
+        return form;
       }
 
       // One exposure per section: the quote's section when it is shown, and the first circle's when it is another.

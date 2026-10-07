@@ -19,6 +19,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use UnitEnum;
 
 /**
  * Everything agents said about products and articles, with where each claim came from and who
@@ -32,7 +33,9 @@ final class EnrichmentFactResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCheckBadge;
 
-    protected static ?int $navigationSort = 20;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'enrichment/facts';
 

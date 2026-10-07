@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * Every feature flag and setting every enabled module declared, one area at a time.
@@ -112,7 +113,9 @@ class Configuration extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-    protected static ?int $navigationSort = 90;
+    protected static string|UnitEnum|null $navigationGroup = 'system';
+
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'configuration';
 

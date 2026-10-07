@@ -9,6 +9,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Widget\Filament\Operator\Pages\ProductPage as OperatorProductPage;
 use Filament\Facades\Filament;
 use Illuminate\Support\Collection;
+use UnitEnum;
 
 /**
  * One page of this shop as the widget builds it, and the team's say over it. The same screen the
@@ -21,7 +22,9 @@ final class ProductPage extends OperatorProductPage
 
     private const MERCHANT_RESULTS = 12;
 
-    protected static ?int $navigationSort = 16;
+    protected static string|UnitEnum|null $navigationGroup = 'on_page';
+
+    protected static ?int $navigationSort = 10;
 
     /**
      * The operator searches every shop at once; a merchant searches their own, through the tenant

@@ -4,6 +4,7 @@ namespace App\Modules\Shoppers\Filament\Merchant\Pages;
 
 use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Modules\Shoppers\Filament\Operator\Pages\ShopSignUps as OperatorShopSignUps;
+use UnitEnum;
 
 /**
  * The shop's own sign-ups, with the contacts people left it. The same screen the operator uses,
@@ -14,5 +15,7 @@ final class ShopSignUps extends OperatorShopSignUps
 {
     use LocksShopToPanelTenant;
 
-    protected static ?int $navigationSort = 14;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 30;
 }

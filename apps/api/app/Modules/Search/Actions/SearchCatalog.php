@@ -27,7 +27,7 @@ use App\Modules\Search\Support\LoadedIndex;
  */
 final class SearchCatalog
 {
-    public const GROUPS = ['product', 'content', 'category'];
+    public const GROUPS = ['answer', 'product', 'content', 'category'];
 
     /** Reciprocal rank constant: how much a lower rank still counts. */
     private const RRF_K = 60;
@@ -254,6 +254,8 @@ final class SearchCatalog
             'kind' => $record['kind'] ?? null,
             'products' => $record['n'] ?? null,
             'buy' => isset($record['buy']) ? $record['buy'] === 1 : null,
+            'answer' => $record['ans'] ?? null,
+            'sources' => $record['src'] ?? null,
         ], fn ($value): bool => $value !== null);
     }
 }

@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 /**
  * Every change the audit has proposed to how articles are read, and every one that was published.
@@ -28,7 +29,9 @@ final class ScanImprovements extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
-    protected static ?int $navigationSort = 47;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 100;
 
     protected static ?string $slug = 'enrichment/scan-improvements';
 

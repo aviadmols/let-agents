@@ -23,6 +23,20 @@
     @if ($r === null)
         <x-filament::section>{{ __('search::ui.no_shop') }}</x-filament::section>
     @else
+        @if ($photos = $this->photos())
+            <x-filament::section :heading="__('search::ui.photos.heading')" :description="__('search::ui.photos.description')">
+                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+                    <div>
+                        <strong>{{ __('search::ui.photos.'.($photos['on'] ? 'is_on' : 'is_off')) }}</strong>
+                        @if ($photos['on'] && ! $photos['ready'])
+                            <div style="{{ $small }}">{{ __('search::ui.photos.not_ready') }}</div>
+                        @endif
+                    </div>
+                    <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                </div>
+            </x-filament::section>
+        @endif
+
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
             @foreach ([
                 'searches' => number_format($r['totals']['searches']),

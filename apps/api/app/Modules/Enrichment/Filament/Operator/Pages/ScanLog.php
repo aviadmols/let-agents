@@ -14,6 +14,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * Everything that happened to one product, in order: what code read, what a model was asked and
@@ -30,7 +31,9 @@ final class ScanLog extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentMagnifyingGlass;
 
-    protected static ?int $navigationSort = 25;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 90;
 
     protected static ?string $slug = 'enrichment/scan-log';
 

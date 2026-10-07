@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * Everyone who left a phone or an email in one store, newest first, with the products they looked
@@ -28,7 +29,9 @@ class ShopSignUps extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
 
-    protected static ?int $navigationSort = 16;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'shoppers/signups';
 

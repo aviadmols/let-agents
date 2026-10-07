@@ -152,7 +152,7 @@ final class SearchFlowTest extends TestCase
         $run = app(BuildSearchIndex::class)->handle($this->shop->id);
 
         $this->assertSame('succeeded', $run->status->value, (string) $run->error);
-        $this->assertSame(['product' => 4, 'content' => 1, 'category' => 1, 'synonyms' => 0], $run->output['counts'], 'no removed product, no empty category');
+        $this->assertSame(['product' => 4, 'content' => 1, 'category' => 1, 'synonyms' => 0, 'answer' => 0], $run->output['counts'], 'no removed product, no empty category');
 
         $items = collect(json_decode((string) $this->inShop(fn () => SearchIndex::query()->value('items')), true)['items'])->keyBy('id');
         $this->assertStringContainsString('Makita', $items['p:101']['kw']);

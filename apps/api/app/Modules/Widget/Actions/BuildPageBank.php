@@ -103,6 +103,9 @@ final class BuildPageBank
     /** Questions the banner may turn through, most asked first. */
     private const MAX_ASKED_SHOWN = 3;
 
+    /** Answers the field may show while typing: few, so the cached bank stays small. */
+    private const MAX_SAVED_ANSWERS = 20;
+
     private const MIN_LEVEL_SET = 3;
 
     /** A product in the best quarter of its set gets "among the highest". */
@@ -200,6 +203,10 @@ final class BuildPageBank
         $bank['ask'] = Features::enabled($type === 'product' ? 'assistant.on_products' : 'assistant.on_content', $shopId);
         $bank['asked'] = $bank['ask'] ? $this->tenant->run($shopId, fn (): int => $this->asked($type, $externalId)) : 0;
         $bank['questions'] = $bank['ask'] ? $this->tenant->run($shopId, fn (): array => $this->askedQuestions($type, $externalId)) : [];
+        // The field above the module: it matches what the page holds while the shopper types,
+        // with the answers this page already gave, and asks only on Enter.
+        $bank['find'] = Features::enabled('widget.find_field', $shopId);
+        $bank['answers'] = $bank['ask'] && $bank['find'] ? $this->tenant->run($shopId, fn (): array => $this->savedAnswers($type, $externalId)) : [];
         // What this page is worth being asked, whether or not anybody has asked it yet. The
         // closed widget puts one of these in front of a shopper who has opened nothing, so it
         // has to be in the bank rather than fetched when the question box opens.
@@ -1376,6 +1383,22 @@ final class BuildPageBank
             ->orderByDesc('asked_count')->orderByDesc('last_asked_at')
             ->limit(self::MAX_ASKED_SHOWN)
             ->pluck('question')
+            ->all() ?? [];
+    }
+
+    /**
+     * Answers this page already gave, the most asked first, for the field to show while typing.
+     *
+     * @return list<array{q: string, a: string}>
+     */
+    private function savedAnswers(string $type, string $externalId): array
+    {
+        return $this->answersHere($type, $externalId)
+            ?->where('outcome', AssistantAnswer::ANSWERED)
+            ->orderByDesc('asked_count')->orderBy('id')
+            ->limit(self::MAX_SAVED_ANSWERS)
+            ->get(['question', 'answer'])
+            ->map(fn (AssistantAnswer $a): array => ['q' => $a->question, 'a' => mb_substr((string) $a->answer, 0, 400)])
             ->all() ?? [];
     }
 

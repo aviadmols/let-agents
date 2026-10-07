@@ -14,6 +14,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 /** The products a guide or post page can show, and why each one was chosen. */
 final class EnrichmentContentProductResource extends Resource
@@ -22,9 +23,11 @@ final class EnrichmentContentProductResource extends Resource
 
     protected static ?string $model = EnrichmentContentProduct::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLink;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPaperClip;
 
-    protected static ?int $navigationSort = 23;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 60;
 
     protected static ?string $slug = 'enrichment/article-products';
 

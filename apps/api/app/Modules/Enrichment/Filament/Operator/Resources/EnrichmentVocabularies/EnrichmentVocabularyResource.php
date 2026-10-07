@@ -19,6 +19,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 /** What agents may say about each branch of each shop's catalog. */
 final class EnrichmentVocabularyResource extends Resource
@@ -29,7 +30,9 @@ final class EnrichmentVocabularyResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    protected static ?int $navigationSort = 21;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 70;
 
     protected static ?string $slug = 'enrichment/vocabularies';
 

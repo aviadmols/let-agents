@@ -80,7 +80,7 @@ final class BuildShopReport
     /**
      * @param  Builder<AnalyticsEvent>  $events
      * @param  Builder<AnalyticsOrder>  $orders
-     * @return list<array{date: string, page_views: int, opens: int, add_to_cart: int, orders: int}>
+     * @return list<array{date: string, page_views: int, impressions: int, opens: int, clicks: int, add_to_cart: int, orders: int, assisted_orders: int}>
      */
     private function daily(Builder $events, Builder $orders, Carbon $since, Carbon $until): array
     {
@@ -88,7 +88,7 @@ final class BuildShopReport
         // is about what Let Agents did, so the line counts the widget's own adds only.
         $byDay = (clone $events)
             ->select(DB::raw('DATE(occurred_at) as day'), 'type', DB::raw('count(*) as n'))
-            ->whereIn('type', ['page_view', 'open', 'add_to_cart'])
+            ->whereIn('type', ['page_view', 'exposure', 'open', 'click', 'add_to_cart'])
             ->where(fn (Builder $q) => $q->where('type', '!=', 'add_to_cart')
                 ->orWhere(fn (Builder $add) => $add->where('source', 'widget')->where('result', 'added')))
             ->groupBy('day', 'type')
@@ -96,10 +96,10 @@ final class BuildShopReport
             ->groupBy(fn ($row): string => substr((string) $row->day, 0, 10));
 
         $ordersByDay = (clone $orders)
-            ->select(DB::raw('DATE(ordered_at) as day'), DB::raw('count(*) as n'))
+            ->select(DB::raw('DATE(ordered_at) as day'), DB::raw('count(*) as n'), DB::raw('sum(case when assisted then 1 else 0 end) as assisted'))
             ->groupBy('day')
-            ->pluck('n', 'day')
-            ->mapWithKeys(fn ($n, $day): array => [substr((string) $day, 0, 10) => (int) $n]);
+            ->get()
+            ->keyBy(fn ($row): string => substr((string) $row->day, 0, 10));
 
         $days = [];
         for ($day = $since->copy(); $day->lte($until); $day->addDay()) {
@@ -108,9 +108,12 @@ final class BuildShopReport
             $days[] = [
                 'date' => $key,
                 'page_views' => (int) ($rows['page_view'] ?? 0),
+                'impressions' => (int) ($rows['exposure'] ?? 0),
                 'opens' => (int) ($rows['open'] ?? 0),
+                'clicks' => (int) ($rows['click'] ?? 0),
                 'add_to_cart' => (int) ($rows['add_to_cart'] ?? 0),
-                'orders' => (int) ($ordersByDay[$key] ?? 0),
+                'orders' => (int) ($ordersByDay->get($key)?->n ?? 0),
+                'assisted_orders' => (int) ($ordersByDay->get($key)?->assisted ?? 0),
             ];
         }
 

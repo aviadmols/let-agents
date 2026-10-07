@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use UnitEnum;
 
 /**
  * Everything the system knows about this shop, where it came from, and what is still missing.
@@ -25,7 +26,9 @@ final class ShopKnowledge extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
 
-    protected static ?int $navigationSort = 5;
+    protected static string|UnitEnum|null $navigationGroup = 'shops';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'knowledge';
 

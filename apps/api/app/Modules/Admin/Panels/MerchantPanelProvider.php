@@ -28,6 +28,7 @@ final class MerchantPanelProvider extends PanelProvider
         $panel
             ->id(User::MERCHANT_PANEL)
             ->path('merchant')
+            ->navigationGroups(PanelNavigation::groups(PanelNavigation::MERCHANT))
             ->tenant(Shop::class, slugAttribute: 'slug')
             ->tenantMiddleware([SyncTenantFromPanel::class], isPersistent: true)
             // The panel wears the shop's name, so which store you are in is the first thing on

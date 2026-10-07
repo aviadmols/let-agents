@@ -16,6 +16,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 /** Superlatives computed in code, with the set each one was measured in. */
 final class EnrichmentRankingResource extends Resource
@@ -26,7 +27,9 @@ final class EnrichmentRankingResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTrophy;
 
-    protected static ?int $navigationSort = 22;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'enrichment/rankings';
 

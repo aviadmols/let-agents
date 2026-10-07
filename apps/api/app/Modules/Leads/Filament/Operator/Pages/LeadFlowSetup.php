@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 /**
  * What this shop wants from a reader, and what it will ask for it.
@@ -39,7 +40,9 @@ class LeadFlowSetup extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserPlus;
 
-    protected static ?int $navigationSort = 20;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'leads/flow';
 

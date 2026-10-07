@@ -63,4 +63,32 @@ return [
         'label' => 'Suggested questions in the box',
         'description' => 'The questions asked most about the product first, then common ones.',
     ],
+    'site_check_provider' => [
+        'label' => 'Provider of the model that checks search answers',
+        'description' => 'anthropic by default. Must be from another family than the writing model.',
+    ],
+    'site_check_model' => [
+        'label' => 'The model that checks search answers',
+        'description' => 'For example claude-haiku-4-5.',
+    ],
+    'site_check_input_usd_per_million' => [
+        'label' => 'Input price of the checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'site_check_output_usd_per_million' => [
+        'label' => 'Output price of the checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'site_passages' => [
+        'label' => 'Pieces of the site per question',
+        'description' => 'The nearest by meaning. More pieces, more tokens.',
+    ],
+    'site_min_similarity' => [
+        'label' => 'Minimum nearness of a piece to the question',
+        'description' => 'Below this a piece is not sent, and with no piece no writing model is asked.',
+    ],
+    'site_retry_days' => [
+        'label' => '"Not found" is asked again after',
+        'description' => 'Days. So a page the store added since makes it into the answer.',
+    ],
 ];

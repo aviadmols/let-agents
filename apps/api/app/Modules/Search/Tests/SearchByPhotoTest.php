@@ -46,6 +46,7 @@ final class SearchByPhotoTest extends TestCase
         LoadedIndex::forget();
 
         $this->shop = Shop::factory()->create();
+        Features::override('search.photos', true, $this->shop->id);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => 'https://www.store.test', 'access_token' => self::TOKEN,
         ]));

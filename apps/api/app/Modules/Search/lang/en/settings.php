@@ -153,4 +153,8 @@ return [
         'label' => 'A tag stays from',
         'description' => 'How many results the search must find for a tag, besides the page itself.',
     ],
+    'answers_in_index' => [
+        'label' => 'Answers in the search box',
+        'description' => 'How many answers shoppers already got go into the search, the most asked first. 0 to show none.',
+    ],
 ];

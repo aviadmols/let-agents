@@ -21,6 +21,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 /**
  * Agent task files: what was asked, of which model, and what came back. The operator
@@ -32,7 +33,9 @@ final class EnrichmentBatchResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
-    protected static ?int $navigationSort = 19;
+    protected static string|UnitEnum|null $navigationGroup = 'content';
+
+    protected static ?int $navigationSort = 80;
 
     protected static ?string $slug = 'enrichment/tasks';
 

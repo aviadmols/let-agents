@@ -80,4 +80,15 @@ return [
         'write_now' => 'Write tags now',
         'written' => 'The tags are written',
     ],
+    'photos' => [
+        'heading' => 'Search by photo on this site',
+        'description' => 'Shoppers upload a photo and get products that look like it. Only the system operator decides which sites have it; the shop manager does not see this switch.',
+        'is_on' => 'On for this site',
+        'is_off' => 'Off for this site',
+        'not_ready' => 'The pictures of this site are not scanned yet, so the camera button is not shown yet. It appears after the scan.',
+        'turn_on' => 'Turn on',
+        'turn_off' => 'Turn off',
+        'turned_on' => 'Search by photo is on for this site',
+        'turned_off' => 'Search by photo is off for this site',
+    ],
 ];

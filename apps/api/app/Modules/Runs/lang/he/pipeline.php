@@ -43,6 +43,7 @@ return [
         'enrichment_compute_relations' => 'חישוב קשרים בין מוצרים',
         'search_write_tags' => 'כתיבת תגיות לדפים',
         'search_resolve' => 'פתרון חיפושים בלי תוצאות',
+        'assistant_answer_site' => 'מענה על שאלה מתיבת החיפוש',
         'analytics_compute_scores' => 'ציוני התנהגות',
         'analytics_compute_popularity' => 'פופולריות מוצרים',
         'improvement_daily_review' => 'בדיקה יומית והצעות לאתר',

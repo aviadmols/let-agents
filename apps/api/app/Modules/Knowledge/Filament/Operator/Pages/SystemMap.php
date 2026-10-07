@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * The shop's machinery, drawn: how its stores are built (products, pages, posts and orders into
@@ -31,7 +32,9 @@ final class SystemMap extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMap;
 
-    protected static ?int $navigationSort = 6;
+    protected static string|UnitEnum|null $navigationGroup = 'overview';
+
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'system-map';
 

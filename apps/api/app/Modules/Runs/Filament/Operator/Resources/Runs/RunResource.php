@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 final class RunResource extends Resource
 {
@@ -19,7 +20,9 @@ final class RunResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCpuChip;
 
-    protected static ?int $navigationSort = 40;
+    protected static string|UnitEnum|null $navigationGroup = 'overview';
+
+    protected static ?int $navigationSort = 30;
 
     public static function getNavigationLabel(): string
     {

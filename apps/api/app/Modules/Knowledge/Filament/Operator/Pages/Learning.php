@@ -15,6 +15,7 @@ use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use UnitEnum;
 
 /**
  * How the system gets better, what it learned this week, and whether any of it helped.
@@ -27,7 +28,9 @@ final class Learning extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAcademicCap;
 
-    protected static ?int $navigationSort = 91;
+    protected static string|UnitEnum|null $navigationGroup = 'analytics';
+
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'learning';
 

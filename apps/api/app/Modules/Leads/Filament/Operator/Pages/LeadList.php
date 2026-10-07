@@ -12,6 +12,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
+use UnitEnum;
 
 /**
  * The people who asked to be contacted.
@@ -32,7 +33,9 @@ class LeadList extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedInbox;
 
-    protected static ?int $navigationSort = 21;
+    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'leads';
 

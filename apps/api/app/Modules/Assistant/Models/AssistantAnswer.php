@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $answer
  * @property string $outcome answered, no_info or out_of_scope
  * @property string|null $source store (the product information), general (knowledge about products like it) or team
+ * @property list<array{title: string, url: string|null, type: string}>|null $sources the pages a site-wide answer was written from
  * @property string $status shown or hidden
  * @property int $prompt_version
  * @property string|null $model
@@ -53,6 +54,7 @@ class AssistantAnswer extends Model
     {
         return [
             'asked_count' => 'integer',
+            'sources' => 'array',
             'prompt_version' => 'integer',
             'input_tokens' => 'integer',
             'output_tokens' => 'integer',
