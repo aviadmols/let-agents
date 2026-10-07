@@ -14,6 +14,7 @@
 | `docs/runbooks/deploy-railway.md` | איך השירותים ב־Railway מוגדרים ואיך פורסים |
 | `docs/ADR` | החלטות ארכיטקטורה |
 | `docs/runbooks` | הוראות עבודה: פיתוח מקומי, פריסה, מודול חדש |
+| `docs/plan` | התוכנית המקורית של Let Agents (לפני הבנייה), עם ההיסטוריה שלה |
 
 בהמשך יתווספו `apps/widget` (הרכיב בדפדפן), `plugins/woocommerce` (התוסף) ו־`packages/feed-spec` (מפרט הפיד).
 

@@ -1,3 +1,5 @@
+> **Historical plan.** This folder is the original plan, brought in from the let-agents-plan repository. The system is built in this repository; the rules in force are in the root CLAUDE.md and docs/ADR. Kept for the reasoning behind the design.
+
 # Let Agents — search, discovery and Q&A for Shopify and WordPress sites
 
 Status: **design only, no application code yet.** Read `docs/INDEX.md` first, then `docs/01-flows.md`.
