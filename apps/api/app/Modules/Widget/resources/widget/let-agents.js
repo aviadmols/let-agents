@@ -448,6 +448,11 @@
     '.let-agents{position:relative}',
     '.note{display:block;width:fit-content;margin:0 0 6px;padding:2px 8px;border-radius:999px;background:#fff4d6;color:#7a5200;font-size:12px}.note a{color:inherit;text-decoration:underline}',
     '.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
+    // The tag bank: a quiet heading over soft tags, each opening its results in the same panel.
+    '.tagbank-title{margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--muted)}',
+    '.tagbank{gap:6px}',
+    '.tag-pill{padding:6px 12px;border-color:transparent;background:rgba(var(--g2),.07);box-shadow:none;font-size:13.5px}',
+    '.tag-pill:hover,.tag-pill:focus-visible{background:rgba(var(--g2),.12);border-color:transparent;box-shadow:none}',
     ':host(.is-floating) .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}',
     '.pill{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:8px 13px;border:1px solid var(--line);',
     'border-radius:999px;background:var(--surface);color:inherit;font:inherit;font-size:14px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:box-shadow .2s,border-color .2s,background .2s;white-space:nowrap}',
@@ -1893,9 +1898,11 @@
       });
     }
 
-    // Render every body first: a section whose products are all gone gets no circle.
+    // Render every body first: a section whose products are all gone gets no circle. In the tag
+    // view the page's own tags come first, then its sections, all as tags in one bank.
+    var tagView = bank.layout === 'tags';
     var rendered = [];
-    bank.sections.forEach(function (section) {
+    (tagView ? (bank.tags || []).concat(bank.sections) : bank.sections).forEach(function (section) {
       var body = renderBody(section, live, labels);
       if (body) {
         rendered.push({ section: section, body: body });
@@ -1991,8 +1998,9 @@
       }
       track('open', item.section, CHIP_SLOTS[Math.min(index, CHIP_SLOTS.length - 1)]);
 
-      if (!exposed[item.section.candidate]) {
-        exposed[item.section.candidate] = true;
+      var exposureKey = item.section.key || item.section.candidate;
+      if (!exposed[exposureKey]) {
+        exposed[exposureKey] = true;
         watchExposure(item.body, function (ms, ratio) {
           track('exposure', item.section, 'panel', { visible_ms: ms, ratio: ratio });
         });
@@ -2046,7 +2054,11 @@
     /** The circles: the quote, the row of circles, one panel under them, the strip. */
     function renderCircles() {
       var quote = null;
-      if (quoteIndex !== -1) {
+      if (tagView) {
+        chips.className = 'chips tagbank';
+        wrap.appendChild(el('div', 'tagbank-title', labels.tags_title || ''));
+      }
+      if (quoteIndex !== -1 && !tagView) {
         quote = el('button', 'quote');
         quote.type = 'button';
         quote.setAttribute('aria-controls', 'let-agents-panel');
@@ -2068,8 +2080,11 @@
         pill.setAttribute('aria-expanded', 'false');
         pill.setAttribute('aria-controls', 'let-agents-panel');
 
-        if (index === 0) {
+        if (index === 0 && !tagView) {
           pill.innerHTML = SPARK;
+        }
+        if (tagView) {
+          pill.className = 'pill tag-pill';
         }
         pill.appendChild(el('span', 'chip-label', item.section.chip || item.section.title));
         var count = pillCount(item.body);
@@ -2976,13 +2991,14 @@
           viewed = recent;
           var hasViewed = !!(recent && recent.products && recent.products.length);
 
-          if (sections.length === 0 && !previous && !hasViewed && !data.ask && !data.contact && !data.popularity) {
+          if (sections.length === 0 && !(data.layout === 'tags' && data.tags && data.tags.length) && !previous && !hasViewed && !data.ask && !data.contact && !data.popularity) {
             rememberCurrent(null);
             return;
           }
 
+          // The tag view's products are checked against the live store like any other.
           var ids = [];
-          sections.forEach(function (section) {
+          sections.concat(data.layout === 'tags' ? (data.tags || []) : []).forEach(function (section) {
             (section.products || []).forEach(function (product) { ids.push(String(product.id)); });
           });
           if (hasViewed) {

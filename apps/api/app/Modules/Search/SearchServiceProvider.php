@@ -5,6 +5,8 @@ namespace App\Modules\Search;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Search\Console\SearchCommand;
+use App\Modules\Search\Contracts\PageTags;
+use App\Modules\Search\Support\StoredPageTags;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -14,6 +16,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
 {
     protected function bootModule(): void
     {
+        $this->app->bind(PageTags::class, StoredPageTags::class);
+
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search:'.$request->ip().'|'.$request->route('site')));
 
@@ -27,6 +31,22 @@ final class SearchServiceProvider extends ModuleServiceProvider
                 ->dailyAt('02:40')
                 ->timezone('Asia/Jerusalem')
                 ->name('search:index')
+                ->withoutOverlapping()
+                ->onOneServer();
+
+            // After the index (02:40) and the vectors (02:45): a tag is kept only when the search fills it.
+            $schedule->command('search tags --all')
+                ->dailyAt('03:30')
+                ->timezone('Asia/Jerusalem')
+                ->name('search:tags')
+                ->withoutOverlapping()
+                ->onOneServer();
+
+            // After the vectors (02:45) and before the daily review (04:30), which sees what was not resolved.
+            $schedule->command('search resolve --all')
+                ->dailyAt('04:00')
+                ->timezone('Asia/Jerusalem')
+                ->name('search:resolve')
                 ->withoutOverlapping()
                 ->onOneServer();
 

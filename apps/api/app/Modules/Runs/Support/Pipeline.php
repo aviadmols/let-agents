@@ -51,6 +51,8 @@ final class Pipeline
             'enrichment.compute_relations' => ['model' => null],
         ],
         'nightly' => [
+            'search.write_tags' => ['model' => 'search.tags_model'],
+            'search.resolve' => ['model' => 'search.resolve_model'],
             'analytics.compute_scores' => ['model' => null],
             'analytics.compute_popularity' => ['model' => null],
             'improvement.daily_review' => ['model' => 'improvement.analyst_model'],
@@ -90,6 +92,8 @@ final class Pipeline
         'retrieval.build_index' => '02:45',
         'retrieval.build_image_index' => '02:45',
         'retrieval.match_products' => '02:45',
+        'search.write_tags' => '03:30',
+        'search.resolve' => '04:00',
         'analytics.compute_scores' => '04:15',
         'analytics.compute_popularity' => '04:15',
         'improvement.daily_review' => '04:30',

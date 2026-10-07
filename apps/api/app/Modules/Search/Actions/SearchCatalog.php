@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 
@@ -55,7 +56,8 @@ final class SearchCatalog
             $spelling = HebrewSearch::search($index['engine'], $query);
             $meaning = $this->meaning($shopId, $query, $index['records']);
             $pictures = $this->pictures($shopId, $query, $index['records']);
-            $ranked = $this->merge($spelling, [$meaning, $pictures]);
+            $pinned = $this->resolved($query, $index['records']);
+            $ranked = $this->merge($spelling, [$meaning, $pictures], $pinned);
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
 
             $groups = array_fill_keys(self::GROUPS, []);
@@ -88,7 +90,7 @@ final class SearchCatalog
                     : [];
             }
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'groups' => $groups, 'counts' => $counts];
         });
     }
 
@@ -178,11 +180,35 @@ final class SearchCatalog
     }
 
     /**
-     * @param  list<array{id: string, title: string, score: float, exact: bool}>  $spelling
-     * @param  list<list<string>>  $others  ranked ids by meaning, by picture
+     * What the night resolved for this exact query, when a shopper's search found nothing: the
+     * products and guides a model matched and a model of another family accepted. Shown first.
+     *
+     * @param  array<string, array<string, mixed>>  $records
      * @return list<string>
      */
-    private function merge(array $spelling, array $others): array
+    private function resolved(string $query, array $records): array
+    {
+        $resolution = SearchResolution::query()->where('query_hash', hash('sha256', $query))->where('status', SearchResolution::RESOLVED)->first();
+
+        if ($resolution === null) {
+            return [];
+        }
+
+        $ids = array_merge(
+            array_map(fn ($id): string => 'p:'.$id, (array) $resolution->products),
+            array_map(fn ($id): string => 'c:'.$id, (array) $resolution->content),
+        );
+
+        return array_values(array_filter($ids, fn (string $id): bool => isset($records[$id])));
+    }
+
+    /**
+     * @param  list<array{id: string, title: string, score: float, exact: bool}>  $spelling
+     * @param  list<list<string>>  $others  ranked ids by meaning, by picture
+     * @param  list<string>  $pinned  what the night resolved for this query, first of all
+     * @return list<string>
+     */
+    private function merge(array $spelling, array $others, array $pinned = []): array
     {
         $exact = [];
         $scores = [];
@@ -207,7 +233,7 @@ final class SearchCatalog
 
         arsort($scores);
 
-        return array_values(array_unique([...$exact, ...array_map('strval', array_keys($scores))]));
+        return array_values(array_unique([...$pinned, ...$exact, ...array_map('strval', array_keys($scores))]));
     }
 
     /**

@@ -41,6 +41,8 @@ return [
         'enrichment_import_relation_rules' => 'ייבוא חוקי קשרים',
         'enrichment_compute_rankings' => 'חישוב סופרלטיבים',
         'enrichment_compute_relations' => 'חישוב קשרים בין מוצרים',
+        'search_write_tags' => 'כתיבת תגיות לדפים',
+        'search_resolve' => 'פתרון חיפושים בלי תוצאות',
         'analytics_compute_scores' => 'ציוני התנהגות',
         'analytics_compute_popularity' => 'פופולריות מוצרים',
         'improvement_daily_review' => 'בדיקה יומית והצעות לאתר',

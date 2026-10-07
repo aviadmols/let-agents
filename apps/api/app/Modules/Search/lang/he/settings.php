@@ -61,4 +61,96 @@ return [
         'label' => 'דמיון מינימלי לתמונה שהועלתה',
         'description' => 'מתחת לזה מוצר לא מוצג. תמונה של גולש שונה מתמונת מוצר ברקע ובתאורה, ולכן הסף נמוך מהדמיון בין מוצרים.',
     ],
+    'resolve_provider' => [
+        'label' => 'ספק המודל שמתאים',
+        'description' => 'openai כברירת מחדל. חייב להיות ממשפחה אחרת מהבודק.',
+    ],
+    'resolve_model' => [
+        'label' => 'המודל שמתאים',
+        'description' => 'למשל gpt-5.4-mini.',
+    ],
+    'resolve_input_usd_per_million' => [
+        'label' => 'מחיר קלט של המודל שמתאים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'resolve_output_usd_per_million' => [
+        'label' => 'מחיר פלט של המודל שמתאים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'resolve_max_output_tokens' => [
+        'label' => 'תקרת טוקנים לתשובת המודל שמתאים',
+        'description' => 'כולל חשיבה.',
+    ],
+    'check_provider' => [
+        'label' => 'ספק המודל שבודק',
+        'description' => 'anthropic כברירת מחדל. משפחה אחרת מהמודל שמתאים.',
+    ],
+    'check_model' => [
+        'label' => 'המודל שבודק',
+        'description' => 'למשל claude-haiku-4-5.',
+    ],
+    'check_input_usd_per_million' => [
+        'label' => 'מחיר קלט של המודל שבודק, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'check_output_usd_per_million' => [
+        'label' => 'מחיר פלט של המודל שבודק, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'check_max_output_tokens' => [
+        'label' => 'תקרת טוקנים לתשובת המודל שבודק',
+        'description' => 'כולל חשיבה.',
+    ],
+    'resolve_per_run' => [
+        'label' => 'חיפושים לפתרון בלילה אחד',
+        'description' => 'הנפוצים ביותר קודם. השאר מחכים ללילה הבא.',
+    ],
+    'resolve_min_searches' => [
+        'label' => 'חיפוש נפתר מ־',
+        'description' => 'כמה פעמים חיפוש צריך לא למצוא כלום כדי להישלח לפתרון.',
+    ],
+    'resolve_candidates' => [
+        'label' => 'כמה מועמדים המודל רואה',
+        'description' => 'הקרובים ביותר לפי משמעות, מוצרים ומדריכים.',
+    ],
+    'resolve_days' => [
+        'label' => 'כמה ימים אחורה נספרים',
+        'description' => 'חיפושים ריקים מהתקופה הזו.',
+    ],
+    'tags_provider' => [
+        'label' => 'ספק המודל שכותב תגיות',
+        'description' => 'openai כברירת מחדל. הבודק הוא המודל שבודק את פתרון החיפושים, ממשפחה אחרת.',
+    ],
+    'tags_model' => [
+        'label' => 'המודל שכותב תגיות',
+        'description' => 'למשל gpt-5.4-mini.',
+    ],
+    'tags_input_usd_per_million' => [
+        'label' => 'מחיר קלט של כותב התגיות, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'tags_output_usd_per_million' => [
+        'label' => 'מחיר פלט של כותב התגיות, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'tags_max_output_tokens' => [
+        'label' => 'תקרת טוקנים לתשובת כותב התגיות',
+        'description' => 'לקבוצת דפים אחת, כולל חשיבה.',
+    ],
+    'tags_per_run' => [
+        'label' => 'דפים לכתיבת תגיות בלילה אחד',
+        'description' => 'דפים חדשים או שהמילים שלהם השתנו. השאר מחכים ללילה הבא.',
+    ],
+    'tags_per_page' => [
+        'label' => 'תגיות לדף',
+        'description' => 'לכל היותר.',
+    ],
+    'tags_batch' => [
+        'label' => 'דפים בקריאה אחת למודל',
+        'description' => 'יותר דפים בקריאה, פחות טוקנים על ההוראות.',
+    ],
+    'tags_min_results' => [
+        'label' => 'תגית נשארת מ־',
+        'description' => 'כמה תוצאות החיפוש צריך למצוא לתגית, חוץ מהדף עצמו.',
+    ],
 ];

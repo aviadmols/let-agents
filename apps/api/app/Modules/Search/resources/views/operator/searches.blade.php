@@ -62,6 +62,76 @@
             @endif
         </x-filament::section>
 
+        <x-filament::section :heading="__('search::ui.resolved.heading')" :description="__('search::ui.resolved.description')">
+            @if ($r['resolutions']->isEmpty())
+                <p style="opacity:.7">{{ __('search::ui.resolved.none') }}</p>
+            @else
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                    <thead><tr>
+                        <th style="{{ $cell }}">{{ __('search::ui.columns.query') }}</th>
+                        <th style="{{ $cell }}">{{ __('search::ui.columns.searches') }}</th>
+                        <th style="{{ $cell }}">{{ __('search::ui.resolved.shows') }}</th>
+                        <th style="{{ $cell }}"></th>
+                        <th style="{{ $cell }}"></th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach ($r['resolutions'] as $row)
+                            <tr>
+                                <td style="{{ $cell }};font-weight:600">{{ $row->query }}</td>
+                                <td style="{{ $cell }}" dir="ltr">{{ number_format((int) $row->searches) }}</td>
+                                <td style="{{ $cell }}">
+                                    @if ($row->status === 'resolved' || $row->status === 'rejected')
+                                        {{ collect($row->candidates)->whereIn('id', collect($row->products)->map(fn ($p) => 'p:'.$p)->merge(collect($row->content)->map(fn ($c) => 'c:'.$c)))->pluck('title')->take(4)->implode(' · ') }}
+                                        @if ($row->synonym_means)<span style="{{ $small }}"> · {{ __('search::ui.resolved.synonym') }}: {{ $row->query }} = {{ $row->synonym_means }}</span>@endif
+                                    @else
+                                        <span style="{{ $small }}">{{ $row->reason }}</span>
+                                    @endif
+                                </td>
+                                <td style="{{ $cell }}"><span style="{{ $small }}">{{ __('search::ui.resolved.statuses.'.$row->status) }}</span></td>
+                                <td style="{{ $cell }}">
+                                    @if ($row->status === 'resolved')
+                                        <button type="button" style="{{ $btn }}" wire:click="undoResolution('{{ $row->id }}')">{{ __('search::ui.resolved.undo') }}</button>
+                                    @elseif ($row->status === 'rejected' || $row->status === 'refused')
+                                        <button type="button" style="{{ $btn }}" wire:click="restoreResolution('{{ $row->id }}')">{{ __('search::ui.resolved.restore') }}</button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+            <div style="margin-top:12px"><button type="button" wire:click="resolveNow" wire:loading.attr="disabled" style="{{ $btn }}">{{ __('search::ui.resolved.resolve_now') }}</button></div>
+        </x-filament::section>
+
+        <x-filament::section :heading="__('search::ui.tags.heading')" :description="__('search::ui.tags.description')" collapsible>
+            @if ($r['pageTags']->isEmpty())
+                <p style="opacity:.7">{{ __('search::ui.tags.none') }}</p>
+            @else
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                    <thead><tr>
+                        <th style="{{ $cell }}">{{ __('search::ui.tags.page') }}</th>
+                        <th style="{{ $cell }}"></th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach ($r['pageTags'] as $row)
+                            <tr>
+                                <td style="{{ $cell }};font-weight:600;width:30%">{{ $row->title }}</td>
+                                <td style="{{ $cell }}">
+                                    @foreach ($row->shown() as $tag)
+                                        <span style="display:inline-flex;align-items:center;gap:4px;margin:2px;padding:3px 10px;border-radius:999px;background:#f5f0fb;font-size:13px" title="{{ $tag['query'] }}">
+                                            {{ $tag['label'] }}
+                                            <button type="button" style="border:0;background:none;cursor:pointer;opacity:.6" aria-label="{{ __('search::ui.tags.remove') }}" wire:click="hideTag('{{ $row->id }}', {{ \Illuminate\Support\Js::from($tag['label']) }})">×</button>
+                                        </span>
+                                    @endforeach
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+            <div style="margin-top:12px"><button type="button" wire:click="writeTagsNow" wire:loading.attr="disabled" style="{{ $btn }}">{{ __('search::ui.tags.write_now') }}</button></div>
+        </x-filament::section>
+
         <x-filament::section :heading="__('search::ui.synonyms.heading')" :description="__('search::ui.synonyms.description')">
             <form wire:submit="addSynonym" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                 <input type="text" wire:model="synonymTerm" placeholder="{{ __('search::ui.synonyms.term') }}" style="{{ $input }}" maxlength="80">

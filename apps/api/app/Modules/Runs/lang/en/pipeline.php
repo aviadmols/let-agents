@@ -41,6 +41,8 @@ return [
         'enrichment_import_relation_rules' => 'Importing relation rules',
         'enrichment_compute_rankings' => 'Computing superlatives',
         'enrichment_compute_relations' => 'Computing product relations',
+        'search_write_tags' => 'Writing the page tags',
+        'search_resolve' => 'Resolving searches that found nothing',
         'analytics_compute_scores' => 'Behaviour scores',
         'analytics_compute_popularity' => 'Product popularity',
         'improvement_daily_review' => 'Daily review and suggestions for the site',

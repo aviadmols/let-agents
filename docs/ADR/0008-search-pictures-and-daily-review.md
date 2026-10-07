@@ -37,3 +37,16 @@
 - נדרש מפתח Gemini בפאנל רק כשמדליקים תמונות. הבדיקה היומית צריכה מפתח OpenAI ומפתח Anthropic.
 - העוזר לשאלות (Assistant) עדיין בודק את תשובות OpenAI עם מודל של OpenAI. זה לא עומד בכלל של שתי משפחות, ונשאר כך עד החלטה של אביעד, כי שינוי שלו משנה התנהגות בפרודקשן.
 - Shopify עדיין לא נבנה. המודולים החדשים לא תלויים בפלטפורמה: הם קוראים מהקטלוג, ו־Shopify יצטרך StoreFeed משלו ו־Theme App Extension שטוען את אותם שני סקריפטים.
+
+## Addendum (2026-10-07): resolving empty searches and the tag bank
+
+- **Searches that found nothing are resolved at night (04:00), never live.** A query that came back
+  empty `search.resolve_min_searches` times gets its nearest products and guides by meaning; one
+  family matches (default OpenAI), another checks (default Anthropic). Accepted matches are shown
+  first for that exact query from the next request on; an accepted synonym joins the index at the
+  next build. The team can take a resolution back and restore it from the searches screen.
+- **The on-page module has a third view, `widget.layout = tags`.** "תרצו לראות גם" over a row of
+  tags. Tags are written per page at night (03:30) by one family, kept only when the store's own
+  search fills them, and checked by the other family against what they show. Widget reads them
+  through `Search\Contracts\PageTags`, which searches each tag when the bank is built, so results
+  follow stock. Tags the team takes off stay off.

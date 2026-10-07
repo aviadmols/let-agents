@@ -5,8 +5,12 @@ namespace App\Modules\Search\Filament\Operator\Pages;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\ResolveEmptySearches;
+use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Models\SearchPageTags;
+use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\HebrewSearch;
@@ -108,6 +112,8 @@ class ShopSearches extends Page
                     ->select('item')->selectRaw('MAX(title) as title, SUM(clicks) as clicks, COUNT(DISTINCT query) as queries')
                     ->groupBy('item')->orderByDesc(DB::raw('SUM(clicks)'))->limit(self::TOP)->get(),
                 'synonyms' => SearchSynonym::query()->orderBy('term')->get(),
+                'pageTags' => SearchPageTags::query()->orderByDesc('updated_at')->orderBy('id')->limit(40)->get()->filter(fn (SearchPageTags $t): bool => $t->shown() !== [])->values(),
+                'resolutions' => SearchResolution::query()->orderByRaw("CASE status WHEN 'resolved' THEN 0 WHEN 'refused' THEN 1 WHEN 'none' THEN 2 ELSE 3 END")->orderByDesc('searches')->limit(50)->get(),
                 'index' => SearchIndex::query()->first(['hash', 'counts', 'built_at']),
             ];
         });
@@ -148,6 +154,84 @@ class ShopSearches extends Page
 
         app(TenantContext::class)->run($this->shop, fn () => SearchSynonym::query()->whereKey($id)->delete());
         Notification::make()->success()->title(__('search::ui.synonyms.removed'))->send();
+    }
+
+    /** The team takes a resolution back: that search shows its regular results again. */
+    public function undoResolution(string $id): void
+    {
+        $this->setResolution($id, SearchResolution::REJECTED, 'undone');
+    }
+
+    public function restoreResolution(string $id): void
+    {
+        $this->setResolution($id, SearchResolution::RESOLVED, 'restored');
+    }
+
+    private function setResolution(string $id, string $status, string $message): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        app(TenantContext::class)->run($this->shop, function () use ($id, $status): void {
+            $resolution = SearchResolution::query()->find($id);
+
+            if ($resolution === null) {
+                return;
+            }
+
+            $resolution->update(['status' => $status, 'decided_by' => auth()->id(), 'decided_at' => now()]);
+
+            // The synonym the night added goes and comes back with its resolution.
+            if ($resolution->synonym_means !== null) {
+                $status === SearchResolution::RESOLVED
+                    ? SearchSynonym::query()->firstOrCreate(['term' => $resolution->query, 'means' => $resolution->synonym_means], ['shop_id' => $this->shop, 'origin' => 'resolution'])
+                    : SearchSynonym::query()->where('term', $resolution->query)->where('means', $resolution->synonym_means)->where('origin', 'resolution')->delete();
+            }
+        });
+        Notification::make()->success()->title(__('search::ui.resolved.'.$message))->send();
+    }
+
+    /** The team takes a tag off one page; the next night does not write it back. */
+    public function hideTag(string $id, string $label): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        app(TenantContext::class)->run($this->shop, function () use ($id, $label): void {
+            $row = SearchPageTags::query()->find($id);
+            $row?->update(['hidden_labels' => array_values(array_unique([...(array) $row->hidden_labels, $label]))]);
+        });
+        Notification::make()->success()->title(__('search::ui.tags.removed'))->send();
+    }
+
+    /** Writes the page tags now, without waiting for the night. */
+    public function writeTagsNow(): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        $run = app(WritePageTags::class)->handle($this->shop, RunTrigger::Manual);
+
+        $run->status->value === 'succeeded'
+            ? Notification::make()->success()->title(__('search::ui.tags.written'))->body($run->summary())->send()
+            : Notification::make()->danger()->title(__('search::ui.index.failed'))->send();
+    }
+
+    /** Resolves the empty searches now, without waiting for the night. */
+    public function resolveNow(): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        $run = app(ResolveEmptySearches::class)->handle($this->shop, RunTrigger::Manual);
+
+        $run->status->value === 'succeeded'
+            ? Notification::make()->success()->title(__('search::ui.resolved.resolved_now'))->body($run->summary())->send()
+            : Notification::make()->danger()->title(__('search::ui.index.failed'))->send();
     }
 
     /** Builds the index now, so new products and synonyms are searchable without waiting for the night. */

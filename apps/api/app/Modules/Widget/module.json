@@ -10,7 +10,8 @@
         "Shoppers",
         "Assistant",
         "Admin",
-        "Leads"
+        "Leads",
+        "Search"
     ],
     "provider": "WidgetServiceProvider",
     "features": [
@@ -81,7 +82,8 @@
             "type": "enum",
             "options": [
                 "circles",
-                "chat"
+                "chat",
+                "tags"
             ],
             "default": "circles",
             "scope": "shop"

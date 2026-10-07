@@ -2,11 +2,14 @@
 
 namespace App\Modules\Search\Console;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
+use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -19,12 +22,16 @@ use Illuminate\Console\Command;
  *   search index gueta-avigdor
  *   search index --all                    what the schedule runs
  *   search try gueta-avigdor "מקיטא"      results, not counted
+ *   search resolve gueta-avigdor          answer searches that found nothing, with two models
+ *   search resolve --all                  what the schedule runs, for shops with the flag on
+ *   search tags gueta-avigdor             write and check the tags the pages offer
+ *   search tags --all                     what the schedule runs, for shops with the flag on
  *   search prune                          drop counts older than search.keep_days
  */
 final class SearchCommand extends Command
 {
     protected $signature = 'search
-        {step : index, try or prune}
+        {step : index, resolve, tags, try or prune}
         {target? : shop slug or ID}
         {query? : what to search, for try}
         {--all : every active shop}';
@@ -35,6 +42,8 @@ final class SearchCommand extends Command
     {
         return $tenant->runUnscoped(fn (): int => match ($this->argument('step')) {
             'index' => $this->index(),
+            'resolve' => $this->resolve(),
+            'tags' => $this->tags(),
             'try' => $this->try(),
             'prune' => $this->prune(),
             default => $this->failWith('Unknown step.'),
@@ -55,6 +64,48 @@ final class SearchCommand extends Command
 
         foreach ($shops as $shop) {
             $run = app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
+            $this->line("{$shop->slug}: ".$run->summary());
+            $failed += $run->status->value === 'succeeded' ? 0 : 1;
+        }
+
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function resolve(): int
+    {
+        $shops = $this->option('all')
+            ? Shop::query()->where('status', ShopStatus::Active)->orderBy('slug')->get()->filter(fn (Shop $shop): bool => Features::enabled('search.resolve_empty', $shop->id))
+            : collect([$this->shop()])->filter();
+
+        if ($shops->isEmpty() && ! $this->option('all')) {
+            return $this->failWith('Shop not found.');
+        }
+
+        $failed = 0;
+
+        foreach ($shops as $shop) {
+            $run = app(ResolveEmptySearches::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
+            $this->line("{$shop->slug}: ".$run->summary());
+            $failed += $run->status->value === 'succeeded' ? 0 : 1;
+        }
+
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function tags(): int
+    {
+        $shops = $this->option('all')
+            ? Shop::query()->where('status', ShopStatus::Active)->orderBy('slug')->get()->filter(fn (Shop $shop): bool => Features::enabled('search.page_tags', $shop->id))
+            : collect([$this->shop()])->filter();
+
+        if ($shops->isEmpty() && ! $this->option('all')) {
+            return $this->failWith('Shop not found.');
+        }
+
+        $failed = 0;
+
+        foreach ($shops as $shop) {
+            $run = app(WritePageTags::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
             $this->line("{$shop->slug}: ".$run->summary());
             $failed += $run->status->value === 'succeeded' ? 0 : 1;
         }

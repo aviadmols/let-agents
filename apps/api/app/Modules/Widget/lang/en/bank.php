@@ -117,6 +117,7 @@ return [
         'made_in' => 'Made in :detail',
     ],
     'ui' => [
+        'tags_title' => 'You may also want to see',
         'close' => 'Close',
         'add_to_cart' => 'Add to cart',
         'adding' => 'Adding…',

@@ -11,7 +11,7 @@ return [
     'layout' => [
         'label' => 'Layout',
         'description' => 'Circles: a row of circles with the key sentence above them, each opening a panel. Assistant: one closed line that invites a click and opens into a conversation whose suggestions are the same parts. Same content, no model call on page load.',
-        'options' => ['circles' => 'Circles', 'chat' => 'Assistant (chat)'],
+        'options' => ['circles' => 'Circles', 'chat' => 'Assistant (chat)', 'tags' => 'Tag bank'],
     ],
     'product_selector' => [
         'label' => 'Where to show it on product pages (CSS selector)',

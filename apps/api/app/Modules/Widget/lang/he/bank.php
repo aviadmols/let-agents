@@ -117,6 +117,7 @@ return [
         'made_in' => 'תוצרת :detail',
     ],
     'ui' => [
+        'tags_title' => 'תרצו לראות גם',
         'close' => 'סגירה',
         'add_to_cart' => 'הוספה לסל',
         'adding' => 'מוסיפים…',

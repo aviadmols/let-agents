@@ -25,6 +25,7 @@ use App\Modules\Enrichment\Models\EnrichmentRanking;
 use App\Modules\Enrichment\Models\EnrichmentRelationRules;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
+use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Tenancy\Models\Shop;
 use App\Modules\Widget\Models\WidgetCuration;
 use App\Modules\Widget\Support\GuideRelevance;
@@ -155,7 +156,7 @@ final class BuildPageBank
                 'floating' => (bool) Settings::get('widget.floating_fallback', $shopId),
             ],
             'bank_version' => 1,
-            // Circles, or the assistant that opens from one closed line. Same bank either way.
+            // Circles, the assistant that opens from one closed line, or a bank of tags. Same bank either way.
             'layout' => (string) Settings::get('widget.layout', $shopId),
             'teaser' => null,
             'sections' => [],
@@ -217,6 +218,9 @@ final class BuildPageBank
         $bank['lead'] = Features::enabled('leads.enabled', $shopId);
         // What this page offers a reader, in the version being tried on them.
         $bank['cta'] = app(OffersCallsToAction::class)->forPage($shopId, $type, $externalId, $this->locale);
+        // The tag bank: what a shopper on this page may want next, written and checked at night,
+        // each searched now so it follows stock. Only in the tag view; the other views keep theirs.
+        $bank['tags'] = $bank['layout'] === 'tags' ? $this->tenant->run($shopId, fn (): array => $this->tags($shopId, $type, $externalId, $maxProducts)) : [];
 
         if ($this->explain) {
             $bank['explain'] = $this->why;
@@ -1220,6 +1224,44 @@ final class BuildPageBank
             'title' => __('widget::bank.titles.'.$candidate, [], $this->locale),
             'chip' => __('widget::bank.chips.'.$candidate, $chipReplace, $this->locale),
         ] + $content;
+    }
+
+    /**
+     * The page's tags as sections the widget opens like any other: the label is the chip and the
+     * title, the products are the usual cards, the guides the usual list.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function tags(string $shopId, string $type, string $externalId, int $maxProducts): array
+    {
+        $out = [];
+
+        foreach (app(PageTags::class)->forPage($shopId, $type, $externalId, $maxProducts) as $tag) {
+            $order = array_flip($tag['products']);
+            $products = CatalogProduct::query()->active()->whereIn('external_id', $tag['products'])->get()
+                ->sortBy(fn (CatalogProduct $p): int => $order[$p->external_id] ?? PHP_INT_MAX)->values();
+            $guideOrder = array_flip($tag['content']);
+            $guides = CatalogContent::query()->active()->whereIn('external_id', $tag['content'])->get()
+                ->sortBy(fn (CatalogContent $c): int => $guideOrder[$c->external_id] ?? PHP_INT_MAX)
+                ->map(fn (CatalogContent $c): array => ['id' => $c->external_id, 'title' => $c->title, 'url' => $c->url, 'image' => $c->image_url])->values()->all();
+
+            if ($products->isEmpty() && $guides === []) {
+                continue;
+            }
+
+            $out[] = array_filter([
+                'candidate' => 'tag',
+                'model' => 'tag',
+                'key' => 'tag_'.(count($out) + 1),
+                'title' => $tag['label'],
+                'chip' => $tag['label'],
+                'query' => $tag['query'],
+                'products' => $products->isEmpty() ? null : $this->cards($products),
+                'guides' => $guides === [] ? null : $guides,
+            ], fn ($value): bool => $value !== null);
+        }
+
+        return $out;
     }
 
     /**

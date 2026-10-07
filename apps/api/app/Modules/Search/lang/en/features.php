@@ -17,4 +17,12 @@ return [
         'label' => 'Search by photo',
         'description' => 'A camera button in the search box: a shopper uploads or takes a photo, and the store shows products that look alike. Shows only once the shop\'s pictures have vectors. Each photo costs one vector, and the photo is not kept.',
     ],
+    'resolve_empty' => [
+        'label' => 'Resolve searches that found nothing, with a model',
+        'description' => 'At night, never live. A search that came back empty several times gets a vector and candidates from the catalogue; a model matches products and guides, and a model from another family checks. From the morning that search shows them. What was not found goes to the site suggestions.',
+    ],
+    'page_tags' => [
+        'label' => 'Tag bank on pages',
+        'description' => 'At night, for every product and guide: a model writes tags such as "materials for building a deck" or "deck screws", the search checks there is something to show, and a model from another family checks each tag against what it shows. Needed for the tag bank view of the on-page module.',
+    ],
 ];

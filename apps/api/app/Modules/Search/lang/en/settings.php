@@ -61,4 +61,96 @@ return [
         'label' => 'Minimum likeness to an uploaded photo',
         'description' => 'Below this a product is not shown. A shopper\'s photo differs from a product picture in background and light, so this is lower than likeness between products.',
     ],
+    'resolve_provider' => [
+        'label' => 'Provider of the model that matches',
+        'description' => 'openai by default. Must be from another family than the checker.',
+    ],
+    'resolve_model' => [
+        'label' => 'The model that matches',
+        'description' => 'For example gpt-5.4-mini.',
+    ],
+    'resolve_input_usd_per_million' => [
+        'label' => 'Input price of the matching model, per million tokens',
+        'description' => 'From the provider\'s price list.',
+    ],
+    'resolve_output_usd_per_million' => [
+        'label' => 'Output price of the matching model, per million tokens',
+        'description' => 'From the provider\'s price list.',
+    ],
+    'resolve_max_output_tokens' => [
+        'label' => 'Token cap for the matching model\'s answer',
+        'description' => 'Including thinking.',
+    ],
+    'check_provider' => [
+        'label' => 'Provider of the model that checks',
+        'description' => 'anthropic by default. Another family than the matching model.',
+    ],
+    'check_model' => [
+        'label' => 'The model that checks',
+        'description' => 'For example claude-haiku-4-5.',
+    ],
+    'check_input_usd_per_million' => [
+        'label' => 'Input price of the checking model, per million tokens',
+        'description' => 'From the provider\'s price list.',
+    ],
+    'check_output_usd_per_million' => [
+        'label' => 'Output price of the checking model, per million tokens',
+        'description' => 'From the provider\'s price list.',
+    ],
+    'check_max_output_tokens' => [
+        'label' => 'Token cap for the checking model\'s answer',
+        'description' => 'Including thinking.',
+    ],
+    'resolve_per_run' => [
+        'label' => 'Searches resolved in one night',
+        'description' => 'The most common first. The rest wait for the next night.',
+    ],
+    'resolve_min_searches' => [
+        'label' => 'A search is resolved from',
+        'description' => 'How many times a search must find nothing to be sent for resolving.',
+    ],
+    'resolve_candidates' => [
+        'label' => 'How many candidates the model sees',
+        'description' => 'The nearest by meaning, products and guides.',
+    ],
+    'resolve_days' => [
+        'label' => 'How many days back are counted',
+        'description' => 'Empty searches from this period.',
+    ],
+    'tags_provider' => [
+        'label' => 'Provider of the model that writes tags',
+        'description' => 'openai by default. The checker is the model that checks resolved searches, from another family.',
+    ],
+    'tags_model' => [
+        'label' => 'The model that writes tags',
+        'description' => 'For example gpt-5.4-mini.',
+    ],
+    'tags_input_usd_per_million' => [
+        'label' => 'Input price of the tag writer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'tags_output_usd_per_million' => [
+        'label' => 'Output price of the tag writer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'tags_max_output_tokens' => [
+        'label' => 'Token cap for the answer of the tag writer',
+        'description' => 'For one batch of pages, including thinking.',
+    ],
+    'tags_per_run' => [
+        'label' => 'Pages tagged in one night',
+        'description' => 'New pages or pages whose words changed. The rest wait for the next night.',
+    ],
+    'tags_per_page' => [
+        'label' => 'Tags per page',
+        'description' => 'At most.',
+    ],
+    'tags_batch' => [
+        'label' => 'Pages in one model call',
+        'description' => 'More pages per call, fewer tokens on the instructions.',
+    ],
+    'tags_min_results' => [
+        'label' => 'A tag stays from',
+        'description' => 'How many results the search must find for a tag, besides the page itself.',
+    ],
 ];
