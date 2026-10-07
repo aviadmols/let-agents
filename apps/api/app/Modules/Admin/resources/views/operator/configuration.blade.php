@@ -35,6 +35,30 @@
                     </form>
                 </x-filament::section>
             @endif
+
         </div>
     </div>
+
+    @if ($preview = $this->previewUrl())
+        <div x-data="{ mobile: false }" style="margin-top:16px">
+            <x-filament::section :heading="__('widget::preview.heading')" :description="__('widget::preview.description')">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+                    <x-filament::button size="xs" color="gray" x-on:click="mobile = false" x-bind:class="mobile ? '' : 'fi-color-primary'">{{ __('widget::preview.desktop') }}</x-filament::button>
+                    <x-filament::button size="xs" color="gray" x-on:click="mobile = true" x-bind:class="mobile ? 'fi-color-primary' : ''">{{ __('widget::preview.mobile') }}</x-filament::button>
+                    <a href="{{ $preview }}" target="_blank" rel="noopener" style="font-size:12px;text-decoration:underline;margin-inline-start:auto">{{ __('widget::preview.open') }}</a>
+                </div>
+                <div style="display:flex;justify-content:center;padding:12px;border-radius:16px;background:rgba(127,127,127,.08)">
+                    <iframe
+                        wire:key="widget-preview-{{ $this->previewVersion }}"
+                        src="{{ $preview }}&v={{ $this->previewVersion }}"
+                        title="{{ __('widget::preview.heading') }}"
+                        loading="lazy"
+                        x-bind:style="(mobile ? 'width:390px;max-width:100%;' : 'width:100%;') + 'height:820px;border:0;border-radius:12px;background:#fff'"
+                        style="width:100%;height:820px;border:0;border-radius:12px;background:#fff"
+                        data-widget-preview
+                    ></iframe>
+                </div>
+            </x-filament::section>
+        </div>
+    @endif
 </x-filament-panels::page>

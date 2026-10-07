@@ -131,6 +131,9 @@ class Configuration extends Page implements HasForms
     #[Url]
     public string $area = '';
 
+    /** Bumped on every save, so the preview frame reloads with what was just saved. */
+    public int $previewVersion = 0;
+
     /** @var array<string, mixed> */
     public array $data = [];
 
@@ -328,6 +331,7 @@ class Configuration extends Page implements HasForms
             }
         });
 
+        $this->previewVersion++;
         Notification::make()->success()->title(__('admin::configuration.saved'))->send();
 
         $this->openArea($this->area);
@@ -460,5 +464,13 @@ class Configuration extends Page implements HasForms
     private function settingManager(): SettingManager
     {
         return app(SettingManager::class);
+    }
+
+    /** The module as this shop's shoppers see it, from the saved settings; null while no one shop is chosen. */
+    public function previewUrl(): ?string
+    {
+        $slug = $this->shop === null ? null : Shop::query()->whereKey($this->shop)->value('slug');
+
+        return $slug === null ? null : url('widget-preview/'.$slug).'?type=product';
     }
 }
