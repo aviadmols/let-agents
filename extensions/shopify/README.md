@@ -17,7 +17,7 @@ npx shopify app config link       # choose the "Let Agents" app; fills client_id
 npx shopify app deploy            # pushes the app config and the theme extension as a new version
 ```
 
-`client_id` בקובץ הוא placeholder (`__SHOPIFY_API_KEY__`). `config link` ממלא אותו; אל תעשו commit לערך של סביבה אחרת.
+`client_id` בקובץ הוא ה־Client ID של אפליקציית Let Agents (ציבורי, לא סוד). ה־Client secret נמצא רק ב־Railway (`SHOPIFY_API_SECRET`).
 הכתובות בקובץ הן של production, ו־`automatically_update_urls_on_dev = false` מונע מ־`shopify app dev` לדרוס אותן.
 
 ## הפעלה בחנות

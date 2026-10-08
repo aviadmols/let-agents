@@ -13,7 +13,7 @@
    shopify app deploy           # כתובות, הרשאות, webhooks והרחבת התבנית
    ```
 5. Distribution: לבדיקות בוחרים Custom distribution לחנות אחת. בשביל כל החנויות בוחרים Public (App Store). כך או כך, החיוב עובר דרך ה־Billing API של האפליקציה, ולא דרך Managed pricing.
-6. בפרטי האפליקציה ב־Partners, תחת API access, מבקשים Protected customer data access. זה נדרש בגלל `read_orders` וה־webhooks של פרטיות.
+6. בפרטי האפליקציה ב־Partners, תחת API access, מבקשים Protected customer data access. זה נדרש בגלל ה־webhooks של פרטיות ובגלל המייל שנשמר בסלים נטושים.
 
 ## 2. משתנים ב־Railway (api, worker, scheduler)
 
