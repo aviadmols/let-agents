@@ -6,4 +6,7 @@ return [
     'declined_title' => 'The plan was not approved',
     'declined_text' => 'Let Agents needs the monthly plan approved. You can approve it any time, from the app in the Shopify admin.',
     'declined_again' => 'Approve the plan',
+    'continue_title' => 'Continuing in Shopify',
+    'continue_text' => 'The next step opens in the full Shopify window.',
+    'continue' => 'Continue',
 ];

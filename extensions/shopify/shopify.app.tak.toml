@@ -8,8 +8,8 @@ client_id = "9ea316a1490656a702d7bd59706c712c"
 name = "Let's search."
 handle = "lets-search-tak"
 application_url = "https://agents.lets.co.il/shopify/app"
-# The merchant works in the Let Agents panel, not inside Shopify admin.
-embedded = false
+# The shop's panel opens inside the Shopify admin, in its frame (App Bridge, session token exchange).
+embedded = true
 
 [build]
 # The URLs above are production's; `shopify app dev` must not rewrite them.

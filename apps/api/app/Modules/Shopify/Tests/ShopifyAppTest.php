@@ -212,6 +212,67 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame(0, Shop::query()->count(), 'the shop and all it holds are erased');
     }
 
+    public function test_opened_inside_the_shopify_admin_the_app_installs_by_token_exchange_and_is_framed(): void
+    {
+        Settings::set('shopify.charge', false);
+        $exchanges = [];
+        Http::fake(function (HttpRequest $request) use (&$exchanges) {
+            if (str_ends_with($request->url(), '/admin/oauth/access_token')) {
+                $exchanges[] = $request->data();
+
+                return Http::response(['access_token' => 'shpat_x', 'scope' => 'read_products', 'expires_in' => 3600, 'refresh_token' => 'shprt_x', 'refresh_token_expires_in' => 7776000]);
+            }
+
+            return Http::response(['data' => ['shop' => ['id' => 'gid://shopify/Shop/7', 'name' => 'גואטה טסט', 'email' => 'owner@gueta.test', 'currencyCode' => 'ILS', 'ianaTimezone' => 'Asia/Jerusalem', 'primaryDomain' => ['host' => 'shop.gueta.test'], 'plan' => ['partnerDevelopment' => true]], 'metafieldsSet' => ['userErrors' => []], 'currentAppInstallation' => ['activeSubscriptions' => []]]]);
+        });
+
+        $token = self::idToken();
+        $opened = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => $token])));
+        $opened->assertRedirect();
+        $this->assertSame('frame-ancestors https://'.self::SHOP.' https://admin.shopify.com;', $opened->headers->get('Content-Security-Policy'), 'only this shop\'s admin may frame it');
+        $this->assertSame(['urn:ietf:params:oauth:grant-type:token-exchange', $token, 'test-key'], [$exchanges[0]['grant_type'], $exchanges[0]['subject_token'], $exchanges[0]['client_id']], 'the token comes by exchange, with no screen between');
+
+        $install = ShopifyInstall::query()->sole();
+        $this->assertSame(['shpat_123', 'test-key', ShopStatus::Active], [$install->access_token, $install->client_id, $install->shop->status], 'the token answer is the first fake Shopify answer; installed, on this app, active');
+        $panel = (string) $opened->headers->get('Location');
+        $this->assertStringContainsString('host=YWRtaW4', $panel, 'the panel keeps what Shopify opened with');
+
+        // The panel inside the frame: framed for this shop only, App Bridge in its head.
+        $page = $this->get($panel, ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
+        $this->assertSame('frame-ancestors https://'.self::SHOP.' https://admin.shopify.com;', $page->headers->get('Content-Security-Policy'));
+        $page->assertSee('<meta name="shopify-api-key" content="test-key">', false)->assertSee('cdn.shopify.com/shopifycloud/app-bridge.js', false);
+
+        // Opened on its own, outside the admin, the same page carries no bridge.
+        $this->get(route('filament.merchant.pages.overview', ['tenant' => 'gueta-test']))->assertOk()->assertDontSee('shopify-api-key', false);
+
+        // Opened again in the admin: straight to the panel, no second exchange.
+        $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => self::idToken()])))->assertRedirect();
+        $this->assertCount(1, $exchanges);
+    }
+
+    public function test_a_forged_or_stale_session_token_opens_nothing(): void
+    {
+        $query = ['shop' => self::SHOP, 'embedded' => '1'];
+        $this->get('/shopify/app?'.http_build_query($query + ['id_token' => self::idToken([], 'shpss_wrong')]))->assertForbidden();
+        $this->get('/shopify/app?'.http_build_query($query + ['id_token' => self::idToken(['exp' => time() - 120])]))->assertForbidden();
+        $this->get('/shopify/app?'.http_build_query($query + ['id_token' => self::idToken(['dest' => 'https://other.myshopify.com', 'iss' => 'https://other.myshopify.com/admin'])]))->assertForbidden();
+        $this->get('/shopify/app?'.http_build_query($query + ['id_token' => 'not.a.token']))->assertForbidden();
+
+        $this->assertSame(0, ShopifyInstall::query()->count());
+    }
+
+    public function test_from_inside_the_frame_shopifys_own_screens_open_in_the_full_window(): void
+    {
+        $install = $this->installed();
+
+        // The plan is not approved: inside the frame, the approval opens on top, not in it.
+        $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4'])))
+            ->assertOk()
+            ->assertSee('target="_top"', false)
+            ->assertSee('https://gueta-test.myshopify.com/admin/charges/confirm', false);
+        $this->assertSame('pending', $install->fresh()->subscription_status);
+    }
+
     private function installed(): ShopifyInstall
     {
         Cache::put('shopify:state:s1', self::SHOP, 600);
@@ -231,6 +292,21 @@ final class ShopifyAppTest extends TestCase
             'HTTP_X_SHOPIFY_HMAC_SHA256' => $hmac ?? base64_encode(hash_hmac('sha256', $body, self::SECRET, true)),
             'CONTENT_TYPE' => 'application/json',
         ], content: $body);
+    }
+
+    /**
+     * A session token as Shopify's admin issues one to an embedded app: HS256 with the app's secret.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private static function idToken(array $claims = [], string $secret = self::SECRET): string
+    {
+        $claims += ['iss' => 'https://'.self::SHOP.'/admin', 'dest' => 'https://'.self::SHOP, 'aud' => 'test-key', 'sub' => '1', 'exp' => time() + 60, 'nbf' => time() - 5, 'iat' => time() - 5, 'jti' => 'j1', 'sid' => 's1'];
+        $encode = fn (string $s): string => rtrim(strtr(base64_encode($s), '+/', '-_'), '=');
+        $head = $encode((string) json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
+        $body = $encode((string) json_encode($claims));
+
+        return $head.'.'.$body.'.'.$encode(hash_hmac('sha256', $head.'.'.$body, $secret, true));
     }
 
     /**

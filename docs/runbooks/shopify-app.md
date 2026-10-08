@@ -24,6 +24,7 @@
 | `SHOPIFY_API_VERSION` | `2026-07` (ברירת המחדל) |
 | `SHOPIFY_APP_HANDLE` | ה־handle של האפליקציה, `let-agents` |
 | `APP_URL` | `https://agents.lets.co.il`: הכתובת שבקובץ ה־toml |
+| `SESSION_SAME_SITE` | `none` (עם `SESSION_SECURE_COOKIE=true` ו־`SESSION_PARTITIONED_COOKIE=true`): העוגייה של הפאנל חיה גם בתוך המסגרת של שופיפיי |
 
 הכתובות שהאפליקציה משתמשת בהן, כולן תחת `APP_URL`:
 
@@ -42,6 +43,16 @@
 4. אחרי האישור נכנסים לפאנל החנות אצלנו, מחוברים כבעל החנות.
 5. בפאנל המפעיל, ב"חנויות", מופיעה שורה עם התגית Shopify והתוכנית "פעילה". הקטלוג נסנכרן ברקע, ב־worker.
 6. בחנות: Online Store ← Themes ← Customize ← App embeds ← מדליקים את Let Agents search ← Save. החיפוש מופיע בתיבת החיפוש של התבנית.
+
+## 3א. בתוך הניהול של שופיפיי
+
+האפליקציה מוטמעת (`embedded = true`): הפאנל של החנות נפתח בתוך הניהול של שופיפיי, במסגרת. ככה זה עובד:
+
+- שופיפיי פותח את `/shopify/app` עם `id_token` (טוקן סשן, JWT חתום בסוד של האפליקציה), `host` ו־`embedded=1`. הטוקן נבדק (`ShopifySessionToken`). חנות שעוד אין לנו טוקן שלה מקבלת אותו ב־token exchange, בלי מסך.
+- התשובות של `/shopify/*` ושל הפאנל של חנות שופיפיי נושאות `Content-Security-Policy: frame-ancestors https://<חנות>.myshopify.com https://admin.shopify.com;` (`FrameInsideShopify`). דף אחר לא נוגע בזה.
+- דף של הפאנל שנטען במסגרת (`Sec-Fetch-Dest: iframe`, או `embedded=1`/`host` בכתובת) מקבל ב־head את App Bridge ואת ה־client id של האפליקציה (`EmbeddedApp`), וסקריפט קטן שמעביר את ה־`host` לכל קישור.
+- מסכים של שופיפיי עצמו (אישור מנוי, הרשאות) לא יכולים לחיות במסגרת, ולכן מתוכה הם נפתחים בחלון המלא (`shopify::top`).
+- העוגייה של הסשן היא `SameSite=None; Secure; Partitioned`, אחרת הדפדפן לא שולח אותה בתוך מסגרת של אתר אחר. ספארי לפני 18.4 לא מכיר `Partitioned`, ושם הפאנל במסגרת יבקש להתחבר.
 
 ## 4. מה קורה אחרי ההתקנה
 

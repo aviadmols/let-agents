@@ -90,6 +90,31 @@ final class ShopifyApi
         return (string) $install->access_token;
     }
 
+    /**
+     * The store's offline token, in exchange for the session token an embedded app opens with:
+     * no redirect, no screen. Null when Shopify refused or did not answer.
+     *
+     * @return array<string, mixed>|null the token answer, as the authorization code grant gives it
+     */
+    public function exchange(string $shopDomain, string $app, string $idToken): ?array
+    {
+        try {
+            $response = Http::acceptJson()->timeout(self::TIMEOUT_SECONDS)->post(self::url($shopDomain, '/admin/oauth/access_token'), [
+                'client_id' => $app,
+                'client_secret' => ShopifyApps::secret($app),
+                'grant_type' => 'urn:ietf:params:oauth:grant-type:token-exchange',
+                'subject_token' => $idToken,
+                'subject_token_type' => 'urn:ietf:params:oauth:token-type:id_token',
+                'requested_token_type' => 'urn:shopify:params:oauth:token-type:offline-access-token',
+                'expiring' => 1,
+            ]);
+        } catch (ConnectionException) {
+            return null;
+        }
+
+        return $response->successful() && is_string($response->json('access_token')) ? (array) $response->json() : null;
+    }
+
     /** Exchanges the refresh token for a new access token (and a new refresh token). */
     public function renew(ShopifyInstall $install): void
     {
