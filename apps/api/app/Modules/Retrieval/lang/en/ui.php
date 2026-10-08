@@ -70,5 +70,9 @@ return [
             'nearest' => 'The nearest pictures in the shop by vector. If they look alike, the scan works well.',
             'none' => 'No other scanned pictures to compare.',
         ],
+        'layout' => [
+            'table' => 'Table',
+            'gallery' => 'Gallery',
+        ],
     ],
 ];

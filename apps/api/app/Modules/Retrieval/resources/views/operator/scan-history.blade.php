@@ -67,12 +67,49 @@
                 @foreach (\App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::STATES as $key)
                     <x-filament::button size="sm" :color="$state === $key ? 'primary' : 'gray'" wire:click="$set('state', '{{ $key }}')">{{ __('retrieval::ui.scans.filter.'.$key) }}</x-filament::button>
                 @endforeach
+                <span style="display:inline-flex;gap:4px;margin-inline-start:8px">
+                    @foreach (['table', 'gallery'] as $mode)
+                        <x-filament::button size="sm" :color="$display === $mode ? 'primary' : 'gray'" :icon="$mode === 'table' ? 'heroicon-o-list-bullet' : 'heroicon-o-squares-2x2'" wire:click="$set('display', '{{ $mode }}')" data-layout="{{ $mode }}">{{ __('retrieval::ui.scans.layout.'.$mode) }}</x-filament::button>
+                    @endforeach
+                </span>
                 <input type="search" wire:model.live.debounce.400ms="search" placeholder="{{ __('retrieval::ui.scans.search') }}" style="flex:1;min-width:180px;padding:6px 12px;border:1px solid rgba(127,127,127,.35);border-radius:10px;background:transparent;color:inherit;font:inherit">
             </div>
 
             @php($images = $this->images())
             @if ($images->isEmpty())
                 <p style="{{ $small }}">{{ __('retrieval::ui.scans.no_pictures') }}</p>
+            @elseif ($display === 'gallery')
+                @if ($inspect && ($look = $this->inspection()))
+                    <div style="padding:14px;border:1px solid rgba(127,127,127,.25);border-radius:14px;margin-bottom:14px;background:rgba(127,127,127,.05)">
+                        <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+                            <img src="{{ $look['image']->image_url }}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:10px">
+                            <strong>{{ $look['image']->title }}</strong>
+                            <button type="button" wire:click="toggleInspect('{{ $look['image']->id }}')" style="all:unset;cursor:pointer;margin-inline-start:auto;font-size:12px;text-decoration:underline">{{ __('retrieval::ui.scans.inspect.close') }}</button>
+                        </div>
+                        @include('retrieval::operator.partials.inspection', ['look' => $look])
+                    </div>
+                @endif
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px" data-gallery>
+                    @foreach ($images as $image)
+                        @php($is = $this->stateOf($image))
+                        @php($mini = $is === 'scanned' ? $this->miniStrip($image) : [])
+                        <button type="button" @if ($is === 'scanned') wire:click="toggleInspect('{{ $image->id }}')" @endif data-card="{{ $image->external_id }}"
+                            style="all:unset;cursor:{{ $is === 'scanned' ? 'pointer' : 'default' }};display:grid;gap:6px;padding:8px;border-radius:12px;border:1px solid {{ $inspect === $image->id ? 'rgb(80,140,255)' : 'rgba(127,127,127,.2)' }}">
+                            <img src="{{ $image->image_url }}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:rgba(127,127,127,.12)">
+                            <span style="font-size:12px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">{{ $image->title }}</span>
+                            @if ($mini !== [])
+                                <span dir="ltr" style="display:flex;gap:1px;height:12px" title="{{ __('retrieval::ui.scans.inspect.strip') }}">
+                                    @foreach ($mini as $cellValue)
+                                        <span style="flex:1;background:{{ $cellValue >= 0 ? 'rgba(52,120,235,'.abs($cellValue).')' : 'rgba(235,104,52,'.abs($cellValue).')' }}"></span>
+                                    @endforeach
+                                </span>
+                            @else
+                                <span style="font-size:11px;opacity:.7">{{ __('retrieval::ui.scans.state.'.$is) }}</span>
+                            @endif
+                        </button>
+                    @endforeach
+                </div>
+                <div style="margin-top:12px">{{ $images->links() }}</div>
             @else
                 <div style="overflow-x:auto">
                     <table style="width:100%;border-collapse:collapse;font-size:13.5px">
@@ -106,42 +143,7 @@
                                 @if ($inspect === $image->id && ($look = $this->inspection()))
                                     <tr>
                                         <td colspan="4" style="{{ $cell }};background:rgba(127,127,127,.06)">
-                                            <div style="display:grid;gap:12px;font-size:13px">
-                                                <div style="display:flex;flex-wrap:wrap;gap:16px">
-                                                    <span>{{ __('retrieval::ui.scans.inspect.model') }}: <code dir="ltr">{{ $look['model'] }}</code></span>
-                                                    <span>{{ __('retrieval::ui.scans.inspect.dimensions') }}: <strong>{{ $look['dimensions'] }}</strong></span>
-                                                    <span>{{ __('retrieval::ui.scans.inspect.norm') }}: <strong dir="ltr">{{ $look['norm'] }}</strong></span>
-                                                    <span>{{ __('retrieval::ui.scans.inspect.range') }}: <strong dir="ltr">{{ $look['min'] }} … {{ $look['max'] }}</strong></span>
-                                                </div>
-                                                <div>
-                                                    <div style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.strip') }}</div>
-                                                    <div dir="ltr" style="display:flex;gap:1px;height:28px;align-items:stretch;margin-top:4px" data-vector-strip>
-                                                        @foreach ($look['strip'] as $cellValue)
-                                                            <span title="{{ $cellValue }}" style="flex:1;background:{{ $cellValue >= 0 ? 'rgba(52,120,235,'.abs($cellValue).')' : 'rgba(235,104,52,'.abs($cellValue).')' }}"></span>
-                                                        @endforeach
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.head') }}</div>
-                                                    <code dir="ltr" style="font-size:12px;word-break:break-all">[{{ implode(', ', $look['head']) }}, …]</code>
-                                                </div>
-                                                <div>
-                                                    <div style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.nearest') }}</div>
-                                                    @if ($look['nearest'] === [])
-                                                        <span style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.none') }}</span>
-                                                    @else
-                                                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:6px">
-                                                            @foreach ($look['nearest'] as $near)
-                                                                <div style="display:grid;gap:4px;justify-items:center;text-align:center" data-nearest="{{ $near['external_id'] }}">
-                                                                    <img src="{{ $near['image_url'] }}" alt="" loading="lazy" style="width:88px;height:88px;object-fit:cover;border-radius:8px;background:rgba(127,127,127,.12)">
-                                                                    <strong>{{ (int) round($near['similarity'] * 100) }}%</strong>
-                                                                    <span style="font-size:12px;line-height:1.3">{{ \Illuminate\Support\Str::limit($near['title'], 50) }}</span>
-                                                                </div>
-                                                            @endforeach
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
+                                            @include('retrieval::operator.partials.inspection', ['look' => $look])
                                         </td>
                                     </tr>
                                 @endif

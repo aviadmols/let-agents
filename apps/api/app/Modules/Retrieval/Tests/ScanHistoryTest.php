@@ -69,5 +69,11 @@ final class ScanHistoryTest extends TestCase
             ->assertSee(__('retrieval::ui.scans.inspect.nearest'))
             ->assertSee('data-nearest="4"', false)
             ->assertSee('data-vector-strip', false);
+        $this->get('/operator/retrieval/scans?display=gallery&state=scanned&inspect='.$image->id)
+            ->assertOk()
+            ->assertSee('data-gallery', false)
+            ->assertSee('data-card="1"', false)
+            ->assertSee('data-nearest="4"', false)
+            ->assertDontSee('data-card="3"', false);
     }
 }

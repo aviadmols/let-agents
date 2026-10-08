@@ -39,6 +39,11 @@ final class ScanHistory extends Page
 
     private const NEAREST = 8;
 
+    private const PER_GALLERY = 48;
+
+    /** Cells in a gallery card's vector strip. */
+    private const MINI_STRIP = 32;
+
     private const STRIP = 64;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
@@ -56,6 +61,10 @@ final class ScanHistory extends Page
 
     #[Url]
     public string $search = '';
+
+    /** "table" or "gallery": the pictures as rows, or as a grid with their vectors. */
+    #[Url]
+    public string $display = 'table';
 
     /** The picture whose vector is open for inspection. */
     #[Url]
@@ -131,7 +140,11 @@ final class ScanHistory extends Page
         };
 
         return $query->orderByRaw('embedded_at is null')->orderByDesc('embedded_at')->orderBy('title')
-            ->paginate(self::PER_PAGE, ['id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at']);
+            ->paginate($this->display === 'gallery' ? self::PER_GALLERY : self::PER_PAGE, array_merge(
+                ['id', 'product_id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at'],
+                // The gallery draws each picture's vector, so it reads them; the table does not.
+                $this->display === 'gallery' ? ['embedding'] : [],
+            ));
     }
 
     public function toggleInspect(string $imageId): void
@@ -169,6 +182,23 @@ final class ScanHistory extends Page
             'strip' => self::strip($vector, self::STRIP),
             'nearest' => array_map(fn (array $hit): array => $hit + ['image_url' => $urls[$hit['external_id']] ?? null], $nearest),
         ];
+    }
+
+    /**
+     * A picture's vector as a short strip for the gallery: empty for a picture not scanned.
+     *
+     * @return list<float>
+     */
+    public function miniStrip(RetrievalImage $image): array
+    {
+        $vector = $image->vector();
+
+        return $vector === null ? [] : self::strip($vector, self::MINI_STRIP);
+    }
+
+    public function updatedDisplay(): void
+    {
+        $this->resetPage();
     }
 
     /**
