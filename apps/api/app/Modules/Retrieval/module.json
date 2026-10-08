@@ -244,6 +244,15 @@
             "unit": "images"
         },
         {
+            "name": "images_per_part",
+            "type": "int",
+            "default": 200,
+            "min": 16,
+            "max": 5000,
+            "scope": "global",
+            "unit": "images"
+        },
+        {
             "name": "image_max_kb",
             "type": "int",
             "default": 4096,

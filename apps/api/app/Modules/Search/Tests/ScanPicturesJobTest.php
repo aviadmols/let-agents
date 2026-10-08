@@ -25,7 +25,7 @@ final class ScanPicturesJobTest extends TestCase
             {
                 $this->parts++;
 
-                return (new Run)->forceFill(['output' => ['stopped' => $this->parts < 3 ? 'time_budget' : null]]);
+                return (new Run)->forceFill(['output' => ['stopped' => [1 => 'more', 2 => 'time_budget'][$this->parts] ?? null]]);
             }
 
             public function match(string $shopId, ?array $productIds = null): Run

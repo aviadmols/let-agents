@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Catalog\Events\CatalogUpdated;
+use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
@@ -42,6 +43,13 @@ final class SearchServiceProvider extends ModuleServiceProvider
                 ->onOneServer()
                 ->runInBackground();
 
+            // A picture scan cut off by a deploy or a crash goes on, however many pictures are left.
+            $schedule->command('search:resume-pictures')
+                ->everyTenMinutes()
+                ->name('search:resume-pictures')
+                ->withoutOverlapping()
+                ->onOneServer();
+
             // After the index (02:40) and the vectors (02:45): a tag is kept only when the search fills it.
             $schedule->command('search tags --all')
                 ->dailyAt('03:30')
@@ -71,6 +79,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
     protected function moduleCommands(): array
     {
         return [
+            ResumePictureScansCommand::class,
             SearchCommand::class,
         ];
     }

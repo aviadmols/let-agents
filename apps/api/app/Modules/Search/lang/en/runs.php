@@ -12,4 +12,5 @@ return [
     'photo_tags' => 'Photo read: :picks categories, :seen words.',
     'photo_tags_failed' => 'Photo reading failed (:reason).',
     'photo_tags_spend_cap' => 'Photo reading: the spending cap was reached.',
+    'scan_cut_off' => 'The picture scan was cut off (a deploy or a crash). It goes on by itself from where it stopped.',
 ];

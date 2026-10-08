@@ -123,7 +123,8 @@ final class BuildImageIndex
             $stats['stopped'] = 'unknown_provider';
         }
 
-        $limit = (int) Settings::get('retrieval.max_images_per_run', $shopId);
+        // A part at a time: the rest is left for the next part, which the job queues at once.
+        $limit = min((int) Settings::get('retrieval.max_images_per_run', $shopId), (int) Settings::get('retrieval.images_per_part'));
         $price = (float) Settings::get('retrieval.image_usd_per_image');
         $dimensions = (int) Settings::get('retrieval.image_dimensions') ?: null;
 
@@ -182,6 +183,10 @@ final class BuildImageIndex
             }
 
             $stats['embedded'] += count($rows);
+        }
+
+        if ($stats['stopped'] === null && count($todo) > $limit) {
+            $stats['stopped'] = 'more';
         }
 
         $stats['pending'] = RetrievalImage::query()->whereNull('error')

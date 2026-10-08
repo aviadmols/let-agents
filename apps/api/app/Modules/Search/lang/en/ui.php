@@ -62,7 +62,12 @@ return [
         'none' => 'No searches resolved yet.',
         'shows' => 'What it shows now',
         'synonym' => 'Synonym',
-        'statuses' => ['resolved' => 'Shown', 'none' => 'Nothing fits', 'refused' => 'Did not pass the check', 'rejected' => 'Taken back'],
+        'statuses' => [
+            'resolved' => 'Shown',
+            'none' => 'Nothing fits',
+            'refused' => 'Did not pass the check',
+            'rejected' => 'Taken back',
+        ],
         'undo' => 'Take back',
         'restore' => 'Restore',
         'undone' => 'The search shows its regular results again',
@@ -119,14 +124,24 @@ return [
         'turn_off' => 'Turn off',
         'turned_on' => 'Search by photo is on for this site',
         'turned_off' => 'Search by photo is off for this site',
+        'gallery' => 'See the scanned pictures and their vectors',
     ],
     'install' => [
         'heading' => 'How to put the search on the site',
         'description' => 'The search goes into the search box the site already has. The theme does not need changing.',
         'checks' => [
-            'connected' => ['yes' => 'The site is connected', 'no' => 'The site is not connected yet'],
-            'plugin' => ['yes' => 'Let Agents plugin version :version', 'no' => 'The plugin has not reported in yet'],
-            'indexed' => ['yes' => 'The search index is built', 'no' => 'The search index is not built yet'],
+            'connected' => [
+                'yes' => 'The site is connected',
+                'no' => 'The site is not connected yet',
+            ],
+            'plugin' => [
+                'yes' => 'Let Agents plugin version :version',
+                'no' => 'The plugin has not reported in yet',
+            ],
+            'indexed' => [
+                'yes' => 'The search index is built',
+                'no' => 'The search index is not built yet',
+            ],
         ],
         'wordpress' => [
             'heading' => 'On a WordPress or WooCommerce site',

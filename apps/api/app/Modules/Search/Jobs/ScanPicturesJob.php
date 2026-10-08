@@ -25,7 +25,10 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
     /** A failed part is a failed run on the screen; the next press or the night goes on. */
     public int $tries = 1;
 
-    private const MAX_PARTS = 20;
+    private const MAX_PARTS = 1000;
+
+    /** A part stopped for these reasons leaves work for the next one. */
+    public const GO_ON = ['more', 'time_budget'];
 
     public function __construct(
         public readonly string $shopId,
@@ -44,7 +47,7 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
     {
         $run = $retrieval->images($this->shopId);
 
-        if (($run->output['stopped'] ?? null) === 'time_budget' && $this->part < self::MAX_PARTS) {
+        if (in_array($run->output['stopped'] ?? null, self::GO_ON, true) && $this->part < self::MAX_PARTS) {
             self::dispatch($this->shopId, $this->part + 1);
         }
     }

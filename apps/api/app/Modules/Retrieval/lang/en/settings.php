@@ -93,15 +93,15 @@ return [
     ],
     'image_dimensions' => [
         'label' => 'Picture vector dimensions',
-        'description' => '768 is enough for visual likeness and cheap to store. 0 keeps the model\x27s default.',
+        'description' => '768 is enough for visual likeness and cheap to store. 0 keeps the model\\x27s default.',
     ],
     'image_usd_per_image' => [
         'label' => 'Price per picture',
-        'description' => 'From the provider\x27s price list. Used to estimate before each call and to record the cost.',
+        'description' => 'From the provider\\x27s price list. Used to estimate before each call and to record the cost.',
     ],
     'image_text_usd_per_million' => [
         'label' => 'Price of words for picture search, per million tokens',
-        'description' => 'From the provider\x27s price list.',
+        'description' => 'From the provider\\x27s price list.',
     ],
     'max_images_per_run' => [
         'label' => 'New pictures in one run',
@@ -114,5 +114,9 @@ return [
     'min_look_alike' => [
         'label' => 'Minimum visual likeness',
         'description' => 'Below this a product is not offered as looking alike.',
+    ],
+    'images_per_part' => [
+        'label' => 'Pictures per scan part',
+        'description' => 'A big scan runs in small parts: a deploy or a crash loses one part at most, and the scan goes on by itself.',
     ],
 ];

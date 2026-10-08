@@ -66,7 +66,9 @@ case "$role" in
         sleep 1
       done
     }
-    trap 'kill 0' TERM INT
+    # On a deploy each worker finishes the job in hand, then stops; parts are short, and a part
+    # cut off anyway is picked up again by search:resume-pictures.
+    trap 'trap - TERM INT; kill -TERM 0; wait; exit 0' TERM INT
     i=0
     while [ "$i" -lt "${QUEUE_FAST_WORKERS:-1}" ]; do work default & i=$((i + 1)); done
     i=0

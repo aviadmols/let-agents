@@ -106,6 +106,9 @@
                         @if ($photos['switch'] && $photos['unreadable'] > 0)
                             <span style="{{ $small }}">{{ __('search::ui.photos.unreadable_why') }}</span>
                         @endif
+                        @if ($photos['switch'] && $photos['scanned'] > 0 && \Illuminate\Support\Facades\Route::has('filament.operator.pages.retrieval.scans'))
+                            <a href="{{ route('filament.operator.pages.retrieval.scans', ['display' => 'gallery', 'state' => 'scanned']) }}" style="font-size:13px;font-weight:600">{{ __('search::ui.photos.gallery') }} ↗</a>
+                        @endif
                         @if ($photos['last'])
                             <span style="{{ $small }}">
                                 {{ __('search::ui.photos.last_scan', ['when' => $photos['last']->diffForHumans()]) }}
