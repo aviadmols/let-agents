@@ -2467,7 +2467,9 @@
       button.title = label('photo_search');
       button.addEventListener('click', function () {
         current = input;
-        if (dropdown && dropdown.upload) {
+        // The camera closes only the empty upload area. Over a photo's results it asks for the
+        // next photo: closing them there read as "nothing happens" on the third try.
+        if (dropdown && dropdown.zone) {
           closeDropdown();
         } else {
           openUpload();
@@ -2501,6 +2503,7 @@
     function openUpload() {
       var d = freshDropdown();
       d.upload = true;
+      d.zone = true;
       var mobile = d.mobile;
       var main = el('div', 'd-main');
       var zone = el('div', 'zone d-zone');
@@ -2671,6 +2674,7 @@
       main.appendChild(head);
       layout(null, main, null);
       d.upload = true;
+      d.zone = false;
       position();
 
       photoRequest(file).then(function (result) {

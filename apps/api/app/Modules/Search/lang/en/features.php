@@ -11,7 +11,7 @@ return [
     ],
     'pictures' => [
         'label' => 'Search in pictures',
-        'description' => 'Words like "striped shirt" also find products whose names do not say so, by their picture. Works only once the shop\x27s pictures have vectors.',
+        'description' => 'Words like "striped shirt" also find products whose names do not say so, by their picture. Works only once the shop\\x27s pictures have vectors.',
     ],
     'photos' => [
         'label' => 'Search by photo',
@@ -32,5 +32,9 @@ return [
     'photo_tags' => [
         'label' => 'Tags from a photo',
         'description' => 'In photo search, a model reads the photo and shows the shop\'s tags that fit it. A tag searches for itself.',
+    ],
+    'photo_limits' => [
+        'label' => 'Limit photo searches',
+        'description' => 'On: up to "photo searches per day" per shop and "per minute" per address. Off: no limit (the monthly spending cap still applies).',
     ],
 ];

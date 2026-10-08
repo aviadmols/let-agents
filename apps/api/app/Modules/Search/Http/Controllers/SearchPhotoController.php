@@ -57,7 +57,7 @@ final class SearchPhotoController
         $key = "search:photos:{$shopId}:".now()->toDateString();
         Cache::add($key, 0, now()->endOfDay());
 
-        if (Cache::increment($key) > (int) Settings::get('search.photos_per_day', $shopId)) {
+        if (Features::enabled('search.photo_limits', $shopId) && Cache::increment($key) > (int) Settings::get('search.photos_per_day', $shopId)) {
             return response()->json(['error' => 'daily_limit'], 429);
         }
 

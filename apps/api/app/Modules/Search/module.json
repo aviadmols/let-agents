@@ -44,6 +44,10 @@
         {
             "name": "photo_tags",
             "default": true
+        },
+        {
+            "name": "photo_limits",
+            "default": false
         }
     ],
     "settings": [

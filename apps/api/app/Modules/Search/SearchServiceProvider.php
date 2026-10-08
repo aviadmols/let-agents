@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Catalog\Events\CatalogUpdated;
@@ -25,8 +26,10 @@ final class SearchServiceProvider extends ModuleServiceProvider
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search:'.$request->ip().'|'.$request->route('site')));
 
-        RateLimiter::for('search-photo', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.photo_requests_per_minute'))
-            ->by('search-photo:'.$request->ip().'|'.$request->route('site')));
+        // Off while search.photo_limits is off: the spending cap still holds every model call.
+        RateLimiter::for('search-photo', fn (Request $request): Limit => Features::enabled('search.photo_limits')
+            ? Limit::perMinute((int) Settings::get('search.photo_requests_per_minute'))->by('search-photo:'.$request->ip().'|'.$request->route('site'))
+            : Limit::none());
 
         // After the catalogue sync (02:30), so the box searches what the store publishes today.
         // The counts are kept for search.keep_days and then dropped.
