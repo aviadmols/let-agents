@@ -51,7 +51,7 @@ final class AnswerSiteQuestion
 
     public const ACTION = 'assistant.answer_site';
 
-    public const PROMPT_VERSION = 2;
+    public const PROMPT_VERSION = 3;
 
     public const MAX_PRODUCTS = 12;
 
@@ -205,6 +205,11 @@ final class AnswerSiteQuestion
                     $productsByRef['p'.($i + 1)] = $product;
                 }
 
+                // Code reads the results before the model: price order among what is in stock, what
+                // is on sale, the brands, and whether the question asks for the cheapest or the dearest.
+                // The model gets ranks, never prices: the page shows the current price.
+                $analysis = self::analysis($question, $productsByRef);
+
                 $maxOutput = (int) Settings::get('assistant.answer_max_output_tokens');
                 $effort = (string) Settings::get('assistant.reasoning_effort');
                 $effort = $effort === 'model_default' ? null : $effort;
@@ -213,7 +218,8 @@ final class AnswerSiteQuestion
                 try {
                     $input = (string) json_encode([
                         'question' => $question,
-                        'products' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'about' => $p['about'], 'category' => $p['category']], array_keys($productsByRef), $productsByRef),
+                        'products' => $this->forModel($productsByRef, $analysis),
+                        'analysis' => $analysis,
                         'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']], array_keys($byRef), $byRef),
                     ], JSON_UNESCAPED_UNICODE);
                     $estimated = (int) ceil(mb_strlen($input) / 2) + 600;
@@ -252,7 +258,8 @@ final class AnswerSiteQuestion
                             'question' => $question,
                             'answer' => $answer,
                             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
-                            'picks' => array_map(fn (array $pick): array => ['title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']], $picks),
+                            'picks' => array_map(fn (array $pick): array => ['title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
+                            'analysis' => $analysis,
                         ], JSON_UNESCAPED_UNICODE), self::CHECK_OUTPUT_TOKENS, null, 'site_check');
                         $replies[] = [$check, 'site_check'];
 
@@ -292,6 +299,62 @@ final class AnswerSiteQuestion
     }
 
     /**
+     * What code can say about the products found, so the model need not guess: which are in stock
+     * from the cheapest up, which are on sale, which brands, and what the question asks for. A
+     * superlative is computed here, never by a model.
+     *
+     * @param  array<string, array{price: float|null, in_stock: bool, on_sale: bool, brand: string|null}>  $productsByRef
+     * @return array{asks: string|null, in_stock_cheapest_first: list<string>, out_of_stock: list<string>, on_sale: list<string>, brands: list<string>}
+     */
+    public static function analysis(string $question, array $productsByRef): array
+    {
+        $priced = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0);
+        uasort($priced, fn (array $a, array $b): int => $a['price'] <=> $b['price']);
+        $text = mb_strtolower($question);
+
+        return [
+            'asks' => match (true) {
+                preg_match('/זול|במחיר\s+נמוך|הכי\s+משתלם|cheap|budget/u', $text) === 1 => 'cheapest',
+                preg_match('/יקר|expensive/u', $text) === 1 => 'most_expensive',
+                preg_match('/מבצע|הנחה|sale|discount/u', $text) === 1 => 'on_sale',
+                default => null,
+            },
+            'in_stock_cheapest_first' => array_keys($priced),
+            'out_of_stock' => array_keys(array_filter($productsByRef, fn (array $p): bool => ! $p['in_stock'])),
+            'on_sale' => array_keys(array_filter($productsByRef, fn (array $p): bool => $p['on_sale'] && $p['in_stock'])),
+            'brands' => array_values(array_unique(array_filter(array_map(fn (array $p): ?string => $p['brand'] ?: null, $productsByRef)))),
+        ];
+    }
+
+    /**
+     * The products as the model sees them: what they are, and code's ranks instead of prices.
+     *
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @param  array{in_stock_cheapest_first: list<string>}  $analysis
+     * @return list<array<string, mixed>>
+     */
+    private function forModel(array $productsByRef, array $analysis): array
+    {
+        $rank = array_flip($analysis['in_stock_cheapest_first']);
+        $out = [];
+
+        foreach ($productsByRef as $ref => $p) {
+            $out[] = array_filter([
+                'ref' => $ref,
+                'title' => $p['title'],
+                'about' => $p['about'],
+                'category' => $p['category'],
+                'brand' => $p['brand'] ?? null,
+                'in_stock' => $p['in_stock'],
+                'on_sale' => $p['on_sale'] ?: null,
+                'price_rank' => isset($rank[$ref]) ? $rank[$ref] + 1 : null,
+            ], fn ($v): bool => $v !== null && $v !== '');
+        }
+
+        return $out;
+    }
+
+    /**
      * The products the shopper was shown, in the order shown, with the little the writer needs.
      *
      * @param  list<string>  $shown
@@ -318,6 +381,10 @@ final class AnswerSiteQuestion
                 'title' => (string) $product->title,
                 'about' => mb_substr(trim(strip_tags((string) $product->shortDescription())), 0, 300),
                 'category' => implode(' > ', $product->categoryPaths()[0] ?? []),
+                'brand' => $product->brand,
+                'in_stock' => (bool) $product->in_stock,
+                'on_sale' => (bool) $product->on_sale,
+                'price' => $product->price !== null ? (float) $product->price : null,
             ];
         }
 

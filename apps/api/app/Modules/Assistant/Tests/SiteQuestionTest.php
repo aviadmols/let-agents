@@ -171,4 +171,30 @@ final class SiteQuestionTest extends TestCase
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
         ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he'], JSON_UNESCAPED_UNICODE));
     }
+
+    public function test_code_reads_the_results_first_so_the_cheapest_in_stock_is_known_without_a_price(): void
+    {
+        $this->product('701', 'מברגה מקיטה 18V', 'מברגה נטענת.', [], ['price' => '890.00', 'brand' => 'Makita', 'in_stock' => true]);
+        $this->product('702', 'מברגה איינהל', 'מברגה רוטטת.', [], ['price' => '240.00', 'brand' => 'Einhell', 'in_stock' => true, 'on_sale' => true]);
+        $this->product('703', 'מברגה זולה שאזלה', 'מברגה.', [], ['price' => '99.00', 'in_stock' => false]);
+        $this->replies = [
+            ['found' => true, 'answer' => 'הזולה במלאי היא מברגה איינהל.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'הזולה במלאי']]],
+            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['question' => 'איזו מברגה הכי זולה?', 'vid' => self::VID, 'locale' => 'he', 'products' => ['701', '702', '703']], JSON_UNESCAPED_UNICODE))->assertOk()->json('data');
+
+        $input = json_decode($this->calls[0]['user'], true);
+        $this->assertSame('cheapest', $input['analysis']['asks']);
+        $this->assertSame(['p2', 'p1'], $input['analysis']['in_stock_cheapest_first'], 'cheapest_in_stock_first, the sold-out one aside');
+        $this->assertSame(['p3'], $input['analysis']['out_of_stock']);
+        $this->assertSame(1, $input['products'][1]['price_rank']);
+        $this->assertStringNotContainsString('240', $this->calls[0]['user'], 'ranks, never prices, reach the model');
+        $this->assertStringContainsString('"price_rank":1', $this->calls[1]['user'], 'the checker sees the measure the why rests on');
+
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertSame('702', $data['picks'][0]['external_id']);
+    }
 }

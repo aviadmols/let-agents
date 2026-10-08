@@ -39,6 +39,9 @@ final class SearchCatalog
     /** Products a tag brings, before the picture orders them. */
     private const PHOTO_PER_TAG = 40;
 
+    /** Products of the asked-about kind put first for a question. */
+    private const SUBJECT_PRODUCTS = 12;
+
     /** Reciprocal rank constant: how much a lower rank still counts. */
     private const RRF_K = 60;
 
@@ -79,7 +82,13 @@ final class SearchCatalog
             $meaning = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : [];
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
             $pinned = $this->resolved($query, $index['records']);
-            $ranked = $this->merge($spelling, [$meaning, $pictures], $pinned);
+            // A question about a kind of product ("איזה עץ…") shows that kind first: products of the
+            // categories named after it, before products that only mention the word (a bracket
+            // "לעמודי עץ"). The assistant then picks from them too.
+            $subject = str_contains($query, ' ') && (str_contains($raw, '?') || HebrewSearch::asks($query))
+                ? $this->subjectProducts($index, $query, $spelling)
+                : [];
+            $ranked = $this->merge($spelling, [$meaning, $pictures], [...$pinned, ...$subject]);
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
 
             $groups = array_fill_keys(self::GROUPS, []);
@@ -112,8 +121,50 @@ final class SearchCatalog
                     : [];
             }
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'groups' => $groups, 'counts' => $counts];
         });
+    }
+
+    /**
+     * Products of the kind a question asks about: the categories whose name starts with its
+     * subject ("עץ אורן", "עצים" for "עץ"; not "צבע לעץ"), what spelling already found of them
+     * first, then the rest of them in stock first. At most SUBJECT_PRODUCTS record ids.
+     *
+     * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
+     * @param  list<array{id: string}>  $spelling
+     * @return list<string>
+     */
+    private function subjectProducts(array $index, string $query, array $spelling): array
+    {
+        $subject = HebrewSearch::subject($index['engine'], $query);
+
+        if ($subject === null) {
+            return [];
+        }
+
+        $close = array_keys(HebrewSearch::closeWords($index['engine'], $subject));
+        $categories = [];
+
+        foreach ($index['records'] as $record) {
+            $first = explode(' ', HebrewSearch::normalize((string) ($record['title'] ?? '')))[0];
+
+            if (($record['t'] ?? null) === 'category' && $first !== '' && in_array($first, $close, true)) {
+                $categories[] = substr((string) $record['id'], 2);
+            }
+        }
+
+        if ($categories === []) {
+            return [];
+        }
+
+        $members = CatalogProduct::query()->active()
+            ->whereHas('categories', fn ($q) => $q->whereIn('external_id', $categories))
+            ->orderByDesc('in_stock')->orderBy('title')
+            ->limit(200)->pluck('external_id')->map(fn ($id): string => 'p:'.$id)->all();
+        $members = array_values(array_filter($members, fn (string $id): bool => isset($index['records'][$id])));
+        $found = array_values(array_intersect(array_column($spelling, 'id'), $members));
+
+        return array_slice(array_values(array_unique([...$found, ...$members])), 0, self::SUBJECT_PRODUCTS);
     }
 
     /**

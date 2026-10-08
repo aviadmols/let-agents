@@ -1572,6 +1572,19 @@
       var content = (groups.content || []).map(fromServer);
       var shownIds = {};
       (d.products || []).forEach(function (record) { shownIds[record.id] = true; });
+      // The server found the kind of product the question asks about: its list replaces what the
+      // browser matched by words (a bracket "for wooden posts" for "which wood").
+      if (result && result.subject && products.length) {
+        shownIds = {};
+        d.products = [];
+        Array.prototype.slice.call(d.main.querySelectorAll('.d-prods, .m-list')).forEach(function (node) {
+          var title = node.previousElementSibling;
+          if (title && title.classList.contains('d-h')) {
+            title.parentNode.removeChild(title);
+          }
+          node.parentNode.removeChild(node);
+        });
+      }
       var fresh = products.filter(function (record) { return !shownIds[record.id]; }).slice(0, state.config.suggestions || 6);
 
       if (fresh.length) {

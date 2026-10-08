@@ -45,6 +45,22 @@ final class HebrewSearch
         return implode(' ', array_filter($words, fn (string $w): bool => mb_strlen($w) >= 2 && self::closeWords($index, $w) !== []));
     }
 
+    /**
+     * What a question asks about: its first word that is not a question or filler word and that
+     * the catalogue knows. "איזה עץ מתאים לבנית פרגולה בחוץ" asks about "עץ"; the pergola is
+     * what it is for. Null when nothing is left.
+     */
+    public static function subject(array $index, string $query): ?string
+    {
+        foreach (explode(' ', self::normalize($query)) as $word) {
+            if ($word !== '' && mb_strlen($word) >= 2 && ! in_array($word, self::FILLER, true) && self::closeWords($index, $word) !== []) {
+                return $word;
+            }
+        }
+
+        return null;
+    }
+
     /** Whether a query is worded as a question: it holds a question or filler word ("מה הכי טוב"). */
     public static function asks(string $query): bool
     {
