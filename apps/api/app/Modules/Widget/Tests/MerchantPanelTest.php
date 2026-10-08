@@ -58,7 +58,7 @@ final class MerchantPanelTest extends TestCase
 
         // The areas are a shop owner's, and there are no others.
         $this->assertSame(
-            ['shown', 'placement', 'panels', 'assistant', 'search', 'whatsapp', 'signup'],
+            ['shown', 'placement', 'panels', 'assistant', 'search', 'whatsapp', 'signup', 'recovery'],
             array_keys($screen->instance()->areas()),
             'nothing about the platform is offered here at all',
         );

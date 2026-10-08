@@ -465,6 +465,22 @@
       }
       markCounted(normalized);
       send([{ type: 'search', q: normalized, results: results }]);
+      remember(query);
+    }
+
+    /**
+     * The shopper's own last searches, kept in this browser only. They leave it only if the
+     * shopper later leaves an email before payment and agrees, to explain their cart to the shop.
+     */
+    function remember(query) {
+      try {
+        var key = 'let_agents_searches';
+        var list = JSON.parse(win.localStorage.getItem(key) || '[]');
+        var cutoff = Date.now() - 14 * 864e5;
+        list = list.filter(function (s) { return s && s.q && Date.parse(s.at) > cutoff && s.q !== query.trim(); });
+        list.push({ q: String(query).trim().slice(0, 120), at: new Date().toISOString() });
+        win.localStorage.setItem(key, JSON.stringify(list.slice(-20)));
+      } catch (e) { /* storage blocked: nothing kept */ }
     }
 
     function countClick(query, item) {

@@ -118,6 +118,16 @@ class Configuration extends Page implements HasForms
             'shoppers.signup_consent',
             'shoppers.signup_note',
         ],
+        'recovery' => [
+            'recovery.capture',
+            'recovery.report',
+            'recovery.wait_minutes',
+            'recovery.popup_title',
+            'recovery.popup_text',
+            'recovery.popup_button',
+            'recovery.popup_skip',
+            'recovery.popup_consent',
+        ],
     ];
 
     /** An area built from a module rather than from the groups above. */

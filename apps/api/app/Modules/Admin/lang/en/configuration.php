@@ -18,6 +18,7 @@ return [
         'search' => ['title' => 'Search and questions in the search', 'help' => 'How results open, whether shoppers may ask the assistant from the search box, and what happens with no exact match: a WhatsApp message to the shop.'],
         'whatsapp' => ['title' => 'Talking to the team on WhatsApp', 'help' => 'The number and the wording. Answering hours are on the "Answering hours" screen.'],
         'signup' => ['title' => 'Products they viewed, and signing up', 'help' => 'What is kept for a returning shopper, and what the sign-up asks.'],
+        'recovery' => ['title' => 'Email before payment, and abandoned carts', 'help' => 'A popup asking for an email before checkout, its words, and how long before an unpaid cart gets a report.'],
         'advanced' => ['title' => 'Advanced — platform tuning', 'help' => 'Caps, time windows, scanning and models. Not needed to run a store; open it only if you know what you are changing.'],
     ],
     'tabs' => [

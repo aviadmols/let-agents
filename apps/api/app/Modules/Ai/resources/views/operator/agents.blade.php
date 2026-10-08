@@ -32,7 +32,7 @@
                     <br>
                     <span style="{{ $small }}">
                         {{ __('ai::agents_screen.module') }}: {{ __($agent['slug'].'::module.name') }}
-                        · {{ $agent['when'] === 'live' || $agent['when'] === 'weekly' ? __('ai::agents_screen.when.'.$agent['when']) : __('ai::agents_screen.when.at', ['time' => $agent['when']]) }}
+                        · {{ in_array($agent['when'], ['live', 'weekly', 'hourly'], true) ? __('ai::agents_screen.when.'.$agent['when']) : __('ai::agents_screen.when.at', ['time' => $agent['when']]) }}
                         · {{ __('ai::agents_screen.week', ['runs' => number_format($agent['week']['runs']), 'failed' => number_format($agent['week']['failed']), 'cost' => number_format($agent['week']['cost'], 4)]) }}
                     </span>
                 </x-slot>
