@@ -23,6 +23,9 @@ final class RunContext
     /** @var array{provider: string, model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cost_usd: float|null}|null */
     private ?array $usage = null;
 
+    /** @var list<array{provider: string, model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cost_usd: float|null}> every model call, for the ledger */
+    private array $calls = [];
+
     public function __construct(public readonly string $runId) {}
 
     /**
@@ -62,6 +65,7 @@ final class RunContext
     public function usage(string $provider, string $model, int $inputTokens = 0, int $outputTokens = 0, int $cacheReadTokens = 0, ?float $costUsd = null): self
     {
         $previous = $this->usage;
+        $this->calls[] = ['provider' => $provider, 'model' => $model, 'input_tokens' => $inputTokens, 'output_tokens' => $outputTokens, 'cache_read_tokens' => $cacheReadTokens, 'cost_usd' => $costUsd];
 
         $this->usage = [
             'provider' => $provider,
@@ -83,7 +87,7 @@ final class RunContext
     }
 
     /**
-     * @return array{summary_key: ?string, summary_params: array<string, scalar>, output: array<string, mixed>, error: ?string, usage: ?array<string, mixed>}
+     * @return array{summary_key: ?string, summary_params: array<string, scalar>, output: array<string, mixed>, error: ?string, usage: ?array<string, mixed>, calls: list<array<string, mixed>>}
      */
     public function report(): array
     {
@@ -93,6 +97,7 @@ final class RunContext
             'output' => $this->output,
             'error' => $this->error,
             'usage' => $this->usage,
+            'calls' => $this->calls,
         ];
     }
 }

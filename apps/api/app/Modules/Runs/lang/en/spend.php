@@ -1,0 +1,37 @@
+<?php
+
+return [
+    'title' => 'AI spend',
+    'subheading' => 'How many tokens and how much money each shop spent on models, by model and by agent, day by day. Every model call is recorded.',
+    'month' => 'Month',
+    'from' => 'From',
+    'to' => 'To',
+    'shop' => 'Shop',
+    'all_shops' => 'Every shop',
+    'platform' => 'The platform (no shop)',
+    'deleted' => 'A deleted shop',
+    'empty' => 'No spend in this range.',
+    'by_shop' => 'By shop',
+    'by_shop_about' => 'Open a shop to see its models.',
+    'by_model' => 'By model',
+    'by_agent' => 'By agent (what it went to)',
+    'by_day' => 'Day by day',
+    'tiles' => [
+        'cost' => 'Total cost',
+        'input' => 'Input tokens',
+        'output' => 'Output tokens',
+        'cache' => 'Cached tokens',
+        'calls' => 'Model calls',
+    ],
+    'cols' => [
+        'shop' => 'Shop',
+        'model' => 'Model',
+        'agent' => 'Agent',
+        'calls' => 'Calls',
+        'input' => 'Input',
+        'output' => 'Output',
+        'cache' => 'Cache',
+        'tokens' => 'Tokens',
+        'cost' => 'Cost',
+    ],
+];
