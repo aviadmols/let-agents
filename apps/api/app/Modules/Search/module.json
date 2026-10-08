@@ -48,6 +48,14 @@
         {
             "name": "photo_limits",
             "default": false
+        },
+        {
+            "name": "photo_second_look",
+            "default": true
+        },
+        {
+            "name": "photo_log",
+            "default": true
         }
     ],
     "settings": [
@@ -208,7 +216,7 @@
         {
             "name": "photo_tags_input_usd_per_million",
             "type": "float",
-            "default": 1.0,
+            "default": 1,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -217,7 +225,7 @@
         {
             "name": "photo_tags_output_usd_per_million",
             "type": "float",
-            "default": 5.0,
+            "default": 5,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -231,6 +239,66 @@
             "max": 2000,
             "scope": "global",
             "unit": "tokens"
+        },
+        {
+            "name": "photo_sure_min",
+            "type": "float",
+            "default": 0.6,
+            "min": 0,
+            "max": 1,
+            "scope": "global"
+        },
+        {
+            "name": "photo_second_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "photo_second_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "photo_second_input_usd_per_million",
+            "type": "float",
+            "default": 3,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "photo_second_output_usd_per_million",
+            "type": "float",
+            "default": 15,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "photo_second_max_output_tokens",
+            "type": "int",
+            "default": 300,
+            "min": 100,
+            "max": 2000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "photo_keep_days",
+            "type": "int",
+            "default": 7,
+            "min": 1,
+            "max": 90,
+            "scope": "global",
+            "unit": "days"
         },
         {
             "name": "resolve_provider",
@@ -551,6 +619,18 @@
                     ],
                     "prompts": [
                         "photo_tags"
+                    ]
+                },
+                {
+                    "role": "second",
+                    "provider": "photo_second_provider",
+                    "model": "photo_second_model",
+                    "prices": [
+                        "photo_second_input_usd_per_million",
+                        "photo_second_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "photo_second_look"
                     ]
                 }
             ]

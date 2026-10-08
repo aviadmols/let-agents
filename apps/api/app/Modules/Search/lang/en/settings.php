@@ -169,11 +169,57 @@ return [
     'drawer_side' => [
         'label' => 'Which side the drawer opens from',
         'description' => 'Start is right on a Hebrew site and left on an English one. On a phone the drawer takes the whole screen.',
-        'options' => ['start' => 'The start side (right in Hebrew)', 'end' => 'The end side (left in Hebrew)'],
+        'options' => [
+            'start' => 'The start side (right in Hebrew)',
+            'end' => 'The end side (left in Hebrew)',
+        ],
     ],
-    'photo_tags_provider' => ['label' => 'Photo reading provider', 'description' => 'anthropic or openai.'],
-    'photo_tags_model' => ['label' => 'Photo reading model', 'description' => 'A model that sees pictures.'],
-    'photo_tags_input_usd_per_million' => ['label' => 'Input price (USD per million)', 'description' => 'For the cost in the log.'],
-    'photo_tags_output_usd_per_million' => ['label' => 'Output price (USD per million)', 'description' => 'For the cost in the log.'],
-    'photo_tags_max_output_tokens' => ['label' => 'Longest answer', 'description' => 'In tokens.'],
+    'photo_tags_provider' => [
+        'label' => 'Photo reading provider',
+        'description' => 'anthropic or openai.',
+    ],
+    'photo_tags_model' => [
+        'label' => 'Photo reading model',
+        'description' => 'A model that sees pictures.',
+    ],
+    'photo_tags_input_usd_per_million' => [
+        'label' => 'Input price (USD per million)',
+        'description' => 'For the cost in the log.',
+    ],
+    'photo_tags_output_usd_per_million' => [
+        'label' => 'Output price (USD per million)',
+        'description' => 'For the cost in the log.',
+    ],
+    'photo_tags_max_output_tokens' => [
+        'label' => 'Longest answer',
+        'description' => 'In tokens.',
+    ],
+    'photo_sure_min' => [
+        'label' => 'Least confidence in a photo reading',
+        'description' => 'The reader says how sure it is (0 to 1). Below this the photo gets a second look from a stronger model.',
+    ],
+    'photo_second_provider' => [
+        'label' => 'Provider for the second look at a photo',
+        'description' => 'anthropic or openai.',
+    ],
+    'photo_second_model' => [
+        'label' => 'Model for the second look at a photo',
+        'description' => 'A strong model that sees pictures. Asked only in doubt: nothing placed in the shop, low confidence, or the nearest product pictures say otherwise.',
+    ],
+    'photo_second_input_usd_per_million' => [
+        'label' => 'Second look input price (USD per million)',
+        'description' => 'For the cost in the log.',
+    ],
+    'photo_second_output_usd_per_million' => [
+        'label' => 'Second look output price (USD per million)',
+        'description' => 'For the cost in the log.',
+    ],
+    'photo_second_max_output_tokens' => [
+        'label' => 'Longest second-look answer',
+        'description' => 'In tokens.',
+    ],
+    'photo_keep_days' => [
+        'label' => 'How long searched photos are kept',
+        'description' => 'A reduced copy of every photo uploaded to search is kept for review and then deleted. A photo marked right or wrong stays, as part of the check set.',
+    ],
 ];

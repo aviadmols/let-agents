@@ -1,6 +1,5 @@
 <?php
 
-// Shown to shoppers in the store's search box. Plain words, no mention of how it works.
 return [
     'products' => 'מוצרים',
     'content' => 'מדריכים ודפים',
@@ -54,7 +53,6 @@ return [
     'back_to' => 'חזרה לתוצאות',
     'show_more' => 'הצג עוד',
     'no_similar' => 'לא מצאנו פריטים דומים.',
-    // The suggestions under the search box.
     'search_label' => 'חיפוש',
     'back' => 'חזרה',
     'clear' => 'ניקוי',
@@ -72,4 +70,5 @@ return [
     'contact_more' => 'רוצים לוודא? הצוות של החנות זמין בוואטסאפ.',
     'photo_drop_mobile' => 'צלמו מוצר או בחרו תמונה מהגלריה',
     'photo_count' => ':count מוצרים דומים',
+    'photo_seen' => 'זיהינו :seen · בתמונה:',
 ];

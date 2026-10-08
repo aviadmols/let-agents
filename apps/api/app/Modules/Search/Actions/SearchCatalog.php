@@ -11,6 +11,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
+use App\Modules\Search\Support\PhotoLook;
 
 /**
  * One search in a shop: by spelling and by meaning, merged, grouped by what was found.
@@ -51,6 +52,7 @@ final class SearchCatalog
         private readonly SemanticSearch $semantic,
         private readonly CountSearch $counter,
         private readonly ReadPhotoTags $photoTags,
+        private readonly KeepPhotoSearch $keeper,
     ) {}
 
     /**
@@ -219,17 +221,24 @@ final class SearchCatalog
         return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes): array {
             $index = LoadedIndex::for($shopId);
             $floor = (float) Settings::get('search.photo_min_similarity');
+            $perGroup = (int) Settings::get('search.results_per_group', $shopId);
+
+            // The shop's pictures nearest the photo: they order what the tags choose, and they speak
+            // up when the reader's word disagrees with them.
+            $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, self::PHOTO_ALL);
 
             // What the photo shows, in the shop's own categories and words.
-            $tags = $index === null ? null : $this->photoTags->handle($shopId, $mime, $bytes);
-            $perGroup = (int) Settings::get('search.results_per_group', $shopId);
+            $look = $index === null ? PhotoLook::unread() : $this->photoTags->handle($shopId, $mime, $bytes, $hits);
+            $tags = $look->tags;
+            $seen = $look->object === null ? [] : ['seen' => $look->object];
 
             // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
             // looks like it, however close a white-background picture of a screw may score.
             if ($tags === []) {
                 $this->counter->photo($shopId, 0);
+                $this->keeper->handle($shopId, $bytes, $look, [], 0);
 
-                return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true];
+                return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true] + $seen;
             }
 
             if ($tags !== null) {
@@ -237,16 +246,16 @@ final class SearchCatalog
                 // scores are flat and the nearest pictures are noise. The tags say what to show; the
                 // picture only orders it. Every product carries which tags it belongs to, so the
                 // shopper narrows by a tag without leaving the photo.
-                $hits = $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, self::PHOTO_ALL);
                 // What the photo shows, against what each product's picture shows.
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_column($tags, 'title')), self::PHOTO_ALL);
                 $products = $this->taggedProducts($index, $tags, $hits, $shopId, $content);
                 $this->counter->photo($shopId, count($products));
+                $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
 
-                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true];
+                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true] + $seen;
             }
 
-            $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, max(48, (int) Settings::get('search.semantic_results')));
+            $hits = array_slice($hits, 0, max(48, (int) Settings::get('search.semantic_results')));
             $hits = array_values(array_filter($hits, fn (array $hit): bool => isset($index['records']['p:'.$hit['external_id']]) && $hit['similarity'] >= $floor));
             $products = [];
 
@@ -256,6 +265,7 @@ final class SearchCatalog
 
             $products = array_slice($products, 0, $perGroup);
             $this->counter->photo($shopId, count($products));
+            $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null];
         });

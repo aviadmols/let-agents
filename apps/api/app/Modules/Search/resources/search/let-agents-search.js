@@ -2609,7 +2609,7 @@
         if (result && result.nothing) {
           return 'photo_nothing';
         }
-        return products.length || tags.length ? { products: products, tags: tags } : 'photo_none';
+        return products.length || tags.length ? { products: products, tags: tags, seen: (result && result.seen) || '' } : 'photo_none';
       }).catch(function () { return 'photo_failed'; });
     }
 
@@ -2617,9 +2617,9 @@
      * What the photo shows, as tags. A tag narrows the photo's own results to it, and pressing
      * it again shows them all; the shopper stays with the photo.
      */
-    function photoTagRow(tags, choose) {
+    function photoTagRow(tags, choose, seen) {
       var row = el('div', 'd-tags');
-      row.appendChild(el('span', 'd-tags-h', label('photo_tags')));
+      row.appendChild(el('span', 'd-tags-h', seen ? label('photo_seen', { seen: seen }) : label('photo_tags')));
       var chips = [];
       var chosen = null;
       tags.forEach(function (tag, at) {
@@ -2732,7 +2732,7 @@
           };
         };
         if (result.tags.length) {
-          main.appendChild(photoTagRow(result.tags, draw));
+          main.appendChild(photoTagRow(result.tags, draw, result.seen));
         }
         main.appendChild(grid);
         main.appendChild(wider);
@@ -2782,7 +2782,7 @@
           liveProducts(ids).then(function () { updateCards(grid); });
         };
         if (result.tags.length) {
-          var tagRow = photoTagRow(result.tags, draw);
+          var tagRow = photoTagRow(result.tags, draw, result.seen);
           tagRow.className += ' section';
           sheet.appendChild(tagRow);
         }

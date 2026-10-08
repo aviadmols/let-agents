@@ -13,4 +13,12 @@ return [
     'photo_tags_failed' => 'Photo reading failed (:reason).',
     'photo_tags_spend_cap' => 'Photo reading: the spending cap was reached.',
     'scan_cut_off' => 'The picture scan was cut off (a deploy or a crash). It goes on by itself from where it stopped.',
+    'photo_look' => 'Photo read: :object (:sure% sure).',
+    'photo_second' => 'Second look at the photo (:reason): :outcome.',
+    'photo_doubt' => [
+        'unplaced' => 'nothing placed in the shop',
+        'unsure' => 'low confidence',
+        'pictures_disagree' => 'the product pictures say otherwise',
+    ],
+    'photo_nothing' => 'nothing the shop sells',
 ];

@@ -169,11 +169,57 @@ return [
     'drawer_side' => [
         'label' => 'מאיזה צד נפתחת המגירה',
         'description' => 'התחלה היא ימין באתר בעברית ושמאל באתר באנגלית. בנייד המגירה תופסת את כל המסך.',
-        'options' => ['start' => 'מצד ההתחלה (ימין בעברית)', 'end' => 'מצד הסוף (שמאל בעברית)'],
+        'options' => [
+            'start' => 'מצד ההתחלה (ימין בעברית)',
+            'end' => 'מצד הסוף (שמאל בעברית)',
+        ],
     ],
-    'photo_tags_provider' => ['label' => 'ספק לקריאת תמונות', 'description' => 'anthropic או openai.'],
-    'photo_tags_model' => ['label' => 'מודל לקריאת תמונות', 'description' => 'מודל שרואה תמונות.'],
-    'photo_tags_input_usd_per_million' => ['label' => 'מחיר קלט (דולר למיליון)', 'description' => 'לחישוב העלות ביומן.'],
-    'photo_tags_output_usd_per_million' => ['label' => 'מחיר פלט (דולר למיליון)', 'description' => 'לחישוב העלות ביומן.'],
-    'photo_tags_max_output_tokens' => ['label' => 'אורך תשובה מקסימלי', 'description' => 'בטוקנים.'],
+    'photo_tags_provider' => [
+        'label' => 'ספק לקריאת תמונות',
+        'description' => 'anthropic או openai.',
+    ],
+    'photo_tags_model' => [
+        'label' => 'מודל לקריאת תמונות',
+        'description' => 'מודל שרואה תמונות.',
+    ],
+    'photo_tags_input_usd_per_million' => [
+        'label' => 'מחיר קלט (דולר למיליון)',
+        'description' => 'לחישוב העלות ביומן.',
+    ],
+    'photo_tags_output_usd_per_million' => [
+        'label' => 'מחיר פלט (דולר למיליון)',
+        'description' => 'לחישוב העלות ביומן.',
+    ],
+    'photo_tags_max_output_tokens' => [
+        'label' => 'אורך תשובה מקסימלי',
+        'description' => 'בטוקנים.',
+    ],
+    'photo_sure_min' => [
+        'label' => 'ביטחון מינימלי בקריאת תמונה',
+        'description' => 'הקורא אומר כמה הוא בטוח (0 עד 1). מתחת לזה התמונה מקבלת מבט שני ממודל חזק יותר.',
+    ],
+    'photo_second_provider' => [
+        'label' => 'ספק למבט שני על תמונה',
+        'description' => 'anthropic או openai.',
+    ],
+    'photo_second_model' => [
+        'label' => 'מודל למבט שני על תמונה',
+        'description' => 'מודל חזק שרואה תמונות. נקרא רק כשיש ספק: לא נמצא מקום בחנות, ביטחון נמוך, או שתמונות המוצרים הקרובות אומרות אחרת.',
+    ],
+    'photo_second_input_usd_per_million' => [
+        'label' => 'מחיר קלט למבט שני (דולר למיליון)',
+        'description' => 'לחישוב העלות ביומן.',
+    ],
+    'photo_second_output_usd_per_million' => [
+        'label' => 'מחיר פלט למבט שני (דולר למיליון)',
+        'description' => 'לחישוב העלות ביומן.',
+    ],
+    'photo_second_max_output_tokens' => [
+        'label' => 'אורך תשובה מקסימלי למבט שני',
+        'description' => 'בטוקנים.',
+    ],
+    'photo_keep_days' => [
+        'label' => 'כמה זמן נשמרות תמונות שחיפשו בהן',
+        'description' => 'עותק מוקטן של כל תמונה שהועלתה לחיפוש נשמר לבדיקה ונמחק אחרי זה. תמונה שסומנה נכון או לא נכון נשארת, כחלק מסט הבדיקה.',
+    ],
 ];

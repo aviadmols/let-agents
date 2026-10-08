@@ -11,6 +11,7 @@ use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Models\SearchClick;
+use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\StoredPageTags;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -139,7 +140,9 @@ final class SearchCommand extends Command
         $before = now()->subDays((int) Settings::get('search.keep_days'))->toDateString();
         $terms = SearchTerm::query()->where('day', '<', $before)->delete();
         $clicks = SearchClick::query()->where('day', '<', $before)->delete();
-        $this->line("Pruned {$terms} query rows and {$clicks} click rows before {$before}.");
+        // Searched photos go after their own days; the marked ones are the check set and stay.
+        $photos = SearchPhotoAsk::query()->whereNull('verdict')->where('created_at', '<', now()->subDays((int) Settings::get('search.photo_keep_days')))->delete();
+        $this->line("Pruned {$terms} query rows, {$clicks} click rows and {$photos} photos before {$before}.");
 
         return self::SUCCESS;
     }

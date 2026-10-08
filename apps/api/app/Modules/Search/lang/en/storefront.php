@@ -1,6 +1,5 @@
 <?php
 
-// Shown to shoppers in the store's search box. Plain words, no mention of how it works.
 return [
     'products' => 'Products',
     'content' => 'Guides and pages',
@@ -54,7 +53,6 @@ return [
     'back_to' => 'Back to the results',
     'show_more' => 'Show more',
     'no_similar' => 'We found no similar items.',
-    // The suggestions under the search box.
     'search_label' => 'Search',
     'back' => 'Back',
     'clear' => 'Clear',
@@ -72,4 +70,5 @@ return [
     'contact_more' => 'Want to be sure? The store team is on WhatsApp.',
     'photo_drop_mobile' => 'Take a photo of a product or choose one from your gallery',
     'photo_count' => ':count similar products',
+    'photo_seen' => 'We saw :seen · In the photo:',
 ];

@@ -5,6 +5,7 @@ namespace App\Modules\Search\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelReply;
@@ -17,15 +18,21 @@ use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\CheckPhotoSearches;
 use App\Modules\Search\Actions\ReadPhotoTags;
+use App\Modules\Search\Filament\Operator\Pages\PhotoSearches;
+use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -229,20 +236,21 @@ final class SearchByPhotoTest extends TestCase
                 $this->calls++;
                 $this->user = $user;
 
-                // The list is in name order: 1 ברגים, 2 עץ אורן, 3 פרגולות. 9 is not on it.
-                return new ModelReply(['picks' => [2, 3, 9, 2], 'seen' => ['דק', 'כיסא מתקפל']], 1800, 40);
+                // No list: what it sees, and code finds the shop's words for it.
+                return new ModelReply(['object' => 'פרגולה', 'also' => ['פרגולת עץ'], 'around' => ['עץ אורן', 'דק', 'כיסא מתקפל', 'עץ אורן'], 'sure' => 0.9, 'sellable' => true], 1800, 40);
             }
         };
         $this->app->instance(VisionModel::class, $vision);
 
-        $tags = $this->upload()->assertOk()->json('tags');
+        $result = $this->upload()->assertOk()->json();
 
         $this->assertSame([
-            ['title' => 'עץ אורן', 'kind' => 'category'],
             ['title' => 'פרגולות', 'kind' => 'category'],
+            ['title' => 'עץ אורן', 'kind' => 'category'],
             ['title' => 'דק', 'kind' => 'words'],
-        ], array_map(fn (array $t): array => ['title' => $t['title'], 'kind' => $t['kind']], $tags), 'only real categories, and only a seen word the shop has products for');
-        $this->assertStringContainsString('2. עץ אורן', $vision->user);
+        ], array_map(fn (array $t): array => ['title' => $t['title'], 'kind' => $t['kind']], $result['tags']), 'the object first as the shop names it (פרגולה finds פרגולות), then real categories, then a word the shop has products for');
+        $this->assertSame('פרגולה', $result['seen'], 'the shopper is told what was seen');
+        $this->assertStringNotContainsString('עץ אורן', $vision->user, 'the reader gets no list to pick from');
 
         $this->upload()->assertOk();
         $this->assertSame(1, $vision->calls, 'the same photo is never asked twice');
@@ -270,7 +278,7 @@ final class SearchByPhotoTest extends TestCase
 
         $vision = new class implements VisionModel
         {
-            public array $answer = ['picks' => [], 'seen' => []];
+            public array $answer = ['object' => 'ילד', 'sure' => 0.95, 'sellable' => false];
 
             public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
@@ -284,9 +292,10 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame([], $child['groups']['product'], 'no screw for a child');
         $this->assertTrue($child['nothing']);
 
-        // A pergola: the reader picks pine (number 2 in name order: ברגים, עץ אורן).
+        // A pergola: nothing in the shop is a pergola, so a second look is taken and changes nothing;
+        // the pine seen around it is what the shop has.
         Cache::flush();
-        $vision->answer = ['picks' => [2], 'seen' => []];
+        $vision->answer = ['object' => 'פרגולה', 'around' => ['עץ אורן'], 'sure' => 0.8, 'sellable' => true];
         $scene = $this->upload()->assertOk()->json();
         $this->assertSame(['31'], array_column($scene['groups']['product'], 'external_id'), 'the tag decides what shows; the close screw does not');
         $this->assertSame([0], $scene['groups']['product'][0]['tags'], 'each product says which tags it belongs to');
@@ -310,8 +319,8 @@ final class SearchByPhotoTest extends TestCase
         {
             public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                // Name order: 1 ארגזי כלים, 2 מברגות. The drill is the main object.
-                return new ModelReply(['main' => 2, 'picks' => [1, 2], 'seen' => []], 1800, 20);
+                // The drill is the main object; the tool box is around it.
+                return new ModelReply(['object' => 'מברגה', 'around' => ['ארגז כלים'], 'sure' => 0.9, 'sellable' => true], 1800, 20);
             }
         });
 
@@ -319,5 +328,189 @@ final class SearchByPhotoTest extends TestCase
 
         $this->assertSame('מברגות', $result['tags'][0]['title'], 'the main object leads the tags');
         $this->assertSame(['41', '40'], array_column($result['groups']['product'], 'external_id'), 'the drill before the closer-scoring tool box');
+    }
+
+    public function test_a_tap_is_placed_among_taps_never_iron_and_the_pictures_can_demand_a_second_look(): void
+    {
+        $taps = $this->shopWithTapsHandlesAndIron();
+        $vision = $this->reader(
+            ['object' => 'ברז מטבח', 'also' => ['ברז'], 'around' => [], 'sure' => 0.9, 'sellable' => true],
+            ['main' => null, 'object' => 'ברז מטבח', 'sure' => 0.9, 'sellable' => true],
+        );
+
+        // Placed by words: ברז is in ברזים and in ברזי מטבח, not in ברזל. Nothing to doubt yet:
+        // the tap's own picture is among the nearest.
+        $result = $this->upload()->assertOk()->json();
+        $this->assertSame('ברזי מטבח', $result['tags'][0]['title'], 'the category holding most of the object\'s words, not the iron');
+        $this->assertSame('50', $result['groups']['product'][0]['external_id']);
+        $this->assertSame(1, $vision->calls, 'no second look when the words and the pictures agree');
+
+        // Now the tap's picture is not scanned, and every near picture is a handle: the pictures
+        // disagree with the reading, so a stronger model takes a second look with a short list.
+        $this->inShop(fn () => RetrievalImage::query()->where('external_id', '50')->delete());
+        Cache::flush();
+        $vision->second = ['main' => 'ברזים', 'object' => 'ברז', 'sure' => 0.95, 'sellable' => true];
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame(3, $vision->calls, 'the first look again (the cache was cleared), then a second look');
+        $this->assertStringContainsString('ידיות', $vision->user, 'the list holds what the pictures say');
+        $this->assertStringContainsString('ברזי מטבח', $vision->user, 'and where the words placed it');
+        $this->assertStringContainsString('pictures_disagree', $vision->user);
+        $this->assertSame('ברזים', $result['tags'][0]['title'], 'the second look\'s category leads');
+        $this->assertSame('ברז', $result['seen']);
+        $this->assertSame(1, Run::query()->where('action', ReadPhotoTags::SECOND_ACTION)->count(), 'the second look is accounted for on its own');
+
+        $ask = $this->inShop(fn () => SearchPhotoAsk::query()->latest('id')->first());
+        $this->assertSame(['ברז', 'ברזים', 'pictures_disagree', true], [$ask->object, $ask->main, $ask->doubt, $ask->second], 'the log says how the tags were reached');
+
+        // The same photo again: both looks come from cache.
+        $this->upload()->assertOk();
+        $this->assertSame(3, $vision->calls);
+    }
+
+    public function test_an_unsure_reading_gets_a_second_look_that_corrects_the_object(): void
+    {
+        $this->shopWithTapsHandlesAndIron();
+        $vision = $this->reader(
+            ['object' => 'ידית', 'also' => [], 'around' => [], 'sure' => 0.3, 'sellable' => true],
+            ['main' => null, 'object' => 'ברז', 'sure' => 0.9, 'sellable' => true],
+        );
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame(2, $vision->calls, 'low confidence asks for a second look');
+        $this->assertStringContainsString('unsure', $vision->user);
+        $this->assertSame('ברזים', $result['tags'][0]['title'], 'the corrected object is placed again');
+        $this->assertSame('ברז', $result['seen']);
+
+        // With the second look off, the first reading stands, unsure as it is.
+        Features::override('search.photo_second_look', false, $this->shop->id);
+        Cache::flush();
+        $this->assertSame('ידיות', $this->upload()->assertOk()->json('tags.0.title'));
+        $this->assertSame(3, $vision->calls);
+    }
+
+    public function test_the_team_sees_each_photo_search_marks_it_and_measures_the_reader_against_the_marks(): void
+    {
+        $this->shopWithTapsHandlesAndIron();
+        $this->reader(['object' => 'ידית', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        $this->upload()->assertOk();
+
+        $ask = $this->inShop(fn () => SearchPhotoAsk::query()->sole());
+        $this->assertSame(['ידית', 'ידיות', null], [$ask->object, $ask->main, $ask->verdict]);
+        $this->assertNotNull($ask->thumb, 'a reduced copy is kept');
+        $this->assertNotNull($ask->photoBytes());
+        $this->assertSame('61', $ask->results[0]['external_id'], 'the first handle shown');
+
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+
+        $page = Livewire::test(PhotoSearches::class, ['shop' => $this->shop->id])
+            ->assertSee('ידית')->assertSee('ידיות')
+            ->call('markWrong', $ask->id)
+            ->assertSet("expected.{$ask->id}", null);
+        $this->assertNull($ask->fresh()->verdict, 'wrong needs a word for what it was');
+
+        $page->set("expected.{$ask->id}", 'ברז')->call('markWrong', $ask->id);
+        $this->assertSame(['wrong', 'ברז'], [$ask->fresh()->verdict, $ask->fresh()->expected]);
+
+        // The reader as it is now still says handle: the check counts it wrong. Then it learns.
+        $this->assertSame(['checked' => 1, 'right' => 0], app(CheckPhotoSearches::class)->handle($this->shop->id));
+        $this->assertFalse($ask->fresh()->checked_right);
+
+        $this->reader(['object' => 'ברז', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        Cache::flush();
+        $this->assertSame(['checked' => 1, 'right' => 1], app(CheckPhotoSearches::class)->handle($this->shop->id));
+        $this->assertSame(['ברזים', true], [$ask->fresh()->checked_main, $ask->fresh()->checked_right]);
+        Livewire::test(PhotoSearches::class, ['shop' => $this->shop->id])->assertSee('1 מתוך 1');
+
+        // Unmarked photos go after their days; marked ones stay as the check set.
+        $this->inShop(function (): void {
+            SearchPhotoAsk::query()->create(['shop_id' => $this->shop->id, 'photo_hash' => 'old', 'tags' => [], 'results' => [], 'total' => 0, 'created_at' => now()->subDays(10)]);
+        });
+        Settings::set('search.photo_keep_days', 7);
+        Artisan::call('search', ['step' => 'prune']);
+        $this->assertSame([$ask->id], $this->inShop(fn () => SearchPhotoAsk::query()->pluck('id')->all()));
+
+        // With the log off, nothing is kept.
+        Features::override('search.photo_log', false, $this->shop->id);
+        $this->upload()->assertOk();
+        $this->assertSame(1, $this->inShop(fn () => SearchPhotoAsk::query()->count()));
+    }
+
+    /**
+     * A reader whose first look is fixed and whose second look (when one is taken) is $second;
+     * the second look's category is named, and turned into its number on the list it gets.
+     *
+     * @param  array<string, mixed>  $first
+     * @param  array<string, mixed>|null  $second
+     */
+    private function reader(array $first, ?array $second = null): object
+    {
+        $vision = new class($first, $second) implements VisionModel
+        {
+            public int $calls = 0;
+
+            public string $user = '';
+
+            public function __construct(public array $first, public ?array $second) {}
+
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->calls++;
+                $this->user = $user;
+
+                if (! str_contains($system, 'second look')) {
+                    return new ModelReply($this->first, 1800, 40);
+                }
+
+                $answer = $this->second ?? ['main' => null, 'object' => null, 'sure' => 0.5, 'sellable' => true];
+
+                if (is_string($answer['main'])) {
+                    preg_match('/^(\d+)\. '.preg_quote($answer['main'], '/').' \(/mu', $user, $m);
+                    $answer['main'] = isset($m[1]) ? (int) $m[1] : null;
+                }
+
+                return new ModelReply($answer, 2200, 40);
+            }
+        };
+        $this->app->instance(VisionModel::class, $vision);
+
+        return $vision;
+    }
+
+    /** Taps, handles and iron: a tap photo must land among the taps. Every handle's picture is near the photo. */
+    private function shopWithTapsHandlesAndIron(): CatalogCategory
+    {
+        $taps = null;
+        $this->inShop(function () use (&$taps): void {
+            CatalogProduct::query()->whereIn('external_id', ['1', '2', '3'])->delete();
+            $category = fn (string $id, string $name, int $count): CatalogCategory => CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'name' => $name, 'path' => [$name], 'depth' => 0, 'hash' => $id, 'product_count' => $count]);
+            $taps = $category('k1', 'ברזים', 2);
+            $kitchen = $category('k2', 'ברזי מטבח', 1);
+            $handles = $category('k3', 'ידיות', 7);
+            $iron = $category('k4', 'ברזל', 1);
+            $make = function (string $id, string $title, ?array $vector, array $categories): void {
+                if ($vector !== null) {
+                    $this->shirt($id, $title, $vector);
+                } else {
+                    CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                }
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                foreach ($categories as $c) {
+                    $product->categories()->attach($c->id);
+                }
+            };
+            $make('50', 'ברז מטבח נשלף כרום', [1.0, 0.0, 0.1], [$taps, $kitchen]);
+            $make('52', 'פרופיל ברזל מגולוון', [0.0, 1.0, 0.0], [$iron]);
+            $make('53', 'ברז גן', null, [$taps]);
+            foreach (range(1, 7) as $i) {
+                $make('6'.$i, 'ידית ארון '.$i, [0.99, 0.0, 0.1 + $i / 100], [$handles]);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        return $taps;
     }
 }

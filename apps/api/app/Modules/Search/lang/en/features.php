@@ -37,4 +37,12 @@ return [
         'label' => 'Limit photo searches',
         'description' => 'On: up to "photo searches per day" per shop and "per minute" per address. Off: no limit (the monthly spending cap still applies).',
     ],
+    'photo_second_look' => [
+        'label' => 'Second look at a photo',
+        'description' => 'When the first reading of a photo leaves doubt, a stronger model looks again, with a short list of the categories that might fit. Only the doubtful photos cost more.',
+    ],
+    'photo_log' => [
+        'label' => 'Photo search log',
+        'description' => 'Keeps a reduced copy of every uploaded photo, what was seen in it and what was shown, on the "Photo searches" screen. The team marks right or wrong there, and that is the check set for photo search.',
+    ],
 ];

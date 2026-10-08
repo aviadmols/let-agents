@@ -108,6 +108,7 @@
                         @endif
                         @if ($photos['switch'] && $photos['scanned'] > 0 && \Illuminate\Support\Facades\Route::has('filament.operator.pages.retrieval.scans'))
                             <a href="{{ route('filament.operator.pages.retrieval.scans', ['display' => 'gallery', 'state' => 'scanned']) }}" style="font-size:13px;font-weight:600">{{ __('search::ui.photos.gallery') }} ↗</a>
+                            <a href="{{ route('filament.operator.pages.search.photos', ['shop' => $this->shop]) }}" style="font-size:13px;font-weight:600">{{ __('search::ui.photos.log') }} ↗</a>
                         @endif
                         @if ($photos['last'])
                             <span style="{{ $small }}">

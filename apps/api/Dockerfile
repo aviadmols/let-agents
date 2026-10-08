@@ -8,6 +8,8 @@ FROM dunglas/frankenphp:1-php8.4-bookworm
 
 RUN install-php-extensions \
         bcmath \
+        exif \
+        gd \
         intl \
         opcache \
         pcntl \

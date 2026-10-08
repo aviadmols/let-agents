@@ -13,4 +13,12 @@ return [
     'photo_tags_failed' => 'קריאת תמונה נכשלה (:reason).',
     'photo_tags_spend_cap' => 'קריאת תמונה: הגענו לתקרת ההוצאה.',
     'scan_cut_off' => 'סריקת התמונות נקטעה (עדכון או נפילה של השרת). היא ממשיכה לבד מאיפה שנעצרה.',
+    'photo_look' => 'קריאת תמונה: :object (ביטחון :sure%).',
+    'photo_second' => 'מבט שני על התמונה (:reason): :outcome.',
+    'photo_doubt' => [
+        'unplaced' => 'לא נמצא מקום בחנות',
+        'unsure' => 'ביטחון נמוך',
+        'pictures_disagree' => 'תמונות המוצרים אומרות אחרת',
+    ],
+    'photo_nothing' => 'אין בתמונה משהו שהחנות מוכרת',
 ];
