@@ -32,6 +32,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Shop extends Model
 {
+    /** Names a shop's address may not take: the platform's own addresses. */
+    public const RESERVED_SLUGS = ['www', 'app', 'api', 'admin', 'operator', 'merchant', 'mail', 'static', 'assets', 'cdn', 'status', 'help', 'docs', 'agents'];
+
     /** @use HasFactory<ShopFactory> */
     use HasFactory;
 

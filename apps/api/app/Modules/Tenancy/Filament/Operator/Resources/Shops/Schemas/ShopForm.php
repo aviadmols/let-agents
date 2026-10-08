@@ -5,6 +5,7 @@ namespace App\Modules\Tenancy\Filament\Operator\Resources\Shops\Schemas;
 use App\Core\Localization\Locales;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
+use App\Modules\Tenancy\Models\Shop;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -35,8 +36,11 @@ final class ShopForm
                         TextInput::make('slug')
                             ->label(__('tenancy::shops.fields.slug'))
                             ->helperText(__('tenancy::shops.fields.slug_help'))
-                            ->alphaDash()
-                            ->maxLength(64)
+                            // It becomes the shop's address (gueta.agents.lets.co.il), so it is a web
+                            // address label: lowercase letters, digits and dashes, not a reserved name.
+                            ->regex('/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/')
+                            ->notIn(Shop::RESERVED_SLUGS)
+                            ->maxLength(63)
                             ->unique(ignoreRecord: true),
                         Select::make('platform')
                             ->label(__('tenancy::shops.fields.platform'))

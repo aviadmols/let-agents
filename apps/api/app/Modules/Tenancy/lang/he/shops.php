@@ -4,6 +4,9 @@ return [
     'singular' => 'חנות',
     'plural' => 'חנויות',
     'fields' => [
+        'address' => 'כתובת החנות כאן',
+        'connected' => 'מחוברת',
+        'products' => 'מוצרים',
         'name' => 'שם החנות',
         'slug' => 'מזהה בכתובת',
         'slug_help' => 'ריק ייצור מזהה מהשם.',

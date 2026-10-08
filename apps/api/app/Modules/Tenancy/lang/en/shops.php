@@ -4,6 +4,9 @@ return [
     'singular' => 'Shop',
     'plural' => 'Shops',
     'fields' => [
+        'address' => 'Shop address here',
+        'connected' => 'Connected',
+        'products' => 'Products',
         'name' => 'Shop name',
         'slug' => 'URL identifier',
         'slug_help' => 'Leave empty to build one from the name.',

@@ -40,7 +40,8 @@ final class CreateShop
         $base = Str::slug($name) ?: Str::slug(explode('.', $domain)[0]) ?: 'shop';
         $slug = $base;
 
-        while (Shop::query()->where('slug', $slug)->exists()) {
+        // The slug is the shop's web address too, so a platform name (www, api…) is never one.
+        while (in_array($slug, Shop::RESERVED_SLUGS, true) || Shop::query()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.Str::lower(Str::random(4));
         }
 

@@ -30,4 +30,10 @@ return [
         'path' => resource_path('plugins'),
     ],
 
+    /*
+     * Each shop's panel on its own address: {shop}.agents.lets.co.il. Empty keeps every shop on
+     * one address, /merchant/{shop}. Needs a wildcard DNS record and custom domain on Railway,
+     * and SESSION_DOMAIN=.agents.lets.co.il so one login serves every shop's address.
+     */
+    'shop_domain' => env('SHOP_DOMAIN'),
 ];

@@ -31,6 +31,8 @@ final class MerchantPanelProvider extends PanelProvider
             ->navigationGroups(PanelNavigation::groups(PanelNavigation::MERCHANT))
             ->tenant(Shop::class, slugAttribute: 'slug')
             ->tenantMiddleware([SyncTenantFromPanel::class], isPersistent: true)
+            // Each shop on its own address when the platform has a shop domain: gueta.agents.lets.co.il.
+            ->tenantDomain(filled(config('upsell.shop_domain')) ? '{tenant:slug}.'.config('upsell.shop_domain') : null)
             // The panel wears the shop's name, so which store you are in is the first thing on
             // the screen and stays there on every page.
             ->brandName(fn (): string => self::shopName())
