@@ -914,6 +914,7 @@
       '.drawer .foot{flex-direction:column;align-items:stretch;padding:12px 14px;background:var(--rs-bg);border-top:1px solid var(--rs-line)}',
       '.askbox{display:flex;align-items:center;gap:10px;border:1.5px solid var(--rs-fg);border-radius:14px;padding:6px;padding-inline-start:12px}',
       '.askbox input{all:unset;flex:1;min-width:0;font:inherit;font-size:14px;color:var(--rs-fg)}',
+      '@media (hover:none) and (pointer:coarse){.askbox input{font-size:16px}}',
       '.askbox button{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:50%;background:var(--rs-fg);color:var(--rs-bg);display:grid;place-items:center}',
       '.askbox button svg{width:18px;height:18px}',
       '.card .sim{margin-top:2px}',
@@ -2885,6 +2886,19 @@
       }
     }
 
+    /**
+     * A phone zooms the page into a field whose text is under 16px when it is tapped, and the page
+     * then scrolls sideways. The store's field gets 16px on a touch screen; a pixel nobody sees.
+     */
+    function noZoom(input) {
+      try {
+        var touch = win.matchMedia && win.matchMedia('(hover: none) and (pointer: coarse)').matches;
+        if (touch && parseFloat(win.getComputedStyle(input).fontSize) < 16) {
+          input.style.setProperty('font-size', '16px', 'important');
+        }
+      } catch (e) { /* an old browser keeps the theme's size */ }
+    }
+
     function attach(input) {
       if (input.__letAgentsSearch) {
         return;
@@ -2893,6 +2907,7 @@
       attached.push(input);
       addCamera(input);
       input.setAttribute('autocomplete', 'off');
+      noZoom(input);
       if (SHOPIFY) {
         quietThemeSearch(input);
       }
