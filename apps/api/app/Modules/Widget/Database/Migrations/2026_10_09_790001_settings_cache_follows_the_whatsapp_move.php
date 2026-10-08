@@ -6,10 +6,10 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Migrations\Migration;
 
 /**
- * A WhatsApp number is one shop's own and is never inherited: a number saved for every shop at
- * once was the pilot store's, and it showed up on a new store's search. It moves to the stores
- * it was meant for (the ones on the plugin at the time) and the shared value goes. Through the
- * settings themselves, so their cache follows.
+ * The move of the shared WhatsApp number to the plugin stores was first written straight to the
+ * table, past the settings' own cache, so a server that had the old map kept serving it. This
+ * does the same move once more through the settings themselves (nothing to do where it is done)
+ * and clears the shared value, which makes the cache follow.
  */
 return new class extends Migration
 {
