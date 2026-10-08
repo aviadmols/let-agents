@@ -170,6 +170,11 @@ class ShopSearches extends Page
 
         // Once an hour a shop, whoever presses: a picture is scanned again only when it changed,
         // but pressing again and again should never queue the same work twice.
+        // A press that never started (the worker was down or failed it) does not hold the next one.
+        if ($this->photos()['stuck'] ?? false) {
+            Cache::forget('search:scan-pictures:'.$shop);
+        }
+
         if (! Cache::add('search:scan-pictures:'.$shop, now()->timestamp, now()->addSeconds(self::SCAN_EVERY_SECONDS))) {
             Notification::make()->warning()->title(__('search::ui.photos.scan_wait'))->send();
 

@@ -10,6 +10,7 @@ use App\Modules\Search\Filament\Operator\Pages\ShopSearches;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -152,5 +153,46 @@ final class PhotoSwitchTest extends TestCase
             ->assertDontSee(__('search::ui.photos.scan_now'))
             ->call('scanPicturesNow')
             ->assertForbidden();
+    }
+
+    public function test_a_press_that_never_started_does_not_hold_the_next_one(): void
+    {
+        $shop = Shop::factory()->create();
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        Features::override('search.photos', true, $shop->id);
+        $fake = new class implements RunsRetrieval
+        {
+            public int $scans = 0;
+
+            public function index(string $shopId): Run
+            {
+                throw new \LogicException('not here');
+            }
+
+            public function images(string $shopId): Run
+            {
+                $this->scans++;
+
+                return new Run;
+            }
+
+            public function match(string $shopId, ?array $productIds = null): Run
+            {
+                throw new \LogicException('not here');
+            }
+        };
+        $this->app->instance(RunsRetrieval::class, $fake);
+        // Pressed ten minutes ago; no scan has started since.
+        Cache::put('search:scan-pictures:'.$shop->id, now()->subMinutes(10)->timestamp, 3600);
+
+        Filament::setCurrentPanel(Filament::getPanel('merchant'));
+        $this->actingAs($merchant);
+        Livewire::test(ShopSearches::class, ['shop' => $shop->id])
+            ->assertSee(__('search::ui.photos.stuck_shop'))
+            ->call('scanPicturesNow')
+            ->assertNotified(__('search::ui.photos.scan_started'));
+
+        $this->assertSame(1, $fake->scans);
     }
 }
