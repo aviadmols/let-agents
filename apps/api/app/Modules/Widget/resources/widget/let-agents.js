@@ -2268,14 +2268,18 @@
           var body = el('div', 'body find-body');
           var question = isQuestion(text);
           var saved = null;
+          // Only an answer to the same question: every word typed is in it, one of them three
+          // letters or more, and they cover most of what it asks. Never an answer to another question.
+          var asked = words.filter(function (word) { return word.length >= 3; });
           (bank.answers || []).forEach(function (answer) {
             var score = findCovers(answer.q, words);
-            if (score >= 0.6 && (!saved || score > saved.score)) {
-              saved = { answer: answer, score: score };
+            var back = findCovers(words.join(' '), findWords(answer.q));
+            if (asked.length && score === 1 && back >= 0.6 && (!saved || back > saved.score)) {
+              saved = { answer: answer, score: back };
             }
           });
 
-          if (saved && (question || words.length >= 2)) {
+          if (saved) {
             body.appendChild(answerCard(labels.find_saved, saved.answer.q, saved.answer.a));
           }
 
@@ -2340,7 +2344,9 @@
                 }
                 var groups = (result && result.groups) || {};
                 var answers = groups.answer || [];
-                if (answers.length && !saved && (question || words.length >= 2)) {
+                var closest = answers.length ? findCovers(answers[0].title, words) : 0;
+                var closestBack = answers.length ? findCovers(words.join(' '), findWords(answers[0].title)) : 0;
+                if (answers.length && !saved && words.some(function (word) { return word.length >= 3; }) && closest === 1 && closestBack >= 0.6) {
                   site.appendChild(answerCard(labels.find_saved, answers[0].title, answers[0].answer));
                 }
                 var items = (groups.product || []).filter(function (item) { return !seen[item.external_id] && String(item.external_id) !== PAGE_ID; })

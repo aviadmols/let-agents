@@ -325,6 +325,46 @@
     return words.length >= 2 && QUESTION_WORDS.indexOf(words[0]) !== -1;
   }
 
+  /** Words a question wraps around what it is about, for telling one saved question from another. */
+  var ANSWER_FILLER = ['כדאי', 'צריך', 'מתאים', 'מתאימה', 'מתאימים', 'הכי', 'לי', 'לנו', 'עם', 'של', 'את', 'על', 'ליד', 'זה', 'זו', 'יש', 'אפשר',
+    'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גם', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my'];
+  var answerDrop = null;
+
+  /** The words a text is about: no question or filler words, each by its stem. */
+  function coreWords(text) {
+    if (!answerDrop) {
+      answerDrop = {};
+      QUESTION_WORDS.concat(ANSWER_FILLER).forEach(function (word) { answerDrop[normalize(word)] = true; });
+    }
+    return normalize(text).split(' ').filter(function (word) { return word && !answerDrop[word]; }).map(stem);
+  }
+
+  /**
+   * Whether a saved question is the one being typed, closely enough to show its answer: every
+   * word typed is in it (a short last word still being typed waits), at least one of them has
+   * three letters or more, and they cover most of what the saved question is about. A loose
+   * match never shows an answer to another question.
+   */
+  function closeAnswer(raw, savedQuestion) {
+    var typed = coreWords(raw);
+    if (typed.length && typed[typed.length - 1].length < 3 && !/\s$/.test(String(raw))) {
+      typed.pop();
+    }
+    typed = typed.filter(function (word) { return word.length >= 2; });
+    var saved = coreWords(savedQuestion);
+    if (!typed.length || !saved.length || !typed.some(function (word) { return word.length >= 3; })) {
+      return false;
+    }
+    var inside = function (list, word) {
+      return list.some(function (other) {
+        return other === word || (word.length >= 3 && other.indexOf(word) === 0) || (other.length >= 3 && word.indexOf(other) === 0);
+      });
+    };
+    var typedFound = typed.filter(function (word) { return inside(saved, word); }).length;
+    var savedFound = saved.filter(function (word) { return inside(typed, word); }).length;
+    return typedFound === typed.length && savedFound / saved.length >= 0.6;
+  }
+
   function boot(win) {
     var doc = win.document;
     var ctx = win.LetAgentsSearchContext;
@@ -1014,7 +1054,7 @@
       d.main = main;
 
       // The answer the site already gave to this question. Typing never reaches a model.
-      if (answers.length && (question || query.split(' ').length >= 3)) {
+      if (answers.length && closeAnswer(raw, answers[0].title)) {
         main.appendChild(answerBlock(answers[0].title, answers[0].ans, answers[0].src, raw, answers[0]));
       }
 
@@ -1818,7 +1858,7 @@
       var categories = groups.category || [];
       var answers = groups.answer || [];
 
-      if (answers.length && !quiet && isQuestion(raw)) {
+      if (answers.length && !quiet && closeAnswer(raw, answers[0].title)) {
         var said = el('div', 'section answer-box');
         said.appendChild(answerBlock(answers[0].title, answers[0].answer, answers[0].sources, raw, answers[0]));
         sheet.appendChild(said);
@@ -2425,6 +2465,7 @@
     closeWords: closeWords,
     search: search,
     isQuestion: isQuestion,
+    closeAnswer: closeAnswer,
     boot: boot
   };
 }));

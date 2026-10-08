@@ -123,4 +123,34 @@ final class HebrewSearchTest extends TestCase
 
         $this->assertSame($cases, json_decode($process->getOutput(), true));
     }
+
+    public function test_a_saved_answer_shows_only_for_the_same_question(): void
+    {
+        $node = (new ExecutableFinder)->find('node');
+
+        if ($node === null) {
+            $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
+        }
+
+        $screws = 'כמה ברגים צריך למטר דק?';
+        $wall = 'האם זה מתאים לקיר גבס?';
+        $cases = [
+            ['מה כי', $wall, false],
+            ['מה כי', $screws, false],
+            ['ברגים', $screws, false],
+            ['קיר', $wall, false],
+            ['מה מתאים לגבס', $wall, false],
+            ['כמה ברגים צר', $screws, false],
+            ['כמה ברגים צריך למטר', $screws, true],
+            ['כמה ברגים צריך למטר דק', $screws, true],
+            ['האם מתאים לקיר גבס', $wall, true],
+        ];
+        $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');'
+            .'process.stdout.write(JSON.stringify('.json_encode($cases, JSON_UNESCAPED_UNICODE).'.map(c=>e.closeAnswer(c[0],c[1]))));';
+
+        $process = new Process([$node, '-e', $harness]);
+        $process->mustRun();
+
+        $this->assertSame(array_column($cases, 2), json_decode($process->getOutput(), true), 'a loose match never shows an answer to another question');
+    }
 }
