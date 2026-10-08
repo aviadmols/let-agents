@@ -1017,7 +1017,7 @@
       '.m-list{display:grid;gap:12px}',
       '.m-arts{display:grid}',
       '.d.m .d-prod{grid-template-columns:72px minmax(0,1fr);gap:12px;margin:0;padding:0}',
-      '.d.m .d-prod .d-pic{width:72px;height:72px}',
+      '.d.m .d-prod .d-pic{width:86px;height:86px}',
       '.d.m .d-art{margin:0;padding:8px 0;border-bottom:1px solid var(--rs-line);border-radius:0}',
       '.d.m .d-all{padding:13px}',
       '.d.m .d-ask{padding:11px 14px}',
