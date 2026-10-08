@@ -6,6 +6,7 @@ use App\Modules\Search\Http\Controllers\SearchEventsController;
 use App\Modules\Search\Http\Controllers\SearchIndexController;
 use App\Modules\Search\Http\Controllers\SearchPhotoController;
 use App\Modules\Search\Http\Controllers\SearchScriptController;
+use App\Modules\Search\Http\Controllers\SimilarController;
 use Illuminate\Support\Facades\Route;
 
 // Prefixed /api/v1 by the module loader. Public: the storefront calls these from every visitor,
@@ -14,6 +15,7 @@ Route::get('search/let-agents-search.js', SearchScriptController::class)->name('
 
 Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/index', SearchIndexController::class)->name('api.search.index');
+    Route::get('search/{site}/similar', SimilarController::class)->name('api.search.similar');
     Route::get('search/{site}', SearchController::class)->name('api.search.query');
     Route::post('search/{site}/events', SearchEventsController::class)->name('api.search.events');
 });

@@ -41,4 +41,13 @@ return [
     'whatsapp' => 'Ask the store on WhatsApp',
     'wa_message' => 'A question from the site: :question',
     'related' => 'Related results',
+    'drawer_title' => 'Smart search',
+    'new_search' => 'New search',
+    'ask_placeholder' => 'Search by description, colour or size, or ask a question',
+    'send' => 'Send',
+    'similar' => 'Similar items',
+    'similar_to' => 'Similar to: :title',
+    'back_to' => 'Back to the results',
+    'show_more' => 'Show more',
+    'no_similar' => 'We found no similar items.',
 ];

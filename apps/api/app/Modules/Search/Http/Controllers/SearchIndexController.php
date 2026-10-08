@@ -54,6 +54,8 @@ final class SearchIndexController
             'ask' => Features::enabled('assistant.on_search', $shopId),
             // What the site does not answer goes to the shop's WhatsApp, when the shop has one.
             'whatsapp' => self::whatsapp($shopId),
+            'drawerSide' => (string) Settings::get('search.drawer_side', $shopId),
+            'similar' => Features::enabled('search.similar', $shopId),
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';

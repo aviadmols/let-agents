@@ -10,6 +10,7 @@ return [
         'description' => 'In LetAgents\'s panel over the page, or on the site\'s own search results page in LetAgents\'s order.',
         'options' => [
             'panel' => 'In LetAgents\'s panel',
+            'drawer' => 'In a side drawer, with a field for more searches and questions at the bottom',
             'page' => 'On the site\'s search page',
         ],
     ],
@@ -156,5 +157,10 @@ return [
     'answers_in_index' => [
         'label' => 'Answers in the search box',
         'description' => 'How many answers shoppers already got go into the search, the most asked first. 0 to show none.',
+    ],
+    'drawer_side' => [
+        'label' => 'Which side the drawer opens from',
+        'description' => 'Start is right on a Hebrew site and left on an English one. On a phone the drawer takes the whole screen.',
+        'options' => ['start' => 'The start side (right in Hebrew)', 'end' => 'The end side (left in Hebrew)'],
     ],
 ];

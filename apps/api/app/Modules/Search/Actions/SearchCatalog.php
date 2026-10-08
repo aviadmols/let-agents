@@ -5,6 +5,7 @@ namespace App\Modules\Search\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\HebrewSearch;
@@ -91,6 +92,45 @@ final class SearchCatalog
             }
 
             return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'groups' => $groups, 'counts' => $counts];
+        });
+    }
+
+    /**
+     * Products like one in the results: by its picture when the shop's pictures are scanned, by
+     * the meaning of its name and description otherwise. Both read vectors already stored, so no
+     * model is asked; what was in stock last night comes first, and the product itself never.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function similar(string $shopId, string $externalId, int $limit): array
+    {
+        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit): array {
+            $index = LoadedIndex::for($shopId);
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id']);
+
+            if ($index === null || $product === null || $limit < 1) {
+                return [];
+            }
+
+            $ids = array_column($this->semantic->picturesReady() ? $this->semantic->lookAlike($product->id, $limit * 2) : [], 'external_id');
+
+            if ($ids === []) {
+                $ids = array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 2), 'external_id');
+            }
+
+            $records = [];
+
+            foreach ($ids as $id) {
+                $record = $index['records']['p:'.$id] ?? null;
+
+                if ($record !== null && (string) $id !== $externalId) {
+                    $records[] = $record;
+                }
+            }
+
+            usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
+
+            return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
         });
     }
 

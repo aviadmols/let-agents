@@ -36,6 +36,10 @@
         {
             "name": "page_tags",
             "default": false
+        },
+        {
+            "name": "similar",
+            "default": true
         }
     ],
     "settings": [
@@ -52,7 +56,8 @@
             "type": "enum",
             "options": [
                 "panel",
-                "page"
+                "page",
+                "drawer"
             ],
             "default": "panel",
             "scope": "shop"
@@ -371,6 +376,16 @@
             "max": 3000,
             "scope": "shop",
             "unit": "answers"
+        },
+        {
+            "name": "drawer_side",
+            "type": "enum",
+            "options": [
+                "start",
+                "end"
+            ],
+            "default": "start",
+            "scope": "shop"
         }
     ],
     "agents": [

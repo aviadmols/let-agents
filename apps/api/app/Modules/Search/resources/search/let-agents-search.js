@@ -352,6 +352,7 @@
     var typeTimer = null;
     var pauseTimer = null;
     var visitorId = null;
+    var currentSheet = null; // where results are shown now, for "similar items" to replace
 
     function label(key, params) {
       var text = String(state.labels[key] || key);
@@ -600,6 +601,24 @@
       '.yours img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--rs-line)}',
       '.card{position:relative}',
       '.badge{position:absolute;top:8px;inset-inline-start:8px;background:var(--rs-bg);color:var(--rs-fg);font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}',
+      '.overlay.side{justify-content:flex-start;align-items:stretch;padding:0}',
+      '.overlay.side.end{justify-content:flex-end}',
+      '.sheet.drawer{width:min(440px,100%);max-height:none;height:100%;border-radius:0;display:flex;flex-direction:column;overflow:hidden}',
+      '.drawer .top{position:static;background:var(--rs-fg);color:var(--rs-bg);border:0;justify-content:space-between}',
+      '.drawer .top h2{text-align:center;font-size:19px;letter-spacing:.04em}',
+      '.drawer .x{color:inherit;opacity:.9}',
+      '.drawer .scroll{flex:1;overflow:auto;background:var(--rs-soft)}',
+      '.drawer .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}',
+      '.drawer .card{background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:12px;padding:10px}',
+      '.drawer .foot{flex-direction:column;align-items:stretch;padding:12px 14px;background:var(--rs-bg);border-top:1px solid var(--rs-line)}',
+      '.askbox{display:flex;align-items:center;gap:10px;border:1.5px solid var(--rs-fg);border-radius:14px;padding:6px;padding-inline-start:12px}',
+      '.askbox input{all:unset;flex:1;min-width:0;font:inherit;font-size:14px;color:var(--rs-fg)}',
+      '.askbox button{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:50%;background:var(--rs-fg);color:var(--rs-bg);display:grid;place-items:center}',
+      '.askbox button svg{width:18px;height:18px}',
+      '.card .sim{margin-top:2px}',
+      '.more{display:block;margin:16px auto 0;font:inherit;font-size:13px;padding:8px 40px;border:1px solid var(--rs-fg);border-radius:var(--rs-radius);background:transparent;color:var(--rs-fg);cursor:pointer}',
+      '.card[hidden]{display:none}',
+      '.backlink{font:inherit;font-size:13px;border:0;background:transparent;color:var(--rs-accent-text);cursor:pointer;padding:0}',
       '@media (max-width:600px){.overlay{padding:0}.sheet{max-height:100vh;height:100vh;border-radius:0}.grid{grid-template-columns:repeat(2,1fr);gap:12px}}',
       '@media (prefers-reduced-motion:no-preference){.sheet{animation:in .25s ease}@keyframes in{from{transform:translateY(8px);opacity:0}}}'
     ].join('');
@@ -890,13 +909,16 @@
      * offers the shop's WhatsApp. What the search finds for the same words shows under it.
      */
     function askSite(input) {
-      var raw = input.value.trim();
+      askText(input.value.trim());
+    }
+
+    function askText(raw) {
       if (!raw) {
         return;
       }
       closeDropdown();
       clearTimeout(pauseTimer);
-      var sheet = openSheet(raw);
+      var sheet = openSheet(raw, raw);
       var box = el('div', 'section answer-box');
       box.appendChild(el('p', 'muted', label('asking')));
       sheet.appendChild(box);
@@ -974,8 +996,106 @@
       }
     }
 
+    function drawerMode() {
+      return !!(state.config && state.config.results === 'drawer');
+    }
+
+    /**
+     * The side drawer: a dark head with the close and new-search buttons, the results in the
+     * middle, and a field at the foot for another search or a question without closing it.
+     * Returns the scrolling middle, where the results go.
+     */
+    function openDrawer(raw) {
+      if (!panel) {
+        panel = shadowHost('let-agents-search-results');
+      }
+      var rootNode = panel.root;
+      while (rootNode.childNodes.length > 1) {
+        rootNode.removeChild(rootNode.lastChild);
+      }
+      var overlay = el('div', 'overlay side' + (state.config.drawerSide === 'end' ? ' end' : ''));
+      overlay.addEventListener('click', function (event) {
+        if (event.target === overlay) {
+          closePanel();
+        }
+      });
+      var sheet = el('aside', 'sheet drawer');
+      sheet.setAttribute('role', 'dialog');
+      sheet.setAttribute('aria-modal', 'true');
+      sheet.setAttribute('aria-label', label('drawer_title'));
+      var top = el('div', 'top');
+      var x = el('button', 'x', '\u00D7');
+      x.type = 'button';
+      x.setAttribute('aria-label', label('close'));
+      x.addEventListener('click', closePanel);
+      var again = el('button', 'x', '\u21BB');
+      again.type = 'button';
+      again.setAttribute('aria-label', label('new_search'));
+      top.appendChild(x);
+      top.appendChild(el('h2', null, label('drawer_title')));
+      top.appendChild(again);
+      sheet.appendChild(top);
+
+      var scroll = el('div', 'scroll');
+      sheet.appendChild(scroll);
+
+      var foot = el('form', 'foot');
+      var box = el('div', 'askbox');
+      var field = el('input');
+      field.type = 'search';
+      field.value = raw || '';
+      field.maxLength = 120;
+      field.placeholder = label('ask_placeholder');
+      field.setAttribute('aria-label', label('ask_placeholder'));
+      var send = el('button');
+      send.type = 'submit';
+      send.setAttribute('aria-label', label('send'));
+      send.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>';
+      box.appendChild(field);
+      // Search by photo from the drawer too, where the shop has it on and its pictures are scanned.
+      if (state.config.photos) {
+        var cam = el('button', 'cam');
+        cam.type = 'button';
+        cam.setAttribute('aria-label', label('photo_search'));
+        cam.title = label('photo_search');
+        cam.innerHTML = CAMERA;
+        cam.addEventListener('click', function () { fileInput(false).click(); });
+        box.appendChild(cam);
+      }
+      box.appendChild(send);
+      foot.appendChild(box);
+      foot.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var text = field.value.trim();
+        if (!text) {
+          return;
+        }
+        if (state.config.ask && isQuestion(text)) {
+          askText(text);
+        } else {
+          openPanel(text);
+        }
+      });
+      again.addEventListener('click', function () {
+        scroll.textContent = '';
+        field.value = '';
+        field.focus();
+      });
+      sheet.appendChild(foot);
+
+      overlay.appendChild(sheet);
+      rootNode.appendChild(overlay);
+      doc.documentElement.style.overflow = 'hidden';
+      (raw ? x : field).focus();
+      currentSheet = scroll;
+      return scroll;
+    }
+
     /** An empty results sheet over the page, with a title and a close button. Returns the sheet. */
-    function openSheet(titleText) {
+    function openSheet(titleText, raw) {
+      if (drawerMode()) {
+        return openDrawer(raw === undefined ? '' : raw);
+      }
       if (!panel) {
         panel = shadowHost('let-agents-search-results');
       }
@@ -1004,41 +1124,14 @@
       rootNode.appendChild(overlay);
       doc.documentElement.style.overflow = 'hidden';
       x.focus();
+      currentSheet = sheet;
       return sheet;
     }
 
     function openPanel(raw) {
-      if (!panel) {
-        panel = shadowHost('let-agents-search-results');
-      }
-      var rootNode = panel.root;
-      while (rootNode.childNodes.length > 1) {
-        rootNode.removeChild(rootNode.lastChild);
-      }
-      var overlay = el('div', 'overlay');
-      overlay.addEventListener('click', function (event) {
-        if (event.target === overlay) {
-          closePanel();
-        }
-      });
-      var sheet = el('div', 'sheet');
-      sheet.setAttribute('role', 'dialog');
-      sheet.setAttribute('aria-modal', 'true');
-      var top = el('div', 'top');
-      var title = el('h2', null, label('all_results', { query: raw }));
-      top.appendChild(title);
-      var x = el('button', 'x', '×');
-      x.type = 'button';
-      x.setAttribute('aria-label', label('close'));
-      x.addEventListener('click', closePanel);
-      top.appendChild(x);
-      sheet.appendChild(top);
+      var sheet = openSheet(label('all_results', { query: raw }), raw);
       var body = el('div', 'section', label('searching'));
       sheet.appendChild(body);
-      overlay.appendChild(sheet);
-      rootNode.appendChild(overlay);
-      doc.documentElement.style.overflow = 'hidden';
-      x.focus();
 
       var normalized = normalize(raw);
       var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
@@ -1047,12 +1140,53 @@
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
         .then(function (response) { return response.ok ? response.json() : null; })
         .then(function (result) {
-          sheet.removeChild(body);
+          if (body.parentNode) {
+            body.parentNode.removeChild(body);
+          }
           renderResults(sheet, result, raw);
         })
         .catch(function () {
           body.textContent = label('no_results', { query: raw });
         });
+    }
+
+    /** Products like one in the results, in place of the results, with the way back. */
+    function showSimilar(item, raw) {
+      var sheet = currentSheet;
+      if (!sheet) {
+        return;
+      }
+      countClick(raw, { id: item.id, title: item.title });
+      sheet.textContent = '';
+      var head = el('div', 'section');
+      var back = el('button', 'backlink', '\u2192 ' + label('back_to'));
+      back.type = 'button';
+      back.addEventListener('click', function () { openPanel(raw); });
+      head.appendChild(back);
+      head.appendChild(el('h3', null, label('similar_to', { title: item.title })));
+      sheet.appendChild(head);
+      var body = el('div', 'section', label('searching'));
+      sheet.appendChild(body);
+
+      win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/similar?id=' + encodeURIComponent(item.external_id), { mode: 'cors', credentials: 'omit' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (json) {
+          var products = (json && json.products) || [];
+          body.textContent = '';
+          if (!products.length) {
+            body.textContent = label('no_similar');
+            return;
+          }
+          var grid = el('div', 'grid');
+          var ids = [];
+          products.forEach(function (product) {
+            grid.appendChild(card(product, raw));
+            ids.push(product.external_id);
+          });
+          body.appendChild(grid);
+          liveProducts(ids).then(function () { updateCards(grid); });
+        })
+        .catch(function () { body.textContent = label('no_similar'); });
     }
 
     function renderResults(sheet, result, raw, quiet) {
@@ -1107,6 +1241,22 @@
           ids.push(products[p].external_id);
         }
         section.appendChild(grid);
+        // The drawer shows a few at a time and the rest on request.
+        if (drawerMode() && products.length > 6) {
+          var cardsInGrid = grid.querySelectorAll('.card');
+          for (var h = 6; h < cardsInGrid.length; h++) {
+            cardsInGrid[h].hidden = true;
+          }
+          var more = el('button', 'more', label('show_more'));
+          more.type = 'button';
+          more.addEventListener('click', function () {
+            for (var k = 0; k < cardsInGrid.length; k++) {
+              cardsInGrid[k].hidden = false;
+            }
+            more.parentNode.removeChild(more);
+          });
+          section.appendChild(more);
+        }
         sheet.appendChild(section);
         liveProducts(ids).then(function () { updateCards(grid); });
       }
@@ -1199,6 +1349,12 @@
       }
       action.setAttribute('data-action', '1');
       node.appendChild(action);
+      if (state.config && state.config.similar) {
+        var sim = el('button', 'btn ghost sim', label('similar'));
+        sim.type = 'button';
+        sim.addEventListener('click', function () { showSimilar(item, raw); });
+        node.appendChild(sim);
+      }
       return node;
     }
 

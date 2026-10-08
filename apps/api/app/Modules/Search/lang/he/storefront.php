@@ -41,4 +41,13 @@ return [
     'whatsapp' => 'לשאול את החנות בוואטסאפ',
     'wa_message' => 'שאלה מהאתר: :question',
     'related' => 'תוצאות קשורות',
+    'drawer_title' => 'חיפוש חכם',
+    'new_search' => 'חיפוש חדש',
+    'ask_placeholder' => 'חפשו פריט לפי תיאור, צבע או מידה, או שאלו שאלה',
+    'send' => 'שליחה',
+    'similar' => 'פריטים דומים',
+    'similar_to' => 'דומים ל: :title',
+    'back_to' => 'חזרה לתוצאות',
+    'show_more' => 'הצג עוד',
+    'no_similar' => 'לא מצאנו פריטים דומים.',
 ];
