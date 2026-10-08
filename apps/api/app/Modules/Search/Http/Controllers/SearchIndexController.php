@@ -82,7 +82,8 @@ final class SearchIndexController
     private static function whatsapp(string $shopId): ?string
     {
         try {
-            $number = (string) preg_replace('/\D/', '', (string) Settings::get('widget.whatsapp_number', $shopId));
+            // The shop's own number only: a number saved for every shop at once is never another shop's.
+            $number = (string) preg_replace('/\D/', '', (string) Settings::overrideFor('widget.whatsapp_number', $shopId));
 
             return Features::enabled('widget.whatsapp', $shopId) && strlen($number) >= 8 ? $number : null;
         } catch (\Throwable) {

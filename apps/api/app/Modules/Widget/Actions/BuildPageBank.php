@@ -1335,7 +1335,8 @@ final class BuildPageBank
      */
     private function contact(string $shopId): ?array
     {
-        $number = preg_replace('/\D/', '', (string) Settings::get('widget.whatsapp_number', $shopId));
+        // The shop's own number only: a number saved for every shop at once is never another shop's.
+        $number = preg_replace('/\D/', '', (string) Settings::overrideFor('widget.whatsapp_number', $shopId));
 
         if (! Features::enabled('widget.whatsapp', $shopId) || mb_strlen((string) $number) < 8) {
             return null;

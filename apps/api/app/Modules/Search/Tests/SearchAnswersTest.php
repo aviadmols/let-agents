@@ -85,4 +85,14 @@ final class SearchAnswersTest extends TestCase
         LoadedIndex::forget();
         $this->assertSame([], app(SearchCatalog::class)->handle($this->shop->id, 'כמה ברגים למטר', count: false)['groups']['answer']);
     }
+
+    public function test_a_whatsapp_number_is_the_shops_own_and_never_a_shared_one(): void
+    {
+        Features::override('widget.whatsapp', true);
+        Settings::set('widget.whatsapp_number', '0501234567');
+        $this->assertNull($this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index')->assertOk()->json('config.whatsapp'), 'a number saved for every shop at once is nobody\x27s');
+
+        Settings::set('widget.whatsapp_number', '0507654321', $this->shop->id);
+        $this->assertSame('0507654321', $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index')->json('config.whatsapp'));
+    }
 }
