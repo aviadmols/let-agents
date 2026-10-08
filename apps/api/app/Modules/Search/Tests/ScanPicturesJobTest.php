@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Tests;
 
+use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Jobs\ScanPicturesJob;
@@ -34,6 +35,13 @@ final class ScanPicturesJobTest extends TestCase
             }
         };
         $this->app->instance(RunsRetrieval::class, $fake);
+        $this->app->instance(CaptionsPictures::class, new class implements CaptionsPictures
+        {
+            public function captions(string $shopId): Run
+            {
+                return (new Run)->forceFill(['output' => ['stopped' => null]]);
+            }
+        });
 
         ScanPicturesJob::dispatch('shop-1');
 

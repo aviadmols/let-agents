@@ -119,4 +119,28 @@ return [
         'label' => 'תמונות בכל חלק של סריקה',
         'description' => 'סריקה גדולה רצה בחלקים קטנים: עדכון או נפילה של השרת מאבדים חלק אחד לכל היותר, והסריקה ממשיכה לבד.',
     ],
+    'caption_provider' => [
+        'label' => 'ספק לתיאור תמונות',
+        'description' => 'anthropic או openai.',
+    ],
+    'caption_model' => [
+        'label' => 'מודל לתיאור תמונות',
+        'description' => 'מודל שרואה תמונות.',
+    ],
+    'caption_input_usd_per_million' => [
+        'label' => 'מחיר קלט לתיאור (דולר למיליון)',
+        'description' => 'לחישוב העלות.',
+    ],
+    'caption_output_usd_per_million' => [
+        'label' => 'מחיר פלט לתיאור (דולר למיליון)',
+        'description' => 'לחישוב העלות.',
+    ],
+    'caption_max_output_tokens' => [
+        'label' => 'אורך תיאור מקסימלי',
+        'description' => 'בטוקנים.',
+    ],
+    'content_weight' => [
+        'label' => 'משקל התוכן מול המראה',
+        'description' => '0: רק מראה. 1: רק תוכן. 0.5: חצי־חצי.',
+    ],
 ];

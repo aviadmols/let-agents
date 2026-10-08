@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Jobs;
 
+use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -43,9 +44,14 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
         return $this->shopId;
     }
 
-    public function handle(RunsRetrieval $retrieval): void
+    public function handle(RunsRetrieval $retrieval, CaptionsPictures $captions): void
     {
         $run = $retrieval->images($this->shopId);
+
+        // Once every picture has its look, each gets its content: a part of descriptions at a time.
+        if (! in_array($run->output['stopped'] ?? null, self::GO_ON, true) && ($run->output['stopped'] ?? null) === null) {
+            $run = $captions->captions($this->shopId);
+        }
 
         if (in_array($run->output['stopped'] ?? null, self::GO_ON, true) && $this->part < self::MAX_PARTS) {
             self::dispatch($this->shopId, $this->part + 1);

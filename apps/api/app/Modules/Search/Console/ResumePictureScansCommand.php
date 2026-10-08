@@ -40,9 +40,12 @@ final class ResumePictureScansCommand extends Command
                 continue;
             }
 
-            $left = $tenant->run($shop->id, function (): int {
+            $captions = Features::enabled('retrieval.image_captions', $shop->id);
+            $left = $tenant->run($shop->id, function () use ($captions): int {
                 $pictures = CatalogProduct::query()->active()->whereNotNull('image_url')->count();
-                $done = RetrievalImage::query()->where(fn ($q) => $q->whereNotNull('error')->orWhereNotNull('embedded_at'))->count();
+                // Done: unreadable, or scanned and (when descriptions are on) described.
+                $done = RetrievalImage::query()->where(fn ($q) => $q->whereNotNull('error')
+                    ->orWhere(fn ($q) => $q->whereNotNull('embedded_at')->when($captions, fn ($q) => $q->whereNotNull('captioned_at'))))->count();
 
                 return max(0, $pictures - $done);
             });

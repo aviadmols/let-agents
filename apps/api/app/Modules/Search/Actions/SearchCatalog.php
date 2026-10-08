@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\HebrewSearch;
@@ -237,7 +238,9 @@ final class SearchCatalog
                 // picture only orders it. Every product carries which tags it belongs to, so the
                 // shopper narrows by a tag without leaving the photo.
                 $hits = $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, self::PHOTO_ALL);
-                $products = $this->taggedProducts($index, $tags, $hits, $shopId);
+                // What the photo shows, against what each product's picture shows.
+                $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_column($tags, 'title')), self::PHOTO_ALL);
+                $products = $this->taggedProducts($index, $tags, $hits, $shopId, $content);
                 $this->counter->photo($shopId, count($products));
 
                 return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true];
@@ -268,7 +271,7 @@ final class SearchCatalog
      * @param  list<array{external_id: string, similarity: float}>  $hits
      * @return list<array<string, mixed>>
      */
-    private function taggedProducts(array $index, array $tags, array $hits, string $shopId): array
+    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = []): array
     {
         $members = [];
 
@@ -293,7 +296,17 @@ final class SearchCatalog
             return [];
         }
 
-        $similarity = array_column($hits, 'similarity', 'external_id');
+        // Looks and content together: each picture's visual likeness and its description's, weighed by
+        // retrieval.content_weight; a picture with only one of them is judged by that one.
+        $looks = array_column($hits, 'similarity', 'external_id');
+        $about = array_column($content, 'similarity', 'external_id');
+        $weight = (float) Settings::get('retrieval.content_weight');
+        $similarity = [];
+        foreach (array_unique([...array_keys($looks), ...array_keys($about)]) as $id) {
+            $v = $looks[$id] ?? null;
+            $c = $about[$id] ?? null;
+            $similarity[$id] = $v !== null && $c !== null ? (1 - $weight) * $v + $weight * $c : (float) ($v ?? $c);
+        }
         $rows = CatalogProduct::query()->whereIn('external_id', array_keys($members))->get(['external_id', 'brand', 'in_stock'])->keyBy('external_id');
         $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0)], array_keys($members));
 

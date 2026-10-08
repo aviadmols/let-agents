@@ -5,4 +5,5 @@ return [
     'matcher' => 'מתאים מוצרים',
     'query_embedder' => 'מכין וקטורים לחיפושים',
     'image_indexer' => 'מכין וקטורים לתמונות',
+    'image_captioner' => 'מתאר תמונות (וקטור תוכן)',
 ];

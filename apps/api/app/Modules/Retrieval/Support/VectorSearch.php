@@ -2,6 +2,7 @@
 
 namespace App\Modules\Retrieval\Support;
 
+use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Retrieval\Models\RetrievalImage;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  *
  * A document is as near as its nearest piece, and is returned once.
  */
-final class VectorSearch implements SemanticSearch
+final class VectorSearch implements PictureContent, SemanticSearch
 {
     /** Pieces read per document asked for, before keeping the best piece of each. */
     private const OVERFETCH = 4;
@@ -105,6 +106,55 @@ final class VectorSearch implements SemanticSearch
         $vector = app(QueryVectors::class)->forPhoto($shopId, $mime, $bytes);
 
         return $vector === null ? [] : $this->nearestPictures($vector, ModelChoice::for('image')->model, $limit);
+    }
+
+    public function picturesNearWords(string $shopId, string $text, int $limit): array
+    {
+        $model = ModelChoice::for('embedding')->model;
+
+        if ($limit < 1 || trim($text) === '' || ! RetrievalImage::query()->where('caption_model', $model)->whereNotNull('caption_embedding')->exists()) {
+            return [];
+        }
+
+        $vector = app(QueryVectors::class)->for($shopId, $text);
+
+        if ($vector === null) {
+            return [];
+        }
+
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $literal = self::literal($vector);
+
+            return RetrievalImage::query()->select(['external_id'])
+                ->selectRaw('1 - (caption_embedding <=> ?::vector) as similarity', [$literal])
+                ->where('caption_model', $model)->whereNotNull('caption_embedding')
+                ->orderByRaw('caption_embedding <=> ?::vector', [$literal])->limit($limit)->get()
+                ->map(fn (RetrievalImage $i): array => ['external_id' => (string) $i->external_id, 'similarity' => round((float) $i->getAttribute('similarity'), 4)])
+                ->all();
+        }
+
+        $seed = self::normalize($vector);
+        $rows = [];
+
+        foreach (RetrievalImage::query()->where('caption_model', $model)->whereNotNull('caption_embedding')->get(['external_id', 'caption_embedding']) as $image) {
+            $other = json_decode((string) $image->caption_embedding, true);
+
+            if (! is_array($other) || count($other) !== count($seed)) {
+                continue;
+            }
+
+            $other = self::normalize(array_map('floatval', $other));
+            $dot = 0.0;
+            foreach ($seed as $i => $value) {
+                $dot += $value * $other[$i];
+            }
+
+            $rows[] = ['external_id' => (string) $image->external_id, 'similarity' => round($dot, 4)];
+        }
+
+        usort($rows, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
+
+        return array_slice($rows, 0, $limit);
     }
 
     public function picturesReady(): bool

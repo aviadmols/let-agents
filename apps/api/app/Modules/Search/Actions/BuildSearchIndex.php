@@ -8,6 +8,7 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -60,8 +61,11 @@ final class BuildSearchIndex
         $items = [];
         $counts = ['product' => 0, 'content' => 0, 'category' => 0, 'synonyms' => count($synonyms)];
 
+        // What each product's picture shows, in words, joins its words: found by what it looks like.
+        $seen = RetrievalImage::query()->whereNotNull('caption_words')->pluck('caption_words', 'product_id')->map(fn ($w): array => is_array($w) ? $w : (array) json_decode((string) $w, true));
+
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
-            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, $this->productWords($product), $synonyms, [
+            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
                 's' => $product->in_stock ? 1 : 0,

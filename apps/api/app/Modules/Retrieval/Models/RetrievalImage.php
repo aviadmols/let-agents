@@ -37,6 +37,8 @@ class RetrievalImage extends Model
         return [
             'dimensions' => 'integer',
             'embedded_at' => 'datetime',
+            'captioned_at' => 'datetime',
+            'caption_words' => 'array',
         ];
     }
 

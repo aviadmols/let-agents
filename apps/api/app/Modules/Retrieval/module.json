@@ -22,6 +22,10 @@
         {
             "name": "image_index",
             "default": false
+        },
+        {
+            "name": "image_captions",
+            "default": true
         }
     ],
     "settings": [
@@ -268,6 +272,57 @@
             "min": 0,
             "max": 1,
             "scope": "global"
+        },
+        {
+            "name": "caption_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "caption_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "caption_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "caption_output_usd_per_million",
+            "type": "float",
+            "default": 5.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "caption_max_output_tokens",
+            "type": "int",
+            "default": 200,
+            "min": 60,
+            "max": 1000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "content_weight",
+            "type": "float",
+            "default": 0.5,
+            "min": 0,
+            "max": 1,
+            "scope": "global"
         }
     ],
     "agents": [
@@ -360,6 +415,29 @@
                 "step": "match",
                 "shop_argument": "target"
             }
+        },
+        {
+            "name": "image_captioner",
+            "action": "caption_images",
+            "when": "live",
+            "features": [
+                "image_index",
+                "image_captions"
+            ],
+            "roles": [
+                {
+                    "role": "reader",
+                    "provider": "caption_provider",
+                    "model": "caption_model",
+                    "prices": [
+                        "caption_input_usd_per_million",
+                        "caption_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "caption"
+                    ]
+                }
+            ]
         }
     ]
 }

@@ -119,4 +119,28 @@ return [
         'label' => 'Pictures per scan part',
         'description' => 'A big scan runs in small parts: a deploy or a crash loses one part at most, and the scan goes on by itself.',
     ],
+    'caption_provider' => [
+        'label' => 'Picture description provider',
+        'description' => 'anthropic or openai.',
+    ],
+    'caption_model' => [
+        'label' => 'Picture description model',
+        'description' => 'A model that sees pictures.',
+    ],
+    'caption_input_usd_per_million' => [
+        'label' => 'Description input price (USD per million)',
+        'description' => 'For the cost.',
+    ],
+    'caption_output_usd_per_million' => [
+        'label' => 'Description output price (USD per million)',
+        'description' => 'For the cost.',
+    ],
+    'caption_max_output_tokens' => [
+        'label' => 'Longest description',
+        'description' => 'In tokens.',
+    ],
+    'content_weight' => [
+        'label' => 'Content against looks',
+        'description' => '0: looks only. 1: content only. 0.5: half and half.',
+    ],
 ];

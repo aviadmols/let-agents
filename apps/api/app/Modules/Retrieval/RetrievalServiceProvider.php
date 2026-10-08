@@ -3,12 +3,15 @@
 namespace App\Modules\Retrieval;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Retrieval\Actions\CaptionImages;
 use App\Modules\Retrieval\Candidates\BoughtTogether;
 use App\Modules\Retrieval\Candidates\LookAlike;
 use App\Modules\Retrieval\Candidates\MentionedTogether;
 use App\Modules\Retrieval\Candidates\SimilarProducts;
 use App\Modules\Retrieval\Console\RetrievalCommand;
+use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Contracts\Passages;
+use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Sources\ContentDocuments;
@@ -35,6 +38,8 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
         $this->app->bind(SemanticSearch::class, VectorSearch::class);
         $this->app->bind(Passages::class, PassageSearch::class);
         $this->app->bind(RunsRetrieval::class, RetrievalRunner::class);
+        $this->app->bind(CaptionsPictures::class, CaptionImages::class);
+        $this->app->bind(PictureContent::class, VectorSearch::class);
         $this->app->tag(self::SOURCES, 'retrieval.sources');
         $this->app->tag(self::CANDIDATES, 'retrieval.candidates');
     }

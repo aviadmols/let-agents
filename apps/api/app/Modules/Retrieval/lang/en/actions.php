@@ -5,4 +5,5 @@ return [
     'match_products' => 'Match products',
     'embed_queries' => 'Vectors for search queries',
     'build_image_index' => 'Vectors for product pictures',
+    'caption_images' => 'Describe pictures',
 ];
