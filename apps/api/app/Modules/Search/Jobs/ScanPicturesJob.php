@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Modules\Search\Jobs;
+
+use App\Modules\Retrieval\Contracts\RunsRetrieval;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+
+/**
+ * A shop's picture scan, pressed from the screen. A scan stops itself before the worker's time
+ * runs out; what is left goes on in the next part, until every picture is done.
+ */
+final class ScanPicturesJob implements ShouldQueue
+{
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+
+    /** Seconds. Above the scan's own time budget, below the queue's retry_after. */
+    public int $timeout = 1500;
+
+    /** A failed part is a failed run on the screen; the next press or the night goes on. */
+    public int $tries = 1;
+
+    private const MAX_PARTS = 20;
+
+    public function __construct(
+        public readonly string $shopId,
+        public readonly int $part = 1,
+    ) {}
+
+    public function handle(RunsRetrieval $retrieval): void
+    {
+        $run = $retrieval->images($this->shopId);
+
+        if (($run->output['stopped'] ?? null) === 'time_budget' && $this->part < self::MAX_PARTS) {
+            self::dispatch($this->shopId, $this->part + 1);
+        }
+    }
+}

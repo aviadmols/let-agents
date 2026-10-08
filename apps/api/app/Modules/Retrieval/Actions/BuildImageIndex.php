@@ -39,6 +39,9 @@ final class BuildImageIndex
 
     private const BATCH = 16;
 
+    /** Seconds one run scans before it stops and leaves the rest for the next part. */
+    private const TIME_BUDGET = 1200;
+
     private const MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
     public function __construct(
@@ -105,7 +108,15 @@ final class BuildImageIndex
         $price = (float) Settings::get('retrieval.image_usd_per_image');
         $dimensions = (int) Settings::get('retrieval.image_dimensions') ?: null;
 
+        $started = microtime(true);
+
         foreach (array_chunk($stats['stopped'] === null ? array_slice($todo, 0, $limit) : [], self::BATCH) as $batch) {
+            // Stopping in time keeps what was done; a worker that kills the run keeps nothing of the run's report.
+            if (microtime(true) - $started > self::TIME_BUDGET) {
+                $stats['stopped'] = 'time_budget';
+                break;
+            }
+
             $images = [];
             $rows = [];
 

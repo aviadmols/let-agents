@@ -60,6 +60,7 @@ case "$role" in
       --queue="${QUEUE_NAMES:-default}" \
       --sleep=1 \
       --tries=3 \
+      --timeout=1500 \
       --max-time=3600
     ;;
   scheduler)

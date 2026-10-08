@@ -8,13 +8,13 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
-use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\WritePageTags;
+use App\Modules\Search\Jobs\ScanPicturesJob;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchPageTags;
@@ -136,7 +136,8 @@ class ShopSearches extends Page
                 'ready' => $scanned > 0,
                 'last' => $last?->finished_at ?? $last?->started_at,
                 'last_failed' => $last !== null && $last->status->value === 'failed',
-                'running' => $last !== null && $last->status->value === 'running',
+                // A run that says it is running for over half an hour was cut off by the worker.
+                'running' => $last !== null && $last->status->value === 'running' && $last->started_at?->gt(now()->subMinutes(30)),
                 'switch' => $this->operatorView(),
                 'can_scan' => $this->canScan(),
                 'queued' => $queued,
@@ -168,22 +169,18 @@ class ShopSearches extends Page
 
         $shop = $this->shop;
 
-        // Once an hour a shop, whoever presses: a picture is scanned again only when it changed,
-        // but pressing again and again should never queue the same work twice.
-        // A press that never started (the worker was down or failed it) does not hold the next one.
-        if ($this->photos()['stuck'] ?? false) {
-            Cache::forget('search:scan-pictures:'.$shop);
-        }
+        // Pressing again never queues the same work twice: while a scan waits or runs, the press
+        // waits. A press that never started, or a run the worker cut off, does not hold the next one.
+        $photos = (array) $this->photos();
 
-        if (! Cache::add('search:scan-pictures:'.$shop, now()->timestamp, now()->addSeconds(self::SCAN_EVERY_SECONDS))) {
+        if (($photos['queued'] && ! $photos['stuck']) || $photos['running']) {
             Notification::make()->warning()->title(__('search::ui.photos.scan_wait'))->send();
 
             return;
         }
 
-        dispatch(function () use ($shop): void {
-            app(RunsRetrieval::class)->images($shop);
-        })->name('scan pictures '.$shop);
+        Cache::put('search:scan-pictures:'.$shop, now()->timestamp, now()->addSeconds(self::SCAN_EVERY_SECONDS));
+        ScanPicturesJob::dispatch((string) $shop);
 
         Notification::make()->success()->title(__('search::ui.photos.scan_started'))->body(__('search::ui.photos.scan_started_body'))->send();
     }

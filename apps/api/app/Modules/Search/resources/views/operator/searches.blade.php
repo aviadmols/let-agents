@@ -99,7 +99,7 @@
                             <span style="{{ $small }}">⚠ {{ __('search::ui.photos.'.($photos['switch'] ? 'stuck' : 'stuck_shop')) }}</span>
                         @endif
                         @if (! $photos['running'] && $photos['stopped'])
-                            <span style="{{ $small }}">⚠ {{ $photos['switch'] ? __('search::ui.photos.stopped.'.(in_array($photos['stopped'], ['unknown_provider', 'no_key', 'spend_cap', 'unsupported'], true) ? $photos['stopped'] : 'other'), ['reason' => $photos['stopped']]) : __('search::ui.photos.stopped_shop') }}</span>
+                            <span style="{{ $small }}">⚠ {{ $photos['switch'] ? __('search::ui.photos.stopped.'.(in_array($photos['stopped'], ['unknown_provider', 'no_key', 'spend_cap', 'unsupported', 'time_budget'], true) ? $photos['stopped'] : 'other'), ['reason' => $photos['stopped']]) : __('search::ui.photos.stopped_shop') }}</span>
                         @elseif (! $photos['running'] && $photos['last'] && $photos['pending'] > 0)
                             <span style="{{ $small }}">{{ __('search::ui.photos.pending', ['count' => number_format($photos['pending'])]) }}</span>
                         @endif
