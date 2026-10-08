@@ -36,10 +36,11 @@ final class PhotoSwitchTest extends TestCase
             ->assertSee('פתוח באתר הזה');
 
         $this->assertTrue(Features::enabled('search.photos', $shop->id));
+        $this->assertTrue(Features::enabled('retrieval.image_index', $shop->id), 'turning photo search on starts the picture scan');
         $this->assertFalse(Features::enabled('search.photos', $other->id), 'the other site is untouched');
     }
 
-    public function test_the_shop_manager_never_sees_or_uses_the_switch(): void
+    public function test_the_shop_manager_sees_the_status_but_never_the_switch(): void
     {
         $shop = Shop::factory()->create();
         $merchant = User::factory()->create();
@@ -48,7 +49,10 @@ final class PhotoSwitchTest extends TestCase
         $this->actingAs($merchant)
             ->get("/merchant/{$shop->slug}/search/terms")
             ->assertOk()
-            ->assertDontSee('חיפוש לפי תמונה באתר הזה');
+            ->assertSee(__('search::ui.photos.heading'))
+            ->assertSee(__('search::ui.photos.no_pictures'))
+            ->assertSee(__('search::ui.photos.ask_us'))
+            ->assertDontSee('setPhotos', false);
 
         $this->assertFalse(Features::enabled('search.photos', $shop->id));
     }

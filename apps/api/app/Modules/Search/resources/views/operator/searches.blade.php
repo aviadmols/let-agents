@@ -75,15 +75,43 @@
         @endif
 
         @if ($photos = $this->photos())
-            <x-filament::section :heading="__('search::ui.photos.heading')" :description="__('search::ui.photos.description')">
-                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
-                    <div>
+            <x-filament::section :heading="__('search::ui.photos.heading')" :description="__('search::ui.photos.'.($photos['switch'] ? 'description' : 'description_shop'))">
+                <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:space-between">
+                    <div style="display:grid;gap:6px;font-size:14px">
                         <strong>{{ __('search::ui.photos.'.($photos['on'] ? 'is_on' : 'is_off')) }}</strong>
-                        @if ($photos['on'] && ! $photos['ready'])
-                            <div style="{{ $small }}">{{ __('search::ui.photos.not_ready') }}</div>
+                        <span>
+                            @if ($photos['total'] === 0)
+                                {{ __('search::ui.photos.no_pictures') }}
+                            @elseif (! $photos['scanning'] && $photos['scanned'] === 0)
+                                {{ __('search::ui.photos.not_scanning') }}
+                            @else
+                                {{ __('search::ui.photos.scanned', ['scanned' => number_format(min($photos['scanned'], $photos['total'])), 'total' => number_format($photos['total'])]) }}
+                                @if ($photos['unreadable'] > 0)
+                                    <span style="{{ $small }}">· {{ __('search::ui.photos.unreadable', ['count' => number_format($photos['unreadable'])]) }}</span>
+                                @endif
+                            @endif
+                        </span>
+                        @if ($photos['last'])
+                            <span style="{{ $small }}">
+                                {{ __('search::ui.photos.last_scan', ['when' => $photos['last']->diffForHumans()]) }}
+                                @if ($photos['last_failed'])
+                                    · {{ __('search::ui.photos.'.($photos['switch'] ? 'last_failed' : 'last_failed_shop')) }}
+                                @endif
+                            </span>
                         @endif
+                        <span>
+                            @if ($photos['on'] && $photos['ready'])
+                                ✓ {{ __('search::ui.photos.camera_shown') }}
+                            @elseif ($photos['on'])
+                                {{ __('search::ui.photos.not_ready') }}
+                            @elseif (! $photos['switch'])
+                                <span style="{{ $small }}">{{ __('search::ui.photos.ask_us') }}</span>
+                            @endif
+                        </span>
                     </div>
-                    <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                    @if ($photos['switch'])
+                        <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                    @endif
                 </div>
             </x-filament::section>
         @endif

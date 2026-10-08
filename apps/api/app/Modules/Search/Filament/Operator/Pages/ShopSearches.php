@@ -6,9 +6,11 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
-use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\WritePageTags;
@@ -97,17 +99,37 @@ class ShopSearches extends Page
         return Filament::getCurrentPanel()?->getId() === User::OPERATOR_PANEL;
     }
 
-    /** @return array{on: bool, ready: bool}|null */
+    /**
+     * Search by photo on this site, as everyone may see it: whether it is on, how many of the
+     * shop's pictures are scanned, and when the scan last ran. Only the operator gets the switch.
+     *
+     * @return array<string, mixed>|null
+     */
     public function photos(): ?array
     {
-        if ($this->shop === null || ! $this->operatorView()) {
+        if ($this->shop === null) {
             return null;
         }
 
-        return [
-            'on' => Features::enabled('search.photos', $this->shop),
-            'ready' => app(TenantContext::class)->run($this->shop, fn (): bool => app(SemanticSearch::class)->picturesReady()),
-        ];
+        return app(TenantContext::class)->run($this->shop, function (): array {
+            $scanned = RetrievalImage::query()
+                ->where('embedding_model', (string) Settings::get('retrieval.image_model'))
+                ->whereNotNull('embedding')
+                ->count();
+            $last = Run::query()->where('shop_id', $this->shop)->where('agent', 'retrieval.image_indexer')->latest('started_at')->first();
+
+            return [
+                'on' => Features::enabled('search.photos', $this->shop),
+                'scanning' => Features::enabled('retrieval.image_index', $this->shop),
+                'scanned' => $scanned,
+                'total' => CatalogProduct::query()->active()->whereNotNull('image_url')->count(),
+                'unreadable' => RetrievalImage::query()->whereNotNull('error')->count(),
+                'ready' => $scanned > 0,
+                'last' => $last?->finished_at ?? $last?->started_at,
+                'last_failed' => $last !== null && $last->status->value === 'failed',
+                'switch' => $this->operatorView(),
+            ];
+        });
     }
 
     public function setPhotos(bool $on): void
@@ -115,6 +137,11 @@ class ShopSearches extends Page
         abort_unless($this->operatorView() && $this->shop !== null, 403);
 
         Features::override('search.photos', $on, $this->shop);
+
+        // Photo search needs the shop's pictures scanned, so turning it on starts the scan too.
+        if ($on) {
+            Features::override('retrieval.image_index', true, $this->shop);
+        }
         Notification::make()->success()->title(__('search::ui.photos.'.($on ? 'turned_on' : 'turned_off')))->send();
     }
 
