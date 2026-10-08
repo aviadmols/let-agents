@@ -254,7 +254,12 @@
                         "product_highlights"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "enrichment",
+                "step": "nightly",
+                "shop_argument": "target"
+            }
         },
         {
             "name": "auditor",
@@ -287,7 +292,12 @@
                         "review_rules"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "enrichment",
+                "step": "audit",
+                "shop_argument": "target"
+            }
         }
     ]
 }

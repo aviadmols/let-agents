@@ -3,6 +3,7 @@
 namespace App\Modules\Connections\Support;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Connections\Events\StoreAddressMoved;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Tenancy\Models\Shop;
 
@@ -39,6 +40,7 @@ final class FollowShopDomain
 
                 $connection->site_url = ($parts['scheme'] ?? 'https').'://'.$new.(isset($parts['port']) ? ':'.$parts['port'] : '').($parts['path'] ?? '');
                 $connection->save();
+                event(new StoreAddressMoved((string) $shop->id, $old, $new));
             }
         });
     }
@@ -66,7 +68,10 @@ final class FollowShopDomain
         }
 
         $parts = parse_url((string) $connection->site_url);
+        $from = strtolower((string) ($parts['host'] ?? ''));
         $connection->site_url = ($parts['scheme'] ?? 'https').'://'.$domain.($parts['path'] ?? '');
         $connection->save();
+
+        event(new StoreAddressMoved((string) $connection->shop_id, $from, $domain));
     }
 }

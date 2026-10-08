@@ -4,6 +4,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -81,6 +82,9 @@ final class SyncCatalog
                 'limit' => number_format((int) Settings::get('catalog.max_products', $shopId)),
             ],
         );
+
+        // What reads the catalogue (the search box) follows now, not at night.
+        event(new CatalogUpdated($shopId));
     }
 
     /** @return array{total: int, created: int, updated: int, unchanged: int, removed: int} */

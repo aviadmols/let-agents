@@ -278,7 +278,12 @@
                         "embedding_usd_per_million"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "retrieval",
+                "step": "index",
+                "shop_argument": "target"
+            }
         },
         {
             "name": "image_indexer",
@@ -297,7 +302,12 @@
                         "image_text_usd_per_million"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "retrieval",
+                "step": "images",
+                "shop_argument": "target"
+            }
         },
         {
             "name": "query_embedder",
@@ -335,7 +345,12 @@
                         "match"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "retrieval",
+                "step": "match",
+                "shop_argument": "target"
+            }
         }
     ]
 }

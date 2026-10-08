@@ -96,4 +96,61 @@ final class PhotoSwitchTest extends TestCase
 
         $this->assertFalse(Features::enabled('search.photos', $shop->id));
     }
+
+    public function test_the_shop_manager_scans_once_photo_search_is_on_and_sees_it_wait(): void
+    {
+        $shop = Shop::factory()->create();
+        Features::override('search.photos', true, $shop->id);
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        $fake = new class implements RunsRetrieval
+        {
+            public int $scans = 0;
+
+            public function index(string $shopId): Run
+            {
+                throw new \LogicException('not here');
+            }
+
+            public function images(string $shopId): Run
+            {
+                $this->scans++;
+
+                return new Run;
+            }
+
+            public function match(string $shopId, ?array $productIds = null): Run
+            {
+                throw new \LogicException('not here');
+            }
+        };
+        $this->app->instance(RunsRetrieval::class, $fake);
+
+        Filament::setCurrentPanel(Filament::getPanel('merchant'));
+        $this->actingAs($merchant);
+        Livewire::test(ShopSearches::class, ['shop' => $shop->id])
+            ->assertSee(__('search::ui.photos.scan_now'))
+            ->assertDontSee('setPhotos', false)
+            ->call('scanPicturesNow')
+            ->assertNotified(__('search::ui.photos.scan_started'))
+            ->assertSee(__('search::ui.photos.queued'))
+            ->call('scanPicturesNow')
+            ->assertNotified(__('search::ui.photos.scan_wait'));
+
+        $this->assertSame(1, $fake->scans, 'pressing again within the hour queues nothing');
+    }
+
+    public function test_the_shop_manager_cannot_scan_while_photo_search_is_off(): void
+    {
+        $shop = Shop::factory()->create();
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+
+        Filament::setCurrentPanel(Filament::getPanel('merchant'));
+        $this->actingAs($merchant);
+        Livewire::test(ShopSearches::class, ['shop' => $shop->id])
+            ->assertDontSee(__('search::ui.photos.scan_now'))
+            ->call('scanPicturesNow')
+            ->assertForbidden();
+    }
 }

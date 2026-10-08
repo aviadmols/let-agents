@@ -35,6 +35,8 @@ final class AgentCatalog
                     'name' => (string) $agent['name'],
                     'action' => $slug.'.'.$agent['action'],
                     'when' => (string) ($agent['when'] ?? 'live'),
+                    // The command that runs it for one shop now, when it has one.
+                    'run' => is_array($agent['run'] ?? null) ? $agent['run'] : null,
                     'features' => array_map(fn (string $f): string => $slug.'.'.$f, (array) ($agent['features'] ?? [])),
                     'roles' => array_map(fn (array $role): array => [
                         'role' => (string) $role['role'],

@@ -421,7 +421,12 @@
                         "tags_check"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "search",
+                "step": "tags",
+                "shop_argument": "target"
+            }
         },
         {
             "name": "resolver",
@@ -455,7 +460,12 @@
                         "resolve_check"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "search",
+                "step": "resolve",
+                "shop_argument": "target"
+            }
         }
     ]
 }

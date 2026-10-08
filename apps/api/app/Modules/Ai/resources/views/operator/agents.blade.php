@@ -2,6 +2,7 @@
     @php($agents = $this->agents())
     @php($models = $this->models())
     @php($providers = $this->providers())
+    @php($chosen = $this->chosenShop())
     @php($small = 'font-size:12px;opacity:.7')
     @php($input = 'width:100%;padding:6px 10px;border:1px solid rgba(127,127,127,.35);border-radius:10px;font:inherit;background:transparent;color:inherit;min-width:0')
     @php($pill = 'display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600')
@@ -110,8 +111,15 @@
                         </div>
                     @endforeach
 
-                    <div>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
                         <x-filament::button wire:click="save('{{ $agent['key'] }}')">{{ __('ai::agents_screen.save') }}</x-filament::button>
+                        @if ($agent['run'])
+                            @if ($chosen)
+                                <x-filament::button color="gray" icon="heroicon-o-play" wire:click="runNow('{{ $agent['key'] }}')" wire:loading.attr="disabled" data-run-now="{{ $agent['key'] }}">{{ __('ai::agents_screen.run_now', ['shop' => $chosen['name']]) }}</x-filament::button>
+                            @else
+                                <span style="{{ $small }}">{{ __('ai::agents_screen.run_needs_shop') }}</span>
+                            @endif
+                        @endif
                     </div>
                 </div>
             </x-filament::section>

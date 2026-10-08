@@ -170,7 +170,12 @@
                         "review_cta"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "leads",
+                "step": "write",
+                "shop_argument": "target"
+            }
         }
     ]
 }

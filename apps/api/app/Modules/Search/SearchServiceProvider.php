@@ -4,12 +4,15 @@ namespace App\Modules\Search;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
+use App\Modules\Search\Listeners\RebuildSearchIndex;
 use App\Modules\Search\Support\StoredPageTags;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 
 final class SearchServiceProvider extends ModuleServiceProvider
@@ -17,6 +20,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         $this->app->bind(PageTags::class, StoredPageTags::class);
+        Event::listen(CatalogUpdated::class, RebuildSearchIndex::class);
 
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search:'.$request->ip().'|'.$request->route('site')));

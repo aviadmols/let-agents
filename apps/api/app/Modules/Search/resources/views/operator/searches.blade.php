@@ -91,8 +91,20 @@
                                 @endif
                             @endif
                         </span>
-                        @if ($photos['running'])
-                            <span style="{{ $small }}">{{ __('search::ui.photos.running') }}</span>
+                        @if ($photos['running'] || $photos['queued'])
+                            {{-- While a scan waits or runs, the status refreshes itself. --}}
+                            <span wire:poll.5s style="{{ $small }}">{{ __('search::ui.photos.'.($photos['running'] ? 'running' : 'queued')) }}</span>
+                        @endif
+                        @if ($photos['stuck'])
+                            <span style="{{ $small }}">⚠ {{ __('search::ui.photos.'.($photos['switch'] ? 'stuck' : 'stuck_shop')) }}</span>
+                        @endif
+                        @if (! $photos['running'] && $photos['stopped'])
+                            <span style="{{ $small }}">⚠ {{ $photos['switch'] ? __('search::ui.photos.stopped.'.(in_array($photos['stopped'], ['unknown_provider', 'no_key', 'spend_cap', 'unsupported'], true) ? $photos['stopped'] : 'other'), ['reason' => $photos['stopped']]) : __('search::ui.photos.stopped_shop') }}</span>
+                        @elseif (! $photos['running'] && $photos['last'] && $photos['pending'] > 0)
+                            <span style="{{ $small }}">{{ __('search::ui.photos.pending', ['count' => number_format($photos['pending'])]) }}</span>
+                        @endif
+                        @if ($photos['switch'] && $photos['unreadable'] > 0)
+                            <span style="{{ $small }}">{{ __('search::ui.photos.unreadable_why') }}</span>
                         @endif
                         @if ($photos['last'])
                             <span style="{{ $small }}">
@@ -112,10 +124,14 @@
                             @endif
                         </span>
                     </div>
-                    @if ($photos['switch'])
+                    @if ($photos['can_scan'] || $photos['switch'])
                         <div style="display:flex;flex-wrap:wrap;gap:8px">
-                            <button type="button" style="{{ $btn }}" wire:click="scanPicturesNow" wire:loading.attr="disabled" @disabled($photos['running'] || $photos['total'] === 0)>{{ __('search::ui.photos.scan_now') }}</button>
-                            <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                            @if ($photos['can_scan'])
+                                <button type="button" style="{{ $btn }}" wire:click="scanPicturesNow" wire:loading.attr="disabled" @disabled($photos['running'] || $photos['total'] === 0)>{{ __('search::ui.photos.scan_now') }}</button>
+                            @endif
+                            @if ($photos['switch'])
+                                <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                            @endif
                         </div>
                     @endif
                 </div>

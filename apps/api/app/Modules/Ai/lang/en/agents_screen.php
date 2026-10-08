@@ -37,4 +37,9 @@ return [
     'saved' => 'Saved. The next run uses it.',
     'invalid' => 'Invalid value',
     'models_hint' => 'Models the provider key can call, from the last check.',
+    'run_now' => 'Run now for :shop',
+    'run_needs_shop' => 'To run it now, choose a shop in the top bar.',
+    'choose_shop' => 'Choose a shop in the top bar',
+    'run_started' => 'The run has started for :shop',
+    'run_started_body' => 'It runs in the background. Its progress and result are in the activity log, and in this agent\'s runs line here.',
 ];

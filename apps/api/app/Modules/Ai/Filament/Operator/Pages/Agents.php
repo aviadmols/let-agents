@@ -5,6 +5,7 @@ namespace App\Modules\Ai\Filament\Operator\Pages;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Settings\InvalidSettingValue;
+use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Ai\Models\AiProvider;
 use App\Modules\Ai\Support\AgentCatalog;
@@ -13,6 +14,7 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
@@ -141,6 +143,40 @@ final class Agents extends Page
         }
 
         Notification::make()->success()->title(__('ai::agents_screen.saved'))->send();
+    }
+
+    /** The shop chosen in the top bar, which "run now" runs for; null while every shop is shown. */
+    /** @return array{id: string, slug: string, name: string}|null */
+    public function chosenShop(): ?array
+    {
+        return app(ChosenShop::class)->get();
+    }
+
+    /**
+     * Runs one agent now for the chosen shop instead of waiting for its hour: its own command,
+     * on the queue, so a long run (hundreds of pictures) never holds the screen.
+     */
+    public function runNow(string $agentKey): void
+    {
+        $agent = collect(AgentCatalog::all())->firstWhere('key', $agentKey);
+        $shop = $this->chosenShop();
+
+        if ($agent === null || ($agent['run'] ?? null) === null) {
+            return;
+        }
+
+        if ($shop === null) {
+            Notification::make()->warning()->title(__('ai::agents_screen.choose_shop'))->send();
+
+            return;
+        }
+
+        $run = $agent['run'];
+        $arguments = isset($run['step']) ? ['step' => $run['step']] : [];
+        $arguments[$run['shop_argument'] ?? 'target'] = $shop['slug'];
+        Artisan::queue((string) $run['command'], $arguments);
+
+        Notification::make()->success()->title(__('ai::agents_screen.run_started', ['shop' => $shop['name']]))->body(__('ai::agents_screen.run_started_body'))->send();
     }
 
     /** On or off for every shop; a shop can still be set apart in its own settings. */

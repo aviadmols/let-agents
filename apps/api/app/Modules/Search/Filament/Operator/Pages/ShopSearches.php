@@ -28,6 +28,7 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use UnitEnum;
@@ -39,6 +40,9 @@ use UnitEnum;
  */
 class ShopSearches extends Page
 {
+    /** A shop's pictures are scanned on request at most once in this time. */
+    private const SCAN_EVERY_SECONDS = 3600;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMagnifyingGlass;
 
     protected static string|UnitEnum|null $navigationGroup = 'discovery';
@@ -118,6 +122,10 @@ class ShopSearches extends Page
                 ->whereNotNull('embedding')
                 ->count();
             $last = Run::query()->where('shop_id', $this->shop)->where('agent', 'retrieval.image_indexer')->latest('started_at')->first();
+            $asked = Cache::get('search:scan-pictures:'.$this->shop);
+            // Pressed, but no run has started since: the scan waits on the queue.
+            $queued = is_int($asked) && ($last === null || $last->started_at === null || $last->started_at->timestamp < $asked);
+            $stopped = $last?->output['stopped'] ?? null;
 
             return [
                 'on' => Features::enabled('search.photos', $this->shop),
@@ -130,6 +138,13 @@ class ShopSearches extends Page
                 'last_failed' => $last !== null && $last->status->value === 'failed',
                 'running' => $last !== null && $last->status->value === 'running',
                 'switch' => $this->operatorView(),
+                'can_scan' => $this->canScan(),
+                'queued' => $queued,
+                // Waiting over five minutes: the worker that runs the queue is not running.
+                'stuck' => $queued && now()->timestamp - $asked > 300,
+                'stopped' => is_string($stopped) ? $stopped : null,
+                'pending' => (int) ($last?->output['pending'] ?? 0),
+                'embedded' => (int) ($last?->output['embedded'] ?? 0),
             ];
         });
     }
@@ -138,11 +153,29 @@ class ShopSearches extends Page
      * Scans this shop's pictures now instead of at night: a vector for each picture that is new or
      * changed. Hundreds of pictures take minutes, so it runs on the queue; the status shows it.
      */
+    /**
+     * Who may start a scan: the operator for any shop, the shop's own manager once photo search
+     * is on for the shop (the operator decides which sites have it).
+     */
+    public function canScan(): bool
+    {
+        return $this->shop !== null && ($this->operatorView() || Features::enabled('search.photos', $this->shop));
+    }
+
     public function scanPicturesNow(): void
     {
-        abort_unless($this->operatorView() && $this->shop !== null, 403);
+        abort_unless($this->canScan(), 403);
 
         $shop = $this->shop;
+
+        // Once an hour a shop, whoever presses: a picture is scanned again only when it changed,
+        // but pressing again and again should never queue the same work twice.
+        if (! Cache::add('search:scan-pictures:'.$shop, now()->timestamp, now()->addSeconds(self::SCAN_EVERY_SECONDS))) {
+            Notification::make()->warning()->title(__('search::ui.photos.scan_wait'))->send();
+
+            return;
+        }
+
         dispatch(function () use ($shop): void {
             app(RunsRetrieval::class)->images($shop);
         })->name('scan pictures '.$shop);

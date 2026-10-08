@@ -177,7 +177,12 @@
                         "audit"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "improvement",
+                "step": "review",
+                "shop_argument": "target"
+            }
         }
     ]
 }

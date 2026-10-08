@@ -401,7 +401,11 @@
                         "review_asks"
                     ]
                 }
-            ]
+            ],
+            "run": {
+                "command": "assistant:review-asks",
+                "shop_argument": "shop"
+            }
         }
     ]
 }
