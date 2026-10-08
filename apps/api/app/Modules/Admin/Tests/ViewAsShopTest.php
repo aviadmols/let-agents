@@ -55,6 +55,6 @@ final class ViewAsShopTest extends TestCase
 
         $this->actingAs($merchant)->followingRedirects()->get("/merchant/{$mine->slug}")->assertOk()->assertDontSee('data-view-as-shop', false);
         $this->actingAs($merchant)->get("/merchant/{$other->slug}")->assertNotFound();
-        $this->actingAs($merchant)->get("/operator/agents")->assertForbidden();
+        $this->actingAs($merchant)->get('/operator/agents')->assertForbidden();
     }
 }
