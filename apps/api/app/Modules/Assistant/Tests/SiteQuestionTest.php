@@ -172,29 +172,50 @@ final class SiteQuestionTest extends TestCase
         ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he'], JSON_UNESCAPED_UNICODE));
     }
 
-    public function test_code_reads_the_results_first_so_the_cheapest_in_stock_is_known_without_a_price(): void
+    public function test_the_cheapest_is_arithmetic_code_answers_it_and_no_model_is_asked(): void
     {
-        $this->product('701', 'מברגה מקיטה 18V', 'מברגה נטענת.', [], ['price' => '890.00', 'brand' => 'Makita', 'in_stock' => true]);
-        $this->product('702', 'מברגה איינהל', 'מברגה רוטטת.', [], ['price' => '240.00', 'brand' => 'Einhell', 'in_stock' => true, 'on_sale' => true]);
-        $this->product('703', 'מברגה זולה שאזלה', 'מברגה.', [], ['price' => '99.00', 'in_stock' => false]);
+        $this->drills();
+
+        $data = $this->askWith('איזו מברגה הכי זולה?', ['701', '704', '702', '703'])->json('data');
+
+        $this->assertSame(['answered', 'code'], [$data['outcome'], $data['from']]);
+        $this->assertSame(['702', '701'], array_column($data['picks'], 'external_id'), 'cheapest in stock first; the sold-out one and the bit are not drills on offer');
+        $this->assertStringContainsString('מברגה איינהל', $data['answer']);
+        $this->assertSame([], $this->calls, 'no model for arithmetic');
+    }
+
+    public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
+    {
+        $this->drills();
         $this->replies = [
-            ['found' => true, 'answer' => 'הזולה במלאי היא מברגה איינהל.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'הזולה במלאי']]],
+            ['found' => true, 'answer' => 'למברגה ביתית, מברגה איינהל.', 'refs' => [], 'picks' => [['ref' => 'p3', 'why' => 'מתאימה לבית']]],
             ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
         ];
 
-        $data = $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
-            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
-        ], content: json_encode(['question' => 'איזו מברגה הכי זולה?', 'vid' => self::VID, 'locale' => 'he', 'products' => ['701', '702', '703']], JSON_UNESCAPED_UNICODE))->assertOk()->json('data');
+        $this->askWith('איזו מברגה מתאימה לבית?', ['701', '704', '702', '703'])->assertOk();
 
         $input = json_decode($this->calls[0]['user'], true);
-        $this->assertSame('cheapest', $input['analysis']['asks']);
-        $this->assertSame(['p2', 'p1'], $input['analysis']['in_stock_cheapest_first'], 'cheapest_in_stock_first, the sold-out one aside');
-        $this->assertSame(['p3'], $input['analysis']['out_of_stock']);
+        $this->assertNull($input['analysis']['asks']);
+        $this->assertSame(['p2', 'p3', 'p1'], $input['analysis']['in_stock_cheapest_first']);
+        $this->assertSame(['p4'], $input['analysis']['out_of_stock']);
         $this->assertSame(1, $input['products'][1]['price_rank']);
         $this->assertStringNotContainsString('240', $this->calls[0]['user'], 'ranks, never prices, reach the model');
-        $this->assertStringContainsString('"price_rank":1', $this->calls[1]['user'], 'the checker sees the measure the why rests on');
+        $this->assertStringContainsString('"price_rank":2', $this->calls[1]['user'], 'the checker sees the measure the why rests on');
+    }
 
-        $this->assertSame('answered', $data['outcome']);
-        $this->assertSame('702', $data['picks'][0]['external_id']);
+    private function drills(): void
+    {
+        $this->product('701', 'מברגה מקיטה 18V', 'מברגה נטענת.', [], ['price' => '890.00', 'brand' => 'Makita', 'in_stock' => true]);
+        $this->product('702', 'מקדחה/מברגה איינהל', 'מברגה רוטטת.', [], ['price' => '240.00', 'brand' => 'Einhell', 'in_stock' => true, 'on_sale' => true]);
+        $this->product('703', 'מברגה זולה שאזלה', 'מברגה.', [], ['price' => '99.00', 'in_stock' => false]);
+        $this->product('704', 'ביט למברגה 25 מ"מ', 'ביט.', [], ['price' => '7.00', 'in_stock' => true]);
+    }
+
+    /** @param list<string> $products */
+    private function askWith(string $question, array $products): TestResponse
+    {
+        return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products], JSON_UNESCAPED_UNICODE));
     }
 }

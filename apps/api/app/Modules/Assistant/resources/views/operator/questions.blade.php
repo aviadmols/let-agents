@@ -87,6 +87,7 @@
                                 <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px">
                                     <span style="padding:1px 9px;border-radius:999px;{{ $ask->outcome === 'answered' ? 'background:rgba(27,175,122,.16)' : 'background:rgba(235,104,52,.14)' }}">{{ __('assistant::ui.asks.outcomes.'.$ask->outcome) }}</span>
                                     @if ($ask->whatsapp_shown)<span style="padding:1px 9px;border-radius:999px;background:rgba(31,157,85,.14)">{{ __('assistant::ui.asks.'.($ask->whatsapp_clicked ? 'whatsapp_clicked' : 'whatsapp_shown')) }}</span>@endif
+                                    @if ($ask->reason && $this->operatorView())<span style="padding:1px 9px;border-radius:999px;background:rgba(127,127,127,.14)" dir="ltr" title="{{ __('assistant::ui.asks.reason_title') }}">{{ __('assistant::ui.asks.reasons.'.$ask->reason) !== 'assistant::ui.asks.reasons.'.$ask->reason ? __('assistant::ui.asks.reasons.'.$ask->reason) : $ask->reason }}</span>@endif
                                     @if ($ask->picked)<span style="padding:1px 9px;border-radius:999px;background:rgba(126,34,206,.12)">{{ __('assistant::ui.asks.picked') }}</span>@endif
                                     @if ($note)<span style="padding:1px 9px;border-radius:999px;background:rgba(127,127,127,.14)">{{ __('assistant::ui.asks.score', ['score' => $note['score']]) }}</span>@endif
                                 </div>

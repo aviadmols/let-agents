@@ -55,6 +55,12 @@ final class AnswerSiteQuestion
 
     public const MAX_PRODUCTS = 12;
 
+    /** Products a superlative answered in code shows. */
+    private const MAX_COMPUTED = 3;
+
+    /** Words a question wraps around the product it names. */
+    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'which', 'what', 'the', 'most', 'your'];
+
     private const MIN_CHARS = 3;
 
     private const CHECK_OUTPUT_TOKENS = 400;
@@ -107,6 +113,12 @@ final class AnswerSiteQuestion
      */
     private function answer(string $shopId, string $question, string $visitorHash, string $locale, array $products): array
     {
+        // "The cheapest drill" is arithmetic: code answers it from the products found, before any
+        // saved answer (prices and stock change) and without a model.
+        if (($computed = $this->computed($question, $locale, $products)) !== null) {
+            return $computed;
+        }
+
         $saved = self::siteAnswers()->where('question_key', Question::key($question))->first();
 
         if ($saved !== null && $this->stale($saved, $shopId)) {
@@ -263,14 +275,17 @@ final class AnswerSiteQuestion
                         ], JSON_UNESCAPED_UNICODE), self::CHECK_OUTPUT_TOKENS, null, 'site_check');
                         $replies[] = [$check, 'site_check'];
 
+                        $verdict = [];
                         if (($check->data['picks_fit'] ?? null) !== true) {
                             $picks = [];
+                            $verdict[] = 'picks';
                         }
                         if (($check->data['supported'] ?? null) !== true || ($check->data['on_topic'] ?? null) !== true) {
                             $answer = '';
+                            $verdict[] = ($check->data['on_topic'] ?? null) !== true ? 'off_topic' : 'unsupported';
                         }
 
-                        $refusal = $answer === '' && $picks === [] ? 'did_not_pass_the_check' : null;
+                        $refusal = $answer === '' && $picks === [] ? 'check_'.implode('_', $verdict ?: ['empty']) : null;
                     }
                 } catch (SpendCapReached $e) {
                     $run->fail('assistant::runs.spend_cap', [], $e->getMessage());
@@ -289,7 +304,7 @@ final class AnswerSiteQuestion
 
                 $result = $refusal === null
                     ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved->id]
-                    : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved->id];
+                    : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved->id, 'reason' => mb_substr((string) $refusal, 0, 40)];
                 $run->output(['outcome' => $outcome, 'refused' => $refusal, 'cited' => count($cited), 'picks' => count($picks), 'answer' => $answer, 'checker' => $checker['name'].' · '.$checker['model']])
                     ->summary('assistant::runs.site_'.$outcome);
             },
@@ -324,6 +339,92 @@ final class AnswerSiteQuestion
             'on_sale' => array_keys(array_filter($productsByRef, fn (array $p): bool => $p['on_sale'] && $p['in_stock'])),
             'brands' => array_values(array_unique(array_filter(array_map(fn (array $p): ?string => $p['brand'] ?: null, $productsByRef)))),
         ];
+    }
+
+    /**
+     * A superlative answered in code: the products found that are what the question names (a
+     * drill, not "a bit for a drill"), in stock, ordered by price or on sale. Null when the
+     * question asks for no superlative or none of the products is what it names: then a model
+     * reads it.
+     *
+     * @param  list<string>  $shown
+     * @return array<string, mixed>|null
+     */
+    private function computed(string $question, string $locale, array $shown): ?array
+    {
+        $productsByRef = [];
+        foreach ($this->candidates($shown) as $i => $product) {
+            $productsByRef['p'.($i + 1)] = $product;
+        }
+
+        $asks = self::analysis($question, $productsByRef)['asks'];
+
+        if ($asks === null || $productsByRef === []) {
+            return null;
+        }
+
+        $named = self::named($question);
+        $fit = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0
+            && ($named === [] || self::titleNames($p['title'], $named)) && ($asks !== 'on_sale' || $p['on_sale']));
+
+        if ($fit === []) {
+            return null;
+        }
+
+        uasort($fit, fn (array $a, array $b): int => $asks === 'most_expensive' ? $b['price'] <=> $a['price'] : $a['price'] <=> $b['price']);
+        $picks = [];
+
+        foreach (array_slice(array_values($fit), 0, self::MAX_COMPUTED) as $at => $product) {
+            $picks[] = ['external_id' => $product['external_id'], 'title' => $product['title'], 'why' => (string) __('assistant::answers.site.computed.why_'.$asks.($at === 0 ? '' : '_next'), [], $locale)];
+        }
+
+        return [
+            'outcome' => AssistantAnswer::ANSWERED,
+            'answer' => (string) __('assistant::answers.site.computed.'.$asks, ['title' => $picks[0]['title']], $locale),
+            'from' => 'code',
+            'sources' => [],
+            'picks' => $this->present($picks),
+        ];
+    }
+
+    /**
+     * The words a question names its product with: no question, filler or superlative words,
+     * each by its stem. "איזו מברגה הכי זולה" names "מברג".
+     *
+     * @return list<string>
+     */
+    private static function named(string $question): array
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(Question::normalize($question)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $out = [];
+
+        foreach ($words as $word) {
+            if (mb_strlen($word) >= 3 && ! in_array($word, self::NOT_NAMES, true) && preg_match('/^(זול|יקר|במבצע|מבצע|הנחה|cheap|expensive)/u', $word) !== 1) {
+                $out[] = self::stem($word);
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /** Whether a title has a word that starts with one of the named stems ("למברגה" does not). */
+    private static function titleNames(string $title, array $named): bool
+    {
+        foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($title), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            foreach ($named as $stem) {
+                if (str_starts_with($word, $stem)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** מברגה, מברגות → מברג. */
+    private static function stem(string $word): string
+    {
+        return mb_strlen($word) > 3 ? (string) preg_replace('/(ות|ים|ה|ת)$/u', '', $word) : $word;
     }
 
     /**
@@ -462,6 +563,8 @@ final class AnswerSiteQuestion
             && Features::enabled('assistant.search_whatsapp', $shopId);
 
         if ($result['outcome'] === 'invalid') {
+            unset($result['reason']);
+
             return $result;
         }
 
@@ -472,12 +575,14 @@ final class AnswerSiteQuestion
             'products' => $products,
             'outcome' => $result['outcome'],
             'from' => $result['from'],
+            // Why it got no answer, for the operator: what refused it.
+            'reason' => $result['reason'] ?? null,
             'answer_id' => $result['answer_id'] ?? null,
             'picks' => array_map(fn (array $p): array => ['external_id' => $p['external_id'], 'title' => $p['title'], 'why' => $p['why']], (array) ($result['picks'] ?? [])),
             'whatsapp_shown' => $whatsapp,
         ]);
 
-        unset($result['answer_id']);
+        unset($result['answer_id'], $result['reason']);
 
         return $result + ['ask_id' => $ask->id, 'whatsapp' => $whatsapp];
     }

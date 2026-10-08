@@ -13,5 +13,16 @@ return [
         'no_info' => 'I could not find that on the site. The store team can help.',
         'limit' => 'You have reached today\'s questions. The store team can help.',
         'unavailable' => 'We could not answer right now. Please try again later.',
+        'computed' => [
+            'cheapest' => 'The cheapest in stock of what we found: :title.',
+            'most_expensive' => 'The most expensive in stock of what we found: :title.',
+            'on_sale' => 'On sale now, of what we found: :title.',
+            'why_cheapest' => 'The cheapest in stock',
+            'why_cheapest_next' => 'Another low-priced option in stock',
+            'why_most_expensive' => 'The most expensive in stock',
+            'why_most_expensive_next' => 'Another of the top-priced in stock',
+            'why_on_sale' => 'On sale now',
+            'why_on_sale_next' => 'Also on sale now',
+        ],
     ],
 ];
