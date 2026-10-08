@@ -242,6 +242,18 @@ final class SearchFlowTest extends TestCase
         $this->assertSame([], $this->meaningAsked);
     }
 
+    public function test_while_typing_the_search_is_spelling_only_and_not_counted(): void
+    {
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $result = $this->getJson("/api/v1/search/{$this->site}?q=".urlencode('מקיטא').'&typing=1', ['Origin' => 'https://www.store.test'])->assertOk()->json();
+
+        $this->assertSame('101', $result['groups']['product'][0]['external_id'] ?? null, 'a typo still finds the drill');
+        $this->assertFalse($result['semantic']);
+        $this->assertSame([], $this->meaningAsked, 'no vector per keystroke');
+        $this->assertSame(0, $this->inShop(fn () => SearchTerm::query()->count()), 'nothing counted while typing');
+    }
+
     public function test_a_synonym_finds_the_products_the_store_names_differently(): void
     {
         app(BuildSearchIndex::class)->handle($this->shop->id);

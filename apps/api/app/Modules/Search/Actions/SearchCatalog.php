@@ -43,9 +43,12 @@ final class SearchCatalog
      * @param  list<string>|null  $only  groups to return; null for all
      * @return array{query: string, total: int, semantic: bool, groups: array<string, list<array<string, mixed>>>, counts: array<string, int>}
      */
-    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null): array
+    /**
+     * @param  bool  $meaning  false while a shopper is still typing: spelling only, code only, no vector
+     */
+    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true): array
     {
-        return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup, $meaning): array {
             $query = HebrewSearch::normalize(mb_substr($raw, 0, 120));
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
             $index = $query === '' ? null : LoadedIndex::for($shopId);
@@ -55,8 +58,9 @@ final class SearchCatalog
             }
 
             $spelling = HebrewSearch::search($index['engine'], $query);
-            $meaning = $this->meaning($shopId, $query, $index['records']);
-            $pictures = $this->pictures($shopId, $query, $index['records']);
+            $byMeaning = $meaning;
+            $meaning = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : [];
+            $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
             $pinned = $this->resolved($query, $index['records']);
             $ranked = $this->merge($spelling, [$meaning, $pictures], $pinned);
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);

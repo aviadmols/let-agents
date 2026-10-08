@@ -386,7 +386,8 @@ class Configuration extends Page implements HasForms
             SettingType::Bool => Toggle::make($name)->inline(false),
             SettingType::Enum => Select::make($name)
                 ->options(array_combine($definition->options, array_map(fn (string $o) => $this->optionLabel($definition, $o), $definition->options)))
-                ->placeholder($this->optionLabel($definition, (string) $inherited)),
+                // The empty choice is the default, named as such, so it never reads like a second copy of an option.
+                ->placeholder(__('admin::configuration.default_option', ['value' => $this->optionLabel($definition, (string) $inherited)])),
             SettingType::Int, SettingType::Float => TextInput::make($name)
                 ->numeric()
                 ->inputMode($definition->type === SettingType::Int ? 'numeric' : 'decimal')

@@ -462,6 +462,7 @@
     '.find-ask{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;margin:8px 0;padding:10px 12px;border:1.5px dashed var(--accent);border-radius:12px;cursor:pointer;font-size:14px}',
     '.find-ask b{color:var(--accent);white-space:nowrap}',
     '.find-none{margin:8px 0;color:var(--muted);font-size:14px}',
+    '.find-head{margin:12px 0 4px;font-size:12px;font-weight:700;color:var(--muted)}',
     // The tag bank: a quiet heading over soft tags, each opening its results in the same panel.
     '.tagbank-title{margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--muted)}',
     '.tagbank{gap:6px}',
@@ -2240,6 +2241,9 @@
           panel.hidden = false;
         }
 
+        var siteTimer = null;
+        var siteAsked = '';
+
         function match(raw) {
           var text = String(raw || '').trim();
           var words = findWords(text);
@@ -2252,7 +2256,9 @@
             item.pill.hidden = !!text && item.section.candidate !== 'ask' && words.length > 0 && findCovers(hay, words) < 0.5;
           });
 
+          clearTimeout(siteTimer);
           if (!text) {
+            siteAsked = '';
             if (open === null) {
               panel.hidden = true;
             }
@@ -2270,20 +2276,10 @@
           });
 
           if (saved && (question || words.length >= 2)) {
-            var box = el('div', 'find-answer');
-            box.appendChild(el('span', 'find-tag', labels.find_saved || ''));
-            box.appendChild(el('strong', null, saved.answer.q));
-            box.appendChild(el('p', null, saved.answer.a));
-            body.appendChild(box);
-          } else if (question && bank.ask) {
-            var ask = el('button', 'find-ask');
-            ask.type = 'button';
-            ask.appendChild(el('span', null, labels.find_ask_hint || ''));
-            ask.appendChild(el('b', null, labels.find_ask || ''));
-            ask.addEventListener('click', function () { submitFind(text); });
-            body.appendChild(ask);
+            body.appendChild(answerCard(labels.find_saved, saved.answer.q, saved.answer.a));
           }
 
+          // What this page already holds: its products and guides, at once.
           var seen = {};
           var cards = el('div', 'cards');
           rendered.forEach(function (item) {
@@ -2315,13 +2311,64 @@
             body.appendChild(guideNodes);
           }
 
-          if (!body.firstChild) {
-            body.appendChild(el('p', 'find-none', labels.find_none || ''));
+          // The whole site, by spelling, once the shopper pauses: code only, nothing counted.
+          var site = el('div', 'find-site');
+          body.appendChild(site);
+
+          // At the foot, always: hand it to the assistant.
+          if (bank.ask && text.length >= 3) {
+            var ask = el('button', 'find-ask');
+            ask.type = 'button';
+            ask.appendChild(el('span', null, question && !saved ? (labels.find_ask_hint || '') : (labels.find_ask_more || '')));
+            ask.appendChild(el('b', null, labels.find_ask || ''));
+            ask.addEventListener('click', function () { submitFind(text, true); });
+            body.appendChild(ask);
           }
+
           showFind(labels.find_title || text, body);
+
+          if (text.length < 2) {
+            return;
+          }
+          siteTimer = setTimeout(function () {
+            siteAsked = text;
+            fetch(API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(text) + '&typing=1', { credentials: 'omit' })
+              .then(function (response) { return response.ok ? response.json() : null; })
+              .then(function (result) {
+                if (siteAsked !== text || !site.isConnected) {
+                  return; // the shopper typed on; this answer is for an older text
+                }
+                var groups = (result && result.groups) || {};
+                var answers = groups.answer || [];
+                if (answers.length && !saved && (question || words.length >= 2)) {
+                  site.appendChild(answerCard(labels.find_saved, answers[0].title, answers[0].answer));
+                }
+                var items = (groups.product || []).filter(function (item) { return !seen[item.external_id] && String(item.external_id) !== PAGE_ID; })
+                  .slice(0, 6)
+                  .concat((groups.content || []).slice(0, 3))
+                  .map(function (item) { return { id: item.external_id, title: item.title, url: item.url, image: item.image }; });
+                var list = items.length ? guideList(findSection, items) : null;
+                if (list) {
+                  site.appendChild(el('div', 'find-head', labels.find_site || ''));
+                  site.appendChild(list);
+                }
+                if (!site.firstChild && !cards.firstChild && !guideNodes && !saved) {
+                  site.appendChild(el('p', 'find-none', labels.find_nothing || ''));
+                }
+              })
+              .catch(function () { /* the page's own matches stand */ });
+          }, 250);
         }
 
-        function submitFind(raw) {
+        function answerCard(tag, question, answer) {
+          var box = el('div', 'find-answer');
+          box.appendChild(el('span', 'find-tag', tag || ''));
+          box.appendChild(el('strong', null, question));
+          box.appendChild(el('p', null, answer));
+          return box;
+        }
+
+        function submitFind(raw, ask) {
           var text = String(raw || '').trim();
           if (!text) {
             return;
@@ -2335,7 +2382,7 @@
           });
 
           // A question goes to the question box: the same answer, limits and way to the shop.
-          if (isQuestion(text) && askIndex !== -1 && typeof rendered[askIndex].body.ask === 'function') {
+          if ((ask || isQuestion(text)) && askIndex !== -1 && typeof rendered[askIndex].body.ask === 'function') {
             if (open !== askIndex) {
               setOpen(askIndex, 'closed');
             }

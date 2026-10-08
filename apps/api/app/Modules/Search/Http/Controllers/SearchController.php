@@ -35,7 +35,10 @@ final class SearchController
             return response()->json(['error' => 'invalid_query'], 422);
         }
 
-        $result = $search->handle($connection->shop_id, $query, count: ! $request->boolean('counted'));
+        // While a shopper is still typing (typing=1): spelling only, so no vector is made per
+        // keystroke, and nothing is counted until they stop.
+        $typing = $request->boolean('typing');
+        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: ! $typing);
 
         return response()->json($result, 200, ['Cache-Control' => 'no-store'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

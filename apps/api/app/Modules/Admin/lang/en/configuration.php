@@ -6,6 +6,7 @@ return [
     'scope_shop_help' => 'Values for :shop only. An empty field inherits the global value.',
     'range' => 'Allowed range: :min to :max.',
     'save' => 'Save',
+    'default_option' => 'Default (:value)',
     'saved' => 'Settings saved',
     'display_title' => 'How it shows in your store',
     'display_help' => 'What shows in your store, where it sits and how it is worded. A change is saved at once and reaches shoppers within a few minutes.',
