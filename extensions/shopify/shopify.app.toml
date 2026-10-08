@@ -14,11 +14,10 @@ embedded = false
 [build]
 # The URLs above are production's; `shopify app dev` must not rewrite them.
 automatically_update_urls_on_dev = false
-include_config_on_deploy = true
 
 [access_scopes]
-# Our server runs the install itself (authorize, token, shop, plan): the classic flow.
-use_legacy_install_flow = true
+# Shopify installs the app and grants these scopes; opening it then sends the store through
+# our OAuth callback (granted already, so it passes straight through) for an offline token.
 # Catalog and content for the index, draft orders and orders for the assistant's carts and reports.
 scopes = "read_products,read_content,read_online_store_pages,write_draft_orders"
 

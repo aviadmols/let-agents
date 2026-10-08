@@ -1,3 +1,4 @@
 # The storefront search as a theme app extension: one app embed the merchant switches on in the theme editor.
 name = "Let Agents search"
 type = "theme"
+uid = "326968ba-2c9e-0c57-6328-2e75db8d9d9ea1d0e0b8"
