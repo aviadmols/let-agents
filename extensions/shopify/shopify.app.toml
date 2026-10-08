@@ -1,0 +1,43 @@
+# Shopify CLI app configuration for Let Agents.
+# Linked to the app in the Partner Dashboard with `shopify app config link`; pushed with `shopify app deploy`.
+# The app itself (install, billing, webhooks) is served by apps/api, module Shopify.
+
+# The app's Client ID from the Partner Dashboard (Apps > Let Agents > Client credentials).
+# It is public, but each environment has its own app, so it is filled in by `shopify app config link`.
+client_id = "__SHOPIFY_API_KEY__"
+name = "Let Agents"
+handle = "let-agents"
+application_url = "https://agents.lets.co.il/shopify/app"
+# The merchant works in the Let Agents panel, not inside Shopify admin.
+embedded = false
+
+[build]
+# The URLs above are production's; `shopify app dev` must not rewrite them.
+automatically_update_urls_on_dev = false
+include_config_on_deploy = true
+
+[access_scopes]
+# Catalog and content for the index, draft orders and orders for the assistant's carts and reports.
+scopes = "read_products,read_content,read_online_store_pages,write_draft_orders,read_orders"
+
+[auth]
+redirect_urls = [ "https://agents.lets.co.il/shopify/callback" ]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
+
+  # Required of every public app: requests to see or erase a shopper's data, and the store's data after uninstall.
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
+
+[pos]
+embedded = false

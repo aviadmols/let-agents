@@ -1,0 +1,47 @@
+{
+    "name": "Shopify",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Runs",
+        "Connections",
+        "Catalog",
+        "Admin"
+    ],
+    "provider": "ShopifyServiceProvider",
+    "features": [],
+    "settings": [
+        {
+            "name": "plan_name",
+            "type": "string",
+            "default": "Let Agents",
+            "min": 1,
+            "max": 80,
+            "scope": "global"
+        },
+        {
+            "name": "plan_price_usd",
+            "type": "float",
+            "default": 49.0,
+            "min": 1,
+            "max": 10000,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "trial_days",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 60,
+            "scope": "global",
+            "unit": "days"
+        },
+        {
+            "name": "billing_test",
+            "type": "bool",
+            "default": false,
+            "scope": "global"
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "let-agents-shopify",
+  "private": true,
+  "scripts": {
+    "config:link": "shopify app config link",
+    "deploy": "shopify app deploy",
+    "info": "shopify app info"
+  },
+  "devDependencies": {
+    "@shopify/cli": "^3"
+  }
+}

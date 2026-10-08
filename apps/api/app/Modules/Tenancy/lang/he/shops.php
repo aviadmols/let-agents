@@ -19,6 +19,7 @@ return [
         'status' => 'סטטוס',
         'active_keys' => 'מפתחות פעילים',
         'created_at' => 'נוצרה',
+        'plan' => 'תוכנית',
     ],
     'sections' => [
         'identity' => 'פרטי החנות',
@@ -40,5 +41,14 @@ return [
     'actions' => [
         'configure' => 'הגדרות ודגלים',
         'merchant_view' => 'כניסה כמו מנהל החנות',
+    ],
+    'plans' => [
+        'none' => '—',
+        'active' => 'פעילה',
+        'pending' => 'ממתינה לאישור',
+        'declined' => 'נדחתה',
+        'cancelled' => 'בוטלה',
+        'frozen' => 'מוקפאת',
+        'expired' => 'פגה',
     ],
 ];

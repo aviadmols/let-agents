@@ -1,0 +1,3 @@
+# The storefront search as a theme app extension: one app embed the merchant switches on in the theme editor.
+name = "Let Agents search"
+type = "theme"

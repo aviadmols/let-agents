@@ -19,6 +19,7 @@ return [
         'status' => 'Status',
         'active_keys' => 'Active keys',
         'created_at' => 'Created',
+        'plan' => 'Plan',
     ],
     'sections' => [
         'identity' => 'Shop details',
@@ -40,5 +41,14 @@ return [
     'actions' => [
         'configure' => 'Settings and flags',
         'merchant_view' => 'Enter as the shop manager',
+    ],
+    'plans' => [
+        'none' => '—',
+        'active' => 'Active',
+        'pending' => 'Waiting for approval',
+        'declined' => 'Declined',
+        'cancelled' => 'Cancelled',
+        'frozen' => 'Frozen',
+        'expired' => 'Expired',
     ],
 ];

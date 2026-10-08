@@ -95,7 +95,9 @@ class StoreConnection extends Model
             return null;
         }
 
-        return app(TenantContext::class)->runUnscoped(fn () => static::query()->with('shop')->where('site_key', $siteKey)->first());
+        // A paused shop (a Shopify store without a live subscription) serves no storefront.
+        return app(TenantContext::class)->runUnscoped(fn () => static::query()->with('shop')->where('site_key', $siteKey)
+            ->whereHas('shop', fn ($shop) => $shop->where('status', 'active'))->first());
     }
 
     /** Private key for preview links: the widget shows only to whoever opens such a link. */
@@ -113,7 +115,9 @@ class StoreConnection extends Model
     /** Hosts the storefront widget may run on: the connected site and the shop's domain. */
     public function allowedHosts(): array
     {
-        $hosts = [parse_url($this->site_url, PHP_URL_HOST), $this->shop?->domain];
+        // A store reachable at more than one address (a Shopify store at its myshopify address
+        // too) lists the others in site_info.hosts.
+        $hosts = [parse_url($this->site_url, PHP_URL_HOST), $this->shop?->domain, ...array_values((array) ($this->site_info['hosts'] ?? []))];
 
         return array_values(array_unique(array_filter(array_map(fn ($h) => is_string($h) ? strtolower(preg_replace('/^www\./', '', $h)) : null, $hosts))));
     }

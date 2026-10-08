@@ -42,6 +42,8 @@ final class ShopsTable
                 ->addSelect([
                     'connected' => DB::table('store_connections')->selectRaw('count(*)')
                         ->whereColumn('store_connections.shop_id', 'shops.id')->where('status', 'connected'),
+                    'plan' => DB::table('shopify_installs')->select('subscription_status')
+                        ->whereColumn('shopify_installs.shop_id', 'shops.id')->limit(1),
                     'products_count' => DB::table('catalog_products')->selectRaw('count(*)')
                         ->whereColumn('catalog_products.shop_id', 'shops.id')->whereNull('removed_at'),
                 ]))
@@ -77,6 +79,18 @@ final class ShopsTable
                     ->label(__('tenancy::shops.fields.connected'))
                     ->boolean()
                     ->state(fn (Shop $record): bool => (int) $record->getAttribute('connected') > 0),
+                // A Shopify store pays through Shopify; its plan is the subscription Shopify reports.
+                TextColumn::make('plan')
+                    ->label(__('tenancy::shops.fields.plan'))
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'active' => 'success',
+                        'pending' => 'warning',
+                        null => 'gray',
+                        default => 'danger',
+                    })
+                    ->formatStateUsing(fn (?string $state): string => __('tenancy::shops.plans.'.($state ?? 'none')))
+                    ->placeholder(__('tenancy::shops.plans.none')),
                 TextColumn::make('products_count')
                     ->label(__('tenancy::shops.fields.products'))
                     ->numeric()

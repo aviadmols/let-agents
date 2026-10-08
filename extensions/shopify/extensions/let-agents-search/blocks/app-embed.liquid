@@ -1,0 +1,50 @@
+{% comment %}
+  Let Agents search, on every page of the store, once the merchant switches this app embed on.
+
+  The app writes two shop metafields at install (namespace let_agents): site_key, the store's public
+  key, and api, the Let Agents API address. Without either nothing is printed, so a store that has not
+  finished installing keeps its own search.
+
+  The context mirrors what the WooCommerce plugin prints (plugins/woocommerce/src/Storefront/Search.php),
+  mapped to Shopify: no Store API or nonce; prices, stock and the cart come from the storefront's own
+  public endpoints under `root`. The script itself downloads nothing until a shopper focuses a field.
+{% endcomment %}
+{%- liquid
+  assign site = shop.metafields.let_agents.site_key.value | strip
+  assign api = shop.metafields.let_agents.api.value | strip
+  assign api_last = api | slice: -1
+  if api_last == '/'
+    assign api = api | remove_last: '/'
+  endif
+  assign api_scheme = api | slice: 0, 8
+-%}
+{%- if site != blank and api != blank and api_scheme == 'https://' -%}
+  <script>
+    window.LetAgentsSearchContext = {
+      "platform": "shopify",
+      "site": {{ site | json }},
+      "api": {{ api | json }},
+      "locale": {{ request.locale.iso_code | slice: 0, 2 | json }},
+      "root": {{ routes.root_url | json }},
+      "searchUrl": {{ routes.search_url | json }},
+      "cartUrl": {{ routes.cart_url | json }},
+      "currency": {{ cart.currency.iso_code | default: shop.currency | json }},
+      "shopCurrency": {{ shop.currency | json }},
+      "moneyFormat": {{ shop.money_format | strip_html | json }}
+    };
+  </script>
+  <script src="{{ api | append: '/search/let-agents-search.js' | escape }}" defer></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.app_embed.name",
+  "target": "body",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.app_embed.settings.about.content"
+    }
+  ]
+}
+{% endschema %}

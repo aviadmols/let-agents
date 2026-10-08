@@ -8,7 +8,8 @@
         "Connections",
         "Catalog",
         "Analytics",
-        "Admin"
+        "Admin",
+        "Shopify"
     ],
     "provider": "RecoveryServiceProvider",
     "features": [

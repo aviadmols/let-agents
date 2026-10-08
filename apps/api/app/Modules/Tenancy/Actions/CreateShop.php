@@ -2,10 +2,11 @@
 
 namespace App\Modules\Tenancy\Actions;
 
+use App\Modules\Tenancy\Contracts\CreatesShops;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Str;
 
-final class CreateShop
+final class CreateShop implements CreatesShops
 {
     /**
      * @param  array{name: string, domain: string, platform: string, slug?: string|null, content_locale?: string, currency?: string, timezone?: string}  $attributes
@@ -13,9 +14,8 @@ final class CreateShop
     public function handle(array $attributes): Shop
     {
         $attributes['domain'] = self::normalizeDomain($attributes['domain']);
-        $attributes['slug'] = filled($attributes['slug'] ?? null)
-            ? Str::slug((string) $attributes['slug'])
-            : $this->uniqueSlug($attributes['name'], $attributes['domain']);
+        // A slug asked for is kept as asked, unless it is taken or reserved: then it gets a suffix.
+        $attributes['slug'] = $this->uniqueSlug(filled($attributes['slug'] ?? null) ? (string) $attributes['slug'] : $attributes['name'], $attributes['domain']);
 
         return Shop::query()->create($attributes);
     }

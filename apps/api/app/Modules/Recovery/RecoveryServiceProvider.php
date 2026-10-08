@@ -4,16 +4,21 @@ namespace App\Modules\Recovery;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Recovery\Console\ReportCommand;
+use App\Modules\Recovery\Listeners\ForgetShopper;
 use App\Modules\Recovery\Models\RecoveryCart;
+use App\Modules\Shopify\Events\ShopperDataRequested;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 
 final class RecoveryServiceProvider extends ModuleServiceProvider
 {
     protected function bootModule(): void
     {
+        Event::listen(ShopperDataRequested::class, ForgetShopper::class);
+
         // The popup's config is read on page loads; it is cached, so this only stops a flood.
         RateLimiter::for('cart', fn (Request $request): Limit => Limit::perMinute(60)->by('cart:'.$request->ip().'|'.$request->route('site')));
 

@@ -2,7 +2,7 @@
 
 namespace App\Modules\Connections\Support;
 
-use App\Modules\Connections\Contracts\StoreFeed;
+use App\Modules\Connections\Contracts\PlatformStoreFeed;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
 use Generator;
@@ -12,8 +12,13 @@ use Illuminate\Http\Client\ConnectionException;
  * The feed as the WooCommerce Let Agents plugin serves it: /let-agents/v1/feed/*, paged by ascending ID
  * with an "after" cursor.
  */
-final class PluginStoreFeed implements StoreFeed
+final class PluginStoreFeed implements PlatformStoreFeed
 {
+    public function platform(): string
+    {
+        return 'woocommerce';
+    }
+
     private const PER_PAGE = 50;
 
     /** A runaway cursor stops here: 2,000 pages is 100,000 records, far above any cap. */

@@ -10,5 +10,7 @@ return [
         'http_error' => 'The site returned an error (HTTP :status).',
         'unexpected_response' => 'The site answered, but not like the Let Agents plugin (HTTP :status). A security or cache plugin may be changing the response.',
         'unreachable' => 'Cannot connect to the site. Check the address and that the site is up.',
+        'unsupported_platform' => 'There is no way yet to read a store on this platform.',
+        'not_installed' => 'The app is not installed in the store, or its access expired. It needs to be installed again.',
     ],
 ];

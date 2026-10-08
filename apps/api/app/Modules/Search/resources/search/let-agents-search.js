@@ -1,8 +1,10 @@
 /*!
  * Let Agents storefront search v1.
  *
- * Loaded by the Let Agents WordPress plugin on every page, which sets window.LetAgentsSearchContext:
- *   { site, api, locale, storeApi, nonce, cartUrl, searchUrl }
+ * Loaded on every page by the Let Agents WordPress plugin, or on Shopify by the theme app embed,
+ * which set window.LetAgentsSearchContext:
+ *   WooCommerce  { site, api, locale, storeApi, nonce, cartUrl, searchUrl }
+ *   Shopify      { platform: 'shopify', site, api, locale, root, searchUrl, cartUrl, currency, shopCurrency, moneyFormat }
  *
  * What it does:
  *   1. Waits until someone focuses or touches a text field. Only then downloads the shop's
@@ -12,7 +14,8 @@
  *      suggestions and the full results agree.
  *   3. On Enter, shows the full results from the server, which also searches by meaning; or, when
  *      the shop prefers its own results page, lets the form submit and the plugin orders that page.
- *   4. Shows live prices and stock from the store's own Store API, never last night's.
+ *   4. Shows live prices and stock from the store itself, never last night's: the WooCommerce
+ *      Store API, or on Shopify the public product JSON ({root}products/{handle}.js).
  *   5. Counts searches and clicks without anything about the shopper: one count per query per tab.
  *   6. Where the shop's pictures are indexed, adds a camera beside the box: a shopper uploads or
  *      takes a photo, it is shrunk in the browser, and the products that look most like it show.
@@ -365,6 +368,96 @@
     return typedFound === typed.length && savedFound / saved.length >= 0.6;
   }
 
+  // ---------------------------------------------------------------- Shopify helpers (pure, tested in node)
+
+  /**
+   * The product handle in a Shopify product link: /products/{handle}, also under a market or
+   * language prefix (/en/products/...) or a collection (/collections/x/products/...).
+   */
+  function handleFromUrl(url) {
+    var match = /\/products\/([^\/?#]+)/.exec(String(url || ''));
+    if (!match) {
+      return null;
+    }
+    try {
+      return decodeURIComponent(match[1]).replace(/\.(js|json)$/, '') || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Shopify's money placeholders: decimals, thousands separator, decimal separator.
+  var MONEY_STYLES = {
+    amount: [2, ',', '.'],
+    amount_no_decimals: [0, ',', '.'],
+    amount_with_comma_separator: [2, '.', ','],
+    amount_no_decimals_with_comma_separator: [0, '.', ','],
+    amount_with_apostrophe_separator: [2, "'", '.'],
+    amount_no_decimals_with_space_separator: [0, ' ', '.'],
+    amount_with_space_separator: [2, ' ', ','],
+    amount_with_period_and_space_separator: [2, ' ', '.']
+  };
+
+  /**
+   * A price in cents, the way the shop writes prices: its own money format ("₪{{amount}}",
+   * "{{amount_with_comma_separator}} €"), or, without one, the browser's currency format.
+   * The format may carry HTML (a <span class="money">); only its text is used.
+   */
+  function formatMoney(cents, format, currency, locale) {
+    var value = Number(cents);
+    if (cents === null || cents === undefined || cents === '' || !isFinite(value)) {
+      return '';
+    }
+    var pattern = String(format || '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&#(\d+);/g, function (all, code) { return String.fromCharCode(Number(code)); })
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&');
+    var placeholder = /\{\{\s*(\w+)\s*\}\}/.exec(pattern);
+    if (!placeholder) {
+      try {
+        return new Intl.NumberFormat(locale || undefined, { style: 'currency', currency: currency }).format(value / 100);
+      } catch (e) {
+        return (value / 100).toFixed(2);
+      }
+    }
+    var style = MONEY_STYLES[placeholder[1]] || MONEY_STYLES.amount;
+    var parts = (value / 100).toFixed(style[0]).split('.');
+    var text = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, style[1]) + (parts[1] ? style[2] + parts[1] : '');
+    return pattern.replace(placeholder[0], function () { return text; });
+  }
+
+  /**
+   * A Shopify product (the JSON of /products/{handle}.js) in the shape the painting code knows from
+   * the WooCommerce Store API. The variant shown and bought is the first one in stock, or, when
+   * none is, the cheapest. Prices are in cents of the currency the shopper browses in.
+   */
+  function fromShopifyProduct(product) {
+    var variants = (product && product.variants) || [];
+    if (!variants.length) {
+      return null;
+    }
+    var chosen = null;
+    for (var i = 0; i < variants.length && !chosen; i++) {
+      if (variants[i].available) {
+        chosen = variants[i];
+      }
+    }
+    if (!chosen) {
+      chosen = variants.slice().sort(function (a, b) { return Number(a.price) - Number(b.price); })[0];
+    }
+    var price = Number(chosen.price);
+    var compare = chosen.compare_at_price == null ? null : Number(chosen.compare_at_price);
+    var sale = compare !== null && compare > price;
+    return {
+      is_in_stock: !!chosen.available,
+      on_sale: sale,
+      prices: { price: price, regular_price: sale ? compare : price, currency_minor_unit: 2 },
+      variant: chosen.id,
+      variants: variants.length
+    };
+  }
+
   function boot(win) {
     var doc = win.document;
     var ctx = win.LetAgentsSearchContext;
@@ -375,6 +468,14 @@
 
     var API = String(ctx.api).replace(/\/+$/, '');
     var STORE_API = ctx.storeApi ? String(ctx.storeApi).replace(/\/?$/, '/') : null;
+    var SHOPIFY = ctx.platform === 'shopify';
+    // The storefront's root with its market or language prefix ("/", "/en/"), so prices and the cart
+    // are the ones this shopper sees.
+    var ROOT = SHOPIFY ? String(ctx.root || '/').replace(/\/?$/, '/') : null;
+    // A product can go to the cart from the results: through the Store API, or Shopify's own cart.
+    var CAN_BUY = !!STORE_API || SHOPIFY;
+    var WP_SELECTOR = 'input[name="s"], input[type="search"]';
+    var SHOPIFY_SELECTOR = 'input[name="q"], input[type="search"]';
     var LOCALE = ctx.locale === 'en' ? 'en' : 'he';
     var COUNTED_KEY = 'let_agents_search_counted';
     var PAUSE_MS = 2000;
@@ -382,6 +483,8 @@
 
     var state = { loading: null, data: null, index: null, records: {}, labels: {}, config: null };
     var live = {};
+    var inflight = {}; // Shopify: product id -> the request already on its way, so typing asks once
+    var urls = {}; // Shopify: product id -> its link, where the handle comes from
     var nonce = ctx.nonce || null;
     var attached = [];
     var current = null; // the field being typed into
@@ -534,6 +637,9 @@
           wanted.push(ids[i]);
         }
       }
+      if (SHOPIFY && wanted.length) {
+        return shopifyProducts(wanted);
+      }
       if (!STORE_API || !wanted.length) {
         return Promise.resolve(live);
       }
@@ -552,9 +658,69 @@
         .catch(function () { return live; });
     }
 
+    function rememberUrl(id, url) {
+      if (SHOPIFY && id != null && url) {
+        urls[String(id)] = url;
+      }
+    }
+
+    /**
+     * Shopify has no "these products by id" for a storefront, so each product on screen is read from
+     * its public JSON, four at a time, once per page view. Nothing here needs a token.
+     */
+    function shopifyProducts(wanted) {
+      var waits = [];
+      var queue = [];
+      for (var i = 0; i < wanted.length; i++) {
+        var id = wanted[i];
+        if (inflight[id]) {
+          waits.push(inflight[id]);
+          continue;
+        }
+        var handle = handleFromUrl(urls[id] || (state.records['p:' + id] || {}).url);
+        if (handle) {
+          queue.push({ id: id, handle: handle });
+        }
+      }
+      var at = 0;
+      var next = function () {
+        if (at >= queue.length) {
+          return null;
+        }
+        var job = queue[at++];
+        return win.fetch(ROOT + 'products/' + encodeURIComponent(job.handle) + '.js', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (json) { live[job.id] = fromShopifyProduct(json); })
+          .catch(function () { live[job.id] = null; })
+          .then(next);
+      };
+      if (queue.length) {
+        var workers = [];
+        for (var w = 0; w < Math.min(4, queue.length); w++) {
+          workers.push(next());
+        }
+        var batch = Promise.all(workers).then(function () {
+          for (var q = 0; q < queue.length; q++) {
+            delete inflight[queue[q].id];
+          }
+        });
+        for (var j = 0; j < queue.length; j++) {
+          inflight[queue[j].id] = batch;
+        }
+        waits.push(batch);
+      }
+      return Promise.all(waits).then(function () { return live; });
+    }
+
     function money(prices) {
       if (!prices || prices.price == null) {
         return '';
+      }
+      if (SHOPIFY) {
+        // The shop's money format is written for its own currency. A shopper browsing in another one
+        // (Shopify Markets) gets that currency in the browser's format instead of the wrong symbol.
+        var foreign = ctx.currency && ctx.shopCurrency && ctx.currency !== ctx.shopCurrency;
+        return formatMoney(prices.price, foreign ? '' : ctx.moneyFormat, ctx.currency, LOCALE);
       }
       var minor = Number(prices.currency_minor_unit || 0);
       var value = Number(prices.price) / Math.pow(10, minor);
@@ -562,7 +728,86 @@
       return (prices.currency_prefix || '') + text + (prices.currency_suffix || '');
     }
 
+    /**
+     * Shopify: the variant in stock goes to the theme's own cart (cart/add.js). A product with several
+     * variants (sizes, colours) is not guessed: the shopper chooses on its page.
+     */
+    function shopifyAddToCart(externalId, button) {
+      button.disabled = true;
+      liveProducts([externalId]).then(function () {
+        var product = live[externalId];
+        var page = safeUrl(urls[externalId]) || safeUrl((state.records['p:' + externalId] || {}).url);
+        if (product && product.variants > 1 && page) {
+          win.location.href = page;
+          return;
+        }
+        if (!product || !product.variant || !product.is_in_stock) {
+          button.textContent = label('add_failed');
+          return;
+        }
+        return win.fetch(ROOT + 'cart/add.js', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          // The cart icon section comes back with the answer, the way Dawn and its relatives ask for it.
+          body: JSON.stringify({
+            items: [{ id: Number(product.variant), quantity: 1 }],
+            sections: 'cart-icon-bubble',
+            sections_url: win.location.pathname
+          })
+        }).then(function (response) {
+          button.textContent = response.ok ? label('added') : label('add_failed');
+          if (!response.ok) {
+            return;
+          }
+          return response.json().catch(function () { return null; }).then(function (json) {
+            refreshShopifyCart(json && json.sections);
+            doc.body.dispatchEvent(new CustomEvent('let-agents:added_to_cart', { detail: { id: externalId, variant: product.variant } }));
+          });
+        });
+      }).catch(function () {
+        button.textContent = label('add_failed');
+      });
+    }
+
+    /**
+     * Themes show the cart in many ways and none is standard, so this tries the common ones and
+     * gives up quietly: Dawn's cart icon section, counters fed from cart.js, and the events several
+     * themes listen to for redrawing their cart drawer.
+     */
+    function refreshShopifyCart(sections) {
+      var bubble = doc.getElementById('cart-icon-bubble');
+      var html = sections && sections['cart-icon-bubble'];
+      if (bubble && typeof html === 'string' && win.DOMParser) {
+        var section = new win.DOMParser().parseFromString(html, 'text/html').querySelector('.shopify-section');
+        if (section) {
+          bubble.innerHTML = section.innerHTML;
+        }
+      }
+      var announce = function (cart) {
+        ['cart:refresh', 'cart:updated'].forEach(function (name) {
+          doc.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: { cart: cart } }));
+        });
+      };
+      win.fetch(ROOT + 'cart.js', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (cart) {
+          if (cart && cart.item_count != null) {
+            var counters = doc.querySelectorAll('[data-cart-count], .cart-count-bubble span[aria-hidden="true"]');
+            for (var i = 0; i < counters.length; i++) {
+              counters[i].textContent = String(cart.item_count);
+            }
+          }
+          announce(cart);
+        })
+        .catch(function () { announce(null); });
+    }
+
     function addToCart(externalId, button) {
+      if (SHOPIFY) {
+        shopifyAddToCart(externalId, button);
+        return;
+      }
       if (!STORE_API) {
         return;
       }
@@ -1302,6 +1547,7 @@
     function productRow(record, raw, match) {
       var link = linkTo('d-prod', record, raw);
       link.setAttribute('data-pid', String(record.id).slice(2));
+      rememberUrl(String(record.id).slice(2), record.url);
       var pic = picture(safeUrl(record.img), true);
       if (match) {
         pic.appendChild(el('span', 'd-match', label('photo_match', { match: match })));
@@ -1372,6 +1618,7 @@
         }
         return;
       }
+      chooseOnPage(node.querySelector('button.d-buy'), product);
       var prices = product.prices || {};
       price.appendChild(doc.createTextNode(money(prices)));
       var sale = !!product.on_sale && prices.regular_price != null && Number(prices.regular_price) > Number(prices.price);
@@ -1386,6 +1633,13 @@
       var tag = node.querySelector('.d-tag');
       if (tag) {
         tag.hidden = !sale;
+      }
+    }
+
+    /** Shopify: a product with several variants says "view", and its button opens the product page. */
+    function chooseOnPage(button, product) {
+      if (button && product && product.variants > 1) {
+        button.textContent = label('view');
       }
     }
 
@@ -1685,6 +1939,7 @@
           send([event]);
         };
         ids.push(id);
+        rememberUrl(id, href);
         var item = el('li', 'd-pick');
         item.setAttribute('data-pid', id);
         item.appendChild(el('span', 'd-num', String(at + 1)));
@@ -1707,7 +1962,7 @@
         }
         info.appendChild(el('span', 'd-price'));
         var action;
-        if (record.buy && STORE_API) {
+        if (record.buy && CAN_BUY) {
           action = el('button', 'd-buy', label('add'));
           action.type = 'button';
           action.addEventListener('click', function () {
@@ -1758,6 +2013,16 @@
 
     // ---------------------------------------------------------------- full results
 
+    /** The shop's own results page: WordPress reads ?s=, Shopify reads ?q= and matches the last word as a prefix. */
+    function siteSearchUrl(raw) {
+      var base = String(ctx.searchUrl);
+      var join = base.indexOf('?') === -1 ? '?' : '&';
+      if (SHOPIFY) {
+        return base + join + 'q=' + encodeURIComponent(raw) + '&options[prefix]=last';
+      }
+      return base + join + 's=' + encodeURIComponent(raw);
+    }
+
     function submit(input) {
       var raw = input.value.trim();
       if (!raw) {
@@ -1770,7 +2035,7 @@
         if (form) {
           form.submit();
         } else if (ctx.searchUrl) {
-          win.location.href = ctx.searchUrl + (ctx.searchUrl.indexOf('?') === -1 ? '?' : '&') + 's=' + encodeURIComponent(raw);
+          win.location.href = siteSearchUrl(raw);
         }
         return;
       }
@@ -2082,7 +2347,7 @@
       if (ctx.searchUrl) {
         var foot = el('div', 'foot');
         var site = el('a', 'btn ghost', label('on_site'));
-        site.href = ctx.searchUrl + (ctx.searchUrl.indexOf('?') === -1 ? '?' : '&') + 's=' + encodeURIComponent(raw);
+        site.href = siteSearchUrl(raw);
         foot.appendChild(site);
         sheet.appendChild(foot);
       }
@@ -2106,6 +2371,7 @@
     function card(item, raw) {
       var node = el('div', 'card');
       node.setAttribute('data-product', item.external_id);
+      rememberUrl(item.external_id, item.url);
       var link = el('a');
       var href = safeUrl(item.url);
       if (href) {
@@ -2125,7 +2391,7 @@
       node.appendChild(link);
       node.appendChild(el('div', 'price'));
       var action;
-      if (item.buy && STORE_API) {
+      if (item.buy && CAN_BUY) {
         action = el('button', 'btn', label('add'));
         action.type = 'button';
         action.addEventListener('click', function () {
@@ -2163,6 +2429,8 @@
           if (button) {
             button.disabled = true;
           }
+        } else {
+          chooseOnPage(cards[i].querySelector('button[data-action]'), product);
         }
       }
     }
@@ -2528,8 +2796,53 @@
 
     // ---------------------------------------------------------------- wiring
 
+    /**
+     * The fields to attach to. The server's default names WordPress's field; on Shopify that default
+     * means "not configured" and Shopify's own search field (q) is used. A selector the shop set wins.
+     */
+    function fieldSelector() {
+      var configured = String((state.config && state.config.selector) || '').replace(/\s+/g, ' ').trim();
+      if (SHOPIFY && (!configured || configured === WP_SELECTOR)) {
+        return SHOPIFY_SELECTOR;
+      }
+      return configured || WP_SELECTOR;
+    }
+
+    /**
+     * Shopify themes built on Dawn have their own suggestions (predictive-search) on the same field.
+     * Two dropdowns would stack, so, once ours is attached: the theme's results are hidden with CSS
+     * (its markup and requests stay as they are), and the arrow and Enter keys stop at the field, so
+     * the theme cannot move or open a selection the shopper cannot see. Typing still reaches the
+     * theme, nothing else is intercepted, and without Let Agents the theme works as before.
+     */
+    function quietThemeSearch(input) {
+      var theirs = input.closest ? input.closest('predictive-search') : null;
+      var owners = [theirs, input.form];
+      for (var i = 0; i < owners.length; i++) {
+        if (owners[i]) {
+          owners[i].setAttribute('data-let-agents-search', '');
+        }
+      }
+      if (!doc.getElementById('let-agents-search-quiet')) {
+        var style = doc.createElement('style');
+        style.id = 'let-agents-search-quiet';
+        style.textContent = '[data-let-agents-search] .predictive-search,[data-let-agents-search] [data-predictive-search],'
+          + '[data-let-agents-search] [id^="predictive-search-results"]{display:none!important}';
+        (doc.head || doc.documentElement).appendChild(style);
+      }
+      if (theirs) {
+        ['keydown', 'keyup'].forEach(function (type) {
+          input.addEventListener(type, function (event) {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'Enter') {
+              event.stopPropagation();
+            }
+          });
+        });
+      }
+    }
+
     function matches(node) {
-      var selector = (state.config && state.config.selector) || 'input[name="s"], input[type="search"]';
+      var selector = fieldSelector();
       try {
         return node && node.matches && node.matches(selector);
       } catch (e) {
@@ -2576,6 +2889,9 @@
       attached.push(input);
       addCamera(input);
       input.setAttribute('autocomplete', 'off');
+      if (SHOPIFY) {
+        quietThemeSearch(input);
+      }
 
       input.addEventListener('input', function () {
         current = input;
@@ -2619,7 +2935,7 @@
     }
 
     function attachAll() {
-      var selector = (state.config && state.config.selector) || 'input[name="s"], input[type="search"]';
+      var selector = fieldSelector();
       var nodes = [];
       try {
         nodes = doc.querySelectorAll(selector);
@@ -2681,6 +2997,9 @@
     search: search,
     isQuestion: isQuestion,
     closeAnswer: closeAnswer,
+    handleFromUrl: handleFromUrl,
+    formatMoney: formatMoney,
+    fromShopifyProduct: fromShopifyProduct,
     boot: boot
   };
 }));
