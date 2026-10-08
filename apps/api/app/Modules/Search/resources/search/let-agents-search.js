@@ -2156,7 +2156,11 @@
 
     // ---------------------------------------------------------------- search by photo
 
-    var CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+    // A lens: four rounded corners of a frame, the camera's bump on top, the eye in the middle.
+    var CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M3.5 9.5V8a3 3 0 0 1 3-3h1.8l1.2-1.6h5l1.2 1.6h1.8a3 3 0 0 1 3 3v1.5"/>'
+      + '<path d="M20.5 14.5V17a3 3 0 0 1-3 3H15"/><path d="M9 20H6.5a3 3 0 0 1-3-3v-2.5"/>'
+      + '<circle cx="12" cy="12.5" r="3.2"/><circle cx="12" cy="12.5" r="1" fill="currentColor" stroke="none"/></svg>';
     var PICTURE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>';
     var MAX_SIDE = 1024;
 
