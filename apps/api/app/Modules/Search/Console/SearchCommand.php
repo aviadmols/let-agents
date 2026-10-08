@@ -12,6 +12,7 @@ use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchTerm;
+use App\Modules\Search\Support\StoredPageTags;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Console\Command;
@@ -95,7 +96,7 @@ final class SearchCommand extends Command
     private function tags(): int
     {
         $shops = $this->option('all')
-            ? Shop::query()->where('status', ShopStatus::Active)->orderBy('slug')->get()->filter(fn (Shop $shop): bool => Features::enabled('search.page_tags', $shop->id))
+            ? Shop::query()->where('status', ShopStatus::Active)->orderBy('slug')->get()->filter(fn (Shop $shop): bool => StoredPageTags::wanted($shop->id))
             : collect([$this->shop()])->filter();
 
         if ($shops->isEmpty() && ! $this->option('all')) {

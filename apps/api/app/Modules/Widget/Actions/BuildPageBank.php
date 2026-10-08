@@ -1257,9 +1257,10 @@ final class BuildPageBank
             }
 
             $out[] = array_filter([
-                'candidate' => 'tag',
+                // One section per tag, named by its words, so what shoppers do with it is learned.
+                'candidate' => self::tagCandidate($tag['label']),
                 'model' => 'tag',
-                'key' => 'tag_'.(count($out) + 1),
+                'key' => self::tagCandidate($tag['label']),
                 'title' => $tag['label'],
                 'chip' => $tag['label'],
                 'query' => $tag['query'],
@@ -1268,7 +1269,25 @@ final class BuildPageBank
             ], fn ($value): bool => $value !== null);
         }
 
+        // What shoppers did with each tag on this page, from the nightly scores: the tags that
+        // were opened and bought from come first; the writer's order stands where nothing is known.
+        $scores = $out === [] ? [] : AnalyticsScore::query()
+            ->where('scope', AnalyticsScore::SCOPE_PAGE)
+            ->where('page_type', $type)->where('page_external_id', $externalId)
+            ->whereIn('candidate', array_column($out, 'candidate'))
+            ->pluck('score', 'candidate')
+            ->map(fn ($score): float => (float) $score)
+            ->all();
+        $position = array_flip(array_column($out, 'candidate'));
+        usort($out, fn (array $a, array $b): int => [-($scores[$a['candidate']] ?? 0.0), $position[$a['candidate']]] <=> [-($scores[$b['candidate']] ?? 0.0), $position[$b['candidate']]]);
+
         return $out;
+    }
+
+    /** A tag's name in events and scores: its words, made short and stable. */
+    public static function tagCandidate(string $label): string
+    {
+        return 'tag:'.substr(hash('sha256', mb_strtolower(trim($label))), 0, 12);
     }
 
     /**

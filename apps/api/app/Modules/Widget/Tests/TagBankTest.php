@@ -5,6 +5,7 @@ namespace App\Modules\Widget\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Analytics\Models\AnalyticsScore;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -64,8 +65,9 @@ final class TagBankTest extends TestCase
 
         $this->assertSame('tags', $bank['layout']);
         $this->assertSame(['ברגים לדק', 'מדריכי דק'], array_column($bank['tags'], 'chip'), 'a tag whose products are all gone is not shown');
-        $this->assertSame(['tag', 'tag'], array_column($bank['tags'], 'candidate'));
-        $this->assertSame(['tag_1', 'tag_2'], array_column($bank['tags'], 'key'));
+        $this->assertSame([BuildPageBank::tagCandidate('ברגים לדק'), BuildPageBank::tagCandidate('מדריכי דק')], array_column($bank['tags'], 'candidate'), 'each tag is its own section in what shoppers do');
+        $this->assertMatchesRegularExpression('/^tag:[a-f0-9]{12}$/', $bank['tags'][0]['candidate']);
+        $this->assertSame(['tag', 'tag'], array_column($bank['tags'], 'model'));
         $this->assertSame(['בורג נירוסטה לדק 5X60', 'בורג נירוסטה לדק 5X50'], array_column($bank['tags'][0]['products'], 'title'), 'in the order the search found them');
         $this->assertArrayNotHasKey('products', $bank['tags'][1], 'a guide-only tag has no empty product row');
         $this->assertSame('איך בונים דק', $bank['tags'][1]['guides'][0]['title']);
@@ -73,6 +75,20 @@ final class TagBankTest extends TestCase
 
         Settings::set('widget.layout', 'circles', $this->shop->id);
         $this->assertSame([], app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he')['tags']);
+    }
+
+    public function test_the_tags_shoppers_respond_to_come_first(): void
+    {
+        Settings::set('widget.layout', 'tags', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, fn () => AnalyticsScore::query()->create([
+            'shop_id' => $this->shop->id, 'scope' => AnalyticsScore::SCOPE_PAGE, 'candidate' => BuildPageBank::tagCandidate('מדריכי דק'),
+            'page_type' => 'product', 'page_external_id' => '201', 'related_external_id' => '',
+            'exposures' => 0, 'opens' => 30, 'clicks' => 12, 'adds' => 3, 'purchases' => 1, 'value' => 74, 'score' => 0.9, 'computed_at' => now(),
+        ]));
+
+        $bank = app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he');
+
+        $this->assertSame(['מדריכי דק', 'ברגים לדק'], array_column($bank['tags'], 'chip'), 'the one shoppers opened and bought from leads');
     }
 
     public function test_the_field_gets_the_answers_this_page_already_gave_and_nothing_else(): void

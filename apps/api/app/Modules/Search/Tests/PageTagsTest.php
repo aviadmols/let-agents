@@ -18,6 +18,7 @@ use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Filament\Operator\Pages\ShopSearches;
 use App\Modules\Search\Models\SearchPageTags;
 use App\Modules\Search\Support\LoadedIndex;
+use App\Modules\Search\Support\StoredPageTags;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -144,6 +145,15 @@ final class PageTagsTest extends TestCase
 
         $this->assertSame('failed', $run->status->value);
         $this->assertSame([], $this->calls);
+    }
+
+    public function test_choosing_the_tag_bank_is_enough_to_have_tags(): void
+    {
+        Features::override('search.page_tags', false, $this->shop->id);
+        $this->assertFalse(StoredPageTags::wanted($this->shop->id));
+
+        Settings::set('widget.layout', 'tags', $this->shop->id);
+        $this->assertTrue(StoredPageTags::wanted($this->shop->id), 'the look of the module turns the tags on, with no second switch');
     }
 
     private function inShop(callable $callback): mixed
