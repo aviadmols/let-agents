@@ -154,4 +154,14 @@ final class SearchByPhotoTest extends TestCase
     {
         return app(TenantContext::class)->run($this->shop->id, $callback);
     }
+
+    public function test_only_what_is_close_to_the_best_match_shows_far_from_the_best_does_not(): void
+    {
+        // Above the fixed floor, but far below the best match: a box of screws next to a drill.
+        $this->inShop(fn () => $this->shirt('4', 'חולצה משובצת', [0.8, 0.5, 0.1]));
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $this->assertSame(['1', '2'], array_column($this->upload()->assertOk()->json('groups.product'), 'external_id'));
+    }
 }

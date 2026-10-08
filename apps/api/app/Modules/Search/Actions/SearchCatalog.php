@@ -161,6 +161,11 @@ final class SearchCatalog
 
             $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, (int) Settings::get('search.semantic_results') ?: 24);
 
+            // Picture scores sit close together (a drill and a box of screws both near 0.7), so a
+            // fixed floor alone lets far products in: keep only what is close to the best match.
+            $best = $hits === [] ? 0.0 : max(array_column($hits, 'similarity'));
+            $floor = max($floor, $best - (float) Settings::get('search.photo_relative_gap'));
+
             foreach ($hits as $hit) {
                 $record = $index['records']['p:'.$hit['external_id']] ?? null;
 

@@ -58,6 +58,10 @@ return [
         'label' => 'Photo searches a minute',
         'description' => 'Per IP address and site.',
     ],
+    'photo_relative_gap' => [
+        'label' => 'Largest distance from the best photo match',
+        'description' => 'Only what is close to the first result is shown (0.06 = up to 6 points below it). Picture similarity scores sit close together, so a fixed floor alone lets far products in.',
+    ],
     'photo_min_similarity' => [
         'label' => 'Minimum likeness to an uploaded photo',
         'description' => 'Below this a product is not shown. A shopper\'s photo differs from a product picture in background and light, so this is lower than likeness between products.',
