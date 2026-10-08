@@ -9,6 +9,9 @@ interface RunsRetrieval
 {
     public function index(string $shopId): Run;
 
+    /** A vector for each product picture that is new or changed since the last scan. */
+    public function images(string $shopId): Run;
+
     /** @param list<string>|null $productIds only these, asked again even if nothing changed */
     public function match(string $shopId, ?array $productIds = null): Run;
 }

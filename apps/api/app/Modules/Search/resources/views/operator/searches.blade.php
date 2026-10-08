@@ -91,6 +91,9 @@
                                 @endif
                             @endif
                         </span>
+                        @if ($photos['running'])
+                            <span style="{{ $small }}">{{ __('search::ui.photos.running') }}</span>
+                        @endif
                         @if ($photos['last'])
                             <span style="{{ $small }}">
                                 {{ __('search::ui.photos.last_scan', ['when' => $photos['last']->diffForHumans()]) }}
@@ -110,7 +113,10 @@
                         </span>
                     </div>
                     @if ($photos['switch'])
-                        <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px">
+                            <button type="button" style="{{ $btn }}" wire:click="scanPicturesNow" wire:loading.attr="disabled" @disabled($photos['running'] || $photos['total'] === 0)>{{ __('search::ui.photos.scan_now') }}</button>
+                            <button type="button" style="{{ $btn }}" wire:click="setPhotos({{ $photos['on'] ? 'false' : 'true' }})">{{ __('search::ui.photos.'.($photos['on'] ? 'turn_off' : 'turn_on')) }}</button>
+                        </div>
                     @endif
                 </div>
             </x-filament::section>

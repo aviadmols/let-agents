@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
@@ -127,9 +128,26 @@ class ShopSearches extends Page
                 'ready' => $scanned > 0,
                 'last' => $last?->finished_at ?? $last?->started_at,
                 'last_failed' => $last !== null && $last->status->value === 'failed',
+                'running' => $last !== null && $last->status->value === 'running',
                 'switch' => $this->operatorView(),
             ];
         });
+    }
+
+    /**
+     * Scans this shop's pictures now instead of at night: a vector for each picture that is new or
+     * changed. Hundreds of pictures take minutes, so it runs on the queue; the status shows it.
+     */
+    public function scanPicturesNow(): void
+    {
+        abort_unless($this->operatorView() && $this->shop !== null, 403);
+
+        $shop = $this->shop;
+        dispatch(function () use ($shop): void {
+            app(RunsRetrieval::class)->images($shop);
+        })->name('scan pictures '.$shop);
+
+        Notification::make()->success()->title(__('search::ui.photos.scan_started'))->body(__('search::ui.photos.scan_started_body'))->send();
     }
 
     public function setPhotos(bool $on): void
