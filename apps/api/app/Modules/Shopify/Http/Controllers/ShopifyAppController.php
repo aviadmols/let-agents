@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Http\Controllers;
 
+use App\Core\Localization\Locales;
 use App\Modules\Admin\Models\User;
 use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
@@ -170,6 +171,11 @@ final class ShopifyAppController
         $owner = User::query()->whereHas('shops', fn ($q) => $q->where('shops.id', $install->shop_id)->where('shop_user.role', 'owner'))->first();
 
         if ($owner !== null && ! $owner->is_operator) {
+            // The merchant's language in Shopify is theirs here too, until they choose another.
+            if ($owner->locale === null && ($locale = Locales::negotiate($request->query('locale'))) !== null) {
+                $owner->forceFill(['locale' => $locale])->save();
+            }
+
             Auth::login($owner);
             $request->session()->regenerate();
         }

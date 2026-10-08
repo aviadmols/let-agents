@@ -22,6 +22,12 @@ php artisan serve
 ```
 
 - פאנל המפעיל: http://localhost:8000/operator
+
+סיסמה שאבדה (גם בפרודקשן, דרך `railway ssh --service api`): הסיסמה עוברת במשתנה סביבה, לא בשורת הפקודה.
+
+```sh
+LA_PW='the-new-password' php artisan admin:password you@example.com --password-env=LA_PW
+```
 - פאנל הסוחר: http://localhost:8000/merchant
 
 מקומית עובדים על SQLite. Postgres עם pgvector רץ ב־CI, וב־staging וב־production.

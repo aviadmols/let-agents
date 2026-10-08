@@ -227,8 +227,9 @@ final class ShopifyAppTest extends TestCase
         });
 
         $token = self::idToken();
-        $opened = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => $token])));
+        $opened = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'locale' => 'he-IL', 'id_token' => $token])));
         $opened->assertRedirect();
+        $this->assertSame('he', User::query()->where('email', 'owner@gueta.test')->sole()->locale, 'the merchant\'s Shopify language is theirs here too');
         $this->assertSame('frame-ancestors https://'.self::SHOP.' https://admin.shopify.com;', $opened->headers->get('Content-Security-Policy'), 'only this shop\'s admin may frame it');
         $this->assertSame(['urn:ietf:params:oauth:grant-type:token-exchange', $token, 'test-key'], [$exchanges[0]['grant_type'], $exchanges[0]['subject_token'], $exchanges[0]['client_id']], 'the token comes by exchange, with no screen between');
 

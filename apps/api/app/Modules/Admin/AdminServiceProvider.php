@@ -4,6 +4,7 @@ namespace App\Modules\Admin;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Console\CreateOperatorCommand;
+use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Http\Responses\RoleAwareLoginResponse;
 use App\Modules\Admin\Panels\MerchantPanelProvider;
@@ -27,6 +28,7 @@ final class AdminServiceProvider extends ModuleServiceProvider
     {
         return [
             CreateOperatorCommand::class,
+            SetPasswordCommand::class,
         ];
     }
 }
