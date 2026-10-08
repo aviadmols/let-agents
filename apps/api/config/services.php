@@ -40,7 +40,7 @@ return [
         'key' => env('SHOPIFY_API_KEY'),
         'secret' => env('SHOPIFY_API_SECRET'),
         'version' => env('SHOPIFY_API_VERSION', '2026-07'),
-        'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_content,read_online_store_pages,write_draft_orders,read_orders'),
+        'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_content,read_online_store_pages,write_draft_orders'),
         'handle' => env('SHOPIFY_APP_HANDLE', 'let-agents'),
     ],
 ];

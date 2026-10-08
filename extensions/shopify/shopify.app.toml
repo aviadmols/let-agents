@@ -17,8 +17,10 @@ automatically_update_urls_on_dev = false
 include_config_on_deploy = true
 
 [access_scopes]
+# Our server runs the install itself (authorize, token, shop, plan): the classic flow.
+use_legacy_install_flow = true
 # Catalog and content for the index, draft orders and orders for the assistant's carts and reports.
-scopes = "read_products,read_content,read_online_store_pages,write_draft_orders,read_orders"
+scopes = "read_products,read_content,read_online_store_pages,write_draft_orders"
 
 [auth]
 redirect_urls = [ "https://agents.lets.co.il/shopify/callback" ]
