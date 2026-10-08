@@ -27,14 +27,16 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('enrichment:nightly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             $schedule->command('enrichment audit --scheduled')
                 ->weeklyOn(0, '04:40')
                 ->timezone('Asia/Jerusalem')
                 ->name('enrichment:audit-weekly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
         });
     }
 

@@ -12,6 +12,7 @@ return [
         'no_pictures' => 'אין תמונות שמתאימות.',
         'search' => 'חיפוש לפי שם מוצר או מספר',
         'stopped' => 'נעצרה: :reason',
+        'hosts' => 'התמונות נמצאות ב:',
         'cols' => [
             'when' => 'מתי',
             'what' => 'מה',
@@ -38,6 +39,7 @@ return [
             'running' => 'רצה',
             'succeeded' => 'הצליחה',
             'failed' => 'נכשלה',
+            'cut_off' => 'נקטעה',
         ],
         'filter' => [
             'all' => 'הכל',

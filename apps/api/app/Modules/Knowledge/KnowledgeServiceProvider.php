@@ -18,7 +18,8 @@ final class KnowledgeServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('knowledge:snapshot-daily')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             // Once a week: did any of it help? Weekly rather than nightly because a day of one
             // shop's traffic cannot answer the question, and asking anyway invites a false yes.
@@ -27,7 +28,8 @@ final class KnowledgeServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('knowledge:measure-weekly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             // And what several shops of a trade found separately becomes the trade's.
             $schedule->command('knowledge promote')
@@ -35,7 +37,8 @@ final class KnowledgeServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('knowledge:promote-weekly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
         });
     }
 

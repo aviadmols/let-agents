@@ -14,6 +14,7 @@ use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\MatchCheck;
 use App\Modules\Retrieval\Tests\Concerns\BuildsShop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -153,5 +154,19 @@ final class ImageIndexTest extends TestCase
     private function shirt(string $externalId, string $title, string $image): CatalogProduct
     {
         return $this->product($externalId, $title, 'חולצת כותנה.', ['image_url' => $image]);
+    }
+
+    public function test_one_scan_of_a_shop_at_a_time(): void
+    {
+        $held = Cache::lock('retrieval:images:'.$this->shop->id, 60);
+        $held->get();
+
+        $run = app(BuildImageIndex::class)->handle($this->shop->id);
+
+        $this->assertSame('already_running', $run->output['stopped']);
+        $this->assertSame(0, $this->pictures->images, 'nothing fetched or paid for twice');
+
+        $held->release();
+        $this->assertGreaterThan(0, app(BuildImageIndex::class)->handle($this->shop->id)->output['embedded']);
     }
 }

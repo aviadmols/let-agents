@@ -4,6 +4,7 @@ namespace App\Modules\Search\Jobs;
 
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -12,7 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
  * A shop's picture scan, pressed from the screen. A scan stops itself before the worker's time
  * runs out; what is left goes on in the next part, until every picture is done.
  */
-final class ScanPicturesJob implements ShouldQueue
+final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -29,7 +30,15 @@ final class ScanPicturesJob implements ShouldQueue
     public function __construct(
         public readonly string $shopId,
         public readonly int $part = 1,
-    ) {}
+    ) {
+        $this->onQueue('long');
+    }
+
+    /** One waiting scan per shop: pressing twice, or a part and a press, queue it once. */
+    public function uniqueId(): string
+    {
+        return $this->shopId;
+    }
 
     public function handle(RunsRetrieval $retrieval): void
     {

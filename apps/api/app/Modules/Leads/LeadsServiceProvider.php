@@ -36,7 +36,8 @@ final class LeadsServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('leads:compose-nightly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             // Then the two models, on whatever the templates could only offer generically.
             $schedule->command('leads write --scheduled')
@@ -44,7 +45,8 @@ final class LeadsServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('leads:write-nightly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             // And last, what readers made of all of it — including whether the reviewer's scores
             // were worth anything.
@@ -53,7 +55,8 @@ final class LeadsServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('leads:learn-nightly')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
         });
 
         // A form that can be posted to as fast as a script wants is a form that will be.

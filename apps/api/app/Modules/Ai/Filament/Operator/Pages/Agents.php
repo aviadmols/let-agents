@@ -174,7 +174,7 @@ final class Agents extends Page
         $run = $agent['run'];
         $arguments = isset($run['step']) ? ['step' => $run['step']] : [];
         $arguments[$run['shop_argument'] ?? 'target'] = $shop['slug'];
-        Artisan::queue((string) $run['command'], $arguments);
+        Artisan::queue((string) $run['command'], $arguments)->onQueue('long');
 
         Notification::make()->success()->title(__('ai::agents_screen.run_started', ['shop' => $shop['name']]))->body(__('ai::agents_screen.run_started_body'))->send();
     }

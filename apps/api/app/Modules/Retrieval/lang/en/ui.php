@@ -12,6 +12,7 @@ return [
         'no_pictures' => 'No pictures match.',
         'search' => 'Search by product name or number',
         'stopped' => 'Stopped: :reason',
+        'hosts' => 'The pictures are on:',
         'cols' => [
             'when' => 'When',
             'what' => 'What',
@@ -38,6 +39,7 @@ return [
             'running' => 'Running',
             'succeeded' => 'Succeeded',
             'failed' => 'Failed',
+            'cut_off' => 'Cut off',
         ],
         'filter' => [
             'all' => 'All',

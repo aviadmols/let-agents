@@ -36,7 +36,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('search:index')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             // After the index (02:40) and the vectors (02:45): a tag is kept only when the search fills it.
             $schedule->command('search tags --all')
@@ -44,7 +45,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('search:tags')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             // After the vectors (02:45) and before the daily review (04:30), which sees what was not resolved.
             $schedule->command('search resolve --all')
@@ -52,7 +54,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('search:resolve')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
 
             $schedule->command('search prune')
                 ->dailyAt('04:20')

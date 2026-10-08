@@ -125,6 +125,34 @@ final class ScanHistory extends Page
             ->paginate(self::PER_PAGE, ['id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at']);
     }
 
+    /** A run's state as shown: one still "running" after half an hour was cut off by the worker. */
+    public static function runState(Run $run): string
+    {
+        $state = $run->status->value;
+
+        return $state === 'running' && $run->started_at?->lt(now()->subMinutes(30)) ? 'cut_off' : $state;
+    }
+
+    /**
+     * Where the shop's pictures are, host by host, most first: a store that moved shows here
+     * whether its pictures moved with it.
+     *
+     * @return array<string, int>
+     */
+    public function hosts(): array
+    {
+        $hosts = [];
+
+        foreach (RetrievalImage::query()->pluck('image_url') as $url) {
+            $host = strtolower((string) parse_url((string) $url, PHP_URL_HOST));
+            $hosts[$host] = ($hosts[$host] ?? 0) + 1;
+        }
+
+        arsort($hosts);
+
+        return $hosts;
+    }
+
     /** Scanned, waiting or unreadable: a key under retrieval::ui.scans.state. */
     public function stateOf(RetrievalImage $image): string
     {

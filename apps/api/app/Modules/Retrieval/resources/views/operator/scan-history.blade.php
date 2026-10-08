@@ -25,7 +25,8 @@
                                 <tr data-run="{{ $run->agent }}">
                                     <td style="{{ $cell }};white-space:nowrap">{{ $run->started_at?->timezone('Asia/Jerusalem')->format('d/m H:i') }}<br><span style="{{ $small }}">{{ $run->started_at?->diffForHumans() }}</span></td>
                                     <td style="{{ $cell }}">{{ __('retrieval::ui.scans.kinds.'.str_replace('.', '_', $run->agent)) }}<br><span style="{{ $small }}">{{ __('retrieval::ui.scans.trigger.'.$run->trigger->value) }}</span></td>
-                                    <td style="{{ $cell }}"><span style="{{ $pill }};{{ $tone[$run->status->value] ?? $tone['pending'] }}">{{ __('retrieval::ui.scans.status.'.$run->status->value) }}</span></td>
+                                    @php($runState = \App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::runState($run))
+                                    <td style="{{ $cell }}"><span style="{{ $pill }};{{ $tone[$runState] ?? $tone['failed'] }}">{{ __('retrieval::ui.scans.status.'.$runState) }}</span></td>
                                     <td style="{{ $cell }}">
                                         {{ $run->summary() ?? '—' }}
                                         @if (is_string($run->output['stopped'] ?? null))
@@ -45,6 +46,15 @@
         </x-filament::section>
 
         <x-filament::section :heading="__('retrieval::ui.scans.pictures')" :description="__('retrieval::ui.scans.pictures_about', ['scanned' => number_format($counts['scanned']), 'total' => number_format($counts['total']), 'pending' => number_format($counts['pending']), 'failed' => number_format(array_sum($counts['failed']))])">
+            @php($hosts = $this->hosts())
+            @if (count($hosts) > 0)
+                <p style="margin:0 0 8px;font-size:13px">
+                    {{ __('retrieval::ui.scans.hosts') }}
+                    @foreach ($hosts as $host => $n)
+                        <span style="{{ $pill }};{{ $tone['pending'] }};margin-inline-end:6px" dir="ltr">{{ $host ?: '?' }} · {{ number_format($n) }}</span>
+                    @endforeach
+                </p>
+            @endif
             @if ($counts['failed'] !== [])
                 <p style="margin:0 0 12px;font-size:13px">
                     @foreach ($counts['failed'] as $reason => $n)

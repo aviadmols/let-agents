@@ -32,7 +32,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('assistant:review-asks')
                 ->withoutOverlapping()
-                ->onOneServer();
+                ->onOneServer()
+                ->runInBackground();
         });
     }
 

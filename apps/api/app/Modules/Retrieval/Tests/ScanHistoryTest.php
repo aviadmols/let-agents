@@ -55,7 +55,8 @@ final class ScanHistoryTest extends TestCase
             ->assertSee('שולחן נגרים')
             ->assertSee('מברגה נטענת')
             ->assertSee(__('retrieval::ui.scans.reasons.unreachable'))
-            ->assertDontSee('מוצר של חנות אחרת');
+            ->assertDontSee('מוצר של חנות אחרת')
+            ->assertSee('shop.test · 3');
 
         $this->get('/operator/retrieval/scans?state=failed')
             ->assertOk()

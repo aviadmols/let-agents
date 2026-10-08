@@ -17,6 +17,7 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -58,8 +59,26 @@ final class BuildImageIndex
             action: self::ACTION,
             shopId: $shopId,
             trigger: $trigger,
-            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->build($run, $shopId)),
+            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->locked($run, $shopId)),
         );
+    }
+
+    /** Two scans of the same shop at once would fetch and pay for the same pictures twice. */
+    private function locked(RunContext $run, string $shopId): void
+    {
+        $lock = Cache::lock('retrieval:images:'.$shopId, self::TIME_BUDGET + 300);
+
+        if (! $lock->get()) {
+            $run->output(['stopped' => 'already_running'])->summary('retrieval::runs.images_busy');
+
+            return;
+        }
+
+        try {
+            $this->build($run, $shopId);
+        } finally {
+            $lock->release();
+        }
     }
 
     private function build(RunContext $run, string $shopId): void

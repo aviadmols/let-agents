@@ -1,7 +1,7 @@
 #!/bin/sh
 # Starts the container in the role Railway asks for.
 #   APP_ROLE=web        Octane on FrankenPHP, listens on $PORT
-#   APP_ROLE=worker     queue worker ($QUEUE_NAMES, default "default")
+#   APP_ROLE=worker     queue workers: $QUEUE_FAST_WORKERS on "default" (1), $QUEUE_LONG_WORKERS on "long,default" (3)
 #   APP_ROLE=scheduler  Laravel scheduler
 set -eu
 
@@ -56,12 +56,22 @@ case "$role" in
       --max-requests="${OCTANE_MAX_REQUESTS:-500}"
     ;;
   worker)
-    exec php artisan queue:work \
-      --queue="${QUEUE_NAMES:-default}" \
-      --sleep=1 \
-      --tries=3 \
-      --timeout=1500 \
-      --max-time=3600
+    # Several workers in one service, each started again when it ends (every hour, --max-time).
+    # QUEUE_FAST_WORKERS take only quick work; QUEUE_LONG_WORKERS take long work first (catalogue
+    # syncs, picture scans, agent runs) and quick work when idle. So shops run side by side, and
+    # one long scan never holds a quick job.
+    work() {
+      while true; do
+        php artisan queue:work --queue="$1" --sleep=1 --tries=3 --timeout=1500 --max-time=3600
+        sleep 1
+      done
+    }
+    trap 'kill 0' TERM INT
+    i=0
+    while [ "$i" -lt "${QUEUE_FAST_WORKERS:-1}" ]; do work default & i=$((i + 1)); done
+    i=0
+    while [ "$i" -lt "${QUEUE_LONG_WORKERS:-3}" ]; do work long,default & i=$((i + 1)); done
+    wait
     ;;
   scheduler)
     exec php artisan schedule:work

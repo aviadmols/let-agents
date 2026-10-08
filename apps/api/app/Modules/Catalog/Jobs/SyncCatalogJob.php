@@ -33,7 +33,10 @@ final class SyncCatalogJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly string $shopId,
         public readonly RunTrigger $trigger = RunTrigger::Manual,
-    ) {}
+    ) {
+        // Minutes of work: on the long queue, so quick work never waits behind it.
+        $this->onQueue('long');
+    }
 
     public function uniqueId(): string
     {
