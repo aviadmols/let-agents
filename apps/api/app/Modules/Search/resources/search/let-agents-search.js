@@ -1021,6 +1021,7 @@
       var articles = [];
       var answers = [];
       var total = 0;
+      var contentTotal = 0;
       for (var i = 0; i < hits.length; i++) {
         var record = state.records[hits[i].id];
         if (!record) {
@@ -1039,8 +1040,11 @@
           if (categories.length < 5) {
             categories.push(record);
           }
-        } else if (articles.length < 4) {
-          articles.push(record);
+        } else {
+          contentTotal++;
+          if (articles.length < 6) {
+            articles.push(record);
+          }
         }
       }
 
@@ -1081,6 +1085,19 @@
         fillPrices(grid, products);
       }
 
+      // A site of articles and pages, or a search that found no product: the articles and pages
+      // are the results, in the main area with their pictures.
+      var contentFirst = !products.length && articles.length > 0;
+      if (contentFirst) {
+        main.appendChild(el('h4', 'd-h', label('articles')));
+        var reading = el('div', d.mobile ? 'm-list' : 'd-prods');
+        for (var r = 0; r < articles.length; r++) {
+          reading.appendChild(contentRow(articles[r], raw));
+        }
+        main.appendChild(reading);
+        articles = [];
+      }
+
       var side = null;
       if (d.mobile) {
         for (var c = 0; c < categories.length; c++) {
@@ -1098,7 +1115,7 @@
         side = sideColumn(categories, articles, raw);
       }
 
-      layout(side, main, footer(input, raw, total, question));
+      layout(side, main, footer(input, raw, total || contentTotal, question));
       position();
       if (d.fresh) {
         d.fresh = false;
@@ -1202,6 +1219,29 @@
         link.appendChild(el('small', null, record.n));
       }
       return link;
+    }
+
+    /** An article or a page as a result of its own: its picture and title, no price. */
+    function contentRow(record, raw) {
+      var link = linkTo('d-prod', record, raw);
+      link.appendChild(picture(safeUrl(record.img), false));
+      var info = el('span', 'd-info');
+      info.appendChild(el('span', 'd-name', record.title));
+      link.appendChild(info);
+      return link;
+    }
+
+    /** A result the server found, in the shape of a record of the downloaded index. */
+    function fromServer(item) {
+      return {
+        id: item.id,
+        t: item.type,
+        title: item.title,
+        url: item.url,
+        img: item.image,
+        buy: item.buy ? 1 : 0,
+        s: 1
+      };
     }
 
     function articleRow(record, raw) {
@@ -1468,16 +1508,66 @@
       if (d.scroll) {
         d.scroll.scrollTop = 0;
       }
-      var ids = [];
-      for (var p = 0; p < d.products.length; p++) {
-        ids.push(String(d.products[p].id).slice(2));
-      }
-      requestAnswer(raw, ids).then(function (data) {
-        if (box.isConnected === false) {
-          return; // the shopper typed on; this answer is no longer wanted here
+      var normalized = normalize(raw);
+      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
+      markCounted(normalized);
+      win.fetch(url, { mode: 'cors', credentials: 'omit' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .catch(function () { return null; })
+        .then(function (result) {
+          if (box.isConnected === false) {
+            return; // the shopper typed on; this answer is no longer wanted here
+          }
+          var found = addResults(d, result, raw);
+          var ids = [];
+          found.concat(d.products).forEach(function (record) {
+            var id = String(record.id).slice(2);
+            if (record.t === 'product' && ids.indexOf(id) === -1) {
+              ids.push(id);
+            }
+          });
+          requestAnswer(raw, ids).then(function (data) {
+            if (box.isConnected === false) {
+              return;
+            }
+            renderReply(box, data, raw);
+          });
+        });
+    }
+
+    /**
+     * What the full search found for the question, under the answer: the products (and the
+     * articles and pages) that fit, where typing alone had found too few. Returns the products.
+     */
+    function addResults(d, result, raw) {
+      var groups = (result && result.groups) || {};
+      var products = (groups.product || []).map(fromServer);
+      var content = (groups.content || []).map(fromServer);
+      var shownIds = {};
+      (d.products || []).forEach(function (record) { shownIds[record.id] = true; });
+      var fresh = products.filter(function (record) { return !shownIds[record.id]; }).slice(0, state.config.suggestions || 6);
+
+      if (fresh.length) {
+        var head = el('h4', 'd-h', label('products'));
+        var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
+        fresh.forEach(function (record) { grid.appendChild(productRow(record, raw)); });
+        var existing = d.main.querySelector('.d-prods, .m-list');
+        if (existing && !(d.products || []).length) {
+          existing.parentNode.removeChild(existing);
         }
-        renderReply(box, data, raw);
-      });
+        d.main.appendChild(head);
+        d.main.appendChild(grid);
+        fillPrices(grid, fresh);
+      }
+
+      if (!products.length && content.length && !d.main.querySelector('.d-prods, .m-list')) {
+        d.main.appendChild(el('h4', 'd-h', label('articles')));
+        var reading = el('div', d.mobile ? 'm-list' : 'd-prods');
+        content.slice(0, 6).forEach(function (record) { reading.appendChild(contentRow(record, raw)); });
+        d.main.appendChild(reading);
+      }
+
+      return products;
     }
 
     /** A question from the drawer's own field: the answer in the results sheet, the results under it. */

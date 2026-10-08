@@ -42,4 +42,31 @@ final class FollowShopDomain
             }
         });
     }
+
+    /**
+     * The shop's domain, when the connection reads the store somewhere else: a site that moved
+     * before its connection did. "www." on either side is the same site.
+     */
+    public static function mismatch(StoreConnection $connection): ?string
+    {
+        $domain = strtolower((string) $connection->shop?->domain);
+        $host = strtolower((string) parse_url((string) $connection->site_url, PHP_URL_HOST));
+        $bare = fn (string $h): string => str_starts_with($h, 'www.') ? substr($h, 4) : $h;
+
+        return $domain === '' || $host === '' || $bare($domain) === $bare($host) ? null : $domain;
+    }
+
+    /** Moves the connection to the shop's domain, keeping its scheme and path. */
+    public static function moveToShopDomain(StoreConnection $connection): void
+    {
+        $domain = self::mismatch($connection);
+
+        if ($domain === null) {
+            return;
+        }
+
+        $parts = parse_url((string) $connection->site_url);
+        $connection->site_url = ($parts['scheme'] ?? 'https').'://'.$domain.($parts['path'] ?? '');
+        $connection->save();
+    }
 }

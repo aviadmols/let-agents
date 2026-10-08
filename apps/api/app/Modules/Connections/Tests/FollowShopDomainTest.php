@@ -4,6 +4,7 @@ namespace App\Modules\Connections\Tests;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Connections\Support\FollowShopDomain;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,10 +41,26 @@ final class FollowShopDomainTest extends TestCase
         $this->assertSame('https://staging.store.test', $this->fresh($connection)->site_url);
     }
 
-    private function connect(Shop $shop, string $url): StoreConnection
+    public function test_a_connection_left_on_an_old_address_is_shown_and_moved_in_one_step(): void
+    {
+        // The shop moved before its connection did, as Gueta from a staging address.
+        $shop = Shop::factory()->create(['domain' => 'shop.guetaavigdor.co.il']);
+        $connection = $this->connect($shop, 'https://guetaavigdor.ussl.co');
+        $same = $this->connect(Shop::factory()->create(['domain' => 'store.test']), 'https://www.store.test', 'b');
+
+        $this->assertSame('shop.guetaavigdor.co.il', FollowShopDomain::mismatch($this->fresh($connection)->load('shop')));
+        $this->assertNull(FollowShopDomain::mismatch($this->fresh($same)->load('shop')), '"www." is the same site');
+
+        FollowShopDomain::moveToShopDomain($this->fresh($connection)->load('shop'));
+
+        $this->assertSame('https://shop.guetaavigdor.co.il', $this->fresh($connection)->site_url);
+        $this->assertNull(FollowShopDomain::mismatch($this->fresh($connection)->load('shop')));
+    }
+
+    private function connect(Shop $shop, string $url, string $letter = 'a'): StoreConnection
     {
         return app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
-            'shop_id' => $shop->id, 'site_url' => $url, 'access_token' => 'lat_'.str_repeat('a', 48),
+            'shop_id' => $shop->id, 'site_url' => $url, 'access_token' => 'lat_'.str_repeat($letter, 48),
         ]));
     }
 

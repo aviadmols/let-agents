@@ -44,6 +44,7 @@ return [
     ],
     'actions' => [
         'test' => 'Test connection',
+        'follow_domain' => 'Move to :domain',
     ],
     'notifications' => [
         'connected' => 'The store is connected',
@@ -54,4 +55,6 @@ return [
         'heading' => 'No connected stores yet',
         'description' => 'Install the Let Agents plugin in the store, create a token and add a connection here.',
     ],
+    'mismatch' => 'The shop\'s domain is :domain. Links go to the old address until the connection is updated.',
+    'follow_domain_help' => 'The connection reads the store at :from. After the move it reads it at :domain, the connection is tested right away, and the next catalogue sync updates every product\'s link.',
 ];
