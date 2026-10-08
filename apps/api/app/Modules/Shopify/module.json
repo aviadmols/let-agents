@@ -20,7 +20,7 @@
         {
             "name": "plan_name",
             "type": "string",
-            "default": "Let Agents",
+            "default": "Let's search",
             "min": 1,
             "max": 80,
             "scope": "global"

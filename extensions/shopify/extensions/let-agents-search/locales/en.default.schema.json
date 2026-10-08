@@ -1,10 +1,10 @@
 {
   "blocks": {
     "app_embed": {
-      "name": "Let Agents search",
+      "name": "Let's search",
       "settings": {
         "about": {
-          "content": "Replaces the store's search suggestions with Let Agents search: typo-tolerant suggestions, live prices and stock, and answers to shoppers' questions. Turn it off to bring back the theme's own search."
+          "content": "Replaces the store's search suggestions with Let's search: typo-tolerant suggestions, live prices and stock, and answers to shoppers' questions. Turn it off to bring back the theme's own search."
         }
       }
     }

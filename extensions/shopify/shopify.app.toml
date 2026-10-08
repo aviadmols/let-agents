@@ -5,7 +5,7 @@
 # The app's Client ID from the Partner Dashboard (Apps > Let Agents > Client credentials).
 # It is public, but each environment has its own app, so it is filled in by `shopify app config link`.
 client_id = "6dbe9d0b0218a1b21e054f496dd95a0a"
-name = "Let Agents"
+name = "Let's search"
 handle = "let-agents"
 application_url = "https://agents.lets.co.il/shopify/app"
 # The merchant works in the Let Agents panel, not inside Shopify admin.
