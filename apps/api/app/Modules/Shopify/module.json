@@ -12,6 +12,12 @@
     "features": [],
     "settings": [
         {
+            "name": "charge",
+            "type": "bool",
+            "default": false,
+            "scope": "global"
+        },
+        {
             "name": "plan_name",
             "type": "string",
             "default": "Let Agents",
@@ -22,7 +28,7 @@
         {
             "name": "plan_price_usd",
             "type": "float",
-            "default": 49.0,
+            "default": 49,
             "min": 1,
             "max": 10000,
             "scope": "global",

@@ -113,7 +113,7 @@ final class ShopifyAppController
         }
 
         // Whatever the link says, the subscription is read from Shopify itself.
-        if ($billing->refresh($install) !== ShopifyInstall::ACTIVE) {
+        if (! in_array($billing->refresh($install), [ShopifyInstall::ACTIVE, ShopifyInstall::FREE], true)) {
             return response(view('shopify::declined', ['shop' => $shop]), 402);
         }
 
@@ -123,7 +123,7 @@ final class ShopifyAppController
     /** A subscribed store goes to its panel; one without a subscription approves the plan first. */
     private function onward(ShopifyInstall $install, ManageSubscription $billing): RedirectResponse
     {
-        if ($billing->refresh($install) !== ShopifyInstall::ACTIVE) {
+        if (! in_array($billing->refresh($install), [ShopifyInstall::ACTIVE, ShopifyInstall::FREE], true)) {
             return redirect()->away($billing->start($install, url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain]))));
         }
 

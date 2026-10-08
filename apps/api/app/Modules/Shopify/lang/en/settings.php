@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'charge' => [
+        'label' => 'Charge Shopify stores a subscription',
+        'description' => 'Off: a store that installs the app is active at once, with no subscription and no charge. On: the store approves the plan before it is active. Stores installed for free are asked to approve when they next open the app.',
+    ],
     'plan_name' => [
         'label' => 'Plan name in Shopify',
         'description' => 'As the merchant sees it on the Shopify invoice.',

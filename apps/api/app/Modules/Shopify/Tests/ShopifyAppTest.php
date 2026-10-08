@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Tests;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
@@ -42,6 +43,7 @@ final class ShopifyAppTest extends TestCase
 
         config(['services.shopify.key' => 'test-key', 'services.shopify.secret' => self::SECRET, 'app.url' => 'https://agents.lets.co.il']);
         Queue::fake();
+        Settings::set('shopify.charge', true);
 
         Http::fake(function (HttpRequest $request) {
             if (str_ends_with($request->url(), '/admin/oauth/access_token')) {
@@ -96,6 +98,27 @@ final class ShopifyAppTest extends TestCase
         ], '$49 every 30 days, in test mode on a development store');
 
         Queue::assertPushed(QueuedCommand::class);
+    }
+
+    public function test_while_charging_is_off_an_install_is_active_at_once_and_free(): void
+    {
+        Settings::set('shopify.charge', false);
+
+        $authorize = $this->get('/shopify/install?shop='.self::SHOP)->assertRedirect();
+        parse_str((string) parse_url((string) $authorize->headers->get('Location'), PHP_URL_QUERY), $asked);
+
+        $this->get('/shopify/callback?'.http_build_query(self::signed(['code' => 'abc', 'state' => $asked['state']])))
+            ->assertRedirect(route('filament.merchant.pages.overview', ['tenant' => 'gueta-test']));
+
+        $install = ShopifyInstall::query()->sole();
+        $this->assertSame([ShopifyInstall::FREE, ShopStatus::Active], [$install->subscription_status, $install->shop->status]);
+        $this->assertNull(collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate')), 'nobody is asked to pay');
+
+        // Once charging is on, the free store approves the plan when it next opens the app.
+        Settings::set('shopify.charge', true);
+        $this->get('/shopify/app?'.http_build_query(self::signed([])))
+            ->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
+        $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
     }
 
     public function test_an_unsigned_or_replayed_callback_installs_nothing(): void

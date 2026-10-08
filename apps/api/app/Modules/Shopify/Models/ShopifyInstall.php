@@ -35,6 +35,9 @@ class ShopifyInstall extends Model
     /** The subscription lets the store use the app. */
     public const ACTIVE = 'active';
 
+    /** Installed while the app charges nobody (shopify.charge off): the store uses it free. */
+    public const FREE = 'free';
+
     protected $table = 'shopify_installs';
 
     protected $guarded = ['id'];
@@ -68,6 +71,6 @@ class ShopifyInstall extends Model
 
     public function subscribed(): bool
     {
-        return $this->installed() && $this->subscription_status === self::ACTIVE;
+        return $this->installed() && in_array($this->subscription_status, [self::ACTIVE, self::FREE], true);
     }
 }

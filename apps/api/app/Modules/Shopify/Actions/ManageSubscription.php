@@ -15,7 +15,8 @@ use RuntimeException;
  * in test mode, so a test install never charges anyone.
  *
  * The shop is active while the subscription is, and paused otherwise: the storefront goes quiet
- * and nothing is lost.
+ * and nothing is lost. While shopify.charge is off nobody is billed: a store without a subscription
+ * is marked free and active, and is asked to approve the plan once charging is turned on.
  */
 final class ManageSubscription
 {
@@ -84,7 +85,9 @@ final class ManageSubscription
                 'subscribed_at' => $install->subscribed_at ?? now(),
                 'trial_ends_at' => $trialDays > 0 ? now()->parse((string) $active['createdAt'])->addDays($trialDays) : null,
             ])->save();
-        } elseif ($install->subscription_status === ShopifyInstall::ACTIVE) {
+        } elseif (! (bool) Settings::get('shopify.charge')) {
+            $install->forceFill(['subscription_status' => ShopifyInstall::FREE])->save();
+        } elseif ($install->subscribed()) {
             $install->forceFill(['subscription_status' => 'cancelled'])->save();
         }
 
