@@ -156,6 +156,9 @@ final class QueryVectors
     /** Today's one run for this shop's query vectors, grown by every new query. */
     private function record(string $shopId, string $provider, string $model, int $tokens, float $cost): void
     {
+        // The ledger gets every call under its own model; the daily run below is the activity log.
+        Run::recordUsage($shopId, self::AGENT, self::ACTION, $provider, $model, $tokens, 0, $cost);
+
         $run = Run::query()
             ->where('shop_id', $shopId)->where('agent', self::AGENT)
             ->where('started_at', '>=', now()->startOfDay())

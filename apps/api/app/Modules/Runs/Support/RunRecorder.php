@@ -9,7 +9,6 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Closure;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -80,20 +79,9 @@ final class RunRecorder implements RecordsRuns
 
         // Each model call in the ledger, so spend reads by shop, agent and model.
         if ($reportData['calls'] !== []) {
-            DB::table('ai_usage')->insert(array_map(fn (array $call): array => [
-                'run_id' => $run->id,
-                'shop_id' => $run->shop_id,
-                'agent' => $run->agent,
-                'action' => $run->action,
-                'provider' => $call['provider'],
-                'model' => $call['model'],
-                'input_tokens' => $call['input_tokens'],
-                'output_tokens' => $call['output_tokens'],
-                'cache_read_tokens' => $call['cache_read_tokens'],
-                'cost_usd' => (float) ($call['cost_usd'] ?? 0),
-                'day' => now()->toDateString(),
-                'created_at' => now(),
-            ], $reportData['calls']));
+            foreach ($reportData['calls'] as $call) {
+                Run::recordUsage($run->shop_id, $run->agent, $run->action, $call['provider'], $call['model'], $call['input_tokens'], $call['output_tokens'], (float) ($call['cost_usd'] ?? 0), $run->id, $call['cache_read_tokens']);
+            }
         }
 
         return $run;

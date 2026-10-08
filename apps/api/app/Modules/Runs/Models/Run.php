@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 
 /**
@@ -132,6 +133,28 @@ class Run extends Model
      * "connections.store_checker" reads its label from connections::agents.store_checker, so
      * each module names its own agents in its own translations.
      */
+    /**
+     * One model call in the spend ledger. Runs write theirs when they end; work that is too small
+     * for a run of its own (a search query's embedding, a shopper's photo) writes here directly.
+     */
+    public static function recordUsage(?string $shopId, string $agent, string $action, string $provider, string $model, int $inputTokens, int $outputTokens, float $costUsd, ?string $runId = null, int $cacheReadTokens = 0): void
+    {
+        DB::table('ai_usage')->insert([
+            'run_id' => $runId,
+            'shop_id' => $shopId,
+            'agent' => $agent,
+            'action' => $action,
+            'provider' => $provider,
+            'model' => $model,
+            'input_tokens' => max(0, $inputTokens),
+            'output_tokens' => max(0, $outputTokens),
+            'cache_read_tokens' => max(0, $cacheReadTokens),
+            'cost_usd' => $costUsd,
+            'day' => now()->toDateString(),
+            'created_at' => now(),
+        ]);
+    }
+
     public static function labelFor(string $group, string $identifier): string
     {
         [$module, $name] = array_pad(explode('.', $identifier, 2), 2, '');

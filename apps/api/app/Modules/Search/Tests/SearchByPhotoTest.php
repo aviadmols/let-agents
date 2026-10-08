@@ -24,6 +24,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -95,6 +96,7 @@ final class SearchByPhotoTest extends TestCase
 
         $this->upload()->assertOk();
         $this->assertSame(1, $this->pictures->photos, 'the same photo again costs nothing');
+        $this->assertSame(['gemini-embedding-2'], DB::table('ai_usage')->pluck('model')->all(), 'the photo is in the spend ledger under its own model, once');
 
         $term = $this->inShop(fn () => SearchTerm::query()->sole());
         $this->assertSame(['[photo]', 2, 0], [$term->query, $term->searches, $term->empty], 'counted, the photo never kept');
