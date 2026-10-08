@@ -171,4 +171,9 @@ return [
         'description' => 'התחלה היא ימין באתר בעברית ושמאל באתר באנגלית. בנייד המגירה תופסת את כל המסך.',
         'options' => ['start' => 'מצד ההתחלה (ימין בעברית)', 'end' => 'מצד הסוף (שמאל בעברית)'],
     ],
+    'photo_tags_provider' => ['label' => 'ספק לקריאת תמונות', 'description' => 'anthropic או openai.'],
+    'photo_tags_model' => ['label' => 'מודל לקריאת תמונות', 'description' => 'מודל שרואה תמונות.'],
+    'photo_tags_input_usd_per_million' => ['label' => 'מחיר קלט (דולר למיליון)', 'description' => 'לחישוב העלות ביומן.'],
+    'photo_tags_output_usd_per_million' => ['label' => 'מחיר פלט (דולר למיליון)', 'description' => 'לחישוב העלות ביומן.'],
+    'photo_tags_max_output_tokens' => ['label' => 'אורך תשובה מקסימלי', 'description' => 'בטוקנים.'],
 ];

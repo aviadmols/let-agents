@@ -171,4 +171,9 @@ return [
         'description' => 'Start is right on a Hebrew site and left on an English one. On a phone the drawer takes the whole screen.',
         'options' => ['start' => 'The start side (right in Hebrew)', 'end' => 'The end side (left in Hebrew)'],
     ],
+    'photo_tags_provider' => ['label' => 'Photo reading provider', 'description' => 'anthropic or openai.'],
+    'photo_tags_model' => ['label' => 'Photo reading model', 'description' => 'A model that sees pictures.'],
+    'photo_tags_input_usd_per_million' => ['label' => 'Input price (USD per million)', 'description' => 'For the cost in the log.'],
+    'photo_tags_output_usd_per_million' => ['label' => 'Output price (USD per million)', 'description' => 'For the cost in the log.'],
+    'photo_tags_max_output_tokens' => ['label' => 'Longest answer', 'description' => 'In tokens.'],
 ];

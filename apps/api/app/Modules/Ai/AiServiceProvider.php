@@ -8,6 +8,7 @@ use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ListsProviderModels;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Support\Drivers\AnthropicChat;
 use App\Modules\Ai\Support\Drivers\GeminiEmbeddings;
 use App\Modules\Ai\Support\Drivers\OpenAiChat;
@@ -39,6 +40,7 @@ final class AiServiceProvider extends ModuleServiceProvider
         $this->app->tag(self::EMBEDDING_DRIVERS, 'ai.embedding_drivers');
         $this->app->tag(self::IMAGE_EMBEDDING_DRIVERS, 'ai.image_embedding_drivers');
         $this->app->bind(ChatModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers')));
+        $this->app->bind(VisionModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers')));
         $this->app->bind(Embedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
         $this->app->bind(ImageEmbedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
     }

@@ -32,6 +32,8 @@ return [
     'photo_failed' => 'We could not search by this photo. Try again later.',
     'photo_match' => ':match% alike',
     'photo_yours' => 'Your photo',
+    'photo_tags' => 'In the photo:',
+    'photo_only_tags' => 'No product looks just like the photo. Search by what is in it:',
     'answer_from_site' => 'Answer from the site',
     'sources' => 'From:',
     'ask_hint' => 'No ready answer yet. It can be looked up on the site pages.',

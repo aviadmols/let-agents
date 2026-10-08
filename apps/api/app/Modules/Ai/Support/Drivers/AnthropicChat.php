@@ -7,6 +7,7 @@ use Anthropic\RequestOptions;
 use App\Modules\Ai\Contracts\ChatDriver;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\VisionDriver;
 use App\Modules\Ai\Enums\AiProviderName;
 use Throwable;
 
@@ -17,7 +18,7 @@ use Throwable;
  * Claude has no JSON mode without a schema, so the system prompt asks for one JSON object and
  * the reply is read from its first brace to its last. Reasoning effort is not passed on.
  */
-final class AnthropicChat implements ChatDriver
+final class AnthropicChat implements ChatDriver, VisionDriver
 {
     private const TIMEOUT_SECONDS = 60.0;
 
@@ -30,12 +31,26 @@ final class AnthropicChat implements ChatDriver
 
     public function json(string $apiKey, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
     {
+        return $this->send($apiKey, $model, $system, $user, $maxOutputTokens);
+    }
+
+    public function jsonWithImage(string $apiKey, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    {
+        return $this->send($apiKey, $model, $system, [
+            ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => base64_encode($bytes)]],
+            ['type' => 'text', 'text' => $user],
+        ], $maxOutputTokens);
+    }
+
+    /** @param string|list<array<string, mixed>> $content */
+    private function send(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens): ModelReply
+    {
         try {
             $message = (new Client(apiKey: $apiKey, requestOptions: RequestOptions::with(timeout: self::TIMEOUT_SECONDS, maxRetries: 1)))
                 ->messages
                 ->create(
                     maxTokens: $maxOutputTokens,
-                    messages: [['role' => 'user', 'content' => $user]],
+                    messages: [['role' => 'user', 'content' => $content]],
                     model: $model,
                     system: $system.self::JSON_ONLY,
                 );

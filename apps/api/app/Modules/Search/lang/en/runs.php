@@ -9,4 +9,7 @@ return [
     'tags_no_provider' => 'Page tags: an unknown provider in one of the roles.',
     'tags_same_family' => 'Page tags: the writing and the checking model are from the same family (:family). Choose a checker from another family.',
     'tags_no_index' => 'Page tags: there is no search index yet. Build it first.',
+    'photo_tags' => 'Photo read: :picks categories, :seen words.',
+    'photo_tags_failed' => 'Photo reading failed (:reason).',
+    'photo_tags_spend_cap' => 'Photo reading: the spending cap was reached.',
 ];

@@ -6,6 +6,8 @@ use App\Modules\Ai\Contracts\ChatDriver;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\VisionDriver;
+use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Enums\AiProviderName;
 
 /**
@@ -13,7 +15,7 @@ use App\Modules\Ai\Enums\AiProviderName;
  * drivers are the ones AiServiceProvider registers; a provider without one is refused as
  * unsupported, the same way as before there were drivers.
  */
-final class ProviderChatModel implements ChatModel
+final class ProviderChatModel implements ChatModel, VisionModel
 {
     /** @param iterable<ChatDriver> $drivers */
     public function __construct(private readonly iterable $drivers) {}
@@ -23,6 +25,17 @@ final class ProviderChatModel implements ChatModel
         foreach ($this->drivers as $driver) {
             if ($driver->provider() === $provider) {
                 return $driver->json(ProviderKey::for($provider), $model, $system, $user, $maxOutputTokens, $reasoningEffort);
+            }
+        }
+
+        throw new ModelCallFailed(ModelCallFailed::UNSUPPORTED);
+    }
+
+    public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    {
+        foreach ($this->drivers as $driver) {
+            if ($driver instanceof VisionDriver && $driver->provider() === $provider) {
+                return $driver->jsonWithImage(ProviderKey::for($provider), $model, $system, $user, $mime, $bytes, $maxOutputTokens, $reasoningEffort);
             }
         }
 

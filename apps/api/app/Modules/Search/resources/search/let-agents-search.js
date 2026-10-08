@@ -730,6 +730,10 @@
       '.d-yours img{width:76px;height:76px;object-fit:cover;border-radius:12px;border:1px solid var(--rs-line)}',
       '.d-yours b{display:block}',
       '.d-link{all:unset;cursor:pointer;color:var(--rs-accent-text);font-weight:600;font-size:14px;justify-self:start}',
+      '.d-tags{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 4px}',
+      '.d-tags-h{font-size:13px;opacity:.7}',
+      '.d-chip{all:unset;cursor:pointer;padding:6px 14px;border:1px solid var(--rs-line);border-radius:999px;font-size:14px;line-height:1.2;transition:border-color .2s,background .2s}',
+      '.d-chip:hover,.d-chip:focus-visible{border-color:var(--rs-accent);background:var(--rs-soft,rgba(0,0,0,.04))}',
       '.d-link:focus-visible,.d-all:focus-visible,.d-ask:focus-visible,.m-back:focus-visible{outline:2px solid var(--rs-accent);outline-offset:-2px}',
       // On a phone the suggestions cover the page.
       '.d.m{position:fixed;inset:0;height:100%;border:0;border-radius:0;box-shadow:none}',
@@ -2271,7 +2275,10 @@
       });
     }
 
-    /** Sends the photo once; resolves with the products that look like it, or a label key saying why not. */
+    /**
+     * Sends the photo once; resolves with { products, tags }: the products that look like it and
+     * what the photo shows in the shop's own words. A label key says why not, when neither came.
+     */
     function photoRequest(file) {
       return shrink(file).then(function (blob) {
         var maxBytes = ((state.config && state.config.photoMaxKb) || 5120) * 1024;
@@ -2292,8 +2299,27 @@
           return result;
         }
         var products = (result && result.groups && result.groups.product) || [];
-        return products.length ? products : 'photo_none';
+        var tags = (result && result.tags) || [];
+        return products.length || tags.length ? { products: products, tags: tags } : 'photo_none';
       }).catch(function () { return 'photo_failed'; });
+    }
+
+    /** What the photo shows, as tags; a tag searches the shop for itself. */
+    function photoTagRow(tags, pick) {
+      var row = el('div', 'd-tags');
+      row.appendChild(el('span', 'd-tags-h', label('photo_tags')));
+      for (var i = 0; i < tags.length; i++) {
+        (function (tag) {
+          var chip = el('button', 'd-chip', tag.title);
+          chip.type = 'button';
+          chip.setAttribute('data-photo-tag', tag.kind || '');
+          chip.addEventListener('click', function () {
+            pick(tag.title);
+          });
+          row.appendChild(chip);
+        })(tags[i]);
+      }
+      return row;
     }
 
     function preview(file) {
@@ -2327,10 +2353,11 @@
       d.upload = true;
       position();
 
-      photoRequest(file).then(function (products) {
+      photoRequest(file).then(function (result) {
         if (main.isConnected === false) {
           return;
         }
+        var products = typeof result === 'string' ? result : result.products;
         var again = el('button', 'd-link', label('photo_again'));
         again.type = 'button';
         again.addEventListener('click', function () { openUpload(); });
@@ -2341,7 +2368,17 @@
           return;
         }
         status.className = 'muted';
-        status.textContent = label('photo_count', { count: products.length });
+        status.textContent = products.length ? label('photo_count', { count: products.length }) : label('photo_only_tags');
+        if (result.tags.length) {
+          main.appendChild(photoTagRow(result.tags, function (text) {
+            var field = d.field || current;
+            if (field) {
+              field.value = text;
+              suggest(field);
+              focusField(dropdown || d);
+            }
+          }));
+        }
         var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
         var records = [];
         for (var i = 0; i < products.length; i++) {
@@ -2378,12 +2415,21 @@
       var status = el('div', 'section', label('photo_searching'));
       sheet.appendChild(status);
 
-      photoRequest(file).then(function (products) {
-        if (typeof products === 'string') {
-          status.textContent = label(products);
+      photoRequest(file).then(function (result) {
+        if (typeof result === 'string') {
+          status.textContent = label(result);
           return;
         }
+        var products = result.products;
         sheet.removeChild(status);
+        if (result.tags.length) {
+          var tagRow = photoTagRow(result.tags, function (text) { openPanel(text); });
+          tagRow.className += ' section';
+          sheet.appendChild(tagRow);
+        }
+        if (!products.length) {
+          sheet.appendChild(el('div', 'section muted', label('photo_only_tags')));
+        }
         var section = el('div', 'section');
         var grid = el('div', 'grid');
         var ids = [];

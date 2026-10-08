@@ -29,4 +29,8 @@ return [
         'label' => 'Similar items in the results',
         'description' => 'A button on every product in the results. By picture where the pictures are scanned, and by the meaning of the product name and description otherwise. From vectors that already exist, with no model and no cost.',
     ],
+    'photo_tags' => [
+        'label' => 'Tags from a photo',
+        'description' => 'In photo search, a model reads the photo and shows the shop\'s tags that fit it. A tag searches for itself.',
+    ],
 ];

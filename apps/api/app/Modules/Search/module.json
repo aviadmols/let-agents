@@ -40,6 +40,10 @@
         {
             "name": "similar",
             "default": true
+        },
+        {
+            "name": "photo_tags",
+            "default": true
         }
     ],
     "settings": [
@@ -180,6 +184,49 @@
             "type": "bool",
             "default": true,
             "scope": "shop"
+        },
+        {
+            "name": "photo_tags_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "photo_tags_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "photo_tags_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "photo_tags_output_usd_per_million",
+            "type": "float",
+            "default": 5.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "photo_tags_max_output_tokens",
+            "type": "int",
+            "default": 400,
+            "min": 100,
+            "max": 2000,
+            "scope": "global",
+            "unit": "tokens"
         },
         {
             "name": "resolve_provider",
@@ -480,6 +527,29 @@
                 "step": "resolve",
                 "shop_argument": "target"
             }
+        },
+        {
+            "name": "photo_reader",
+            "action": "read_photo",
+            "when": "live",
+            "features": [
+                "photos",
+                "photo_tags"
+            ],
+            "roles": [
+                {
+                    "role": "reader",
+                    "provider": "photo_tags_provider",
+                    "model": "photo_tags_model",
+                    "prices": [
+                        "photo_tags_input_usd_per_million",
+                        "photo_tags_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "photo_tags"
+                    ]
+                }
+            ]
         }
     ]
 }

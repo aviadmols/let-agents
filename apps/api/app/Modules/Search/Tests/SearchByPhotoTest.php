@@ -7,18 +7,23 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
+use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Retrieval\Models\RetrievalImage;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\ReadPhotoTags;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -192,5 +197,52 @@ final class SearchByPhotoTest extends TestCase
         $found = array_column($this->upload()->assertOk()->json('groups.product'), 'external_id');
 
         $this->assertSame(['11', '12', '14', '13', '16'], $found, 'drills of every brand first, never a third Makita in a row while Bosch waits, screws last, the sold-out drill not at all');
+    }
+
+    public function test_what_the_photo_shows_comes_back_as_the_shops_own_tags_and_is_never_asked_twice(): void
+    {
+        $this->inShop(function (): void {
+            foreach ([['k1', 'עץ אורן'], ['k2', 'פרגולות'], ['k3', 'ברגים']] as [$id, $name]) {
+                CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'name' => $name, 'path' => [$name], 'depth' => 0, 'hash' => $id, 'product_count' => 3]);
+            }
+            $this->shirt('20', 'דק איפאה לרצפה', [0.0, 0.0, 1.0]);
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $vision = new class implements VisionModel
+        {
+            public int $calls = 0;
+
+            public string $user = '';
+
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->calls++;
+                $this->user = $user;
+
+                // The list is in name order: 1 ברגים, 2 עץ אורן, 3 פרגולות. 9 is not on it.
+                return new ModelReply(['picks' => [2, 3, 9, 2], 'seen' => ['דק', 'כיסא מתקפל']], 1800, 40);
+            }
+        };
+        $this->app->instance(VisionModel::class, $vision);
+
+        $tags = $this->upload()->assertOk()->json('tags');
+
+        $this->assertSame([
+            ['title' => 'עץ אורן', 'kind' => 'category'],
+            ['title' => 'פרגולות', 'kind' => 'category'],
+            ['title' => 'דק', 'kind' => 'words'],
+        ], array_map(fn (array $t): array => ['title' => $t['title'], 'kind' => $t['kind']], $tags), 'only real categories, and only a seen word the shop has products for');
+        $this->assertStringContainsString('2. עץ אורן', $vision->user);
+
+        $this->upload()->assertOk();
+        $this->assertSame(1, $vision->calls, 'the same photo is never asked twice');
+        $this->assertSame(1, Run::query()->where('agent', ReadPhotoTags::AGENT)->count(), 'the call is accounted for');
+
+        Features::override('search.photo_tags', false, $this->shop->id);
+        Cache::flush();
+        $this->assertSame([], $this->upload()->assertOk()->json('tags'));
+        $this->assertSame(1, $vision->calls, 'off is off');
     }
 }
