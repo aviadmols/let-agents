@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -163,5 +164,33 @@ final class SearchByPhotoTest extends TestCase
         app(BuildSearchIndex::class)->handle($this->shop->id);
 
         $this->assertSame(['1', '2'], array_column($this->upload()->assertOk()->json('groups.product'), 'external_id'));
+    }
+
+    public function test_a_photo_brings_other_brands_of_the_same_kind_and_only_what_is_in_stock(): void
+    {
+        $this->inShop(function (): void {
+            $drills = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'c1', 'name' => 'מברגות', 'path' => ['מברגות'], 'depth' => 0, 'hash' => 'c1']);
+            $screws = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'c2', 'name' => 'ברגים', 'path' => ['ברגים'], 'depth' => 0, 'hash' => 'c2']);
+            $make = function (string $id, string $title, array $vector, string $brand, $category, bool $inStock = true): void {
+                $this->shirt($id, $title, $vector);
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                $product->update(['brand' => $brand, 'in_stock' => $inStock]);
+                $product->categories()->attach($category->id);
+            };
+
+            $make('11', 'מברגה מקיטה א', [1.0, 0.0, 0.1], 'Makita', $drills);
+            $make('12', 'מברגה מקיטה ב', [0.98, 0.05, 0.1], 'Makita', $drills);
+            $make('13', 'מברגה מקיטה ג', [0.97, 0.05, 0.12], 'Makita', $drills);
+            $make('14', 'מברגה בוש', [0.8, 0.4, 0.1], 'Bosch', $drills);
+            $make('15', 'מברגה מקיטה שאזלה', [0.99, 0.02, 0.1], 'Makita', $drills, false);
+            $make('16', 'בורג גבס', [0.97, 0.1, 0.05], 'Generic', $screws);
+            CatalogProduct::query()->whereIn('external_id', ['1', '2', '3'])->delete();
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $found = array_column($this->upload()->assertOk()->json('groups.product'), 'external_id');
+
+        $this->assertSame(['11', '12', '14', '13', '16'], $found, 'drills of every brand first, never a third Makita in a row while Bosch waits, screws last, the sold-out drill not at all');
     }
 }

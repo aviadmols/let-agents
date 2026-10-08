@@ -157,21 +157,13 @@ final class SearchCatalog
         return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes): array {
             $index = LoadedIndex::for($shopId);
             $floor = (float) Settings::get('search.photo_min_similarity');
+
+            $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, max(48, (int) Settings::get('search.semantic_results')));
+            $hits = array_values(array_filter($hits, fn (array $hit): bool => isset($index['records']['p:'.$hit['external_id']]) && $hit['similarity'] >= $floor));
             $products = [];
 
-            $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, (int) Settings::get('search.semantic_results') ?: 24);
-
-            // Picture scores sit close together (a drill and a box of screws both near 0.7), so a
-            // fixed floor alone lets far products in: keep only what is close to the best match.
-            $best = $hits === [] ? 0.0 : max(array_column($hits, 'similarity'));
-            $floor = max($floor, $best - (float) Settings::get('search.photo_relative_gap'));
-
-            foreach ($hits as $hit) {
-                $record = $index['records']['p:'.$hit['external_id']] ?? null;
-
-                if ($record !== null && $hit['similarity'] >= $floor) {
-                    $products[] = $this->present($record) + ['match' => (int) round(max(0, min(1, $hit['similarity'])) * 100)];
-                }
+            foreach ($this->photoOrder($hits, $shopId) as $hit) {
+                $products[] = $this->present($index['records']['p:'.$hit['external_id']]) + ['match' => (int) round(max(0, min(1, $hit['similarity'])) * 100)];
             }
 
             $products = array_slice($products, 0, (int) Settings::get('search.results_per_group', $shopId));
@@ -179,6 +171,83 @@ final class SearchCatalog
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'searched' => $hits !== [] || $index !== null];
         });
+    }
+
+    /**
+     * What a photo shows, in the order a shopper wants it. Picture scores sit close together and
+     * favour a brand's colours, so the score alone shows six Makita tools and a box of screws.
+     *
+     *   1. kind      products in the categories of the best matches, whatever their brand,
+     *                then what is only close to the best match (search.photo_relative_gap)
+     *   2. variety   no more than two of one brand in a row while other brands are left
+     *   3. stock     only what is in stock (search.photo_in_stock_only), unless nothing is
+     *
+     * @param  list<array{external_id: string, similarity: float}>  $hits  most alike first
+     * @return list<array{external_id: string, similarity: float}>
+     */
+    private function photoOrder(array $hits, string $shopId): array
+    {
+        if ($hits === []) {
+            return [];
+        }
+
+        $products = CatalogProduct::query()->whereIn('external_id', array_column($hits, 'external_id'))
+            ->with('categories:id')->get(['id', 'external_id', 'brand', 'in_stock'])->keyBy('external_id');
+        $categoriesOf = fn (array $hit): array => $products->get($hit['external_id'])?->categories->pluck('id')->all() ?? [];
+
+        usort($hits, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
+        $best = $hits[0]['similarity'];
+        $close = $best - (float) Settings::get('search.photo_relative_gap');
+        $kind = array_unique(array_merge(...array_map($categoriesOf, array_slice($hits, 0, 3))));
+
+        $sameKind = array_values(array_filter($hits, fn (array $hit): bool => array_intersect($categoriesOf($hit), $kind) !== []));
+        $onlyClose = array_values(array_filter($hits, fn (array $hit): bool => $hit['similarity'] >= $close && array_intersect($categoriesOf($hit), $kind) === []));
+
+        if ((bool) Settings::get('search.photo_in_stock_only', $shopId)) {
+            $inStock = fn (array $hit): bool => (bool) $products->get($hit['external_id'])?->in_stock;
+            $stocked = array_values(array_filter($sameKind, $inStock));
+            $stockedClose = array_values(array_filter($onlyClose, $inStock));
+
+            if ($stocked !== [] || $stockedClose !== []) {
+                [$sameKind, $onlyClose] = [$stocked, $stockedClose];
+            }
+        }
+
+        $brandOf = fn (array $hit): string => mb_strtolower(trim((string) $products->get($hit['external_id'])?->brand)) ?: 'id:'.$hit['external_id'];
+
+        return array_merge($this->varied($sameKind, $brandOf), $this->varied($onlyClose, $brandOf));
+    }
+
+    /**
+     * The same hits, most alike first, but never a third of one brand in a row while another
+     * brand is still waiting.
+     *
+     * @param  list<array{external_id: string, similarity: float}>  $hits
+     * @return list<array{external_id: string, similarity: float}>
+     */
+    private function varied(array $hits, callable $brandOf): array
+    {
+        $out = [];
+
+        while ($hits !== []) {
+            $last = array_map($brandOf, array_slice($out, -2));
+            $repeat = count($last) === 2 && $last[0] === $last[1] ? $last[0] : null;
+            $at = 0;
+
+            if ($repeat !== null) {
+                foreach ($hits as $i => $hit) {
+                    if ($brandOf($hit) !== $repeat) {
+                        $at = $i;
+                        break;
+                    }
+                }
+            }
+
+            $out[] = $hits[$at];
+            array_splice($hits, $at, 1);
+        }
+
+        return $out;
     }
 
     /**

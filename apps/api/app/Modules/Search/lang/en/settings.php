@@ -62,6 +62,10 @@ return [
         'label' => 'Largest distance from the best photo match',
         'description' => 'Only what is close to the first result is shown (0.06 = up to 6 points below it). Picture similarity scores sit close together, so a fixed floor alone lets far products in.',
     ],
+    'photo_in_stock_only' => [
+        'label' => 'In photo search, only what is in stock',
+        'description' => 'Products that ran out are not shown, unless nothing alike is in stock.',
+    ],
     'photo_min_similarity' => [
         'label' => 'Minimum likeness to an uploaded photo',
         'description' => 'Below this a product is not shown. A shopper\'s photo differs from a product picture in background and light, so this is lower than likeness between products.',
