@@ -247,12 +247,31 @@
     return 4;
   }
 
+  // Words that are not asked of a record for it to hold the whole query (the server's FILLER list).
+  var FILLER = ['איך', 'כמה', 'האם', 'למה', 'מדוע', 'מה', 'מהו', 'מהי', 'מהמ', 'איפה', 'היכנ', 'מתי', 'מי', 'איזה', 'איזו', 'אילו',
+    'אפשר', 'ניתנ', 'יש', 'צריכ', 'כדאי', 'מותר', 'מתאימ', 'מתאימה', 'מתאימימ', 'הכי', 'לי', 'לנו', 'עמ', 'של', 'את', 'על', 'ליד', 'זה', 'זו',
+    'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
+    'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
+
   function rank(index, query) {
     var tokens = query.split(' ');
     var score = {};
     var hits = {};
     var found = [];
     var needed = tokens.length <= 2 ? tokens.length : tokens.length - 1;
+    // The words that must all be there for a record to hold the whole query.
+    var required = [];
+    for (var q = 0; q < tokens.length; q++) {
+      if (FILLER.indexOf(tokens[q]) === -1) {
+        required.push(q);
+      }
+    }
+    if (!required.length) {
+      for (var q2 = 0; q2 < tokens.length; q2++) {
+        required.push(q2);
+      }
+    }
+    var matched = {};
 
     for (var t = 0; t < tokens.length; t++) {
       var close = closeWords(index, tokens[t]);
@@ -276,6 +295,10 @@
       for (var b = 0; b < bestOrder.length; b++) {
         score[bestOrder[b]] = (score[bestOrder[b]] || 0) + best[bestOrder[b]];
         hits[bestOrder[b]] = (hits[bestOrder[b]] || 0) + 1;
+        if (!matched[bestOrder[b]]) {
+          matched[bestOrder[b]] = {};
+        }
+        matched[bestOrder[b]][t] = true;
       }
     }
 
@@ -285,11 +308,22 @@
       if (tier < 0 && (hits[r] || 0) < needed) {
         continue;
       }
-      found.push({ id: record.id, title: record.title, score: (tier >= 0 ? 10 - tier : 0) + (score[r] || 0) / tokens.length, exact: tier >= 0 });
+      var full = tier >= 0;
+      if (!full) {
+        full = true;
+        for (var k = 0; k < required.length; k++) {
+          if (!matched[r] || !matched[r][required[k]]) {
+            full = false;
+            break;
+          }
+        }
+      }
+      found.push({ id: record.id, title: record.title, score: (tier >= 0 ? 10 - tier : 0) + (score[r] || 0) / tokens.length, exact: tier >= 0, full: full });
     }
 
+    // What holds the whole query before what holds part of it; then by score.
     found.sort(function (a, b) {
-      return (b.score - a.score) || (a.title.length - b.title.length);
+      return ((b.full ? 1 : 0) - (a.full ? 1 : 0)) || (b.score - a.score) || (a.title.length - b.title.length);
     });
     return found;
   }
@@ -945,6 +979,9 @@
       '.d-tag[hidden]{display:none}',
       '.d-match{position:absolute;bottom:6px;inset-inline-start:6px;background:var(--rs-bg);color:var(--rs-fg);font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.15)}',
       '.d-info{display:block;min-width:0}',
+      '.d-row{position:relative;min-width:0}',
+      '.d-sim{position:absolute;inset-inline-end:2px;bottom:0;font:inherit;font-size:12px;line-height:1;padding:5px 10px;border:0;border-radius:999px;background:var(--rs-soft);color:inherit;cursor:pointer;opacity:.85}',
+      '.d-sim:hover{opacity:1}',
       '.d-name{font-size:14.5px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:inherit;text-decoration:none}',
       '.d-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-weight:700;margin-top:4px;font-size:14px;min-height:1.2em}',
       '.d-price s{opacity:.5;font-weight:400}',
@@ -1289,6 +1326,17 @@
       var answers = [];
       var total = 0;
       var contentTotal = 0;
+      // "טבעת יהלום סוליטר בכסף": when products hold every word, only they are offered, as on the server.
+      var whole = false;
+      if (query.indexOf(' ') !== -1) {
+        for (var w = 0; w < hits.length; w++) {
+          var holder = state.records[hits[w].id];
+          if (hits[w].full && holder && holder.t === 'product') {
+            whole = true;
+            break;
+          }
+        }
+      }
       for (var i = 0; i < hits.length; i++) {
         var record = state.records[hits[i].id];
         if (!record) {
@@ -1299,6 +1347,9 @@
             answers.push(record);
           }
         } else if (record.t === 'product') {
+          if (whole && !hits[i].full) {
+            continue;
+          }
           total++;
           if (products.length < max) {
             products.push(record);
@@ -1563,7 +1614,22 @@
       }
       info.appendChild(price);
       link.appendChild(info);
-      return link;
+      if (!(state.config && state.config.similar)) {
+        return link;
+      }
+      // "Similar items" beside every product, from the suggestions too.
+      var row = el('div', 'd-row');
+      row.appendChild(link);
+      var sim = el('button', 'd-sim', label('similar'));
+      sim.type = 'button';
+      sim.setAttribute('aria-label', label('similar_to', { title: record.title }));
+      sim.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        showSimilar({ id: record.id, external_id: String(record.id).slice(2), title: record.title }, raw);
+      });
+      row.appendChild(sim);
+      return row;
     }
 
     function footer(input, raw, total, question) {
@@ -2210,7 +2276,8 @@
 
     /** Products like one in the results, in place of the results, with the way back. */
     function showSimilar(item, raw) {
-      var sheet = currentSheet;
+      // From the suggestions there is no sheet yet: one opens for the similar items.
+      var sheet = currentSheet || openSheet(label('similar_to', { title: item.title }), raw);
       if (!sheet) {
         return;
       }

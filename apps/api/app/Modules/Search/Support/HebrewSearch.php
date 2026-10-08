@@ -247,7 +247,7 @@ final class HebrewSearch
     }
 
     /**
-     * @return list<array{id: string, title: string, score: float, exact: bool}>
+     * @return list<array{id: string, title: string, score: float, exact: bool, full: bool}>
      */
     public static function rank(array $index, string $query): array
     {
@@ -256,8 +256,13 @@ final class HebrewSearch
         $hits = [];
         $found = [];
         $needed = count($tokens) <= 2 ? count($tokens) : count($tokens) - 1;
+        // The words that must all be there for a record to hold the whole query: filler words
+        // ("עם", "של") are not asked of it.
+        $required = array_keys(array_filter($tokens, fn (string $t): bool => ! in_array($t, self::FILLER, true)));
+        $required = $required === [] ? array_keys($tokens) : $required;
+        $matched = [];
 
-        foreach ($tokens as $token) {
+        foreach ($tokens as $position => $token) {
             $best = [];
 
             foreach (self::closeWords($index, $token) as $word => $closeness) {
@@ -274,6 +279,7 @@ final class HebrewSearch
             foreach ($best as $at => $value) {
                 $score[$at] = ($score[$at] ?? 0) + $value;
                 $hits[$at] = ($hits[$at] ?? 0) + 1;
+                $matched[$at][$position] = true;
             }
         }
 
@@ -289,10 +295,13 @@ final class HebrewSearch
                 'title' => $record['title'],
                 'score' => ($tier >= 0 ? 10 - $tier : 0) + ($score[$at] ?? 0) / count($tokens),
                 'exact' => $tier >= 0,
+                // Holds every word that counts, as typed or close to it: "טבעת יהלום סוליטר בכסף" in full.
+                'full' => $tier >= 0 || array_diff_key(array_flip($required), $matched[$at] ?? []) === [],
             ];
         }
 
-        usort($found, static fn (array $a, array $b): int => $b['score'] <=> $a['score'] ?: mb_strlen($a['title']) <=> mb_strlen($b['title']));
+        // What holds the whole query before what holds part of it; then by score.
+        usort($found, static fn (array $a, array $b): int => (int) $b['full'] <=> (int) $a['full'] ?: $b['score'] <=> $a['score'] ?: mb_strlen($a['title']) <=> mb_strlen($b['title']));
 
         return $found;
     }
@@ -301,7 +310,7 @@ final class HebrewSearch
      * Everything that matches, best first. A query typed on an English keyboard is read both ways
      * and the reading whose best hit scores higher wins, so "milwakee" stays English.
      *
-     * @return list<array{id: string, title: string, score: float, exact: bool}>
+     * @return list<array{id: string, title: string, score: float, exact: bool, full: bool}>
      */
     public static function search(array $index, ?string $raw): array
     {

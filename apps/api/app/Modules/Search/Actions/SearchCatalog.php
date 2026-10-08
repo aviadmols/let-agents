@@ -84,6 +84,16 @@ final class SearchCatalog
             $byMeaning = $meaning;
             $meaning = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : [];
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
+
+            // "טבעת יהלום סוליטר בכסף": when products hold every word, only they are shown, however
+            // close by meaning or by picture a gold solitaire or a silver zircon ring may be. The
+            // search widens to products holding most of the words only when none holds them all.
+            if (str_contains($query, ' ') && ($whole = self::whole($spelling)) !== []) {
+                $spelling = array_values(array_filter($spelling, fn (array $hit): bool => isset($whole[$hit['id']]) || ! str_starts_with($hit['id'], 'p:')));
+                $keep = fn (string $id): bool => isset($whole[$id]) || ! str_starts_with($id, 'p:');
+                $meaning = array_values(array_filter($meaning, $keep));
+                $pictures = array_values(array_filter($pictures, $keep));
+            }
             $pinned = $this->resolved($query, $index['records']);
             // A question about a kind of product ("איזה עץ…") shows that kind first: products of the
             // categories named after it, before products that only mention the word (a bracket
@@ -530,6 +540,25 @@ final class SearchCatalog
         arsort($scores);
 
         return array_values(array_unique([...$pinned, ...$exact, ...array_map('strval', array_keys($scores))]));
+    }
+
+    /**
+     * The products among the hits that hold the whole query, by id.
+     *
+     * @param  list<array{id: string, full?: bool}>  $hits
+     * @return array<string, true>
+     */
+    private static function whole(array $hits): array
+    {
+        $whole = [];
+
+        foreach ($hits as $hit) {
+            if (($hit['full'] ?? false) && str_starts_with($hit['id'], 'p:')) {
+                $whole[$hit['id']] = true;
+            }
+        }
+
+        return $whole;
     }
 
     /**
