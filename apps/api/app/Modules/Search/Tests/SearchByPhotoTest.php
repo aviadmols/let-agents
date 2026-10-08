@@ -283,4 +283,33 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(['31'], array_column($scene['groups']['product'], 'external_id'), 'the tag decides what shows; the close screw does not');
         $this->assertSame([0], $scene['groups']['product'][0]['tags'], 'each product says which tags it belongs to');
     }
+
+    public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void
+    {
+        $this->inShop(function (): void {
+            $drills = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k1', 'name' => 'מברגות', 'path' => ['מברגות'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 1]);
+            $boxes = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k2', 'name' => 'ארגזי כלים', 'path' => ['ארגזי כלים'], 'depth' => 0, 'hash' => 'k2', 'product_count' => 1]);
+            // The tool box's picture is scanned and close; the drill's is not scanned yet.
+            $this->shirt('40', 'ארגז כלים', [1.0, 0.0, 0.1]);
+            CatalogProduct::query()->where('external_id', '40')->sole()->categories()->attach($boxes->id);
+            $drill = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '41', 'type' => 'simple', 'status' => 'publish', 'title' => 'מברגה נטענת', 'url' => 'https://www.store.test/p/41', 'in_stock' => true, 'purchasable' => true, 'hash' => 'h41', 'payload' => []]);
+            $drill->categories()->attach($drills->id);
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $this->app->instance(VisionModel::class, new class implements VisionModel
+        {
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                // Name order: 1 ארגזי כלים, 2 מברגות. The drill is the main object.
+                return new ModelReply(['main' => 2, 'picks' => [1, 2], 'seen' => []], 1800, 20);
+            }
+        });
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame('מברגות', $result['tags'][0]['title'], 'the main object leads the tags');
+        $this->assertSame(['41', '40'], array_column($result['groups']['product'], 'external_id'), 'the drill before the closer-scoring tool box');
+    }
 }

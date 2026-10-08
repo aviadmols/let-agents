@@ -240,7 +240,7 @@ final class SearchCatalog
                 $products = $this->taggedProducts($index, $tags, $hits, $shopId);
                 $this->counter->photo($shopId, count($products));
 
-                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0]), $tags), 'searched' => true];
+                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true];
             }
 
             $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, max(48, (int) Settings::get('search.semantic_results')));
@@ -302,8 +302,12 @@ final class SearchCatalog
             $candidates = $stocked !== [] ? $stocked : $candidates;
         }
 
-        // Alike first; a product in more of the photo's tags first among equals.
-        usort($candidates, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
+        // What the shopper photographed first (the main tag's products), then by likeness, then by
+        // how many of the photo's tags a product shares. Likeness alone would put a scanned tool box
+        // above a drill whose picture is not scanned yet.
+        $main = array_keys(array_filter($tags, fn (array $t): bool => ($t['main'] ?? false) === true));
+        $isMain = fn (array $c): int => array_intersect($members[$c['external_id']], $main) !== [] ? 1 : 0;
+        usort($candidates, fn (array $a, array $b): int => $isMain($b) <=> $isMain($a) ?: $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
         $brandOf = fn (array $c): string => mb_strtolower(trim((string) $rows->get($c['external_id'])?->brand)) ?: 'id:'.$c['external_id'];
 
         $out = [];

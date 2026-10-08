@@ -33,9 +33,9 @@ final class ReadPhotoTags
 
     public const ACTION = 'search.read_photo';
 
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
-    private const PROMPT = __DIR__.'/../Prompts/photo_tags.v1.md';
+    private const PROMPT = __DIR__.'/../Prompts/photo_tags.v'.self::PROMPT_VERSION.'.md';
 
     private const MAX_CANDIDATES = 300;
 
@@ -172,7 +172,13 @@ final class ReadPhotoTags
                     }
                 }
 
-                $answer = ['picks' => array_slice($picks, 0, self::MAX_TAGS), 'seen' => array_slice($seen, 0, self::MAX_TAGS)];
+                // The main object first: what the shopper photographed, before what came with it.
+                $main = is_numeric($reply->data['main'] ?? null) && isset($candidates[(int) $reply->data['main'] - 1]) ? (int) $reply->data['main'] : null;
+                if ($main !== null) {
+                    $picks = [$main, ...array_values(array_diff($picks, [$main]))];
+                }
+
+                $answer = ['picks' => array_slice($picks, 0, self::MAX_TAGS), 'seen' => array_slice($seen, 0, self::MAX_TAGS), 'main' => $main];
                 $run->output($answer)->summary('search::runs.photo_tags', ['picks' => (string) count($answer['picks']), 'seen' => (string) count($answer['seen'])]);
             },
         );
@@ -198,7 +204,7 @@ final class ReadPhotoTags
             $candidate = $candidates[$number - 1] ?? null;
 
             if ($candidate !== null) {
-                $tags[] = array_filter(['title' => $candidate['title'], 'kind' => 'category', 'id' => $candidate['id'], 'url' => $candidate['url']], fn ($v): bool => $v !== null);
+                $tags[] = array_filter(['title' => $candidate['title'], 'kind' => 'category', 'id' => $candidate['id'], 'url' => $candidate['url'], 'main' => ($picked['main'] ?? null) === $number ? true : null], fn ($v): bool => $v !== null);
                 $titles[] = HebrewSearch::normalize($candidate['title']);
             }
         }
