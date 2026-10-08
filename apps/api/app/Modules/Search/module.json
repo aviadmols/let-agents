@@ -166,7 +166,7 @@
         {
             "name": "photo_min_similarity",
             "type": "float",
-            "default": 0.5,
+            "default": 0.7,
             "min": 0,
             "max": 1,
             "scope": "global"

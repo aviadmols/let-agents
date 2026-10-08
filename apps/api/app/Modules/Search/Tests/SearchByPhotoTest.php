@@ -245,4 +245,42 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame([], $this->upload()->assertOk()->json('tags'));
         $this->assertSame(1, $vision->calls, 'off is off');
     }
+
+    public function test_a_photo_of_nothing_the_shop_sells_finds_nothing_and_a_scene_finds_its_tags_products(): void
+    {
+        $this->inShop(function (): void {
+            $pine = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k1', 'name' => 'עץ אורן', 'path' => ['עץ אורן'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 1]);
+            $screws = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k2', 'name' => 'ברגים', 'path' => ['ברגים'], 'depth' => 0, 'hash' => 'k2', 'product_count' => 1]);
+            // A screw on white scores close to any photo; the beam's picture looks little like a pergola.
+            $this->shirt('30', 'בורג גבס', [1.0, 0.0, 0.05]);
+            $this->shirt('31', 'קורת עץ אורן', [0.2, 1.0, 0.0]);
+            CatalogProduct::query()->where('external_id', '30')->sole()->categories()->attach($screws->id);
+            CatalogProduct::query()->where('external_id', '31')->sole()->categories()->attach($pine->id);
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $vision = new class implements VisionModel
+        {
+            public array $answer = ['picks' => [], 'seen' => []];
+
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                return new ModelReply($this->answer, 1800, 20);
+            }
+        };
+        $this->app->instance(VisionModel::class, $vision);
+
+        // A child: the reader sees nothing the shop sells.
+        $child = $this->upload()->assertOk()->json();
+        $this->assertSame([], $child['groups']['product'], 'no screw for a child');
+        $this->assertTrue($child['nothing']);
+
+        // A pergola: the reader picks pine (number 2 in name order: ברגים, עץ אורן).
+        Cache::flush();
+        $vision->answer = ['picks' => [2], 'seen' => []];
+        $scene = $this->upload()->assertOk()->json();
+        $this->assertSame(['31'], array_column($scene['groups']['product'], 'external_id'), 'the tag decides what shows; the close screw does not');
+        $this->assertSame([0], $scene['groups']['product'][0]['tags'], 'each product says which tags it belongs to');
+    }
 }

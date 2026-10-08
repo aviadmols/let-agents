@@ -734,6 +734,7 @@
       '.d-tags-h{font-size:13px;opacity:.7}',
       '.d-chip{all:unset;cursor:pointer;padding:6px 14px;border:1px solid var(--rs-line);border-radius:999px;font-size:14px;line-height:1.2;transition:border-color .2s,background .2s}',
       '.d-chip:hover,.d-chip:focus-visible{border-color:var(--rs-accent);background:var(--rs-soft,rgba(0,0,0,.04))}',
+      '.d-chip[aria-pressed="true"]{border-color:var(--rs-accent);background:var(--rs-accent);color:var(--rs-accent-fg,#fff)}',
       '.d-link:focus-visible,.d-all:focus-visible,.d-ask:focus-visible,.m-back:focus-visible{outline:2px solid var(--rs-accent);outline-offset:-2px}',
       // On a phone the suggestions cover the page.
       '.d.m{position:fixed;inset:0;height:100%;border:0;border-radius:0;box-shadow:none}',
@@ -2300,26 +2301,42 @@
         }
         var products = (result && result.groups && result.groups.product) || [];
         var tags = (result && result.tags) || [];
+        if (result && result.nothing) {
+          return 'photo_nothing';
+        }
         return products.length || tags.length ? { products: products, tags: tags } : 'photo_none';
       }).catch(function () { return 'photo_failed'; });
     }
 
-    /** What the photo shows, as tags; a tag searches the shop for itself. */
-    function photoTagRow(tags, pick) {
+    /**
+     * What the photo shows, as tags. A tag narrows the photo's own results to it, and pressing
+     * it again shows them all; the shopper stays with the photo.
+     */
+    function photoTagRow(tags, choose) {
       var row = el('div', 'd-tags');
       row.appendChild(el('span', 'd-tags-h', label('photo_tags')));
-      for (var i = 0; i < tags.length; i++) {
-        (function (tag) {
-          var chip = el('button', 'd-chip', tag.title);
-          chip.type = 'button';
-          chip.setAttribute('data-photo-tag', tag.kind || '');
-          chip.addEventListener('click', function () {
-            pick(tag.title);
-          });
-          row.appendChild(chip);
-        })(tags[i]);
-      }
+      var chips = [];
+      var chosen = null;
+      tags.forEach(function (tag, at) {
+        var chip = el('button', 'd-chip', tag.title);
+        chip.type = 'button';
+        chip.setAttribute('aria-pressed', 'false');
+        chip.setAttribute('data-photo-tag', tag.kind || '');
+        chip.addEventListener('click', function () {
+          chosen = chosen === at ? null : at;
+          chips.forEach(function (other, i) { other.setAttribute('aria-pressed', i === chosen ? 'true' : 'false'); });
+          choose(chosen);
+        });
+        chips.push(chip);
+        row.appendChild(chip);
+      });
       return row;
+    }
+
+    /** The photo's products to show: all, or those of the chosen tag; at most PHOTO_SHOW. */
+    function photoShown(products, chosen) {
+      var shown = chosen === null ? products : products.filter(function (p) { return (p.tags || []).indexOf(chosen) !== -1; });
+      return shown.slice(0, PHOTO_SHOW);
     }
 
     function preview(file) {
@@ -2330,6 +2347,8 @@
       } catch (e) { /* no preview */ }
       return thumb;
     }
+
+    var PHOTO_SHOW = 12;
 
     /** Search by photo inside the suggestions: the shopper's picture, then the products like it. */
     function searchPhoto(file) {
@@ -2368,36 +2387,51 @@
           return;
         }
         status.className = 'muted';
-        status.textContent = products.length ? label('photo_count', { count: products.length }) : label('photo_only_tags');
-        if (result.tags.length) {
-          main.appendChild(photoTagRow(result.tags, function (text) {
+        var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
+        var wider = el('button', 'd-link');
+        wider.type = 'button';
+        wider.hidden = true;
+        var draw = function (chosen) {
+          var shown = photoShown(products, chosen);
+          status.textContent = shown.length
+            ? label('photo_count', { count: shown.length }) + (chosen === null ? '' : ' · ' + result.tags[chosen].title)
+            : label('photo_only_tags');
+          grid.textContent = '';
+          var records = [];
+          for (var i = 0; i < shown.length; i++) {
+            var item = shown[i];
+            var record = state.records['p:' + item.external_id] || {};
+            var row = {
+              id: 'p:' + item.external_id,
+              t: 'product',
+              title: item.title || record.title || '',
+              url: item.url || record.url,
+              img: item.image || record.img,
+              s: record.s
+            };
+            records.push(row);
+            grid.appendChild(productRow(row, '', item.match));
+          }
+          fillPrices(grid, records);
+          // The whole site for the chosen tag stays one step away, never the default.
+          wider.hidden = chosen === null;
+          wider.textContent = chosen === null ? '' : label('photo_tag_site', { tag: result.tags[chosen].title });
+          wider.onclick = chosen === null ? null : function () {
             var field = d.field || current;
             if (field) {
-              field.value = text;
+              field.value = result.tags[chosen].title;
               suggest(field);
               focusField(dropdown || d);
             }
-          }));
-        }
-        var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
-        var records = [];
-        for (var i = 0; i < products.length; i++) {
-          var item = products[i];
-          var record = state.records['p:' + item.external_id] || {};
-          var row = {
-            id: 'p:' + item.external_id,
-            t: 'product',
-            title: item.title || record.title || '',
-            url: item.url || record.url,
-            img: item.image || record.img,
-            s: record.s
           };
-          records.push(row);
-          grid.appendChild(productRow(row, '', item.match));
+        };
+        if (result.tags.length) {
+          main.appendChild(photoTagRow(result.tags, draw));
         }
         main.appendChild(grid);
+        main.appendChild(wider);
         main.appendChild(again);
-        fillPrices(grid, records);
+        draw(null);
       });
     }
 
@@ -2422,28 +2456,34 @@
         }
         var products = result.products;
         sheet.removeChild(status);
+        var note = el('div', 'section muted');
+        var section = el('div', 'section');
+        var grid = el('div', 'grid');
+        var draw = function (chosen) {
+          var shown = photoShown(products, chosen);
+          note.textContent = shown.length ? '' : label('photo_only_tags');
+          note.hidden = !!shown.length;
+          grid.textContent = '';
+          var ids = [];
+          for (var i = 0; i < shown.length; i++) {
+            var node = card(shown[i], '');
+            if (shown[i].match) {
+              node.appendChild(el('span', 'badge', label('photo_match', { match: shown[i].match })));
+            }
+            grid.appendChild(node);
+            ids.push(shown[i].external_id);
+          }
+          liveProducts(ids).then(function () { updateCards(grid); });
+        };
         if (result.tags.length) {
-          var tagRow = photoTagRow(result.tags, function (text) { openPanel(text); });
+          var tagRow = photoTagRow(result.tags, draw);
           tagRow.className += ' section';
           sheet.appendChild(tagRow);
         }
-        if (!products.length) {
-          sheet.appendChild(el('div', 'section muted', label('photo_only_tags')));
-        }
-        var section = el('div', 'section');
-        var grid = el('div', 'grid');
-        var ids = [];
-        for (var i = 0; i < products.length; i++) {
-          var node = card(products[i], '');
-          if (products[i].match) {
-            node.appendChild(el('span', 'badge', label('photo_match', { match: products[i].match })));
-          }
-          grid.appendChild(node);
-          ids.push(products[i].external_id);
-        }
+        sheet.appendChild(note);
         section.appendChild(grid);
         sheet.appendChild(section);
-        liveProducts(ids).then(function () { updateCards(grid); });
+        draw(null);
         var foot = el('div', 'foot');
         var again = el('button', 'btn ghost', label('photo_again'));
         again.type = 'button';

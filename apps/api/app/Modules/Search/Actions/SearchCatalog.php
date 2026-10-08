@@ -5,7 +5,6 @@ namespace App\Modules\Search\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
-use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
@@ -30,6 +29,15 @@ use App\Modules\Search\Support\LoadedIndex;
 final class SearchCatalog
 {
     public const GROUPS = ['answer', 'product', 'content', 'category'];
+
+    /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
+    private const PHOTO_ALL = 5000;
+
+    /** Products a tagged photo returns, for the shopper to narrow by tag in the browser. */
+    private const PHOTO_TAGGED = 60;
+
+    /** Products a tag brings, before the picture orders them. */
+    private const PHOTO_PER_TAG = 40;
 
     /** Reciprocal rank constant: how much a lower rank still counts. */
     private const RRF_K = 60;
@@ -160,24 +168,102 @@ final class SearchCatalog
             $index = LoadedIndex::for($shopId);
             $floor = (float) Settings::get('search.photo_min_similarity');
 
+            // What the photo shows, in the shop's own categories and words.
+            $tags = $index === null ? null : $this->photoTags->handle($shopId, $mime, $bytes);
+            $perGroup = (int) Settings::get('search.results_per_group', $shopId);
+
+            // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
+            // looks like it, however close a white-background picture of a screw may score.
+            if ($tags === []) {
+                $this->counter->photo($shopId, 0);
+
+                return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true];
+            }
+
+            if ($tags !== null) {
+                // A scene (a pergola, a deck) looks like no single product picture, so the picture
+                // scores are flat and the nearest pictures are noise. The tags say what to show; the
+                // picture only orders it. Every product carries which tags it belongs to, so the
+                // shopper narrows by a tag without leaving the photo.
+                $hits = $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, self::PHOTO_ALL);
+                $products = $this->taggedProducts($index, $tags, $hits, $shopId);
+                $this->counter->photo($shopId, count($products));
+
+                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0]), $tags), 'searched' => true];
+            }
+
             $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, max(48, (int) Settings::get('search.semantic_results')));
             $hits = array_values(array_filter($hits, fn (array $hit): bool => isset($index['records']['p:'.$hit['external_id']]) && $hit['similarity'] >= $floor));
             $products = [];
 
-            // What the photo shows, in the shop's own categories and words; their categories count as
-            // the kind of product the photo is about, so a pergola photo brings pine beams first.
-            $tags = $index === null ? [] : $this->photoTags->handle($shopId, $mime, $bytes);
-            $tagged = array_values(array_filter(array_map(fn (array $t): ?string => isset($t['id']) ? substr($t['id'], 2) : null, $tags)));
-
-            foreach ($this->photoOrder($hits, $shopId, $tagged) as $hit) {
+            foreach ($this->photoOrder($hits, $shopId) as $hit) {
                 $products[] = $this->present($index['records']['p:'.$hit['external_id']]) + ['match' => (int) round(max(0, min(1, $hit['similarity'])) * 100)];
             }
 
-            $products = array_slice($products, 0, (int) Settings::get('search.results_per_group', $shopId));
+            $products = array_slice($products, 0, $perGroup);
             $this->counter->photo($shopId, count($products));
 
-            return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0]), $tags), 'searched' => $hits !== [] || $index !== null];
+            return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null];
         });
+    }
+
+    /**
+     * The products a tagged photo is about: each tag's products (a category's own, or what its
+     * words find), in stock when the shop asks for it, ordered by how alike their picture is to
+     * the photo and varied by brand. Each carries `tags`, the positions of the tags it belongs to.
+     *
+     * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
+     * @param  list<array{title: string, kind: string, id?: string}>  $tags
+     * @param  list<array{external_id: string, similarity: float}>  $hits
+     * @return list<array<string, mixed>>
+     */
+    private function taggedProducts(array $index, array $tags, array $hits, string $shopId): array
+    {
+        $members = [];
+
+        foreach ($tags as $at => $tag) {
+            $ids = isset($tag['id'])
+                ? CatalogProduct::query()->active()
+                    ->whereHas('categories', fn ($q) => $q->where('external_id', substr((string) $tag['id'], 2)))
+                    ->limit(self::PHOTO_PER_TAG * 3)->pluck('external_id')->map(fn ($id): string => (string) $id)->all()
+                : array_map(fn (array $hit): string => substr($hit['id'], 2), array_slice(array_values(array_filter(
+                    HebrewSearch::search($index['engine'], $tag['title']),
+                    fn (array $hit): bool => str_starts_with($hit['id'], 'p:'),
+                )), 0, self::PHOTO_PER_TAG));
+
+            foreach ($ids as $id) {
+                if (isset($index['records']['p:'.$id])) {
+                    $members[$id][] = $at;
+                }
+            }
+        }
+
+        if ($members === []) {
+            return [];
+        }
+
+        $similarity = array_column($hits, 'similarity', 'external_id');
+        $rows = CatalogProduct::query()->whereIn('external_id', array_keys($members))->get(['external_id', 'brand', 'in_stock'])->keyBy('external_id');
+        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0)], array_keys($members));
+
+        if ((bool) Settings::get('search.photo_in_stock_only', $shopId)) {
+            $stocked = array_values(array_filter($candidates, fn (array $c): bool => (bool) $rows->get($c['external_id'])?->in_stock));
+            $candidates = $stocked !== [] ? $stocked : $candidates;
+        }
+
+        // Alike first; a product in more of the photo's tags first among equals.
+        usort($candidates, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
+        $brandOf = fn (array $c): string => mb_strtolower(trim((string) $rows->get($c['external_id'])?->brand)) ?: 'id:'.$c['external_id'];
+
+        $out = [];
+        foreach (array_slice($this->varied($candidates, $brandOf), 0, self::PHOTO_TAGGED) as $c) {
+            $out[] = $this->present($index['records']['p:'.$c['external_id']]) + array_filter([
+                'match' => $c['similarity'] > 0 ? (int) round(min(1, $c['similarity']) * 100) : null,
+                'tags' => $members[$c['external_id']],
+            ], fn ($v): bool => $v !== null);
+        }
+
+        return $out;
     }
 
     /**
@@ -190,10 +276,9 @@ final class SearchCatalog
      *   3. stock     only what is in stock (search.photo_in_stock_only), unless nothing is
      *
      * @param  list<array{external_id: string, similarity: float}>  $hits  most alike first
-     * @param  list<string>  $taggedCategories  external ids of categories read in the photo
      * @return list<array{external_id: string, similarity: float}>
      */
-    private function photoOrder(array $hits, string $shopId, array $taggedCategories = []): array
+    private function photoOrder(array $hits, string $shopId): array
     {
         if ($hits === []) {
             return [];
@@ -206,10 +291,7 @@ final class SearchCatalog
         usort($hits, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
         $best = $hits[0]['similarity'];
         $close = $best - (float) Settings::get('search.photo_relative_gap');
-        $kind = array_unique(array_merge(
-            ...array_map($categoriesOf, array_slice($hits, 0, 3)),
-            ...[$taggedCategories === [] ? [] : CatalogCategory::query()->whereIn('external_id', $taggedCategories)->pluck('id')->all()],
-        ));
+        $kind = array_unique(array_merge(...array_map($categoriesOf, array_slice($hits, 0, 3))));
 
         $sameKind = array_values(array_filter($hits, fn (array $hit): bool => array_intersect($categoriesOf($hit), $kind) !== []));
         $onlyClose = array_values(array_filter($hits, fn (array $hit): bool => $hit['similarity'] >= $close && array_intersect($categoriesOf($hit), $kind) === []));

@@ -53,14 +53,16 @@ final class ReadPhotoTags
     ) {}
 
     /**
-     * @return list<array{title: string, kind: string, url?: string, id?: string}> category tags first, then words
+     * @return list<array{title: string, kind: string, url?: string, id?: string}>|null category tags
+     *                                                                                  first, then words; an empty list when the photo shows nothing the shop sells; null when
+     *                                                                                  the photo could not be read (off, no model, a failed call)
      */
-    public function handle(string $shopId, string $mime, string $bytes): array
+    public function handle(string $shopId, string $mime, string $bytes): ?array
     {
         $index = LoadedIndex::for($shopId);
 
         if ($index === null || ! Features::enabled('search.photo_tags', $shopId)) {
-            return [];
+            return null;
         }
 
         $candidates = $this->candidates($index['records']);
@@ -68,7 +70,7 @@ final class ReadPhotoTags
         $model = trim((string) Settings::get('search.photo_tags_model'));
 
         if ($provider === null || $model === '') {
-            return [];
+            return null;
         }
 
         $key = 'search:photo-tags:'.$shopId.':'.hash('sha256', implode('|', [
@@ -81,7 +83,7 @@ final class ReadPhotoTags
             $picked = $this->ask($shopId, $provider, $model, $mime, $bytes, $candidates);
 
             if ($picked === null) {
-                return [];
+                return null;
             }
 
             Cache::put($key, $picked, now()->addDays(self::CACHE_DAYS));
