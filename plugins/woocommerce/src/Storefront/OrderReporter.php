@@ -22,6 +22,8 @@ final class OrderReporter {
 
 	private const MAX_ITEMS = 200;
 
+	private const VISITOR_PATTERN = '/^anon-[A-Za-z0-9_-]{16,64}$/';
+
 	public static function register(): void {
 		add_action( 'woocommerce_checkout_order_processed', array( self::class, 'classic_checkout' ), 20, 3 );
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( self::class, 'block_checkout' ), 20, 1 );
@@ -52,7 +54,7 @@ final class OrderReporter {
 			return;
 		}
 
-		$payload = self::payload( $order, isset( $_COOKIE['let_agents_vid'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['let_agents_vid'] ) ) : null );
+		$payload = self::payload( $order, self::visitor() );
 
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
 			as_enqueue_async_action( self::ACTION, array( $payload ), 'let-agents' );
@@ -92,12 +94,24 @@ final class OrderReporter {
 		$created = $order->get_date_created();
 
 		return array(
-			'order_ref'  => hash_hmac( 'sha256', 'order|' . $order->get_id(), (string) SiteKeys::preview() ),
+			'order_ref'  => self::ref( $order->get_id() ),
 			'total'      => round( (float) $order->get_total(), 2 ),
 			'currency'   => $order->get_currency(),
 			'ordered_at' => $created ? $created->getTimestamp() : time(),
-			'vid'        => null !== $visitor && preg_match( '/^anon-[A-Za-z0-9_-]{16,64}$/', $visitor ) ? $visitor : null,
+			'vid'        => null !== $visitor && preg_match( self::VISITOR_PATTERN, $visitor ) ? $visitor : null,
 			'items'      => $items,
 		);
+	}
+
+	/** The order as Let Agents knows it: a keyed hash, so the store's own order number never leaves it. */
+	public static function ref( int $order_id ): string {
+		return hash_hmac( 'sha256', 'order|' . $order_id, (string) SiteKeys::preview() );
+	}
+
+	/** The anonymous visitor ID the widget set, or null when there is none or it is not one. */
+	public static function visitor(): ?string {
+		$visitor = isset( $_COOKIE['let_agents_vid'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['let_agents_vid'] ) ) : '';
+
+		return preg_match( self::VISITOR_PATTERN, $visitor ) ? $visitor : null;
 	}
 }

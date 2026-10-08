@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,7 +21,13 @@ Let Agents gets read-only access through a token created by a store manager:
 * Published guides and articles from the post types you choose, with the products they mention.
 * Site information: WordPress, WooCommerce, theme and active plugin versions.
 
-Customer details are never shared: orders reach Let Agents only as totals, product IDs and quantities, at checkout and once from the last 24 months. Custom fields that look like costs, supplier details or internal notes are never shared either. There is no write access.
+Customer details are never shared: orders reach Let Agents only as totals, product IDs and quantities, at checkout and once from the last 24 months. The one exception is an email a shopper gives Let Agents themselves, below. Custom fields that look like costs, supplier details or internal notes are never shared either.
+
+The plugin reads the store, and writes only one thing: a pending payment order a shopper asks for by leaving their email before checkout, when the shop turns that on. Nothing else in the store is ever changed, and the token gives Let Agents no write access.
+
+= The email before checkout =
+
+When the shop turns it on in Let Agents, the store asks the shopper for their email before checkout. When they leave it and agree, the plugin saves the cart as an order waiting for payment, with that email, so the shop can follow up. Leaving the email again updates the same order. If the shopper then checks out, the classic checkout finishes that same order; the block checkout makes its own, and the one left waiting goes to the trash. The shopper gets no email from the store, stock is not touched and nothing is charged.
 
 = The widget on the store =
 
@@ -41,6 +47,7 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 
 * The widget keeps an anonymous visitor ID in a first-party cookie (let_agents_vid) and localStorage, and sends Let Agents the page path, the product or article ID and what was done with the widget. No names, emails or query strings.
 * When an order is placed, the plugin sends Let Agents a keyed hash of the order ID, the total and currency, product IDs with quantities and line totals, and the anonymous visitor ID. Never names, emails, phone numbers, addresses, payment details, notes or coupons. The request runs in the background and never slows checkout.
+* When a shopper leaves their email before checkout, the plugin sends Let Agents that email with the text the shopper agreed to, the order ID and a link to it in the store admin, product IDs with quantities and line totals, the total and currency, what they searched for in the store, and the anonymous visitor ID. Nothing else about the shopper. It too runs in the background.
 * Requests from the plugin to Let Agents are signed with a key derived from the access token.
 
 == Installation ==
@@ -50,6 +57,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.7.0 =
+* The email before checkout: when the shop turns it on in Let Agents, a shopper can leave their email before checkout and the cart is saved as an order waiting for payment, with that email, so the shop can follow up. Leaving it again updates the same order; checking out finishes it, or trashes it when the checkout made its own. This is the only thing the plugin writes to the store. The shopper gets no email, stock and payment are not touched.
 
 = 0.6.0 =
 * The plugin is now called Let Agents (it was Rega). Installing it carries over the access token, the settings and the past-orders progress, and switches the old plugin off, so the store stays connected. New tokens start with lat_; a token made before still works.

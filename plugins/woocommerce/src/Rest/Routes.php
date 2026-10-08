@@ -19,8 +19,13 @@ use WP_REST_Server;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The read-only API Let Agents uses. Every route needs the access token. There is no write route,
- * and no route for customers or orders.
+ * The read-only API Let Agents uses. Every route needs the access token. There is no write route
+ * here, and no route for customers or orders.
+ *
+ * The plugin's only write route, POST /let-agents/v1/cart/capture, lives in CartRoutes: it is called
+ * by logged-out shoppers rather than by Let Agents, takes a page nonce instead of the token, and
+ * writes one thing, the pending payment order a shopper asks for by leaving their email. Keeping it
+ * apart means no route here can ever write.
  *
  *   GET /let-agents/v1/status
  *   GET /let-agents/v1/feed/manifest

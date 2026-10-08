@@ -376,3 +376,231 @@ test('a post with no shortcode gets nothing until a shop asks for a paragraph', 
 
   assert.ok(!html.includes('let-agents-cta'), 'nothing is added to a post nobody asked about');
 });
+// The email before checkout. Each shopper keeps their own cookies: the WooCommerce session lives in one.
+const shopper = () => {
+  const jar = new Map([['let_agents_vid', 'anon-testvisitor0123456789']]);
+  const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
+  const keep = (res) => {
+    for (const line of res.headers.getSetCookie()) {
+      const [pair, ...attrs] = line.split(';');
+      const [name, ...rest] = pair.split('=');
+      const value = rest.join('=');
+      const expired = attrs.some((a) => /^\s*max-age=0/i.test(a) || (/^\s*expires=/i.test(a) && Date.parse(a.split('=')[1]) < Date.now()));
+      if (expired || value === '' || value === 'deleted') jar.delete(name.trim());
+      else jar.set(name.trim(), value);
+    }
+  };
+  // Redirects are followed by hand, so cookies set on the way are kept.
+  const request = async (path, init = {}, hops = 0) => {
+    const target = path.startsWith('http') ? new URL(path) : new URL(path, base);
+    const res = await fetch(`${base}${target.pathname}${target.search}`, { redirect: 'manual', ...init, headers: { ...init.headers, Cookie: cookie() } });
+    keep(res);
+    if ([301, 302, 303, 307].includes(res.status) && !init.method && hops < 5) {
+      return request(res.headers.get('location'), {}, hops + 1);
+    }
+    const text = await res.text();
+    let body;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
+    return { status: res.status, body, headers: res.headers };
+  };
+  const page = async (query = { post_type: 'product', p: String(P.drill) }) => {
+    const { status, body } = await request(`/?${new URLSearchParams(query)}`);
+    assert.equal(status, 200, `page ${JSON.stringify(query)}`);
+    return body;
+  };
+  const context = async (query) => {
+    const match = (await page(query)).match(/window\.LetAgentsCartContext = (\{.*\});\n/);
+    return match ? JSON.parse(match[1]) : null;
+  };
+  const addToCart = (id, extra = {}) => request(`/?${new URLSearchParams({ 'add-to-cart': String(id), ...extra })}`);
+  // nonce: undefined takes a fresh one from a page, null sends none.
+  const capture = async (body, nonce) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (nonce !== null) headers['X-WP-Nonce'] = nonce ?? (await context()).nonce;
+    return request('/?rest_route=/let-agents/v1/cart/capture', { method: 'POST', headers, body: JSON.stringify(body) });
+  };
+  return { request, page, context, addToCart, capture };
+};
+
+const consent = { consent: true, consent_text: 'אני מסכים/ה לקבל מייל על הסל שלי' };
+const carts = async () => (await fetch(`${base}/?rest_route=/let-agents-test/v1/carts`)).json();
+const address = { first_name: 'ישראל', last_name: 'ישראלי', address_1: 'הרצל 1', city: 'תל אביב', postcode: '6100000', country: 'IL', phone: '0501234567' };
+
+test('every page but the thank-you page loads the cart script with what it needs', async () => {
+  const hash = crypto.createHash('sha256').update(token).digest('hex');
+  const site = crypto.createHash('sha256').update(`let-agents-site|${hash}`).digest('hex').slice(0, 24);
+  const s = shopper();
+
+  for (const query of [{}, { post_type: 'product', p: String(P.drill) }, { p: String(fixtures.protected) }]) { // A Latin slug: Playground 404s on Hebrew ones.
+    const ctx = await s.context(query);
+    assert.ok(ctx, `LetAgentsCartContext on ${JSON.stringify(query)}`);
+    assert.equal(ctx.site, site);
+    assert.match(ctx.api, /^https:\/\/.+\/api\/v1$/);
+    assert.match(ctx.capture, /let-agents\/v1\/cart\/capture$/);
+    assert.match(ctx.captureFallback, /\?rest_route=\/let-agents\/v1\/cart\/capture$/);
+    assert.match(ctx.nonce, /^[a-f0-9]{10}$/);
+    assert.ok(ctx.checkoutUrl.startsWith('http'));
+    assert.equal(ctx.cartCount, 0);
+    assert.equal(typeof ctx.locale, 'string');
+  }
+
+  const tag = (await s.page()).match(/<script[^>]*src="https:\/\/[^"]+\/cart\/let-agents-cart\.js"[^>]*>/);
+  assert.ok(tag, 'the cart script is loaded from Let Agents');
+  assert.match(tag[0], /\sdefer[\s>=]/, 'deferred, so it never blocks the page');
+});
+
+test('the capture refuses a missing nonce, a bad email, no consent and an empty cart', async () => {
+  const s = shopper();
+
+  const noNonce = await s.capture({ email: 'a@example.com', ...consent }, null);
+  assert.equal(noNonce.status, 403, JSON.stringify(noNonce.body));
+
+  const wrongNonce = await s.capture({ email: 'a@example.com', ...consent }, 'abcdef0123');
+  assert.equal(wrongNonce.status, 403, JSON.stringify(wrongNonce.body));
+
+  const badEmail = await s.capture({ email: 'not an email', ...consent });
+  assert.equal(badEmail.status, 422);
+  assert.deepEqual(badEmail.body, { error: 'invalid_email' });
+
+  const noConsent = await s.capture({ email: 'a@example.com', consent: 'yes', consent_text: 'x' });
+  assert.equal(noConsent.status, 422);
+  assert.deepEqual(noConsent.body, { error: 'no_consent' });
+
+  const empty = await s.capture({ email: 'a@example.com', ...consent });
+  assert.equal(empty.status, 409);
+  assert.deepEqual(empty.body, { error: 'empty_cart' });
+});
+
+test('the email saves the cart as an order waiting for payment, leaving it again updates it, and classic checkout finishes it', async () => {
+  const s = shopper();
+  // A product without stock management: Playground's SQLite cannot run WooCommerce's stock hold at checkout.
+  await s.addToCart(P.pro);
+  assert.equal((await s.context()).cartCount, 1, 'the product is in the cart');
+
+  const searches = [{ q: 'מקדחה רוטטת', at: '2026-10-08T09:00:00Z' }, { q: 'x'.repeat(200), at: 'not a date' }, { q: '' }];
+  const first = await s.capture({ email: 'first@example.com', ...consent, searches });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.deepEqual(first.body, { ok: true }, 'the answer says nothing about the order');
+
+  let { orders } = await carts();
+  let ours = orders.filter((o) => o.capture);
+  assert.equal(ours.length, 1);
+  const [order] = ours;
+  assert.equal(order.status, 'pending');
+  assert.equal(order.created_via, 'let-agents');
+  assert.equal(order.email, 'first@example.com');
+  assert.equal(order.consent.text, consent.consent_text);
+  assert.deepEqual(order.items, [[P.pro, 0, 1]]);
+  assert.equal(Number(order.total), 399);
+  assert.equal(order.notes.length, 1, 'one note says where the order came from');
+
+  await s.addToCart(P.variable, { variation_id: String(fixtures.variations.red), attribute_pa_color: 'red', quantity: '2' });
+  const second = await s.capture({ email: 'second@example.com', ...consent });
+  assert.equal(second.status, 200, JSON.stringify(second.body));
+
+  ({ orders } = await carts());
+  ours = orders.filter((o) => o.capture);
+  assert.equal(ours.length, 1, 'the same order, not a second one');
+  assert.equal(ours[0].id, order.id);
+  assert.equal(ours[0].email, 'second@example.com');
+  assert.deepEqual(ours[0].items, [[P.pro, 0, 1], [P.variable, fixtures.variations.red, 2]]);
+
+  const sent = (await carts()).requests.filter((r) => r.url.endsWith('/carts'));
+  assert.equal(sent.length, 2, 'Let Agents is told each time');
+  assert.match(sent[1].url, /\/api\/v1\/plugin\/[a-f0-9]{24}\/carts$/);
+  assert.ok(sent[1].headers.includes('X-LetAgents-Signature'), 'signed like every request to Let Agents');
+
+  const payload = sent[1].body;
+  assert.deepEqual(Object.keys(payload).sort(), ['admin_url', 'captured_at', 'consent', 'consent_text', 'currency', 'email', 'items', 'order_id', 'order_ref', 'searches', 'total', 'vid']);
+  assert.equal(payload.order_id, order.id);
+  assert.match(payload.order_ref, /^[a-f0-9]{64}$/);
+  assert.match(payload.admin_url, new RegExp(`/wp-admin/.*[=/]${order.id}(&|$)`));
+  assert.equal(payload.email, 'second@example.com');
+  assert.equal(payload.consent, true);
+  assert.equal(payload.consent_text, consent.consent_text);
+  assert.equal(payload.vid, 'anon-testvisitor0123456789');
+  assert.equal(payload.currency, 'ILS');
+  assert.equal(payload.total, '997.00');
+  assert.deepEqual(payload.items, [
+    { product_id: String(P.pro), variation_id: null, quantity: 1, total: '399.00' },
+    { product_id: String(P.variable), variation_id: String(fixtures.variations.red), quantity: 2, total: '598.00' },
+  ]);
+  assert.match(payload.captured_at, /^\d{4}-\d\d-\d\dT/);
+  assert.deepEqual(payload.searches, []);
+
+  const firstPayload = sent[0].body;
+  assert.equal(firstPayload.searches.length, 2, 'empty searches are dropped');
+  assert.deepEqual(firstPayload.searches[0], { q: 'מקדחה רוטטת', at: '2026-10-08T09:00:00+00:00' });
+  assert.equal(firstPayload.searches[1].q.length, 120, 'cut to 120 characters');
+  assert.equal(firstPayload.searches[1].at, null);
+
+  // Classic checkout finishes the same order rather than making another.
+  const form = String((await s.request(`/?page_id=${fixtures.classic_checkout}`)).body);
+  const nonce = form.match(/name="woocommerce-process-checkout-nonce" value="([^"]+)"/);
+  assert.ok(nonce, 'the classic checkout form is on the checkout page');
+
+  const fields = Object.fromEntries(Object.entries(address).map(([k, v]) => [`billing_${k}`, v]));
+  const placed = await s.request('/?wc-ajax=checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ ...fields, billing_email: 'second@example.com', payment_method: 'bacs', 'woocommerce-process-checkout-nonce': nonce[1] }),
+  });
+  assert.equal(placed.status, 200);
+  assert.equal(placed.body.result, 'success', JSON.stringify(placed.body));
+
+  ({ orders } = await carts());
+  ours = orders.filter((o) => o.capture);
+  assert.equal(ours.length, 1, 'no second order');
+  assert.equal(ours[0].id, order.id, 'checkout resumed the order the email made');
+  assert.equal(ours[0].status, 'on-hold', 'and finished it');
+  assert.equal(ours[0].created_via, 'checkout');
+  assert.equal(orders.filter((o) => o.email === 'second@example.com').length, 1, 'one order for this shopper');
+
+  const thanks = await s.request(placed.body.redirect);
+  assert.equal(thanks.status, 200);
+  assert.ok(!String(thanks.body).includes('LetAgentsCartContext'), 'not on the thank-you page');
+
+  const again = await s.capture({ email: 'second@example.com', ...consent });
+  assert.equal(again.status, 409, 'checkout emptied the cart');
+});
+
+test('block checkout makes its own order, and the one the email made goes to the trash', async () => {
+  const s = shopper();
+  await s.addToCart(P.bits);
+  assert.equal((await s.capture({ email: 'blocks@example.com', ...consent })).status, 200);
+
+  const captured = (await carts()).orders.find((o) => o.capture && o.email === 'blocks@example.com');
+  assert.equal(captured.status, 'pending');
+
+  // The Store API nonce the widget gets on a product page.
+  const widget = JSON.parse((await s.page()).match(/window\.LetAgentsContext = (\{.*\});\n/)[1]);
+  const placed = await s.request('/?rest_route=/wc/store/v1/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Nonce: widget.nonce },
+    body: JSON.stringify({ billing_address: { ...address, email: 'blocks@example.com' }, shipping_address: address, payment_method: 'bacs' }),
+  });
+  assert.equal(placed.status, 200, JSON.stringify(placed.body));
+  assert.notEqual(placed.body.order_id, captured.id);
+
+  const { orders } = await carts();
+  assert.equal(orders.find((o) => o.id === captured.id).status, 'trash', 'the order the email made is in the trash');
+  assert.notEqual(orders.find((o) => o.id === placed.body.order_id).status, 'trash', 'the placed order stays');
+});
+
+test('the capture takes ten tries an hour from one address', async () => {
+  const s = shopper();
+  let attempts = 0;
+  let last;
+  do {
+    attempts++;
+    last = await s.capture({ email: 'not an email', ...consent });
+  } while (last.status !== 429 && attempts < 15);
+
+  assert.equal(last.status, 429);
+  assert.deepEqual(last.body, { error: 'rate_limited' });
+  assert.ok(attempts <= 10, `limited after at most ten tries, took ${attempts}`);
+});

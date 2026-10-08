@@ -237,6 +237,25 @@ add_filter(
 \LetAgents\Storefront\OrderHistory::send_page( 1, 0 );
 $history_state = \LetAgents\Storefront\OrderHistory::state();
 
+// The email before checkout: a guest can check out with bank transfer and nothing to ship, and a page
+// carries the classic checkout form, so the test can place real orders both ways. The test plugin
+// keeps every request to the Let Agents API inside Playground.
+if ( ! is_dir( WPMU_PLUGIN_DIR ) ) {
+	mkdir( WPMU_PLUGIN_DIR, 0777, true );
+}
+copy( __DIR__ . '/mu-plugin.php', WPMU_PLUGIN_DIR . '/let-agents-test.php' );
+update_option( 'woocommerce_ship_to_countries', 'disabled' );
+update_option( 'woocommerce_enable_guest_checkout', 'yes' );
+update_option( 'woocommerce_bacs_settings', array( 'enabled' => 'yes', 'title' => 'Bank transfer' ) );
+$classic_checkout_id = wp_insert_post(
+	array(
+		'post_type'    => 'page',
+		'post_status'  => 'publish',
+		'post_title'   => 'Classic checkout',
+		'post_content' => '[woocommerce_checkout]',
+	)
+);
+
 if ( ! is_dir( '/let-agents-out' ) ) {
 	mkdir( '/let-agents-out' );
 }
@@ -260,6 +279,7 @@ file_put_contents(
 			'long'        => $long_id,
 			'protected'   => $protected_id,
 			'terms'       => $terms_id,
+			'classic_checkout' => $classic_checkout_id,
 			'history'     => array(
 				'orders'   => $history_orders,
 				'requests' => $history_requests,
