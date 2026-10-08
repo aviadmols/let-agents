@@ -33,7 +33,8 @@ final class ScanHistoryTest extends TestCase
                 'image_url' => "https://shop.test/{$id}.jpg", 'url_hash' => hash('sha256', $id),
             ], $extra));
 
-            $picture($shop->id, '1', 'שולחן נגרים', ['embedding_model' => $model, 'embedded_at' => now(), 'dimensions' => 3]);
+            $table = $picture($shop->id, '1', 'שולחן נגרים', ['embedding_model' => $model, 'embedded_at' => now(), 'dimensions' => 3, 'embedding' => '[0.9,0.1,0.2]']);
+            $picture($shop->id, '4', 'שולחן עבודה', ['embedding_model' => $model, 'embedded_at' => now(), 'dimensions' => 3, 'embedding' => '[0.8,0.2,0.2]']);
             $picture($shop->id, '2', 'מברגה נטענת', []);
             $picture($shop->id, '3', 'בורג עדש', ['error' => 'unreachable']);
             $picture($other->id, '9', 'מוצר של חנות אחרת', []);
@@ -51,16 +52,22 @@ final class ScanHistoryTest extends TestCase
         $this->get('/operator/retrieval/scans')
             ->assertOk()
             ->assertSee(__('retrieval::ui.scans.kinds.retrieval_image_indexer'))
-            ->assertSee(__('retrieval::ui.scans.pictures_about', ['scanned' => 1, 'total' => 3, 'pending' => 1, 'failed' => 1]))
+            ->assertSee(__('retrieval::ui.scans.pictures_about', ['scanned' => 2, 'total' => 4, 'pending' => 1, 'failed' => 1]))
             ->assertSee('שולחן נגרים')
             ->assertSee('מברגה נטענת')
             ->assertSee(__('retrieval::ui.scans.reasons.unreachable'))
             ->assertDontSee('מוצר של חנות אחרת')
-            ->assertSee('shop.test · 3');
+            ->assertSee('shop.test · 4');
 
         $this->get('/operator/retrieval/scans?state=failed')
             ->assertOk()
             ->assertSee('בורג עדש')
             ->assertDontSee('שולחן נגרים');
+        $image = app(TenantContext::class)->runUnscoped(fn () => RetrievalImage::query()->where('external_id', '1')->sole());
+        $this->get('/operator/retrieval/scans?state=scanned&inspect='.$image->id)
+            ->assertOk()
+            ->assertSee(__('retrieval::ui.scans.inspect.nearest'))
+            ->assertSee('data-nearest="4"', false)
+            ->assertSee('data-vector-strip', false);
     }
 }

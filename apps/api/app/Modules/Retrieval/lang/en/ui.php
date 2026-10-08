@@ -58,5 +58,17 @@ return [
             'too_big' => 'File too big',
             'other' => 'Other error',
         ],
+        'inspect' => [
+            'open' => 'Inspect the vector',
+            'close' => 'Close',
+            'model' => 'Model',
+            'dimensions' => 'Dimensions',
+            'norm' => 'Vector length',
+            'range' => 'Value range',
+            'strip' => 'The whole vector squeezed into a strip (blue positive, orange negative). Alike pictures give alike strips.',
+            'head' => 'First values',
+            'nearest' => 'The nearest pictures in the shop by vector. If they look alike, the scan works well.',
+            'none' => 'No other scanned pictures to compare.',
+        ],
     ],
 ];

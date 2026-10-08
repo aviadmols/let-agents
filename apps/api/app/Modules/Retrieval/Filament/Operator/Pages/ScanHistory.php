@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Actions\BuildImageIndex;
 use App\Modules\Retrieval\Actions\BuildIndex;
 use App\Modules\Retrieval\Models\RetrievalImage;
+use App\Modules\Retrieval\Support\VectorSearch;
 use App\Modules\Runs\Models\Run;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -36,6 +37,10 @@ final class ScanHistory extends Page
 
     private const PER_PAGE = 50;
 
+    private const NEAREST = 8;
+
+    private const STRIP = 64;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
 
     protected static string|UnitEnum|null $navigationGroup = 'content';
@@ -51,6 +56,10 @@ final class ScanHistory extends Page
 
     #[Url]
     public string $search = '';
+
+    /** The picture whose vector is open for inspection. */
+    #[Url]
+    public ?string $inspect = null;
 
     public static function getNavigationLabel(): string
     {
@@ -123,6 +132,59 @@ final class ScanHistory extends Page
 
         return $query->orderByRaw('embedded_at is null')->orderByDesc('embedded_at')->orderBy('title')
             ->paginate(self::PER_PAGE, ['id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at']);
+    }
+
+    public function toggleInspect(string $imageId): void
+    {
+        $this->inspect = $this->inspect === $imageId ? null : $imageId;
+    }
+
+    /**
+     * One picture's vector, readable: its model and size, its length, a few raw values, a strip of
+     * the whole vector, and the shop's pictures nearest to it. Nearest pictures that look alike
+     * are the proof the scan works; nearest pictures that do not are the sign it does not.
+     *
+     * @return array{image: RetrievalImage, model: string, dimensions: int, norm: float, min: float, max: float, head: list<float>, strip: list<float>, nearest: list<array<string, mixed>>}|null
+     */
+    public function inspection(): ?array
+    {
+        $image = $this->inspect === null ? null : RetrievalImage::query()->find($this->inspect);
+        $vector = $image?->vector();
+
+        if ($image === null || $vector === null) {
+            return null;
+        }
+
+        $nearest = app(VectorSearch::class)->lookAlike((string) $image->product_id, self::NEAREST);
+        $urls = RetrievalImage::query()->whereIn('external_id', array_column($nearest, 'external_id'))->pluck('image_url', 'external_id');
+
+        return [
+            'image' => $image,
+            'model' => (string) $image->embedding_model,
+            'dimensions' => count($vector),
+            'norm' => round(sqrt(array_sum(array_map(fn (float $v): float => $v * $v, $vector))), 4),
+            'min' => round(min($vector), 4),
+            'max' => round(max($vector), 4),
+            'head' => array_map(fn (float $v): float => round($v, 4), array_slice($vector, 0, 12)),
+            'strip' => self::strip($vector, self::STRIP),
+            'nearest' => array_map(fn (array $hit): array => $hit + ['image_url' => $urls[$hit['external_id']] ?? null], $nearest),
+        ];
+    }
+
+    /**
+     * The vector squeezed into a few cells, each the mean of its stretch scaled to -1…1, so two
+     * pictures' vectors can be compared by eye.
+     *
+     * @param  list<float>  $vector
+     * @return list<float>
+     */
+    private static function strip(array $vector, int $cells): array
+    {
+        $size = max(1, (int) ceil(count($vector) / $cells));
+        $means = array_map(fn (array $chunk): float => array_sum($chunk) / count($chunk), array_chunk($vector, $size));
+        $peak = max(array_map('abs', $means)) ?: 1.0;
+
+        return array_map(fn (float $m): float => round($m / $peak, 3), $means);
     }
 
     /** A run's state as shown: one still "running" after half an hour was cut off by the worker. */
