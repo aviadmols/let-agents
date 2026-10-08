@@ -136,6 +136,15 @@
             "unit": "questions"
         },
         {
+            "name": "questions_per_address_per_day",
+            "type": "int",
+            "default": 30,
+            "min": 1,
+            "max": 1000,
+            "scope": "shop",
+            "unit": "questions"
+        },
+        {
             "name": "questions_per_shop_per_day",
             "type": "int",
             "default": 300,

@@ -12,6 +12,7 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\Subject;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -19,7 +20,6 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
-use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Answers a shopper's question about one page: a product, or a guide the store published. The
@@ -212,18 +212,8 @@ final class AnswerQuestion
 
     private function withinDailyLimits(string $shopId, string $visitorHash): bool
     {
-        $visitorKey = "assistant:visitor:{$shopId}:{$visitorHash}";
-        $shopKey = "assistant:shop:{$shopId}";
-
-        if (RateLimiter::tooManyAttempts($visitorKey, (int) Settings::get('assistant.questions_per_visitor_per_day', $shopId))
-            || RateLimiter::tooManyAttempts($shopKey, (int) Settings::get('assistant.questions_per_shop_per_day', $shopId))) {
-            return false;
-        }
-
-        RateLimiter::hit($visitorKey, 86400);
-        RateLimiter::hit($shopKey, 86400);
-
-        return true;
+        // From a storefront request, its address counts too; from the console there is none.
+        return DailyQuestions::allow($shopId, $visitorHash, app()->runningInConsole() && ! app()->runningUnitTests() ? null : request()->ip());
     }
 
     /** @param list<array{0: ModelReply, 1: string}> $replies each reply with the prices it is charged at */

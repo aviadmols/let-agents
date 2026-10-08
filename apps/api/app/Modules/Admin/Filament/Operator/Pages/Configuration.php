@@ -89,6 +89,9 @@ class Configuration extends Page implements HasForms
         'assistant' => [
             'assistant.on_products',
             'assistant.on_content',
+            'assistant.questions_per_visitor_per_day',
+            'assistant.questions_per_address_per_day',
+            'assistant.questions_per_shop_per_day',
         ],
         'search' => [
             'search.results',

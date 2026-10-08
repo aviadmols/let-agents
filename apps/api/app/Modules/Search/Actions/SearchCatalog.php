@@ -58,6 +58,13 @@ final class SearchCatalog
             }
 
             $spelling = HebrewSearch::search($index['engine'], $query);
+
+            // A sentence ("מה הכי טוב למברגה ביתית וזולה") holds words no product has: search
+            // what it is about instead, so a question finds the products it asks about.
+            if ($spelling === [] && str_contains($query, ' ') && (str_contains($raw, '?') || HebrewSearch::asks($query))) {
+                $about = HebrewSearch::aboutWords($index['engine'], $query);
+                $spelling = $about !== '' && $about !== $query ? HebrewSearch::search($index['engine'], $about) : [];
+            }
             $byMeaning = $meaning;
             $meaning = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : [];
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];

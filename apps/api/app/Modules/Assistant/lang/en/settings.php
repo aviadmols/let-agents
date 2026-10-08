@@ -51,6 +51,10 @@ return [
         'label' => 'New questions per visitor per day',
         'description' => 'A question answered before does not count.',
     ],
+    'questions_per_address_per_day' => [
+        'label' => 'New questions per network address per day',
+        'description' => 'Stops a bot that makes up a new identity for every question. An office or home with several people shares one address.',
+    ],
     'questions_per_shop_per_day' => [
         'label' => 'New questions per shop per day',
         'description' => 'Past this, shoppers are pointed to the store team until tomorrow.',

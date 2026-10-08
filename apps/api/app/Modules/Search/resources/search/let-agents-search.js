@@ -1145,9 +1145,15 @@
       if (!core || core === normalize(raw)) {
         return hits;
       }
+      var more = search(state.index, core);
+      if (!more.length) {
+        // Words no product holds ("ביתית", "וזולה") describe; search what is left.
+        var known = core.split(' ').filter(function (word) { return word.length >= 2 && closeWords(state.index, word).words.length; }).join(' ');
+        more = known && known !== core ? search(state.index, known) : [];
+      }
       var seen = {};
       hits.forEach(function (hit) { seen[hit.id] = true; });
-      return hits.concat(search(state.index, core).filter(function (hit) { return !seen[hit.id]; }));
+      return hits.concat(more.filter(function (hit) { return !seen[hit.id]; }));
     }
 
     function focusField(d) {

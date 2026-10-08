@@ -14,6 +14,7 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -22,7 +23,6 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Answers a question typed in the store's search box, about the whole site rather than one page,
@@ -459,19 +459,8 @@ final class AnswerSiteQuestion
 
     private function withinDailyLimits(string $shopId, string $visitorHash): bool
     {
-        // The same daily allowance as questions asked on a page: one shopper, one shop.
-        $visitorKey = "assistant:visitor:{$shopId}:{$visitorHash}";
-        $shopKey = "assistant:shop:{$shopId}";
-
-        if (RateLimiter::tooManyAttempts($visitorKey, (int) Settings::get('assistant.questions_per_visitor_per_day', $shopId))
-            || RateLimiter::tooManyAttempts($shopKey, (int) Settings::get('assistant.questions_per_shop_per_day', $shopId))) {
-            return false;
-        }
-
-        RateLimiter::hit($visitorKey, 86400);
-        RateLimiter::hit($shopKey, 86400);
-
-        return true;
+        // From a storefront request, its address counts too; from the console there is none.
+        return DailyQuestions::allow($shopId, $visitorHash, app()->runningInConsole() && ! app()->runningUnitTests() ? null : request()->ip());
     }
 
     /**

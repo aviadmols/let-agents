@@ -27,6 +27,30 @@ final class HebrewSearch
         'z' => 'ז', 'x' => 'ס', 'c' => 'ב', 'v' => 'ה', 'b' => 'נ', 'n' => 'מ', 'm' => 'צ', ',' => 'ת', '.' => 'צ',
     ];
 
+    /** Words a question wraps around what it is about ("מה הכי טוב ל…"). */
+    private const FILLER = ['איך', 'כמה', 'האם', 'למה', 'מדוע', 'מה', 'מהו', 'מהי', 'מהמ', 'איפה', 'היכנ', 'מתי', 'מי', 'איזה', 'איזו', 'אילו',
+        'אפשר', 'ניתנ', 'יש', 'צריכ', 'כדאי', 'מותר', 'מתאימ', 'מתאימה', 'מתאימימ', 'הכי', 'לי', 'לנו', 'עמ', 'של', 'את', 'על', 'ליד', 'זה', 'זו',
+        'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
+        'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
+
+    /**
+     * What a sentence is about, in the catalogue's words: question and filler words dropped, then
+     * every word no product or page holds anything close to ("ביתית", "וזולה"). "מה הכי טוב
+     * למברגה ביתית וזולה" is "למברגה". Empty when nothing is left.
+     */
+    public static function aboutWords(array $index, string $query): string
+    {
+        $words = array_filter(explode(' ', self::normalize($query)), fn (string $w): bool => $w !== '' && ! in_array($w, self::FILLER, true));
+
+        return implode(' ', array_filter($words, fn (string $w): bool => mb_strlen($w) >= 2 && self::closeWords($index, $w) !== []));
+    }
+
+    /** Whether a query is worded as a question: it holds a question or filler word ("מה הכי טוב"). */
+    public static function asks(string $query): bool
+    {
+        return array_intersect(explode(' ', self::normalize($query)), self::FILLER) !== [];
+    }
+
     /** A word scores at least this to count as close to what was typed. */
     public const FLOOR = 0.45;
 
