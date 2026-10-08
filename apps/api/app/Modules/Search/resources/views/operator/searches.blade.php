@@ -23,6 +23,57 @@
     @if ($r === null)
         <x-filament::section>{{ __('search::ui.no_shop') }}</x-filament::section>
     @else
+        @if ($install = $this->install())
+            @php($ready = $install['connected'] && $install['indexed'])
+            <x-filament::section :heading="__('search::ui.install.heading')" :description="__('search::ui.install.description')" collapsible :collapsed="$ready">
+                <div style="display:grid;gap:16px;font-size:14px;line-height:1.6">
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        @foreach ([
+                            'connected' => $install['connected'],
+                            'plugin' => $install['plugin_version'] !== null,
+                            'indexed' => $install['indexed'],
+                        ] as $check => $ok)
+                            <span style="display:inline-flex;gap:6px;align-items:center;padding:3px 12px;border-radius:999px;font-size:12.5px;{{ $ok ? 'background:rgba(27,175,122,.14)' : 'background:rgba(235,104,52,.14)' }}">
+                                {{ $ok ? '✓' : '!' }}
+                                {{ __('search::ui.install.checks.'.$check.'.'.($ok ? 'yes' : 'no'), ['version' => $install['plugin_version']]) }}
+                            </span>
+                        @endforeach
+                    </div>
+
+                    <div>
+                        <strong>{{ __('search::ui.install.wordpress.heading') }}</strong>
+                        <ol style="margin:6px 0 0;padding-inline-start:20px;display:grid;gap:6px">
+                            <li>{{ __('search::ui.install.wordpress.plugin') }}</li>
+                            <li>{{ __('search::ui.install.wordpress.mode') }}</li>
+                            <li>
+                                {{ __('search::ui.install.wordpress.field') }}
+                                <code dir="ltr" style="padding:1px 6px;border-radius:6px;background:rgba(127,127,127,.12)">{{ $install['selector'] }}</code>.
+                                {{ __('search::ui.install.wordpress.field_other') }}
+                            </li>
+                            <li>{{ __('search::ui.install.wordpress.results', ['how' => __('search::settings.results.options.'.$install['results'])]) }}</li>
+                            <li>
+                                {{ __('search::ui.install.wordpress.check') }}
+                                @if ($install['preview_url'])
+                                    <br><a href="{{ $install['preview_url'] }}" target="_blank" rel="noopener" dir="ltr" style="text-decoration:underline;word-break:break-all">{{ $install['preview_url'] }}</a>
+                                @endif
+                            </li>
+                        </ol>
+                    </div>
+
+                    <details>
+                        <summary style="cursor:pointer;font-weight:600">{{ __('search::ui.install.other.heading') }}</summary>
+                        <p style="margin:8px 0">{{ __('search::ui.install.other.text') }}</p>
+                        @if ($install['site_key'])
+                            <pre dir="ltr" style="white-space:pre-wrap;word-break:break-all;font-size:12.5px;line-height:1.5;padding:12px;border-radius:12px;background:rgba(127,127,127,.1);margin:0">{{ '<script>'."\n".'window.LetAgentsSearchContext = '.json_encode(['site' => $install['site_key'], 'api' => $install['api'], 'locale' => $install['locale'], 'searchUrl' => ($install['site_url'] ?? '').'/'], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT).';'."\n".'</script>'."\n".'<script src="'.$install['api'].'/search/let-agents-search.js" defer></script>' }}</pre>
+                            <p style="margin:8px 0 0;font-size:12.5px;opacity:.75">{{ __('search::ui.install.other.note', ['site' => $install['site_url']]) }}</p>
+                        @else
+                            <p style="margin:0;opacity:.75">{{ __('search::ui.install.other.no_key') }}</p>
+                        @endif
+                    </details>
+                </div>
+            </x-filament::section>
+        @endif
+
         @if ($photos = $this->photos())
             <x-filament::section :heading="__('search::ui.photos.heading')" :description="__('search::ui.photos.description')">
                 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">

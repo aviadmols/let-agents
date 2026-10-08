@@ -3,8 +3,10 @@
 namespace App\Modules\Search\Filament\Operator\Pages;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
+use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
@@ -114,6 +116,38 @@ class ShopSearches extends Page
 
         Features::override('search.photos', $on, $this->shop);
         Notification::make()->success()->title(__('search::ui.photos.'.($on ? 'turned_on' : 'turned_off')))->send();
+    }
+
+    /**
+     * How to put the search on this shop's site, filled in with its own details: whether the
+     * store is connected and with which plugin, the field the search attaches to, how results
+     * open, a preview link for the team, and the code for a site without the plugin.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function install(): ?array
+    {
+        if ($this->shop === null) {
+            return null;
+        }
+
+        return app(TenantContext::class)->run($this->shop, function (): array {
+            $connection = StoreConnection::query()->latest()->first();
+            $site = $connection?->site_url;
+
+            return [
+                'connected' => $connection !== null,
+                'site_url' => $site,
+                'site_key' => $connection?->site_key,
+                'plugin_version' => $connection?->info('plugin.version'),
+                'indexed' => SearchIndex::query()->exists(),
+                'selector' => (string) Settings::get('search.input_selector', $this->shop),
+                'results' => (string) Settings::get('search.results', $this->shop),
+                'preview_url' => $site === null || $connection === null ? null : $site.'/?let_agents_preview='.$connection->previewKey(),
+                'api' => url('/api/v1'),
+                'locale' => 'he',
+            ];
+        });
     }
 
     public function report(): ?array

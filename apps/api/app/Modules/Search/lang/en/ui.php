@@ -91,4 +91,28 @@ return [
         'turned_on' => 'Search by photo is on for this site',
         'turned_off' => 'Search by photo is off for this site',
     ],
+    'install' => [
+        'heading' => 'How to put the search on the site',
+        'description' => 'The search goes into the search box the site already has. The theme does not need changing.',
+        'checks' => [
+            'connected' => ['yes' => 'The site is connected', 'no' => 'The site is not connected yet'],
+            'plugin' => ['yes' => 'Let Agents plugin version :version', 'no' => 'The plugin has not reported in yet'],
+            'indexed' => ['yes' => 'The search index is built', 'no' => 'The search index is not built yet'],
+        ],
+        'wordpress' => [
+            'heading' => 'On a WordPress or WooCommerce site',
+            'plugin' => 'Install the Let Agents plugin (version 0.6.0 or later) and connect it with the token. Once connected the catalogue is read, and the search index is built at night.',
+            'mode' => 'In WordPress: WooCommerce → Let Agents → "Search on the store". Choose "Preview" to try it as the team first, then "Live". Save.',
+            'field' => 'The search attaches to every search field on the site that matches',
+            'field_other' => 'For a theme with a different search field, change it in the search settings.',
+            'results' => 'All results open :how. This can be changed in the settings.',
+            'check' => 'To check: open the site and type a product name. In preview, this link opens the new search in a browser that is not logged in to WordPress too:',
+        ],
+        'other' => [
+            'heading' => 'A site without the plugin (Shopify, another site)',
+            'text' => 'Paste this code before the closing </body> tag on every page of the site, or pass it to whoever built the site. It already holds this shop\'s details.',
+            'note' => 'The code works only on :site. Without WooCommerce there is no "add to cart" in the results, and each product opens on its own page.',
+            'no_key' => 'The code appears here once the site is connected.',
+        ],
+    ],
 ];
