@@ -5,6 +5,7 @@ namespace App\Modules\Connections\Models;
 use App\Core\Tenancy\BelongsToTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Enums\ConnectionStatus;
+use App\Modules\Connections\Events\StoreAddressMoved;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -62,6 +63,21 @@ class StoreConnection extends Model
                 $connection->site_key = SiteKeys::site((string) $connection->access_token);
                 $connection->status = ConnectionStatus::Untested;
                 $connection->last_error_code = null;
+            }
+        });
+
+        // The store moved: however the address was changed (the one-click move, the edit form,
+        // the shop's own domain), whatever kept the old host in a link moves with it.
+        static::updated(function (self $connection): void {
+            if (! $connection->wasChanged('site_url')) {
+                return;
+            }
+
+            $from = strtolower((string) parse_url((string) $connection->getOriginal('site_url'), PHP_URL_HOST));
+            $to = strtolower((string) parse_url((string) $connection->site_url, PHP_URL_HOST));
+
+            if ($from !== '' && $to !== '' && $from !== $to) {
+                event(new StoreAddressMoved((string) $connection->shop_id, $from, $to));
             }
         });
     }

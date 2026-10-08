@@ -51,4 +51,22 @@ final class StoreMovedTest extends TestCase
             $this->assertStringNotContainsString('guetaavigdor.ussl.co', $index);
         });
     }
+
+    public function test_an_address_changed_by_hand_moves_the_links_too(): void
+    {
+        $shop = Shop::factory()->create(['domain' => 'shop.guetaavigdor.co.il']);
+        $tenant = app(TenantContext::class);
+        $connection = $tenant->runUnscoped(fn () => StoreConnection::query()->create([
+            'shop_id' => $shop->id, 'site_url' => 'https://guetaavigdor.ussl.co', 'access_token' => 'lat_'.str_repeat('b', 48),
+        ]));
+        $product = $tenant->run($shop->id, fn () => CatalogProduct::query()->create([
+            'shop_id' => $shop->id, 'external_id' => '1', 'type' => 'simple', 'status' => 'publish', 'hash' => 'h1', 'payload' => [],
+            'title' => 'מברגה', 'url' => 'https://guetaavigdor.ussl.co/product/a/', 'image_url' => 'https://guetaavigdor.ussl.co/a.jpg',
+        ]));
+
+        // The edit form saves the connection with a new address.
+        $tenant->runUnscoped(fn () => StoreConnection::query()->findOrFail($connection->id)->update(['site_url' => 'https://shop.guetaavigdor.co.il/']));
+
+        $this->assertSame('https://shop.guetaavigdor.co.il/a.jpg', $tenant->run($shop->id, fn () => $product->fresh()->image_url));
+    }
 }
