@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Actions;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
@@ -60,8 +61,11 @@ final class InstallStore
         $store = (array) ($this->api->query($install, self::SHOP_QUERY)['shop'] ?? []);
         $host = (string) ($store['primaryDomain']['host'] ?? $shopDomain);
 
-        DB::transaction(function () use ($install, $store, $host, $shopDomain): void {
+        $created = false;
+
+        DB::transaction(function () use ($install, $store, $host, $shopDomain, &$created): void {
             $shop = $install->shop_id !== null ? Shop::query()->find($install->shop_id) : null;
+            $created = $shop === null;
             $shop ??= $this->shops->handle([
                 'name' => (string) ($store['name'] ?? Str::before($shopDomain, '.')),
                 'domain' => $host,
@@ -97,6 +101,13 @@ final class InstallStore
 
             $this->owner($install, $shop);
         });
+
+        // Photo search is part of what a Shopify store gets, from the first day: its pictures are
+        // scanned as soon as the catalog is in, with no one to turn it on.
+        if ($created) {
+            Features::override('search.photos', true, (string) $install->shop_id);
+            Features::override('retrieval.image_index', true, (string) $install->shop_id);
+        }
 
         $this->writeThemeSettings($install->refresh());
         Artisan::queue('catalog:sync', ['shop' => $install->shop->slug])->onQueue('long');

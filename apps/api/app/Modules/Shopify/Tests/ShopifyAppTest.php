@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
@@ -113,6 +114,7 @@ final class ShopifyAppTest extends TestCase
 
         $install = ShopifyInstall::query()->sole();
         $this->assertSame([ShopifyInstall::FREE, ShopStatus::Active], [$install->subscription_status, $install->shop->status]);
+        $this->assertTrue(Features::enabled('search.photos', $install->shop_id) && Features::enabled('retrieval.image_index', $install->shop_id), 'photo search and the picture scan are on from the first day');
         $this->assertNull(collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate')), 'nobody is asked to pay');
 
         // Once charging is on, the free store approves the plan when it next opens the app.
