@@ -42,5 +42,7 @@ return [
         'version' => env('SHOPIFY_API_VERSION', '2026-07'),
         'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_content,read_online_store_pages,write_draft_orders'),
         'handle' => env('SHOPIFY_APP_HANDLE', 'let-agents'),
+        // Custom-distribution apps for single stores, "client_id:secret" pairs separated by commas.
+        'more_apps' => env('SHOPIFY_MORE_APPS', ''),
     ],
 ];

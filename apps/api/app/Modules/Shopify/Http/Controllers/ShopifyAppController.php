@@ -6,6 +6,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
 use App\Modules\Shopify\Models\ShopifyInstall;
+use App\Modules\Shopify\Support\ShopifyApps;
 use App\Modules\Shopify\Support\ShopifySignatures;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,8 @@ use Throwable;
  *   GET /shopify/billing/return   after the merchant approved (or not) the monthly plan
  *
  * Every request Shopify sends is signed; a link older than a few minutes is refused, so a copied
- * link never logs anyone in.
+ * link never logs anyone in. The signature also says which of our apps (ShopifyApps) the store is
+ * using, and its tokens are asked for with that app's credentials.
  */
 final class ShopifyAppController
 {
@@ -39,8 +41,9 @@ final class ShopifyAppController
     public function install(Request $request): RedirectResponse|Response
     {
         $shop = ShopifySignatures::shopDomain($request->query('shop'));
+        $app = ShopifyApps::key($request->query('app'));
 
-        if ($shop === null || blank(config('services.shopify.key'))) {
+        if ($shop === null || $app === '') {
             return response(__('shopify::app.bad_request'), 400);
         }
 
@@ -48,7 +51,7 @@ final class ShopifyAppController
         Cache::put('shopify:state:'.$state, $shop, self::STATE_SECONDS);
 
         return redirect()->away('https://'.$shop.'/admin/oauth/authorize?'.http_build_query([
-            'client_id' => config('services.shopify.key'),
+            'client_id' => $app,
             'scope' => config('services.shopify.scopes'),
             'redirect_uri' => url('/shopify/callback'),
             'state' => $state,
@@ -60,6 +63,7 @@ final class ShopifyAppController
         $query = $request->query();
         $shop = ShopifySignatures::shopDomain($request->query('shop'));
         $expected = Cache::pull('shopify:state:'.$request->query('state'));
+        $app = ShopifySignatures::queryApp($query);
 
         if ($shop === null || ! $this->signedAndFresh($query) || $expected !== $shop || blank($request->query('code'))) {
             return response(__('shopify::app.bad_request'), 403);
@@ -67,8 +71,8 @@ final class ShopifyAppController
 
         try {
             $token = Http::acceptJson()->timeout(30)->post('https://'.$shop.'/admin/oauth/access_token', [
-                'client_id' => config('services.shopify.key'),
-                'client_secret' => config('services.shopify.secret'),
+                'client_id' => $app,
+                'client_secret' => ShopifyApps::secret($app),
                 'code' => (string) $request->query('code'),
                 // An offline token that expires and is renewed with a refresh token.
                 'expiring' => 1,
@@ -82,6 +86,7 @@ final class ShopifyAppController
         }
 
         $install = $installer->handle($shop, (array) $token->json());
+        $install->forceFill(['client_id' => $app])->save();
 
         return $this->onward($install, $billing);
     }
@@ -97,7 +102,8 @@ final class ShopifyAppController
         $install = ShopifyInstall::query()->where('shop_domain', $shop)->first();
 
         if ($install === null || ! $install->installed()) {
-            return redirect()->to('/shopify/install?'.http_build_query(['shop' => $shop]));
+            // Shopify installed the app already; the store still needs our token, from the same app.
+            return redirect()->to('/shopify/install?'.http_build_query(['shop' => $shop, 'app' => ShopifySignatures::queryApp($request->query())]));
         }
 
         return $this->onward($install, $billing);

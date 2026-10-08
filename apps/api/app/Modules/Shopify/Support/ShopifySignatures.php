@@ -4,8 +4,8 @@ namespace App\Modules\Shopify\Support;
 
 /**
  * Proof that a request comes from Shopify: the install and admin links (query hmac), webhooks
- * (body hmac in a header) and the app proxy (query signature). All with the app's secret, all
- * compared in constant time.
+ * (body hmac in a header) and the app proxy (query signature). Each is signed with the secret of
+ * one of our apps (ShopifyApps); the checks say which, and compare in constant time.
  */
 final class ShopifySignatures
 {
@@ -20,6 +20,16 @@ final class ShopifySignatures
     /** @param array<string, mixed> $query */
     public static function query(array $query): bool
     {
+        return self::queryApp($query) !== null;
+    }
+
+    /**
+     * The client id of the app that signed these query parameters, or null.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    public static function queryApp(array $query): ?string
+    {
         $hmac = (string) ($query['hmac'] ?? '');
         unset($query['hmac'], $query['signature']);
         ksort($query);
@@ -30,13 +40,13 @@ final class ShopifySignatures
             $query,
         ));
 
-        return $hmac !== '' && self::secret() !== '' && hash_equals(hash_hmac('sha256', $message, self::secret()), $hmac);
+        return $hmac === '' ? null : self::signer(fn (string $secret): bool => hash_equals(hash_hmac('sha256', $message, $secret), $hmac));
     }
 
     public static function webhook(string $body, ?string $header): bool
     {
-        return $header !== null && self::secret() !== ''
-            && hash_equals(base64_encode(hash_hmac('sha256', $body, self::secret(), true)), $header);
+        return $header !== null
+            && self::signer(fn (string $secret): bool => hash_equals(base64_encode(hash_hmac('sha256', $body, $secret, true)), $header)) !== null;
     }
 
     /** @param array<string, mixed> $query */
@@ -52,11 +62,18 @@ final class ShopifySignatures
             $query,
         ));
 
-        return $signature !== '' && self::secret() !== '' && hash_equals(hash_hmac('sha256', $message, self::secret()), $signature);
+        return $signature !== '' && self::signer(fn (string $secret): bool => hash_equals(hash_hmac('sha256', $message, $secret), $signature)) !== null;
     }
 
-    private static function secret(): string
+    /** @param callable(string): bool $matches */
+    private static function signer(callable $matches): ?string
     {
-        return (string) config('services.shopify.secret');
+        foreach (ShopifyApps::all() as $clientId => $secret) {
+            if ($matches($secret)) {
+                return (string) $clientId;
+            }
+        }
+
+        return null;
     }
 }

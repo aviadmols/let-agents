@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $shop_id
  * @property string $shop_domain
+ * @property string|null $client_id
  * @property string|null $access_token
  * @property Carbon|null $access_expires_at
  * @property string|null $refresh_token

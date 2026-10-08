@@ -53,3 +53,14 @@
 ## 5. מחיר וניסיון
 
 בפאנל המפעיל ← הגדרות ← Shopify: שם התוכנית, המחיר (ברירת מחדל $49) וימי הניסיון (ברירת מחדל 0). שינוי חל רק על מנויים חדשים.
+
+## 6. אפליקציה פרטית לחנות אחת (עד שהציבורית מאושרת)
+
+אפליקציה ציבורית לא מותקנת על חנות אמיתית לפני אישור App Store. בינתיים יוצרים לכל חנות כזו אפליקציה נוספת ב־Partners, בהפצה Custom distribution לכתובת ה־myshopify שלה. הקוד זהה, והשרת מזהה לפי החתימה של Shopify איזו אפליקציה פנתה.
+
+1. Partners ← Create app. אותן כתובות והרשאות כמו בציבורית, בלי legacy install flow. Distribution ← Custom ← כתובת החנות.
+2. ב־Railway (api, worker, scheduler) מוסיפים ל־`SHOPIFY_MORE_APPS` את `client_id:secret`. כמה אפליקציות מפרידים בפסיק.
+3. ב־`extensions/shopify` מעתיקים את `shopify.app.toml` ל־`shopify.app.<חנות>.toml` עם ה־`client_id` שלה, ומריצים `npx shopify app deploy --config <חנות> --allow-updates`.
+4. מתקינים מהקישור שנוצר ב־Distribution.
+
+כשהציבורית מאושרת, החנות יכולה לעבור אליה: מסירים את הפרטית ומתקינים את הציבורית. החנות אצלנו נשארת אותה חנות, כי היא מזוהה לפי כתובת ה־myshopify.

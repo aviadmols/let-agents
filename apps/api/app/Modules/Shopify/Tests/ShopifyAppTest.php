@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Models\ShopifyInstall;
+use App\Modules\Shopify\Support\ShopifyApi;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Console\QueuedCommand;
@@ -121,6 +122,42 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
     }
 
+    public function test_a_store_on_a_custom_app_is_installed_and_renewed_with_that_apps_credentials(): void
+    {
+        Settings::set('shopify.charge', false);
+        config(['services.shopify.more_apps' => 'custom-key:shpss_custom']);
+        $tokenAsks = [];
+        Http::fake(function (HttpRequest $request) use (&$tokenAsks) {
+            if (str_ends_with($request->url(), '/admin/oauth/access_token')) {
+                $tokenAsks[] = $request->data();
+
+                return Http::response(['access_token' => 'shpat_c', 'scope' => 'read_products', 'expires_in' => 86400, 'refresh_token' => 'shprt_c', 'refresh_token_expires_in' => 7776000]);
+            }
+
+            return Http::response(['data' => ['shop' => ['id' => 'gid://shopify/Shop/8', 'name' => 'TAK', 'email' => 'tak@tak.test', 'currencyCode' => 'ILS', 'ianaTimezone' => 'Asia/Jerusalem', 'primaryDomain' => ['host' => 'tak.test'], 'plan' => ['partnerDevelopment' => false]], 'metafieldsSet' => ['userErrors' => []], 'currentAppInstallation' => ['activeSubscriptions' => []]]]);
+        });
+
+        // Shopify installed the custom app and opens it: the link is signed with the custom secret.
+        $open = self::signed([], 'shpss_custom');
+        $this->get('/shopify/app?'.http_build_query($open))->assertRedirect('/shopify/install?'.http_build_query(['shop' => self::SHOP, 'app' => 'custom-key']));
+
+        $authorize = $this->get('/shopify/install?'.http_build_query(['shop' => self::SHOP, 'app' => 'custom-key']))->assertRedirect();
+        parse_str((string) parse_url((string) $authorize->headers->get('Location'), PHP_URL_QUERY), $asked);
+        $this->assertSame('custom-key', $asked['client_id']);
+
+        $this->get('/shopify/callback?'.http_build_query(self::signed(['code' => 'abc', 'state' => $asked['state']], 'shpss_custom')))->assertRedirect();
+
+        $install = ShopifyInstall::query()->sole();
+        $this->assertSame(['custom-key', ShopStatus::Active], [$install->client_id, $install->shop->status]);
+        $this->assertSame(['custom-key', 'shpss_custom'], [$tokenAsks[0]['client_id'], $tokenAsks[0]['client_secret']]);
+
+        app(ShopifyApi::class)->renew($install);
+        $this->assertSame(['custom-key', 'shpss_custom'], [$tokenAsks[1]['client_id'], $tokenAsks[1]['client_secret']], 'renewed with the app it was installed from');
+
+        // A link signed by neither app is refused.
+        $this->get('/shopify/app?'.http_build_query(self::signed([], 'shpss_other')))->assertForbidden();
+    }
+
     public function test_an_unsigned_or_replayed_callback_installs_nothing(): void
     {
         Cache::put('shopify:state:s1', self::SHOP, 600);
@@ -200,12 +237,12 @@ final class ShopifyAppTest extends TestCase
      * @param  array<string, mixed>  $query
      * @return array<string, mixed>
      */
-    private static function signed(array $query): array
+    private static function signed(array $query, string $secret = self::SECRET): array
     {
         $query += ['shop' => self::SHOP, 'timestamp' => (string) time()];
         ksort($query);
         $message = implode('&', array_map(fn ($k, $v) => $k.'='.$v, array_keys($query), $query));
 
-        return $query + ['hmac' => hash_hmac('sha256', $message, self::SECRET)];
+        return $query + ['hmac' => hash_hmac('sha256', $message, $secret)];
     }
 }

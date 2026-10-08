@@ -98,8 +98,8 @@ final class ShopifyApi
         }
 
         $response = Http::asForm()->timeout(self::TIMEOUT_SECONDS)->post(self::url($install->shop_domain, '/admin/oauth/access_token'), [
-            'client_id' => config('services.shopify.key'),
-            'client_secret' => config('services.shopify.secret'),
+            'client_id' => ShopifyApps::key($install->client_id),
+            'client_secret' => ShopifyApps::secret($install->client_id),
             'grant_type' => 'refresh_token',
             'refresh_token' => $install->refresh_token,
         ]);
