@@ -10,4 +10,8 @@ return [
     'site_no_info' => 'A question from the search box: the site pages do not answer it, or the answer did not pass the check.',
     'site_nothing_near' => 'A question from the search box: no page of the site is near it. No writing model was asked.',
     'site_same_family' => 'A question from the search box: the checking model is from the same family as the writer (:family). Choose a checker from another family.',
+    'review_done' => 'The report on search questions for :day already exists.',
+    'review_quiet' => 'No questions were asked in the search on :day.',
+    'review_same_family' => 'The daily reviewer is from the same family as the answering model (:family). Choose a reviewer from another family.',
+    'review_done_score' => 'Search questions report for :day: :asks questions, score :score.',
 ];

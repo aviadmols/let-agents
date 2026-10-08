@@ -90,6 +90,15 @@ class Configuration extends Page implements HasForms
             'assistant.on_products',
             'assistant.on_content',
         ],
+        'search' => [
+            'search.results',
+            'search.drawer_side',
+            'search.similar',
+            'assistant.on_search',
+            'assistant.search_whatsapp',
+            'assistant.search_whatsapp_message',
+            'assistant.ask_review',
+        ],
         'whatsapp' => [
             'widget.whatsapp',
             'widget.whatsapp_number',

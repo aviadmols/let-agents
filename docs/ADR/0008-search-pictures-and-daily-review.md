@@ -69,3 +69,21 @@
   and handover to the shop) and plain words to the store's search.
 - **Search by photo is off by default and the system operator turns it on per site** from the
   searches screen. The shop's own screen never shows the switch.
+
+## Addendum (2026-10-08): the assistant picks from the results, WhatsApp on no match, a daily score
+
+- **A question in the search box carries the products the search showed** (`products`, at most
+  12). AnswerSiteQuestion (prompt v2) writes a short answer from the site's passages and the
+  products' own descriptions, and picks at most three of those products, each with why. Code
+  keeps only refs it gave; the checker of the other family (`picks_fit`) drops picks that do not
+  fit and refuses an answer the pages do not hold. Nothing left is `no_match`.
+- **No exact match offers the shop's WhatsApp** (`assistant.search_whatsapp`, the message in
+  `assistant.search_whatsapp_message`, both in the shop's own settings, group "search").
+- **Every question asked is logged** in `assistant_search_asks`: what was shown, the outcome, the
+  picks, whether WhatsApp was offered and clicked, and which picks the shopper opened (events
+  `ask_whatsapp` and `ask_pick`, accepted only for that question's own picks).
+- **Every morning at 05:15, ReviewSearchAsks** (another family than the answering model, checked
+  in code) scores each of yesterday's questions 1–5 and writes the shop manager a summary, up to
+  five improvements and a score out of 100 (`assistant_ask_reviews`). A quiet day asks no model;
+  a day is reviewed once. The report and the questions show on the questions screen; costs and
+  the "review now" button only on the operator's.

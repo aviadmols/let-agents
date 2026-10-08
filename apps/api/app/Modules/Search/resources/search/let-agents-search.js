@@ -620,6 +620,102 @@
       '.card[hidden]{display:none}',
       '.backlink{font:inherit;font-size:13px;border:0;background:transparent;color:var(--rs-accent-text);cursor:pointer;padding:0}',
       '@media (max-width:600px){.overlay{padding:0}.sheet{max-height:100vh;height:100vh;border-radius:0}.grid{grid-template-columns:repeat(2,1fr);gap:12px}}',
+      // The suggestions under the box: side column (categories, articles), products, foot.
+      '.d{font-size:15px;line-height:1.45;color:var(--rs-fg);background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:16px;',
+      'box-shadow:0 30px 80px -24px rgba(0,0,0,.35),0 2px 10px rgba(0,0,0,.06);overflow:hidden;display:flex;flex-direction:column}',
+      '.d-cols{display:grid;grid-template-columns:minmax(200px,280px) minmax(0,1fr);overflow:auto;min-height:0;flex:1 1 auto}',
+      '.d.one .d-cols{grid-template-columns:minmax(0,1fr)}',
+      '.d-side{background:var(--rs-soft);padding:18px 20px;display:grid;gap:2px;align-content:start;border-inline-end:1px solid var(--rs-line)}',
+      '.d-h{margin:0 0 4px;font-size:13px;font-weight:500;opacity:.62}',
+      '.d-cat,.d-art{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 8px;margin:0 -8px;border-radius:8px;color:inherit;text-decoration:none;cursor:pointer}',
+      '.d-cat{font-weight:600}',
+      '.d-cat small{opacity:.6;font-weight:400;font-size:13px;flex:none}',
+      '.d-path{display:block;font-size:12px;opacity:.6;font-weight:400}',
+      '.d-hr{border:0;border-top:1px solid var(--rs-line);margin:10px 0;width:100%}',
+      '.d-main{padding:18px 20px;display:grid;gap:12px;align-content:start;min-width:0}',
+      '.d-prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 22px}',
+      '.d-prod{display:grid;grid-template-columns:88px minmax(0,1fr);gap:14px;align-items:center;color:inherit;text-decoration:none;padding:6px;margin:-6px;border-radius:12px;cursor:pointer;min-width:0}',
+      '.d-cat:hover,.d-art:hover,.d-cat[aria-selected="true"],.d-art[aria-selected="true"]{background:var(--rs-hover)}',
+      '.d-prod:hover,.d-prod[aria-selected="true"]{background:var(--rs-soft)}',
+      '.d-pic{position:relative;display:block;width:88px;height:88px;border-radius:10px;background:var(--rs-soft);overflow:hidden;flex:none}',
+      '.d-pic img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.d-tag{position:absolute;top:6px;inset-inline-end:6px;background:var(--rs-fg);color:var(--rs-bg);font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;line-height:1.4}',
+      '.d-tag[hidden]{display:none}',
+      '.d-match{position:absolute;bottom:6px;inset-inline-start:6px;background:var(--rs-bg);color:var(--rs-fg);font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.15)}',
+      '.d-info{display:block;min-width:0}',
+      '.d-name{font-size:14.5px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:inherit;text-decoration:none}',
+      '.d-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-weight:700;margin-top:4px;font-size:14px;min-height:1.2em}',
+      '.d-price s{opacity:.5;font-weight:400}',
+      '.d-price.out{opacity:.6;font-weight:500}',
+      '.d-empty{display:grid;gap:4px}',
+      '.d-foot{border-top:1px solid var(--rs-line);display:grid;background:var(--rs-bg);flex:none}',
+      '.d-all{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;padding:14px;font-weight:600;font-size:15px}',
+      '.d-all:hover,.d-all[aria-selected="true"]{background:var(--rs-soft)}',
+      '.d-ask{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;',
+      'background:color-mix(in srgb,var(--rs-accent) 7%,var(--rs-bg));border-top:1px solid var(--rs-line)}',
+      '.d-ask:hover,.d-ask[aria-selected="true"]{background:color-mix(in srgb,var(--rs-accent) 14%,var(--rs-bg))}',
+      '.d-who{display:flex;align-items:center;gap:10px;min-width:0}',
+      '.d-who>span:last-child{min-width:0}',
+      '.d-dot{width:34px;height:34px;border-radius:50%;background:var(--rs-accent);color:var(--rs-accent-fg);display:grid;place-items:center;flex:none}',
+      '.d-dot svg{width:18px;height:18px}',
+      '.d-who b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.d-who small{display:block;opacity:.65;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.d-go{font-weight:700;color:var(--rs-accent-text);white-space:nowrap;flex:none}',
+      '.d-reply{display:grid;gap:10px}',
+      '.d-answer{border:1px solid color-mix(in srgb,var(--rs-accent) 22%,var(--rs-bg));background:color-mix(in srgb,var(--rs-accent) 4%,var(--rs-bg));',
+      'border-radius:14px;padding:14px 16px;display:grid;gap:8px;font-size:14.5px;line-height:1.55;color:var(--rs-fg)}',
+      '.d-label{font-size:12px;font-weight:600;color:var(--rs-accent-text)}',
+      '.d-q{font-weight:600}',
+      '.d-a{white-space:pre-line}',
+      '.d-src{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}',
+      '.d-src a{color:var(--rs-accent-text);text-decoration:none;border:1px solid var(--rs-line);border-radius:999px;padding:2px 10px;background:var(--rs-bg)}',
+      '.d-thinking{opacity:.7;font-size:14px;display:flex;align-items:center;gap:8px}',
+      '.d-thinking:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--rs-accent);flex:none}',
+      '@media (prefers-reduced-motion:no-preference){.d-thinking:before{animation:pulse 1s ease-in-out infinite alternate}@keyframes pulse{to{opacity:.25}}}',
+      '.d-picks{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:10px}',
+      '.d-pick{display:grid;grid-template-columns:26px 64px minmax(0,1fr);gap:12px;align-items:center;background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:12px;padding:8px 10px}',
+      '.d-num{width:26px;height:26px;border-radius:50%;background:var(--rs-accent);color:var(--rs-accent-fg);display:grid;place-items:center;font-weight:700;font-size:13px}',
+      '.d-pick .d-pic{width:64px;height:64px}',
+      '.d-pick a{color:inherit;text-decoration:none}',
+      '.d-why{opacity:.75;font-size:13.5px;line-height:1.4;margin-top:2px}',
+      '.d-buy{display:inline-block;margin-top:6px;font:inherit;font-size:12.5px;font-weight:600;padding:4px 12px;border-radius:var(--rs-radius);border:1.5px solid var(--rs-fg);',
+      'background:transparent;color:var(--rs-fg);cursor:pointer;text-decoration:none}',
+      '.d-buy[disabled]{opacity:.5;cursor:default}',
+      '.d-contact{border:1.5px solid #1f9d55;background:color-mix(in srgb,#1f9d55 7%,var(--rs-bg));border-radius:14px;padding:14px 16px;display:grid;gap:10px;font-size:14.5px;line-height:1.55}',
+      '.d-wa{display:inline-flex;align-items:center;gap:8px;background:#1f9d55;color:#fff;border-radius:999px;padding:9px 16px;font-weight:600;font-size:14px;text-decoration:none;justify-self:start}',
+      '.d-wa svg{width:18px;height:18px;flex:none}',
+      '.d-zone{margin:0;padding:28px 18px;background:var(--rs-soft)}',
+      '.d-zone strong{font-size:16px}',
+      '.d-yours{display:flex;align-items:center;gap:14px}',
+      '.d-yours img{width:76px;height:76px;object-fit:cover;border-radius:12px;border:1px solid var(--rs-line)}',
+      '.d-yours b{display:block}',
+      '.d-link{all:unset;cursor:pointer;color:var(--rs-accent-text);font-weight:600;font-size:14px;justify-self:start}',
+      '.d-link:focus-visible,.d-all:focus-visible,.d-ask:focus-visible,.m-back:focus-visible{outline:2px solid var(--rs-accent);outline-offset:-2px}',
+      // On a phone the suggestions cover the page.
+      '.d.m{position:fixed;inset:0;height:100%;border:0;border-radius:0;box-shadow:none}',
+      '.m-top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--rs-line);flex:none}',
+      '.m-back{all:unset;cursor:pointer;width:38px;height:38px;display:grid;place-items:center;border-radius:50%;flex:none}',
+      '.m-back svg{width:22px;height:22px}',
+      ':host([dir="rtl"]) .m-back svg{transform:scaleX(-1)}',
+      '.m-box{flex:1;display:flex;align-items:center;gap:4px;border:1.5px solid var(--rs-fg);border-radius:12px;padding:2px 4px;padding-inline-start:12px;min-width:0}',
+      '.m-box input{all:unset;flex:1;min-width:0;font-size:16px;padding:8px 0;color:var(--rs-fg)}',
+      '.m-box input::-webkit-search-cancel-button{display:none}',
+      '.m-x{all:unset;cursor:pointer;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;opacity:.55;flex:none}',
+      '.m-x svg{width:18px;height:18px}',
+      '.m-body{flex:1 1 auto;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 14px 18px}',
+      '.d.m .d-main{padding:0;gap:14px}',
+      '.m-cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px 2px}',
+      '.m-cats::-webkit-scrollbar{display:none}',
+      '.m-chip{flex:none;border:1px solid var(--rs-line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;white-space:nowrap;color:inherit;text-decoration:none}',
+      '.m-chip small{opacity:.6;font-weight:400;margin-inline-start:4px}',
+      '.m-list{display:grid;gap:12px}',
+      '.m-arts{display:grid}',
+      '.d.m .d-prod{grid-template-columns:72px minmax(0,1fr);gap:12px;margin:0;padding:0}',
+      '.d.m .d-prod .d-pic{width:72px;height:72px}',
+      '.d.m .d-art{margin:0;padding:8px 0;border-bottom:1px solid var(--rs-line);border-radius:0}',
+      '.d.m .d-all{padding:13px}',
+      '.d.m .d-ask{padding:11px 14px}',
+      '.d.m .d-foot{padding-bottom:env(safe-area-inset-bottom)}',
       '@media (prefers-reduced-motion:no-preference){.sheet{animation:in .25s ease}@keyframes in{from{transform:translateY(8px);opacity:0}}}'
     ].join('');
 
@@ -634,6 +730,7 @@
       host.style.setProperty('--rs-bg', bg);
       host.style.setProperty('--rs-soft', 'color-mix(in srgb, ' + (body.color || '#111') + ' 6%, ' + bg + ')');
       host.style.setProperty('--rs-line', 'color-mix(in srgb, ' + (body.color || '#111') + ' 14%, ' + bg + ')');
+      host.style.setProperty('--rs-hover', 'color-mix(in srgb, ' + (body.color || '#111') + ' 10%, ' + bg + ')');
       host.style.setProperty('--rs-accent', accent);
       host.style.setProperty('--rs-accent-fg', bs && bs.color ? bs.color : '#fff');
       host.style.setProperty('--rs-accent-text', accent);
@@ -656,183 +753,548 @@
 
     // ---------------------------------------------------------------- suggestions
 
+    var NARROW = 720; // at most this wide, the suggestions cover the page
+    var SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c.5 4.6 2.9 7 7.5 7.5-4.6.5-7 2.9-7.5 7.5-.5-4.6-2.9-7-7.5-7.5 4.6-.5 7-2.9 7.5-7.5Z"/><path d="M19 15.5c.2 1.9 1.1 2.8 3 3-1.9.2-2.8 1.1-3 3-.2-1.9-1.1-2.8-3-3 1.9-.2 2.8-1.1 3-3Z"/></svg>';
+    var BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></svg>';
+    var CLEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+    var WHATSAPP = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.8-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
+
+    function narrow() {
+      return win.innerWidth <= NARROW;
+    }
+
+    /** On a phone the page under the suggestions does not scroll. */
+    function lockPage(on) {
+      if (on) {
+        doc.documentElement.style.overflow = 'hidden';
+      } else if (!panel) {
+        doc.documentElement.style.overflow = '';
+      }
+    }
+
     function closeDropdown() {
       if (dropdown) {
         dropdown.host.parentNode && dropdown.host.parentNode.removeChild(dropdown.host);
+        if (dropdown.mobile) {
+          lockPage(false);
+        }
         dropdown = null;
       }
       active = -1;
       shown = [];
     }
 
+    /** Clicks inside the suggestions keep the focus where the shopper types. */
+    function keepFocus(event) {
+      var target = event.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+      event.preventDefault();
+    }
+
+    /** The suggestions box, or on a phone the sheet over the page, emptied for new content. */
+    function freshDropdown() {
+      var mobile = narrow();
+      if (dropdown && dropdown.mobile !== mobile) {
+        closeDropdown();
+      }
+      if (!dropdown) {
+        dropdown = shadowHost('let-agents-search-suggest');
+        dropdown.mobile = mobile;
+        if (mobile) {
+          sheetFrame(dropdown);
+          lockPage(true);
+        }
+      }
+      dropdown.upload = false;
+      dropdown.sticky = false;
+      dropdown.raw = null;
+      dropdown.products = [];
+      dropdown.main = null;
+      shown = [];
+      active = -1;
+      return dropdown;
+    }
+
+    /** The phone sheet's top: back, and a box that types into the shop's own field. */
+    function sheetFrame(d) {
+      var frame = el('div', 'd m');
+      frame.setAttribute('role', 'dialog');
+      frame.setAttribute('aria-modal', 'true');
+      frame.setAttribute('aria-label', label('search_label'));
+      var top = el('div', 'm-top');
+      var back = el('button', 'm-back');
+      back.type = 'button';
+      back.innerHTML = BACK;
+      back.setAttribute('aria-label', label('back'));
+      back.addEventListener('click', function () { closeDropdown(); });
+      top.appendChild(back);
+
+      var box = el('div', 'm-box');
+      var field = el('input');
+      field.type = 'search';
+      field.value = current ? current.value : '';
+      field.placeholder = (current && current.placeholder) || '';
+      field.setAttribute('aria-label', label('search_label'));
+      field.setAttribute('autocomplete', 'off');
+      field.setAttribute('enterkeyhint', 'search');
+      field.addEventListener('input', function () {
+        if (!current) {
+          return;
+        }
+        current.value = field.value;
+        clearTimeout(typeTimer);
+        typeTimer = setTimeout(function () { suggest(current); }, TYPE_MS);
+      });
+      field.addEventListener('keydown', function (event) {
+        if (current) {
+          onKey(event, current, true);
+        }
+      });
+      box.appendChild(field);
+      var clear = el('button', 'm-x');
+      clear.type = 'button';
+      clear.innerHTML = CLEAR;
+      clear.setAttribute('aria-label', label('clear'));
+      clear.addEventListener('click', function () {
+        field.value = '';
+        if (current) {
+          current.value = '';
+          suggest(current);
+        }
+        field.focus();
+      });
+      box.appendChild(clear);
+      if (state.config.photos) {
+        var cam = el('button', 'cam');
+        cam.type = 'button';
+        cam.innerHTML = CAMERA;
+        cam.setAttribute('aria-label', label('photo_search'));
+        cam.title = label('photo_search');
+        cam.addEventListener('click', function () { openUpload(); });
+        box.appendChild(cam);
+      }
+      top.appendChild(box);
+      frame.appendChild(top);
+      frame.addEventListener('mousedown', keepFocus);
+      d.root.appendChild(frame);
+      d.frame = frame;
+      d.field = field;
+      d.fresh = true;
+    }
+
+    /** Puts the parts in place: a side column and the main area on a wide screen, one scroll on a phone. */
+    function layout(side, main, foot) {
+      var d = dropdown;
+      if (d.mobile) {
+        while (d.frame.childNodes.length > 1) {
+          d.frame.removeChild(d.frame.lastChild);
+        }
+        var scroll = el('div', 'm-body');
+        scroll.appendChild(main);
+        d.frame.appendChild(scroll);
+        if (foot) {
+          d.frame.appendChild(foot);
+        }
+        d.scroll = scroll;
+        return;
+      }
+      var rootNode = d.root;
+      while (rootNode.childNodes.length > 1) {
+        rootNode.removeChild(rootNode.lastChild);
+      }
+      var box = el('div', 'd' + (side ? '' : ' one'));
+      box.setAttribute('role', 'listbox');
+      var cols = el('div', 'd-cols');
+      if (side) {
+        cols.appendChild(side);
+      }
+      cols.appendChild(main);
+      box.appendChild(cols);
+      if (foot) {
+        box.appendChild(foot);
+      }
+      box.addEventListener('mousedown', keepFocus);
+      rootNode.appendChild(box);
+      d.box = box;
+      d.scroll = cols;
+    }
+
     function position() {
-      if (!dropdown || !current) {
+      if (!dropdown) {
+        return;
+      }
+      var s = dropdown.host.style;
+      s.zIndex = '2147482000';
+      if (dropdown.mobile !== narrow()) {
+        closeDropdown();
+        return;
+      }
+      if (dropdown.mobile) {
+        s.position = 'fixed';
+        s.top = '0';
+        s.left = '0';
+        s.width = '100%';
+        s.height = '100%';
+        return;
+      }
+      if (!current) {
         return;
       }
       var rect = current.getBoundingClientRect();
-      var width = Math.max(rect.width, Math.min(380, win.innerWidth - 16));
-      var rtl = dropdown.host.dir === 'rtl';
-      var left = rtl ? rect.right - width : rect.left;
-      left = Math.max(8, Math.min(left, win.innerWidth - width - 8));
-      var s = dropdown.host.style;
+      var room = win.innerWidth - 32;
+      var width = Math.min(Math.max(rect.width, 1000), room);
+      var left = rect.left + rect.width / 2 - width / 2;
+      left = Math.max(16, Math.min(left, win.innerWidth - width - 16));
       s.position = 'absolute';
-      s.zIndex = '2147482000';
-      s.top = (rect.bottom + win.scrollY + 6) + 'px';
+      s.top = (rect.bottom + win.scrollY + 8) + 'px';
       s.left = (left + win.scrollX) + 'px';
       s.width = width + 'px';
+      s.height = '';
+      if (dropdown.box) {
+        dropdown.box.style.maxHeight = Math.max(280, win.innerHeight - Math.max(rect.bottom, 0) - 24) + 'px';
+      }
     }
 
+    /**
+     * Suggestions as the shopper types, all in the browser: categories and articles on the side,
+     * products with pictures and live prices, the way to all results, and the way to ask.
+     */
     function suggest(input) {
       var raw = input.value;
       var query = normalize(raw);
       if (!state.index || query.length < 1) {
-        closeDropdown();
+        if (dropdown && dropdown.mobile) {
+          freshDropdown();
+          layout(null, el('div', 'd-main'), null);
+        } else {
+          closeDropdown();
+        }
         return;
       }
-      var hits = search(state.index, raw);
+      var question = isQuestion(raw);
+      var hits = lookup(raw, question);
       var max = state.config.suggestions || 6;
       var products = [];
-      var others = [];
+      var categories = [];
+      var articles = [];
       var answers = [];
-      var question = isQuestion(raw);
+      var total = 0;
       for (var i = 0; i < hits.length; i++) {
         var record = state.records[hits[i].id];
         if (!record) {
           continue;
         }
         if (record.t === 'answer') {
-          if (answers.length < 1) {
+          if (!answers.length) {
             answers.push(record);
           }
-          continue;
-        }
-        if (record.t === 'product') {
+        } else if (record.t === 'product') {
+          total++;
           if (products.length < max) {
             products.push(record);
           }
-        } else if (others.length < 4) {
-          others.push(record);
+        } else if (record.t === 'category') {
+          if (categories.length < 5) {
+            categories.push(record);
+          }
+        } else if (articles.length < 4) {
+          articles.push(record);
         }
       }
 
-      if (!dropdown) {
-        dropdown = shadowHost('let-agents-search-suggest');
+      var d = freshDropdown();
+      d.raw = raw;
+      d.products = products;
+      if (d.field && d.field !== d.root.activeElement && d.field.value !== raw) {
+        d.field.value = raw;
       }
-      dropdown.upload = false;
-      var rootNode = dropdown.root;
-      while (rootNode.childNodes.length > 1) {
-        rootNode.removeChild(rootNode.lastChild);
-      }
-      var box = el('div', 'box');
-      box.setAttribute('role', 'listbox');
-      shown = [];
-      active = -1;
+      var main = el('div', 'd-main');
+      d.main = main;
 
-      // A question: the answer the site already gave, or a way to ask it. Asking happens only on
-      // Enter or a click; typing never reaches a model.
-      if (answers.length && (question || normalize(raw).split(' ').length >= 3)) {
-        box.appendChild(answerBlock(answers[0].title, answers[0].ans, answers[0].src, raw, answers[0]));
-      } else if (question && state.config.ask) {
-        var askRow = el('button', 'ask');
-        askRow.type = 'button';
-        askRow.setAttribute('role', 'option');
-        askRow.appendChild(el('span', null, label('ask_hint')));
-        askRow.appendChild(el('b', null, label('ask_button')));
-        askRow.addEventListener('mousedown', function (event) {
-          event.preventDefault();
-          askSite(input);
-        });
-        shown.push({ node: askRow, ask: true });
-        box.appendChild(askRow);
+      // The answer the site already gave to this question. Typing never reaches a model.
+      if (answers.length && (question || query.split(' ').length >= 3)) {
+        main.appendChild(answerBlock(answers[0].title, answers[0].ans, answers[0].src, raw, answers[0]));
       }
 
-      if (!products.length && !others.length && !answers.length && !question) {
-        box.appendChild(el('div', 'empty', label('no_results', { query: raw.trim() })));
+      if (!products.length && !categories.length && !articles.length && !answers.length && !question) {
+        var empty = el('div', 'd-empty');
+        empty.appendChild(el('span', null, label('no_results', { query: raw.trim() })));
+        empty.appendChild(el('span', 'muted', label('try_other')));
+        main.appendChild(empty);
+      }
+
+      var chips = null;
+      if (d.mobile && categories.length) {
+        chips = el('div', 'm-cats');
+        main.appendChild(chips);
       }
 
       if (products.length) {
-        box.appendChild(el('div', 'head', label('products')));
+        main.appendChild(el('h4', 'd-h', label('products')));
+        var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
         for (var p = 0; p < products.length; p++) {
-          box.appendChild(row(products[p], raw));
+          grid.appendChild(productRow(products[p], raw));
         }
-        fillPrices(box, products);
+        main.appendChild(grid);
+        fillPrices(grid, products);
       }
 
-      if (others.length) {
-        var chips = el('div', 'chips');
-        for (var o = 0; o < others.length; o++) {
-          chips.appendChild(chip(others[o], raw));
+      var side = null;
+      if (d.mobile) {
+        for (var c = 0; c < categories.length; c++) {
+          chips.appendChild(categoryChip(categories[c], raw));
         }
-        box.appendChild(chips);
+        if (articles.length) {
+          main.appendChild(el('h4', 'd-h', label('articles')));
+          var list = el('div', 'm-arts');
+          for (var a = 0; a < articles.length; a++) {
+            list.appendChild(articleRow(articles[a], raw));
+          }
+          main.appendChild(list);
+        }
+      } else if (categories.length || articles.length) {
+        side = sideColumn(categories, articles, raw);
       }
 
-      var all = el('button', 'all', label('all_results', { query: raw.trim() }));
-      all.type = 'button';
-      all.setAttribute('role', 'option');
-      all.addEventListener('mousedown', function (event) {
-        event.preventDefault();
-        submit(input);
-      });
-      shown.push({ node: all, all: true });
-      box.appendChild(all);
-
-      rootNode.appendChild(box);
+      layout(side, main, footer(input, raw, total, question));
       position();
+      if (d.fresh) {
+        d.fresh = false;
+        focusField(d);
+      }
 
       clearTimeout(pauseTimer);
       pauseTimer = setTimeout(function () { countSearch(raw, hits.length); }, PAUSE_MS);
     }
 
-    function row(record, raw) {
-      var link = el('a', 'row');
+    /** Words a question wraps around what it is about; dropped to find the products it is about. */
+    var FILLER = ['כדאי', 'צריך', 'מתאים', 'מתאימה', 'מתאימים', 'הכי', 'לי', 'לנו', 'עם', 'של', 'את', 'על', 'ליד', 'זה', 'זו', 'יש', 'אפשר',
+      'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גם', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my'];
+    var dropWords = null;
+
+    /** The client-side hits; for a question, also the hits for what it asks about. */
+    function lookup(raw, question) {
+      var hits = search(state.index, raw);
+      if (!question) {
+        return hits;
+      }
+      if (!dropWords) {
+        dropWords = {};
+        QUESTION_WORDS.concat(FILLER).forEach(function (word) { dropWords[normalize(word)] = true; });
+      }
+      var core = normalize(raw).split(' ').filter(function (word) { return word && !dropWords[word]; }).join(' ');
+      if (!core || core === normalize(raw)) {
+        return hits;
+      }
+      var seen = {};
+      hits.forEach(function (hit) { seen[hit.id] = true; });
+      return hits.concat(search(state.index, core).filter(function (hit) { return !seen[hit.id]; }));
+    }
+
+    function focusField(d) {
+      if (!d.field) {
+        return;
+      }
+      d.field.focus();
+      try {
+        d.field.setSelectionRange(d.field.value.length, d.field.value.length);
+      } catch (e) { /* not every field takes a caret */ }
+    }
+
+    function sideColumn(categories, articles, raw) {
+      var side = el('div', 'd-side');
+      if (categories.length) {
+        side.appendChild(el('h4', 'd-h', label('categories_match')));
+        for (var c = 0; c < categories.length; c++) {
+          side.appendChild(categoryRow(categories[c], raw));
+        }
+      }
+      if (categories.length && articles.length) {
+        side.appendChild(el('hr', 'd-hr'));
+      }
+      if (articles.length) {
+        side.appendChild(el('h4', 'd-h', label('articles')));
+        for (var a = 0; a < articles.length; a++) {
+          side.appendChild(articleRow(articles[a], raw));
+        }
+      }
+      return side;
+    }
+
+    /** Where a category sits: its path words before its own name. */
+    function categoryPath(record) {
+      var words = String(record.kw || '');
+      var at = words.lastIndexOf(record.title);
+      return at > 0 ? words.slice(0, at).trim() : '';
+    }
+
+    function linkTo(className, record, raw, text) {
+      var link = el('a', className, text);
       var url = safeUrl(record.url);
       if (url) {
         link.href = url;
       }
       link.setAttribute('role', 'option');
-      var img = safeUrl(record.img);
-      if (img) {
-        var thumb = el('img', 'thumb');
-        thumb.src = img;
-        thumb.alt = '';
-        thumb.loading = 'lazy';
-        link.appendChild(thumb);
-      } else {
-        link.appendChild(el('span', 'thumb'));
-      }
-      link.appendChild(el('span', 'name', record.title));
-      var price = el('span', 'price');
-      price.setAttribute('data-price', record.id);
-      link.appendChild(price);
-      link.addEventListener('mousedown', function () { countClick(raw, record); });
+      link.addEventListener('click', function () { countClick(raw, record); });
       shown.push({ node: link, record: record });
       return link;
     }
 
-    function chip(record, raw) {
-      var link = el('a', 'chip', record.title);
-      var url = safeUrl(record.url);
-      if (url) {
-        link.href = url;
+    function categoryRow(record, raw) {
+      var link = linkTo('d-cat', record, raw);
+      var name = el('span', null, record.title);
+      var path = categoryPath(record);
+      if (path) {
+        name.appendChild(el('span', 'd-path', path));
       }
-      link.addEventListener('mousedown', function () { countClick(raw, record); });
+      link.appendChild(name);
+      if (record.n) {
+        link.appendChild(el('small', null, record.n));
+      }
       return link;
+    }
+
+    function categoryChip(record, raw) {
+      var link = linkTo('m-chip', record, raw, record.title);
+      if (record.n) {
+        link.appendChild(el('small', null, record.n));
+      }
+      return link;
+    }
+
+    function articleRow(record, raw) {
+      return linkTo('d-art', record, raw, record.title);
+    }
+
+    /** A square picture; a missing or broken one leaves the soft square, never a broken icon. */
+    function picture(src, sale) {
+      var pic = el('span', 'd-pic');
+      if (src) {
+        var img = el('img');
+        img.alt = '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.addEventListener('error', function () {
+          if (img.parentNode) {
+            img.parentNode.removeChild(img);
+          }
+        });
+        img.src = src;
+        pic.appendChild(img);
+      }
+      if (sale) {
+        var tag = el('span', 'd-tag', label('sale'));
+        tag.hidden = true;
+        pic.appendChild(tag);
+      }
+      return pic;
+    }
+
+    function productRow(record, raw, match) {
+      var link = linkTo('d-prod', record, raw);
+      link.setAttribute('data-pid', String(record.id).slice(2));
+      var pic = picture(safeUrl(record.img), true);
+      if (match) {
+        pic.appendChild(el('span', 'd-match', label('photo_match', { match: match })));
+      }
+      link.appendChild(pic);
+      var info = el('span', 'd-info');
+      info.appendChild(el('span', 'd-name', record.title));
+      var price = el('span', 'd-price');
+      if (record.s === 0) {
+        price.className = 'd-price out';
+        price.textContent = label('out_of_stock');
+      }
+      info.appendChild(price);
+      link.appendChild(info);
+      return link;
+    }
+
+    function footer(input, raw, total, question) {
+      var foot = el('div', 'd-foot');
+      var text = total > 1 ? label('show_all', { count: total }) : (total === 1 ? label('show_all_one') : label('all_results', { query: raw.trim() }));
+      var all = el('button', 'd-all', text);
+      all.type = 'button';
+      all.setAttribute('role', 'option');
+      all.addEventListener('click', function () { submit(input); });
+      shown.push({ node: all, all: true });
+      foot.appendChild(all);
+      if (state.config.ask) {
+        foot.appendChild(askRow(input, raw, question));
+      }
+      return foot;
+    }
+
+    /** "Have a question?": asks the assistant only when pressed. */
+    function askRow(input, raw, question) {
+      var typed = raw.trim();
+      var row = el('button', 'd-ask');
+      row.type = 'button';
+      row.setAttribute('role', 'option');
+      var who = el('span', 'd-who');
+      var dot = el('span', 'd-dot');
+      dot.innerHTML = SPARK;
+      who.appendChild(dot);
+      var words = el('span');
+      words.appendChild(el('b', null, question ? label('ask_title_question') : label('ask_title', { query: typed })));
+      words.appendChild(el('small', null, question ? '"' + typed + '"' : label('ask_sub')));
+      who.appendChild(words);
+      row.appendChild(who);
+      row.appendChild(el('span', 'd-go', label('ask_go')));
+      row.addEventListener('click', function () { askInline(input); });
+      shown.push({ node: row, ask: true });
+      return row;
+    }
+
+    /** Live price, the regular price struck when on sale, and the sale tag, from the store itself. */
+    function paint(node, product) {
+      var price = node.querySelector('.d-price');
+      if (!price || !product) {
+        return;
+      }
+      price.textContent = '';
+      price.className = 'd-price';
+      if (product.is_in_stock === false) {
+        price.className = 'd-price out';
+        price.textContent = label('out_of_stock');
+        var buy = node.querySelector('button.d-buy');
+        if (buy) {
+          buy.disabled = true;
+        }
+        return;
+      }
+      var prices = product.prices || {};
+      price.appendChild(doc.createTextNode(money(prices)));
+      var sale = !!product.on_sale && prices.regular_price != null && Number(prices.regular_price) > Number(prices.price);
+      if (sale) {
+        price.appendChild(el('s', null, money({
+          price: prices.regular_price,
+          currency_minor_unit: prices.currency_minor_unit,
+          currency_prefix: prices.currency_prefix,
+          currency_suffix: prices.currency_suffix
+        })));
+      }
+      var tag = node.querySelector('.d-tag');
+      if (tag) {
+        tag.hidden = !sale;
+      }
     }
 
     function fillPrices(container, products) {
       var ids = [];
       for (var i = 0; i < products.length; i++) {
-        ids.push(products[i].id.slice(2));
+        ids.push(String(products[i].id).slice(2));
       }
-      liveProducts(ids).then(function () {
-        for (var j = 0; j < products.length; j++) {
-          var node = container.querySelector('[data-price="' + products[j].id.replace(/"/g, '') + '"]');
-          var product = live[products[j].id.slice(2)];
-          if (node && product) {
-            node.textContent = product.is_in_stock === false ? label('out_of_stock') : money(product.prices);
-          }
-        }
-      });
+      liveProducts(ids).then(function () { paintAll(container); });
+    }
+
+    function paintAll(container) {
+      var nodes = container.querySelectorAll('[data-pid]');
+      for (var i = 0; i < nodes.length; i++) {
+        paint(nodes[i], live[nodes[i].getAttribute('data-pid')]);
+      }
     }
 
     function move(step) {
@@ -844,6 +1306,9 @@
       }
       active = (active + step + shown.length) % shown.length;
       shown[active].node.setAttribute('aria-selected', 'true');
+      if (shown[active].node.scrollIntoView) {
+        shown[active].node.scrollIntoView({ block: 'nearest' });
+      }
     }
 
     // ---------------------------------------------------------------- questions
@@ -879,39 +1344,103 @@
       return id;
     }
 
-    /** An answer with the site's pages it came from. */
+    /** The site's pages an answer came from, as small links. */
+    function sourceLinks(block, sources, raw, record) {
+      var links = (sources || []).filter(function (source) { return source && safeUrl(source.url); });
+      if (!links.length) {
+        return;
+      }
+      var src = el('div', 'd-src');
+      src.appendChild(el('span', null, label('sources')));
+      links.forEach(function (source) {
+        var link = el('a', null, source.title || source.url);
+        link.href = source.url;
+        if (record) {
+          link.addEventListener('click', function () { countClick(raw, record); });
+        }
+        src.appendChild(link);
+      });
+      block.appendChild(src);
+    }
+
+    /** An answer the site already gave, with the site's pages it came from. */
     function answerBlock(question, text, sources, raw, record) {
-      var block = el('div', 'answer');
-      block.appendChild(el('span', 'tag', label('answer_from_site')));
+      var block = el('div', 'd-answer');
+      block.appendChild(el('span', 'd-label', label('answer_from_site')));
       if (question) {
-        block.appendChild(el('span', 'q', question));
+        block.appendChild(el('span', 'd-q', question));
       }
-      block.appendChild(el('span', 'a', text || ''));
-      var links = (sources || []).filter(function (source) { return safeUrl(source && source.url); });
-      if (links.length) {
-        var src = el('div', 'src');
-        src.appendChild(el('span', null, label('sources')));
-        links.forEach(function (source) {
-          var link = el('a', null, source.title);
-          link.href = source.url;
-          if (record) {
-            link.addEventListener('mousedown', function () { countClick(raw, record); });
-          }
-          src.appendChild(link);
-        });
-        block.appendChild(src);
-      }
+      block.appendChild(el('span', 'd-a', text || ''));
+      sourceLinks(block, sources, raw, record);
       return block;
     }
 
-    /**
-     * The shopper asked: the assistant answers from the site's pages, or says it did not find it and
-     * offers the shop's WhatsApp. What the search finds for the same words shows under it.
-     */
-    function askSite(input) {
-      askText(input.value.trim());
+    function requestAnswer(raw, ids) {
+      return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/ask', {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ question: raw, vid: visitor(), locale: LOCALE, products: ids.slice(0, 12) })
+      })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (json) { return (json && json.data) || null; })
+        .catch(function () { return null; });
     }
 
+    /**
+     * The shopper pressed "ask" (or Enter on a question): the answer opens inside the suggestions,
+     * above the products they already see, which go with the question so the assistant picks from them.
+     */
+    function askInline(input) {
+      var raw = String(input.value || '').trim();
+      if (!raw) {
+        return;
+      }
+      clearTimeout(typeTimer); // a suggestion still on its way would replace the answer
+      if (!dropdown || !dropdown.main || dropdown.raw !== input.value) {
+        suggest(input);
+      }
+      if (!dropdown || !dropdown.main) {
+        askText(raw);
+        return;
+      }
+      var d = dropdown;
+      d.sticky = true;
+      clearTimeout(pauseTimer);
+      var row = d.root.querySelector('.d-ask');
+      if (row && row.parentNode) {
+        row.parentNode.removeChild(row);
+      }
+      if (active >= 0 && shown[active]) {
+        shown[active].node.removeAttribute('aria-selected');
+      }
+      active = -1;
+      shown = shown.filter(function (item) { return !item.ask; });
+      var ready = d.main.querySelectorAll('.d-answer, .d-reply');
+      for (var i = 0; i < ready.length; i++) {
+        ready[i].parentNode.removeChild(ready[i]);
+      }
+      var box = el('div', 'd-reply');
+      box.setAttribute('aria-live', 'polite');
+      box.appendChild(el('div', 'd-thinking', label('ask_thinking')));
+      d.main.insertBefore(box, d.main.firstChild);
+      if (d.scroll) {
+        d.scroll.scrollTop = 0;
+      }
+      var ids = [];
+      for (var p = 0; p < d.products.length; p++) {
+        ids.push(String(d.products[p].id).slice(2));
+      }
+      requestAnswer(raw, ids).then(function (data) {
+        if (box.isConnected === false) {
+          return; // the shopper typed on; this answer is no longer wanted here
+        }
+        renderReply(box, data, raw);
+      });
+    }
+
+    /** A question from the drawer's own field: the answer in the results sheet, the results under it. */
     function askText(raw) {
       if (!raw) {
         return;
@@ -919,22 +1448,23 @@
       closeDropdown();
       clearTimeout(pauseTimer);
       var sheet = openSheet(raw, raw);
-      var box = el('div', 'section answer-box');
-      box.appendChild(el('p', 'muted', label('asking')));
+      var box = el('div', 'section d-reply');
+      box.appendChild(el('div', 'd-thinking', label('ask_thinking')));
       sheet.appendChild(box);
       var below = el('div');
       sheet.appendChild(below);
 
-      win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/ask', {
-        method: 'POST',
-        mode: 'cors',
-        credentials: 'omit',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ question: raw, vid: visitor(), locale: LOCALE })
-      })
-        .then(function (response) { return response.ok ? response.json() : null; })
-        .then(function (json) { showAnswer(box, json && json.data, raw); })
-        .catch(function () { showAnswer(box, null, raw); });
+      var ids = [];
+      if (state.index) {
+        var hits = lookup(raw, isQuestion(raw));
+        for (var i = 0; i < hits.length && ids.length < 12; i++) {
+          var record = state.records[hits[i].id];
+          if (record && record.t === 'product') {
+            ids.push(String(record.id).slice(2));
+          }
+        }
+      }
+      requestAnswer(raw, ids).then(function (data) { renderReply(box, data, raw); });
 
       var normalized = normalize(raw);
       var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
@@ -945,23 +1475,115 @@
         .catch(function () { /* the answer stands alone */ });
     }
 
-    function showAnswer(box, data, raw) {
+    /**
+     * The assistant's reply: the answer, the products it picked from what the shopper saw and why,
+     * the pages it came from; and where the site has no answer, the shop's WhatsApp.
+     */
+    function renderReply(box, data, raw) {
       box.textContent = '';
-      if (data && data.outcome === 'answered') {
-        box.appendChild(answerBlock(null, data.answer, data.sources, raw, null));
-        return;
+      var askId = data && data.ask_id ? String(data.ask_id) : null;
+      var q = normalize(raw);
+      var answered = !!(data && data.outcome === 'answered');
+      if (answered) {
+        var block = el('div', 'd-answer');
+        block.appendChild(el('span', 'd-label', label('ask_answer')));
+        block.appendChild(el('div', 'd-a', data.answer || ''));
+        var picks = (data.picks || []).filter(function (pick) { return pick && pick.external_id != null && pick.title; }).slice(0, 6);
+        if (picks.length) {
+          block.appendChild(pickList(picks, q, askId));
+        }
+        sourceLinks(block, data.sources, raw, null);
+        box.appendChild(block);
       }
-      var none = el('div', 'answer');
-      none.appendChild(el('span', 'a', (data && data.answer) || label('no_answer')));
-      var number = state.config && state.config.whatsapp;
-      if (number && /^\d{8,15}$/.test(String(number))) {
-        var wa = el('a', 'btn wa', label('whatsapp'));
-        wa.href = 'https://wa.me/' + number + '?text=' + encodeURIComponent(label('wa_message', { question: raw, url: win.location.href }));
+      if (!answered || (data && data.whatsapp === true)) {
+        box.appendChild(contactBox(data, raw, q, askId, answered));
+      }
+    }
+
+    function pickList(picks, q, askId) {
+      var list = el('ol', 'd-picks');
+      var ids = [];
+      picks.forEach(function (pick, at) {
+        var id = String(pick.external_id);
+        var record = state.records['p:' + id] || {};
+        var href = safeUrl(pick.url) || safeUrl(record.url);
+        var counted = function () {
+          var event = { type: 'ask_pick', q: q, id: id };
+          if (askId) {
+            event.ask_id = askId;
+          }
+          send([event]);
+        };
+        ids.push(id);
+        var item = el('li', 'd-pick');
+        item.setAttribute('data-pid', id);
+        item.appendChild(el('span', 'd-num', String(at + 1)));
+        var picLink = el('a');
+        if (href) {
+          picLink.href = href;
+        }
+        picLink.appendChild(picture(safeUrl(pick.image) || safeUrl(record.img), false));
+        picLink.addEventListener('click', counted);
+        item.appendChild(picLink);
+        var info = el('div', 'd-info');
+        var name = el('a', 'd-name', pick.title);
+        if (href) {
+          name.href = href;
+        }
+        name.addEventListener('click', counted);
+        info.appendChild(name);
+        if (pick.why) {
+          info.appendChild(el('div', 'd-why', pick.why));
+        }
+        info.appendChild(el('span', 'd-price'));
+        var action;
+        if (record.buy && STORE_API) {
+          action = el('button', 'd-buy', label('add'));
+          action.type = 'button';
+          action.addEventListener('click', function () {
+            counted();
+            addToCart(id, action);
+          });
+        } else {
+          action = el('a', 'd-buy', label('view'));
+          if (href) {
+            action.href = href;
+          }
+          action.addEventListener('click', counted);
+        }
+        info.appendChild(action);
+        item.appendChild(info);
+        list.appendChild(item);
+      });
+      liveProducts(ids).then(function () { paintAll(list); });
+      return list;
+    }
+
+    /** No answer on the site: say so, and offer the shop's WhatsApp with the question in it. */
+    function contactBox(data, raw, q, askId, answered) {
+      var box = el('div', 'd-contact');
+      box.appendChild(el('div', 'd-a', answered ? label('contact_more') : ((data && data.answer) || label('no_answer'))));
+      var number = String((state.config && state.config.whatsapp) || '').replace(/\D/g, '');
+      var offered = (data && data.whatsapp === true) || (state.config && state.config.askWhatsapp !== false);
+      if (offered && /^\d{8,15}$/.test(number)) {
+        var template = typeof state.config.whatsappMessage === 'string' && state.config.whatsappMessage ? state.config.whatsappMessage : label('wa_message');
+        var text = template.split(':question').join(raw).split(':url').join(win.location.href);
+        var wa = el('a', 'd-wa');
+        wa.innerHTML = WHATSAPP;
+        wa.appendChild(doc.createTextNode(label('whatsapp')));
+        wa.href = 'https://wa.me/' + number + '?text=' + encodeURIComponent(text);
         wa.target = '_blank';
         wa.rel = 'noopener';
-        none.appendChild(wa);
+        wa.addEventListener('click', function () {
+          var event = { type: 'ask_whatsapp', q: q };
+          if (askId) {
+            event.ask_id = askId;
+          }
+          send([event]);
+        });
+        box.appendChild(wa);
       }
-      box.appendChild(none);
+      return box;
     }
 
     // ---------------------------------------------------------------- full results
@@ -1059,7 +1681,7 @@
         cam.setAttribute('aria-label', label('photo_search'));
         cam.title = label('photo_search');
         cam.innerHTML = CAMERA;
-        cam.addEventListener('click', function () { fileInput(false).click(); });
+        cam.addEventListener('click', function () { fileInput(false, true).click(); });
         box.appendChild(cam);
       }
       box.appendChild(send);
@@ -1403,13 +2025,18 @@
       button.title = label('photo_search');
       button.addEventListener('click', function () {
         current = input;
-        openUpload();
+        if (dropdown && dropdown.upload) {
+          closeDropdown();
+        } else {
+          openUpload();
+        }
       });
       shadow.appendChild(button);
       input.insertAdjacentElement('afterend', host);
     }
 
-    function fileInput(capture) {
+    /** inSheet: the results go to the open results sheet or drawer, not to the suggestions. */
+    function fileInput(capture, inSheet) {
       var picker = doc.createElement('input');
       picker.type = 'file';
       picker.accept = 'image/jpeg,image/png,image/webp';
@@ -1418,30 +2045,28 @@
       }
       picker.addEventListener('change', function () {
         if (picker.files && picker.files[0]) {
-          searchPhoto(picker.files[0]);
+          if (inSheet) {
+            searchPhotoSheet(picker.files[0]);
+          } else {
+            searchPhoto(picker.files[0]);
+          }
         }
       });
       return picker;
     }
 
+    /** The upload area, inside the suggestions (or the phone sheet), until the shopper leaves it. */
     function openUpload() {
-      if (!dropdown) {
-        dropdown = shadowHost('let-agents-search-suggest');
-      }
-      var rootNode = dropdown.root;
-      while (rootNode.childNodes.length > 1) {
-        rootNode.removeChild(rootNode.lastChild);
-      }
-      shown = [];
-      active = -1;
-      dropdown.upload = true;
-      var box = el('div', 'box');
-      var zone = el('div', 'zone');
+      var d = freshDropdown();
+      d.upload = true;
+      var mobile = d.mobile;
+      var main = el('div', 'd-main');
+      var zone = el('div', 'zone d-zone');
       zone.tabIndex = 0;
       zone.setAttribute('role', 'button');
-      zone.innerHTML = PICTURE;
-      zone.appendChild(el('strong', null, label('photo_drop')));
-      zone.appendChild(el('span', 'muted', label('photo_formats')));
+      zone.innerHTML = CAMERA;
+      zone.appendChild(el('strong', null, label('photo_search')));
+      zone.appendChild(el('span', null, label(mobile ? 'photo_drop_mobile' : 'photo_drop')));
       var buttons = el('div', 'btns');
       var choose = el('button', 'btn', label('photo_choose'));
       choose.type = 'button';
@@ -1450,6 +2075,7 @@
       buttons.appendChild(choose);
       buttons.appendChild(take);
       zone.appendChild(buttons);
+      zone.appendChild(el('span', 'muted', label('photo_formats') + '. ' + label('photo_private')));
       choose.addEventListener('click', function (event) {
         event.stopPropagation();
         fileInput(false).click();
@@ -1483,11 +2109,12 @@
           searchPhoto(dropped);
         }
       });
-      box.appendChild(zone);
-      box.appendChild(el('p', 'muted', label('photo_private'))).style.margin = '0 12px 12px';
-      rootNode.appendChild(box);
+      main.appendChild(zone);
+      layout(null, main, null);
       position();
-      zone.focus();
+      if (!mobile) {
+        zone.focus();
+      }
     }
 
     /** The photo, at most MAX_SIDE pixels on its long side, as JPEG: smaller to send, same to compare. */
@@ -1508,49 +2135,116 @@
       });
     }
 
-    function searchPhoto(file) {
-      if (!file || !/^image\//.test(file.type || '')) {
-        return;
-      }
-      closeDropdown();
-      var sheet = openSheet(label('photo_results'));
-      var preview = el('div', 'yours');
+    /** Sends the photo once; resolves with the products that look like it, or a label key saying why not. */
+    function photoRequest(file) {
+      return shrink(file).then(function (blob) {
+        var maxBytes = ((state.config && state.config.photoMaxKb) || 5120) * 1024;
+        if (blob.size > maxBytes) {
+          return 'photo_too_big';
+        }
+        var form = new FormData();
+        form.append('photo', blob, 'photo.jpg');
+        return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/photo', { method: 'POST', body: form, mode: 'cors', credentials: 'omit' })
+          .then(function (response) {
+            if (response.status === 413) {
+              return 'photo_too_big';
+            }
+            return response.ok ? response.json() : 'photo_failed';
+          });
+      }).then(function (result) {
+        if (typeof result === 'string') {
+          return result;
+        }
+        var products = (result && result.groups && result.groups.product) || [];
+        return products.length ? products : 'photo_none';
+      }).catch(function () { return 'photo_failed'; });
+    }
+
+    function preview(file) {
       var thumb = el('img');
       thumb.alt = label('photo_yours');
       try {
         thumb.src = win.URL.createObjectURL(file);
       } catch (e) { /* no preview */ }
-      preview.appendChild(thumb);
-      preview.appendChild(el('strong', null, label('photo_results')));
-      sheet.appendChild(preview);
+      return thumb;
+    }
+
+    /** Search by photo inside the suggestions: the shopper's picture, then the products like it. */
+    function searchPhoto(file) {
+      if (!file || !/^image\//.test(file.type || '')) {
+        return;
+      }
+      if (!dropdown || !dropdown.upload) {
+        openUpload();
+      }
+      var d = dropdown;
+      var main = el('div', 'd-main');
+      var head = el('div', 'd-yours');
+      head.appendChild(preview(file));
+      var words = el('div');
+      words.appendChild(el('b', null, label('photo_results')));
+      var status = el('div', 'd-thinking', label('photo_searching'));
+      words.appendChild(status);
+      head.appendChild(words);
+      main.appendChild(head);
+      layout(null, main, null);
+      d.upload = true;
+      position();
+
+      photoRequest(file).then(function (products) {
+        if (main.isConnected === false) {
+          return;
+        }
+        var again = el('button', 'd-link', label('photo_again'));
+        again.type = 'button';
+        again.addEventListener('click', function () { openUpload(); });
+        if (typeof products === 'string') {
+          status.className = 'muted';
+          status.textContent = label(products);
+          main.appendChild(again);
+          return;
+        }
+        status.className = 'muted';
+        status.textContent = label('photo_count', { count: products.length });
+        var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
+        var records = [];
+        for (var i = 0; i < products.length; i++) {
+          var item = products[i];
+          var record = state.records['p:' + item.external_id] || {};
+          var row = {
+            id: 'p:' + item.external_id,
+            t: 'product',
+            title: item.title || record.title || '',
+            url: item.url || record.url,
+            img: item.image || record.img,
+            s: record.s
+          };
+          records.push(row);
+          grid.appendChild(productRow(row, '', item.match));
+        }
+        main.appendChild(grid);
+        main.appendChild(again);
+        fillPrices(grid, records);
+      });
+    }
+
+    /** Search by photo from the results sheet or drawer: the results fill that sheet. */
+    function searchPhotoSheet(file) {
+      if (!file || !/^image\//.test(file.type || '')) {
+        return;
+      }
+      closeDropdown();
+      var sheet = openSheet(label('photo_results'));
+      var head = el('div', 'yours');
+      head.appendChild(preview(file));
+      head.appendChild(el('strong', null, label('photo_results')));
+      sheet.appendChild(head);
       var status = el('div', 'section', label('photo_searching'));
       sheet.appendChild(status);
 
-      shrink(file).then(function (blob) {
-        var maxBytes = ((state.config && state.config.photoMaxKb) || 5120) * 1024;
-        if (blob.size > maxBytes) {
-          status.textContent = label('photo_too_big');
-          return null;
-        }
-        var form = new FormData();
-        form.append('photo', blob, 'photo.jpg');
-        return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/photo', { method: 'POST', body: form, mode: 'cors', credentials: 'omit' });
-      }).then(function (response) {
-        if (!response) {
-          return null;
-        }
-        if (response.status === 413) {
-          status.textContent = label('photo_too_big');
-          return null;
-        }
-        return response.ok ? response.json() : (status.textContent = label('photo_failed'), null);
-      }).then(function (result) {
-        if (!result) {
-          return;
-        }
-        var products = (result.groups && result.groups.product) || [];
-        if (!products.length) {
-          status.textContent = label('photo_none');
+      photoRequest(file).then(function (products) {
+        if (typeof products === 'string') {
+          status.textContent = label(products);
           return;
         }
         sheet.removeChild(status);
@@ -1571,14 +2265,9 @@
         var foot = el('div', 'foot');
         var again = el('button', 'btn ghost', label('photo_again'));
         again.type = 'button';
-        again.addEventListener('click', function () {
-          closePanel();
-          openUpload();
-        });
+        again.addEventListener('click', function () { fileInput(false, true).click(); });
         foot.appendChild(again);
         sheet.appendChild(foot);
-      }).catch(function () {
-        status.textContent = label('photo_failed');
       });
     }
 
@@ -1590,6 +2279,37 @@
         return node && node.matches && node.matches(selector);
       } catch (e) {
         return false;
+      }
+    }
+
+    /** Arrows move through the rows, Enter opens one, asks a question, or shows all results. */
+    function onKey(event, input, fromSheet) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        move(1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        move(-1);
+      } else if (event.key === 'Escape') {
+        closeDropdown();
+      } else if (event.key === 'Enter') {
+        var picked = active >= 0 ? shown[active] : null;
+        if ((picked && picked.ask) || (!picked && state.config && state.config.ask && isQuestion(input.value))) {
+          event.preventDefault();
+          askInline(input);
+        } else if (picked && picked.all) {
+          event.preventDefault();
+          submit(input);
+        } else if (picked && picked.record && picked.node.href) {
+          event.preventDefault();
+          countClick(input.value, picked.record);
+          win.location.href = picked.node.href;
+        } else if (fromSheet || (state.config && state.config.results) !== 'page') {
+          event.preventDefault();
+          submit(input);
+        } else {
+          closeDropdown();
+        }
       }
     }
 
@@ -1605,46 +2325,32 @@
       input.addEventListener('input', function () {
         current = input;
         clearTimeout(typeTimer);
+        // On a phone the sheet opens at once, while the keyboard is up, so its field can take over.
+        if (narrow() && !(dropdown && dropdown.mobile) && input.value.trim()) {
+          suggest(input);
+          return;
+        }
         typeTimer = setTimeout(function () { suggest(input); }, TYPE_MS);
       });
       input.addEventListener('focus', function () {
         current = input;
-        if (input.value.trim()) {
+        if (input.value.trim() && !(dropdown && dropdown.raw === input.value)) {
           suggest(input);
         }
       });
       input.addEventListener('blur', function () {
         setTimeout(function () {
-          if (doc.activeElement !== input && !(dropdown && dropdown.upload)) {
+          if (!dropdown || dropdown.mobile || dropdown.upload || dropdown.sticky) {
+            return;
+          }
+          if (doc.activeElement !== input && doc.activeElement !== dropdown.host) {
             closeDropdown();
           }
         }, 150);
       });
       input.addEventListener('keydown', function (event) {
-        if (event.key === 'ArrowDown') {
-          event.preventDefault();
-          move(1);
-        } else if (event.key === 'ArrowUp') {
-          event.preventDefault();
-          move(-1);
-        } else if (event.key === 'Escape') {
-          closeDropdown();
-        } else if (event.key === 'Enter') {
-          var picked = active >= 0 ? shown[active] : null;
-          if ((picked && picked.ask) || (!picked && state.config && state.config.ask && isQuestion(input.value))) {
-            event.preventDefault();
-            askSite(input);
-          } else if (picked && picked.record && picked.node.href) {
-            event.preventDefault();
-            countClick(input.value, picked.record);
-            win.location.href = picked.node.href;
-          } else if ((state.config && state.config.results) !== 'page') {
-            event.preventDefault();
-            submit(input);
-          } else {
-            closeDropdown();
-          }
-        }
+        current = input;
+        onKey(event, input, false);
       });
       if (input.form && !input.form.__letAgentsSearch) {
         input.form.__letAgentsSearch = true;
@@ -1679,6 +2385,9 @@
       if (!target || target.tagName !== 'INPUT' || !/^(text|search)$/i.test(target.type || 'text')) {
         return;
       }
+      if (dropdown && target === dropdown.host) {
+        return;
+      }
       current = target;
       load();
     }
@@ -1688,15 +2397,20 @@
     win.addEventListener('resize', position);
     win.addEventListener('scroll', position, { passive: true });
     doc.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && panel) {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      if (panel) {
         closePanel();
-      } else if (event.key === 'Escape' && dropdown && dropdown.upload) {
+      } else if (dropdown) {
         closeDropdown();
       }
     });
+    // An answer or the photo area stays open while the shopper reads; a click elsewhere closes it.
     doc.addEventListener('pointerdown', function (event) {
       var target = event.target;
-      if (dropdown && dropdown.upload && target !== dropdown.host && !(target.closest && target.closest('.let-agents-search-camera'))) {
+      if (dropdown && !dropdown.mobile && (dropdown.upload || dropdown.sticky) && target !== dropdown.host && target !== current &&
+        !(target.closest && target.closest('.let-agents-search-camera'))) {
         closeDropdown();
       }
     }, true);

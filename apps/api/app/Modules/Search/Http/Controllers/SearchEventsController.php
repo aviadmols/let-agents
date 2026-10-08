@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Http\Controllers;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Search\Actions\CountSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use Illuminate\Http\JsonResponse;
@@ -42,11 +43,32 @@ final class SearchEventsController
                 match ($event['type'] ?? null) {
                     'search' => $count->search($connection->shop_id, $event['q'], (int) ($event['results'] ?? 0)),
                     'click' => $count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? '')),
+                    'ask_whatsapp' => self::onAsk($event, fn (AssistantSearchAsk $ask) => $ask->forceFill(['whatsapp_clicked' => true])->save()),
+                    'ask_pick' => self::onAsk($event, function (AssistantSearchAsk $ask) use ($event): void {
+                        $id = (string) ($event['id'] ?? '');
+                        // Only one of the products it picked counts as acting on its pick.
+                        if (in_array($id, array_column((array) $ask->picks, 'external_id'), true)) {
+                            $ask->forceFill(['picked' => array_values(array_unique([...(array) $ask->picked, $id]))])->save();
+                        }
+                    }),
                     default => null,
                 };
             }
         });
 
         return response()->noContent();
+    }
+
+    /** The question this event belongs to, in this shop, asked today or yesterday. */
+    private static function onAsk(array $event, \Closure $then): void
+    {
+        $id = (string) ($event['ask_id'] ?? '');
+        $ask = preg_match('/^[0-9a-z]{26}$/i', $id) === 1
+            ? AssistantSearchAsk::query()->whereKey(strtolower($id))->where('created_at', '>=', now()->subDays(2))->first()
+            : null;
+
+        if ($ask !== null) {
+            $then($ask);
+        }
     }
 }

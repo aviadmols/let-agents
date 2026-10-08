@@ -24,6 +24,14 @@
         {
             "name": "on_search",
             "default": true
+        },
+        {
+            "name": "search_whatsapp",
+            "default": true
+        },
+        {
+            "name": "ask_review",
+            "default": true
         }
     ],
     "settings": [
@@ -235,6 +243,68 @@
             ],
             "default": "openai",
             "scope": "global"
+        },
+        {
+            "name": "search_whatsapp_message",
+            "type": "string",
+            "default": "",
+            "max": 300,
+            "scope": "shop"
+        },
+        {
+            "name": "review_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "review_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "review_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "review_output_usd_per_million",
+            "type": "float",
+            "default": 5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "review_max_output_tokens",
+            "type": "int",
+            "default": 4000,
+            "min": 500,
+            "max": 16000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "review_max_asks",
+            "type": "int",
+            "default": 80,
+            "min": 1,
+            "max": 500,
+            "scope": "shop",
+            "unit": "questions"
         }
     ],
     "agents": [
@@ -307,6 +377,28 @@
                     ],
                     "prompts": [
                         "verify_site"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "ask_reviewer",
+            "action": "review_asks",
+            "when": "05:15",
+            "features": [
+                "ask_review"
+            ],
+            "roles": [
+                {
+                    "role": "checker",
+                    "provider": "review_provider",
+                    "model": "review_model",
+                    "prices": [
+                        "review_input_usd_per_million",
+                        "review_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "review_asks"
                     ]
                 }
             ]

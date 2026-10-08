@@ -13,4 +13,12 @@ return [
         'label' => 'Questions in the search box',
         'description' => 'A shopper who types a question in the search and presses Enter gets an answer from the site pages, with the pages it came from. A saved answer shows while typing. No model is asked while typing.',
     ],
+    'search_whatsapp' => [
+        'label' => 'WhatsApp when search has no match',
+        'description' => 'When the assistant finds no answer or product that exactly fits a question from the search box, a message to contact the shop on WhatsApp shows, with the question already written.',
+    ],
+    'ask_review' => [
+        'label' => 'Daily report on questions in the search',
+        'description' => 'Every morning: a check of yesterday\'s questions and of what the assistant answered, a score for each question and for the day, and what to improve.',
+    ],
 ];

@@ -55,7 +55,7 @@ final class ConfigurationPageTest extends TestCase
         $areas = $page->instance()->areas();
 
         // A store's own areas come before the modules.
-        $this->assertSame(['shown', 'placement', 'panels', 'assistant', 'whatsapp', 'signup'], $page->instance()->storeAreas());
+        $this->assertSame(['shown', 'placement', 'panels', 'assistant', 'search', 'whatsapp', 'signup'], $page->instance()->storeAreas());
         $this->assertArrayHasKey(self::TENANCY, $areas);
 
         // Every declared key belongs to exactly one area.

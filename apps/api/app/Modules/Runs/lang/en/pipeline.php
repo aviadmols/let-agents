@@ -44,6 +44,7 @@ return [
         'search_write_tags' => 'Writing the page tags',
         'search_resolve' => 'Resolving searches that found nothing',
         'assistant_answer_site' => 'Answering a question from the search box',
+        'assistant_review_asks' => 'Daily report on search questions',
         'analytics_compute_scores' => 'Behaviour scores',
         'analytics_compute_popularity' => 'Product popularity',
         'improvement_daily_review' => 'Daily review and suggestions for the site',

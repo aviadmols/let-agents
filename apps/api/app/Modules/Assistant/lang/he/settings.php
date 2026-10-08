@@ -99,4 +99,32 @@ return [
         'label' => 'ספק המודל הקטן שבודק',
         'description' => 'בודק שהשאלה על הדף ושהתשובה נשענת עליו. כדאי ממשפחה אחרת מהמודל שעונה.',
     ],
+    'search_whatsapp_message' => [
+        'label' => 'ההודעה שנפתחת בוואטסאפ מהחיפוש',
+        'description' => 'ריק להודעה הרגילה. :question תוחלף בשאלה של הגולש.',
+    ],
+    'review_provider' => [
+        'label' => 'ספק המודל שבודק את השאלות בחיפוש',
+        'description' => 'משפחה אחרת מהמודל שעונה.',
+    ],
+    'review_model' => [
+        'label' => 'המודל שבודק את השאלות בחיפוש',
+        'description' => 'למשל claude-haiku-4-5.',
+    ],
+    'review_input_usd_per_million' => [
+        'label' => 'מחיר קלט של הבודק היומי, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'review_output_usd_per_million' => [
+        'label' => 'מחיר פלט של הבודק היומי, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'review_max_output_tokens' => [
+        'label' => 'תקרת טוקנים לדוח היומי',
+        'description' => 'כולל חשיבה.',
+    ],
+    'review_max_asks' => [
+        'label' => 'כמה שאלות נבדקות ביום',
+        'description' => 'הראשונות של אותו יום.',
+    ],
 ];

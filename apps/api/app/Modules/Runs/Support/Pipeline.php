@@ -56,6 +56,7 @@ final class Pipeline
             'analytics.compute_scores' => ['model' => null],
             'analytics.compute_popularity' => ['model' => null],
             'improvement.daily_review' => ['model' => 'improvement.analyst_model'],
+            'assistant.review_asks' => ['model' => 'assistant.review_model'],
         ],
         'live' => [
             'assistant.answer' => ['model' => 'assistant.answer_model'],
@@ -98,5 +99,6 @@ final class Pipeline
         'analytics.compute_scores' => '04:15',
         'analytics.compute_popularity' => '04:15',
         'improvement.daily_review' => '04:30',
+        'assistant.review_asks' => '05:15',
     ];
 }

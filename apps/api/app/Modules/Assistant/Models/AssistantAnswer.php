@@ -55,6 +55,7 @@ class AssistantAnswer extends Model
         return [
             'asked_count' => 'integer',
             'sources' => 'array',
+            'picks' => 'array',
             'prompt_version' => 'integer',
             'input_tokens' => 'integer',
             'output_tokens' => 'integer',

@@ -99,4 +99,32 @@ return [
         'label' => 'Provider of the small checking model',
         'description' => 'Checks the question is about the page and the answer rests on it. Best from another family than the answering model.',
     ],
+    'search_whatsapp_message' => [
+        'label' => 'The message WhatsApp opens with from the search',
+        'description' => 'Empty for the usual message. :question becomes the shopper\'s question.',
+    ],
+    'review_provider' => [
+        'label' => 'Provider of the model that reviews search questions',
+        'description' => 'Another family than the answering model.',
+    ],
+    'review_model' => [
+        'label' => 'The model that reviews search questions',
+        'description' => 'For example claude-haiku-4-5.',
+    ],
+    'review_input_usd_per_million' => [
+        'label' => 'Input price of the daily reviewer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'review_output_usd_per_million' => [
+        'label' => 'Output price of the daily reviewer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'review_max_output_tokens' => [
+        'label' => 'Token cap for the daily report',
+        'description' => 'Including thinking.',
+    ],
+    'review_max_asks' => [
+        'label' => 'How many questions are reviewed a day',
+        'description' => 'The first of that day.',
+    ],
 ];

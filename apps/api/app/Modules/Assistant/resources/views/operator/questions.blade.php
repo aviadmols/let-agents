@@ -25,12 +25,83 @@
                 'from_team' => number_format($q['totals']['from_team']),
                 'cost' => '$'.number_format($q['totals']['cost'], 3),
             ] as $key => $value)
+                @continue($key === 'cost' && ! $this->operatorView())
                 <x-filament::section compact>
                     <div style="{{ $small }}">{{ __("assistant::ui.questions.totals.{$key}") }}</div>
                     <div style="font-size:22px;font-weight:600;margin-top:4px" dir="ltr">{{ $value }}</div>
                 </x-filament::section>
             @endforeach
         </div>
+
+        @if ($a = $this->searchAsks())
+            <x-filament::section :heading="__('assistant::ui.asks.heading')" :description="__('assistant::ui.asks.description')">
+                @if ($a['latest'])
+                    @php($latest = $a['latest'])
+                    @php($tone = $latest->score === null ? 'rgba(127,127,127,.15)' : ($latest->score >= 80 ? 'rgba(27,175,122,.16)' : ($latest->score >= 60 ? 'rgba(235,170,52,.2)' : 'rgba(220,60,60,.15)')))
+                    <div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start">
+                        <div style="display:grid;place-items:center;min-width:96px;padding:12px;border-radius:16px;background:{{ $tone }}">
+                            <div style="font-size:32px;font-weight:700;line-height:1" dir="ltr">{{ $latest->score ?? '—' }}</div>
+                            <div style="{{ $small }}">{{ __('assistant::ui.asks.out_of') }}</div>
+                        </div>
+                        <div style="display:grid;gap:8px;min-width:0">
+                            <div style="{{ $small }}">{{ __('assistant::ui.asks.report_for', ['day' => $latest->day->format('d/m/Y')]) }}</div>
+                            @if ($latest->summary)<p style="margin:0">{{ $latest->summary }}</p>@endif
+                            <div style="display:flex;flex-wrap:wrap;gap:6px">
+                                @foreach (['asks', 'answered', 'no_match', 'whatsapp_shown', 'whatsapp_clicked', 'picked'] as $count)
+                                    <span style="font-size:12.5px;padding:2px 10px;border-radius:999px;background:rgba(127,127,127,.12)">{{ __('assistant::ui.asks.counts.'.$count, ['count' => number_format((int) ($latest->counts[$count] ?? 0))]) }}</span>
+                                @endforeach
+                            </div>
+                            @if ($latest->improvements)
+                                <div>
+                                    <strong style="font-size:13px">{{ __('assistant::ui.asks.improvements') }}</strong>
+                                    <ul style="margin:4px 0 0;padding-inline-start:20px">
+                                        @foreach ($latest->improvements as $line)<li>{{ $line }}</li>@endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            @if (count($a['trend']) > 1)
+                                <div style="{{ $small }}">{{ __('assistant::ui.asks.trend') }}: @foreach ($a['trend'] as $point)<span dir="ltr">{{ $point['day'] }} · {{ $point['score'] ?? '—' }}</span>@if (! $loop->last) &nbsp;|&nbsp; @endif @endforeach</div>
+                            @endif
+                        </div>
+                    </div>
+                @else
+                    <p style="margin:0;opacity:.75">{{ __('assistant::ui.asks.no_report') }}</p>
+                @endif
+                @if ($this->operatorView())
+                    <div style="margin-top:12px"><button type="button" wire:click="reviewNow" wire:loading.attr="disabled" style="{{ $btn }}">{{ __('assistant::ui.asks.review_now') }}</button></div>
+                @endif
+            </x-filament::section>
+
+            <x-filament::section :heading="__('assistant::ui.asks.list_heading')" :description="__('assistant::ui.asks.list_description')" collapsible>
+                @if ($a['asks']->isEmpty())
+                    <p style="margin:0;opacity:.75">{{ __('assistant::ui.asks.none') }}</p>
+                @else
+                    <div style="display:grid;gap:10px">
+                        @foreach ($a['asks'] as $ask)
+                            @php($note = $a['notes'][$ask->id] ?? null)
+                            <div style="{{ $box }};display:grid;gap:6px">
+                                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between">
+                                    <strong>{{ $ask->question }}</strong>
+                                    <span style="{{ $small }}">{{ $ask->created_at->diffForHumans() }}</span>
+                                </div>
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px">
+                                    <span style="padding:1px 9px;border-radius:999px;{{ $ask->outcome === 'answered' ? 'background:rgba(27,175,122,.16)' : 'background:rgba(235,104,52,.14)' }}">{{ __('assistant::ui.asks.outcomes.'.$ask->outcome) }}</span>
+                                    @if ($ask->whatsapp_shown)<span style="padding:1px 9px;border-radius:999px;background:rgba(31,157,85,.14)">{{ __('assistant::ui.asks.'.($ask->whatsapp_clicked ? 'whatsapp_clicked' : 'whatsapp_shown')) }}</span>@endif
+                                    @if ($ask->picked)<span style="padding:1px 9px;border-radius:999px;background:rgba(126,34,206,.12)">{{ __('assistant::ui.asks.picked') }}</span>@endif
+                                    @if ($note)<span style="padding:1px 9px;border-radius:999px;background:rgba(127,127,127,.14)">{{ __('assistant::ui.asks.score', ['score' => $note['score']]) }}</span>@endif
+                                </div>
+                                @if ($ask->picks)
+                                    <ol style="margin:0;padding-inline-start:20px;font-size:13.5px">
+                                        @foreach ($ask->picks as $pick)<li><strong>{{ $pick['title'] }}</strong> · <span style="opacity:.8">{{ $pick['why'] }}</span></li>@endforeach
+                                    </ol>
+                                @endif
+                                @if ($note && $note['note'] !== '')<div style="{{ $small }}">{{ $note['note'] }}</div>@endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </x-filament::section>
+        @endif
 
         <x-filament::section :heading="__('assistant::ui.questions.open_heading')" :description="__('assistant::ui.questions.open_description')">
             @if ($q['open']->isEmpty())

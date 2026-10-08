@@ -7,6 +7,7 @@ return [
     'limit' => 'You have reached today\'s questions. The store team can help.',
     'unavailable' => 'We could not answer right now. Please try again later.',
     'site' => [
+        'no_match' => 'We found no product that exactly fits the question. The store team will be glad to help.',
         'invalid' => 'Ask a short question about the products or the store.',
         'out_of_scope' => 'That one is not mine to answer, but the store team can.',
         'no_info' => 'I could not find that on the site. The store team can help.',

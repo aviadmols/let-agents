@@ -44,6 +44,7 @@ return [
         'search_write_tags' => 'כתיבת תגיות לדפים',
         'search_resolve' => 'פתרון חיפושים בלי תוצאות',
         'assistant_answer_site' => 'מענה על שאלה מתיבת החיפוש',
+        'assistant_review_asks' => 'דוח יומי על השאלות בחיפוש',
         'analytics_compute_scores' => 'ציוני התנהגות',
         'analytics_compute_popularity' => 'פופולריות מוצרים',
         'improvement_daily_review' => 'בדיקה יומית והצעות לאתר',

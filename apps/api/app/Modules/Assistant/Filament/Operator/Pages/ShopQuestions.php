@@ -3,9 +3,15 @@
 namespace App\Modules\Assistant\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
+use App\Modules\Assistant\Actions\ReviewSearchAsks;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantAskReview;
+use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -77,6 +83,57 @@ class ShopQuestions extends Page
     /**
      * @return array{open: Collection<string, Collection<int, AssistantAnswer>>, answered: Collection<string, Collection<int, AssistantAnswer>>, refused: Collection<int, AssistantAnswer>, totals: array<string, int>}|null
      */
+    /** Costs and the "review now" button are the operator's; the shop's screen never shows them. */
+    public function operatorView(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === User::OPERATOR_PANEL;
+    }
+
+    /**
+     * Questions asked in the search box: the latest daily report, the scores of the last two
+     * weeks, and each recent question with what the assistant said and picked and what the
+     * shopper did next.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function searchAsks(): ?array
+    {
+        if ($this->shop === null) {
+            return null;
+        }
+
+        return app(TenantContext::class)->run($this->shop, function (): array {
+            $reviews = AssistantAskReview::query()->where('day', '>=', now()->subDays(14)->toDateString())->orderByDesc('day')->get();
+            $latest = $reviews->firstWhere('status', AssistantAskReview::REVIEWED);
+            $notes = [];
+
+            foreach ($reviews as $review) {
+                foreach ((array) $review->items as $item) {
+                    $notes[$item['ask_id']] = $item;
+                }
+            }
+
+            return [
+                'latest' => $latest,
+                'trend' => $reviews->where('status', AssistantAskReview::REVIEWED)->sortBy('day')->map(fn (AssistantAskReview $r): array => ['day' => $r->day->format('d/m'), 'score' => $r->score])->values()->all(),
+                'asks' => AssistantSearchAsk::query()->latest('created_at')->orderByDesc('id')->limit(40)->get(),
+                'notes' => $notes,
+            ];
+        });
+    }
+
+    /** The operator runs yesterday's report now instead of waiting for the morning. */
+    public function reviewNow(): void
+    {
+        abort_unless($this->operatorView() && $this->shop !== null, 403);
+
+        $run = app(ReviewSearchAsks::class)->handle($this->shop, null, RunTrigger::Manual);
+
+        $run->status->value === 'succeeded'
+            ? Notification::make()->success()->title(__('assistant::ui.asks.reviewed'))->body($run->summary())->send()
+            : Notification::make()->danger()->title(__('assistant::ui.asks.review_failed'))->body($run->summary())->send();
+    }
+
     public function questions(): ?array
     {
         if ($this->shop === null) {
