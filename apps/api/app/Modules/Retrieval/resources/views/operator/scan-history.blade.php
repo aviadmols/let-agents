@@ -7,6 +7,7 @@
     @php($runs = $this->runs())
 
     <div @if ($runs->contains(fn ($run) => $run->status->value === 'running')) wire:poll.10s @endif style="display:grid;gap:16px">
+        @if ($this->operatorView())
         <x-filament::section :heading="__('retrieval::ui.scans.runs')" :description="__('retrieval::ui.scans.runs_about')">
             @if ($runs->isEmpty())
                 <p style="{{ $small }}">{{ __('retrieval::ui.scans.no_runs') }}</p>
@@ -44,6 +45,7 @@
                 </div>
             @endif
         </x-filament::section>
+        @endif
 
         <x-filament::section :heading="__('retrieval::ui.scans.pictures')" :description="__('retrieval::ui.scans.pictures_about', ['scanned' => number_format($counts['scanned']), 'total' => number_format($counts['total']), 'pending' => number_format($counts['pending']), 'failed' => number_format(array_sum($counts['failed']))])">
             @php($hosts = $this->hosts())
@@ -67,11 +69,13 @@
                 @foreach (\App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::STATES as $key)
                     <x-filament::button size="sm" :color="$state === $key ? 'primary' : 'gray'" wire:click="$set('state', '{{ $key }}')">{{ __('retrieval::ui.scans.filter.'.$key) }}</x-filament::button>
                 @endforeach
+                @if ($this->operatorView())
                 <span style="display:inline-flex;gap:4px;margin-inline-start:8px">
                     @foreach (['table', 'gallery'] as $mode)
                         <x-filament::button size="sm" :color="$display === $mode ? 'primary' : 'gray'" :icon="$mode === 'table' ? 'heroicon-o-list-bullet' : 'heroicon-o-squares-2x2'" wire:click="$set('display', '{{ $mode }}')" data-layout="{{ $mode }}">{{ __('retrieval::ui.scans.layout.'.$mode) }}</x-filament::button>
                     @endforeach
                 </span>
+                @endif
                 <input type="search" wire:model.live.debounce.400ms="search" placeholder="{{ __('retrieval::ui.scans.search') }}" style="flex:1;min-width:180px;padding:6px 12px;border:1px solid rgba(127,127,127,.35);border-radius:10px;background:transparent;color:inherit;font:inherit">
             </div>
 
@@ -86,7 +90,7 @@
                             <strong>{{ $look['image']->title }}</strong>
                             <button type="button" wire:click="toggleInspect('{{ $look['image']->id }}')" style="all:unset;cursor:pointer;margin-inline-start:auto;font-size:12px;text-decoration:underline">{{ __('retrieval::ui.scans.inspect.close') }}</button>
                         </div>
-                        @include('retrieval::operator.partials.inspection', ['look' => $look])
+                        @include('retrieval::operator.partials.inspection', ['look' => $look, 'operator' => $this->operatorView()])
                     </div>
                 @endif
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px" data-gallery>
@@ -97,7 +101,10 @@
                             style="all:unset;cursor:{{ $is === 'scanned' ? 'pointer' : 'default' }};display:grid;gap:6px;padding:8px;border-radius:12px;border:1px solid {{ $inspect === $image->id ? 'rgb(80,140,255)' : 'rgba(127,127,127,.2)' }}">
                             <img src="{{ $image->image_url }}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:rgba(127,127,127,.12)">
                             <span style="font-size:12px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">{{ $image->title }}</span>
-                            @if ($mini !== [])
+                            @if ($image->caption_words)
+                                <span style="font-size:11px;opacity:.75;line-height:1.3" data-seen>{{ implode(' · ', array_slice((array) $image->caption_words, 0, 4)) }}</span>
+                            @endif
+                            @if ($mini !== [] && $this->operatorView())
                                 <span dir="ltr" style="display:flex;gap:1px;height:12px" title="{{ __('retrieval::ui.scans.inspect.strip') }}">
                                     @foreach ($mini as $cellValue)
                                         <span style="flex:1;background:{{ $cellValue >= 0 ? 'rgba(52,120,235,'.abs($cellValue).')' : 'rgba(235,104,52,'.abs($cellValue).')' }}"></span>
@@ -143,7 +150,7 @@
                                 @if ($inspect === $image->id && ($look = $this->inspection()))
                                     <tr>
                                         <td colspan="4" style="{{ $cell }};background:rgba(127,127,127,.06)">
-                                            @include('retrieval::operator.partials.inspection', ['look' => $look])
+                                            @include('retrieval::operator.partials.inspection', ['look' => $look, 'operator' => $this->operatorView()])
                                         </td>
                                     </tr>
                                 @endif

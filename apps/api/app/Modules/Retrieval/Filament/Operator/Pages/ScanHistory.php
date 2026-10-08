@@ -5,12 +5,14 @@ namespace App\Modules\Retrieval\Filament\Operator\Pages;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
 use App\Modules\Retrieval\Actions\BuildImageIndex;
 use App\Modules\Retrieval\Actions\BuildIndex;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\VectorSearch;
 use App\Modules\Runs\Models\Run;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -24,7 +26,7 @@ use UnitEnum;
  * One shop's scans, in order: every catalogue sync, text index and picture scan with what it
  * did, and below them every picture of the shop, scanned, waiting or unreadable and why.
  */
-final class ScanHistory extends Page
+class ScanHistory extends Page
 {
     use NeedsShopContext;
     use WithPagination;
@@ -66,23 +68,40 @@ final class ScanHistory extends Page
     #[Url]
     public string $display = 'table';
 
+    /** The shop, in the shop's own panel (set from the address there). */
+    public ?string $shop = null;
+
     /** The picture whose vector is open for inspection. */
     #[Url]
     public ?string $inspect = null;
 
     public static function getNavigationLabel(): string
     {
-        return __('retrieval::ui.scans.title');
+        return __('retrieval::ui.scans.'.(static::forOperator() ? 'title' : 'shop_title'));
     }
 
     public function getTitle(): string
     {
-        return __('retrieval::ui.scans.title');
+        return static::getNavigationLabel();
     }
 
     public function getSubheading(): ?string
     {
-        return __('retrieval::ui.scans.subheading');
+        return __('retrieval::ui.scans.'.(static::forOperator() ? 'subheading' : 'shop_subheading'));
+    }
+
+    /**
+     * The operator sees runs, vectors and models; the shop sees its pictures and what was seen in
+     * them, nothing about how.
+     */
+    public function operatorView(): bool
+    {
+        return static::forOperator();
+    }
+
+    protected static function forOperator(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === User::OPERATOR_PANEL;
     }
 
     public function updatedState(): void
@@ -141,7 +160,7 @@ final class ScanHistory extends Page
 
         return $query->orderByRaw('embedded_at is null')->orderByDesc('embedded_at')->orderBy('title')
             ->paginate($this->display === 'gallery' ? self::PER_GALLERY : self::PER_PAGE, array_merge(
-                ['id', 'product_id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at'],
+                ['id', 'product_id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at', 'caption', 'caption_words'],
                 // The gallery draws each picture's vector, so it reads them; the table does not.
                 $this->display === 'gallery' ? ['embedding'] : [],
             ));
@@ -173,6 +192,8 @@ final class ScanHistory extends Page
 
         return [
             'image' => $image,
+            'caption' => $image->caption,
+            'words' => (array) $image->caption_words,
             'model' => (string) $image->embedding_model,
             'dimensions' => count($vector),
             'norm' => round(sqrt(array_sum(array_map(fn (float $v): float => $v * $v, $vector))), 4),

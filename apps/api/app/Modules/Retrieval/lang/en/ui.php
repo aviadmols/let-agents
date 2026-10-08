@@ -69,10 +69,13 @@ return [
             'head' => 'First values',
             'nearest' => 'The nearest pictures in the shop by vector. If they look alike, the scan works well.',
             'none' => 'No other scanned pictures to compare.',
+            'seen' => 'What was seen in the picture',
         ],
         'layout' => [
             'table' => 'Table',
             'gallery' => 'Gallery',
         ],
+        'shop_title' => 'Scanned pictures',
+        'shop_subheading' => 'Every product picture photo search knows, and what was seen in each. Click a picture to see the products that look most like it.',
     ],
 ];

@@ -1,6 +1,20 @@
 {{-- One picture's vector, readable, and the shop's pictures nearest to it. --}}
 @php($small = 'font-size:12px;opacity:.7')
 <div style="display:grid;gap:12px;font-size:13px">
+    @if ($look['caption'] || $look['words'])
+        <div data-caption>
+            <div style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.seen') }}</div>
+            <div>{{ $look['caption'] }}</div>
+            @if ($look['words'])
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+                    @foreach ($look['words'] as $word)
+                        <span style="padding:2px 10px;border-radius:999px;background:rgba(127,127,127,.12);font-size:12px">{{ $word }}</span>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    @endif
+    @if ($operator ?? true)
     <div style="display:flex;flex-wrap:wrap;gap:16px">
         <span>{{ __('retrieval::ui.scans.inspect.model') }}: <code dir="ltr">{{ $look['model'] }}</code></span>
         <span>{{ __('retrieval::ui.scans.inspect.dimensions') }}: <strong>{{ $look['dimensions'] }}</strong></span>
@@ -19,6 +33,7 @@
         <div style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.head') }}</div>
         <code dir="ltr" style="font-size:12px;word-break:break-all">[{{ implode(', ', $look['head']) }}, …]</code>
     </div>
+    @endif
     <div>
         <div style="{{ $small }}">{{ __('retrieval::ui.scans.inspect.nearest') }}</div>
         @if ($look['nearest'] === [])

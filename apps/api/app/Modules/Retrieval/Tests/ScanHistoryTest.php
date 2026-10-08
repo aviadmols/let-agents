@@ -33,7 +33,7 @@ final class ScanHistoryTest extends TestCase
                 'image_url' => "https://shop.test/{$id}.jpg", 'url_hash' => hash('sha256', $id),
             ], $extra));
 
-            $table = $picture($shop->id, '1', 'שולחן נגרים', ['embedding_model' => $model, 'embedded_at' => now(), 'dimensions' => 3, 'embedding' => '[0.9,0.1,0.2]']);
+            $table = $picture($shop->id, '1', 'שולחן נגרים', ['embedding_model' => $model, 'embedded_at' => now(), 'dimensions' => 3, 'embedding' => '[0.9,0.1,0.2]', 'caption' => 'שולחן עבודה מעץ מלא', 'caption_words' => ['שולחן נגרים', 'עץ מלא']]);
             $picture($shop->id, '4', 'שולחן עבודה', ['embedding_model' => $model, 'embedded_at' => now(), 'dimensions' => 3, 'embedding' => '[0.8,0.2,0.2]']);
             $picture($shop->id, '2', 'מברגה נטענת', []);
             $picture($shop->id, '3', 'בורג עדש', ['error' => 'unreachable']);
@@ -75,5 +75,18 @@ final class ScanHistoryTest extends TestCase
             ->assertSee('data-card="1"', false)
             ->assertSee('data-nearest="4"', false)
             ->assertDontSee('data-card="3"', false);
+
+        // The shop sees its pictures and what was seen in them, nothing about models or runs.
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        $this->actingAs($merchant)->get("/merchant/{$shop->slug}/retrieval/scans?inspect=".$image->id)
+            ->assertOk()
+            ->assertSee(__('retrieval::ui.scans.shop_title'))
+            ->assertSee('שולחן עבודה מעץ מלא')
+            ->assertSee('עץ מלא')
+            ->assertSee('data-nearest="4"', false)
+            ->assertDontSee(__('retrieval::ui.scans.runs'))
+            ->assertDontSee($model)
+            ->assertDontSee('data-vector-strip', false);
     }
 }
