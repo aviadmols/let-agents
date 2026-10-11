@@ -46,6 +46,12 @@ final class ReadPhotoTags
 
     public const SECOND_VERSION = 1;
 
+    /**
+     * How a reading is checked after it comes (what box is sensible, how many words): the cache keeps
+     * the reading after these rules, so a change to them reads the photo afresh.
+     */
+    private const READ_RULES = 2;
+
     private const PROMPT = __DIR__.'/../Prompts/photo_tags.v'.self::PROMPT_VERSION.'.md';
 
     private const SECOND_PROMPT = __DIR__.'/../Prompts/photo_second_look.v'.self::SECOND_VERSION.'.md';
@@ -104,7 +110,7 @@ final class ReadPhotoTags
 
         // The shop's latest corrections go to the reader as notes, and are part of what is remembered.
         $notes = $this->notes();
-        $first = $this->remembered('look', $shopId, $hash, [self::PROMPT_VERSION, $reader['model'], $notes],
+        $first = $this->remembered('look', $shopId, $hash, [self::PROMPT_VERSION, self::READ_RULES, $reader['model'], $notes],
             fn (): ?array => $this->firstLook($shopId, $reader, $mime, $bytes, $notes));
 
         if ($first === null) {
