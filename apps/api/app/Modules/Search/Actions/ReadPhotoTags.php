@@ -42,7 +42,7 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 5;
+    public const PROMPT_VERSION = 6;
 
     public const SECOND_VERSION = 1;
 
@@ -54,7 +54,7 @@ final class ReadPhotoTags
 
     private const MAX_CANDIDATES = 15;
 
-    private const MAX_WORD = 40;
+    private const MAX_WORD = 60;
 
     /** A photo of about 1000px is about this many input tokens, for the spend estimate. */
     private const PHOTO_TOKENS = 1600;
