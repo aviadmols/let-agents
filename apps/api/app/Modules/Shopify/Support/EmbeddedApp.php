@@ -40,12 +40,12 @@ final class EmbeddedApp
             return '';
         }
 
-        $install = ShopifyInstall::query()->where('shop_id', $tenant->getKey())->first(['id', 'client_id']);
+        $install = ShopifyInstall::query()->where('shop_id', $tenant->getKey())->first(['id', 'client_id', 'shop_domain']);
 
         if ($install === null) {
             return '';
         }
 
-        return view('shopify::embed', ['key' => ShopifyApps::key($install->client_id)])->render();
+        return view('shopify::embed', ['key' => ShopifyApps::key($install->client_id), 'shop' => (string) $install->shop_domain])->render();
     }
 }
