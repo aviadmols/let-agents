@@ -13,6 +13,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Models\RetrievalGalleryImage;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\ModelChoice;
+use App\Modules\Retrieval\Support\PictureTrim;
 use App\Modules\Retrieval\Support\VectorSearch;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -107,7 +108,7 @@ final class BuildImageIndex
             $row = RetrievalImage::query()->firstOrNew(['product_id' => $product->id], ['shop_id' => $shopId]);
             $row->fill(['external_id' => $product->external_id, 'title' => mb_substr($product->title, 0, 500)]);
 
-            if ($row->exists && $row->url_hash === $hash && $row->embedding_model === $choice->model && $row->embedding !== null) {
+            if ($row->exists && $row->url_hash === $hash && $row->embedding_model === $choice->model && $row->embedding !== null && (int) $row->prep === PictureTrim::VERSION) {
                 $row->isDirty() && $row->save();
                 $stats['kept']++;
 
@@ -198,6 +199,7 @@ final class BuildImageIndex
             foreach ($rows as $i => $row) {
                 RetrievalImage::query()->whereKey($row->id)->update([
                     'embedding' => VectorSearch::column($embeddings->vectors[$i]),
+                    'prep' => PictureTrim::VERSION,
                     'embedding_model' => $choice->model,
                     'dimensions' => count($embeddings->vectors[$i]),
                     'error' => null,
@@ -274,7 +276,7 @@ final class BuildImageIndex
                 $row->fill(['external_id' => $product->external_id, 'title' => mb_substr($product->title, 0, 500)]);
                 $same = $row->exists && $row->url_hash === $hash;
 
-                if ($same && ($row->error !== null || ($row->embedding_model === $choice->model && $row->embedding !== null))) {
+                if ($same && ($row->error !== null || ($row->embedding_model === $choice->model && $row->embedding !== null && (int) $row->prep === PictureTrim::VERSION))) {
                     $row->isDirty() && $row->save();
 
                     continue;
@@ -329,6 +331,7 @@ final class BuildImageIndex
             foreach ($rows as $i => $row) {
                 RetrievalGalleryImage::query()->whereKey($row->id)->update([
                     'embedding' => VectorSearch::column($embeddings->vectors[$i]),
+                    'prep' => PictureTrim::VERSION,
                     'embedding_model' => $choice->model,
                     'dimensions' => count($embeddings->vectors[$i]),
                     'error' => null,
@@ -398,8 +401,21 @@ final class BuildImageIndex
             ! in_array($mime, self::MIMES, true) => $this->failed($row, 'not_image'),
             strlen($body) > $maxBytes => $this->failed($row, 'too_big'),
             $body === '' => $this->failed($row, 'not_image'),
-            default => ['mime' => $mime, 'data' => $body],
+            default => self::prepared($mime, $body),
         };
+    }
+
+    /**
+     * The picture as it is compared: without the plain background around the product, when there is
+     * one to trim; as it came otherwise.
+     *
+     * @return array{mime: string, data: string}
+     */
+    private static function prepared(string $mime, string $body): array
+    {
+        $trimmed = PictureTrim::trim($body);
+
+        return $trimmed === null ? ['mime' => $mime, 'data' => $body] : ['mime' => 'image/jpeg', 'data' => $trimmed];
     }
 
     private function failed(RetrievalImage|RetrievalGalleryImage $row, string $reason): null

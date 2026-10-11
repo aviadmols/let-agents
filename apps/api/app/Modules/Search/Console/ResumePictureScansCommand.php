@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Console;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Models\RetrievalImage;
@@ -43,11 +44,10 @@ final class ResumePictureScansCommand extends Command
             $captions = Features::enabled('retrieval.image_captions', $shop->id);
             $left = $tenant->run($shop->id, function () use ($captions): int {
                 $pictures = CatalogProduct::query()->active()->whereNotNull('image_url')->count();
-                // Done: unreadable, or scanned and (when descriptions are on) described.
-                $done = RetrievalImage::query()->where(fn ($q) => $q->whereNotNull('error')
-                    ->orWhere(fn ($q) => $q->whereNotNull('embedded_at')->when($captions, fn ($q) => $q->whereNotNull('captioned_at'))))->count();
+                // Not yet a row at all, or a row waiting under the current preparation and description.
+                $rows = RetrievalImage::query()->count();
 
-                return max(0, $pictures - $done);
+                return max(0, $pictures - $rows) + RetrievalImage::leftToDo($captions, trim((string) Settings::get('retrieval.caption_model')));
             });
 
             $running = Run::query()->where('shop_id', $shop->id)->where('agent', 'retrieval.image_indexer')

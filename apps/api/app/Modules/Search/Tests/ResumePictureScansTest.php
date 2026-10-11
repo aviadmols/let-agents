@@ -27,6 +27,8 @@ final class ResumePictureScansTest extends TestCase
         $off = Shop::factory()->create();
         foreach ([$waiting, $done, $off] as $shop) {
             Features::override('retrieval.image_index', $shop !== $off, $shop->id);
+            // Descriptions are not what this test is about.
+            Features::override('retrieval.image_captions', false, $shop->id);
         }
 
         app(TenantContext::class)->runUnscoped(function () use ($waiting, $done, $off): void {
@@ -34,7 +36,7 @@ final class ResumePictureScansTest extends TestCase
                 for ($i = 1; $i <= $products; $i++) {
                     $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $i, 'type' => 'simple', 'status' => 'publish', 'title' => 'p'.$i, 'image_url' => "https://s.test/{$i}.jpg", 'hash' => 'h'.$i, 'payload' => []]);
                     if ($i <= $scanned) {
-                        RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => (string) $i, 'title' => 'p'.$i, 'image_url' => "https://s.test/{$i}.jpg", 'url_hash' => 'u'.$i, 'embedding_model' => 'gemini-embedding-2', 'embedded_at' => now(), 'captioned_at' => now()]);
+                        RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => (string) $i, 'title' => 'p'.$i, 'image_url' => "https://s.test/{$i}.jpg", 'url_hash' => 'u'.$i, 'embedding_model' => 'gemini-embedding-2', 'embedded_at' => now(), 'prep' => RetrievalImage::PREP_CURRENT, 'captioned_at' => now()]);
                     }
                 }
             }
