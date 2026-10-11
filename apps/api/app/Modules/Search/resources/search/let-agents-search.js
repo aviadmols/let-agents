@@ -903,7 +903,7 @@
       'border-radius:12px;background:transparent;color:inherit;font:inherit;font-size:14px;cursor:pointer;text-align:start}',
       '.ask[aria-selected="true"],.ask:hover{background:var(--rs-soft)}',
       '.ask b{color:var(--rs-accent-text);white-space:nowrap}',
-      '.btn.wa{background:#1f9d55;border-color:#1f9d55;color:#fff;display:inline-block;justify-self:start}',
+      '.la-btn.la-wa{background:#1f9d55;border-color:#1f9d55;color:#fff;display:inline-block;justify-self:start}',
       '.section.answer-box{display:grid;gap:10px}',
       '.section.answer-box .answer{margin:0}',
       '.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;justify-content:center;align-items:flex-start;padding:min(8vh,64px) 16px 16px;z-index:2147483000}',
@@ -919,10 +919,10 @@
       '.card a{color:inherit;text-decoration:none}',
       '.card img,.card .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;background:var(--rs-soft)}',
       '.card .title{line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
-      '.btn{font:inherit;font-size:13px;font-weight:600;padding:8px 12px;border-radius:var(--rs-radius);border:1px solid var(--rs-accent);',
+      '.la-btn{font:inherit;font-size:13px;font-weight:400;padding:8px 12px;border-radius:var(--rs-radius);border:1px solid var(--rs-accent);',
       'background:var(--rs-accent);color:var(--rs-accent-fg);cursor:pointer;text-align:center;text-decoration:none}',
-      '.btn.ghost{background:transparent;color:var(--rs-accent-text)}',
-      '.btn[disabled]{opacity:.6;cursor:default}',
+      '.la-btn.la-ghost{background:transparent;color:var(--rs-accent-text)}',
+      '.la-btn[disabled]{opacity:.6;cursor:default}',
       '.list{display:grid;gap:4px}',
       '.foot{padding:12px 20px 20px;display:flex;gap:12px;flex-wrap:wrap}',
       '.cam{display:inline-grid;place-items:center;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--rs-fg);cursor:pointer;padding:0}',
@@ -931,7 +931,7 @@
       '.zone{display:grid;gap:8px;justify-items:center;text-align:center;margin:12px;padding:22px 14px;border:1.5px dashed var(--rs-line);border-radius:12px;cursor:pointer}',
       '.zone.over,.zone:hover{border-color:var(--rs-accent);background:var(--rs-soft)}',
       '.zone svg{width:34px;height:34px;opacity:.6}',
-      '.zone .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}',
+      '.zone .la-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}',
       '.yours{display:flex;gap:14px;align-items:center;padding:16px 20px 0}',
       '.yours img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--rs-line)}',
       '.card{position:relative}',
@@ -951,7 +951,7 @@
       '@media (hover:none) and (pointer:coarse){.askbox input{font-size:16px}}',
       '.askbox button{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:50%;background:var(--rs-fg);color:var(--rs-bg);display:grid;place-items:center}',
       '.askbox button svg{width:18px;height:18px}',
-      '.card .sim{margin-top:2px}',
+      '.card .la-sim{margin-top:2px}',
       '.more{display:block;margin:16px auto 0;font:inherit;font-size:13px;padding:8px 40px;border:1px solid var(--rs-fg);border-radius:var(--rs-radius);background:transparent;color:var(--rs-fg);cursor:pointer}',
       '.card[hidden]{display:none}',
       '.backlink{font:inherit;font-size:13px;border:0;background:transparent;color:var(--rs-accent-text);cursor:pointer;padding:0}',
@@ -2414,7 +2414,7 @@
 
       if (ctx.searchUrl) {
         var foot = el('div', 'foot');
-        var site = el('a', 'btn ghost', label('on_site'));
+        var site = el('a', 'la-btn la-ghost', label('on_site'));
         site.href = siteSearchUrl(raw);
         foot.appendChild(site);
         sheet.appendChild(foot);
@@ -2460,14 +2460,14 @@
       node.appendChild(el('div', 'price'));
       var action;
       if (item.buy && CAN_BUY) {
-        action = el('button', 'btn', label('add'));
+        action = el('button', 'la-btn', label('add'));
         action.type = 'button';
         action.addEventListener('click', function () {
           countClick(raw, { id: item.id, title: item.title });
           addToCart(item.external_id, action);
         });
       } else {
-        action = el('a', 'btn ghost', label('view'));
+        action = el('a', 'la-btn la-ghost', label('view'));
         if (href) {
           action.href = href;
         }
@@ -2476,7 +2476,7 @@
       action.setAttribute('data-action', '1');
       node.appendChild(action);
       if (state.config && state.config.similar) {
-        var sim = el('button', 'btn ghost sim', label('similar'));
+        var sim = el('button', 'la-btn la-ghost la-sim', label('similar'));
         sim.type = 'button';
         sim.addEventListener('click', function () { showSimilar(item, raw); });
         node.appendChild(sim);
@@ -2580,10 +2580,10 @@
       zone.innerHTML = CAMERA;
       zone.appendChild(el('strong', null, label('photo_search')));
       zone.appendChild(el('span', null, label(mobile ? 'photo_drop_mobile' : 'photo_drop')));
-      var buttons = el('div', 'btns');
-      var choose = el('button', 'btn', label('photo_choose'));
+      var buttons = el('div', 'la-btns');
+      var choose = el('button', 'la-btn', label('photo_choose'));
       choose.type = 'button';
-      var take = el('button', 'btn ghost', label('photo_take'));
+      var take = el('button', 'la-btn la-ghost', label('photo_take'));
       take.type = 'button';
       buttons.appendChild(choose);
       buttons.appendChild(take);
@@ -2858,7 +2858,7 @@
         sheet.appendChild(section);
         draw(null);
         var foot = el('div', 'foot');
-        var again = el('button', 'btn ghost', label('photo_again'));
+        var again = el('button', 'la-btn la-ghost', label('photo_again'));
         again.type = 'button';
         again.addEventListener('click', function () { fileInput(false, true).click(); });
         foot.appendChild(again);
