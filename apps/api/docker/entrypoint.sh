@@ -50,7 +50,8 @@ case "$role" in
     # A lost password, set again at boot from the same variables: BOOTSTRAP_OPERATOR_RESET=true
     # makes the password in BOOTSTRAP_OPERATOR_PASSWORD the user's. Turn it off after one boot.
     if [ "${BOOTSTRAP_OPERATOR_RESET:-false}" = "true" ] && [ -n "${BOOTSTRAP_OPERATOR_EMAIL:-}" ]; then
-      php artisan admin:password "$BOOTSTRAP_OPERATOR_EMAIL" --password-env=BOOTSTRAP_OPERATOR_PASSWORD --no-interaction \n        || echo "Password reset failed; see the message above." >&2
+      php artisan admin:password "$BOOTSTRAP_OPERATOR_EMAIL" --password-env=BOOTSTRAP_OPERATOR_PASSWORD --no-interaction \
+        || echo "Password reset failed; see the message above." >&2
     fi
 
     # Report wiring problems in the first lines of the log without blocking the boot.
