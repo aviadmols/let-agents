@@ -183,6 +183,40 @@
                 "step": "review",
                 "shop_argument": "target"
             }
+        },
+        {
+            "name": "post_writer",
+            "action": "draft_post",
+            "when": "manual",
+            "features": [
+                "daily_review"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "analyst_provider",
+                    "model": "analyst_model",
+                    "prices": [
+                        "analyst_input_usd_per_million",
+                        "analyst_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "post"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "auditor_provider",
+                    "model": "auditor_model",
+                    "prices": [
+                        "auditor_input_usd_per_million",
+                        "auditor_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "post_check"
+                    ]
+                }
+            ]
         }
     ]
 }

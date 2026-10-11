@@ -5,6 +5,8 @@ namespace App\Modules\Improvement\Filament\Operator\Pages;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Improvement\Actions\DecideProposal;
 use App\Modules\Improvement\Actions\RunDailyReview;
+use App\Modules\Improvement\Jobs\DraftPostJob;
+use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -14,13 +16,16 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
  * What the daily review proposes for the site, waiting for the team: words shoppers use that the
  * store calls otherwise, questions worth answering on the site, and things shoppers look for that
- * the store does not have. Each shows the searches and questions behind it.
+ * the store does not have. Each shows the searches and questions behind it. A question comes with
+ * a drafted answer the team edits and publishes; a missing topic gets a post written on request,
+ * which the team edits and publishes as a guide of the store's own.
  */
 class SiteSuggestions extends Page
 {
@@ -36,6 +41,12 @@ class SiteSuggestions extends Page
 
     #[Url]
     public ?string $shop = null;
+
+    /** @var array<string, string> the answer or the post body as the team leaves it, by proposal */
+    public array $drafts = [];
+
+    /** @var array<string, string> the post's title as the team leaves it, by proposal */
+    public array $titles = [];
 
     public static function getNavigationLabel(): string
     {
@@ -76,11 +87,48 @@ class SiteSuggestions extends Page
             return null;
         }
 
-        return app(TenantContext::class)->run($this->shop, fn (): array => [
-            'pending' => ImprovementProposal::query()->where('status', ImprovementProposal::PENDING)->latest()->orderBy('id')->get(),
-            'decided' => ImprovementProposal::query()->whereIn('status', [ImprovementProposal::APPLIED, ImprovementProposal::APPROVED, ImprovementProposal::REJECTED])->latest('updated_at')->limit(30)->get(),
+        $s = app(TenantContext::class)->run($this->shop, fn (): array => [
+            'pending' => ImprovementProposal::query()->with('post')->where('status', ImprovementProposal::PENDING)->latest()->orderBy('id')->get(),
+            'decided' => ImprovementProposal::query()->with('post')->whereIn('status', [ImprovementProposal::APPLIED, ImprovementProposal::APPROVED, ImprovementProposal::REJECTED])->latest('updated_at')->limit(30)->get(),
             'latest' => ImprovementReview::query()->latest('day')->first(),
         ]);
+
+        // The drafts as written, until the team edits them.
+        foreach ($s['pending'] as $p) {
+            if ($p->kind === ImprovementProposal::FAQ) {
+                $this->drafts[$p->id] ??= (string) ($p->detail['answer'] ?? '');
+            } elseif ($p->post !== null) {
+                $this->drafts[$p->id] ??= (string) $p->post->body;
+                $this->titles[$p->id] ??= (string) $p->post->title;
+            }
+        }
+
+        return $s;
+    }
+
+    /** Whether a post is being written for this proposal right now. */
+    public function drafting(string $id): bool
+    {
+        return Cache::has(DraftPostJob::WRITING.$id);
+    }
+
+    /** Asks for a post on a missing topic, written in the background; the screen shows it when it is there. */
+    public function draftPost(string $id): void
+    {
+        if ($this->shop === null || $this->drafting($id)) {
+            return;
+        }
+
+        $proposal = app(TenantContext::class)->run($this->shop, fn (): ?ImprovementProposal => ImprovementProposal::query()->whereKey($id)->where('kind', ImprovementProposal::CONTENT_GAP)->first());
+
+        if ($proposal === null) {
+            return;
+        }
+
+        unset($this->drafts[$id], $this->titles[$id]);
+        Cache::put(DraftPostJob::WRITING.$id, now()->timestamp, now()->addSeconds(DraftPostJob::WRITING_SECONDS));
+        DraftPostJob::dispatch($this->shop, $id);
+        Notification::make()->success()->title(__('improvement::ui.post.writing'))->send();
     }
 
     public function approve(string $id): void
@@ -113,16 +161,35 @@ class SiteSuggestions extends Page
             return;
         }
 
-        app(TenantContext::class)->run($this->shop, function () use ($id, $approve): void {
-            $proposal = ImprovementProposal::query()->find($id);
+        $problem = app(TenantContext::class)->run($this->shop, function () use ($id, $approve): ?string {
+            $proposal = ImprovementProposal::query()->with('post')->find($id);
 
-            if ($proposal !== null) {
-                $approve
-                    ? app(DecideProposal::class)->approve($proposal, auth()->id())
-                    : app(DecideProposal::class)->reject($proposal, auth()->id());
+            if ($proposal === null) {
+                return null;
             }
+
+            if (! $approve) {
+                app(DecideProposal::class)->reject($proposal, auth()->id());
+
+                return null;
+            }
+
+            return app(DecideProposal::class)->approve($proposal, auth()->id(), $this->drafts[$id] ?? null, $this->titles[$id] ?? null);
         });
 
+        if ($problem !== null) {
+            Notification::make()->warning()->title(__($problem))->send();
+
+            return;
+        }
+
+        unset($this->drafts[$id], $this->titles[$id]);
         Notification::make()->success()->title(__($approve ? 'improvement::ui.approved' : 'improvement::ui.rejected'))->send();
+    }
+
+    /** Where a published post is read. */
+    public function guideUrl(ImprovementPost $post): string
+    {
+        return route('improvement.guide', ['shop' => Shop::query()->whereKey($post->shop_id)->value('slug'), 'post' => $post->id]);
     }
 }

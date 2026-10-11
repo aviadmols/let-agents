@@ -36,6 +36,14 @@ class CatalogContent extends Model
 
     protected $table = 'catalog_content';
 
+    /** The content types a store feed gives: its posts (guides) and its pages. */
+    public const POST = 'post';
+
+    public const PAGE = 'page';
+
+    /** External ids of content the platform wrote for the store itself; a sync never removes them. */
+    public const OWN_PREFIX = 'la:';
+
     protected $guarded = ['id'];
 
     protected function casts(): array

@@ -5,6 +5,7 @@ namespace App\Modules\Improvement\Models;
 use App\Core\Tenancy\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -53,5 +54,11 @@ class ImprovementProposal extends Model
     protected function casts(): array
     {
         return ['detail' => 'array', 'evidence' => 'array', 'decided_at' => 'datetime'];
+    }
+
+    /** The post drafted for a missing topic, when one was. */
+    public function post(): HasOne
+    {
+        return $this->hasOne(ImprovementPost::class, 'proposal_id');
     }
 }

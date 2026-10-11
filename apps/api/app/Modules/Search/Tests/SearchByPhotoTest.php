@@ -513,4 +513,20 @@ final class SearchByPhotoTest extends TestCase
 
         return $taps;
     }
+
+    public function test_the_shop_manager_sees_the_photo_searches_of_their_own_site_without_the_mechanics(): void
+    {
+        $this->shopWithTapsHandlesAndIron();
+        $this->reader(['object' => 'ידית', 'also' => [], 'around' => [], 'sure' => 0.3, 'sellable' => true], ['main' => null, 'object' => 'ידית', 'sure' => 0.9, 'sellable' => true]);
+        $this->upload()->assertOk();
+
+        $merchant = User::factory()->create();
+        $merchant->attachShop($this->shop);
+        $this->actingAs($merchant)->get("/merchant/{$this->shop->slug}/search/photos")
+            ->assertOk()
+            ->assertSee('ידית')
+            ->assertSee(__('search::ui.photo_log.right'))
+            ->assertDontSee(__('search::ui.photo_log.check_now'))
+            ->assertDontSee(__('search::ui.photo_log.doubt.unsure'), 'why a second look was taken is the operator\x27s');
+    }
 }

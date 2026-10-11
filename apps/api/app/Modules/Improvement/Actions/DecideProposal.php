@@ -2,42 +2,120 @@
 
 namespace App\Modules\Improvement\Actions;
 
+use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Search\Models\SearchSynonym;
 
 /**
  * The team's decision on a proposal. Approving a synonym puts it into the search (from the next
- * update); approving a question or a missing topic marks it as work the team took on. Rejecting
- * keeps it, so the review never proposes it again. Callers are inside the shop's tenant.
+ * update). Approving a question publishes its answer, as the team left it, as an answer of the
+ * site's own: the search offers it and the assistant gives it, with no model in between.
+ * Approving a missing topic publishes the post a model drafted and the team edited, as a guide
+ * of the store's own. Rejecting keeps the proposal, so the review never proposes it again, and
+ * takes back what an earlier approval put out. Callers are inside the shop's tenant.
  */
 final class DecideProposal
 {
-    public function approve(ImprovementProposal $proposal, ?int $userId): void
+    public const TEAM = 'team';
+
+    public function __construct(private readonly PublishPost $posts) {}
+
+    /**
+     * @param  string|null  $text  the answer or the post body as the team left it; the draft when null
+     * @param  string|null  $title  the post's title as the team left it; the draft's when null
+     * @return string|null why it could not be approved (a text key), or null when it was
+     */
+    public function approve(ImprovementProposal $proposal, ?int $userId, ?string $text = null, ?string $title = null): ?string
     {
         if (! in_array($proposal->status, [ImprovementProposal::PENDING, ImprovementProposal::REFUSED], true)) {
-            return;
+            return null;
         }
+
+        $status = ImprovementProposal::APPROVED;
 
         if ($proposal->kind === ImprovementProposal::SYNONYM) {
             SearchSynonym::query()->firstOrCreate(
                 ['term' => (string) $proposal->detail['term'], 'means' => (string) $proposal->detail['means']],
                 ['shop_id' => $proposal->shop_id, 'origin' => 'review'],
             );
+            $status = ImprovementProposal::APPLIED;
+        } elseif ($proposal->kind === ImprovementProposal::FAQ) {
+            $answer = trim((string) ($text ?? $proposal->detail['answer'] ?? ''));
+
+            if (mb_strlen($answer) < 2) {
+                return 'improvement::ui.answer_missing';
+            }
+
+            // "[לבדוק]": a fact the draft left for the team is not an answer yet.
+            if (preg_match('/\[[^\]\n]{1,60}\]/u', $answer) === 1) {
+                return 'improvement::ui.answer_placeholder';
+            }
+
+            $this->publishAnswer($proposal, mb_substr($answer, 0, 1200));
+            $proposal->detail = ['answer' => mb_substr($answer, 0, 1200)] + $proposal->detail;
+            $status = ImprovementProposal::APPLIED;
+        } elseif ($proposal->kind === ImprovementProposal::CONTENT_GAP) {
+            $post = $proposal->post;
+            $body = trim((string) ($text ?? $post?->body ?? ''));
+            $heading = trim((string) ($title ?? $post?->title ?? ''));
+
+            if ($post === null || $body === '' || $heading === '') {
+                return 'improvement::ui.post_missing';
+            }
+
+            $this->posts->publish($post, $heading, $body);
+            $status = ImprovementProposal::APPLIED;
         }
 
-        $proposal->update([
-            'status' => $proposal->kind === ImprovementProposal::SYNONYM ? ImprovementProposal::APPLIED : ImprovementProposal::APPROVED,
-            'decided_by' => $userId,
-            'decided_at' => now(),
-        ]);
+        $proposal->forceFill(['status' => $status, 'decided_by' => $userId, 'decided_at' => now()])->save();
+
+        return null;
     }
 
     public function reject(ImprovementProposal $proposal, ?int $userId): void
     {
-        if ($proposal->status === ImprovementProposal::APPLIED && $proposal->kind === ImprovementProposal::SYNONYM) {
-            SearchSynonym::query()->where('term', $proposal->detail['term'])->where('means', $proposal->detail['means'])->where('origin', 'review')->delete();
+        if ($proposal->status === ImprovementProposal::APPLIED) {
+            if ($proposal->kind === ImprovementProposal::SYNONYM) {
+                SearchSynonym::query()->where('term', $proposal->detail['term'])->where('means', $proposal->detail['means'])->where('origin', 'review')->delete();
+            } elseif ($proposal->kind === ImprovementProposal::FAQ) {
+                AssistantAnswer::query()->whereNull('product_id')->whereNull('content_id')
+                    ->where('question_key', AssistantAnswer::keyFor($this->question($proposal)))->where('source', self::TEAM)
+                    ->update(['status' => AssistantAnswer::HIDDEN, 'updated_at' => now()]);
+            } elseif ($proposal->kind === ImprovementProposal::CONTENT_GAP && $proposal->post instanceof ImprovementPost) {
+                $this->posts->unpublish($proposal->post);
+            }
         }
 
-        $proposal->update(['status' => ImprovementProposal::REJECTED, 'decided_by' => $userId, 'decided_at' => now()]);
+        $proposal->forceFill(['status' => ImprovementProposal::REJECTED, 'decided_by' => $userId, 'decided_at' => now()])->save();
+    }
+
+    /** The answer as one of the site's own: shown to the next shopper who asks, never replaced by a model. */
+    private function publishAnswer(ImprovementProposal $proposal, string $answer): void
+    {
+        $question = $this->question($proposal);
+        $asked = array_sum(array_map(fn (array $e): int => (int) ($e['asked'] ?? 0), $proposal->evidence));
+
+        AssistantAnswer::query()->updateOrCreate(
+            ['shop_id' => $proposal->shop_id, 'product_id' => null, 'content_id' => null, 'question_key' => AssistantAnswer::keyFor($question)],
+            [
+                'question' => $question,
+                'answer' => $answer,
+                'outcome' => AssistantAnswer::ANSWERED,
+                'source' => self::TEAM,
+                'sources' => null,
+                'status' => AssistantAnswer::SHOWN,
+                'prompt_version' => 0,
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'asked_count' => max(1, $asked),
+                'last_asked_at' => now(),
+            ],
+        );
+    }
+
+    private function question(ImprovementProposal $proposal): string
+    {
+        return trim((string) ($proposal->detail['question'] ?? $proposal->title));
     }
 }

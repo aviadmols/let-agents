@@ -57,7 +57,8 @@ final class SearchIndexController
             'askWhatsapp' => Features::enabled('assistant.search_whatsapp', $shopId),
             'whatsappMessage' => trim((string) Settings::get('assistant.search_whatsapp_message', $shopId)) ?: (string) __('search::storefront.wa_message', [], $locale),
             'drawerSide' => (string) Settings::get('search.drawer_side', $shopId),
-            'similar' => Features::enabled('search.similar', $shopId),
+            // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
+            'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';

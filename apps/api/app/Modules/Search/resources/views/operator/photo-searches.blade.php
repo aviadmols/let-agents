@@ -21,17 +21,19 @@
     @if ($s === null)
         <x-filament::section>{{ __('search::ui.no_shop') }}</x-filament::section>
     @else
-        <x-filament::section :heading="__('search::ui.photo_log.measure')" :description="__('search::ui.photo_log.measure_about')">
+        <x-filament::section :heading="__('search::ui.photo_log.measure')" :description="__('search::ui.photo_log.'.($this->operatorView() ? 'measure_about' : 'measure_about_shop'))">
             <div style="display:grid;gap:10px;font-size:14px;line-height:1.6">
                 <div style="display:flex;flex-wrap:wrap;gap:18px">
                     <span>{{ __('search::ui.photo_log.asks', ['count' => $s['asks'], 'days' => 30]) }} <span style="{{ $small }}">({{ __('search::ui.photo_log.found_nothing', ['count' => $s['nothing']]) }})</span></span>
                     <span>{{ __('search::ui.photo_log.marked', ['count' => $s['marked'], 'right' => $s['right']]) }}</span>
-                    @if ($s['checked'] > 0)
+                    @if ($s['checked'] > 0 && $this->operatorView())
                         <span data-checked>{{ __('search::ui.photo_log.checked', ['right' => $s['checked_right'], 'count' => $s['checked'], 'when' => \Illuminate\Support\Carbon::parse($s['checked_at'])->diffForHumans()]) }}</span>
                     @endif
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-                    @if ($s['running'])
+                    @if (! $this->operatorView())
+                        <span style="{{ $small }}">{{ __('search::ui.photo_log.mark_how') }}</span>
+                    @elseif ($s['running'])
                         <span style="{{ $small }}" wire:poll.10s>{{ __('search::ui.photo_log.check_running') }}</span>
                     @elseif ($s['marked'] > 0)
                         <button type="button" wire:click="checkNow" style="{{ $btn }}">{{ __('search::ui.photo_log.check_now') }}</button>
@@ -66,10 +68,10 @@
                                     @if ($ask->sure !== null)
                                         <span style="{{ $small }}">{{ (int) round($ask->sure * 100) }}%</span>
                                     @endif
-                                    @if ($ask->doubt)
+                                    @if ($ask->doubt && $this->operatorView())
                                         <span style="{{ $chip }}" title="{{ __('search::ui.photo_log.doubt_about') }}">{{ __('search::ui.photo_log.doubt.'.$ask->doubt) }}</span>
                                     @endif
-                                    @if ($ask->second)
+                                    @if ($ask->second && $this->operatorView())
                                         <span style="{{ $chip }}">{{ __('search::ui.photo_log.second') }}</span>
                                     @endif
                                 </div>
@@ -96,7 +98,7 @@
                                         @endforeach
                                     </div>
                                 @endif
-                                @if ($ask->checked_at !== null)
+                                @if ($ask->checked_at !== null && $this->operatorView())
                                     <div style="{{ $small }}" data-check>
                                         {{ $ask->checked_right ? '✓' : '✗' }}
                                         {{ __('search::ui.photo_log.check_result', ['main' => $ask->checked_main ?? __('search::ui.photo_log.nothing'), 'when' => $ask->checked_at->diffForHumans()]) }}

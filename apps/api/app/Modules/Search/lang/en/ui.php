@@ -161,6 +161,9 @@ return [
         ],
     ],
     'photo_log' => [
+        'subheading_shop' => 'The photos shoppers searched your site with, what was seen in each and what they got. Mark right or wrong and say what was in the photo: that is how photo search gets better.',
+        'measure_about_shop' => 'How many of the latest searches were right, by your marks.',
+        'mark_how' => 'Mark each search below: right, or wrong and what it was.',
         'title' => 'Photo searches',
         'subheading' => 'The photos shoppers searched with, what was seen in each and what they got. Mark right or wrong: the marked photos are the check set, and every change to photo search is measured against it.',
         'measure' => 'Measure',

@@ -3,10 +3,12 @@
 namespace App\Modules\Search\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
 use App\Modules\Search\Jobs\CheckPhotoSearchesJob;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -19,7 +21,7 @@ use UnitEnum;
  * the team to say right or wrong. The marked photos are the set photo search is measured against:
  * "check now" reads them again with the reader as it is today and counts how many it gets.
  */
-final class PhotoSearches extends Page
+class PhotoSearches extends Page
 {
     private const ROWS = 40;
 
@@ -53,6 +55,12 @@ final class PhotoSearches extends Page
         return __('search::ui.photo_log.title');
     }
 
+    /** The operator sees why a second look was taken and may re-check; the shop sees its searches and marks them. */
+    public function operatorView(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === User::OPERATOR_PANEL;
+    }
+
     public function getTitle(): string
     {
         return __('search::ui.photo_log.title');
@@ -60,7 +68,7 @@ final class PhotoSearches extends Page
 
     public function getSubheading(): ?string
     {
-        return __('search::ui.photo_log.subheading');
+        return __('search::ui.photo_log.'.($this->operatorView() ? 'subheading' : 'subheading_shop'));
     }
 
     public function mount(): void
@@ -142,7 +150,7 @@ final class PhotoSearches extends Page
     /** Reads every marked photo again with the reader as it is now, on the queue. */
     public function checkNow(): void
     {
-        abort_if($this->shop === null, 404);
+        abort_if($this->shop === null || ! $this->operatorView(), 404);
 
         if ((bool) ($this->summary()['running'] ?? false)) {
             Notification::make()->warning()->title(__('search::ui.photo_log.check_wait'))->send();

@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Models;
 
 use App\Core\Tenancy\BelongsToTenant;
+use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -47,6 +48,12 @@ class AssistantAnswer extends Model
     public const SHOWN = 'shown';
 
     public const HIDDEN = 'hidden';
+
+    /** The key a question is saved under, the same however it was typed. */
+    public static function keyFor(string $question): string
+    {
+        return Question::key($question);
+    }
 
     protected $guarded = ['id'];
 

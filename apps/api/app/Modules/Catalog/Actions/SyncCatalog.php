@@ -202,7 +202,8 @@ final class SyncCatalog
             $counts['removed'] = CatalogContent::query()
                 ->whereNull('removed_at')
                 ->get(['id', 'type', 'external_id'])
-                ->reject(fn (CatalogContent $c): bool => isset($seen[$c->type.':'.$c->external_id]))
+                // Content the platform wrote for the store is not the feed's to remove.
+                ->reject(fn (CatalogContent $c): bool => isset($seen[$c->type.':'.$c->external_id]) || str_starts_with((string) $c->external_id, CatalogContent::OWN_PREFIX))
                 ->each(fn (CatalogContent $c) => $c->forceFill(['removed_at' => now()])->save())
                 ->count();
         }
