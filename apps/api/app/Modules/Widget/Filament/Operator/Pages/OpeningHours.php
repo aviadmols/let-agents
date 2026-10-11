@@ -2,6 +2,7 @@
 
 namespace App\Modules\Widget\Filament\Operator\Pages;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Widget\Support\OpeningHours as Week;
@@ -69,7 +70,12 @@ class OpeningHours extends Page implements HasForms
     public function mount(): void
     {
         $shop = $this->shopId();
-        $state = ['timezone' => $shop === null ? 'Asia/Jerusalem' : (string) Settings::get('widget.whatsapp_timezone', $shop)];
+        $state = [
+            'timezone' => $shop === null ? 'Asia/Jerusalem' : (string) Settings::get('widget.whatsapp_timezone', $shop),
+            // The shop's own number only, never one saved for every shop.
+            'number' => $shop === null ? '' : (string) (Settings::overrideFor('widget.whatsapp_number', $shop) ?? ''),
+            'whatsapp' => $shop !== null && Features::enabled('widget.whatsapp', $shop),
+        ];
 
         foreach (Week::DAYS as $day) {
             $value = $shop === null ? '' : (string) Settings::get("widget.hours_{$day}", $shop);
@@ -107,6 +113,16 @@ class OpeningHours extends Page implements HasForms
         return $schema
             ->statePath('data')
             ->components([
+                Section::make(__('widget::ui.hours.number_section'))
+                    ->description(__('widget::ui.hours.number_help'))
+                    ->schema([
+                        Toggle::make('whatsapp')->label(__('widget::features.whatsapp.label'))->inline(false),
+                        TextInput::make('number')
+                            ->label(__('widget::settings.whatsapp_number.label'))
+                            ->tel()
+                            ->maxLength(20)
+                            ->placeholder('972501234567'),
+                    ]),
                 Section::make(__('widget::ui.hours.timezone_section'))->schema([
                     Select::make('timezone')
                         ->label(__('widget::settings.whatsapp_timezone.label'))
@@ -150,6 +166,9 @@ class OpeningHours extends Page implements HasForms
         }
 
         Settings::set('widget.whatsapp_timezone', (string) ($this->data['timezone'] ?? 'Asia/Jerusalem'), $shop);
+        $number = (string) preg_replace('/[^\d+]/', '', (string) ($this->data['number'] ?? ''));
+        $number === '' ? Settings::clear('widget.whatsapp_number', $shop) : Settings::set('widget.whatsapp_number', mb_substr($number, 0, 20), $shop);
+        Features::override('widget.whatsapp', (bool) ($this->data['whatsapp'] ?? false) && $number !== '', $shop);
 
         foreach (Week::DAYS as $day) {
             $value = ($this->data["open_{$day}"] ?? false)

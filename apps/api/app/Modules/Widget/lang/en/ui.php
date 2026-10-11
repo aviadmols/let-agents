@@ -122,7 +122,11 @@ return [
         'questions_description' => 'What shoppers asked here, most asked first. An answer the team writes in "Shopper questions" replaces the automatic one.',
         'no_questions' => 'Nobody has asked about this product yet.',
         'asked_times' => '{1} asked once|[2,*] asked :count times',
-        'answer_sources' => ['store' => 'From the store information', 'general' => 'General knowledge', 'team' => 'The team\'s answer'],
+        'answer_sources' => [
+            'store' => 'From the store information',
+            'general' => 'General knowledge',
+            'team' => 'The team\'s answer',
+        ],
         'no_answer' => 'No answer',
         'answer_hidden' => 'Hidden',
         'absent_heading' => 'Circles not built for this page',
@@ -130,6 +134,8 @@ return [
         'saved' => 'Saved. The widget updates on the next page load.',
     ],
     'hours' => [
+        'number_section' => 'The shop\'s WhatsApp number',
+        'number_help' => 'Where shoppers go when the site has no answer, and the WhatsApp button in the widget. Without a number no WhatsApp button shows. Write it with the country code, for example 972501234567.',
         'title' => 'Answering hours',
         'help' => 'When the store team answers on WhatsApp. A day that is off is a day with no answer.',
         'week' => 'Days of the week',

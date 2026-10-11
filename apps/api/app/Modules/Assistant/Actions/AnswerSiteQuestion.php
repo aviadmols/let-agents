@@ -179,7 +179,13 @@ final class AnswerSiteQuestion
                 continue;
             }
 
-            $words[] = mb_strlen($word) > 4 ? (string) preg_replace('/(ים|ות)$/u', '', $word) : $word;
+            $base = mb_strlen($word) > 4 ? (string) preg_replace('/(ים|ות)$/u', '', $word) : $word;
+            $words[] = $base;
+
+            // "הביטולים" is "ביטול" with the letter in front: ה, ו, ב, ל, מ, ש, כ.
+            if (mb_strlen($base) > 3 && preg_match('/^[הובלמשכ]/u', $base) === 1) {
+                $words[] = mb_substr($base, 1);
+            }
         }
 
         if ($words === []) {
