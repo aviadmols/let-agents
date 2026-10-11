@@ -15,6 +15,9 @@ final class PhotoLook
 
     public const PICTURES_DISAGREE = 'pictures_disagree';
 
+    /** The team marked the reading wrong: the stronger model reads it again with their word. */
+    public const TEAM_WRONG = 'team_wrong';
+
     /**
      * @param  list<array{title: string, kind: string, url?: string, id?: string, main?: bool}>|null  $tags  category tags first, then words; an
      *                                                                                                       empty list when the photo shows nothing the shop sells; null when it could not be read

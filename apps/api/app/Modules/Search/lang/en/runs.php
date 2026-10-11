@@ -19,6 +19,7 @@ return [
         'unplaced' => 'nothing placed in the shop',
         'unsure' => 'low confidence',
         'pictures_disagree' => 'the product pictures say otherwise',
+        'team_wrong' => 'the team marked it wrong',
     ],
     'photo_nothing' => 'nothing the shop sells',
 ];

@@ -22,6 +22,7 @@ use App\Modules\Search\Actions\CheckPhotoSearches;
 use App\Modules\Search\Actions\ReadPhotoTags;
 use App\Modules\Search\Filament\Operator\Pages\PhotoSearches;
 use App\Modules\Search\Models\SearchPhotoAsk;
+use App\Modules\Search\Models\SearchPhotoLesson;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
@@ -410,16 +411,14 @@ final class SearchByPhotoTest extends TestCase
             ->assertSee('ידית')->assertSee('ידיות')
             ->call('markWrong', $ask->id)
             ->assertSet("expected.{$ask->id}", null);
-        $this->assertNull($ask->fresh()->verdict, 'wrong needs a word for what it was');
+        $this->assertSame('wrong', $ask->fresh()->verdict, 'wrong needs no word; the stronger model looks again');
 
         $page->set("expected.{$ask->id}", 'ברז')->call('markWrong', $ask->id);
         $this->assertSame(['wrong', 'ברז'], [$ask->fresh()->verdict, $ask->fresh()->expected]);
 
-        // The reader as it is now still says handle: the check counts it wrong. Then it learns.
-        $this->assertSame(['checked' => 1, 'right' => 0], app(CheckPhotoSearches::class)->handle($this->shop->id));
-        $this->assertFalse($ask->fresh()->checked_right);
-
-        $this->reader(['object' => 'ברז', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        // Marked wrong, the stronger model looked again with the team's word, and the lesson stands:
+        // the reader still says handle, but the same photo is now answered from what was learned.
+        $this->assertSame(['ידית', 'ברז', 'ברז'], $this->inShop(fn () => SearchPhotoLesson::query()->sole()->only(['seen', 'team', 'object'])) ? array_values($this->inShop(fn () => SearchPhotoLesson::query()->sole()->only(['seen', 'team', 'object']))) : []);
         Cache::flush();
         $this->assertSame(['checked' => 1, 'right' => 1], app(CheckPhotoSearches::class)->handle($this->shop->id));
         $this->assertSame(['ברזים', true], [$ask->fresh()->checked_main, $ask->fresh()->checked_right]);
@@ -543,5 +542,22 @@ final class SearchByPhotoTest extends TestCase
         $this->assertTrue($result['groups']['product'][0]['same']);
         $this->assertGreaterThanOrEqual(99, $result['groups']['product'][0]['match']);
         $this->assertSame('61', $result['groups']['product'][1]['external_id'], 'then what the tags chose');
+    }
+
+    public function test_the_shop_manager_marks_a_photo_search_from_their_panel(): void
+    {
+        $this->shopWithTapsHandlesAndIron();
+        $this->reader(['object' => 'ידית', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        $this->upload()->assertOk();
+        $ask = $this->inShop(fn () => SearchPhotoAsk::query()->sole());
+
+        $merchant = User::factory()->create();
+        $merchant->attachShop($this->shop);
+        $this->actingAs($merchant);
+        Filament::setCurrentPanel(Filament::getPanel('merchant'));
+        Filament::setTenant($this->shop);
+
+        Livewire::test(\App\Modules\Search\Filament\Merchant\Pages\PhotoSearches::class)->call('markRight', $ask->id);
+        $this->assertSame('right', $ask->fresh()->verdict);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Modules\Search\Filament\Operator\Pages;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Search\Jobs\CheckPhotoSearchesJob;
+use App\Modules\Search\Jobs\RelearnPhotoJob;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -133,13 +134,10 @@ class PhotoSearches extends Page
     {
         $expected = trim((string) ($this->expected[$id] ?? ''));
 
-        if ($expected === '') {
-            Notification::make()->warning()->title(__('search::ui.photo_log.say_what'))->send();
-
-            return;
-        }
-
-        $this->mark($id, SearchPhotoAsk::WRONG, mb_substr($expected, 0, 120));
+        // The team's word helps but is not needed: the stronger model looks again either way.
+        $this->mark($id, SearchPhotoAsk::WRONG, $expected === '' ? null : mb_substr($expected, 0, 120));
+        RelearnPhotoJob::dispatch((string) $this->shop, $id);
+        Notification::make()->success()->title(__('search::ui.photo_log.relearning'))->body(__('search::ui.photo_log.relearning_body'))->send();
     }
 
     public function unmark(string $id): void
