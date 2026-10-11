@@ -347,6 +347,44 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(['אבן אובלית בצבע תכלת', 'זהב צהוב'], $this->inShop(fn () => SearchPhotoAsk::query()->latest('id')->first()->details), 'the log shows what told it apart');
     }
 
+    public function test_two_things_in_one_photo_are_offered_apart_and_each_is_searched_alone(): void
+    {
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 1]);
+            $bands = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k8', 'name' => 'טבעות נישואין', 'path' => ['טבעות נישואין'], 'depth' => 0, 'hash' => 'k8', 'product_count' => 1]);
+            $this->shirt('80', 'טבעת אבן תכלת', [0.9, 0.1, 0.3]);
+            $this->shirt('81', 'טבעת נישואין חלקה', [0.9, 0.1, 0.3]);
+            CatalogProduct::query()->where('external_id', '80')->sole()->categories()->attach($rings->id);
+            CatalogProduct::query()->where('external_id', '81')->sole()->categories()->attach($bands->id);
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $vision = $this->reader([
+            'object' => 'טבעת', 'also' => [], 'details' => ['אבן בצבע תכלת'], 'around' => [], 'box' => [0.3, 0.5, 0.5, 0.65],
+            'others' => [['object' => 'טבעת נישואין', 'details' => ['פס זהב דק'], 'box' => [0.55, 0.6, 0.75, 0.7]], ['object' => 'טבעת', 'box' => [0.1, 0.1, 0.2, 0.2]]],
+            'sure' => 0.9, 'sellable' => true,
+        ]);
+        $image = imagecreatetruecolor(600, 800);
+        ob_start();
+        imagejpeg($image);
+        $bytes = (string) ob_get_clean();
+        $send = fn (int $item) => $this->call('POST', "/api/v1/search/{$this->site}/photo", ['photo' => UploadedFile::fake()->createWithContent('hand.jpg', $bytes), 'item' => $item], server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json();
+
+        $first = $send(0);
+        $this->assertSame(['טבעת', 'טבעת נישואין'], $first['items'], 'the two separate things; the object named again is not a third');
+        $this->assertSame(0, $first['item']);
+
+        $second = $send(1);
+        $this->assertSame(1, $second['item']);
+        $this->assertSame('טבעת נישואין', $second['seen']);
+        $this->assertSame('טבעות נישואין', $second['tags'][0]['title'], 'the wedding band is placed among the bands');
+        $this->assertSame(1, $vision->calls, 'the photo is read once; choosing the other thing asks nothing again');
+
+        $logged = $this->inShop(fn () => SearchPhotoAsk::query()->latest('id')->first());
+        $this->assertSame([1, ['טבעת', 'טבעת נישואין'], true, ['פס זהב דק']], [$logged->item, $logged->items, $logged->cut, $logged->details]);
+        $this->assertArrayHasKey('look', $logged->results[0], 'each result says why it is there');
+    }
+
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void
     {
         $this->inShop(function (): void {

@@ -2872,7 +2872,7 @@
      * Sends the photo once; resolves with { products, tags }: the products that look like it and
      * what the photo shows in the shop's own words. A label key says why not, when neither came.
      */
-    function photoRequest(file) {
+    function photoRequest(file, item) {
       return shrink(file).then(function (blob) {
         var maxBytes = ((state.config && state.config.photoMaxKb) || 5120) * 1024;
         if (blob.size > maxBytes) {
@@ -2880,6 +2880,9 @@
         }
         var form = new FormData();
         form.append('photo', blob, 'photo.jpg');
+        if (item) {
+          form.append('item', String(item));
+        }
         return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/photo', { method: 'POST', body: form, mode: 'cors', credentials: 'omit' })
           .then(function (response) {
             if (response.status === 413) {
@@ -2896,7 +2899,10 @@
         if (result && result.nothing) {
           return 'photo_nothing';
         }
-        return products.length || tags.length ? { products: products, tags: tags, seen: (result && result.seen) || '' } : 'photo_none';
+        var items = (result && result.items) || [];
+        return products.length || tags.length || items.length > 1
+          ? { products: products, tags: tags, seen: (result && result.seen) || '', items: items, item: (result && result.item) || 0 }
+          : 'photo_none';
       }).catch(function () { return 'photo_failed'; });
     }
 
@@ -2925,6 +2931,27 @@
       return row;
     }
 
+    /**
+     * Several separate things in the photo (a ring and a wedding band): the shopper says which one
+     * they meant, and that one is searched, cut from the same photo. The photo is not read again.
+     */
+    function photoItemRow(items, chosen, pick) {
+      var row = el('div', 'd-tags');
+      row.appendChild(el('span', 'd-tags-h', label('photo_items')));
+      items.forEach(function (name, at) {
+        var chip = el('button', 'd-chip', name);
+        chip.type = 'button';
+        chip.setAttribute('aria-pressed', at === chosen ? 'true' : 'false');
+        chip.addEventListener('click', function () {
+          if (at !== chosen) {
+            pick(at);
+          }
+        });
+        row.appendChild(chip);
+      });
+      return row;
+    }
+
     /** The photo's products to show: all, or those of the chosen tag; at most PHOTO_SHOW. */
     function photoShown(products, chosen) {
       var shown = chosen === null ? products : products.filter(function (p) { return (p.tags || []).indexOf(chosen) !== -1; });
@@ -2943,7 +2970,7 @@
     var PHOTO_SHOW = 12;
 
     /** Search by photo inside the suggestions: the shopper's picture, then the products like it. */
-    function searchPhoto(file) {
+    function searchPhoto(file, item) {
       // An iPhone photo can come with no type at all; the server reads what the bytes are.
       if (!file || (file.type && !/^image\//.test(file.type))) {
         return;
@@ -2966,7 +2993,7 @@
       d.zone = false;
       position();
 
-      photoRequest(file).then(function (result) {
+      photoRequest(file, item).then(function (result) {
         if (main.isConnected === false) {
           return;
         }
@@ -3019,6 +3046,9 @@
             }
           };
         };
+        if (result.items && result.items.length > 1) {
+          main.appendChild(photoItemRow(result.items, result.item, function (at) { searchPhoto(file, at); }));
+        }
         if (result.tags.length) {
           main.appendChild(photoTagRow(result.tags, draw, result.seen));
         }
@@ -3030,7 +3060,7 @@
     }
 
     /** Search by photo from the results sheet or drawer: the results fill that sheet. */
-    function searchPhotoSheet(file) {
+    function searchPhotoSheet(file, item) {
       // An iPhone photo can come with no type at all; the server reads what the bytes are.
       if (!file || (file.type && !/^image\//.test(file.type))) {
         return;
@@ -3044,7 +3074,7 @@
       var status = el('div', 'section', label('photo_searching'));
       sheet.appendChild(status);
 
-      photoRequest(file).then(function (result) {
+      photoRequest(file, item).then(function (result) {
         if (typeof result === 'string') {
           status.textContent = label(result);
           return;
@@ -3070,6 +3100,11 @@
           }
           liveProducts(ids).then(function () { updateCards(grid); });
         };
+        if (result.items && result.items.length > 1) {
+          var itemRow = photoItemRow(result.items, result.item, function (at) { searchPhotoSheet(file, at); });
+          itemRow.className += ' section';
+          sheet.appendChild(itemRow);
+        }
         if (result.tags.length) {
           var tagRow = photoTagRow(result.tags, draw, result.seen);
           tagRow.className += ' section';

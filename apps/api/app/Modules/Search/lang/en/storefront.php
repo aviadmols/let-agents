@@ -71,4 +71,5 @@ return [
     'photo_drop_mobile' => 'Take a photo of a product or choose one from your gallery',
     'photo_count' => ':count similar products',
     'photo_seen' => 'We saw :seen · In the photo:',
+    'photo_items' => 'We found several items in the photo. Which one?',
 ];

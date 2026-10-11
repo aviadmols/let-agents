@@ -236,9 +236,9 @@ final class SearchCatalog
      *
      * @return array{total: int, groups: array{product: list<array<string, mixed>>}, searched: bool}
      */
-    public function photo(string $shopId, string $mime, string $bytes): array
+    public function photo(string $shopId, string $mime, string $bytes, int $item = 0): array
     {
-        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes, $item): array {
             $index = LoadedIndex::for($shopId);
             $floor = (float) Settings::get('search.photo_min_similarity');
             $perGroup = (int) Settings::get('search.results_per_group', $shopId);
@@ -248,14 +248,20 @@ final class SearchCatalog
             $hits = $index === null ? [] : $this->semantic->picturesNearPhoto($shopId, $mime, $bytes, self::PHOTO_ALL);
 
             // What the photo shows, in the shop's own categories and words.
-            $look = $index === null ? PhotoLook::unread() : $this->photoTags->handle($shopId, $mime, $bytes, $hits);
+            $look = $index === null ? PhotoLook::unread() : $this->photoTags->handle($shopId, $mime, $bytes, $hits, $item);
+            // The separate things in the photo, for the shopper to choose which one they meant.
+            $seen = $look->items === [] ? [] : ['items' => $look->items, 'item' => $look->item];
             $tags = $look->tags;
-            $seen = $look->object === null ? [] : ['seen' => $look->object];
+            $seen += $look->object === null ? [] : ['seen' => $look->object];
+            $cut = false;
 
             // A ring on a hand, a lamp in a room: the object alone, cut from the photo, is compared with
             // the shop's pictures too, and each product keeps the closer of the two likenesses.
-            if ($look->box !== null && $hits !== [] && ($cut = self::cut($bytes, $look->box)) !== null) {
-                $hits = self::closer($hits, $this->semantic->picturesNearPhoto($shopId, 'image/jpeg', $cut, self::PHOTO_ALL));
+            if ($look->box !== null && $hits !== [] && ($piece = self::cut($bytes, $look->box)) !== null) {
+                $near = $this->semantic->picturesNearPhoto($shopId, 'image/jpeg', $piece, self::PHOTO_ALL);
+                // Another thing in the photo was chosen: the whole photo is about the first one, so only its own cut counts.
+                $hits = $look->item > 0 && $near !== [] ? $near : self::closer($hits, $near);
+                $cut = true;
             }
 
             // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
@@ -279,7 +285,7 @@ final class SearchCatalog
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
                 $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content));
                 $this->counter->photo($shopId, count($products));
-                $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
+                $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
 
                 return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true] + $seen;
             }
@@ -294,9 +300,9 @@ final class SearchCatalog
 
             $products = array_slice($this->samePictureFirst($index, $hits, $products), 0, $perGroup);
             $this->counter->photo($shopId, count($products));
-            $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
+            $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
 
-            return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null];
+            return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null] + $seen;
         });
     }
 
@@ -456,9 +462,15 @@ final class SearchCatalog
 
         $out = [];
         foreach (array_slice($this->varied($candidates, $brandOf), 0, self::PHOTO_TAGGED) as $c) {
-            $out[] = $this->present($index['records']['p:'.$c['external_id']]) + array_filter([
+            $id = $c['external_id'];
+            $out[] = $this->present($index['records']['p:'.$id]) + array_filter([
                 'match' => $c['similarity'] > 0 ? (int) round(min(1, $c['similarity']) * 100) : null,
-                'tags' => $members[$c['external_id']],
+                'tags' => $members[$id],
+                // Why it is here, for the photo log: how alike its picture looks, how well what its picture
+                // shows matches the details, and whether it is of the kind photographed.
+                'look' => isset($looks[$id]) ? (int) round(max(0, min(1, $looks[$id])) * 100) : null,
+                'about' => isset($about[$id]) ? (int) round(max(0, min(1, $about[$id])) * 100) : null,
+                'kind' => $isMain($c) === 1,
             ], fn ($v): bool => $v !== null);
         }
 

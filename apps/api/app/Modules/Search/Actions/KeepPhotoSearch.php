@@ -26,7 +26,7 @@ final class KeepPhotoSearch
     /**
      * @param  list<array<string, mixed>>  $products  what the shopper got, first first
      */
-    public function handle(string $shopId, string $bytes, PhotoLook $look, array $products, int $total): void
+    public function handle(string $shopId, string $bytes, PhotoLook $look, array $products, int $total, bool $cut = false): void
     {
         if (! Features::enabled('search.photo_log', $shopId)) {
             return;
@@ -40,6 +40,10 @@ final class KeepPhotoSearch
                 'thumb' => self::reduced($bytes, self::THUMB_SIDE, 70),
                 'object' => $look->object === null ? null : mb_substr($look->object, 0, 120),
                 'details' => $look->details,
+                'box' => $look->box,
+                'cut' => $cut,
+                'items' => $look->items,
+                'item' => $look->item,
                 'sure' => $look->sure,
                 'doubt' => $look->doubt,
                 'second' => $look->second,
@@ -49,6 +53,10 @@ final class KeepPhotoSearch
                     'external_id' => (string) $p['external_id'],
                     'title' => mb_substr((string) $p['title'], 0, 120),
                     'image' => isset($p['image']) ? (string) $p['image'] : null,
+                    'look' => isset($p['look']) ? (int) $p['look'] : (isset($p['match']) && ! isset($p['about']) ? (int) $p['match'] : null),
+                    'about' => isset($p['about']) ? (int) $p['about'] : null,
+                    'kind' => (bool) ($p['kind'] ?? false),
+                    'same' => (bool) ($p['same'] ?? false),
                 ], array_slice($products, 0, self::RESULTS)),
                 'total' => $total,
             ]);

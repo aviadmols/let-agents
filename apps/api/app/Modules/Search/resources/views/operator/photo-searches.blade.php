@@ -55,7 +55,13 @@
                         <div style="display:grid;grid-template-columns:96px minmax(0,1fr) minmax(200px,260px);gap:14px;padding:10px 0;border-bottom:1px solid #f1f1f4;font-size:13px;line-height:1.5" data-ask="{{ $ask->id }}">
                             <div>
                                 @if ($ask->thumb)
-                                    <img src="data:image/jpeg;base64,{{ $ask->thumb }}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:8px;background:#f4f4f5">
+                                    <div style="position:relative;width:96px;line-height:0">
+                                        <img src="data:image/jpeg;base64,{{ $ask->thumb }}" alt="" style="width:96px;height:auto;border-radius:8px;background:#f4f4f5">
+                                        @if (is_array($ask->box) && count($ask->box) === 4)
+                                            @php([$bl, $bt, $br, $bb] = array_map('floatval', $ask->box))
+                                            <span title="{{ __('search::ui.photo_log.box') }}" style="position:absolute;left:{{ round($bl * 100, 1) }}%;top:{{ round($bt * 100, 1) }}%;width:{{ round(($br - $bl) * 100, 1) }}%;height:{{ round(($bb - $bt) * 100, 1) }}%;border:2px solid #f59e0b;border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></span>
+                                        @endif
+                                    </div>
                                 @else
                                     <div style="width:96px;height:96px;border-radius:8px;background:#f4f4f5"></div>
                                 @endif
@@ -78,6 +84,18 @@
                                         <span style="{{ $chip }}">{{ __('search::ui.photo_log.second') }}</span>
                                     @endif
                                 </div>
+                                @if (! empty($ask->items))
+                                    <div>
+                                        <span style="{{ $small }}">{{ __('search::ui.photo_log.items') }}</span>
+                                        @foreach ($ask->items as $at => $name)
+                                            <span style="{{ $chip }}{{ $at === (int) $ask->item ? ';background:rgba(245,158,11,.18);font-weight:600' : '' }}">{{ $name }}</span>
+                                        @endforeach
+                                        <span style="{{ $small }}">{{ __('search::ui.photo_log.item_chosen', ['item' => $ask->items[(int) $ask->item] ?? '']) }}</span>
+                                    </div>
+                                @endif
+                                @if ($ask->cut)
+                                    <div style="{{ $small }}">{{ __('search::ui.photo_log.cut') }}</div>
+                                @endif
                                 <div>
                                     <span style="{{ $small }}">{{ __('search::ui.photo_log.showed') }}</span>
                                     @if ($ask->total === 0)
@@ -91,13 +109,29 @@
                                     @endforeach
                                 </div>
                                 @if ($ask->results !== [])
-                                    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
-                                        @foreach (array_slice($ask->results, 0, 6) as $result)
-                                            @if (! empty($result['image']))
-                                                <img src="{{ $result['image'] }}" alt="" title="{{ $result['title'] }}" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:6px;background:#f4f4f5">
-                                            @else
-                                                <span style="{{ $chip }}">{{ $result['title'] }}</span>
-                                            @endif
+                                    @php($described = collect($ask->results)->contains(fn ($r) => isset($r['about'])))
+                                    <div style="{{ $small }}">{{ $described ? __('search::ui.photo_log.order_details') : __('search::ui.photo_log.order_look') }}</div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
+                                        @foreach (array_slice($ask->results, 0, 8) as $result)
+                                            <div style="width:64px;display:grid;gap:2px;font-size:11px;line-height:1.3" title="{{ $result['title'] }}">
+                                                @if (! empty($result['image']))
+                                                    <img src="{{ $result['image'] }}" alt="" loading="lazy" style="width:64px;height:64px;object-fit:cover;border-radius:6px;background:#f4f4f5">
+                                                @else
+                                                    <span style="{{ $chip }}">{{ $result['title'] }}</span>
+                                                @endif
+                                                @if (! empty($result['same']))
+                                                    <span style="color:#15803d;font-weight:600">{{ __('search::ui.photo_log.same') }}</span>
+                                                @endif
+                                                @isset($result['look'])
+                                                    <span>{{ __('search::ui.photo_log.look', ['score' => $result['look']]) }}</span>
+                                                @endisset
+                                                @isset($result['about'])
+                                                    <span>{{ __('search::ui.photo_log.about', ['score' => $result['about']]) }}</span>
+                                                @endisset
+                                                @if (array_key_exists('kind', $result) && ! $result['kind'] && $described)
+                                                    <span style="opacity:.7">{{ __('search::ui.photo_log.other_kind') }}</span>
+                                                @endif
+                                            </div>
                                         @endforeach
                                     </div>
                                 @endif

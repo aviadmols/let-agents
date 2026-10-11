@@ -61,7 +61,9 @@ final class SearchPhotoController
             return response()->json(['error' => 'daily_limit'], 429);
         }
 
-        $result = $search->photo($shopId, $mime, $bytes);
+        // Which of the separate things in the photo the shopper chose; 0 is the one the reader saw first.
+        $item = max(0, min(3, (int) $request->input('item', 0)));
+        $result = $search->photo($shopId, $mime, $bytes, $item);
 
         return response()->json($result, 200, ['Cache-Control' => 'no-store'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

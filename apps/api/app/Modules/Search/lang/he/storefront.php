@@ -71,4 +71,5 @@ return [
     'photo_drop_mobile' => 'צלמו מוצר או בחרו תמונה מהגלריה',
     'photo_count' => ':count מוצרים דומים',
     'photo_seen' => 'זיהינו :seen · בתמונה:',
+    'photo_items' => 'זיהינו כמה פריטים בתמונה. מה לחפש?',
 ];

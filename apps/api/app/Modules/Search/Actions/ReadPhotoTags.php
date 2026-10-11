@@ -42,7 +42,7 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 4;
+    public const PROMPT_VERSION = 5;
 
     public const SECOND_VERSION = 1;
 
@@ -77,7 +77,7 @@ final class ReadPhotoTags
     /**
      * @param  list<array{external_id: string, similarity: float}>  $hits  the shop's pictures nearest the photo, nearest first
      */
-    public function handle(string $shopId, string $mime, string $bytes, array $hits = []): PhotoLook
+    public function handle(string $shopId, string $mime, string $bytes, array $hits = [], int $item = 0): PhotoLook
     {
         $index = LoadedIndex::for($shopId);
 
@@ -94,7 +94,7 @@ final class ReadPhotoTags
         $hash = hash('sha256', $bytes);
 
         // A photo the team marked wrong and the stronger model read again: answered from that lesson.
-        if (($lesson = SearchPhotoLesson::query()->where('photo_hash', $hash)->first()) !== null) {
+        if ($item === 0 && ($lesson = SearchPhotoLesson::query()->where('photo_hash', $hash)->first()) !== null) {
             $placer = new PhotoPlacer($index);
             $main = $lesson->main_id !== null ? $placer->categoryTag($placer->record(PhotoPlacer::CATEGORY.$lesson->main_id), true) : null;
             $main ??= $placer->place($lesson->object)['main'];
@@ -115,10 +115,22 @@ final class ReadPhotoTags
             return PhotoLook::nothing($first['object'], $first['sure']);
         }
 
+        // Several separate things in the photo: the shopper chose one of the others, and it is read as
+        // the object, with its own details and its own place in the photo. Nothing is asked again.
+        $others = (array) ($first['others'] ?? []);
+        $items = $others === [] ? [] : [(string) $first['object'], ...array_column($others, 'object')];
+
+        if ($item > 0 && isset($others[$item - 1])) {
+            $other = $others[$item - 1];
+            $first = ['object' => $other['object'], 'also' => [], 'details' => $other['details'], 'box' => $other['box'], 'around' => [(string) $first['object']]] + $first;
+        } else {
+            $item = 0;
+        }
+
         $placer = new PhotoPlacer($index);
         $placed = $placer->place($first['object'], $first['also']);
         $doubt = $this->doubt($placer, $placed, $first['sure'], $hits);
-        $look = (new PhotoLook(null, $first['object'], $first['around'], $first['sure']))->seen($first['details'] ?? [], $first['box'] ?? null);
+        $look = (new PhotoLook(null, $first['object'], $first['around'], $first['sure']))->seen($first['details'] ?? [], $first['box'] ?? null)->among($items, $item);
 
         if ($doubt === null || ! Features::enabled('search.photo_second_look', $shopId) || ($second = $this->role('photo_second')) === null) {
             return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt);
@@ -142,7 +154,7 @@ final class ReadPhotoTags
             $placed = $placer->place($answer['object'], [$first['object'], ...$first['also']]);
         }
 
-        $look = (new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null);
+        $look = (new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null)->among($items, $item);
 
         return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt, true);
     }
@@ -288,6 +300,7 @@ final class ReadPhotoTags
                     'around' => self::words($data['around'] ?? [], 4, [$object]),
                     'details' => self::words($data['details'] ?? [], 6, [$object]),
                     'box' => self::box($data['box'] ?? null),
+                    'others' => self::others($data['others'] ?? [], $object),
                     'sure' => self::sure($data['sure'] ?? null),
                     'sellable' => $object !== null && ($data['sellable'] ?? true) !== false,
                 ];
@@ -456,6 +469,30 @@ final class ReadPhotoTags
         $area = ($right - $left) * ($bottom - $top);
 
         return $right > $left && $bottom > $top && $area >= 0.01 && $area < 0.8 ? [$left, $top, $right, $bottom] : null;
+    }
+
+    /**
+     * The other separate things in the photo, as the reader gave them: each with a name, its
+     * details and a sensible place in the photo; at most three, never the object again.
+     *
+     * @return list<array{object: string, details: list<string>, box: array{0: float, 1: float, 2: float, 3: float}}>
+     */
+    private static function others(mixed $values, ?string $object): array
+    {
+        $out = [];
+
+        foreach (array_slice(is_array($values) ? array_values($values) : [], 0, 6) as $other) {
+            $name = is_array($other) ? self::word($other['object'] ?? null) : null;
+            $box = is_array($other) ? self::box($other['box'] ?? null) : null;
+
+            if ($name === null || $box === null || HebrewSearch::normalize($name) === HebrewSearch::normalize((string) $object)) {
+                continue;
+            }
+
+            $out[] = ['object' => $name, 'details' => self::words($other['details'] ?? [], 6, [$name]), 'box' => $box];
+        }
+
+        return array_slice($out, 0, 3);
     }
 
     private static function sure(mixed $value): float

@@ -29,6 +29,8 @@ final class PhotoLook
      * @param  string|null  $main  the main tag's title, after everything
      * @param  list<string>  $details  what tells the object apart from others of its kind ("אבן אובלית בצבע תכלת")
      * @param  array{0: float, 1: float, 2: float, 3: float}|null  $box  where it is in the photo, 0 to 1: left, top, right, bottom
+     * @param  list<string>  $items  every separate thing in the photo the shopper might mean, the object first; empty when one
+     * @param  int  $item  which of them was searched: 0 the object, 1 the first of the others
      */
     public function __construct(
         public readonly ?array $tags,
@@ -40,6 +42,8 @@ final class PhotoLook
         public readonly ?string $main = null,
         public readonly array $details = [],
         public readonly ?array $box = null,
+        public readonly array $items = [],
+        public readonly int $item = 0,
     ) {}
 
     /** The photo could not be read: reading is off, no model, or the call failed. */
@@ -57,7 +61,13 @@ final class PhotoLook
     /** The same reading, with what tells the object apart and where it is in the photo. */
     public function seen(array $details, ?array $box): self
     {
-        return new self($this->tags, $this->object, $this->around, $this->sure, $this->doubt, $this->second, $this->main, $details, $box);
+        return new self($this->tags, $this->object, $this->around, $this->sure, $this->doubt, $this->second, $this->main, $details, $box, $this->items, $this->item);
+    }
+
+    /** The same reading, knowing the separate things in the photo and which of them was searched. */
+    public function among(array $items, int $item): self
+    {
+        return new self($this->tags, $this->object, $this->around, $this->sure, $this->doubt, $this->second, $this->main, $this->details, $this->box, $items, $item);
     }
 
     /** The shop's own tags for the photo, the main one first. */
@@ -72,6 +82,6 @@ final class PhotoLook
             }
         }
 
-        return new self($tags, $this->object, $this->around, $this->sure, $doubt, $second, $main, $this->details, $this->box);
+        return new self($tags, $this->object, $this->around, $this->sure, $doubt, $second, $main, $this->details, $this->box, $this->items, $this->item);
     }
 }
