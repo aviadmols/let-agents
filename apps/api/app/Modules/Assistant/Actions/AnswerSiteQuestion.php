@@ -157,6 +157,58 @@ final class AnswerSiteQuestion
         return $this->ask($shopId, $question, $locale, $products);
     }
 
+    /** Words a question is made of that name no page: asked, not about. */
+    private const QUESTION_WORDS = ['מה', 'מהי', 'מהו', 'איך', 'האם', 'יש', 'אפשר', 'כמה', 'מתי', 'למה', 'של', 'את', 'על', 'עם', 'לי', 'שלכם', 'אצלכם', 'what', 'is', 'the', 'how', 'do', 'you', 'your', 'can', 'i'];
+
+    private const PAGES_BY_WORDS = 3;
+
+    /**
+     * The shop's pages whose title holds a word of the question (a plural as its singular: ביטולים
+     * finds ביטול), most words first, before the passages the meaning search found. Inside the
+     * shop's tenant.
+     *
+     * @param  list<array<string, mixed>>  $found
+     * @return list<array<string, mixed>>
+     */
+    private function pagesByWords(string $question, array $found): array
+    {
+        $words = [];
+
+        foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [] as $word) {
+            if (mb_strlen($word) < 3 || in_array($word, self::QUESTION_WORDS, true)) {
+                continue;
+            }
+
+            $words[] = mb_strlen($word) > 4 ? (string) preg_replace('/(ים|ות)$/u', '', $word) : $word;
+        }
+
+        if ($words === []) {
+            return $found;
+        }
+
+        $scores = [];
+
+        foreach (array_unique($words) as $word) {
+            foreach (CatalogContent::query()->active()->where('title', 'like', '%'.$word.'%')->limit(10)->pluck('id') as $id) {
+                $scores[(string) $id] = ($scores[(string) $id] ?? 0) + 1;
+            }
+        }
+
+        arsort($scores);
+        $have = array_map(fn (array $p): string => $p['source'].'|'.$p['source_id'], $found);
+        $pages = [];
+
+        foreach (CatalogContent::query()->whereIn('id', array_slice(array_keys($scores), 0, self::PAGES_BY_WORDS))->get(['id', 'title', 'body']) as $page) {
+            if (in_array('content|'.$page->id, $have, true)) {
+                continue;
+            }
+
+            $pages[] = ['source' => 'content', 'source_id' => (string) $page->id, 'external_id' => null, 'title' => (string) $page->title, 'text' => mb_substr(trim((string) $page->body), 0, 1500), 'similarity' => 1.0];
+        }
+
+        return [...$pages, ...$found];
+    }
+
     private function stale(AssistantAnswer $saved, string $shopId): bool
     {
         if ($saved->source === 'team') {
@@ -210,6 +262,9 @@ final class AnswerSiteQuestion
                     $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
                     fn (array $p): bool => $p['similarity'] >= $floor,
                 ));
+                // Code before model: the pages whose title holds the question's words ("ביטול עסקה" for
+                // "מה מדיניות הביטולים") are read first, whatever the meaning search found.
+                $found = $this->pagesByWords($question, $found);
                 $candidates = $this->candidates($shown);
                 $noAnswer = $shown === [] ? AssistantAnswer::NO_INFO : 'no_match';
 
