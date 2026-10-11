@@ -786,7 +786,7 @@
           // The cart icon section comes back with the answer, the way Dawn and its relatives ask for it.
           body: JSON.stringify({
             items: [{ id: Number(product.variant), quantity: 1 }],
-            sections: 'cart-icon-bubble',
+            sections: 'cart-icon-bubble,cart-drawer',
             sections_url: win.location.pathname
           })
         }).then(function (response) {
@@ -795,7 +795,16 @@
             return;
           }
           return response.json().catch(function () { return null; }).then(function (json) {
-            refreshShopifyCart(json && json.sections);
+            // Dawn and its relatives redraw and open their drawer from the sections that came back.
+            var dawn = doc.querySelector('cart-drawer');
+            if (dawn && typeof dawn.renderContents === 'function' && json && json.sections && json.sections['cart-drawer']) {
+              closeDropdown();
+              closePanel();
+              dawn.classList.remove('is-empty');
+              dawn.renderContents(json);
+            } else {
+              refreshShopifyCart(json && json.sections);
+            }
             doc.body.dispatchEvent(new CustomEvent('let-agents:added_to_cart', { detail: { id: externalId, variant: product.variant } }));
           });
         });
@@ -819,9 +828,12 @@
         }
       }
       var announce = function (cart) {
+        // Prestige, Impact and their relatives listen on the root element, others on the document.
         ['cart:refresh', 'cart:updated'].forEach(function (name) {
+          doc.documentElement.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: { cart: cart } }));
           doc.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: { cart: cart } }));
         });
+        openCartDrawer();
       };
       win.fetch(ROOT + 'cart.js', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
         .then(function (response) { return response.ok ? response.json() : null; })
@@ -835,6 +847,31 @@
           announce(cart);
         })
         .catch(function () { announce(null); });
+    }
+
+    /**
+     * The theme's own cart drawer, opened once it has redrawn, so the shopper sees what was added:
+     * our results close first. A theme without one keeps its counter and nothing more.
+     */
+    function openCartDrawer() {
+      var drawer = doc.querySelector('cart-drawer, #cart-drawer, #CartDrawer, cart-notification');
+      if (!drawer) {
+        return;
+      }
+      setTimeout(function () {
+        closeDropdown();
+        closePanel();
+        if (typeof drawer.show === 'function') {
+          drawer.show();
+        } else if (typeof drawer.open === 'function') {
+          drawer.open();
+        } else {
+          var opener = doc.querySelector('[aria-controls="cart-drawer"], [aria-controls="CartDrawer"], a[href$="/cart"][data-action], #cart-icon-bubble');
+          if (opener) {
+            opener.click();
+          }
+        }
+      }, 400);
     }
 
     function addToCart(externalId, button) {
