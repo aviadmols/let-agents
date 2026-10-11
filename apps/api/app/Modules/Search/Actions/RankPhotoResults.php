@@ -57,7 +57,7 @@ final class RankPhotoResults
      * @param  list<array<string, mixed>>  $products
      * @return list<array<string, mixed>>
      */
-    public function handle(string $shopId, string $bytes, ?array $box, array $products): array
+    public function handle(string $shopId, string $bytes, ?array $box, array $products, string $described = ''): array
     {
         $count = (int) Settings::get('search.photo_rank_candidates', $shopId);
         // The shop's own picture uploaded again is already known: it keeps its place, the rest are ordered.
@@ -70,11 +70,11 @@ final class RankPhotoResults
 
         $provider = AiProviderName::from(strtolower(trim((string) Settings::get('search.photo_rank_provider'))));
         $model = trim((string) Settings::get('search.photo_rank_model'));
-        $key = 'search:photo-rank:'.$shopId.':'.hash('sha256', implode('|', [hash('sha256', $bytes), json_encode($box), implode(',', array_column($top, 'external_id')), self::PROMPT_VERSION, $model]));
+        $key = 'search:photo-rank:'.$shopId.':'.hash('sha256', implode('|', [hash('sha256', $bytes), json_encode($box), implode(',', array_column($top, 'external_id')), self::PROMPT_VERSION, $model, $described]));
         $answer = Cache::get($key);
 
         if (! is_array($answer)) {
-            $answer = $this->ask($shopId, $provider, $model, $bytes, $box, $top);
+            $answer = $this->ask($shopId, $provider, $model, $bytes, $box, $top, $described);
 
             if ($answer !== null) {
                 Cache::put($key, $answer, now()->addDays(self::CACHE_DAYS));
@@ -105,7 +105,7 @@ final class RankPhotoResults
      * @param  list<array<string, mixed>>  $top
      * @return array{order: list<string>, same: string|null}|null
      */
-    private function ask(string $shopId, AiProviderName $provider, string $model, string $bytes, ?array $box, array $top): ?array
+    private function ask(string $shopId, AiProviderName $provider, string $model, string $bytes, ?array $box, array $top, string $described = ''): ?array
     {
         $sheet = RankSheet::build($bytes, $box, $top);
 
@@ -118,7 +118,7 @@ final class RankPhotoResults
         $out = (float) Settings::get('search.photo_rank_output_usd_per_million');
         $max = (int) Settings::get('search.photo_rank_max_output_tokens');
         $system = (string) file_get_contents(self::PROMPT);
-        $user = 'The sheet holds '.count($sheet['numbered']).' products, numbered 1 to '.count($sheet['numbered']).'.';
+        $user = 'The sheet holds '.count($sheet['numbered']).' products, numbered 1 to '.count($sheet['numbered']).'.'.($described === '' ? '' : "\n".$described);
 
         $this->runs->track(
             agent: ReadPhotoTags::AGENT,

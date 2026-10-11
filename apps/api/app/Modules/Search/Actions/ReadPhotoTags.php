@@ -42,7 +42,7 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 6;
+    public const PROMPT_VERSION = 7;
 
     public const SECOND_VERSION = 1;
 
@@ -122,7 +122,7 @@ final class ReadPhotoTags
 
         if ($item > 0 && isset($others[$item - 1])) {
             $other = $others[$item - 1];
-            $first = ['object' => $other['object'], 'also' => [], 'details' => $other['details'], 'box' => $other['box'], 'around' => [(string) $first['object']]] + $first;
+            $first = ['object' => $other['object'], 'also' => [], 'details' => $other['details'], 'lacks' => $other['lacks'] ?? [], 'box' => $other['box'], 'around' => [(string) $first['object']]] + $first;
         } else {
             $item = 0;
         }
@@ -130,7 +130,7 @@ final class ReadPhotoTags
         $placer = new PhotoPlacer($index);
         $placed = $placer->place($first['object'], $first['also']);
         $doubt = $this->doubt($placer, $placed, $first['sure'], $hits);
-        $look = (new PhotoLook(null, $first['object'], $first['around'], $first['sure']))->seen($first['details'] ?? [], $first['box'] ?? null)->among($items, $item);
+        $look = (new PhotoLook(null, $first['object'], $first['around'], $first['sure']))->seen($first['details'] ?? [], $first['box'] ?? null, $first['lacks'] ?? [])->among($items, $item);
 
         if ($doubt === null || ! Features::enabled('search.photo_second_look', $shopId) || ($second = $this->role('photo_second')) === null) {
             return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt);
@@ -154,7 +154,7 @@ final class ReadPhotoTags
             $placed = $placer->place($answer['object'], [$first['object'], ...$first['also']]);
         }
 
-        $look = (new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null)->among($items, $item);
+        $look = (new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null, $first['lacks'] ?? [])->among($items, $item);
 
         return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt, true);
     }
@@ -299,6 +299,7 @@ final class ReadPhotoTags
                     'also' => self::words($data['also'] ?? [], 3, [$object]),
                     'around' => self::words($data['around'] ?? [], 4, [$object]),
                     'details' => self::words($data['details'] ?? [], 6, [$object]),
+                    'lacks' => self::words($data['lacks'] ?? [], 4, []),
                     'box' => self::box($data['box'] ?? null),
                     'others' => self::others($data['others'] ?? [], $object),
                     'sure' => self::sure($data['sure'] ?? null),
@@ -489,7 +490,7 @@ final class ReadPhotoTags
                 continue;
             }
 
-            $out[] = ['object' => $name, 'details' => self::words($other['details'] ?? [], 6, [$name]), 'box' => $box];
+            $out[] = ['object' => $name, 'details' => self::words($other['details'] ?? [], 6, [$name]), 'lacks' => self::words($other['lacks'] ?? [], 4, []), 'box' => $box];
         }
 
         return array_slice($out, 0, 3);

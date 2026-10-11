@@ -494,6 +494,25 @@ final class SearchByPhotoTest extends TestCase
         $this->assertGreaterThan(0, $result['groups']['product'][0]['words']);
     }
 
+    public function test_a_plain_band_puts_rings_with_stones_after_the_rest(): void
+    {
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 2]);
+            // The ring with diamonds looks a little closer; the plain one has none.
+            $this->shirt('98', 'טבעת רחבה ארבעה פסים משובצים יהלומים', [0.9, 0.1, 0.4]);
+            $this->shirt('99', 'טבעת זהב פרופיל חצי עגול', [0.85, 0.15, 0.45]);
+            CatalogProduct::query()->whereIn('external_id', ['98', '99'])->get()->each(fn (CatalogProduct $p) => $p->categories()->attach($rings->id));
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'טבעת פס חלקה', 'also' => ['טבעת'], 'details' => ['פס זהב דק'], 'lacks' => ['אבן', 'יהלומים', 'משובצת'], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $products = $this->upload()->assertOk()->json('groups.product');
+
+        $this->assertSame(['99', '98'], array_column($products, 'external_id'), 'what the band plainly lacks puts the diamond ring after it');
+        $this->assertTrue($products[1]['lacks']);
+    }
+
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void
     {
         $this->inShop(function (): void {

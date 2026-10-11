@@ -52,6 +52,9 @@ final class SearchCatalog
     /** Products a tag of words brings, before the picture orders them. */
     private const PHOTO_PER_TAG = 200;
 
+    /** How far down a product goes that has what the photographed object plainly lacks. */
+    private const LACKS_PENALTY = 0.5;
+
     /** A category tag brings all its products, up to this many. */
     private const PHOTO_CATEGORY_ALL = 5000;
 
@@ -299,8 +302,8 @@ final class SearchCatalog
                 // ring is matched with the pictures described so, not with every gold ring.
                 $words = $look->details !== [] ? [$look->object, ...$look->details] : array_column($tags, 'title');
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
-                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details]))));
-                $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products) : $products;
+                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details])), $look->lacks));
+                $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products, self::described($look)) : $products;
                 $record && $this->counter->photo($shopId, count($products));
                 $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
 
@@ -322,6 +325,16 @@ final class SearchCatalog
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null] + $seen;
         });
+    }
+
+    /** What the reader saw, in words, for the model that orders: the object, its details, what it lacks. */
+    private static function described(PhotoLook $look): string
+    {
+        return trim(implode(' ', array_filter([
+            $look->object === null ? null : 'The shopper means: '.$look->object.'.',
+            $look->details === [] ? null : 'Seen: '.implode(', ', $look->details).'.',
+            $look->lacks === [] ? null : 'It has no: '.implode(', ', $look->lacks).'.',
+        ])));
     }
 
     /**
@@ -435,7 +448,7 @@ final class SearchCatalog
      * @param  list<array{external_id: string, similarity: float}>  $hits
      * @return list<array<string, mixed>>
      */
-    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = [], array $description = []): array
+    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = [], array $description = [], array $lacks = []): array
     {
         $members = [];
 
@@ -478,7 +491,9 @@ final class SearchCatalog
         $named = $this->namedLike($index, array_keys($members), $description);
         $wordsWeight = (float) Settings::get('search.photo_words_weight', $shopId);
         $rows = CatalogProduct::query()->whereIn('external_id', array_keys($members))->get(['external_id', 'brand', 'in_stock'])->keyBy('external_id');
-        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0)], array_keys($members));
+        // What the object lacks (a plain band has no stone): a product whose name or picture has it goes after the rest.
+        $lacking = $this->holding($index, array_keys($members), $lacks);
+        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0) - (isset($lacking[$id]) ? self::LACKS_PENALTY : 0.0)], array_keys($members));
 
         if ((bool) Settings::get('search.photo_in_stock_only', $shopId)) {
             $stocked = array_values(array_filter($candidates, fn (array $c): bool => (bool) $rows->get($c['external_id'])?->in_stock));
@@ -504,6 +519,7 @@ final class SearchCatalog
                 'look' => isset($looks[$id]) ? (int) round(max(0, min(1, $looks[$id])) * 100) : null,
                 'about' => isset($about[$id]) ? (int) round(max(0, min(1, $about[$id])) * 100) : null,
                 'words' => isset($named[$id]) && $named[$id] > 0 ? (int) round($named[$id] * 100) : null,
+                'lacks' => isset($lacking[$id]) ? true : null,
                 'kind' => $isMain($c) === 1,
             ], fn ($v): bool => $v !== null);
         }
@@ -573,6 +589,35 @@ final class SearchCatalog
             }
 
             $out[$id] = $score / $total;
+        }
+
+        return $out;
+    }
+
+    /**
+     * The candidates whose name or keywords (their picture's words among them) hold any of the words
+     * the object lacks, as the typed search keeps "בלי יהלומים" out.
+     *
+     * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
+     * @param  list<string>  $ids
+     * @param  list<string>  $lacks
+     * @return array<string, true>
+     */
+    private function holding(array $index, array $ids, array $lacks): array
+    {
+        $stems = $lacks === [] ? [] : HebrewSearch::without('בלי '.implode(' בלי ', $lacks))[1];
+        $out = [];
+
+        if ($stems === []) {
+            return [];
+        }
+
+        foreach ($ids as $id) {
+            $record = $index['records']['p:'.$id] ?? [];
+
+            if (HebrewSearch::holdsAny((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? ''), $stems)) {
+                $out[(string) $id] = true;
+            }
         }
 
         return $out;

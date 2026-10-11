@@ -59,6 +59,7 @@ final class KeepPhotoSearch
                     'look' => isset($p['look']) ? (int) $p['look'] : (isset($p['match']) && ! isset($p['about']) ? (int) $p['match'] : null),
                     'about' => isset($p['about']) ? (int) $p['about'] : null,
                     'words' => isset($p['words']) ? (int) $p['words'] : null,
+                    'lacks' => (bool) ($p['lacks'] ?? false),
                     'kind' => (bool) ($p['kind'] ?? false),
                     'same' => (bool) ($p['same'] ?? false),
                 ], array_slice($products, 0, self::RESULTS)),

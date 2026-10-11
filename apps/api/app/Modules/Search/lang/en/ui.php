@@ -236,6 +236,7 @@ return [
         'ranks_how_shop' => 'Press "This one" under the right result, or paste the product\'s link if it was not shown. This measures how often the right product comes first, and every change to the search is checked against these photos.',
         'words' => 'Name :score%',
         'order_words' => 'A product whose name holds the words seen rises.',
+        'has_lacked' => 'Has what the photo lacks',
     ],
     'analytics' => [
         'title' => 'Search analytics',

@@ -139,6 +139,9 @@
                                                 @isset($result['words'])
                                                     <span>{{ __('search::ui.photo_log.words', ['score' => $result['words']]) }}</span>
                                                 @endisset
+                                                @if (! empty($result['lacks']))
+                                                    <span style="color:#b45309">{{ __('search::ui.photo_log.has_lacked') }}</span>
+                                                @endif
                                                 @if (array_key_exists('kind', $result) && ! $result['kind'] && $described)
                                                     <span style="opacity:.7">{{ __('search::ui.photo_log.other_kind') }}</span>
                                                 @endif
