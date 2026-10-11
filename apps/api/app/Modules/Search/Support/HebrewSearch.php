@@ -76,6 +76,87 @@ final class HebrewSearch
     /** Words that turn the next word into what the shopper does not want. */
     public const WITHOUT = ['בלי', 'ללא', 'without', 'no'];
 
+    /** A number as a shopper writes it ("2500", "2,500", "2.5 אלף"), and the currency after it. */
+    private const PRICE_NUMBER = '(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(אלף|k)?';
+
+    private const PRICE_CURRENCY = '(?:\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils))?';
+
+    /**
+     * "טבעת יהלום בזהב עד 2500 ש״ח": the words to search, and the price range the shopper asked for.
+     * Understood: עד / מתחת ל / פחות מ / לא יותר מ / under / up to (a top), מעל / יותר מ / לפחות /
+     * over / above (a bottom), בין X ל Y / מ X עד Y / X-Y (both), and a bare amount with its currency
+     * as a top. The amounts are taken out of the words.
+     *
+     * @return array{0: string, 1: float|null, 2: float|null} the words left, the lowest price, the highest
+     */
+    public static function priceRange(string $query): array
+    {
+        $text = ' '.$query.' ';
+        $num = self::PRICE_NUMBER;
+        $cur = self::PRICE_CURRENCY;
+        $min = null;
+        $max = null;
+        $amount = function (array $m, int $at): float {
+            $digits = (string) preg_replace('/[,.](?=\d{3}(\D|$))/u', '', $m[$at]);
+
+            return (float) $digits * (($m[$at + 1] ?? '') !== '' ? 1000 : 1);
+        };
+
+        $patterns = [
+            // between and from-to: both ends
+            '/\s(?:בין|between)\s*'.$num.$cur.'\s*(?:ל-?|and|to|עד|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
+            '/\s(?:מ-?|מ־|from)\s*'.$num.$cur.'\s*(?:עד|to|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
+            '/\s'.$num.$cur.'\s*(?:-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
+            // a top
+            '/\s(?:עד|מתחת\s*ל-?|מתחת|פחות\s*מ-?|לא\s+יותר\s+מ-?|under|below|up\s+to|max)\s*'.$num.$cur.'(?=\s)/iu' => 'max',
+            // a bottom
+            '/\s(?:מעל|יותר\s*מ-?|לפחות|over|above|min)\s*'.$num.$cur.'(?=\s)/iu' => 'min',
+        ];
+
+        foreach ($patterns as $pattern => $kind) {
+            if (preg_match($pattern, $text, $m) !== 1) {
+                continue;
+            }
+
+            // A bare "14-18" with no currency is a size or a karat, not a price.
+            if ($kind === 'both' && ! preg_match('/ש|₪|nis|ils|בין|between|מ|from/iu', $m[0]) && min($amount($m, 1), $amount($m, 3)) < 100) {
+                continue;
+            }
+
+            if ($kind === 'both') {
+                [$min, $max] = [min($amount($m, 1), $amount($m, 3)), max($amount($m, 1), $amount($m, 3))];
+            } elseif ($kind === 'max') {
+                $max = $amount($m, 1);
+            } else {
+                $min = $amount($m, 1);
+            }
+
+            $text = str_replace($m[0], ' ', $text);
+        }
+
+        // A bare amount with its currency ("טבעת 2500 ש״ח"): a budget, so a top.
+        if ($min === null && $max === null && preg_match('/\s'.$num.'\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils)(?=\s)/iu', $text, $m) === 1) {
+            $max = $amount($m, 1);
+            $text = str_replace($m[0], ' ', $text);
+        }
+
+        return [trim((string) preg_replace('/\s+/u', ' ', $text)), $min, $max];
+    }
+
+    /** Whether a price is inside the range; a product with no price is outside any range. */
+    public static function inRange(mixed $price, ?float $min, ?float $max): bool
+    {
+        if ($min === null && $max === null) {
+            return true;
+        }
+
+        if (! is_numeric($price)) {
+            return false;
+        }
+
+        return ($min === null || (float) $price >= $min) && ($max === null || (float) $price <= $max);
+    }
+
     /**
      * "צמיד חוליות בלי יהלומים": what to look for, and the stems of what must not be there. The
      * word after בלי / ללא / without is left out of the search and keeps products that hold it away.

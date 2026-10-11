@@ -84,6 +84,8 @@ final class BuildSearchIndex
                 'img' => $product->image_url,
                 'i2' => $this->secondPicture($product),
                 's' => $product->in_stock ? 1 : 0,
+                // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
+                'pr' => $product->price === null ? null : (int) round((float) $product->price),
                 'buy' => $product->type === 'simple' && $product->purchasable ? 1 : 0,
             ]);
             $counts['product']++;

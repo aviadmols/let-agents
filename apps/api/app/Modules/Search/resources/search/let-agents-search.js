@@ -1559,7 +1559,75 @@
       return false;
     }
 
+    // "עד 2500 ש״ח": the amount is not searched for, and products outside the range stay out (as on the server).
+    var PRICE_NUM = '(\\d{1,3}(?:[,.]\\d{3})+|\\d+(?:\\.\\d+)?)\\s*(אלף|k)?';
+    var PRICE_CUR = '(?:\\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils))?';
+    var PRICE_PATTERNS = [
+      ['both', new RegExp('\\s(?:בין|between)\\s*' + PRICE_NUM + PRICE_CUR + '\\s*(?:ל-?|and|to|עד|-|–)\\s*' + PRICE_NUM + PRICE_CUR + '(?=\\s)', 'iu')],
+      ['both', new RegExp('\\s(?:מ-?|מ־|from)\\s*' + PRICE_NUM + PRICE_CUR + '\\s*(?:עד|to|-|–)\\s*' + PRICE_NUM + PRICE_CUR + '(?=\\s)', 'iu')],
+      ['both', new RegExp('\\s' + PRICE_NUM + PRICE_CUR + '\\s*(?:-|–)\\s*' + PRICE_NUM + PRICE_CUR + '(?=\\s)', 'iu')],
+      ['max', new RegExp('\\s(?:עד|מתחת\\s*ל-?|מתחת|פחות\\s*מ-?|לא\\s+יותר\\s+מ-?|under|below|up\\s+to|max)\\s*' + PRICE_NUM + PRICE_CUR + '(?=\\s)', 'iu')],
+      ['min', new RegExp('\\s(?:מעל|יותר\\s*מ-?|לפחות|over|above|min)\\s*' + PRICE_NUM + PRICE_CUR + '(?=\\s)', 'iu')]
+    ];
+    var PRICE_BARE = new RegExp('\\s' + PRICE_NUM + '\\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils)(?=\\s)', 'iu');
+
+    function priceAmount(m, at) {
+      return parseFloat(String(m[at]).replace(/[,.](?=\d{3}(\D|$))/g, '')) * (m[at + 1] ? 1000 : 1);
+    }
+
+    function priceRange(raw) {
+      var text = ' ' + String(raw) + ' ';
+      var min = null;
+      var max = null;
+      PRICE_PATTERNS.forEach(function (pattern) {
+        var m = text.match(pattern[1]);
+        if (!m) {
+          return;
+        }
+        if (pattern[0] === 'both') {
+          var a = priceAmount(m, 1);
+          var b = priceAmount(m, 3);
+          // A bare "14-18" with no currency is a size or a karat, not a price.
+          if (!/ש|₪|nis|ils|בין|between|מ|from/i.test(m[0]) && Math.min(a, b) < 100) {
+            return;
+          }
+          min = Math.min(a, b);
+          max = Math.max(a, b);
+        } else if (pattern[0] === 'max') {
+          max = priceAmount(m, 1);
+        } else {
+          min = priceAmount(m, 1);
+        }
+        text = text.replace(m[0], ' ');
+      });
+      if (min === null && max === null) {
+        var bare = text.match(PRICE_BARE);
+        if (bare) {
+          max = priceAmount(bare, 1);
+          text = text.replace(bare[0], ' ');
+        }
+      }
+      return { query: text.replace(/\s+/g, ' ').trim(), min: min, max: max };
+    }
+
+    function inPriceRange(price, min, max) {
+      if (min === null && max === null) {
+        return true;
+      }
+      if (typeof price !== 'number') {
+        return false;
+      }
+      return (min === null || price >= min) && (max === null || price <= max);
+    }
+
     function lookup(raw, question) {
+      var price = priceRange(raw);
+      if (price.min !== null || price.max !== null) {
+        return lookup(price.query, question).filter(function (hit) {
+          var record = state.records[hit.id];
+          return !record || record.t !== 'product' || inPriceRange(record.pr, price.min, price.max);
+        });
+      }
       var without = withoutWords(raw);
       if (without.out.length) {
         return lookup(without.query, question).filter(function (hit) {

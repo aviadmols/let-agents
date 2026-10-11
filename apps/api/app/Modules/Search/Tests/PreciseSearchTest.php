@@ -44,6 +44,7 @@ final class PreciseSearchTest extends TestCase
                 CatalogProduct::query()->create([
                     'shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
                     'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => [],
+                    'price' => ['1' => 900, '2' => 2400, '3' => 300, '4' => 3900, '5' => 1200][$id],
                 ]);
             }
         });
@@ -85,5 +86,18 @@ final class PreciseSearchTest extends TestCase
         $this->assertEqualsCanonicalizing(['3'], $this->found('טבעת סוליטר בלי יהלומים'), 'the solitaires, not the ones with diamonds');
         $this->assertEqualsCanonicalizing(['1', '3'], $this->found('טבעת כסף ללא זהב'));
         $this->assertSame(['טבעת סוליטר', ['יהלומ']], HebrewSearch::without('טבעת סוליטר בלי יהלומים'));
+    }
+
+    public function test_a_price_in_the_words_is_a_range_not_a_word(): void
+    {
+        $this->assertEqualsCanonicalizing(['2'], $this->found('טבעת יהלום בזהב עד 2500 שח'), 'the gold diamond ring at 2,400, not the white gold one at 3,900');
+        $this->assertEqualsCanonicalizing(['2', '4'], $this->found('טבעת יהלום זהב'), 'without the price, both');
+        $this->assertEqualsCanonicalizing(['4'], $this->found('טבעת מעל 3 אלף ש״ח'));
+        $this->assertEqualsCanonicalizing(['1', '5'], $this->found('יהלום בין 800 ל-1500'));
+
+        $this->assertSame(['טבעת יהלום בזהב', null, 2500.0], HebrewSearch::priceRange('טבעת יהלום בזהב עד 2500 שח'));
+        $this->assertSame(['טבעת', 1000.0, 2000.0], HebrewSearch::priceRange('טבעת מ-1000 עד 2,000 ש"ח'));
+        $this->assertSame(['טבעת 14-18K', null, null], HebrewSearch::priceRange('טבעת 14-18K'), 'a karat range is not a price');
+        $this->assertSame(['מדף 60 ס"מ', null, null], HebrewSearch::priceRange('מדף 60 ס"מ'), 'a size is not a price');
     }
 }

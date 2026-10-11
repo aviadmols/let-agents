@@ -83,8 +83,10 @@ final class SearchCatalog
     public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true): array
     {
         return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup, $meaning): array {
+            // "עד 2500 ש״ח": the amount is not searched for; products outside the range are kept away.
+            [$priced, $minPrice, $maxPrice] = HebrewSearch::priceRange(mb_substr($raw, 0, 120));
             // "בלי יהלומים": that word is not searched for, and what holds it is kept away.
-            [$query, $without] = HebrewSearch::without(mb_substr($raw, 0, 120));
+            [$query, $without] = HebrewSearch::without($priced);
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
             $index = $query === '' ? null : LoadedIndex::for($shopId);
 
@@ -130,6 +132,10 @@ final class SearchCatalog
                 $type = $record['t'] ?? null;
 
                 if ($record !== null && $without !== [] && $type === 'product' && HebrewSearch::holdsAny($record['title'].' '.($record['kw'] ?? ''), $without)) {
+                    continue;
+                }
+
+                if ($record !== null && $type === 'product' && ! HebrewSearch::inRange($record['pr'] ?? null, $minPrice, $maxPrice)) {
                     continue;
                 }
 
