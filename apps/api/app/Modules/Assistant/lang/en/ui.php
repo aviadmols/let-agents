@@ -88,4 +88,46 @@ return [
             'check_empty' => 'Nothing left to show',
         ],
     ],
+    'knowledge' => [
+        'title' => 'About the store',
+        'subheading' => 'What the assistant knows about the store before it reads any page: what every product page shows, the policies, what you wrote and the answers you gave. All of it goes into answers to questions in the search.',
+        'no_shop' => 'No shop yet.',
+        'pair' => 'Question: :question
+Answer: :answer',
+        'titles' => [
+            'repeated' => 'Information shown on every product page of the site',
+            'own' => 'About the store, from the store team',
+            'team' => 'The store team\'s answers to shoppers\' questions',
+        ],
+        'repeated' => [
+            'title' => 'What every product page shows',
+            'help' => 'Sentences the site shows on nearly every product: returns, warranty, payments, shipping. They are read from the pages themselves after every sync, and the assistant puts them first.',
+            'read' => 'Read from :pages product pages, :when.',
+            'none' => 'Nothing repeated on the product pages yet. It is read after the next sync, or with "Read again".',
+            'read_again' => 'Read again now',
+            'remove' => 'Remove',
+            'remove_confirm' => 'Remove this sentence? It will not be read again next time either.',
+        ],
+        'policies' => [
+            'title' => 'Policies and key pages',
+            'help' => 'The site\'s pages that look like policies: returns, cancellations, shipping, warranty and terms. The assistant reads them when a question is about them.',
+            'none' => 'No policy pages found on the site. You can write the main points in "More information" below.',
+            'open' => 'View',
+        ],
+        'own' => [
+            'title' => 'More information you want the assistant to know',
+            'help' => 'What the site does not say, or what matters to you that it says: pickup hours, delivery times, payment plans, services. The assistant answers from it.',
+            'placeholder' => 'For example: a piece can be reserved with a 10% deposit and the rest paid in instalments, without holding the credit card limit.',
+            'save' => 'Save',
+        ],
+        'team' => [
+            'title' => 'Answers you gave shoppers',
+            'help' => 'Every answer you write on the questions screen comes here, and the assistant uses it for similar questions too.',
+            'none' => 'You have not answered questions yet. An answer you write on the questions screen shows here.',
+        ],
+        'saved' => 'Saved. The assistant uses it from the next question',
+        'removed' => 'The sentence was removed',
+        'reading' => 'Reading the product pages',
+        'reading_body' => 'This takes a minute or two. Refresh the screen to see it.',
+    ],
 ];

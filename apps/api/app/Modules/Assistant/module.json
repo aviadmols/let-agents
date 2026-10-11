@@ -32,6 +32,10 @@
         {
             "name": "ask_review",
             "default": true
+        },
+        {
+            "name": "knowledge",
+            "default": true
         }
     ],
     "settings": [
@@ -314,6 +318,23 @@
             "max": 500,
             "scope": "shop",
             "unit": "questions"
+        },
+        {
+            "name": "knowledge_pages",
+            "type": "int",
+            "default": 12,
+            "min": 3,
+            "max": 40,
+            "scope": "global",
+            "unit": "pages"
+        },
+        {
+            "name": "knowledge_share",
+            "type": "float",
+            "default": 0.6,
+            "min": 0.3,
+            "max": 1,
+            "scope": "global"
         }
     ],
     "agents": [

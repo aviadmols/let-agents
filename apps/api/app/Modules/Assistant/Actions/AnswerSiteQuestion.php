@@ -162,15 +162,18 @@ final class AnswerSiteQuestion
 
     private const PAGES_BY_WORDS = 3;
 
+    /** Of the team's answers, how many like the question are read; and how much of an entry. */
+    private const TEAM_PAIRS = 4;
+
+    private const KNOWLEDGE_CHARS = 2500;
+
     /**
-     * The shop's pages whose title holds a word of the question (a plural as its singular: ביטולים
-     * finds ביטול), most words first, before the passages the meaning search found. Inside the
-     * shop's tenant.
+     * The words of a question that may name something: a plural as its singular (ביטולים finds
+     * ביטול), and a word with its leading letter dropped as well.
      *
-     * @param  list<array<string, mixed>>  $found
-     * @return list<array<string, mixed>>
+     * @return list<string>
      */
-    private function pagesByWords(string $question, array $found): array
+    private function words(string $question): array
     {
         $words = [];
 
@@ -188,6 +191,21 @@ final class AnswerSiteQuestion
             }
         }
 
+        return array_values(array_unique($words));
+    }
+
+    /**
+     * The shop's pages whose title holds a word of the question (a plural as its singular: ביטולים
+     * finds ביטול), most words first, before the passages the meaning search found. Inside the
+     * shop's tenant.
+     *
+     * @param  list<array<string, mixed>>  $found
+     * @return list<array<string, mixed>>
+     */
+    private function pagesByWords(string $question, array $found): array
+    {
+        $words = $this->words($question);
+
         if ($words === []) {
             return $found;
         }
@@ -195,7 +213,7 @@ final class AnswerSiteQuestion
         $scores = [];
 
         foreach (array_unique($words) as $word) {
-            foreach (CatalogContent::query()->active()->where('title', 'like', '%'.$word.'%')->limit(10)->pluck('id') as $id) {
+            foreach (CatalogContent::query()->active()->where('type', '!=', CatalogContent::KNOWLEDGE)->where('title', 'like', '%'.$word.'%')->limit(10)->pluck('id') as $id) {
                 $scores[(string) $id] = ($scores[(string) $id] ?? 0) + 1;
             }
         }
@@ -213,6 +231,45 @@ final class AnswerSiteQuestion
         }
 
         return [...$pages, ...$found];
+    }
+
+    /**
+     * The store's knowledge entries as the first passages: what its product pages repeat and what
+     * its team wrote, whole; of the team's answers, only those that share a word with the question.
+     */
+    private function knowledge(string $question, string $shopId, array $found): array
+    {
+        if (! Features::enabled('assistant.knowledge', $shopId)) {
+            return $found;
+        }
+
+        $words = $this->words($question);
+        $first = [];
+
+        foreach (CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->orderBy('external_id')->get(['id', 'external_id', 'title', 'body']) as $entry) {
+            $text = trim((string) $entry->body);
+
+            if ($entry->external_id === BuildShopKnowledge::TEAM) {
+                $pairs = array_filter(preg_split('/\n{2,}/u', $text) ?: [], function (string $pair) use ($words): bool {
+                    foreach ($words as $word) {
+                        if (mb_stripos($pair, $word) !== false) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+                $text = implode("\n\n", array_slice($pairs, 0, self::TEAM_PAIRS));
+            }
+
+            if ($text !== '') {
+                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0];
+            }
+        }
+
+        $ids = array_map(fn (array $p): string => $p['source_id'], $first);
+
+        return [...$first, ...array_values(array_filter($found, fn (array $p): bool => $p['source'] !== 'content' || ! in_array($p['source_id'], $ids, true)))];
     }
 
     private function stale(AssistantAnswer $saved, string $shopId): bool
@@ -271,6 +328,9 @@ final class AnswerSiteQuestion
                 // Code before model: the pages whose title holds the question's words ("ביטול עסקה" for
                 // "מה מדיניות הביטולים") are read first, whatever the meaning search found.
                 $found = $this->pagesByWords($question, $found);
+                // Before all: what the store says about itself on every product page, in its team's words,
+                // and the team's answers to questions like this one.
+                $found = $this->knowledge($question, $shopId, $found);
                 $candidates = $this->candidates($shown);
                 $noAnswer = $shown === [] ? AssistantAnswer::NO_INFO : 'no_match';
 

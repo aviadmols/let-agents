@@ -21,4 +21,8 @@ return [
         'label' => 'Daily report on questions in the search',
         'description' => 'Every morning: a check of yesterday\'s questions and of what the assistant answered, a score for each question and for the day, and what to improve.',
     ],
+    'knowledge' => [
+        'label' => 'What the store says about itself',
+        'description' => 'What every product page repeats (returns, warranty, payments, shipping), what the team wrote, and the team\'s answers: the assistant reads them before any other page. Read by code, no model.',
+    ],
 ];

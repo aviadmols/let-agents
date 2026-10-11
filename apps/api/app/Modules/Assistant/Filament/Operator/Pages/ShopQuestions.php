@@ -176,13 +176,13 @@ class ShopQuestions extends Page
             return;
         }
 
-        app(TenantContext::class)->run($this->shop, fn () => AssistantAnswer::query()->whereKey($id)->update([
+        // Saved through the model: the team's answer also joins what the assistant knows about the store.
+        app(TenantContext::class)->run($this->shop, fn () => AssistantAnswer::query()->whereKey($id)->first()?->forceFill([
             'answer' => mb_substr($text, 0, 1200),
             'outcome' => AssistantAnswer::ANSWERED,
             'source' => self::TEAM,
             'status' => AssistantAnswer::SHOWN,
-            'updated_at' => now(),
-        ]));
+        ])->save());
 
         unset($this->drafts[$id]);
         Notification::make()->success()->title(__('assistant::ui.questions.answered'))->send();
@@ -205,7 +205,7 @@ class ShopQuestions extends Page
             return;
         }
 
-        app(TenantContext::class)->run($this->shop, fn () => AssistantAnswer::query()->whereKey($id)->update(['status' => $status, 'updated_at' => now()]));
+        app(TenantContext::class)->run($this->shop, fn () => AssistantAnswer::query()->whereKey($id)->first()?->forceFill(['status' => $status])->save());
         Notification::make()->success()->title(__('assistant::ui.questions.saved'))->send();
     }
 }

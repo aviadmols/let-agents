@@ -131,4 +131,12 @@ return [
         'label' => 'How many questions are reviewed a day',
         'description' => 'The first of that day.',
     ],
+    'knowledge_pages' => [
+        'label' => 'Product pages read',
+        'description' => 'How many product pages, spread over the catalogue, are read to find what they all repeat.',
+    ],
+    'knowledge_share' => [
+        'label' => 'Share of pages that must repeat a sentence',
+        'description' => 'The share of pages a sentence must appear on to count as information about the store. 0.6 = sixty percent.',
+    ],
 ];

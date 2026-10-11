@@ -41,6 +41,9 @@ class CatalogContent extends Model
 
     public const PAGE = 'page';
 
+    /** What the store says about itself, gathered for the assistant: never a page of the site, never in search results. */
+    public const KNOWLEDGE = 'knowledge';
+
     /** External ids of content the platform wrote for the store itself; a sync never removes them. */
     public const OWN_PREFIX = 'la:';
 
