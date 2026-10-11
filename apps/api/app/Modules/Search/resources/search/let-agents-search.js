@@ -2899,6 +2899,9 @@
         if (result && result.nothing) {
           return 'photo_nothing';
         }
+        if (result && result.unclear) {
+          return 'photo_unclear';
+        }
         var items = (result && result.items) || [];
         return products.length || tags.length || items.length > 1
           ? { products: products, tags: tags, seen: (result && result.seen) || '', items: items, item: (result && result.item) || 0 }

@@ -246,9 +246,9 @@
         {
             "name": "photo_tags_max_output_tokens",
             "type": "int",
-            "default": 600,
+            "default": 1500,
             "min": 100,
-            "max": 2000,
+            "max": 4000,
             "scope": "global",
             "unit": "tokens"
         },

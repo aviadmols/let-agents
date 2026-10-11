@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
+use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Enums\AiProviderName;
@@ -511,6 +512,23 @@ final class SearchByPhotoTest extends TestCase
 
         $this->assertSame(['99', '98'], array_column($products, 'external_id'), 'what the band plainly lacks puts the diamond ring after it');
         $this->assertTrue($products[1]['lacks']);
+    }
+
+    public function test_a_photo_the_reader_could_not_make_out_says_so_instead_of_showing_lookalikes(): void
+    {
+        // The model answered, but its answer was cut off: not JSON.
+        $this->app->instance(VisionModel::class, new class implements VisionModel
+        {
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                throw new ModelCallFailed(ModelCallFailed::NOT_JSON);
+            }
+        });
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertTrue($result['unclear']);
+        $this->assertSame([], $result['groups']['product'], 'no shirts that only share the photo\'s colours');
     }
 
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void

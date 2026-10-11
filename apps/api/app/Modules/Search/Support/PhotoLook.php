@@ -46,12 +46,19 @@ final class PhotoLook
         public readonly array $items = [],
         public readonly int $item = 0,
         public readonly array $lacks = [],
+        public readonly bool $failed = false,
     ) {}
 
     /** The photo could not be read: reading is off, no model, or the call failed. */
     public static function unread(): self
     {
         return new self(null);
+    }
+
+    /** The reader was asked and gave no usable answer: the photo was not understood. */
+    public static function failed(): self
+    {
+        return new self(null, failed: true);
     }
 
     /** The photo shows nothing the shop sells. */

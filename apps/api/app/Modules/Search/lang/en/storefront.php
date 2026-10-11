@@ -72,4 +72,5 @@ return [
     'photo_count' => ':count similar products',
     'photo_seen' => 'We saw :seen · In the photo:',
     'photo_items' => 'We found several items in the photo. Which one?',
+    'photo_unclear' => 'We could not make out what is in the photo. Try a closer photo of one item.',
 ];

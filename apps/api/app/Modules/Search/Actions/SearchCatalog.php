@@ -292,6 +292,15 @@ final class SearchCatalog
                 return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true] + $seen;
             }
 
+            // The reader was asked and could not make the photo out: say so. Pictures alike in colour
+            // and light would be shown as if they were what the shopper photographed.
+            if ($look->failed) {
+                $record && $this->counter->photo($shopId, 0);
+                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0);
+
+                return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'unclear' => true, 'searched' => true];
+            }
+
             if ($tags !== null) {
                 // A scene (a pergola, a deck) looks like no single product picture, so the picture
                 // scores are flat and the nearest pictures are noise. The tags say what to show; the

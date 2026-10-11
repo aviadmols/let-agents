@@ -74,6 +74,9 @@ final class ReadPhotoTags
 
     private const NEAR_ANY = 30;
 
+    /** Whether the last call answered with something that could not be read. */
+    private bool $unreadable = false;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly VisionModel $vision,
@@ -114,7 +117,9 @@ final class ReadPhotoTags
             fn (): ?array => $this->firstLook($shopId, $reader, $mime, $bytes, $notes));
 
         if ($first === null) {
-            return PhotoLook::unread();
+            // An answer that came and could not be read (cut off, not JSON) means the photo was not made
+            // out; no key or a provider down means only that reading is not there, and pictures still help.
+            return $this->unreadable ? PhotoLook::failed() : PhotoLook::unread();
         }
 
         if (! $first['sellable']) {
@@ -297,6 +302,7 @@ final class ReadPhotoTags
      */
     private function firstLook(string $shopId, array $role, string $mime, string $bytes, string $notes = ''): ?array
     {
+        $this->unreadable = false;
         $answer = null;
         $user = "The shopper's photo is attached.".($notes === '' ? '' : "\n\n".$notes);
 
@@ -381,6 +387,7 @@ final class ReadPhotoTags
 
                     return;
                 } catch (ModelCallFailed $e) {
+                    $this->unreadable = $e->reason === 'not_json';
                     $run->fail('search::runs.photo_tags_failed', ['reason' => $e->reason]);
 
                     return;
