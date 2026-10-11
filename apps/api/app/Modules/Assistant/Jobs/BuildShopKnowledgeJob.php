@@ -18,17 +18,15 @@ final class BuildShopKnowledgeJob implements ShouldBeUnique, ShouldQueue
     use InteractsWithQueue;
     use Queueable;
 
-    public int $timeout = 600;
+    public int $timeout = 300;
 
     public int $tries = 1;
 
     /** One reading of a shop at a time; a second sync in the same minutes waits for the next. */
-    public int $uniqueFor = 900;
+    public int $uniqueFor = 300;
 
-    public function __construct(public readonly string $shopId)
-    {
-        $this->onQueue('long');
-    }
+    /** A dozen page reads: the quick queue, never behind a picture scan. */
+    public function __construct(public readonly string $shopId) {}
 
     public function uniqueId(): string
     {
