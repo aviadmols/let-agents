@@ -453,6 +453,27 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(1, $vision->sheets, 'the same photo and candidates are not asked twice');
     }
 
+    public function test_the_likest_product_of_a_big_category_is_found_wherever_the_database_keeps_it(): void
+    {
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 131]);
+            // 130 rings that look little like the photo, then, last of all, the one that does.
+            foreach (range(1, 130) as $i) {
+                $this->shirt((string) (1000 + $i), 'טבעת '.$i, [0.2, 1.0, 0.1]);
+            }
+            $this->shirt('2000', 'טבעת סוליטר', [0.9, 0.1, 0.4]);
+            CatalogProduct::query()->whereIn('external_id', [...array_map(fn (int $i): string => (string) (1000 + $i), range(1, 130)), '2000'])->get()
+                ->each(fn (CatalogProduct $p) => $p->categories()->attach($rings->id));
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'טבעת', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame('2000', $result['groups']['product'][0]['external_id'], 'the whole category is weighed, not its first rows');
+    }
+
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void
     {
         $this->inShop(function (): void {

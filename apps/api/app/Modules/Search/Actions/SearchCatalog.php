@@ -43,8 +43,11 @@ final class SearchCatalog
     /** Products a tagged photo returns, for the shopper to narrow by tag in the browser. */
     private const PHOTO_TAGGED = 60;
 
-    /** Products a tag brings, before the picture orders them. */
-    private const PHOTO_PER_TAG = 40;
+    /** Products a tag of words brings, before the picture orders them. */
+    private const PHOTO_PER_TAG = 200;
+
+    /** A category tag brings all its products, up to this many. */
+    private const PHOTO_CATEGORY_ALL = 5000;
 
     /** Products of the asked-about kind put first for a question. */
     private const SUBJECT_PRODUCTS = 12;
@@ -422,7 +425,9 @@ final class SearchCatalog
             $ids = isset($tag['id'])
                 ? CatalogProduct::query()->active()
                     ->whereHas('categories', fn ($q) => $q->where('external_id', substr((string) $tag['id'], 2)))
-                    ->limit(self::PHOTO_PER_TAG * 3)->pluck('external_id')->map(fn ($id): string => (string) $id)->all()
+                    // The whole category: the likeness below picks from all of it. A cap here took the first
+                    // rows the database gave, and the right ring could be outside them.
+                    ->limit(self::PHOTO_CATEGORY_ALL)->pluck('external_id')->map(fn ($id): string => (string) $id)->all()
                 : array_map(fn (array $hit): string => substr($hit['id'], 2), array_slice(array_values(array_filter(
                     HebrewSearch::search($index['engine'], $tag['title']),
                     fn (array $hit): bool => str_starts_with($hit['id'], 'p:'),
