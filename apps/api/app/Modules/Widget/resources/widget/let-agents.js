@@ -4,6 +4,8 @@
  * Loaded by the Let Agents WordPress plugin, which sets window.LetAgentsContext:
  *   { site, api, script, mode: 'live'|'preview', preview, page: {type, id}, locale,
  *     storeApi, nonce, cartUrl }
+ * or by the Shopify app block, which sets platform: 'shopify', root, moneyFormat and page.url;
+ * prices then come from /products/{handle}.js and the cart is Shopify's own.
  *
  * What it does, in order:
  *   1. Reads the page content from the Let Agents API (cached, public data).
@@ -34,6 +36,14 @@
   var STORE_API = ctx.storeApi ? String(ctx.storeApi).replace(/\/?$/, '/') : null;
   var PAGE_TYPE = ctx.page.type === 'content' ? 'content' : 'product';
   var PAGE_ID = String(ctx.page.id || '');
+  var SHOPIFY = ctx.platform === 'shopify';
+  // The storefront's root with its market or language prefix, so prices and the cart are this shopper's.
+  var ROOT = SHOPIFY ? String(ctx.root || '/').replace(/\/?$/, '/') : null;
+  // Shopify: product id -> its link, where the handle comes from.
+  var knownUrls = {};
+  if (SHOPIFY && ctx.page.url) {
+    knownUrls[PAGE_ID] = String(ctx.page.url);
+  }
   var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   var MAX_BATCH = 50;
   var SEEN_KEY = 'let_agents_seen';
@@ -297,7 +307,92 @@
     return typeof value === 'string' && /^https?:\/\//i.test(value) ? value : null;
   }
 
+  /** The handle in a product link: /products/{handle}, with or without a market prefix. */
+  function shopifyHandle(url) {
+    var match = String(url || '').match(/\/products\/([^/?#]+)/);
+    return match ? match[1] : null;
+  }
+
+  /** A shop's money format ("₪{{amount}}", "{{amount_no_decimals}} ₪") as the prefix and suffix money() uses. */
+  function shopifyMoney(price, compare) {
+    var format = String(ctx.moneyFormat || '{{amount}}');
+    var at = format.indexOf('{{');
+    var end = format.indexOf('}}');
+    var whole = /no_decimals/.test(format) || (price % 100 === 0 && (compare === null || compare % 100 === 0));
+    return {
+      price: price,
+      regular_price: compare !== null && compare > price ? compare : price,
+      currency_minor_unit: 2,
+      currency_decimals: whole ? 0 : 2,
+      currency_prefix: at > 0 ? format.slice(0, at) : '',
+      currency_suffix: end !== -1 ? format.slice(end + 2) : '',
+      currency_thousand_separator: /comma_separator/.test(format) ? '.' : ',',
+      currency_decimal_separator: /comma_separator/.test(format) ? ',' : '.'
+    };
+  }
+
+  /**
+   * A Shopify product (the JSON of /products/{handle}.js) in the shape the cards know from the
+   * WooCommerce Store API. The variant shown and bought is the first in stock, or the cheapest.
+   */
+  function fromShopify(product) {
+    var variants = (product && product.variants) || [];
+    if (!variants.length) {
+      return null;
+    }
+    var chosen = null;
+    for (var i = 0; i < variants.length && !chosen; i++) {
+      if (variants[i].available) {
+        chosen = variants[i];
+      }
+    }
+    chosen = chosen || variants.slice().sort(function (a, b) { return Number(a.price) - Number(b.price); })[0];
+    var price = Number(chosen.price);
+    var compare = chosen.compare_at_price == null ? null : Number(chosen.compare_at_price);
+    var image = product.featured_image ? String(product.featured_image) : '';
+    if (image.indexOf('//') === 0) {
+      image = 'https:' + image;
+    }
+    return {
+      id: product.id,
+      name: product.title,
+      permalink: location.origin + String(product.url || ''),
+      images: image ? [{ thumbnail: image + (image.indexOf('?') === -1 ? '?' : '&') + 'width=400' }] : [],
+      is_in_stock: !!chosen.available,
+      on_sale: compare !== null && compare > price,
+      prices: shopifyMoney(price, compare),
+      type: variants.length === 1 ? 'simple' : 'variable',
+      is_purchasable: true,
+      has_options: variants.length > 1,
+      variant: chosen.id
+    };
+  }
+
+  function shopifyLive(ids) {
+    var unique = ids.filter(function (id, i) { return ids.indexOf(id) === i && shopifyHandle(knownUrls[id]); }).slice(0, 40);
+    if (!unique.length) {
+      return Promise.resolve(null);
+    }
+    return Promise.all(unique.map(function (id) {
+      return fetch(ROOT + 'products/' + shopifyHandle(knownUrls[id]) + '.js', { credentials: 'same-origin' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (product) { return product ? fromShopify(product) : null; })
+        .catch(function () { return null; });
+    })).then(function (products) {
+      var byId = {};
+      products.forEach(function (product, i) {
+        if (product) {
+          byId[String(unique[i])] = product;
+        }
+      });
+      return byId;
+    });
+  }
+
   function liveProducts(ids) {
+    if (SHOPIFY && window.fetch) {
+      return shopifyLive(ids);
+    }
     if (!STORE_API || ids.length === 0 || !window.fetch) {
       return Promise.resolve(null);
     }
@@ -327,7 +422,8 @@
     if (isNaN(amount)) {
       return '';
     }
-    var parts = amount.toFixed(minor).split('.');
+    var decimals = prices.currency_decimals !== undefined ? prices.currency_decimals : minor;
+    var parts = amount.toFixed(decimals).split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, prices.currency_thousand_separator || ',');
     return (prices.currency_prefix || '') + parts.join(prices.currency_decimal_separator || '.') + (prices.currency_suffix || '');
   }
@@ -337,7 +433,62 @@
     return parseInt(prices && prices[key], 10) / Math.pow(10, minor);
   }
 
+  var lastLive = {};
+
+  function shopifyAddToCart(productId) {
+    var product = lastLive[String(productId)];
+    if (!product || !product.variant) {
+      return Promise.resolve('error');
+    }
+    if (!product.is_in_stock) {
+      return Promise.resolve('out_of_stock');
+    }
+    return fetch(ROOT + 'cart/add.js', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ items: [{ id: Number(product.variant), quantity: 1 }], sections: 'cart-icon-bubble,cart-drawer', sections_url: location.pathname })
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (body) {
+        if (response.ok) {
+          shopifySections = body && body.sections;
+          return 'added';
+        }
+        return /sold out|stock/i.test(String((body && (body.description || body.message)) || '')) ? 'out_of_stock' : 'error';
+      });
+    }).catch(function () { return 'error'; });
+  }
+
+  var shopifySections = null;
+
+  /** The theme's cart drawer, redrawn and opened the ways common themes allow; quietly nothing otherwise. */
+  function refreshShopifyCart() {
+    try {
+      var dawn = document.querySelector('cart-drawer');
+      if (dawn && typeof dawn.renderContents === 'function' && shopifySections && shopifySections['cart-drawer']) {
+        dawn.classList.remove('is-empty');
+        dawn.renderContents({ sections: shopifySections });
+        return;
+      }
+      document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true, detail: { open: true } }));
+      document.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+      var drawer = document.querySelector('cart-drawer, #cart-drawer, #CartDrawer, cart-notification');
+      if (drawer) {
+        setTimeout(function () {
+          if (typeof drawer.show === 'function') {
+            drawer.show();
+          } else if (typeof drawer.open === 'function') {
+            drawer.open();
+          }
+        }, 400);
+      }
+    } catch (e) { /* the theme has no drawer */ }
+  }
+
   function addToCart(productId, retried) {
+    if (SHOPIFY) {
+      return shopifyAddToCart(productId);
+    }
     var headers = { 'Content-Type': 'application/json' };
     var ready = nonce ? Promise.resolve(nonce) : fetch(STORE_API + 'cart', { credentials: 'same-origin' })
       .then(function (response) {
@@ -385,6 +536,10 @@
   }
 
   function refreshCartFragments() {
+    if (SHOPIFY) {
+      refreshShopifyCart();
+      return;
+    }
     try {
       if (window.jQuery) {
         window.jQuery(document.body).trigger('wc_fragment_refresh');
@@ -708,6 +863,13 @@
   }
 
   function place(host) {
+    // The theme's own block for the widget (Shopify's theme editor): there, before any selector.
+    var mount = document.querySelector('[data-let-agents-widget]');
+    if (mount) {
+      mount.appendChild(host);
+      return true;
+    }
+
     var placement = bank.placement || {};
     var target = null;
 
@@ -3299,19 +3461,21 @@
           // The tag view's products are checked against the live store like any other.
           var ids = [];
           sections.concat(data.layout === 'tags' ? (data.tags || []) : []).forEach(function (section) {
-            (section.products || []).forEach(function (product) { ids.push(String(product.id)); });
+            (section.products || []).forEach(function (product) { ids.push(String(product.id)); knownUrls[String(product.id)] = knownUrls[String(product.id)] || product.url; });
           });
           if (hasViewed) {
-            recent.products.forEach(function (product) { ids.push(String(product.id)); });
+            recent.products.forEach(function (product) { ids.push(String(product.id)); knownUrls[String(product.id)] = knownUrls[String(product.id)] || product.url; });
           }
           if (PAGE_TYPE === 'product') {
             ids.push(PAGE_ID);
           }
           if (previous) {
             ids.push(String(previous.id));
+            knownUrls[String(previous.id)] = knownUrls[String(previous.id)] || previous.url;
           }
 
           return liveProducts(ids).then(function (live) {
+            lastLive = live || {};
             reconcile(live);
             render(live, previous);
             rememberCurrent(live);

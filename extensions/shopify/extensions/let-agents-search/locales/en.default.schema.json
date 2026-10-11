@@ -1,12 +1,23 @@
 {
-  "blocks": {
-    "app_embed": {
-      "name": "Let's search",
-      "settings": {
-        "about": {
-          "content": "Replaces the store's search suggestions with Let's search: typo-tolerant suggestions, live prices and stock, and answers to shoppers' questions. Turn it off to bring back the theme's own search."
+    "blocks": {
+        "app_embed": {
+            "name": "Let's search",
+            "settings": {
+                "about": {
+                    "content": "Replaces the store's search suggestions with Let's search: typo-tolerant suggestions, live prices and stock, and answers to shoppers' questions. Turn it off to bring back the theme's own search."
+                }
+            }
+        },
+        "page_widget": {
+            "name": "Let's search – page",
+            "settings": {
+                "about": {
+                    "content": "Shows the Let's search component in this spot: questions and answers, similar products and what matters about the product or the post. Works on product pages and blog posts. The search itself is switched on in App embeds."
+                },
+                "space": {
+                    "label": "Space above and below"
+                }
+            }
         }
-      }
     }
-  }
 }
