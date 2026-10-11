@@ -49,7 +49,10 @@ final class ShopifyStoreFeedTest extends TestCase
             'installed_at' => now(),
         ]);
 
-        Http::fake(fn (Request $request) => $this->respond($request));
+        Http::fake(fn (Request $request) => str_contains($request->url(), '/pages/')
+            // The storefront page a theme builds from sections: its text is only on the page itself.
+            ? Http::response('<html><body><header>תפריט</header><main><h1>ביטול עסקה</h1><p>ניתן לבטל עסקה תוך 14 יום.</p><form><input name="id"><button>שליחה</button></form></main><footer>זכויות</footer></body></html>', 200, ['Content-Type' => 'text/html'])
+            : $this->respond($request));
     }
 
     public function test_a_shopify_store_syncs_into_the_catalog_like_a_woocommerce_one(): void
@@ -105,6 +108,11 @@ final class ShopifyStoreFeedTest extends TestCase
             $policy = CatalogContent::query()->where('external_id', 'policy-71')->sole();
             $this->assertSame(['page', 'מדיניות החזרות וביטולים', 'https://kli.co.il/policies/refund-policy', 'ביטול עסקה תוך 14 יום.'], [$policy->type, $policy->title, $policy->url, $policy->body], 'the store\x27s refund policy is a page the search and the assistant read');
             $this->assertFalse(CatalogContent::query()->where('external_id', 'policy-72')->exists(), 'an empty policy is not a page');
+
+            $built = CatalogContent::query()->where('external_id', '5002')->sole();
+            $this->assertStringContainsString('ניתן לבטל עסקה תוך 14 יום.', $built->body, 'a page the theme builds is read as shoppers see it');
+            $this->assertStringNotContainsString('תפריט', $built->body, 'the main part only');
+            $this->assertStringNotContainsString('שליחה', $built->body, 'not a form\x27s buttons');
 
             $page = CatalogContent::query()->where('type', 'page')->where('external_id', '5001')->sole();
             $this->assertSame('5001', $page->external_id);
@@ -177,6 +185,7 @@ final class ShopifyStoreFeedTest extends TestCase
                 ? $this->connection([$this->saw(), $this->sawBlade(), $this->posOnly()], 'cursor-1')
                 : $this->connection([$this->drill()])],
             'Pages' => ['pages' => $this->connection([
+                ['id' => 'gid://shopify/Page/5002', 'title' => 'ביטול עסקה', 'handle' => 'cancel', 'body' => '', 'bodySummary' => '', 'isPublished' => true, 'createdAt' => '2026-01-01T00:00:00Z', 'updatedAt' => '2026-02-01T00:00:00Z'],
                 ['id' => 'gid://shopify/Page/5001', 'title' => 'אחריות', 'handle' => 'warranty', 'body' => '<p>אחריות לשנתיים.</p><p>על כל&nbsp;כלי.</p>', 'bodySummary' => 'אחריות לשנתיים.', 'isPublished' => true, 'createdAt' => '2026-01-01T00:00:00Z', 'updatedAt' => '2026-02-01T00:00:00Z'],
             ])],
             'Policies' => ['shop' => ['shopPolicies' => [

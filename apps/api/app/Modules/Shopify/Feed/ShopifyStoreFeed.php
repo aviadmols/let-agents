@@ -8,6 +8,7 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
 use Generator;
+use Illuminate\Support\Facades\Http;
 
 /**
  * A Shopify store's catalog in the same feed shape the WooCommerce plugin serves, read from the
@@ -367,6 +368,12 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
     private function page(array $node, string $base): array
     {
         $text = self::text($node['body'] ?? '');
+
+        // A page whose content the theme builds from sections (a form, contact details) has an empty
+        // body in Shopify: its text is read from the page as shoppers see it.
+        if ($text === '' && isset($node['handle'])) {
+            $text = self::shown($base.'/pages/'.rawurlencode((string) $node['handle']));
+        }
         $summary = self::line($node['bodySummary'] ?? '');
 
         return [
@@ -473,6 +480,29 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
 
             $after = $cursor;
         }
+    }
+
+    /** The text of the main part of a storefront page, or empty when it cannot be read. */
+    private static function shown(string $url): string
+    {
+        try {
+            $response = Http::timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
+        } catch (\Throwable) {
+            return '';
+        }
+
+        if (! $response->successful()) {
+            return '';
+        }
+
+        $html = (string) $response->body();
+        $html = (string) preg_replace('#<(script|style|noscript|svg|template)\b[^>]*>.*?</\1>#is', ' ', $html);
+        $main = preg_match('#<main\b[^>]*>(.*)</main>#is', $html, $m) === 1 ? $m[1] : '';
+        // Labels and buttons of a form are not what the page says.
+        $main = (string) preg_replace('#<(select|textarea|button|label)\b[^>]*>.*?</\1>#is', ' ', $main);
+        $main = (string) preg_replace('#<input\b[^>]*>#i', ' ', $main);
+
+        return mb_substr(self::text($main), 0, 20000);
     }
 
     /** "gid://shopify/Product/8123" is "8123": the plain number is what the storefront knows. */
