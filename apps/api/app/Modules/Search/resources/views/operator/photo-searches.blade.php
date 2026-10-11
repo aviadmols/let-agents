@@ -118,7 +118,7 @@
                                 </div>
                                 @if ($ask->results !== [])
                                     @php($described = collect($ask->results)->contains(fn ($r) => isset($r['about'])))
-                                    <div style="{{ $small }}">{{ $described ? __('search::ui.photo_log.order_details') : __('search::ui.photo_log.order_look') }}</div>
+                                    <div style="{{ $small }}">{{ $described ? __('search::ui.photo_log.order_details') : __('search::ui.photo_log.order_look') }} {{ __('search::ui.photo_log.order_words') }}</div>
                                     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
                                         @foreach (array_slice($ask->results, 0, 8) as $result)
                                             <div style="width:64px;display:grid;gap:2px;font-size:11px;line-height:1.3" title="{{ $result['title'] }}">
@@ -135,6 +135,9 @@
                                                 @endisset
                                                 @isset($result['about'])
                                                     <span>{{ __('search::ui.photo_log.about', ['score' => $result['about']]) }}</span>
+                                                @endisset
+                                                @isset($result['words'])
+                                                    <span>{{ __('search::ui.photo_log.words', ['score' => $result['words']]) }}</span>
                                                 @endisset
                                                 @if (array_key_exists('kind', $result) && ! $result['kind'] && $described)
                                                     <span style="opacity:.7">{{ __('search::ui.photo_log.other_kind') }}</span>

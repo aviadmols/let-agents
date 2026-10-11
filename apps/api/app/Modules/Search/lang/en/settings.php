@@ -278,4 +278,8 @@ return [
         'label' => 'How many leading products are ordered again',
         'description' => 'The first products the model sees and orders. The rest stay after them.',
     ],
+    'photo_words_weight' => [
+        'label' => 'Weight of the product\'s name in photo search',
+        'description' => 'How much a product whose name holds the words seen in the photo ("band", "plain", "solitaire") rises in the order. 0 = pictures only.',
+    ],
 ];

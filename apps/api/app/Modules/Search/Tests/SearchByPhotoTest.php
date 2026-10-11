@@ -474,6 +474,26 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame('2000', $result['groups']['product'][0]['external_id'], 'the whole category is weighed, not its first rows');
     }
 
+    public function test_a_product_named_with_the_words_seen_in_the_photo_comes_before_a_lookalike(): void
+    {
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 3]);
+            // Pictures equally alike; only the names differ.
+            $this->shirt('95', 'טבעת וינטג׳ משובצת לאפיס לזולי, זהב', [0.9, 0.1, 0.4]);
+            $this->shirt('96', 'טבעת פס חלקה דקה, זהב', [0.9, 0.1, 0.4]);
+            $this->shirt('97', 'טבעת אבן ירקרקה, זהב', [0.9, 0.1, 0.4]);
+            CatalogProduct::query()->whereIn('external_id', ['95', '96', '97'])->get()->each(fn (CatalogProduct $p) => $p->categories()->attach($rings->id));
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'טבעת פס חלקה', 'also' => ['טבעת'], 'details' => ['פס זהב דק'], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame('96', $result['groups']['product'][0]['external_id'], 'the plain thin band, by its name; gold, which every ring is, decides nothing');
+        $this->assertGreaterThan(0, $result['groups']['product'][0]['words']);
+    }
+
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void
     {
         $this->inShop(function (): void {

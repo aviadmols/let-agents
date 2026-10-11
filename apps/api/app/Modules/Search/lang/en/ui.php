@@ -234,6 +234,8 @@ return [
         'ranks_second' => 'With the second ordering: first in :first%, first three in :three%, first five in :five%.',
         'ranks_how' => 'Press "This one" under the right result (or paste a link), then "Check now": every photo is searched again, once in the usual order and once with the second ordering, and where the right product came out is measured.',
         'ranks_how_shop' => 'Press "This one" under the right result, or paste the product\'s link if it was not shown. This measures how often the right product comes first, and every change to the search is checked against these photos.',
+        'words' => 'Name :score%',
+        'order_words' => 'A product whose name holds the words seen rises.',
     ],
     'analytics' => [
         'title' => 'Search analytics',

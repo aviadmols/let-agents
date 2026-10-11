@@ -12,6 +12,7 @@ use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\PhotoLook;
+use App\Modules\Search\Support\PhotoPlacer;
 
 /**
  * One search in a shop: by spelling and by meaning, merged, grouped by what was found.
@@ -38,7 +39,12 @@ final class SearchCatalog
     /** Around the object cut from a photo: a margin of this share of its size, and no cut under this many pixels. */
     private const CUT_MARGIN = 0.12;
 
-    private const CUT_MIN_PIXELS = 48;
+    private const CUT_MIN_PIXELS = 20;
+
+    /** A cut narrower than this is scaled up to CUT_UPSCALE_TO on its long side before it is compared. */
+    private const CUT_UPSCALE_BELOW = 256;
+
+    private const CUT_UPSCALE_TO = 512;
 
     /** Products a tagged photo returns, for the shopper to narrow by tag in the browser. */
     private const PHOTO_TAGGED = 60;
@@ -269,6 +275,9 @@ final class SearchCatalog
                 // Another thing in the photo was chosen: the whole photo is about the first one, so only its own cut counts.
                 $hits = $look->item > 0 && $near !== [] ? $near : self::closer($hits, $near);
                 $cut = true;
+            } elseif ($look->item > 0) {
+                // The whole photo is about the first thing in it, not the one chosen: its likeness would mislead.
+                $hits = [];
             }
 
             // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
@@ -290,7 +299,7 @@ final class SearchCatalog
                 // ring is matched with the pictures described so, not with every gold ring.
                 $words = $look->details !== [] ? [$look->object, ...$look->details] : array_column($tags, 'title');
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
-                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content));
+                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details]))));
                 $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products) : $products;
                 $record && $this->counter->photo($shopId, count($products));
                 $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
@@ -346,6 +355,15 @@ final class SearchCatalog
 
         if ($cut === false) {
             return null;
+        }
+
+        // A thin band on a finger is a few dozen pixels: scaled up, the picture model sees a ring, not a smudge.
+        if (max($w, $h) < self::CUT_UPSCALE_BELOW) {
+            $scaled = $w >= $h ? imagescale($cut, self::CUT_UPSCALE_TO, -1, IMG_BICUBIC) : imagescale($cut, (int) round(self::CUT_UPSCALE_TO * $w / $h), self::CUT_UPSCALE_TO, IMG_BICUBIC);
+
+            if ($scaled !== false) {
+                $cut = $scaled;
+            }
         }
 
         ob_start();
@@ -417,7 +435,7 @@ final class SearchCatalog
      * @param  list<array{external_id: string, similarity: float}>  $hits
      * @return list<array<string, mixed>>
      */
-    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = []): array
+    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = [], array $description = []): array
     {
         $members = [];
 
@@ -455,8 +473,12 @@ final class SearchCatalog
             $c = $about[$id] ?? null;
             $similarity[$id] = $v !== null && $c !== null ? (1 - $weight) * $v + $weight * $c : (float) ($v ?? $c);
         }
+        // The shop's own words for what the reader described ("פס", "חלקה", "סוליטר"): a product named so is
+        // closer than its picture alone says. A word most candidates share ("זהב") weighs little.
+        $named = $this->namedLike($index, array_keys($members), $description);
+        $wordsWeight = (float) Settings::get('search.photo_words_weight', $shopId);
         $rows = CatalogProduct::query()->whereIn('external_id', array_keys($members))->get(['external_id', 'brand', 'in_stock'])->keyBy('external_id');
-        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0)], array_keys($members));
+        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0)], array_keys($members));
 
         if ((bool) Settings::get('search.photo_in_stock_only', $shopId)) {
             $stocked = array_values(array_filter($candidates, fn (array $c): bool => (bool) $rows->get($c['external_id'])?->in_stock));
@@ -481,11 +503,100 @@ final class SearchCatalog
                 // shows matches the details, and whether it is of the kind photographed.
                 'look' => isset($looks[$id]) ? (int) round(max(0, min(1, $looks[$id])) * 100) : null,
                 'about' => isset($about[$id]) ? (int) round(max(0, min(1, $about[$id])) * 100) : null,
+                'words' => isset($named[$id]) && $named[$id] > 0 ? (int) round($named[$id] * 100) : null,
                 'kind' => $isMain($c) === 1,
             ], fn ($v): bool => $v !== null);
         }
 
         return $out;
+    }
+
+    /**
+     * How much of the description's words each product's name and keywords hold, 0 to 1, weighed by
+     * how few of the candidates hold each word. The description's head noun (the kind) counts for
+     * nothing: every candidate is of that kind. A word is held as any of its forms, or as a longer or
+     * shorter spelling of it (חלק, חלקה).
+     *
+     * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
+     * @param  list<string>  $ids
+     * @param  list<string>  $description  the object first, then what tells it apart
+     * @return array<string, float>
+     */
+    private function namedLike(array $index, array $ids, array $description): array
+    {
+        $wanted = [];
+
+        foreach ($description as $at => $phrase) {
+            foreach (array_slice(PhotoPlacer::words((string) $phrase), $at === 0 ? 1 : 0) as $forms) {
+                $wanted[$forms[0]] = $forms;
+            }
+        }
+
+        if ($wanted === [] || $ids === []) {
+            return [];
+        }
+
+        $held = [];
+
+        foreach ($ids as $id) {
+            $record = $index['records']['p:'.$id] ?? [];
+            $own = PhotoPlacer::words(trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '')));
+
+            foreach ($wanted as $key => $forms) {
+                foreach ($own as $word) {
+                    if (self::sameWord($word, $forms)) {
+                        $held[$key][$id] = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $weights = [];
+
+        foreach ($wanted as $key => $forms) {
+            $weights[$key] = 1 - count($held[$key] ?? []) / count($ids);
+        }
+
+        $total = array_sum($weights);
+        $out = [];
+
+        if ($total <= 0) {
+            return [];
+        }
+
+        foreach ($ids as $id) {
+            $score = 0.0;
+
+            foreach ($weights as $key => $weight) {
+                $score += isset($held[$key][$id]) ? $weight : 0;
+            }
+
+            $out[$id] = $score / $total;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<string>  $a  a word's forms
+     * @param  list<string>  $b  another's
+     */
+    private static function sameWord(array $a, array $b): bool
+    {
+        if (array_intersect($a, $b) !== []) {
+            return true;
+        }
+
+        foreach ($a as $x) {
+            foreach ($b as $y) {
+                if (mb_strlen($x) >= 3 && mb_strlen($y) >= 3 && (str_starts_with($x, $y) || str_starts_with($y, $x))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
