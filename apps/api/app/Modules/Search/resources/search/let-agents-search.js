@@ -981,6 +981,7 @@
       '.drawer .x{color:inherit;opacity:.9}',
       '.drawer .scroll{flex:1;overflow:auto;background:var(--rs-soft)}',
       '.drawer .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}',
+      '.drawer.one .grid{grid-template-columns:minmax(0,1fr)}',
       '.drawer .card{background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:12px;padding:10px}',
       '.drawer .foot{flex-direction:column;align-items:stretch;padding:12px 14px;background:var(--rs-bg);border-top:1px solid var(--rs-line)}',
       '.askbox{display:flex;align-items:center;gap:10px;border:1.5px solid var(--rs-fg);border-radius:14px;padding:6px;padding-inline-start:12px}',
@@ -2231,7 +2232,7 @@
           closePanel();
         }
       });
-      var sheet = el('aside', 'sheet drawer');
+      var sheet = el('aside', 'sheet drawer' + (state.config.drawerColumns === 1 ? ' one' : ''));
       sheet.setAttribute('role', 'dialog');
       sheet.setAttribute('aria-modal', 'true');
       sheet.setAttribute('aria-label', label('drawer_title'));

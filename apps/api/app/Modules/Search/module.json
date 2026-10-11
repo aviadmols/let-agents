@@ -527,6 +527,16 @@
             ],
             "default": "start",
             "scope": "shop"
+        },
+        {
+            "name": "drawer_columns",
+            "type": "enum",
+            "options": [
+                "2",
+                "1"
+            ],
+            "default": "2",
+            "scope": "shop"
         }
     ],
     "agents": [

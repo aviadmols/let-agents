@@ -96,6 +96,7 @@ class Configuration extends Page implements HasForms
         'search' => [
             'search.results',
             'search.drawer_side',
+            'search.drawer_columns',
             'search.similar',
             'assistant.on_search',
             'assistant.search_whatsapp',
