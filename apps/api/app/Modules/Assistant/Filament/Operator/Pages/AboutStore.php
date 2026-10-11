@@ -19,7 +19,7 @@ use UnitEnum;
  * repeat, the store's policies, what the team wrote, and the team's answers. The team sees each
  * part, removes a sentence that is not the store's, and adds what the site does not say.
  */
-class ShopKnowledge extends Page
+class AboutStore extends Page
 {
     /** Words in a page title that make it one of the store's policies. */
     private const POLICY_WORDS = '/מדיניות|החזר|ביטול|משלוח|אחריות|תקנון|פרטיות|החלפ|policy|refund|return|shipping|terms|warranty|privacy/iu';
@@ -30,9 +30,9 @@ class ShopKnowledge extends Page
 
     protected static ?int $navigationSort = 12;
 
-    protected static ?string $slug = 'knowledge';
+    protected static ?string $slug = 'about-store';
 
-    protected string $view = 'assistant::operator.shop-knowledge';
+    protected string $view = 'assistant::operator.about-store';
 
     #[Url]
     public ?string $shop = null;

@@ -7,7 +7,7 @@ use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
-use App\Modules\Assistant\Filament\Merchant\Pages\ShopKnowledge;
+use App\Modules\Assistant\Filament\Merchant\Pages\AboutStore;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\RepeatedText;
@@ -112,14 +112,14 @@ final class ShopKnowledgeTest extends TestCase
         Filament::setTenant($this->shop);
         $this->inShop(fn () => CatalogContent::query()->create(['type' => 'page', 'external_id' => 'policy-1', 'title' => 'מדיניות החזרות', 'url' => 'https://rings.test/policies/refund', 'body' => 'החזרה תוך 14 יום.', 'hash' => 'p1']));
 
-        Livewire::test(ShopKnowledge::class)
+        Livewire::test(AboutStore::class)
             ->assertOk()
             ->assertSee('מדיניות החזרות')
             ->set('own', 'משלוח עד הבית תוך 3 ימי עסקים.')
             ->call('saveOwn');
 
         $this->assertSame('משלוח עד הבית תוך 3 ימי עסקים.', $this->inShop(fn () => app(BuildShopKnowledge::class)->entries())[BuildShopKnowledge::OWN]->body);
-        Livewire::test(ShopKnowledge::class)->assertSet('own', 'משלוח עד הבית תוך 3 ימי עסקים.');
+        Livewire::test(AboutStore::class)->assertSet('own', 'משלוח עד הבית תוך 3 ימי עסקים.');
     }
 
     private function inShop(callable $callback): mixed
