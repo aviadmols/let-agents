@@ -258,7 +258,7 @@ final class SearchCatalog
                 // shopper narrows by a tag without leaving the photo.
                 // What the photo shows, against what each product's picture shows.
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_column($tags, 'title')), self::PHOTO_ALL);
-                $products = $this->taggedProducts($index, $tags, $hits, $shopId, $content);
+                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content));
                 $this->counter->photo($shopId, count($products));
                 $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
 
@@ -273,12 +273,44 @@ final class SearchCatalog
                 $products[] = $this->present($index['records']['p:'.$hit['external_id']]) + ['match' => (int) round(max(0, min(1, $hit['similarity'])) * 100)];
             }
 
-            $products = array_slice($products, 0, $perGroup);
+            $products = array_slice($this->samePictureFirst($index, $hits, $products), 0, $perGroup);
             $this->counter->photo($shopId, count($products));
             $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null];
         });
+    }
+
+    /**
+     * The shop's own picture, photographed or saved and uploaded again, is the product itself:
+     * whatever the reader called it and whatever tags it chose, a picture this alike comes first.
+     *
+     * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
+     * @param  list<array{external_id: string, similarity: float}>  $hits  nearest first
+     * @param  list<array<string, mixed>>  $products
+     * @return list<array<string, mixed>>
+     */
+    private function samePictureFirst(array $index, array $hits, array $products): array
+    {
+        $floor = (float) Settings::get('search.photo_same_similarity');
+        $same = [];
+
+        // Only the nearest picture can be the same one; close is not the same.
+        foreach (array_slice($hits, 0, 1) as $hit) {
+            $record = $index['records']['p:'.$hit['external_id']] ?? null;
+
+            if ($record !== null && $hit['similarity'] >= $floor) {
+                $same[] = $this->present($record) + ['match' => (int) round(min(1, $hit['similarity']) * 100), 'same' => true];
+            }
+        }
+
+        if ($same === []) {
+            return $products;
+        }
+
+        $ids = array_column($same, 'external_id');
+
+        return [...$same, ...array_values(array_filter($products, fn (array $p): bool => ! in_array($p['external_id'], $ids, true)))];
     }
 
     /**

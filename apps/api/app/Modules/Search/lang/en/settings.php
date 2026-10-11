@@ -222,4 +222,8 @@ return [
         'label' => 'How long searched photos are kept',
         'description' => 'A reduced copy of every photo uploaded to search is kept for review and then deleted. A photo marked right or wrong stays, as part of the check set.',
     ],
+    'photo_same_similarity' => [
+        'label' => 'Likeness that counts as the same picture',
+        'description' => 'An uploaded photo at least this alike (0 to 1) to a product picture is that product\'s own picture: it comes first, whatever was seen and whatever tags were chosen.',
+    ],
 ];

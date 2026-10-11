@@ -86,8 +86,9 @@ final class SearchByPhotoTest extends TestCase
         $this->app->instance(ImageEmbedder::class, $this->pictures);
 
         $this->inShop(function (): void {
-            $this->shirt('1', 'חולצת פסים כחולה', [1.0, 0.0, 0.0]);
-            $this->shirt('2', 'חולצת פסים אדומה', [0.9, 0.1, 0.2]);
+            // Close to the photo, neither the same picture (that is above 0.97).
+            $this->shirt('1', 'חולצת פסים כחולה', [1.0, 0.0, 0.4]);
+            $this->shirt('2', 'חולצת פסים אדומה', [0.85, 0.1, 0.4]);
             $this->shirt('3', 'מכנסי ג׳ינס', [0.0, 1.0, 0.0]);
         });
         app(BuildSearchIndex::class)->handle($this->shop->id);
@@ -267,8 +268,8 @@ final class SearchByPhotoTest extends TestCase
         $this->inShop(function (): void {
             $pine = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k1', 'name' => 'עץ אורן', 'path' => ['עץ אורן'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 1]);
             $screws = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k2', 'name' => 'ברגים', 'path' => ['ברגים'], 'depth' => 0, 'hash' => 'k2', 'product_count' => 1]);
-            // A screw on white scores close to any photo; the beam's picture looks little like a pergola.
-            $this->shirt('30', 'בורג גבס', [1.0, 0.0, 0.05]);
+            // A screw on white scores close to any photo (close, not the same picture); the beam's picture looks little like a pergola.
+            $this->shirt('30', 'בורג גבס', [0.9, 0.0, 0.4]);
             $this->shirt('31', 'קורת עץ אורן', [0.2, 1.0, 0.0]);
             CatalogProduct::query()->where('external_id', '30')->sole()->categories()->attach($screws->id);
             CatalogProduct::query()->where('external_id', '31')->sole()->categories()->attach($pine->id);
@@ -306,8 +307,8 @@ final class SearchByPhotoTest extends TestCase
         $this->inShop(function (): void {
             $drills = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k1', 'name' => 'מברגות', 'path' => ['מברגות'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 1]);
             $boxes = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k2', 'name' => 'ארגזי כלים', 'path' => ['ארגזי כלים'], 'depth' => 0, 'hash' => 'k2', 'product_count' => 1]);
-            // The tool box's picture is scanned and close; the drill's is not scanned yet.
-            $this->shirt('40', 'ארגז כלים', [1.0, 0.0, 0.1]);
+            // The tool box's picture is scanned and close (not the same picture); the drill's is not scanned yet.
+            $this->shirt('40', 'ארגז כלים', [0.85, 0.1, 0.35]);
             CatalogProduct::query()->where('external_id', '40')->sole()->categories()->attach($boxes->id);
             $drill = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '41', 'type' => 'simple', 'status' => 'publish', 'title' => 'מברגה נטענת', 'url' => 'https://www.store.test/p/41', 'in_stock' => true, 'purchasable' => true, 'hash' => 'h41', 'payload' => []]);
             $drill->categories()->attach($drills->id);
@@ -400,7 +401,7 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(['ידית', 'ידיות', null], [$ask->object, $ask->main, $ask->verdict]);
         $this->assertNotNull($ask->thumb, 'a reduced copy is kept');
         $this->assertNotNull($ask->photoBytes());
-        $this->assertSame('61', $ask->results[0]['external_id'], 'the first handle shown');
+        $this->assertSame('50', $ask->results[0]['external_id'], 'the tap, whose own picture this is, before the handles the reader named');
 
         Filament::setCurrentPanel(Filament::getPanel('operator'));
         $this->actingAs(User::factory()->operator()->create());
@@ -528,5 +529,19 @@ final class SearchByPhotoTest extends TestCase
             ->assertSee(__('search::ui.photo_log.right'))
             ->assertDontSee(__('search::ui.photo_log.check_now'))
             ->assertDontSee(__('search::ui.photo_log.doubt.unsure'), 'why a second look was taken is the operator\x27s');
+    }
+
+    public function test_the_shops_own_picture_uploaded_again_is_that_product_first_whatever_the_reader_said(): void
+    {
+        $this->shopWithTapsHandlesAndIron();
+        // The reader calls the tap a handle; the photo is the tap's own picture (its vector exactly).
+        $this->reader(['object' => 'ידית', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame('50', $result['groups']['product'][0]['external_id'], 'the product whose picture this is');
+        $this->assertTrue($result['groups']['product'][0]['same']);
+        $this->assertGreaterThanOrEqual(99, $result['groups']['product'][0]['match']);
+        $this->assertSame('61', $result['groups']['product'][1]['external_id'], 'then what the tags chose');
     }
 }

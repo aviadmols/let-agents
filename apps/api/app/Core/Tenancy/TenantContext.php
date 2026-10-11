@@ -54,12 +54,18 @@ final class TenantContext
     public function run(string $shopId, Closure $callback): mixed
     {
         $previous = $this->shopId;
+        $depth = $this->unscopedDepth;
         $this->shopId = $shopId;
+        // One shop's work is that shop's alone, even when a cross-shop loop (a nightly --all, the
+        // operator panel on "all shops") called it: without this, every query inside read every
+        // shop's rows. A deliberate runUnscoped() inside still crosses shops.
+        $this->unscopedDepth = 0;
 
         try {
             return $callback();
         } finally {
             $this->shopId = $previous;
+            $this->unscopedDepth = $depth;
         }
     }
 
