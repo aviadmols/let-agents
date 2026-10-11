@@ -1063,6 +1063,16 @@
       '@media (prefers-reduced-motion:no-preference){.sheet{animation:in .25s ease}@keyframes in{from{transform:translateY(8px);opacity:0}}}'
     ].join('');
 
+    /** White or black, whichever reads on a colour given as rgb(...). */
+    function readable(color) {
+      var m = String(color).match(/\d+(\.\d+)?/g);
+      if (!m || m.length < 3) {
+        return '#fff';
+      }
+      var luminance = (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) / 255;
+      return luminance > 0.6 ? '#111' : '#fff';
+    }
+
     /** The shop's own look: its font, text colour and main button, read once from the page. */
     function theme(host) {
       var body = win.getComputedStyle(doc.body);
@@ -1076,7 +1086,10 @@
       host.style.setProperty('--rs-line', 'color-mix(in srgb, ' + (body.color || '#111') + ' 14%, ' + bg + ')');
       host.style.setProperty('--rs-hover', 'color-mix(in srgb, ' + (body.color || '#111') + ' 10%, ' + bg + ')');
       host.style.setProperty('--rs-accent', accent);
-      host.style.setProperty('--rs-accent-fg', bs && bs.color ? bs.color : '#fff');
+      // The label on the accent: the button's own text colour only where the button has its own fill;
+      // otherwise white or black, whichever reads on the accent.
+      var filled = bs && accent === bs.backgroundColor;
+      host.style.setProperty('--rs-accent-fg', filled && bs.color && bs.color !== accent ? bs.color : readable(accent));
       host.style.setProperty('--rs-accent-text', accent);
       host.style.setProperty('--rs-radius', bs ? bs.borderRadius || '6px' : '6px');
       host.style.fontFamily = body.fontFamily;
@@ -2566,7 +2579,8 @@
       }
       picker.addEventListener('change', function () {
         if (picker.files && picker.files[0]) {
-          if (inSheet) {
+          // Where the shop shows results in the side drawer, a photo's results go there too.
+          if (inSheet || drawerMode()) {
             searchPhotoSheet(picker.files[0]);
           } else {
             searchPhoto(picker.files[0]);
@@ -2628,7 +2642,11 @@
       zone.addEventListener('drop', function (event) {
         var dropped = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
         if (dropped) {
-          searchPhoto(dropped);
+          if (drawerMode()) {
+            searchPhotoSheet(dropped);
+          } else {
+            searchPhoto(dropped);
+          }
         }
       });
       main.appendChild(zone);
