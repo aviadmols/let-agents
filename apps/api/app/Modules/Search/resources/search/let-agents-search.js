@@ -2640,11 +2640,26 @@
     function fileInput(capture, inSheet) {
       var picker = doc.createElement('input');
       picker.type = 'file';
-      picker.accept = 'image/jpeg,image/png,image/webp';
+      // iOS hands photos over as JPEG for image/*; a narrower list can leave the first pick unread.
+      picker.accept = 'image/*';
       if (capture) {
         picker.setAttribute('capture', 'environment');
       }
-      picker.addEventListener('change', function () {
+      // On the page, hidden: Safari on iPhone sometimes drops the first change of an input that is
+      // not in the document, and the shopper has to take the photo twice.
+      picker.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0';
+      doc.body.appendChild(picker);
+      var handled = false;
+      var chosen = function () {
+        if (handled || !(picker.files && picker.files[0])) {
+          return;
+        }
+        handled = true;
+        setTimeout(function () {
+          if (picker.parentNode) {
+            picker.parentNode.removeChild(picker);
+          }
+        }, 1000);
         if (picker.files && picker.files[0]) {
           // Where the shop shows results in the side drawer, a photo's results go there too.
           if (inSheet || drawerMode()) {
@@ -2653,7 +2668,9 @@
             searchPhoto(picker.files[0]);
           }
         }
-      });
+      };
+      picker.addEventListener('change', chosen);
+      picker.addEventListener('input', chosen);
       return picker;
     }
 
@@ -2818,7 +2835,8 @@
 
     /** Search by photo inside the suggestions: the shopper's picture, then the products like it. */
     function searchPhoto(file) {
-      if (!file || !/^image\//.test(file.type || '')) {
+      // An iPhone photo can come with no type at all; the server reads what the bytes are.
+      if (!file || (file.type && !/^image\//.test(file.type))) {
         return;
       }
       if (!dropdown || !dropdown.upload) {
@@ -2904,7 +2922,8 @@
 
     /** Search by photo from the results sheet or drawer: the results fill that sheet. */
     function searchPhotoSheet(file) {
-      if (!file || !/^image\//.test(file.type || '')) {
+      // An iPhone photo can come with no type at all; the server reads what the bytes are.
+      if (!file || (file.type && !/^image\//.test(file.type))) {
         return;
       }
       closeDropdown();

@@ -23,6 +23,7 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 /**
  * Answers a question typed in the store's search box, about the whole site rather than one page,
@@ -162,8 +163,20 @@ final class AnswerSiteQuestion
             return false;
         }
 
-        return $saved->prompt_version < self::PROMPT_VERSION
-            || ($saved->outcome === AssistantAnswer::NO_INFO && $saved->updated_at?->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId))));
+        if ($saved->prompt_version < self::PROMPT_VERSION) {
+            return true;
+        }
+
+        if ($saved->outcome !== AssistantAnswer::NO_INFO) {
+            return false;
+        }
+
+        // "Not on the site" holds only as long as the site does: a page added or changed since
+        // (a cancellation policy synced later) is read before saying so again.
+        $changed = CatalogContent::query()->active()->max('updated_at');
+
+        return $saved->updated_at?->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId)))
+            || ($changed !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($changed)));
     }
 
     /**
