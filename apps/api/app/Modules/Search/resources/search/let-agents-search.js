@@ -982,6 +982,15 @@
       '.drawer .scroll{flex:1;overflow:auto;background:var(--rs-soft)}',
       '.drawer .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}',
       '.drawer.one .grid{grid-template-columns:minmax(0,1fr)}',
+      // Waiting: a line of what is happening and a bar that moves.
+      '.la-wait{display:grid;gap:10px;padding:14px 16px;border-radius:14px;background:var(--rs-soft);margin:8px 0;font-size:14px}',
+      '.la-wait-bar{position:relative;height:6px;border-radius:999px;background:var(--rs-line);overflow:hidden}',
+      '.la-wait-bar:after{content:"";position:absolute;top:0;bottom:0;left:0;width:45%;border-radius:999px;background:var(--rs-accent)}',
+      '@media (prefers-reduced-motion:no-preference){.la-wait-bar:after{animation:la-slide 1.3s ease-in-out infinite}@keyframes la-slide{0%{transform:translateX(-105%)}100%{transform:translateX(230%)}}}',
+      // The drawer as a conversation: each search a turn, the shopper's words in a bubble above its results.
+      '.turn{display:grid;gap:6px;padding-block:6px 14px}',
+      '.turn+.turn{border-top:1px solid var(--rs-line);padding-top:14px}',
+      '.me{justify-self:start;max-width:85%;background:var(--rs-accent);color:var(--rs-accent-fg);padding:8px 14px;border-radius:16px;font-size:14px;line-height:1.4;overflow-wrap:anywhere}',
       // The shop hides prices; the second picture shows while the pointer is on the product.
       ':host(.la-np) .price,:host(.la-np) .d-price,.la-np .price,.la-np .d-price{display:none}',
       '.pics{position:relative;display:block}.pics .alt,.d-pic .alt{position:absolute;inset:0;opacity:0;transition:opacity .3s ease}',
@@ -2132,8 +2141,9 @@
       clearTimeout(pauseTimer);
       var sheet = openSheet(raw, raw);
       var box = el('div', 'section d-reply');
-      box.appendChild(el('div', 'd-thinking', label('ask_thinking')));
+      box.appendChild(drawerMode() ? waiting(label('ask_thinking')) : el('div', 'd-thinking', label('ask_thinking')));
       sheet.appendChild(box);
+      var kept = keepTurn({ t: Date.now(), k: 'a', q: raw });
       var below = el('div');
       sheet.appendChild(below);
 
@@ -2147,14 +2157,14 @@
           }
         }
       }
-      requestAnswer(raw, ids).then(function (data) { renderReply(box, data, raw); });
+      requestAnswer(raw, ids).then(function (data) { renderReply(box, data, raw); kept({ d: data }); });
 
       var normalized = normalize(raw);
       var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
       markCounted(normalized);
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
         .then(function (response) { return response.ok ? response.json() : null; })
-        .then(function (result) { renderResults(below, result, raw, true); })
+        .then(function (result) { renderResults(below, result, raw, true); kept({ r: result }); })
         .catch(function () { /* the answer stands alone */ });
     }
 
@@ -2332,6 +2342,94 @@
       return state.config && state.config.hover ? safeUrl(src) : null;
     }
 
+    /** What is happening, with a moving bar, while the answer is on its way. */
+    function waiting(text) {
+      var box = el('div', 'la-wait');
+      box.setAttribute('role', 'status');
+      box.appendChild(el('span', null, text));
+      box.appendChild(el('div', 'la-wait-bar'));
+      return box;
+    }
+
+    // ---------------------------------------------------------------- the drawer's conversation
+
+    /** The drawer's searches this visit, kept in the browser so they are there on the next page too. */
+    var CHAT_KEY = 'let_agents_chat:' + ctx.site;
+    var CHAT_TURNS = 8;
+    var drawerScroll = null;
+
+    function chatTurns() {
+      try {
+        var turns = JSON.parse(win.sessionStorage.getItem(CHAT_KEY) || '[]');
+        return Array.isArray(turns) ? turns : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveTurns(turns) {
+      try {
+        win.sessionStorage.setItem(CHAT_KEY, JSON.stringify(turns.slice(-CHAT_TURNS)));
+      } catch (e) { /* storage full or blocked: this visit only */ }
+    }
+
+    /** A new turn in the drawer's history; returns a function that stores what the turn showed. */
+    function keepTurn(turn) {
+      if (!drawerMode()) {
+        return function () {};
+      }
+      var turns = chatTurns();
+      turns.push(turn);
+      saveTurns(turns);
+      var at = turns.length - 1;
+      return function (fields) {
+        var now = chatTurns();
+        if (now[at] && now[at].t === turn.t) {
+          for (var key in fields) {
+            if (Object.prototype.hasOwnProperty.call(fields, key)) {
+              now[at][key] = fields[key];
+            }
+          }
+          saveTurns(now);
+        }
+      };
+    }
+
+    /** One turn in the drawer: the shopper's words, then a place for what came back. */
+    function turnIn(scroll, mine) {
+      var turn = el('div', 'turn');
+      if (mine) {
+        turn.appendChild(el('div', 'me', mine));
+      }
+      var body = el('div', 'turn-body');
+      turn.appendChild(body);
+      scroll.appendChild(turn);
+      return body;
+    }
+
+    /** The earlier turns of this visit, drawn again from what they showed. */
+    function replayTurns(scroll) {
+      chatTurns().forEach(function (turn) {
+        var body = turnIn(scroll, turn.q || (turn.k === 'p' ? label('photo_results') : ''));
+        if (turn.k === 's' && turn.r) {
+          renderResults(body, turn.r, turn.q || '');
+        } else if (turn.k === 'a') {
+          var box = el('div', 'section d-reply');
+          body.appendChild(box);
+          if (turn.d) {
+            renderReply(box, turn.d, turn.q || '');
+          }
+          if (turn.r) {
+            var below = el('div');
+            body.appendChild(below);
+            renderResults(below, turn.r, turn.q || '', true);
+          }
+        } else if (turn.k === 'p' && turn.r) {
+          renderResults(body, { groups: { product: turn.r } }, '', true);
+        }
+      });
+    }
+
     function drawerMode() {
       return !!(state.config && state.config.results === 'drawer');
     }
@@ -2371,6 +2469,13 @@
 
     function openDrawer(raw) {
       closeThemeSearch();
+      // Already open: the new search is the next turn, below the ones before it.
+      if (panel && drawerScroll && drawerScroll.isConnected) {
+        var next = turnIn(drawerScroll, raw);
+        next.parentNode.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        currentSheet = next;
+        return next;
+      }
       if (!panel) {
         panel = shadowHost('let-agents-search-results');
       }
@@ -2408,7 +2513,7 @@
       var box = el('div', 'askbox');
       var field = el('input');
       field.type = 'search';
-      field.value = raw || '';
+      field.value = '';
       field.maxLength = 120;
       field.placeholder = label('ask_placeholder');
       field.setAttribute('aria-label', label('ask_placeholder'));
@@ -2435,14 +2540,17 @@
         if (!text) {
           return;
         }
+        field.value = '';
         if (state.config.ask && isQuestion(text)) {
           askText(text);
         } else {
           openPanel(text);
         }
       });
+      // A fresh conversation: the turns of this visit are forgotten.
       again.addEventListener('click', function () {
         scroll.textContent = '';
+        saveTurns([]);
         field.value = '';
         field.focus();
       });
@@ -2451,9 +2559,15 @@
       overlay.appendChild(sheet);
       rootNode.appendChild(overlay);
       doc.documentElement.style.overflow = 'hidden';
+      drawerScroll = scroll;
+      replayTurns(scroll);
+      var first = turnIn(scroll, raw);
+      if (scroll.childNodes.length > 1) {
+        first.parentNode.scrollIntoView({ block: 'start' });
+      }
       (raw ? x : field).focus();
-      currentSheet = scroll;
-      return scroll;
+      currentSheet = first;
+      return first;
     }
 
     /** An empty results sheet over the page, with a title and a close button. Returns the sheet. */
@@ -2496,8 +2610,9 @@
 
     function openPanel(raw) {
       var sheet = openSheet(label('all_results', { query: raw }), raw);
-      var body = el('div', 'section', label('searching'));
+      var body = drawerMode() ? waiting(label('drawer_thinking')) : el('div', 'section', label('searching'));
       sheet.appendChild(body);
+      var kept = keepTurn({ t: Date.now(), k: 's', q: raw });
 
       var normalized = normalize(raw);
       var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
@@ -2510,6 +2625,7 @@
             body.parentNode.removeChild(body);
           }
           renderResults(sheet, result, raw);
+          kept({ r: result });
         })
         .catch(function () {
           body.textContent = label('no_results', { query: raw });
@@ -3142,8 +3258,9 @@
       head.appendChild(preview(file));
       head.appendChild(el('strong', null, label('photo_results')));
       sheet.appendChild(head);
-      var status = el('div', 'section', label('photo_searching'));
+      var status = drawerMode() ? waiting(label('photo_searching')) : el('div', 'section', label('photo_searching'));
       sheet.appendChild(status);
+      var kept = keepTurn({ t: Date.now(), k: 'p' });
 
       photoRequest(file, item).then(function (result) {
         if (typeof result === 'string') {
@@ -3152,6 +3269,7 @@
         }
         var products = result.products;
         sheet.removeChild(status);
+        kept({ r: products.slice(0, 12) });
         var note = el('div', 'section muted');
         var section = el('div', 'section');
         var grid = el('div', 'grid');
