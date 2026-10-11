@@ -4,6 +4,7 @@ namespace App\Modules\Retrieval\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
@@ -164,8 +165,28 @@ final class BuildImageIndex
                 $stats['stopped'] = 'spend_cap';
                 break;
             } catch (ModelCallFailed $e) {
-                $stats['stopped'] = $e->reason;
-                break;
+                // One picture the provider will not read fails the whole batch. Each is asked
+                // alone: what fails alone is marked unreadable and the rest go on; only when every
+                // one fails (a key, a quota, an outage) does the scan stop.
+                report($e);
+                [$vectors, $kept] = $this->oneByOne($choice, $images, $rows, $dimensions);
+
+                // Several refused, every one alone: not the pictures (a key, a quota, an outage).
+                if ($kept === [] && count($rows) > 1) {
+                    $stats['stopped'] = $e->reason;
+                    break;
+                }
+
+                if ($kept === []) {
+                    $stats['skipped']++;
+
+                    continue;
+                }
+
+                $stats['skipped'] += count($rows) - count($kept);
+                $rows = $kept;
+                $embeddings = new Embeddings($vectors, 0);
+                $images = array_slice($images, 0, count($kept));
             }
 
             $cost = count($images) * $price;
@@ -201,6 +222,37 @@ final class BuildImageIndex
                 'kept' => (string) $stats['kept'],
                 'pending' => (string) $stats['pending'],
             ]);
+    }
+
+    /**
+     * The pictures of a refused batch, each asked alone.
+     *
+     * @param  list<array{mime: string, data: string}>  $images
+     * @param  list<RetrievalImage>  $rows
+     * @return array{0: list<list<float>>, 1: list<RetrievalImage>} the vectors and the rows they belong to
+     */
+    private function oneByOne(object $choice, array $images, array $rows, ?int $dimensions): array
+    {
+        $vectors = [];
+        $kept = [];
+        $failed = 0;
+
+        foreach ($images as $i => $image) {
+            try {
+                $vectors[] = $this->embedder->embedImages($choice->provider, $choice->model, [$image], $dimensions)->vectors[0];
+                $kept[] = $rows[$i];
+            } catch (ModelCallFailed $e) {
+                $failed++;
+                $this->failed($rows[$i], 'refused');
+            }
+        }
+
+        // Several, every one refused alone, is not a picture problem: leave them for the next scan.
+        if ($kept === [] && $failed > 1) {
+            RetrievalImage::query()->whereIn('id', array_map(fn (RetrievalImage $r): string => (string) $r->id, $rows))->where('error', 'refused')->update(['error' => null]);
+        }
+
+        return [$vectors, $kept];
     }
 
     /** @return array{mime: string, data: string}|null */

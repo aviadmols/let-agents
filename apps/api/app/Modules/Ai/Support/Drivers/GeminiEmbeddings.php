@@ -84,7 +84,8 @@ final class GeminiEmbeddings implements EmbeddingDriver, ImageEmbeddingDriver
         }
 
         if (! $response->successful()) {
-            throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR);
+            // Gemini's own reason, for the log: the scan reports it and goes on without it.
+            throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, new \RuntimeException('Gemini '.$response->status().': '.mb_substr((string) $response->body(), 0, 500)));
         }
 
         $vectors = [];

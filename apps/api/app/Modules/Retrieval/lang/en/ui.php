@@ -54,6 +54,7 @@ return [
         ],
         'reasons' => [
             'unreachable' => 'Address does not answer',
+            'refused' => 'The vector service would not read the picture',
             'not_image' => 'Not an image file',
             'too_big' => 'File too big',
             'other' => 'Other error',
