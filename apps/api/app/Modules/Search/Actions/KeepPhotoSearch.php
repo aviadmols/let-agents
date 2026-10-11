@@ -17,7 +17,10 @@ use Throwable;
 final class KeepPhotoSearch
 {
     /** The long side of the kept copy, enough to read again, and of the small one for the list. */
-    private const PHOTO_SIDE = 1024;
+    private const PHOTO_SIDE = 1600;
+
+    /** A photo up to this size is kept exactly as it came, so a check later reads the very same photo. */
+    private const KEEP_AS_IS_BYTES = 3 * 1024 * 1024;
 
     private const THUMB_SIDE = 320;
 
@@ -36,7 +39,7 @@ final class KeepPhotoSearch
             SearchPhotoAsk::query()->create([
                 'shop_id' => $shopId,
                 'photo_hash' => hash('sha256', $bytes),
-                'photo' => self::reduced($bytes, self::PHOTO_SIDE, 82),
+                'photo' => strlen($bytes) <= self::KEEP_AS_IS_BYTES ? base64_encode($bytes) : self::reduced($bytes, self::PHOTO_SIDE, 90),
                 'thumb' => self::reduced($bytes, self::THUMB_SIDE, 70),
                 'object' => $look->object === null ? null : mb_substr($look->object, 0, 120),
                 'details' => $look->details,

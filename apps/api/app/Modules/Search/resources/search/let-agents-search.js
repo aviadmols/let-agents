@@ -2709,7 +2709,7 @@
       + '<path d="M20.5 14.5V17a3 3 0 0 1-3 3H15"/><path d="M9 20H6.5a3 3 0 0 1-3-3v-2.5"/>'
       + '<circle cx="12" cy="12.5" r="3.2"/><circle cx="12" cy="12.5" r="1" fill="currentColor" stroke="none"/></svg>';
     var PICTURE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>';
-    var MAX_SIDE = 1024;
+    var MAX_SIDE = 1600;
 
     /** A camera beside the box, in its own shadow root, so the theme's buttons do not restyle it. */
     function addCamera(input) {
@@ -2863,7 +2863,7 @@
           canvas.width = Math.max(1, Math.round(bitmap.width * scale));
           canvas.height = Math.max(1, Math.round(bitmap.height * scale));
           canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/jpeg', 0.85);
+          canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/jpeg', 0.9);
         }).catch(function () { resolve(file); });
       });
     }
