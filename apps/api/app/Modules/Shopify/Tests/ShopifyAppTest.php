@@ -251,6 +251,14 @@ final class ShopifyAppTest extends TestCase
         // Opened again in the admin: straight to the panel, no second exchange.
         $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => self::idToken()])))->assertRedirect();
         $this->assertCount(1, $exchanges);
+
+        // A refresh inside the admin asks for the screen the merchant was on: they land on it, in their panel.
+        $deep = $this->get('/shopify/app/merchant/search/photos?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => self::idToken()])));
+        $deep->assertRedirect();
+        $location = (string) $deep->headers->get('Location');
+        $this->assertStringContainsString('/merchant/search/photos?embedded=1', $location);
+        $this->assertSame(parse_url($panel, PHP_URL_HOST), parse_url($location, PHP_URL_HOST), 'the shop\'s own panel, never another address');
+        $this->get('/shopify/app/elsewhere?'.http_build_query(self::signed(['embedded' => '1', 'id_token' => self::idToken()])))->assertNotFound();
     }
 
     public function test_a_forged_or_stale_session_token_opens_nothing(): void

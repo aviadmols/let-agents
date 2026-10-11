@@ -181,6 +181,13 @@ final class ShopifyAppController
         }
 
         $url = route(self::MERCHANT_OVERVIEW_ROUTE, ['tenant' => $install->shop->slug]);
+        // After a refresh inside Shopify: the screen the merchant was on, in their own shop's panel.
+        $path = (string) $request->route('path');
+
+        if (preg_match('#^merchant(/[A-Za-z0-9_-]+)+$#', $path) === 1) {
+            $parts = parse_url($url);
+            $url = $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '').'/'.$path;
+        }
 
         if (EmbeddedApp::framed($request)) {
             $url .= '?'.http_build_query(['embedded' => '1', 'host' => (string) $request->query('host'), 'shop' => $install->shop_domain]);
