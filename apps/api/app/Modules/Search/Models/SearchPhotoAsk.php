@@ -46,7 +46,7 @@ class SearchPhotoAsk extends Model
     protected function casts(): array
     {
         return [
-            'sure' => 'float', 'second' => 'boolean', 'tags' => 'array', 'results' => 'array', 'total' => 'integer',
+            'sure' => 'float', 'second' => 'boolean', 'tags' => 'array', 'details' => 'array', 'results' => 'array', 'total' => 'integer',
             'marked_at' => 'datetime', 'checked_right' => 'boolean', 'checked_at' => 'datetime',
         ];
     }

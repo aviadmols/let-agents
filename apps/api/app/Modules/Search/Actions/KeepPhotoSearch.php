@@ -39,6 +39,7 @@ final class KeepPhotoSearch
                 'photo' => self::reduced($bytes, self::PHOTO_SIDE, 82),
                 'thumb' => self::reduced($bytes, self::THUMB_SIDE, 70),
                 'object' => $look->object === null ? null : mb_substr($look->object, 0, 120),
+                'details' => $look->details,
                 'sure' => $look->sure,
                 'doubt' => $look->doubt,
                 'second' => $look->second,

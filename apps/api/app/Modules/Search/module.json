@@ -242,7 +242,7 @@
         {
             "name": "photo_tags_max_output_tokens",
             "type": "int",
-            "default": 400,
+            "default": 600,
             "min": 100,
             "max": 2000,
             "scope": "global",

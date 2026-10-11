@@ -42,7 +42,7 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 3;
+    public const PROMPT_VERSION = 4;
 
     public const SECOND_VERSION = 1;
 
@@ -118,7 +118,7 @@ final class ReadPhotoTags
         $placer = new PhotoPlacer($index);
         $placed = $placer->place($first['object'], $first['also']);
         $doubt = $this->doubt($placer, $placed, $first['sure'], $hits);
-        $look = new PhotoLook(null, $first['object'], $first['around'], $first['sure']);
+        $look = (new PhotoLook(null, $first['object'], $first['around'], $first['sure']))->seen($first['details'] ?? [], $first['box'] ?? null);
 
         if ($doubt === null || ! Features::enabled('search.photo_second_look', $shopId) || ($second = $this->role('photo_second')) === null) {
             return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt);
@@ -142,7 +142,7 @@ final class ReadPhotoTags
             $placed = $placer->place($answer['object'], [$first['object'], ...$first['also']]);
         }
 
-        $look = new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']);
+        $look = (new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null);
 
         return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt, true);
     }
@@ -286,6 +286,8 @@ final class ReadPhotoTags
                     'object' => $object,
                     'also' => self::words($data['also'] ?? [], 3, [$object]),
                     'around' => self::words($data['around'] ?? [], 4, [$object]),
+                    'details' => self::words($data['details'] ?? [], 6, [$object]),
+                    'box' => self::box($data['box'] ?? null),
                     'sure' => self::sure($data['sure'] ?? null),
                     'sellable' => $object !== null && ($data['sellable'] ?? true) !== false,
                 ];
@@ -436,6 +438,24 @@ final class ReadPhotoTags
         }
 
         return array_slice($out, 0, $limit);
+    }
+
+    /**
+     * Where the object is, when the reader says so sensibly: four numbers from 0 to 1, a box that
+     * is not the whole photo nor a sliver of it. Anything else is null and the whole photo is used.
+     *
+     * @return array{0: float, 1: float, 2: float, 3: float}|null
+     */
+    private static function box(mixed $value): ?array
+    {
+        if (! is_array($value) || count($value) !== 4 || array_filter($value, fn ($v): bool => ! is_numeric($v)) !== []) {
+            return null;
+        }
+
+        [$left, $top, $right, $bottom] = array_map(fn ($v): float => max(0.0, min(1.0, (float) $v)), array_values($value));
+        $area = ($right - $left) * ($bottom - $top);
+
+        return $right > $left && $bottom > $top && $area >= 0.01 && $area < 0.8 ? [$left, $top, $right, $bottom] : null;
     }
 
     private static function sure(mixed $value): float

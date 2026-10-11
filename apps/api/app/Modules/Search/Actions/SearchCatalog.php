@@ -35,6 +35,11 @@ final class SearchCatalog
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
 
+    /** Around the object cut from a photo: a margin of this share of its size, and no cut under this many pixels. */
+    private const CUT_MARGIN = 0.12;
+
+    private const CUT_MIN_PIXELS = 48;
+
     /** Products a tagged photo returns, for the shopper to narrow by tag in the browser. */
     private const PHOTO_TAGGED = 60;
 
@@ -247,6 +252,12 @@ final class SearchCatalog
             $tags = $look->tags;
             $seen = $look->object === null ? [] : ['seen' => $look->object];
 
+            // A ring on a hand, a lamp in a room: the object alone, cut from the photo, is compared with
+            // the shop's pictures too, and each product keeps the closer of the two likenesses.
+            if ($look->box !== null && $hits !== [] && ($cut = self::cut($bytes, $look->box)) !== null) {
+                $hits = self::closer($hits, $this->semantic->picturesNearPhoto($shopId, 'image/jpeg', $cut, self::PHOTO_ALL));
+            }
+
             // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
             // looks like it, however close a white-background picture of a screw may score.
             if ($tags === []) {
@@ -262,7 +273,10 @@ final class SearchCatalog
                 // picture only orders it. Every product carries which tags it belongs to, so the
                 // shopper narrows by a tag without leaving the photo.
                 // What the photo shows, against what each product's picture shows.
-                $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_column($tags, 'title')), self::PHOTO_ALL);
+                // What tells it apart ("אבן אובלית בצבע תכלת"), not only the category's name: an aquamarine
+                // ring is matched with the pictures described so, not with every gold ring.
+                $words = $look->details !== [] ? [$look->object, ...$look->details] : array_column($tags, 'title');
+                $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
                 $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content));
                 $this->counter->photo($shopId, count($products));
                 $this->keeper->handle($shopId, $bytes, $look, $products, count($products));
@@ -284,6 +298,66 @@ final class SearchCatalog
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null];
         });
+    }
+
+    /**
+     * The object cut from the photo, with a margin around it, as a JPEG; null when the photo cannot
+     * be read as an image or the cut would be too small to say anything.
+     *
+     * @param  array{0: float, 1: float, 2: float, 3: float}  $box
+     */
+    private static function cut(string $bytes, array $box): ?string
+    {
+        $image = @imagecreatefromstring($bytes);
+
+        if ($image === false) {
+            return null;
+        }
+
+        [$width, $height] = [imagesx($image), imagesy($image)];
+        [$left, $top, $right, $bottom] = $box;
+        $padX = ($right - $left) * self::CUT_MARGIN;
+        $padY = ($bottom - $top) * self::CUT_MARGIN;
+        $x = (int) max(0, floor(($left - $padX) * $width));
+        $y = (int) max(0, floor(($top - $padY) * $height));
+        $w = (int) min($width - $x, ceil(($right - $left + 2 * $padX) * $width));
+        $h = (int) min($height - $y, ceil(($bottom - $top + 2 * $padY) * $height));
+
+        if ($w < self::CUT_MIN_PIXELS || $h < self::CUT_MIN_PIXELS) {
+            return null;
+        }
+
+        $cut = imagecrop($image, ['x' => $x, 'y' => $y, 'width' => $w, 'height' => $h]);
+
+        if ($cut === false) {
+            return null;
+        }
+
+        ob_start();
+        imagejpeg($cut, null, 90);
+
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Two lists of likenesses as one: each product with the closer of its two, most alike first.
+     *
+     * @param  list<array{external_id: string, similarity: float}>  $a
+     * @param  list<array{external_id: string, similarity: float}>  $b
+     * @return list<array{external_id: string, similarity: float}>
+     */
+    private static function closer(array $a, array $b): array
+    {
+        $best = [];
+
+        foreach ([...$a, ...$b] as $hit) {
+            $id = (string) $hit['external_id'];
+            $best[$id] = max($best[$id] ?? -1.0, (float) $hit['similarity']);
+        }
+
+        arsort($best);
+
+        return array_map(fn (string $id, float $similarity): array => ['external_id' => $id, 'similarity' => $similarity], array_map('strval', array_keys($best)), array_values($best));
     }
 
     /**

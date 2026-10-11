@@ -27,6 +27,8 @@ final class PhotoLook
      * @param  string|null  $doubt  why a second look was wanted, or null when the first look stood
      * @param  bool  $second  whether the second look was taken
      * @param  string|null  $main  the main tag's title, after everything
+     * @param  list<string>  $details  what tells the object apart from others of its kind ("אבן אובלית בצבע תכלת")
+     * @param  array{0: float, 1: float, 2: float, 3: float}|null  $box  where it is in the photo, 0 to 1: left, top, right, bottom
      */
     public function __construct(
         public readonly ?array $tags,
@@ -36,6 +38,8 @@ final class PhotoLook
         public readonly ?string $doubt = null,
         public readonly bool $second = false,
         public readonly ?string $main = null,
+        public readonly array $details = [],
+        public readonly ?array $box = null,
     ) {}
 
     /** The photo could not be read: reading is off, no model, or the call failed. */
@@ -50,6 +54,12 @@ final class PhotoLook
         return new self([], $object, [], $sure, $doubt, $second);
     }
 
+    /** The same reading, with what tells the object apart and where it is in the photo. */
+    public function seen(array $details, ?array $box): self
+    {
+        return new self($this->tags, $this->object, $this->around, $this->sure, $this->doubt, $this->second, $this->main, $details, $box);
+    }
+
     /** The shop's own tags for the photo, the main one first. */
     public function with(array $tags, ?string $doubt = null, bool $second = false): self
     {
@@ -62,6 +72,6 @@ final class PhotoLook
             }
         }
 
-        return new self($tags, $this->object, $this->around, $this->sure, $doubt, $second, $main);
+        return new self($tags, $this->object, $this->around, $this->sure, $doubt, $second, $main, $this->details, $this->box);
     }
 }

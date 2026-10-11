@@ -15,6 +15,7 @@ use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
@@ -301,6 +302,49 @@ final class SearchByPhotoTest extends TestCase
         $scene = $this->upload()->assertOk()->json();
         $this->assertSame(['31'], array_column($scene['groups']['product'], 'external_id'), 'the tag decides what shows; the close screw does not');
         $this->assertSame([0], $scene['groups']['product'][0]['tags'], 'each product says which tags it belongs to');
+    }
+
+    public function test_a_ring_on_a_hand_is_matched_by_what_tells_it_apart_and_by_the_ring_alone(): void
+    {
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות זהב', 'path' => ['טבעות זהב'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 2]);
+            $this->shirt('70', 'טבעת זהב עם אקוומרין אובלי', [0.9, 0.1, 0.3]);
+            $this->shirt('71', 'טבעת זהב עם רובי', [0.9, 0.1, 0.3]);
+            foreach (['70', '71'] as $id) {
+                CatalogProduct::query()->where('external_id', $id)->sole()->categories()->attach($rings->id);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'טבעת זהב', 'also' => ['טבעת'], 'details' => ['אבן אובלית בצבע תכלת', 'זהב צהוב'], 'around' => [], 'box' => [0.4, 0.5, 0.6, 0.7], 'sure' => 0.9, 'sellable' => true]);
+
+        // The pictures' descriptions: the aquamarine ring is the one described like the photo.
+        $content = new class implements PictureContent
+        {
+            public string $asked = '';
+
+            public function picturesNearWords(string $shopId, string $text, int $limit): array
+            {
+                $this->asked = $text;
+
+                return str_contains($text, 'תכלת') ? [['external_id' => '70', 'similarity' => 0.8], ['external_id' => '71', 'similarity' => 0.2]] : [];
+            }
+        };
+        $this->app->instance(PictureContent::class, $content);
+
+        // A real photo, big enough to cut the ring out of it.
+        $image = imagecreatetruecolor(200, 260);
+        ob_start();
+        imagejpeg($image);
+        $photo = UploadedFile::fake()->createWithContent('hand.jpg', (string) ob_get_clean());
+        $before = $this->pictures->photos;
+
+        $result = $this->call('POST', "/api/v1/search/{$this->site}/photo", ['photo' => $photo], server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json();
+
+        $this->assertSame('טבעת זהב, אבן אובלית בצבע תכלת, זהב צהוב', $content->asked, 'the details, not the category name, are matched with the descriptions');
+        $this->assertSame('70', $result['groups']['product'][0]['external_id'], 'the aquamarine ring before the ruby one');
+        $this->assertSame(2, $this->pictures->photos - $before, 'the whole photo and the ring cut from it');
+        $this->assertSame(['אבן אובלית בצבע תכלת', 'זהב צהוב'], $this->inShop(fn () => SearchPhotoAsk::query()->latest('id')->first()->details), 'the log shows what told it apart');
     }
 
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void

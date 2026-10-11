@@ -65,6 +65,9 @@
                                 <div>
                                     <span style="{{ $small }}">{{ __('search::ui.photo_log.seen') }}</span>
                                     <strong>{{ $ask->object ?? '—' }}</strong>
+                                    @if (! empty($ask->details))
+                                        <span style="{{ $small }}">· {{ implode(' · ', $ask->details) }}</span>
+                                    @endif
                                     @if ($ask->sure !== null)
                                         <span style="{{ $small }}">{{ (int) round($ask->sure * 100) }}%</span>
                                     @endif
