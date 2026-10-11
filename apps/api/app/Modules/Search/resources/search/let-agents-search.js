@@ -2188,7 +2188,36 @@
      * middle, and a field at the foot for another search or a question without closing it.
      * Returns the scrolling middle, where the results go.
      */
+    /**
+     * The theme's own search panel (Prestige's header-search, Dawn's details modal, a dialog) closes
+     * when our results open, so it does not show behind them. Only containers of a search field.
+     */
+    function closeThemeSearch() {
+      var fields = doc.querySelectorAll(state.config && state.config.selector ? state.config.selector : 'input[type="search"], input[name="q"]');
+      for (var i = 0; i < fields.length; i++) {
+        var node = fields[i].parentElement;
+        while (node && node !== doc.body) {
+          var tag = node.tagName.toLowerCase();
+          if (tag === 'details' && node.hasAttribute('open')) {
+            node.removeAttribute('open');
+          } else if (tag === 'dialog' && node.open && typeof node.close === 'function') {
+            node.close();
+          } else if (tag.indexOf('-') !== -1 && /search|modal|drawer/.test(tag)) {
+            try {
+              if (typeof node.hide === 'function') {
+                node.hide();
+              } else if (typeof node.close === 'function') {
+                node.close();
+              }
+            } catch (e) { /* a theme's own panel is not ours to break */ }
+          }
+          node = node.parentElement;
+        }
+      }
+    }
+
     function openDrawer(raw) {
+      closeThemeSearch();
       if (!panel) {
         panel = shadowHost('let-agents-search-results');
       }
@@ -2279,6 +2308,7 @@
       if (drawerMode()) {
         return openDrawer(raw === undefined ? '' : raw);
       }
+      closeThemeSearch();
       if (!panel) {
         panel = shadowHost('let-agents-search-results');
       }
