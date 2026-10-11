@@ -29,6 +29,11 @@ final class BuildShopKnowledge
 
     public const TEAM = CatalogContent::OWN_PREFIX.'knowledge-team';
 
+    /** The pause between two pages, and before the one try again after "too many requests". */
+    private const PAUSE_MS = 1000;
+
+    private const RETRY_MS = 4000;
+
     /** How much of each entry is kept. */
     private const MAX_BODY = 12000;
 
@@ -42,15 +47,14 @@ final class BuildShopKnowledge
         $urls = $this->sample((int) Settings::get('assistant.knowledge_pages', $shopId));
         $pages = [];
 
-        foreach ($urls as $url) {
-            try {
-                $response = Http::withUserAgent('Mozilla/5.0 (compatible; LetsSearch/1.0)')->timeout(15)->get($url);
+        foreach ($urls as $at => $url) {
+            // A page at a time, a moment apart: stores (Shopify above all) refuse a burst from one address.
+            if ($at > 0) {
+                usleep(app()->runningUnitTests() ? 0 : self::PAUSE_MS * 1000);
+            }
 
-                if ($response->successful()) {
-                    $pages[] = RepeatedText::sentences($response->body());
-                }
-            } catch (Throwable) {
-                // One page that does not answer does not stop the others.
+            if (($html = $this->page($url)) !== null) {
+                $pages[] = RepeatedText::sentences($html);
             }
         }
 
@@ -145,6 +149,30 @@ final class BuildShopKnowledge
         $step = max(1, intdiv($urls->count(), max(1, $wanted)));
 
         return $urls->filter(fn (string $url, int $at): bool => $at % $step === 0)->take($wanted)->values()->all();
+    }
+
+    /** A product page as the store shows it, or null when it does not answer. */
+    private function page(string $url): ?string
+    {
+        foreach ([0, self::RETRY_MS] as $wait) {
+            usleep(app()->runningUnitTests() ? 0 : $wait * 1000);
+
+            try {
+                $response = Http::timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
+            } catch (Throwable) {
+                return null;
+            }
+
+            if ($response->successful()) {
+                return $response->body();
+            }
+
+            if (! in_array($response->status(), [429, 430, 503], true)) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     private function row(string $id): ?CatalogContent
