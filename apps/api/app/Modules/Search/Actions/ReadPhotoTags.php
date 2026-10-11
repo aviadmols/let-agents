@@ -42,7 +42,7 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 8;
+    public const PROMPT_VERSION = 9;
 
     public const SECOND_VERSION = 1;
 
@@ -154,7 +154,10 @@ final class ReadPhotoTags
             $placed = $placer->place($answer['object'], [$first['object'], ...$first['also']]);
         }
 
-        $look = (new PhotoLook(null, $answer['object'] ?? $first['object'], $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null, $first['lacks'] ?? [])->among($items, $item);
+        // The second look names the kind; when it is the kind the first reading already named, the first
+        // reading's fuller words stay ("טבעת עם אבן אובלית כחולה", not "טבעת").
+        $object = $answer['object'] !== null && ! PhotoPlacer::agrees((string) $answer['object'], (string) $first['object']) ? $answer['object'] : $first['object'];
+        $look = (new PhotoLook(null, $object, $first['around'], $answer['sure']))->seen($first['details'] ?? [], $first['box'] ?? null, $first['lacks'] ?? [])->among($items, $item);
 
         return $look->with($this->tags($placer, $placed['main'], $first['around']), $doubt, true);
     }

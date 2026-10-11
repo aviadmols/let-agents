@@ -569,11 +569,11 @@ final class SearchByPhotoTest extends TestCase
         $this->assertStringContainsString('ברזי מטבח', $vision->user, 'and where the words placed it');
         $this->assertStringContainsString('pictures_disagree', $vision->user);
         $this->assertSame('ברזים', $result['tags'][0]['title'], 'the second look\'s category leads');
-        $this->assertSame('ברז', $result['seen']);
+        $this->assertSame('ברז מטבח', $result['seen'], 'the second look said tap, the kind the first already named: the fuller words stay');
         $this->assertSame(1, Run::query()->where('action', ReadPhotoTags::SECOND_ACTION)->count(), 'the second look is accounted for on its own');
 
         $ask = $this->inShop(fn () => SearchPhotoAsk::query()->latest('id')->first());
-        $this->assertSame(['ברז', 'ברזים', 'pictures_disagree', true], [$ask->object, $ask->main, $ask->doubt, $ask->second], 'the log says how the tags were reached');
+        $this->assertSame(['ברז מטבח', 'ברזים', 'pictures_disagree', true], [$ask->object, $ask->main, $ask->doubt, $ask->second], 'the log says how the tags were reached');
 
         // The same photo again: both looks come from cache.
         $this->upload()->assertOk();
