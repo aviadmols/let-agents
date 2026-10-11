@@ -102,7 +102,11 @@ final class ShopifyStoreFeedTest extends TestCase
             $this->assertTrue(CatalogProduct::query()->where('external_id', '8004')->exists(), 'the second page is read');
             $this->assertFalse(CatalogProduct::query()->where('external_id', '8003')->exists());
 
-            $page = CatalogContent::query()->where('type', 'page')->sole();
+            $policy = CatalogContent::query()->where('external_id', 'policy-71')->sole();
+            $this->assertSame(['page', 'מדיניות החזרות וביטולים', 'https://kli.co.il/policies/refund-policy', 'ביטול עסקה תוך 14 יום.'], [$policy->type, $policy->title, $policy->url, $policy->body], 'the store\x27s refund policy is a page the search and the assistant read');
+            $this->assertFalse(CatalogContent::query()->where('external_id', 'policy-72')->exists(), 'an empty policy is not a page');
+
+            $page = CatalogContent::query()->where('type', 'page')->where('external_id', '5001')->sole();
             $this->assertSame('5001', $page->external_id);
             $this->assertSame('https://kli.co.il/pages/warranty', $page->url);
             $this->assertSame("אחריות לשנתיים.\nעל כל כלי.", $page->body);
@@ -175,6 +179,10 @@ final class ShopifyStoreFeedTest extends TestCase
             'Pages' => ['pages' => $this->connection([
                 ['id' => 'gid://shopify/Page/5001', 'title' => 'אחריות', 'handle' => 'warranty', 'body' => '<p>אחריות לשנתיים.</p><p>על כל&nbsp;כלי.</p>', 'bodySummary' => 'אחריות לשנתיים.', 'isPublished' => true, 'createdAt' => '2026-01-01T00:00:00Z', 'updatedAt' => '2026-02-01T00:00:00Z'],
             ])],
+            'Policies' => ['shop' => ['shopPolicies' => [
+                ['id' => 'gid://shopify/ShopPolicy/71', 'type' => 'REFUND_POLICY', 'title' => 'מדיניות החזרות וביטולים', 'body' => '<p>ביטול עסקה תוך 14 יום.</p>', 'url' => 'https://kli.co.il/policies/refund-policy', 'updatedAt' => '2026-02-01T00:00:00Z'],
+                ['id' => 'gid://shopify/ShopPolicy/72', 'type' => 'PRIVACY_POLICY', 'title' => 'מדיניות פרטיות', 'body' => '', 'url' => 'https://kli.co.il/policies/privacy-policy', 'updatedAt' => null],
+            ]]],
             'Articles' => ['articles' => $this->connection([
                 ['id' => 'gid://shopify/Article/6001', 'title' => 'איך בוחרים מסור', 'handle' => 'choosing-a-saw', 'body' => '<h2>קוטר</h2><p>לפי העבודה.</p>', 'summary' => '', 'isPublished' => true, 'tags' => ['קנייה', 'מסורים'], 'createdAt' => '2026-03-01T00:00:00Z', 'updatedAt' => '2026-03-02T00:00:00Z', 'image' => ['url' => 'https://cdn.shopify.com/article.jpg'], 'blog' => ['title' => 'מדריכים', 'handle' => 'guides']],
             ])],

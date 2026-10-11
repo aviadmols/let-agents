@@ -1265,6 +1265,8 @@
       d.scroll = cols;
     }
 
+    var lastRect = null;
+
     function position() {
       if (!dropdown) {
         return;
@@ -1287,6 +1289,13 @@
         return;
       }
       var rect = current.getBoundingClientRect();
+      // A theme that hides its search field (a drawer closing while the file picker is open) leaves
+      // a box of nothing at the corner: stay where the field was seen last, or under the top of the page.
+      if (!rect.width && !rect.height) {
+        rect = lastRect || { left: win.innerWidth / 2 - 200, width: 400, bottom: 80 };
+      } else {
+        lastRect = { left: rect.left, width: rect.width, bottom: rect.bottom };
+      }
       var room = win.innerWidth - 32;
       var width = Math.min(Math.max(rect.width, 1000), room);
       var left = rect.left + rect.width / 2 - width / 2;

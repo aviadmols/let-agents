@@ -73,6 +73,11 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
         }
         GRAPHQL;
 
+    /** The store's policies (refunds, returns, shipping, terms, privacy): pages in Shopify's own place, needs read_legal_policies. */
+    private const POLICIES = <<<'GRAPHQL'
+        query Policies { shop { shopPolicies { id type title body url updatedAt } } }
+        GRAPHQL;
+
     private const ARTICLES = <<<'GRAPHQL'
         query Articles($first: Int!, $after: String) {
           articles(first: $first, after: $after, sortKey: ID, query: "published_status:published") {
@@ -143,6 +148,48 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
         }
     }
 
+    /**
+     * The store's policies as pages: what a shopper asks about cancelling, returns or shipping is
+     * answered from them. Nothing when the store installed the app before it asked to read them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function policies(ShopifyInstall $install): array
+    {
+        try {
+            $policies = (array) data_get($this->api->query($install, self::POLICIES), 'shop.shopPolicies', []);
+        } catch (StoreFeedUnavailable) {
+            return [];
+        }
+
+        $records = [];
+
+        foreach ($policies as $policy) {
+            $text = self::text($policy['body'] ?? '');
+
+            if (! is_array($policy) || $text === '' || ! isset($policy['id'])) {
+                continue;
+            }
+
+            $records[] = [
+                'external_id' => 'policy-'.self::id($policy['id']),
+                'type' => 'page',
+                'title' => self::line($policy['title'] ?? ''),
+                'slug' => strtolower((string) ($policy['type'] ?? '')),
+                'url' => (string) ($policy['url'] ?? ''),
+                'excerpt' => self::excerpt($text),
+                'text' => $text,
+                'image' => '',
+                'terms' => [],
+                'product_ids' => [],
+                'created_at' => null,
+                'updated_at' => $policy['updatedAt'] ?? null,
+            ];
+        }
+
+        return $records;
+    }
+
     public function content(StoreConnection $connection, string $type): Generator
     {
         [$query, $field] = match ($type) {
@@ -157,6 +204,10 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
 
         $install = $this->install($connection);
         $base = $this->shop($install)['base'];
+
+        if ($type === 'page' && ($policies = $this->policies($install)) !== []) {
+            yield $policies;
+        }
 
         foreach ($this->pages($install, $query, $field, ['first' => self::PER_PAGE]) as $nodes) {
             $records = [];
