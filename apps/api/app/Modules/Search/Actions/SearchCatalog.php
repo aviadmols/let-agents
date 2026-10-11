@@ -613,6 +613,7 @@ final class SearchCatalog
             'title' => $record['title'],
             'url' => $record['url'] ?? null,
             'image' => $record['img'] ?? null,
+            'image2' => $record['i2'] ?? null,
             'kind' => $record['kind'] ?? null,
             'products' => $record['n'] ?? null,
             'buy' => isset($record['buy']) ? $record['buy'] === 1 : null,

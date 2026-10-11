@@ -982,6 +982,10 @@
       '.drawer .scroll{flex:1;overflow:auto;background:var(--rs-soft)}',
       '.drawer .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}',
       '.drawer.one .grid{grid-template-columns:minmax(0,1fr)}',
+      // The shop hides prices; the second picture shows while the pointer is on the product.
+      ':host(.la-np) .price,:host(.la-np) .d-price,.la-np .price,.la-np .d-price{display:none}',
+      '.pics{position:relative;display:block}.pics .alt,.d-pic .alt{position:absolute;inset:0;opacity:0;transition:opacity .3s ease}',
+      '@media (hover:hover){.card a:hover .pics .alt,.d-prod:hover .d-pic .alt{opacity:1}}',
       '.drawer .card{background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:12px;padding:10px}',
       '.drawer .foot{flex-direction:column;align-items:stretch;padding:12px 14px;background:var(--rs-bg);border-top:1px solid var(--rs-line)}',
       '.askbox{display:flex;align-items:center;gap:10px;border:1.5px solid var(--rs-fg);border-radius:14px;padding:6px;padding-inline-start:12px}',
@@ -1123,12 +1127,22 @@
       host.style.setProperty('--rs-soft', 'color-mix(in srgb, ' + (body.color || '#111') + ' 6%, ' + bg + ')');
       host.style.setProperty('--rs-line', 'color-mix(in srgb, ' + (body.color || '#111') + ' 14%, ' + bg + ')');
       host.style.setProperty('--rs-hover', 'color-mix(in srgb, ' + (body.color || '#111') + ' 10%, ' + bg + ')');
-      host.style.setProperty('--rs-accent', accent);
       // The label on the accent: the button's own text colour only where the button has its own fill;
       // otherwise white or black, whichever reads on the accent.
       var filled = bs && accent === bs.backgroundColor;
-      host.style.setProperty('--rs-accent-fg', filled && bs.color && bs.color !== accent ? bs.color : readable(accent));
+      var fg = filled && bs.color && bs.color !== accent ? bs.color : readable(accent);
+      // A colour the shop chose wins over the theme's button, with a label that reads on it.
+      var own = state.config && /^#[0-9a-f]{6}$/i.test(state.config.buttonColor || '') ? state.config.buttonColor : null;
+      if (own) {
+        accent = own;
+        fg = readable(parseInt(own.slice(1, 3), 16) + ',' + parseInt(own.slice(3, 5), 16) + ',' + parseInt(own.slice(5, 7), 16));
+      }
+      host.style.setProperty('--rs-accent', accent);
+      host.style.setProperty('--rs-accent-fg', fg);
       host.style.setProperty('--rs-accent-text', accent);
+      if (state.config && state.config.price === false) {
+        host.classList.add('la-np');
+      }
       host.style.setProperty('--rs-radius', bs ? bs.borderRadius || '6px' : '6px');
       host.style.fontFamily = body.fontFamily;
       host.dir = doc.documentElement.dir || (LOCALE === 'he' ? 'rtl' : 'ltr');
@@ -1407,7 +1421,7 @@
             answers.push(record);
           }
         } else if (record.t === 'product') {
-          if (whole && !hits[i].full) {
+          if (!showsGroup('product') || (whole && !hits[i].full)) {
             continue;
           }
           total++;
@@ -1415,10 +1429,13 @@
             products.push(record);
           }
         } else if (record.t === 'category') {
-          if (categories.length < 5) {
+          if (showsGroup('category') && categories.length < 5) {
             categories.push(record);
           }
         } else {
+          if (!showsGroup('content')) {
+            continue;
+          }
           contentTotal++;
           if (articles.length < 6) {
             articles.push(record);
@@ -1453,8 +1470,10 @@
         main.appendChild(chips);
       }
 
+      var productsAt = null;
       if (products.length) {
-        main.appendChild(el('h4', 'd-h', label('products')));
+        productsAt = el('h4', 'd-h', label('products'));
+        main.appendChild(productsAt);
         var grid = el('div', d.mobile ? 'm-list' : 'd-prods');
         for (var p = 0; p < products.length; p++) {
           grid.appendChild(productRow(products[p], raw));
@@ -1465,14 +1484,15 @@
 
       // A site of articles and pages, or a search that found no product: the articles and pages
       // are the results, in the main area with their pictures.
-      var contentFirst = !products.length && articles.length > 0;
+      var contentFirst = articles.length > 0 && (!products.length || groupOrder().indexOf('content') < groupOrder().indexOf('product'));
       if (contentFirst) {
-        main.appendChild(el('h4', 'd-h', label('articles')));
+        var before = products.length ? productsAt : null;
+        main.insertBefore(el('h4', 'd-h', label('articles')), before);
         var reading = el('div', d.mobile ? 'm-list' : 'd-prods');
         for (var r = 0; r < articles.length; r++) {
           reading.appendChild(contentRow(articles[r], raw));
         }
-        main.appendChild(reading);
+        main.insertBefore(reading, before);
         articles = [];
       }
 
@@ -1659,6 +1679,7 @@
         title: item.title,
         url: item.url,
         img: item.image,
+        i2: item.image2,
         buy: item.buy ? 1 : 0,
         s: 1
       };
@@ -1669,8 +1690,15 @@
     }
 
     /** A square picture; a missing or broken one leaves the soft square, never a broken icon. */
-    function picture(src, sale) {
+    function picture(src, sale, alt) {
       var pic = el('span', 'd-pic');
+      if (src && alt && alt !== src) {
+        var second = el('img', 'alt');
+        second.alt = '';
+        second.loading = 'lazy';
+        second.src = alt;
+        pic.appendChild(second);
+      }
       if (src) {
         var img = el('img');
         img.alt = '';
@@ -1682,7 +1710,7 @@
           }
         });
         img.src = src;
-        pic.appendChild(img);
+        pic.insertBefore(img, pic.firstChild);
       }
       if (sale) {
         var tag = el('span', 'd-tag', label('sale'));
@@ -1696,7 +1724,7 @@
       var link = linkTo('d-prod', record, raw);
       link.setAttribute('data-pid', String(record.id).slice(2));
       rememberUrl(String(record.id).slice(2), record.url);
-      var pic = picture(safeUrl(record.img), true);
+      var pic = picture(safeUrl(record.img), true, hoverSrc(record.i2));
       if (match) {
         pic.appendChild(el('span', 'd-match', label('photo_match', { match: match })));
       }
@@ -2125,7 +2153,7 @@
         }
         info.appendChild(el('span', 'd-price'));
         var action;
-        if (record.buy && CAN_BUY) {
+        if (record.buy && CAN_BUY && showsCart()) {
           action = el('button', 'd-buy', label('add'));
           action.type = 'button';
           action.addEventListener('click', function () {
@@ -2214,6 +2242,26 @@
       if (current) {
         current.focus();
       }
+    }
+
+    /** The groups of results the shop shows, in its order. */
+    function groupOrder() {
+      var list = state.config && state.config.groups;
+      return Array.isArray(list) && list.length ? list : ['product', 'category', 'content'];
+    }
+
+    function showsGroup(type) {
+      return groupOrder().indexOf(type) !== -1;
+    }
+
+    /** Whether products carry an add-to-cart button. */
+    function showsCart() {
+      return !(state.config && state.config.cart === false);
+    }
+
+    /** The second picture, where the shop shows it on hover. */
+    function hoverSrc(src) {
+      return state.config && state.config.hover ? safeUrl(src) : null;
     }
 
     function drawerMode() {
@@ -2442,10 +2490,12 @@
 
     function renderResults(sheet, result, raw, quiet) {
       var groups = (result && result.groups) || {};
-      var products = groups.product || [];
-      var content = groups.content || [];
-      var categories = groups.category || [];
+      var products = showsGroup('product') ? groups.product || [] : [];
+      var content = showsGroup('content') ? groups.content || [] : [];
+      var categories = showsGroup('category') ? groups.category || [] : [];
       var answers = groups.answer || [];
+      // Each group is built, then put on the sheet in the shop's order.
+      var blocks = {};
 
       if (answers.length && !quiet && closeAnswer(raw, answers[0].title)) {
         var said = el('div', 'section answer-box');
@@ -2479,7 +2529,7 @@
           chips.appendChild(resultChip(categories[c], raw));
         }
         cats.appendChild(chips);
-        sheet.appendChild(cats);
+        blocks.category = cats;
       }
 
       if (products.length) {
@@ -2508,7 +2558,7 @@
           });
           section.appendChild(more);
         }
-        sheet.appendChild(section);
+        blocks.product = section;
         liveProducts(ids).then(function () { updateCards(grid); });
       }
 
@@ -2535,8 +2585,14 @@
           list.appendChild(link);
         }
         guides.appendChild(list);
-        sheet.appendChild(guides);
+        blocks.content = guides;
       }
+
+      groupOrder().forEach(function (type) {
+        if (blocks[type]) {
+          sheet.appendChild(blocks[type]);
+        }
+      });
 
       if (ctx.searchUrl) {
         var foot = el('div', 'foot');
@@ -2576,7 +2632,19 @@
         img.src = item.image;
         img.alt = '';
         img.loading = 'lazy';
-        link.appendChild(img);
+        var second = hoverSrc(item.image2);
+        if (second && second !== item.image) {
+          var pics = el('span', 'pics');
+          var alt = el('img', 'alt');
+          alt.src = second;
+          alt.alt = '';
+          alt.loading = 'lazy';
+          pics.appendChild(img);
+          pics.appendChild(alt);
+          link.appendChild(pics);
+        } else {
+          link.appendChild(img);
+        }
       } else {
         link.appendChild(el('div', 'ph'));
       }
@@ -2585,7 +2653,9 @@
       node.appendChild(link);
       node.appendChild(el('div', 'price'));
       var action;
-      if (item.buy && CAN_BUY) {
+      if (!showsCart()) {
+        action = null;
+      } else if (item.buy && CAN_BUY) {
         action = el('button', 'la-btn', label('add'));
         action.type = 'button';
         action.addEventListener('click', function () {
@@ -2599,8 +2669,10 @@
         }
         bindClick(action, raw, item);
       }
-      action.setAttribute('data-action', '1');
-      node.appendChild(action);
+      if (action) {
+        action.setAttribute('data-action', '1');
+        node.appendChild(action);
+      }
       if (state.config && state.config.similar) {
         var sim = el('button', 'la-btn la-ghost la-sim', label('similar'));
         sim.type = 'button';

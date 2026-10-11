@@ -55,6 +55,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
               createdAt updatedAt hasOnlyDefaultVariant tracksInventory totalInventory
               variantsCount { count }
               featuredMedia { preview { image { url altText } } }
+              media(first: 2) { nodes { preview { image { url altText } } } }
               priceRangeV2 { minVariantPrice { amount } maxVariantPrice { amount } }
               options { name optionValues { name } }
               collections(first: $collections) { nodes { id title handle } }
@@ -281,9 +282,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
             'sku' => (string) ($variants[0]['sku'] ?? ''),
             'short_description' => '',
             'description' => self::text($node['descriptionHtml'] ?? ''),
-            'images' => is_array($image) && is_string($image['url'] ?? null)
-                ? [['url' => $image['url'], 'alt' => self::line($image['altText'] ?? '')]]
-                : [],
+            'images' => self::images($image, (array) data_get($node, 'media.nodes', [])),
             'categories' => array_values(array_map(fn (array $c): array => [
                 'id' => self::id($c['id']),
                 'name' => self::line($c['title'] ?? ''),
@@ -519,6 +518,27 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
         $value = number_format((float) $value, 2, '.', '');
 
         return rtrim(rtrim($value, '0'), '.');
+    }
+
+    /**
+     * The featured picture first, then the next one, for a second picture on hover.
+     *
+     * @param  list<mixed>  $media
+     * @return list<array{url: string, alt: string}>
+     */
+    private static function images(mixed $featured, array $media): array
+    {
+        $images = [];
+
+        foreach ([$featured, ...array_map(fn ($m): mixed => data_get($m, 'preview.image'), $media)] as $image) {
+            $url = is_array($image) ? ($image['url'] ?? null) : null;
+
+            if (is_string($url) && $url !== '' && ! in_array($url, array_column($images, 'url'), true)) {
+                $images[] = ['url' => $url, 'alt' => self::line($image['altText'] ?? '')];
+            }
+        }
+
+        return array_slice($images, 0, 2);
     }
 
     /** Titles and labels: one line, decoded. */

@@ -537,6 +537,40 @@
             ],
             "default": "2",
             "scope": "shop"
+        },
+        {
+            "name": "groups",
+            "type": "string",
+            "default": "product,category,content",
+            "min": 1,
+            "max": 60,
+            "scope": "shop"
+        },
+        {
+            "name": "show_price",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "show_cart",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "hover_image",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
+            "name": "button_color",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 7,
+            "scope": "shop"
         }
     ],
     "agents": [

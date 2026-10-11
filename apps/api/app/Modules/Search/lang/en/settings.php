@@ -234,4 +234,24 @@ return [
             1 => 'One product a row',
         ],
     ],
+    'groups' => [
+        'label' => 'Result groups and their order',
+        'description' => 'Products, categories and guides, in order. A group not on the list is not shown.',
+    ],
+    'show_price' => [
+        'label' => 'Price on every product',
+        'description' => 'The live price from the store beside every product in the results.',
+    ],
+    'show_cart' => [
+        'label' => 'Add to cart button',
+        'description' => 'On every product that can be bought directly. Opens the theme\'s cart.',
+    ],
+    'hover_image' => [
+        'label' => 'Second picture on hover',
+        'description' => 'When a product has more than one picture, the second shows while the pointer is on it.',
+    ],
+    'button_color' => [
+        'label' => 'Button colour',
+        'description' => 'Empty: like the theme\'s buttons. Otherwise a colour as #RRGGBB.',
+    ],
 ];

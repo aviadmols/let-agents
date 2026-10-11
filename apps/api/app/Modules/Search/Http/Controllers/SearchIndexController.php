@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Support\ResultGroups;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -60,6 +61,12 @@ final class SearchIndexController
             'drawerColumns' => (int) Settings::get('search.drawer_columns', $shopId),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),
+            // How the results look, as the shop set it on its search display screen.
+            'groups' => ResultGroups::parse((string) Settings::get('search.groups', $shopId)),
+            'price' => (bool) Settings::get('search.show_price', $shopId),
+            'cart' => (bool) Settings::get('search.show_cart', $shopId),
+            'hover' => (bool) Settings::get('search.hover_image', $shopId),
+            'buttonColor' => self::color((string) Settings::get('search.button_color', $shopId)),
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';
@@ -78,6 +85,12 @@ final class SearchIndexController
             'labels' => $labels,
             'items' => $data['items'] ?? [],
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /** The shop's own button colour as #rrggbb, or empty for the theme's. */
+    public static function color(string $value): string
+    {
+        return preg_match('/^#[0-9a-f]{6}$/i', trim($value)) === 1 ? strtolower(trim($value)) : '';
     }
 
     /** The number the on-page module offers, read from the same settings; null when the shop has none. */

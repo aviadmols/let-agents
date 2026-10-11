@@ -76,6 +76,7 @@ final class DisplaySettings extends OperatorConfiguration
     /** @return list<string> */
     private static function allowed(): array
     {
-        return array_merge(...array_values(OperatorConfiguration::SHOP_GROUPS));
+        // The search has its own screen, "Search display", with a preview.
+        return array_merge(...array_values(array_diff_key(OperatorConfiguration::SHOP_GROUPS, ['search' => true])));
     }
 }

@@ -55,6 +55,20 @@ final class BuildSearchIndex
         );
     }
 
+    /** The product's second picture, for the shops that show it on hover; null when it has one. */
+    private function secondPicture(CatalogProduct $product): ?string
+    {
+        foreach (array_slice((array) ($product->payload['images'] ?? []), 1) as $image) {
+            $url = is_array($image) ? ($image['url'] ?? null) : null;
+
+            if (is_string($url) && $url !== '' && $url !== $product->image_url) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
     private function build(RunContext $run, string $shopId): void
     {
         $synonyms = $this->synonyms();
@@ -68,6 +82,7 @@ final class BuildSearchIndex
             $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
+                'i2' => $this->secondPicture($product),
                 's' => $product->in_stock ? 1 : 0,
                 'buy' => $product->type === 'simple' && $product->purchasable ? 1 : 0,
             ]);
