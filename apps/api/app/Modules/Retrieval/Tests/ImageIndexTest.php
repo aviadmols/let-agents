@@ -10,6 +10,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Actions\BuildImageIndex;
 use App\Modules\Retrieval\Candidates\LookAlike;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Models\RetrievalGalleryImage;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\MatchCheck;
 use App\Modules\Retrieval\Tests\Concerns\BuildsShop;
@@ -140,6 +141,29 @@ final class ImageIndexTest extends TestCase
         $this->assertSame([$ids['2']], array_map(fn ($c) => $c->productId, $candidates), 'only what clears the likeness floor');
         $this->assertSame('looks_alike', $candidates[0]->source);
         $this->assertGreaterThan(0.9, MatchCheck::likeness($candidates[0]->signals), 'a look-alike counts as an alternative');
+    }
+
+    public function test_a_products_other_pictures_are_scanned_too_and_its_closest_picture_counts(): void
+    {
+        // The grey pocket shirt's main picture is grey; its second picture shows red stripes.
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '3')->update(['payload' => json_encode(['images' => [
+            ['url' => 'https://store.test/img/3.jpg'], ['url' => 'https://store.test/img/3-side.jpg'], ['url' => 'https://store.test/img/3-side.jpg'],
+        ]])]));
+
+        $run = app(BuildImageIndex::class)->handle($this->shop->id);
+
+        $this->assertSame(1, $run->output['gallery_embedded'], 'one other picture, once, however often it is listed');
+        $found = $this->inShop(fn () => app(SemanticSearch::class)->picturesNearText($this->shop->id, 'פסים אדום', 3));
+        $this->assertSame('3', $found[0]['external_id'], 'found by its second picture');
+        $this->assertSame(count($found), count(array_unique(array_column($found, 'external_id'))), 'each product once');
+
+        // Scanned again: kept, nothing paid twice; with no gallery wanted, the rows go.
+        $before = $this->pictures->images;
+        app(BuildImageIndex::class)->handle($this->shop->id);
+        $this->assertSame($before, $this->pictures->images);
+        Settings::set('retrieval.gallery_pictures', 0, $this->shop->id);
+        app(BuildImageIndex::class)->handle($this->shop->id);
+        $this->assertSame(0, $this->inShop(fn () => RetrievalGalleryImage::query()->count()));
     }
 
     public function test_nothing_is_compared_until_the_pictures_are_indexed(): void

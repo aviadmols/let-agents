@@ -143,4 +143,8 @@ return [
         'label' => 'Content against looks',
         'description' => '0: looks only. 1: content only. 0.5: half and half.',
     ],
+    'gallery_pictures' => [
+        'label' => 'More pictures per product for photo search',
+        'description' => 'How many of each product\'s gallery pictures (after the main one) are scanned, so a photo from another angle finds the product. 0 = the main one only.',
+    ],
 ];

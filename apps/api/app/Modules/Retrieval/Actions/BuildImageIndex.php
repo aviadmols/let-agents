@@ -10,6 +10,7 @@ use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Retrieval\Models\RetrievalGalleryImage;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\ModelChoice;
 use App\Modules\Retrieval\Support\VectorSearch;
@@ -17,6 +18,7 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -206,6 +208,11 @@ final class BuildImageIndex
             $stats['embedded'] += count($rows);
         }
 
+        // Each product's other pictures, once every main picture is done, in what is left of this part.
+        if ($stats['stopped'] === null && count($todo) <= $limit) {
+            $this->gallery($run, $shopId, $choice, $stats, $limit - $stats['embedded'] - $stats['skipped'], $started, $price, $dimensions);
+        }
+
         if ($stats['stopped'] === null && count($todo) > $limit) {
             $stats['stopped'] = 'more';
         }
@@ -222,6 +229,123 @@ final class BuildImageIndex
                 'kept' => (string) $stats['kept'],
                 'pending' => (string) $stats['pending'],
             ]);
+    }
+
+    /**
+     * A product's other pictures (retrieval.gallery_pictures of them, after the main one), each with
+     * its own vector, so a photo taken from the side finds the store's side view. Kept while the
+     * address is the same; an address the provider would not read stays unread until it changes.
+     *
+     * @param  array<string, mixed>  $stats
+     */
+    private function gallery(RunContext $run, string $shopId, ModelChoice $choice, array &$stats, int $room, float $started, float $price, ?int $dimensions): void
+    {
+        $per = (int) Settings::get('retrieval.gallery_pictures', $shopId);
+        $stats += ['gallery_embedded' => 0, 'gallery_pending' => 0];
+
+        // A product gone, or more pictures kept than the shop now wants: those rows go.
+        RetrievalGalleryImage::query()
+            ->where(fn ($q) => $q->where('position', '>', $per)->orWhereNotIn('product_id', CatalogProduct::query()->active()->select('id')))
+            ->delete();
+
+        if ($per < 1 || $choice->provider === null || $choice->model === '') {
+            return;
+        }
+
+        $todo = [];
+
+        foreach (CatalogProduct::query()->active()->whereNotNull('image_url')->orderBy('id')->lazy(200) as $product) {
+            $urls = [];
+
+            foreach ((array) ($product->payload['images'] ?? []) as $image) {
+                $url = is_array($image) ? (string) ($image['url'] ?? '') : '';
+
+                if (preg_match('#^https?://#i', $url) === 1 && $url !== $product->image_url && ! in_array($url, $urls, true)) {
+                    $urls[] = $url;
+                }
+            }
+
+            $urls = array_slice($urls, 0, $per);
+            RetrievalGalleryImage::query()->where('product_id', $product->id)->where('position', '>', count($urls))->delete();
+
+            foreach ($urls as $at => $url) {
+                $hash = hash('sha256', $url);
+                $row = RetrievalGalleryImage::query()->firstOrNew(['product_id' => $product->id, 'position' => $at + 1], ['shop_id' => $shopId]);
+                $row->fill(['external_id' => $product->external_id, 'title' => mb_substr($product->title, 0, 500)]);
+                $same = $row->exists && $row->url_hash === $hash;
+
+                if ($same && ($row->error !== null || ($row->embedding_model === $choice->model && $row->embedding !== null))) {
+                    $row->isDirty() && $row->save();
+
+                    continue;
+                }
+
+                if (! $same) {
+                    $row->fill(['image_url' => $url, 'url_hash' => $hash, 'embedding' => null, 'embedding_model' => null, 'dimensions' => null, 'error' => null, 'embedded_at' => null]);
+                }
+
+                $row->save();
+                $todo[] = $row;
+            }
+        }
+
+        foreach (array_chunk(array_slice($todo, 0, max(0, $room)), self::BATCH) as $batch) {
+            if (microtime(true) - $started > self::TIME_BUDGET) {
+                $stats['stopped'] = 'time_budget';
+                break;
+            }
+
+            $images = [];
+            $rows = [];
+
+            foreach ($batch as $row) {
+                if (($image = $this->fetch($row)) !== null) {
+                    $images[] = $image;
+                    $rows[] = $row;
+                }
+            }
+
+            if ($images === []) {
+                continue;
+            }
+
+            try {
+                $this->spend->assertCanSpend(count($images) * $price);
+                $embeddings = $this->embedder->embedImages($choice->provider, $choice->model, $images, $dimensions);
+            } catch (SpendCapReached) {
+                $stats['stopped'] = 'spend_cap';
+                break;
+            } catch (ModelCallFailed $e) {
+                // The gallery is extra: a refusal waits for the next scan rather than marking pictures.
+                report($e);
+                $stats['stopped'] = $e->reason;
+                break;
+            }
+
+            $cost = count($images) * $price;
+            $run->usage($choice->providerName, $choice->model, $embeddings->inputTokens, 0, 0, $cost);
+            $stats['cost_usd'] += $cost;
+
+            foreach ($rows as $i => $row) {
+                RetrievalGalleryImage::query()->whereKey($row->id)->update([
+                    'embedding' => VectorSearch::column($embeddings->vectors[$i]),
+                    'embedding_model' => $choice->model,
+                    'dimensions' => count($embeddings->vectors[$i]),
+                    'error' => null,
+                    'embedded_at' => now(),
+                ]);
+            }
+
+            $stats['gallery_embedded'] += count($rows);
+        }
+
+        $stats['gallery_pending'] = RetrievalGalleryImage::query()->whereNull('error')
+            ->where(fn ($q) => $q->whereNull('embedding_model')->orWhere('embedding_model', '!=', $choice->model))
+            ->count();
+
+        if ($stats['stopped'] === null && count($todo) > max(0, $room)) {
+            $stats['stopped'] = 'more';
+        }
     }
 
     /**
@@ -256,7 +380,7 @@ final class BuildImageIndex
     }
 
     /** @return array{mime: string, data: string}|null */
-    private function fetch(RetrievalImage $row): ?array
+    private function fetch(RetrievalImage|RetrievalGalleryImage $row): ?array
     {
         $maxBytes = (int) Settings::get('retrieval.image_max_kb') * 1024;
 
@@ -278,9 +402,9 @@ final class BuildImageIndex
         };
     }
 
-    private function failed(RetrievalImage $row, string $reason): null
+    private function failed(RetrievalImage|RetrievalGalleryImage $row, string $reason): null
     {
-        RetrievalImage::query()->whereKey($row->id)->update(['error' => $reason]);
+        $row::query()->whereKey($row->id)->update(['error' => $reason]);
 
         return null;
     }

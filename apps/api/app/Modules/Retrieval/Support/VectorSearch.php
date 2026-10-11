@@ -5,6 +5,7 @@ namespace App\Modules\Retrieval\Support;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalChunk;
+use App\Modules\Retrieval\Models\RetrievalGalleryImage;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
@@ -279,10 +280,39 @@ final class VectorSearch implements PictureContent, SemanticSearch
      */
     private function nearestPictures(array $vector, string $model, int $limit, ?string $exceptProductId = null): array
     {
+        $main = $this->nearestIn(RetrievalImage::class, $vector, $model, $limit, $exceptProductId);
+
+        if (! RetrievalGalleryImage::query()->where('embedding_model', $model)->whereNotNull('embedding')->exists()) {
+            return $main;
+        }
+
+        // A product's other pictures too: each product keeps its closest picture, whichever it is.
+        $best = [];
+
+        foreach ([...$main, ...$this->nearestIn(RetrievalGalleryImage::class, $vector, $model, $limit * 2, $exceptProductId)] as $row) {
+            $key = (string) $row['product_id'];
+
+            if (! isset($best[$key]) || $row['similarity'] > $best[$key]['similarity']) {
+                $best[$key] = $row;
+            }
+        }
+
+        usort($best, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
+
+        return array_slice(array_values($best), 0, $limit);
+    }
+
+    /**
+     * @param  class-string<RetrievalImage|RetrievalGalleryImage>  $table
+     * @param  list<float>  $vector
+     * @return list<array{product_id: string, external_id: string, title: string, similarity: float}>
+     */
+    private function nearestIn(string $table, array $vector, string $model, int $limit, ?string $exceptProductId): array
+    {
         if (DB::connection()->getDriverName() === 'pgsql') {
             $literal = self::literal($vector);
 
-            return RetrievalImage::query()
+            return $table::query()
                 ->select(['product_id', 'external_id', 'title'])
                 ->selectRaw('1 - (embedding <=> ?::vector) as similarity', [$literal])
                 ->where('embedding_model', $model)->whereNotNull('embedding')
@@ -290,7 +320,7 @@ final class VectorSearch implements PictureContent, SemanticSearch
                 ->orderByRaw('embedding <=> ?::vector', [$literal])
                 ->limit($limit)
                 ->get()
-                ->map(fn (RetrievalImage $i): array => [
+                ->map(fn ($i): array => [
                     'product_id' => $i->product_id,
                     'external_id' => $i->external_id,
                     'title' => $i->title,
@@ -302,7 +332,7 @@ final class VectorSearch implements PictureContent, SemanticSearch
         $seed = self::normalize($vector);
         $rows = [];
 
-        RetrievalImage::query()
+        $table::query()
             ->where('embedding_model', $model)->whereNotNull('embedding')
             ->when($exceptProductId !== null, fn ($q) => $q->where('product_id', '!=', $exceptProductId))
             ->select(['id', 'product_id', 'external_id', 'title', 'embedding'])

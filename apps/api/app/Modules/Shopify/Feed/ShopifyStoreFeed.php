@@ -55,7 +55,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
               createdAt updatedAt hasOnlyDefaultVariant tracksInventory totalInventory
               variantsCount { count }
               featuredMedia { preview { image { url altText } } }
-              media(first: 2) { nodes { preview { image { url altText } } } }
+              media(first: 4) { nodes { preview { image { url altText } } } }
               priceRangeV2 { minVariantPrice { amount } maxVariantPrice { amount } }
               options { name optionValues { name } }
               collections(first: $collections) { nodes { id title handle } }
@@ -521,7 +521,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
     }
 
     /**
-     * The featured picture first, then the next one, for a second picture on hover.
+     * The featured picture first, then the next ones: the second for hover, all of them for photo search.
      *
      * @param  list<mixed>  $media
      * @return list<array{url: string, alt: string}>
@@ -538,7 +538,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
             }
         }
 
-        return array_slice($images, 0, 2);
+        return array_slice($images, 0, 4);
     }
 
     /** Titles and labels: one line, decoded. */
