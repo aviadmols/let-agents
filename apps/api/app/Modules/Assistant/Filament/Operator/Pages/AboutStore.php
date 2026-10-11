@@ -4,7 +4,6 @@ namespace App\Modules\Assistant\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
-use App\Modules\Assistant\Jobs\BuildShopKnowledgeJob;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -149,8 +148,16 @@ class AboutStore extends Page
             return;
         }
 
-        BuildShopKnowledgeJob::dispatch($this->shop);
-        Notification::make()->success()->title(__('assistant::ui.knowledge.reading'))->body(__('assistant::ui.knowledge.reading_body'))->send();
+        // A dozen pages, read now, so the team sees at once what was found or why nothing was.
+        $read = $this->inShop(fn (): array => app(BuildShopKnowledge::class)->repeated((string) $this->shop));
+
+        if ($read['pages'] < 3) {
+            Notification::make()->warning()->title(__('assistant::ui.knowledge.unread'))->body(__('assistant::ui.knowledge.unread_body', ['tried' => $read['tried'], 'pages' => $read['pages']]))->send();
+
+            return;
+        }
+
+        Notification::make()->success()->title(__('assistant::ui.knowledge.read_now', ['pages' => $read['pages'], 'sentences' => $read['sentences']]))->send();
     }
 
     private function inShop(callable $callback): mixed

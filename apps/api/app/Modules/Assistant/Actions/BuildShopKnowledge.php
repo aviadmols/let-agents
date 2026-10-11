@@ -35,7 +35,7 @@ final class BuildShopKnowledge
     /**
      * Reads the shop's product pages and keeps what most of them repeat.
      *
-     * @return array{pages: int, sentences: int}
+     * @return array{tried: int, pages: int, sentences: int}
      */
     public function repeated(string $shopId): array
     {
@@ -55,7 +55,7 @@ final class BuildShopKnowledge
         }
 
         if (count($pages) < 3) {
-            return ['pages' => count($pages), 'sentences' => 0];
+            return ['tried' => count($urls), 'pages' => count($pages), 'sentences' => 0];
         }
 
         $row = $this->row(self::REPEATED);
@@ -71,7 +71,7 @@ final class BuildShopKnowledge
             'read_at' => now()->toIso8601String(),
         ]);
 
-        return ['pages' => count($pages), 'sentences' => count($found)];
+        return ['tried' => count($urls), 'pages' => count($pages), 'sentences' => count($found)];
     }
 
     /** A sentence the team does not want read as the store's: left out now and at every later reading. */
