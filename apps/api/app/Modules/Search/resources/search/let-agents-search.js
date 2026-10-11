@@ -979,7 +979,7 @@
       '.drawer .top{position:static;background:var(--rs-fg);color:var(--rs-bg);border:0;justify-content:space-between}',
       '.drawer .top h2{text-align:center;font-size:19px;letter-spacing:.04em}',
       '.drawer .x{color:inherit;opacity:.9}',
-      '.drawer .scroll{flex:1;overflow:auto;background:var(--rs-soft)}',
+      '.drawer .scroll{flex:1;overflow:auto;background:var(--rs-soft);position:relative}',
       '.drawer .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}',
       '.drawer.one .grid{grid-template-columns:minmax(0,1fr)}',
       // Waiting: a line of what is happening and a bar that moves.
@@ -2395,6 +2395,18 @@
       };
     }
 
+    /** The turn at the top of the drawer; again a moment later, once the pictures above it have taken their height. */
+    function showTurn(body) {
+      var turn = body && body.parentNode;
+      if (!turn || !drawerScroll) {
+        return;
+      }
+      var go = function () { drawerScroll.scrollTop = Math.max(0, turn.offsetTop - 8); };
+      go();
+      setTimeout(go, 400);
+      setTimeout(go, 1200);
+    }
+
     /** One turn in the drawer: the shopper's words, then a place for what came back. */
     function turnIn(scroll, mine) {
       var turn = el('div', 'turn');
@@ -2472,7 +2484,7 @@
       // Already open: the new search is the next turn, below the ones before it.
       if (panel && drawerScroll && drawerScroll.isConnected) {
         var next = turnIn(drawerScroll, raw);
-        next.parentNode.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        showTurn(next);
         currentSheet = next;
         return next;
       }
@@ -2563,7 +2575,7 @@
       replayTurns(scroll);
       var first = turnIn(scroll, raw);
       if (scroll.childNodes.length > 1) {
-        first.parentNode.scrollIntoView({ block: 'start' });
+        showTurn(first);
       }
       (raw ? x : field).focus();
       currentSheet = first;
@@ -2626,6 +2638,9 @@
           }
           renderResults(sheet, result, raw);
           kept({ r: result });
+          if (drawerMode()) {
+            showTurn(sheet);
+          }
         })
         .catch(function () {
           body.textContent = label('no_results', { query: raw });
