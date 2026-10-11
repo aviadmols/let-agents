@@ -54,6 +54,9 @@ return [
         'build_now' => 'Update search now',
         'built' => 'Search updated',
         'failed' => 'The update failed. Details are in the activity log.',
+        'sync_now' => 'Read the shop again now',
+        'sync_started' => 'The shop is being read again',
+        'sync_started_body' => 'Products, pages and policies are read from the shop in the background, then the search updates. It takes a few minutes.',
     ],
     'photo_query' => 'Search by photo',
     'resolved' => [

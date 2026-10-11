@@ -25,8 +25,11 @@ final class SyncCatalogCommand extends Command
     public function handle(SyncCatalog $sync, TenantContext $tenant): int
     {
         if ($this->option('scheduled')) {
+            // Plugin stores once their connection was tested; Shopify stores from install on, since
+            // the app's token is their connection and no plugin test ever marks them.
             $shopIds = $tenant->runUnscoped(fn () => StoreConnection::query()
-                ->where('status', ConnectionStatus::Connected)
+                ->where(fn ($q) => $q->where('status', ConnectionStatus::Connected)->orWhere('platform', 'shopify'))
+                ->whereHas('shop', fn ($shop) => $shop->where('status', 'active'))
                 ->pluck('shop_id'));
 
             foreach ($shopIds as $shopId) {

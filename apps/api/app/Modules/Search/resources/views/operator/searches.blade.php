@@ -334,6 +334,7 @@
                     <span style="opacity:.7">{{ __('search::ui.index.never') }}</span>
                 @endif
                 <button type="button" wire:click="buildNow" wire:loading.attr="disabled" style="{{ $btn }}">{{ __('search::ui.index.build_now') }}</button>
+                <button type="button" wire:click="syncNow" wire:loading.attr="disabled" style="{{ $btn }}">{{ __('search::ui.index.sync_now') }}</button>
             </div>
         </x-filament::section>
     @endif

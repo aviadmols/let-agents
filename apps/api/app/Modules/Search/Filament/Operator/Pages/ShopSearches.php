@@ -28,6 +28,7 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
@@ -383,6 +384,17 @@ class ShopSearches extends Page
     }
 
     /** Builds the index now, so new products and synonyms are searchable without waiting for the night. */
+    /** The shop's catalog read again from the store now (products, pages, policies), on the queue; the search follows. */
+    public function syncNow(): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        Artisan::queue('catalog:sync', ['shop' => (string) $this->shop])->onQueue('long');
+        Notification::make()->success()->title(__('search::ui.index.sync_started'))->body(__('search::ui.index.sync_started_body'))->send();
+    }
+
     public function buildNow(): void
     {
         if ($this->shop === null) {
