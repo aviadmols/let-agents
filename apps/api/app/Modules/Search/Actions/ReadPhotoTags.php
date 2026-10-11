@@ -459,7 +459,8 @@ final class ReadPhotoTags
 
     /**
      * Where the object is, when the reader says so sensibly: four numbers from 0 to 1, a box that
-     * is not the whole photo nor a sliver of it. Anything else is null and the whole photo is used.
+     * is not the whole photo nor a sliver of it. A ring on a hand in a wide photo is well under a
+     * hundredth of it, so the floor is a thousandth; a small cut is scaled up before it is compared. Anything else is null and the whole photo is used.
      *
      * @return array{0: float, 1: float, 2: float, 3: float}|null
      */
@@ -472,7 +473,7 @@ final class ReadPhotoTags
         [$left, $top, $right, $bottom] = array_map(fn ($v): float => max(0.0, min(1.0, (float) $v)), array_values($value));
         $area = ($right - $left) * ($bottom - $top);
 
-        return $right > $left && $bottom > $top && $area >= 0.01 && $area < 0.8 ? [$left, $top, $right, $bottom] : null;
+        return $right > $left && $bottom > $top && $area >= 0.001 && $area < 0.8 ? [$left, $top, $right, $bottom] : null;
     }
 
     /**

@@ -362,7 +362,7 @@ final class SearchByPhotoTest extends TestCase
         app(BuildSearchIndex::class)->handle($this->shop->id);
         $vision = $this->reader([
             'object' => 'טבעת', 'also' => [], 'details' => ['אבן בצבע תכלת'], 'around' => [], 'box' => [0.3, 0.5, 0.5, 0.65],
-            'others' => [['object' => 'טבעת נישואין', 'details' => ['פס זהב דק'], 'box' => [0.55, 0.6, 0.75, 0.7]], ['object' => 'טבעת', 'box' => [0.1, 0.1, 0.2, 0.2]]],
+            'others' => [['object' => 'טבעת נישואין', 'details' => ['פס זהב דק'], 'box' => [0.6, 0.3, 0.66, 0.38]], ['object' => 'טבעת', 'box' => [0.1, 0.1, 0.2, 0.2]]],
             'sure' => 0.9, 'sellable' => true,
         ]);
         $image = imagecreatetruecolor(600, 800);
