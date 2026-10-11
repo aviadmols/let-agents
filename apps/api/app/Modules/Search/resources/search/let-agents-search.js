@@ -1510,7 +1510,43 @@
     var dropWords = null;
 
     /** The client-side hits; for a question, also the hits for what it asks about. */
+    // "בלי יהלומים": the word after it is not searched for, and products holding it stay out (as on the server).
+    var WITHOUT = ['בלי', 'ללא', 'without', 'no'];
+
+    function withoutWords(raw) {
+      var tokens = normalize(raw).split(' ');
+      var keep = [];
+      var out = [];
+      for (var i = 0; i < tokens.length; i++) {
+        if (WITHOUT.indexOf(tokens[i]) !== -1 && tokens[i + 1]) {
+          var word = tokens[++i];
+          var base = word.length > 4 ? word.replace(/(ימ|ות)$/, '') : word;
+          out.push(base.length >= 2 ? base : word);
+        } else if (tokens[i]) {
+          keep.push(tokens[i]);
+        }
+      }
+      return { query: keep.join(' '), out: out };
+    }
+
+    function holdsAny(text, stems) {
+      var hay = ' ' + normalize(text);
+      for (var i = 0; i < stems.length; i++) {
+        if (hay.indexOf(' ' + stems[i]) !== -1 || new RegExp(' [והבלמשכ]' + stems[i].replace(/[^\u0590-\u05FFa-z0-9]/g, '')).test(hay)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     function lookup(raw, question) {
+      var without = withoutWords(raw);
+      if (without.out.length) {
+        return lookup(without.query, question).filter(function (hit) {
+          var record = state.records[hit.id];
+          return !record || record.t !== 'product' || !holdsAny(record.title + ' ' + (record.kw || ''), without.out);
+        });
+      }
       var hits = search(state.index, raw);
       if (!question) {
         return hits;

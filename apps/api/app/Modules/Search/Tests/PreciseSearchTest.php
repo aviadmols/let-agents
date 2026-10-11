@@ -79,4 +79,11 @@ final class PreciseSearchTest extends TestCase
     {
         return array_column(app(SearchCatalog::class)->handle($this->shop->id, $query, count: false)['groups']['product'], 'external_id');
     }
+
+    public function test_a_word_after_without_is_kept_out(): void
+    {
+        $this->assertEqualsCanonicalizing(['3'], $this->found('טבעת סוליטר בלי יהלומים'), 'the solitaires, not the ones with diamonds');
+        $this->assertEqualsCanonicalizing(['1', '3'], $this->found('טבעת כסף ללא זהב'));
+        $this->assertSame(['טבעת סוליטר', ['יהלומ']], HebrewSearch::without('טבעת סוליטר בלי יהלומים'));
+    }
 }

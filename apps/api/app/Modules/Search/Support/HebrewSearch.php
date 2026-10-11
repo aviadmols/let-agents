@@ -73,6 +73,52 @@ final class HebrewSearch
     /** Kept only when at least this share of the best close word's score. */
     public const RELATIVE_FLOOR = 0.8;
 
+    /** Words that turn the next word into what the shopper does not want. */
+    public const WITHOUT = ['בלי', 'ללא', 'without', 'no'];
+
+    /**
+     * "צמיד חוליות בלי יהלומים": what to look for, and the stems of what must not be there. The
+     * word after בלי / ללא / without is left out of the search and keeps products that hold it away.
+     *
+     * @return array{0: string, 1: list<string>} the normalized query without them, and the stems to keep out
+     */
+    public static function without(string $query): array
+    {
+        $tokens = explode(' ', self::normalize($query));
+        $keep = [];
+        $out = [];
+
+        for ($i = 0; $i < count($tokens); $i++) {
+            if (in_array($tokens[$i], self::WITHOUT, true) && isset($tokens[$i + 1])) {
+                $word = $tokens[++$i];
+                $base = mb_strlen($word) > 4 ? (string) preg_replace('/(ימ|ות)$/u', '', $word) : $word;
+                $out[] = mb_strlen($base) >= 2 ? $base : $word;
+
+                continue;
+            }
+
+            if ($tokens[$i] !== '') {
+                $keep[] = $tokens[$i];
+            }
+        }
+
+        return [implode(' ', $keep), $out];
+    }
+
+    /** Whether a text holds any of the stems kept out (a prefix like ו or ב in front is still the word). */
+    public static function holdsAny(string $text, array $stems): bool
+    {
+        $hay = ' '.self::normalize($text);
+
+        foreach ($stems as $stem) {
+            if (preg_match('/ [והבלמשכ]?'.preg_quote($stem, '/').'/u', $hay) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function normalize(?string $text): string
     {
         $text = mb_strtolower((string) $text, 'UTF-8');
