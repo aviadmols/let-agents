@@ -33,7 +33,7 @@ class ScanHistory extends Page
 
     public const STATES = ['all', 'scanned', 'pending', 'failed'];
 
-    public const REASONS = ['unreachable', 'not_image', 'too_big'];
+    public const REASONS = ['unreachable', 'not_image', 'too_big', 'refused', 'not_described'];
 
     private const RUNS = 40;
 
@@ -131,6 +131,10 @@ class ScanHistory extends Page
         $failed = RetrievalImage::query()->whereNotNull('error')
             ->selectRaw('error, count(*) as n')->groupBy('error')->pluck('n', 'error')
             ->map(fn ($n): int => (int) $n)->all();
+        // Scanned, but the model that describes pictures would not read it: no content vector.
+        if (($undescribed = $this->undescribed(RetrievalImage::query())->count()) > 0) {
+            $failed['not_described'] = $undescribed;
+        }
         ksort($failed);
 
         return [
@@ -154,13 +158,13 @@ class ScanHistory extends Page
         match ($this->state) {
             'scanned' => $this->scanned($query),
             'pending' => $this->pending($query),
-            'failed' => $query->whereNotNull('error'),
+            'failed' => $query->where(fn ($q) => $q->whereNotNull('error')->orWhere(fn ($q) => $this->undescribed($q))),
             default => null,
         };
 
         return $query->orderByRaw('embedded_at is null')->orderByDesc('embedded_at')->orderBy('title')
             ->paginate($this->display === 'gallery' ? self::PER_GALLERY : self::PER_PAGE, array_merge(
-                ['id', 'product_id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at', 'caption', 'caption_words'],
+                ['id', 'product_id', 'external_id', 'title', 'image_url', 'embedding_model', 'error', 'embedded_at', 'caption', 'caption_words', 'captioned_at'],
                 // The gallery draws each picture's vector, so it reads them; the table does not.
                 $this->display === 'gallery' ? ['embedding'] : [],
             ));
@@ -280,6 +284,18 @@ class ScanHistory extends Page
     public static function reason(?string $error): string
     {
         return in_array($error, self::REASONS, true) ? $error : 'other';
+    }
+
+    /** Why this picture is in the list of what did not work, or null: a key under retrieval::ui.scans.reasons. */
+    public function problemOf(RetrievalImage $image): ?string
+    {
+        return $image->error ?? ($image->captioned_at !== null && $image->caption === null ? 'not_described' : null);
+    }
+
+    /** @param Builder<RetrievalImage> $query */
+    private function undescribed(Builder $query): Builder
+    {
+        return $query->whereNull('error')->whereNotNull('captioned_at')->whereNull('caption');
     }
 
     /** @param Builder<RetrievalImage> $query */

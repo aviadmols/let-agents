@@ -4,6 +4,7 @@ namespace App\Modules\Retrieval\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
@@ -58,5 +59,15 @@ final class RefusedPictureTest extends TestCase
         $this->assertNotNull($rows['1']->embedded_at);
         $this->assertNotNull($rows['3']->embedded_at, 'the picture after the refused one still gets its vector');
         $this->assertSame('refused', $rows['2']->error);
+
+        // The shop sees which pictures did not work, and why.
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        app(TenantContext::class)->run($shop->id, fn () => RetrievalImage::query()->where('external_id', '3')->update(['captioned_at' => now(), 'caption' => null]));
+        $this->actingAs($merchant)->get("/merchant/{$shop->slug}/retrieval/scans?state=failed&display=table")
+            ->assertOk()
+            ->assertSee('data-problem="refused"', false)
+            ->assertSee('data-problem="not_described"', false)
+            ->assertSee(__('retrieval::ui.scans.reasons.refused'));
     }
 }

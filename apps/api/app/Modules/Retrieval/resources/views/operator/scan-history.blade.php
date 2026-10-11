@@ -101,6 +101,9 @@
                             style="all:unset;cursor:{{ $is === 'scanned' ? 'pointer' : 'default' }};display:grid;gap:6px;padding:8px;border-radius:12px;border:1px solid {{ $inspect === $image->id ? 'rgb(80,140,255)' : 'rgba(127,127,127,.2)' }}">
                             <img src="{{ $image->image_url }}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:rgba(127,127,127,.12)">
                             <span style="font-size:12px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">{{ $image->title }}</span>
+                            @if ($problem = $this->problemOf($image))
+                                <span style="font-size:11px;line-height:1.3;color:#b45309" data-problem="{{ $problem }}">{{ __('retrieval::ui.scans.reasons.'.\App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::reason($problem)) }}</span>
+                            @endif
                             @if ($image->caption_words)
                                 <span style="font-size:11px;opacity:.75;line-height:1.3" data-seen>{{ implode(' · ', array_slice((array) $image->caption_words, 0, 4)) }}</span>
                             @endif
@@ -135,8 +138,8 @@
                                     <td style="{{ $cell }}">{{ $image->title }}<br><span style="{{ $small }}" dir="ltr">#{{ $image->external_id }}</span></td>
                                     <td style="{{ $cell }}">
                                         <span style="{{ $pill }};{{ $tone[$is] }}">{{ __('retrieval::ui.scans.state.'.$is) }}</span>
-                                        @if ($image->error)
-                                            <br><span style="{{ $small }}">{{ __('retrieval::ui.scans.reasons.'.\App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::reason($image->error)) }}</span>
+                                        @if ($problem = $this->problemOf($image))
+                                            <br><span style="{{ $small }}" data-problem="{{ $problem }}">{{ __('retrieval::ui.scans.reasons.'.\App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::reason($problem)) }}</span>
                                             <br><span style="{{ $small }};word-break:break-all" dir="ltr">{{ \Illuminate\Support\Str::limit($image->image_url, 90) }}</span>
                                         @endif
                                     </td>

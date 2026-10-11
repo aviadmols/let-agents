@@ -58,6 +58,7 @@ return [
             'not_image' => 'Not an image file',
             'too_big' => 'File too big',
             'other' => 'Other error',
+            'not_described' => 'Scanned, but not described in words',
         ],
         'inspect' => [
             'open' => 'Inspect the vector',
