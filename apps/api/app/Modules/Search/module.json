@@ -56,6 +56,10 @@
         {
             "name": "photo_log",
             "default": true
+        },
+        {
+            "name": "photo_rank",
+            "default": false
         }
     ],
     "settings": [
@@ -571,6 +575,58 @@
             "min": 0,
             "max": 7,
             "scope": "shop"
+        },
+        {
+            "name": "photo_rank_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "photo_rank_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "photo_rank_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "photo_rank_output_usd_per_million",
+            "type": "float",
+            "default": 5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "photo_rank_max_output_tokens",
+            "type": "int",
+            "default": 300,
+            "min": 100,
+            "max": 2000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "photo_rank_candidates",
+            "type": "int",
+            "default": 12,
+            "min": 4,
+            "max": 20,
+            "scope": "shop",
+            "unit": "products"
         }
     ],
     "agents": [
@@ -683,6 +739,18 @@
                     ],
                     "prompts": [
                         "photo_second_look"
+                    ]
+                },
+                {
+                    "role": "ranker",
+                    "provider": "photo_rank_provider",
+                    "model": "photo_rank_model",
+                    "prices": [
+                        "photo_rank_input_usd_per_million",
+                        "photo_rank_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "photo_rank"
                     ]
                 }
             ]

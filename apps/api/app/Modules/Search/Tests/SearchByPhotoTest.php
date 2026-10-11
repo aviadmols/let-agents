@@ -33,6 +33,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -385,6 +386,73 @@ final class SearchByPhotoTest extends TestCase
         $this->assertArrayHasKey('look', $logged->results[0], 'each result says why it is there');
     }
 
+    public function test_the_team_marks_the_right_product_and_the_check_says_where_it_stands_with_and_without_the_second_ordering(): void
+    {
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 3]);
+            // Close to the photo, none the same picture.
+            foreach (['90' => [0.9, 0.1, 0.4], '91' => [0.85, 0.15, 0.45], '92' => [0.8, 0.2, 0.5]] as $id => $vector) {
+                $this->shirt($id, 'טבעת '.$id, $vector);
+                CatalogProduct::query()->where('external_id', $id)->sole()->categories()->attach($rings->id);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        // The reader says ring; the model that orders sees the sheet and puts 92 first.
+        $vision = new class implements VisionModel
+        {
+            public int $sheets = 0;
+
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                if (str_contains($system, 'put them in order') || str_contains($system, 'in order.')) {
+                    $this->sheets++;
+                    preg_match('/numbered 1 to (\d+)/', $user, $m);
+
+                    return new ModelReply(['order' => [3, 1, 2], 'same' => null], 1700, 20);
+                }
+
+                return new ModelReply(['object' => 'טבעת', 'also' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true], 1800, 20);
+            }
+        };
+        $this->app->instance(VisionModel::class, $vision);
+        Http::fake(['*' => Http::response(base64_decode(self::JPEG), 200, ['Content-Type' => 'image/jpeg'])]);
+
+        $image = imagecreatetruecolor(400, 400);
+        ob_start();
+        imagejpeg($image);
+        $photo = UploadedFile::fake()->createWithContent('ring.jpg', (string) ob_get_clean());
+        $shown = $this->call('POST', "/api/v1/search/{$this->site}/photo", ['photo' => $photo], server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json();
+        $this->assertSame('90', $shown['groups']['product'][0]['external_id'], 'the second ordering is off unless the shop turns it on');
+        $this->assertSame(0, $vision->sheets);
+
+        // The team says 92 was the right one, by its link.
+        $ask = $this->inShop(fn () => SearchPhotoAsk::query()->latest('id')->first());
+        $this->actingAs(User::factory()->operator()->create());
+        Filament::setCurrentPanel(Filament::getPanel(User::OPERATOR_PANEL));
+        Livewire::test(PhotoSearches::class, ['shop' => $this->shop->id])
+            ->set("product.{$ask->id}", 'https://www.store.test/p/92')
+            ->call('markProduct', $ask->id);
+        $this->assertSame('92', $ask->fresh()->expected_product);
+
+        $before = $this->inShop(fn () => SearchPhotoAsk::query()->count());
+        $this->assertSame(1, app(CheckPhotoSearches::class)->handle($this->shop->id)['ranked']);
+        $this->assertSame([3, 1], [$ask->fresh()->checked_rank, $ask->fresh()->checked_rank_ranked], 'third as it is, first with the second ordering');
+        $this->assertSame($before, $this->inShop(fn () => SearchPhotoAsk::query()->count()), 'the check logs no search of its own');
+        $this->assertSame(1, $vision->sheets, 'one sheet, one call');
+
+        Livewire::test(PhotoSearches::class, ['shop' => $this->shop->id])
+            ->assertSee(__('search::ui.photo_log.ranks', ['count' => 1, 'first' => 0, 'three' => 100, 'five' => 100]))
+            ->assertSee(__('search::ui.photo_log.ranks_second', ['first' => 100, 'three' => 100, 'five' => 100]));
+
+        // Turned on for the shop, shoppers get the second order, asked once for the same photo.
+        Features::override('search.photo_rank', true, $this->shop->id);
+        $again = $this->call('POST', "/api/v1/search/{$this->site}/photo", ['photo' => $photo], server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json();
+        $this->assertSame('92', $again['groups']['product'][0]['external_id']);
+        $this->assertSame(1, $vision->sheets, 'the same photo and candidates are not asked twice');
+    }
+
     public function test_what_the_shopper_photographed_comes_first_whatever_was_scanned(): void
     {
         $this->inShop(function (): void {
@@ -502,7 +570,7 @@ final class SearchByPhotoTest extends TestCase
         // the reader still says handle, but the same photo is now answered from what was learned.
         $this->assertSame(['ידית', 'ברז', 'ברז'], $this->inShop(fn () => SearchPhotoLesson::query()->sole()->only(['seen', 'team', 'object'])) ? array_values($this->inShop(fn () => SearchPhotoLesson::query()->sole()->only(['seen', 'team', 'object']))) : []);
         Cache::flush();
-        $this->assertSame(['checked' => 1, 'right' => 1], app(CheckPhotoSearches::class)->handle($this->shop->id));
+        $this->assertSame(['checked' => 1, 'right' => 1, 'ranked' => 0], app(CheckPhotoSearches::class)->handle($this->shop->id));
         $this->assertSame(['ברזים', true], [$ask->fresh()->checked_main, $ask->fresh()->checked_right]);
         Livewire::test(PhotoSearches::class, ['shop' => $this->shop->id])->assertSee('1 מתוך 1');
 

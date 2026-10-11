@@ -254,4 +254,28 @@ return [
         'label' => 'צבע הכפתורים',
         'description' => 'ריק: כמו כפתורי התבנית. אחרת צבע בפורמט #RRGGBB.',
     ],
+    'photo_rank_provider' => [
+        'label' => 'ספק המודל שמסדר את התוצאות',
+        'description' => 'anthropic, openai או gemini.',
+    ],
+    'photo_rank_model' => [
+        'label' => 'המודל שמסדר את התוצאות',
+        'description' => 'מודל שרואה תמונות.',
+    ],
+    'photo_rank_input_usd_per_million' => [
+        'label' => 'מחיר קלט, דולר למיליון טוקנים',
+        'description' => 'לחישוב העלות.',
+    ],
+    'photo_rank_output_usd_per_million' => [
+        'label' => 'מחיר פלט, דולר למיליון טוקנים',
+        'description' => 'לחישוב העלות.',
+    ],
+    'photo_rank_max_output_tokens' => [
+        'label' => 'תשובה מקסימלית',
+        'description' => 'כמה טוקנים לכל היותר בתשובה.',
+    ],
+    'photo_rank_candidates' => [
+        'label' => 'כמה מוצרים מובילים מסודרים מחדש',
+        'description' => 'המוצרים הראשונים שהמודל רואה ומסדר. השאר נשארים אחריהם.',
+    ],
 ];

@@ -4,6 +4,7 @@ namespace App\Modules\Search\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Jobs\CheckPhotoSearchesJob;
 use App\Modules\Search\Jobs\RelearnPhotoJob;
 use App\Modules\Search\Models\SearchPhotoAsk;
@@ -120,9 +121,87 @@ class PhotoSearches extends Page
                 'checked' => (clone $checked)->count(),
                 'checked_right' => (clone $checked)->where('checked_right', true)->count(),
                 'checked_at' => (clone $checked)->max('checked_at'),
+                // Where the right product stood when it was last searched again.
+                'products' => SearchPhotoAsk::query()->whereNotNull('expected_product')->count(),
+                'ranks' => self::ranks(SearchPhotoAsk::query()->whereNotNull('ranked_at')->whereNotNull('expected_product')->pluck('checked_rank')->all()),
+                'ranks_second' => self::ranks(SearchPhotoAsk::query()->whereNotNull('ranked_at')->whereNotNull('expected_product')->whereNotNull('checked_rank_ranked')->pluck('checked_rank_ranked')->all()),
                 'running' => is_int($asked) && now()->timestamp - $asked < self::RUNNING_SECONDS,
             ];
         });
+    }
+
+    /** What the team typed to name the right product when it was not among the results: a link, a SKU or a name. */
+    public array $product = [];
+
+    /** The product this photo was of, chosen among its results or named by a link, a SKU or a name. */
+    public function markProduct(string $id, ?string $externalId = null): void
+    {
+        abort_if($this->shop === null, 404);
+
+        $found = app(TenantContext::class)->run($this->shop, function () use ($id, $externalId): ?CatalogProduct {
+            $typed = trim((string) ($this->product[$id] ?? ''));
+            $query = CatalogProduct::query()->active();
+
+            if ($externalId !== null) {
+                return $query->where('external_id', $externalId)->first();
+            }
+
+            if ($typed === '') {
+                return null;
+            }
+
+            // A product link: the product with that address, or whose address ends the same way (a
+            // Shopify handle under a market prefix, a WooCommerce slug).
+            if (preg_match('#^https?://#i', $typed) === 1) {
+                $path = rtrim((string) parse_url($typed, PHP_URL_PATH), '/');
+                $last = (string) last(explode('/', $path));
+
+                return $last === '' ? null : ((clone $query)->where('url', 'like', '%'.$path)->first()
+                    ?? (clone $query)->where('url', 'like', '%/'.$last)->first()
+                    ?? (clone $query)->where('url', 'like', '%/'.$last.'/%')->first());
+            }
+
+            return (clone $query)->where('external_id', $typed)->first()
+                ?? (clone $query)->where('sku', $typed)->first()
+                ?? (clone $query)->where('title', 'like', '%'.$typed.'%')->orderBy('title')->first();
+        });
+
+        if ($found === null) {
+            Notification::make()->warning()->title(__('search::ui.photo_log.product_not_found'))->send();
+
+            return;
+        }
+
+        app(TenantContext::class)->run($this->shop, fn () => SearchPhotoAsk::query()->whereKey($id)->update([
+            'expected_product' => $found->external_id, 'checked_rank' => null, 'checked_rank_ranked' => null, 'ranked_at' => null,
+        ]));
+        unset($this->product[$id]);
+        Notification::make()->success()->title(__('search::ui.photo_log.product_marked', ['title' => $found->title]))->send();
+    }
+
+    /** The titles of the right products marked on these rows, for the screen. */
+    public function expectedTitles(array $asks): array
+    {
+        $ids = array_values(array_filter(array_map(fn (SearchPhotoAsk $a): ?string => $a->expected_product, $asks)));
+
+        return $ids === [] || $this->shop === null ? [] : app(TenantContext::class)->run($this->shop, fn (): array => CatalogProduct::query()->whereIn('external_id', $ids)->pluck('title', 'external_id')->all());
+    }
+
+    /**
+     * @param  list<int|null>  $ranks  where the right product stood, null when not found
+     * @return array{count: int, first: int, three: int, five: int}|null percentages
+     */
+    private static function ranks(array $ranks): ?array
+    {
+        $n = count($ranks);
+
+        if ($n === 0) {
+            return null;
+        }
+
+        $share = fn (int $deep): int => (int) round(100 * count(array_filter($ranks, fn ($r): bool => $r !== null && $r <= $deep)) / $n);
+
+        return ['count' => $n, 'first' => $share(1), 'three' => $share(3), 'five' => $share(5)];
     }
 
     public function markRight(string $id): void

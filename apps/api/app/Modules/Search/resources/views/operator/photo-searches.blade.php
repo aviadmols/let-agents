@@ -26,6 +26,12 @@
                 <div style="display:flex;flex-wrap:wrap;gap:18px">
                     <span>{{ __('search::ui.photo_log.asks', ['count' => $s['asks'], 'days' => 30]) }} <span style="{{ $small }}">({{ __('search::ui.photo_log.found_nothing', ['count' => $s['nothing']]) }})</span></span>
                     <span>{{ __('search::ui.photo_log.marked', ['count' => $s['marked'], 'right' => $s['right']]) }}</span>
+                    @if ($s['ranks'] !== null)
+                        <span data-ranks>{{ __('search::ui.photo_log.ranks', $s['ranks']) }}</span>
+                    @endif
+                    @if ($s['ranks_second'] !== null && $this->operatorView())
+                        <span data-ranks-second>{{ __('search::ui.photo_log.ranks_second', $s['ranks_second']) }}</span>
+                    @endif
                     @if ($s['checked'] > 0 && $this->operatorView())
                         <span data-checked>{{ __('search::ui.photo_log.checked', ['right' => $s['checked_right'], 'count' => $s['checked'], 'when' => \Illuminate\Support\Carbon::parse($s['checked_at'])->diffForHumans()]) }}</span>
                     @endif
@@ -35,18 +41,20 @@
                         <span style="{{ $small }}">{{ __('search::ui.photo_log.mark_how') }}</span>
                     @elseif ($s['running'])
                         <span style="{{ $small }}" wire:poll.10s>{{ __('search::ui.photo_log.check_running') }}</span>
-                    @elseif ($s['marked'] > 0)
+                    @elseif ($s['marked'] > 0 || $s['products'] > 0)
                         <button type="button" wire:click="checkNow" style="{{ $btn }}">{{ __('search::ui.photo_log.check_now') }}</button>
                         <span style="{{ $small }}">{{ __('search::ui.photo_log.check_how') }}</span>
                     @else
                         <span style="{{ $small }}">{{ __('search::ui.photo_log.mark_first') }}</span>
                     @endif
                 </div>
+                <div style="{{ $small }}">{{ __('search::ui.photo_log.'.($this->operatorView() ? 'ranks_how' : 'ranks_how_shop')) }}</div>
             </div>
         </x-filament::section>
 
         <x-filament::section :heading="__('search::ui.photo_log.heading')">
             @php($asks = $this->asks())
+            @php($expectedTitles = $this->expectedTitles($asks))
             @if ($asks === [])
                 <div style="{{ $small }}">{{ __('search::ui.photo_log.none') }}</div>
             @else
@@ -131,10 +139,28 @@
                                                 @if (array_key_exists('kind', $result) && ! $result['kind'] && $described)
                                                     <span style="opacity:.7">{{ __('search::ui.photo_log.other_kind') }}</span>
                                                 @endif
+                                                @if ($ask->expected_product === ($result['external_id'] ?? null))
+                                                    <span style="color:#15803d;font-weight:600">✓ {{ __('search::ui.photo_log.the_product') }}</span>
+                                                @else
+                                                    <button type="button" wire:click="markProduct('{{ $ask->id }}', @js((string) ($result['external_id'] ?? '')))" style="{{ $btn }};font-size:11px;padding:1px 6px">{{ __('search::ui.photo_log.this_product') }}</button>
+                                                @endif
                                             </div>
                                         @endforeach
                                     </div>
                                 @endif
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                                    @if ($ask->expected_product !== null)
+                                        <span data-expected>{{ __('search::ui.photo_log.expected_product', ['title' => $expectedTitles[$ask->expected_product] ?? $ask->expected_product]) }}</span>
+                                        @if ($ask->ranked_at !== null)
+                                            <span style="{{ $chip }}">{{ $ask->checked_rank === null ? __('search::ui.photo_log.rank_missing') : __('search::ui.photo_log.rank_now', ['rank' => $ask->checked_rank]) }}</span>
+                                            @if ($ask->checked_rank_ranked !== null && $this->operatorView())
+                                                <span style="{{ $chip }}">{{ __('search::ui.photo_log.rank_second', ['rank' => $ask->checked_rank_ranked]) }}</span>
+                                            @endif
+                                        @endif
+                                    @endif
+                                    <input type="text" wire:model="product.{{ $ask->id }}" placeholder="{{ __('search::ui.photo_log.product_field') }}" style="{{ $input }};font-size:12px;min-width:220px">
+                                    <button type="button" wire:click="markProduct('{{ $ask->id }}')" style="{{ $btn }}">{{ __('search::ui.photo_log.product_mark') }}</button>
+                                </div>
                                 @if ($ask->checked_at !== null && $this->operatorView())
                                     <div style="{{ $small }}" data-check>
                                         {{ $ask->checked_right ? '✓' : '✗' }}

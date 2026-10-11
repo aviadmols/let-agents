@@ -254,4 +254,28 @@ return [
         'label' => 'Button colour',
         'description' => 'Empty: like the theme\'s buttons. Otherwise a colour as #RRGGBB.',
     ],
+    'photo_rank_provider' => [
+        'label' => 'Provider of the model that orders the results',
+        'description' => 'anthropic, openai or gemini.',
+    ],
+    'photo_rank_model' => [
+        'label' => 'The model that orders the results',
+        'description' => 'A model that sees pictures.',
+    ],
+    'photo_rank_input_usd_per_million' => [
+        'label' => 'Input price, USD per million tokens',
+        'description' => 'For the cost.',
+    ],
+    'photo_rank_output_usd_per_million' => [
+        'label' => 'Output price, USD per million tokens',
+        'description' => 'For the cost.',
+    ],
+    'photo_rank_max_output_tokens' => [
+        'label' => 'Longest answer',
+        'description' => 'The most tokens in the answer.',
+    ],
+    'photo_rank_candidates' => [
+        'label' => 'How many leading products are ordered again',
+        'description' => 'The first products the model sees and orders. The rest stay after them.',
+    ],
 ];

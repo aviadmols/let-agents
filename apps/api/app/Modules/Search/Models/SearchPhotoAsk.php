@@ -46,7 +46,7 @@ class SearchPhotoAsk extends Model
     protected function casts(): array
     {
         return [
-            'sure' => 'float', 'second' => 'boolean', 'tags' => 'array', 'details' => 'array', 'box' => 'array', 'cut' => 'boolean', 'items' => 'array', 'item' => 'integer', 'results' => 'array', 'total' => 'integer',
+            'sure' => 'float', 'second' => 'boolean', 'tags' => 'array', 'details' => 'array', 'box' => 'array', 'cut' => 'boolean', 'items' => 'array', 'item' => 'integer', 'checked_rank' => 'integer', 'checked_rank_ranked' => 'integer', 'ranked_at' => 'datetime', 'results' => 'array', 'total' => 'integer',
             'marked_at' => 'datetime', 'checked_right' => 'boolean', 'checked_at' => 'datetime',
         ];
     }

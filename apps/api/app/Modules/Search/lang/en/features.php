@@ -45,4 +45,8 @@ return [
         'label' => 'Photo search log',
         'description' => 'Keeps a reduced copy of every uploaded photo, what was seen in it and what was shown, on the "Photo searches" screen. The team marks right or wrong there, and that is the check set for photo search.',
     ],
+    'photo_rank' => [
+        'label' => 'Second ordering of photo search results',
+        'description' => 'A model sees the shopper\'s photo beside the leading products\' pictures and orders them again: the truly closest first. One call per photo search, so it costs. Turn on only once the check shows it helps.',
+    ],
 ];

@@ -58,6 +58,7 @@ final class SearchCatalog
         private readonly CountSearch $counter,
         private readonly ReadPhotoTags $photoTags,
         private readonly KeepPhotoSearch $keeper,
+        private readonly RankPhotoResults $ranker,
     ) {}
 
     /**
@@ -236,9 +237,12 @@ final class SearchCatalog
      *
      * @return array{total: int, groups: array{product: list<array<string, mixed>>}, searched: bool}
      */
-    public function photo(string $shopId, string $mime, string $bytes, int $item = 0): array
+    public function photo(string $shopId, string $mime, string $bytes, int $item = 0, ?bool $rank = null, bool $record = true): array
     {
-        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes, $item): array {
+        // Whether a model orders the first products again: the shop's choice, unless the team's check asks.
+        $rank ??= Features::enabled('search.photo_rank', $shopId);
+
+        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes, $item, $rank, $record): array {
             $index = LoadedIndex::for($shopId);
             $floor = (float) Settings::get('search.photo_min_similarity');
             $perGroup = (int) Settings::get('search.results_per_group', $shopId);
@@ -267,8 +271,8 @@ final class SearchCatalog
             // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
             // looks like it, however close a white-background picture of a screw may score.
             if ($tags === []) {
-                $this->counter->photo($shopId, 0);
-                $this->keeper->handle($shopId, $bytes, $look, [], 0);
+                $record && $this->counter->photo($shopId, 0);
+                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0);
 
                 return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true] + $seen;
             }
@@ -284,8 +288,9 @@ final class SearchCatalog
                 $words = $look->details !== [] ? [$look->object, ...$look->details] : array_column($tags, 'title');
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
                 $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content));
-                $this->counter->photo($shopId, count($products));
-                $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
+                $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products) : $products;
+                $record && $this->counter->photo($shopId, count($products));
+                $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
 
                 return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true] + $seen;
             }
@@ -299,8 +304,9 @@ final class SearchCatalog
             }
 
             $products = array_slice($this->samePictureFirst($index, $hits, $products), 0, $perGroup);
-            $this->counter->photo($shopId, count($products));
-            $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
+            $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products) : $products;
+            $record && $this->counter->photo($shopId, count($products));
+            $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null] + $seen;
         });

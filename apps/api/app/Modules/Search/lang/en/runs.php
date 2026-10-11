@@ -22,4 +22,7 @@ return [
         'team_wrong' => 'the team marked it wrong',
     ],
     'photo_nothing' => 'nothing the shop sells',
+    'photo_rank' => 'Ordered :count products again by the photo',
+    'photo_rank_spend_cap' => 'The monthly budget is spent: the results kept their order',
+    'photo_rank_failed' => 'The second ordering failed (:reason): the results kept their order',
 ];
