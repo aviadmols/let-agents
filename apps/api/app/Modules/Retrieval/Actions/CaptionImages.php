@@ -123,7 +123,17 @@ final class CaptionImages implements CaptionsPictures
                     }
 
                     $this->spend->assertCanSpend((self::PHOTO_TOKENS * $in + $maxOutput * $out) / 1_000_000);
-                    $reply = $this->vision->jsonWithImage($reader, $model, $system, 'Describe this product photo.', $picture['mime'], $picture['data'], $maxOutput, 'low');
+                    try {
+                        $reply = $this->vision->jsonWithImage($reader, $model, $system, 'Describe this product photo.', $picture['mime'], $picture['data'], $maxOutput, 'low');
+                    } catch (ModelCallFailed $e) {
+                        // One picture the model will not read (too big, a format it refuses) is passed
+                        // over for good, so the next run does not pay again for the ones before it.
+                        report($e);
+                        RetrievalImage::query()->whereKey($image->id)->update(['caption_key' => self::key($image->url_hash, $model), 'caption_model' => $text->model, 'caption' => null, 'captioned_at' => now()]);
+                        $stats['skipped']++;
+
+                        continue;
+                    }
                     $cost = $reply->costUsd($in, $out);
                     $run->usage($reader->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $cost);
                     $stats['cost_usd'] += $cost;
@@ -157,6 +167,8 @@ final class CaptionImages implements CaptionsPictures
                 $stats['stopped'] = 'spend_cap';
                 break;
             } catch (ModelCallFailed $e) {
+                // The words could not be embedded (the text model's provider): the reason to the log.
+                report($e);
                 $stats['stopped'] = $e->reason;
                 break;
             }
