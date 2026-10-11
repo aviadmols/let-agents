@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -60,10 +61,17 @@ final class ShopOverview extends Page
                     TextEntry::make('content_locale')
                         ->label(__('tenancy::shops.fields.content_locale'))
                         ->state(__("tenancy::shops.locales.{$shop->content_locale}")),
+                    // A Shopify store is connected by its app; keys and plugin calls are a plugin store's.
+                    TextEntry::make('shopify_app')
+                        ->label(__('admin::overview.connected_by'))
+                        ->state(__('admin::overview.shopify_app'))
+                        ->visible($shop->platform === ShopPlatform::Shopify),
                     TextEntry::make('active_keys')
+                        ->visible($shop->platform !== ShopPlatform::Shopify)
                         ->label(__('tenancy::shops.fields.active_keys'))
                         ->state((string) $shop->apiKeys()->active()->count()),
                     TextEntry::make('last_api_call')
+                        ->visible($shop->platform !== ShopPlatform::Shopify)
                         ->label(__('admin::overview.last_api_call'))
                         ->state($lastUsed === null ? __('admin::overview.never_connected') : Carbon::parse($lastUsed)->diffForHumans()),
                 ]),
