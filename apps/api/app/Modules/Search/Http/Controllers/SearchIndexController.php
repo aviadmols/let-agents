@@ -9,6 +9,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\ResultGroups;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -58,6 +59,8 @@ final class SearchIndexController
             'askWhatsapp' => Features::enabled('assistant.search_whatsapp', $shopId),
             'whatsappMessage' => trim((string) Settings::get('assistant.search_whatsapp_message', $shopId)) ?: (string) __('search::storefront.wa_message', [], $locale),
             'drawerSide' => (string) Settings::get('search.drawer_side', $shopId),
+            // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
+            'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
             'drawerColumns' => (int) Settings::get('search.drawer_columns', $shopId),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),

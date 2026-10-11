@@ -988,9 +988,14 @@
       '.la-wait-bar:after{content:"";position:absolute;top:0;bottom:0;left:0;width:45%;border-radius:999px;background:var(--rs-accent)}',
       '@media (prefers-reduced-motion:no-preference){.la-wait-bar:after{animation:la-slide 1.3s ease-in-out infinite}@keyframes la-slide{0%{transform:translateX(-105%)}100%{transform:translateX(230%)}}}',
       // The drawer as a conversation: each search a turn, the shopper's words in a bubble above its results.
-      '.turn{display:grid;gap:6px;padding-block:6px 14px}',
-      '.turn+.turn{border-top:1px solid var(--rs-line);padding-top:14px}',
-      '.me{justify-self:start;max-width:85%;background:var(--rs-accent);color:var(--rs-accent-fg);padding:8px 14px;border-radius:16px;font-size:14px;line-height:1.4;overflow-wrap:anywhere}',
+      '.turn{display:grid;gap:10px;padding:14px 12px 18px}',
+      '.who{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700}',
+      '.who i{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--rs-fg);color:var(--rs-bg)}',
+      '.who i svg{width:16px;height:16px}',
+      '.who.ai i{background:var(--rs-accent);color:var(--rs-accent-fg)}',
+      '.said{font-size:15px;line-height:1.5;padding-inline-start:36px;overflow-wrap:anywhere}',
+      '.turn-body{background:var(--rs-bg);border-radius:16px;padding:6px 4px;min-width:0}',
+      '.turn-body .la-wait{margin:6px 8px;background:var(--rs-soft)}',
       // The shop hides prices; the second picture shows while the pointer is on the product.
       ':host(.la-np) .price,:host(.la-np) .d-price,.la-np .price,.la-np .d-price{display:none}',
       '.pics{position:relative;display:block}.pics .alt,.d-pic .alt{position:absolute;inset:0;opacity:0;transition:opacity .3s ease}',
@@ -2401,6 +2406,7 @@
       if (!turn || !drawerScroll) {
         return;
       }
+      // The turn's own top: what the shopper wrote, the reply right under it.
       var go = function () { drawerScroll.scrollTop = Math.max(0, turn.offsetTop - 8); };
       go();
       setTimeout(go, 400);
@@ -2408,11 +2414,25 @@
     }
 
     /** One turn in the drawer: the shopper's words, then a place for what came back. */
+    var PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>';
+
+    /** A heading in the conversation: an icon and who is speaking. */
+    function who(kind, name, icon) {
+      var row = el('div', 'who ' + kind);
+      var mark = el('i');
+      mark.innerHTML = icon;
+      row.appendChild(mark);
+      row.appendChild(el('span', null, name));
+      return row;
+    }
+
     function turnIn(scroll, mine) {
       var turn = el('div', 'turn');
       if (mine) {
-        turn.appendChild(el('div', 'me', mine));
+        turn.appendChild(who('me', label('chat_you'), PERSON));
+        turn.appendChild(el('div', 'said', mine));
       }
+      turn.appendChild(who('ai', label('chat_ai', { shop: (state.config && state.config.shopName) || '' }).replace(/^\s+/, ''), SPARK));
       var body = el('div', 'turn-body');
       turn.appendChild(body);
       scroll.appendChild(turn);
