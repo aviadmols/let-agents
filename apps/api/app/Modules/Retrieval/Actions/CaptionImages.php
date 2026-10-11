@@ -37,11 +37,11 @@ final class CaptionImages implements CaptionsPictures
 
     public const ACTION = 'retrieval.caption_images';
 
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     private const BATCH = 16;
 
-    private const MAX_WORDS = 8;
+    private const MAX_WORDS = 14;
 
     /** A picture of about 1000px is about this many input tokens, for the spend estimate. */
     private const PHOTO_TOKENS = 1600;
@@ -124,7 +124,10 @@ final class CaptionImages implements CaptionsPictures
 
                     $this->spend->assertCanSpend((self::PHOTO_TOKENS * $in + $maxOutput * $out) / 1_000_000);
                     try {
-                        $reply = $this->vision->jsonWithImage($reader, $model, $system, 'Describe this product photo.', $picture['mime'], $picture['data'], $maxOutput, 'low');
+                        // The store's name for it, so the description uses the store's words ("רובי" for a red stone).
+                        $user = 'The store calls this product: '.mb_substr((string) $image->title, 0, 300).'
+Describe this product photo.';
+                        $reply = $this->vision->jsonWithImage($reader, $model, $system, $user, $picture['mime'], $picture['data'], $maxOutput, 'low');
                     } catch (ModelCallFailed $e) {
                         // One picture the model will not read (too big, a format it refuses) is passed
                         // over for good, so the next run does not pay again for the ones before it.
@@ -138,7 +141,7 @@ final class CaptionImages implements CaptionsPictures
                     $run->usage($reader->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $cost);
                     $stats['cost_usd'] += $cost;
 
-                    $caption = trim(mb_substr((string) ($reply->data['caption'] ?? ''), 0, 300));
+                    $caption = trim(mb_substr((string) ($reply->data['caption'] ?? ''), 0, 500));
                     $words = array_values(array_unique(array_filter(array_map(
                         fn ($w): string => trim(mb_substr(is_string($w) ? $w : '', 0, 40)),
                         array_slice((array) ($reply->data['words'] ?? []), 0, self::MAX_WORDS),

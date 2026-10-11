@@ -39,9 +39,12 @@ final class CaptionImagesTest extends TestCase
         {
             public int $calls = 0;
 
+            public array $users = [];
+
             public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
                 $this->calls++;
+                $this->users[] = $user;
 
                 return new ModelReply($this->calls === 1
                     ? ['caption' => 'מברגה נטענת כחולה עם סוללה', 'words' => ['מברגה', 'סוללה']]
@@ -71,6 +74,7 @@ final class CaptionImagesTest extends TestCase
         $this->assertSame(['מברגה', 'סוללה'], $drill->caption_words);
         $this->assertNotNull($drill->captioned_at);
         $this->assertSame(3, DB::table('ai_usage')->count(), 'two descriptions and one embedding call, each accounted');
+        $this->assertStringContainsString('The store calls this product: מקדחה', $vision->users[0], 'the describer gets the store\x27s name for it');
 
         app(CaptionImages::class)->handle($shop->id);
         $this->assertSame(2, $vision->calls, 'a picture is described once');

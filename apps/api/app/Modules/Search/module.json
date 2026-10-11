@@ -220,7 +220,7 @@
         {
             "name": "photo_tags_model",
             "type": "string",
-            "default": "claude-haiku-4-5",
+            "default": "claude-sonnet-5-5",
             "min": 1,
             "max": 120,
             "scope": "global"
@@ -228,7 +228,7 @@
         {
             "name": "photo_tags_input_usd_per_million",
             "type": "float",
-            "default": 1,
+            "default": 3,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -237,7 +237,7 @@
         {
             "name": "photo_tags_output_usd_per_million",
             "type": "float",
-            "default": 5,
+            "default": 15,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -587,7 +587,7 @@
         {
             "name": "photo_rank_model",
             "type": "string",
-            "default": "claude-haiku-4-5",
+            "default": "claude-sonnet-5-5",
             "min": 1,
             "max": 120,
             "scope": "global"
@@ -595,7 +595,7 @@
         {
             "name": "photo_rank_input_usd_per_million",
             "type": "float",
-            "default": 1,
+            "default": 3,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -604,7 +604,7 @@
         {
             "name": "photo_rank_output_usd_per_million",
             "type": "float",
-            "default": 5,
+            "default": 15,
             "min": 0,
             "max": 400,
             "scope": "global",

@@ -310,7 +310,7 @@
         {
             "name": "caption_max_output_tokens",
             "type": "int",
-            "default": 200,
+            "default": 450,
             "min": 60,
             "max": 1000,
             "scope": "global",
