@@ -275,16 +275,18 @@ return [
         'callback_consent' => 'I agree that the store keeps my contact in order to come back to me with the answer to this question.',
         'callback_saved' => 'Kept. We will let you know when there is an answer.',
     ],
-    'assistant' => [
-        'title' => 'Ask :shop AI',
-        'placeholder' => 'Ask anything about this product...',
-        'other' => 'Is there a similar :type in :value?',
-        'questions' => [
-            0 => 'How soon does it arrive?',
-            1 => 'Can I return or exchange it?',
-            2 => 'What is special about this product?',
-        ],
-        'model' => 'model',
-        'cheaper' => 'Is there a similar :type for less?',
-    ],
+    'assistant' => array (
+  'title' => 'Ask :shop AI',
+  'placeholder' => 'Ask anything about this product...',
+  'other' => 'Is there a similar :type in :value?',
+  'questions' => 
+  array (
+    0 => 'How soon does it arrive?',
+    1 => 'Can I return or exchange it?',
+    2 => 'What is special about this product?',
+  ),
+  'model' => 'model',
+  'cheaper' => 'Is there a similar :type for less?',
+  'cheaper_query' => ':type under :price',
+),
 ];

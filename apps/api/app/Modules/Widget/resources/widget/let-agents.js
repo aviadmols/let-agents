@@ -2214,7 +2214,17 @@
       button.type = 'button';
       button.innerHTML = AS_SPARK;
       button.appendChild(el('span', null, text));
-      button.addEventListener('click', function () { ask(text, about); });
+      // About others like it: a search ("טבעת זהב צהוב", "טבעת עד 649"), in code, with its tags.
+      var query = typeof question === 'string' ? '' : String(question.query || '');
+      button.addEventListener('click', function () {
+        var search = window.LetAgentsSearch;
+        if (query && search && typeof search.search === 'function') {
+          track('click', AS_SECTION, 'panel');
+          search.search(query);
+          return;
+        }
+        ask(text, about);
+      });
       wrap.appendChild(button);
     });
 

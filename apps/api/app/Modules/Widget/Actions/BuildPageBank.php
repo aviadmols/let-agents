@@ -1560,7 +1560,7 @@ final class BuildPageBank
      * then what any shopper asks before buying. No model.
      *
      * @param  list<string>  $asked
-     * @return array{title: string, placeholder: string, product: array{id: string, title: string}, tags: list<array{label: string, query: string}>, questions: list<array{text: string, about: string}>}|null
+     * @return array{title: string, placeholder: string, product: array{id: string, title: string}, tags: list<array{label: string, query: string}>, questions: list<array{text: string, about: string, query?: string}>}|null
      */
     private function assistantBlock(string $shopId, string $externalId, array $asked): ?array
     {
@@ -1598,7 +1598,7 @@ final class BuildPageBank
                 $copy->value_text = $other->value_text;
                 $value = trim($copy->valueLabel());
                 // "בזהב לבן", but "ב-18K": a prefix letter joins a Hebrew word only.
-                $others[] = ['text' => (string) __('widget::bank.assistant.other', ['type' => $kind, 'value' => (preg_match('/^\p{Hebrew}/u', $value) === 1 ? '' : '-').$value], $this->locale), 'about' => 'similar'];
+                $others[] = ['text' => (string) __('widget::bank.assistant.other', ['type' => $kind, 'value' => (preg_match('/^\p{Hebrew}/u', $value) === 1 ? '' : '-').$value], $this->locale), 'about' => 'similar', 'query' => trim($kind.' '.$value)];
             }
         }
 
@@ -1607,8 +1607,12 @@ final class BuildPageBank
         foreach ([
             ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], array_slice($asked, 0, 2)),
             ...array_slice($others, 0, 2),
+            // Cheaper than this one: searched as "טבעת עד 649", the price range the search reads in code.
+            ...($product->price !== null && (float) $product->price > 1
+                ? [['text' => (string) __('widget::bank.assistant.cheaper', ['type' => $kind], $this->locale), 'about' => 'similar',
+                    'query' => (string) __('widget::bank.assistant.cheaper_query', ['type' => $kind, 'price' => (string) ((int) ceil((float) $product->price) - 1)], $this->locale)]]
+                : []),
             ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], (array) __('widget::bank.assistant.questions', [], $this->locale)),
-            ['text' => (string) __('widget::bank.assistant.cheaper', ['type' => $kind], $this->locale), 'about' => 'similar'],
         ] as $question) {
             $questions[$question['text']] ??= $question;
         }

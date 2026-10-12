@@ -62,10 +62,12 @@ final class AssistantBlockTest extends TestCase
         $this->assertSame('שאלו את Rocks and Gold AI', $block['title']);
         $this->assertSame(['id' => '1', 'title' => 'תליון 1'], $block['product']);
         $this->assertSame([['label' => 'תליון', 'query' => 'תליון'], ['label' => 'זהב צהוב', 'query' => 'תליון זהב צהוב'], ['label' => '14K', 'query' => 'תליון 14K']], $block['tags']);
-        $this->assertSame(['text' => 'יש תליון דומה בזהב לבן?', 'about' => 'similar'], $block['questions'][0], 'a value of its choice the store also sells, searched for');
+        $this->assertSame(['text' => 'יש תליון דומה בזהב לבן?', 'about' => 'similar', 'query' => 'תליון זהב לבן'], $block['questions'][0], 'a value of its choice the store also sells, as a search');
         $this->assertSame('יש תליון דומה ב-18K?', $block['questions'][1]['text'], 'a prefix letter joins a Hebrew word only');
+        $this->assertSame('תליון 18K', $block['questions'][1]['query']);
         $this->assertCount(5, $block['questions']);
-        $this->assertSame(['text' => 'תוך כמה זמן זה מגיע?', 'about' => 'product'], $block['questions'][2], 'then what any shopper asks about this one');
+        $this->assertSame(['text' => 'יש תליון דומה במחיר נמוך יותר?', 'about' => 'similar', 'query' => 'תליון עד 899'], $block['questions'][2], 'cheaper than this one, as a price range');
+        $this->assertSame(['text' => 'תוך כמה זמן זה מגיע?', 'about' => 'product'], $block['questions'][3], 'then what any shopper asks about this one');
 
         Settings::set('widget.layout', 'circles', $this->shop->id);
         $this->assertNull(app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant']);
