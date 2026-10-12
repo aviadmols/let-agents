@@ -151,6 +151,8 @@
   var offered = false;
   var teamPreview = false;
   var viewed = null;
+  // More from the search that brought them here: { query, products }, or null.
+  var searched = null;
 
   function pageContext() {
     var page = { type: PAGE_TYPE, path: (location.pathname || '/').slice(0, 512) };
@@ -2123,6 +2125,18 @@
       });
     }
 
+    // More from the search that brought them here ("עוד חולצה לבנה"): one shopper's own, like what they viewed.
+    if (searched && searched.products && searched.products.length) {
+      var words = searched.query.length > 24 ? searched.query.slice(0, 22) + '…' : searched.query;
+      bank.sections.push({
+        candidate: 'searched',
+        model: 'recent',
+        title: String(labels.searched_title || '').replace(':query', searched.query),
+        chip: String(labels.searched_chip || '').replace(':query', words),
+        products: searched.products
+      });
+    }
+
     // What this visitor looked at, and the invitation to have it kept for next time. Never part of
     // the page bank: the bank is the same for everyone and cached, this is one person's own.
     if (viewed && viewed.products && viewed.products.length) {
@@ -2936,6 +2950,10 @@
     }
     say('chat_line_complement_one', 'chat_line_complement', count('complement'));
     say('chat_line_similar_one', 'chat_line_similar', count('alternatives'));
+    var fromSearch = count('searched');
+    if (fromSearch > 0 && searched) {
+      lines.push(String(labels[fromSearch === 1 ? 'chat_line_searched_one' : 'chat_line_searched'] || '').replace(':count', String(fromSearch)).replace(':query', searched.query));
+    }
     say('chat_line_viewed_one', 'chat_line_viewed', count('recent'));
     say('chat_line_points_one', 'chat_line_points', count('highlights', '.highlights li'));
     say('chat_line_asked_one', 'chat_line_asked', Math.max(0, parseInt(bank.asked, 10) || 0));
@@ -3233,7 +3251,12 @@
       add('ask', bannerRow(bannerTile('ask', QUESTION), labels.banner_ask, labels.banner_ask_note), ask.index);
     }
 
-    // What this shopper looked at before.
+    // More from the search that brought them here, then what they looked at before.
+    if (searched) {
+      labels.banner_searched = String(labels.banner_searched || '').replace(':query', searched.query);
+      labels.banner_searched_one = String(labels.banner_searched_one || '').replace(':query', searched.query);
+    }
+    listFrame('searched', 'searched', 'banner_searched_one', 'banner_searched', 'banner_list');
     listFrame('seen', 'recent', 'banner_seen_one', 'banner_seen', 'banner_list');
 
     // The opening line comes first, and carries the whole invitation when it is alone.
@@ -3449,11 +3472,14 @@
           return;
         }
 
-        return fetchViewed().then(function (recent) {
+        return Promise.all([fetchViewed(), fetchSearched()]).then(function (both) {
+          var recent = both[0];
           viewed = recent;
+          searched = both[1];
           var hasViewed = !!(recent && recent.products && recent.products.length);
+          var hasSearched = !!(searched && searched.products && searched.products.length);
 
-          if (sections.length === 0 && !(data.layout === 'tags' && data.tags && data.tags.length) && !previous && !hasViewed && !data.ask && !data.contact && !data.popularity) {
+          if (sections.length === 0 && !(data.layout === 'tags' && data.tags && data.tags.length) && !previous && !hasViewed && !hasSearched && !data.ask && !data.contact && !data.popularity) {
             rememberCurrent(null);
             return;
           }
@@ -3465,6 +3491,9 @@
           });
           if (hasViewed) {
             recent.products.forEach(function (product) { ids.push(String(product.id)); knownUrls[String(product.id)] = knownUrls[String(product.id)] || product.url; });
+          }
+          if (hasSearched) {
+            searched.products.forEach(function (product) { ids.push(String(product.id)); knownUrls[String(product.id)] = knownUrls[String(product.id)] || product.url; });
           }
           if (PAGE_TYPE === 'product') {
             ids.push(PAGE_ID);
@@ -3504,6 +3533,39 @@
         id: PAGE_TYPE === 'product' ? PAGE_ID : '',
         locale: String(ctx.locale || 'he').slice(0, 2)
       })
+    })
+      .then(function (response) { return response.ok ? response.json() : null; })
+      .then(function (json) { return (json && json.data) || null; })
+      .catch(function () { return null; });
+  }
+
+  /**
+   * "More like what you searched for": the shopper's latest search in this browser, from the last
+   * half hour (the search box keeps them, in this browser only). The server answers only when this
+   * product is among what that search finds, so the search is what brought them here.
+   */
+  function fetchSearched() {
+    if (!bank.searched || PAGE_TYPE !== 'product') {
+      return Promise.resolve(null);
+    }
+
+    var last = null;
+    try {
+      var list = JSON.parse(window.localStorage.getItem('let_agents_searches') || '[]');
+      last = Array.isArray(list) && list.length ? list[list.length - 1] : null;
+    } catch (e) {
+      return Promise.resolve(null);
+    }
+    var query = last && typeof last.q === 'string' ? last.q.trim() : '';
+    if (query.length < 2 || !(Date.parse(last.at) > Date.now() - 30 * 60000)) {
+      return Promise.resolve(null);
+    }
+
+    return fetch(API + '/widget/' + ctx.site + '/searched', {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ q: query.slice(0, 120), id: PAGE_ID, locale: String(ctx.locale || 'he').slice(0, 2) })
     })
       .then(function (response) { return response.ok ? response.json() : null; })
       .then(function (json) { return (json && json.data) || null; })

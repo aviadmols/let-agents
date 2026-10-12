@@ -2,6 +2,7 @@
 
 use App\Modules\Widget\Http\Controllers\PageBankController;
 use App\Modules\Widget\Http\Controllers\RecentController;
+use App\Modules\Widget\Http\Controllers\SearchedController;
 use App\Modules\Widget\Http\Controllers\WidgetScriptController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,3 +17,8 @@ Route::get('widget/{site}/page', PageBankController::class)
 Route::post('widget/{site}/recent', RecentController::class)
     ->middleware('throttle:widget-recent')
     ->name('api.widget.recent');
+
+// More from the shopper's own search, the words in the body.
+Route::post('widget/{site}/searched', SearchedController::class)
+    ->middleware('throttle:widget-recent')
+    ->name('api.widget.searched');

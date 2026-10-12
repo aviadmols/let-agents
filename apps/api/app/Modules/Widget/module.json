@@ -56,6 +56,10 @@
             "default": true
         },
         {
+            "name": "searched_products",
+            "default": true
+        },
+        {
             "name": "show_alternatives",
             "default": true
         },

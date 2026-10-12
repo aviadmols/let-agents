@@ -41,6 +41,10 @@ return [
         'label' => 'Other sizes and models',
         'description' => 'The rest of the same product family.',
     ],
+    'searched_products' => [
+        'label' => 'More from their search',
+        'description' => 'On a product page reached from a search ("white shirt"), a circle with more products from that search. Only when the product itself is among the results. Search by spelling, no model, no cost.',
+    ],
     'show_alternatives' => [
         'label' => 'Similar options',
         'description' => 'Alternatives in a close price range.',

@@ -217,6 +217,7 @@ final class BuildPageBank
         // The products this visitor viewed are their own, so the widget asks for them separately;
         // the bank only says whether to ask, and what the sign-up under them should say.
         $bank['recent'] = Features::enabled('shoppers.recent_products', $shopId);
+        $bank['searched'] = Features::enabled('widget.searched_products', $shopId);
         // Whether a shopper may leave a way to be told an answer the assistant did not have.
         $bank['callbacks'] = Features::enabled('shoppers.callbacks', $shopId);
         $bank['signup'] = $this->signUp($shopId);

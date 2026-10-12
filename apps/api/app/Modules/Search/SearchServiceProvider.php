@@ -11,8 +11,10 @@ use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
+use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
 use App\Modules\Search\Support\HebrewPriceRange;
+use App\Modules\Search\Support\SpellingProductsForQuery;
 use App\Modules\Search\Support\SpellingProductsNamed;
 use App\Modules\Search\Support\StoredPageTags;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -26,6 +28,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         $this->app->bind(PageTags::class, StoredPageTags::class);
+        $this->app->bind(ProductsForQuery::class, SpellingProductsForQuery::class);
         $this->app->bind(PriceRange::class, HebrewPriceRange::class);
         $this->app->bind(ProductsNamed::class, SpellingProductsNamed::class);
         Event::listen(CatalogUpdated::class, RebuildSearchIndex::class);
