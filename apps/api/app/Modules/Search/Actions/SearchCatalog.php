@@ -75,7 +75,7 @@ final class SearchCatalog
 
     /**
      * @param  list<string>|null  $only  groups to return; null for all
-     * @return array{query: string, total: int, semantic: bool, single: array{id: string, by: string}|null, groups: array<string, list<array<string, mixed>>>, counts: array<string, int>}
+     * @return array{query: string, total: int, semantic: bool, single: array{id: string, by: string}|null, focus: array{options: list<array{query: string, count: int}>, category: array<string, mixed>|null}|null, groups: array<string, list<array<string, mixed>>>, counts: array<string, int>}
      */
     /**
      * @param  bool  $meaning  false while a shopper is still typing: spelling only, code only, no vector
@@ -101,6 +101,8 @@ final class SearchCatalog
                 ? HebrewSearch::single($index['codes'] ?? [], $query, $spelling)
                 : null;
             $single = $single !== null && isset($index['records'][$single['id']]) ? $single : null;
+            // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, to choose from.
+            $focus = $minPrice === null && $maxPrice === null && $without === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
 
             // A sentence ("מה הכי טוב למברגה ביתית וזולה") holds words no product has: search
             // what it is about instead, so a question finds the products it asks about.
@@ -191,7 +193,10 @@ final class SearchCatalog
                     : [];
             }
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'single' => $single, 'groups' => $groups, 'counts' => $counts];
+            // With the choices, the category the words found first, as a way in of its own.
+            $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
+
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 

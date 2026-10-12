@@ -85,4 +85,7 @@ return [
     'show_similar' => 'Show similar items',
     'more_results' => 'More results',
     'to_product' => 'View product',
+    'focus_title' => 'Nothing matches ":query" exactly. Did you mean:',
+    'focus_count' => ':query (:count)',
+    'focus_category' => 'Category: :title',
 ];

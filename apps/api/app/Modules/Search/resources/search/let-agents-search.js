@@ -253,16 +253,21 @@
     'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
     'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
 
+  // Words that say what kind of word follows ("בצבע שחור"), normalized: the server's DESCRIBES.
+  var DESCRIBES = ['בצבע', 'בגוונ', 'בגימור'];
+
   function rank(index, query) {
     var tokens = query.split(' ');
     var score = {};
     var hits = {};
     var found = [];
-    var needed = tokens.length <= 2 ? tokens.length : tokens.length - 1;
-    // The words that must all be there for a record to hold the whole query.
+    // A word that only says what follows is a colour or a finish ("בצבע שחור") is not counted.
+    var counted = tokens.filter(function (token) { return DESCRIBES.indexOf(token) === -1; }).length || tokens.length;
+    var needed = counted <= 2 ? counted : counted - 1;
+    // The words that must all be there for a record to hold the whole query ("בצבע" is not one).
     var required = [];
     for (var q = 0; q < tokens.length; q++) {
-      if (FILLER.indexOf(tokens[q]) === -1) {
+      if (FILLER.indexOf(tokens[q]) === -1 && DESCRIBES.indexOf(tokens[q]) === -1) {
         required.push(q);
       }
     }
@@ -380,6 +385,46 @@
     }
     var whole = hits.filter(function (hit) { return hit.full && String(hit.id).indexOf('p:') === 0; });
     return whole.length === 1 ? { id: whole[0].id, by: 'words' } : null;
+  }
+
+  /** How many products hold every word of a query. */
+  function wholeCount(index, query) {
+    return search(index, query).filter(function (hit) { return hit.full && String(hit.id).indexOf('p:') === 0; }).length;
+  }
+
+  /**
+   * Narrower searches to offer when no product holds every word ("מקדחה בצבע שחור"): the query
+   * without one of its words at a time, each with how many products hold all of it. Same as
+   * HebrewSearch::focus(); change both.
+   */
+  function focus(index, raw, max) {
+    var words = String(raw || '').trim().split(/\s+/).filter(Boolean);
+    var norm = words.map(normalize);
+    var content = [];
+    for (var c = 0; c < norm.length; c++) {
+      if (norm[c] !== '' && FILLER.indexOf(norm[c]) === -1 && DESCRIBES.indexOf(norm[c]) === -1) {
+        content.push(c);
+      }
+    }
+    if (content.length < 2 || wholeCount(index, String(raw || '')) > 0) {
+      return [];
+    }
+    var out = [];
+    for (var d = content.length - 1; d >= 0; d--) {
+      var drop = content[d];
+      var keep = [];
+      for (var i = 0; i < words.length; i++) {
+        if (i !== drop && !(i === drop - 1 && DESCRIBES.indexOf(norm[i]) !== -1) && norm[i] !== '') {
+          keep.push(words[i]);
+        }
+      }
+      var query = keep.join(' ');
+      var count = wholeCount(index, query);
+      if (count > 0 && !out.some(function (option) { return option.query === query; })) {
+        out.push({ query: query, count: count });
+      }
+    }
+    return out.slice(0, max || 3);
   }
 
   // ---------------------------------------------------------------- storefront
@@ -1188,6 +1233,11 @@
       '.la-mode button:focus-visible{outline:2px solid var(--rs-accent);outline-offset:1px}',
       '.la-mode i{display:inline-grid;color:var(--rs-accent-text)}',
       '.la-mode i svg{width:14px;height:14px}',
+      // Nothing holds every word: the narrower searches to choose from.
+      '.la-focus{display:grid;gap:8px}',
+      '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
+      '.la-focus-row{display:flex;flex-wrap:wrap;gap:8px}',
+      'a.d-chip{color:inherit;text-decoration:none}',
       // The one product a search is plainly for: alone and large, the rest on request.
       '.la-exact{display:inline-flex;align-items:center;justify-self:start;align-self:start;font-size:12px;font-weight:700;color:var(--rs-accent-text);',
       'border:1px solid color-mix(in srgb,var(--rs-accent) 35%,var(--rs-bg));border-radius:999px;padding:3px 10px}',
@@ -1598,6 +1648,18 @@
       // The answer the site already gave to this question. Typing never reaches a model.
       if (answers.length && closeAnswer(raw, answers[0].title)) {
         main.appendChild(answerBlock(answers[0].title, answers[0].ans, answers[0].src, raw, answers[0]));
+      }
+
+      // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, above
+      // what holds most of the words. Choosing one types it into the box. As on the server.
+      var options = !one && !question && !/[?？]/.test(raw) && !asks(raw) && !withoutWords(raw).out.length
+        && priceRange(raw).min === null && priceRange(raw).max === null ? focus(state.index, raw) : [];
+      if (options.length) {
+        main.appendChild(focusRow(options, null, raw, function (query) {
+          input.value = query;
+          current = input;
+          suggest(input);
+        }));
       }
 
       if (one) {
@@ -3198,6 +3260,13 @@
           one = products[s];
         }
       }
+      // No product holds every word: the narrower searches that do find, to choose from.
+      if (!quiet && result && result.focus && result.focus.options && result.focus.options.length) {
+        var choose = el('div', 'section');
+        choose.appendChild(focusRow(result.focus.options, result.focus.category, raw, function (query) { openPanel(query); }));
+        sheet.appendChild(choose);
+      }
+
       var place = sheet;
       if (one) {
         products = products.filter(function (product) { return product !== one; });
@@ -3312,6 +3381,34 @@
         foot.appendChild(site);
         sheet.appendChild(foot);
       }
+    }
+
+    /**
+     * "Nothing matches exactly. Did you mean:" and a button for each narrower search, with how many
+     * it finds; the category the words found first as a link. pick(query) runs the chosen search.
+     */
+    function focusRow(options, category, raw, pick) {
+      var box = el('div', 'la-focus');
+      box.appendChild(el('p', null, label('focus_title', { query: String(raw).trim() })));
+      var row = el('div', 'la-focus-row');
+      options.forEach(function (option) {
+        var chip = el('button', 'd-chip', label('focus_count', { query: option.query, count: option.count }));
+        chip.type = 'button';
+        chip.addEventListener('click', function (event) {
+          event.preventDefault();
+          pick(option.query);
+        });
+        row.appendChild(chip);
+      });
+      var href = category && safeUrl(category.url);
+      if (href) {
+        var link = el('a', 'd-chip', label('focus_category', { title: category.title }));
+        link.href = href;
+        row.appendChild(link);
+      }
+      box.appendChild(row);
+      box.addEventListener('mousedown', keepFocus);
+      return box;
     }
 
     function bindClick(node, raw, item) {
@@ -4243,6 +4340,7 @@
     isQuestion: isQuestion,
     codes: codes,
     single: single,
+    focus: focus,
     closeAnswer: closeAnswer,
     handleFromUrl: handleFromUrl,
     formatMoney: formatMoney,

@@ -33,6 +33,9 @@ final class HebrewSearch
         'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
         'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
 
+    /** Words that say what kind of word follows ("בצבע שחור", "בגוון אפור", "בגימור מט"), normalized. */
+    private const DESCRIBES = ['בצבע', 'בגוונ', 'בגימור'];
+
     /**
      * What a sentence is about, in the catalogue's words: question and filler words dropped, then
      * every word no product or page holds anything close to ("ביתית", "וזולה"). "מה הכי טוב
@@ -383,10 +386,13 @@ final class HebrewSearch
         $score = [];
         $hits = [];
         $found = [];
-        $needed = count($tokens) <= 2 ? count($tokens) : count($tokens) - 1;
+        // A word that only says what follows is a colour or a finish ("בצבע שחור") is not counted.
+        $counted = count(array_filter($tokens, fn (string $t): bool => ! in_array($t, self::DESCRIBES, true))) ?: count($tokens);
+        $needed = $counted <= 2 ? $counted : $counted - 1;
         // The words that must all be there for a record to hold the whole query: filler words
-        // ("עם", "של") are not asked of it.
-        $required = array_keys(array_filter($tokens, fn (string $t): bool => ! in_array($t, self::FILLER, true)));
+        // ("עם", "של") are not asked of it, nor "בצבע": "מקדחה בצבע שחור" is a black drill, and
+        // a black hook "בצבע שחור" holds two of its words but not the drill.
+        $required = array_keys(array_filter($tokens, fn (string $t): bool => ! in_array($t, self::FILLER, true) && ! in_array($t, self::DESCRIBES, true)));
         $required = $required === [] ? array_keys($tokens) : $required;
         $matched = [];
 
@@ -515,6 +521,50 @@ final class HebrewSearch
         $whole = array_values(array_filter($hits, fn (array $hit): bool => ($hit['full'] ?? false) && str_starts_with($hit['id'], 'p:')));
 
         return count($whole) === 1 ? ['id' => $whole[0]['id'], 'by' => 'words'] : null;
+    }
+
+    /**
+     * Narrower searches to offer when no product holds every word of a query: "מקדחה בצבע שחור"
+     * finds drills and black hooks, none both, so "מקדחה" and "בצבע שחור" are offered, each with
+     * how many products hold all of it. The query without one of its words at a time (a word's
+     * "בצבע" goes with it), the first words kept longest. Empty when a product holds every word
+     * or fewer than two words count. let-agents-search.js has the same focus(); change both.
+     *
+     * @return list<array{query: string, count: int}>
+     */
+    public static function focus(array $index, ?string $raw, int $max = 3): array
+    {
+        $words = preg_split('/\s+/u', trim((string) $raw), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $norm = array_map(fn (string $word): string => self::normalize($word), $words);
+        $content = array_keys(array_filter($norm, fn (string $n): bool => $n !== '' && ! in_array($n, self::FILLER, true) && ! in_array($n, self::DESCRIBES, true)));
+
+        if (count($content) < 2 || self::wholeCount($index, (string) $raw) > 0) {
+            return [];
+        }
+
+        $out = [];
+        foreach (array_reverse($content) as $drop) {
+            $keep = [];
+            foreach ($words as $i => $word) {
+                if ($i !== $drop && ! ($i === $drop - 1 && in_array($norm[$i], self::DESCRIBES, true)) && $norm[$i] !== '') {
+                    $keep[] = $word;
+                }
+            }
+            $query = implode(' ', $keep);
+            $count = self::wholeCount($index, $query);
+
+            if ($count > 0 && ! in_array($query, array_column($out, 'query'), true)) {
+                $out[] = ['query' => $query, 'count' => $count];
+            }
+        }
+
+        return array_slice($out, 0, $max);
+    }
+
+    /** How many products hold every word of a query. */
+    private static function wholeCount(array $index, string $query): int
+    {
+        return count(array_filter(self::search($index, $query), fn (array $hit): bool => $hit['full'] && str_starts_with($hit['id'], 'p:')));
     }
 
     private static function allTokensStartWords(string $name, array $tokens): bool

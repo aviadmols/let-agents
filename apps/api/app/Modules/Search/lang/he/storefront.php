@@ -85,4 +85,7 @@ return [
     'show_similar' => 'הצג פריטים דומים',
     'more_results' => 'עוד תוצאות',
     'to_product' => 'לעמוד המוצר',
+    'focus_title' => 'לא מצאנו בדיוק ":query". למה התכוונתם?',
+    'focus_count' => ':query (:count)',
+    'focus_category' => 'קטגוריה: :title',
 ];
