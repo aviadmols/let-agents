@@ -26,13 +26,14 @@
         <div>
             @if ($current)
                 <x-filament::section :heading="$current['title']" :description="$current['help']">
-                    <form wire:submit="save">
+                    {{-- A click, not a form submit: inside the Shopify admin the frame may not submit forms, and the browser drops the submit silently. --}}
+                    <div>
                         {{ $this->form }}
 
                         <div style="margin-top:14px">
-                            <x-filament::button type="submit">{{ __('admin::configuration.save') }}</x-filament::button>
+                            <x-filament::button type="button" wire:click="save">{{ __('admin::configuration.save') }}</x-filament::button>
                         </div>
-                    </form>
+                    </div>
                 </x-filament::section>
             @endif
 

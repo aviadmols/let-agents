@@ -4,6 +4,7 @@ namespace App\Modules\Recovery\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Modules\ModuleRepository;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\CurrentShop;
@@ -44,6 +45,10 @@ final class AbandonedCartsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        if (! app(ModuleRepository::class)->get('Recovery')?->enabled) {
+            $this->markTestSkipped('Abandoned carts are switched off (Recovery/module.json).');
+        }
 
         $this->shop = Shop::factory()->create();
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([

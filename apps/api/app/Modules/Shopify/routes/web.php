@@ -12,3 +12,12 @@ Route::middleware('throttle:shopify')->group(function (): void {
     Route::get('shopify/app/{path}', [ShopifyAppController::class, 'open'])->where('path', 'merchant(/[A-Za-z0-9_-]+)*')->name('shopify.app.deep');
     Route::get('shopify/billing/return', [ShopifyAppController::class, 'billingReturn'])->name('shopify.billing.return');
 });
+
+// Each shop's panel is on its own address ({slug}.shop_domain), so the Shopify admin keeps only the
+// screen's path, and a refresh asks for it at the app's own address, where no panel answers. Only
+// that address: the shops' own addresses keep their panels.
+if (filled(config('upsell.shop_domain'))) {
+    Route::domain((string) config('upsell.shop_domain'))->middleware('throttle:shopify')->group(function (): void {
+        Route::get('{path}', [ShopifyAppController::class, 'open'])->where('path', 'merchant(/[A-Za-z0-9_-]+)*')->name('shopify.app.reload');
+    });
+}

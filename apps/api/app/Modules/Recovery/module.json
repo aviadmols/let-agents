@@ -1,6 +1,6 @@
 {
     "name": "Recovery",
-    "enabled": true,
+    "enabled": false,
     "requires": [
         "Tenancy",
         "Runs",
