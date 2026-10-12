@@ -693,7 +693,7 @@ final class AnswerSiteQuestion
     public function screen(array $data, array $prepared, string $question, string $mode): array
     {
         ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'forModel' => $forModel] = $prepared;
-        $answer = mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
+        $answer = self::withoutRefs(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS));
         $cited = array_values(array_unique(array_filter(array_map('strval', (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
         $picks = $this->picks((array) ($data['picks'] ?? []), $productsByRef);
         $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
@@ -710,11 +710,33 @@ final class AnswerSiteQuestion
             $cited === [] && $picks === [] => 'cites_nothing',
             Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== [] => 'contact_details',
             preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 => 'price',
+            self::hasRef($answer) => 'internal_ref',
             self::hasNumberNotIn($answer, $known) => 'number_not_in_the_pages',
             default => null,
         };
 
         return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal];
+    }
+
+    /**
+     * The refs the writer was given ("p5", "s2") are its own, never the shopper's: one that only
+     * names a product beside its name, in brackets or after it, is dropped; one left anywhere else
+     * refuses the text, since what it stands for is unknown to the shopper.
+     */
+    public static function withoutRefs(string $text): string
+    {
+        // "(p5)", "(p5, p6)", "[s2]", "(ref p5)", " - p5" at the end of a clause.
+        $text = (string) preg_replace('~\s*[(\[]\s*(?:ref\s*)?[ps]\d{1,2}(?:\s*[,/]\s*[ps]\d{1,2})*\s*[)\]]~iu', '', $text);
+        // Only a dash or colon that stands apart (" - p5"): "מ-p3" is a prefix glued to the ref, a ref used as a word.
+        $text = (string) preg_replace('~(?<=\s)[-–—:]\s*[ps]\d{1,2}(?=[\s.,;!?]|$)~iu', '', $text);
+
+        return trim((string) preg_replace('/[ \t]{2,}/u', ' ', $text));
+    }
+
+    /** Whether a text still shows an internal ref ("p5", "s2") to the shopper. */
+    public static function hasRef(string $text): bool
+    {
+        return preg_match('~(?<![A-Za-z0-9])[ps]\d{1,2}(?![A-Za-z0-9])~u', $text) === 1;
     }
 
     /**
@@ -1069,9 +1091,9 @@ final class AnswerSiteQuestion
 
         foreach ($raw as $pick) {
             $ref = is_array($pick) ? (string) ($pick['ref'] ?? '') : '';
-            $why = is_array($pick) ? mb_substr(trim((string) ($pick['why'] ?? '')), 0, 160) : '';
+            $why = is_array($pick) ? self::withoutRefs(mb_substr(trim((string) ($pick['why'] ?? '')), 0, 160)) : '';
 
-            if (! isset($productsByRef[$ref]) || isset($seen[$ref]) || $why === '' || Question::hasContactDetails($why)) {
+            if (! isset($productsByRef[$ref]) || isset($seen[$ref]) || $why === '' || Question::hasContactDetails($why) || self::hasRef($why)) {
                 continue;
             }
 

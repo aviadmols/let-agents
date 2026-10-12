@@ -114,7 +114,7 @@ final class WriterBenchTest extends TestCase
             'usage' => ['prompt_tokens' => 1200, 'completion_tokens' => 80, 'cost' => 0.0014], 'provider' => 'Alibaba'];
         Http::fake(['router.test/api/v1/chat/completions' => Http::sequence()
             ->push($reply('צריך כ-30 ברגים למטר מרובע של דק.', [['ref' => 'p1', 'why' => 'מתאים לדק']]))
-            ->push($reply('כ-30 ברגים (p1) למטר.', []))]);
+            ->push($reply('p1 מספיק, כ-30 ברגים למטר.', []))]);
         config(['local_ai.model' => 'qwen/qwen3.5-27b']);
         $this->artisan('assistant:writer-bench', ['step' => 'write', 'file' => $this->file])->assertSuccessful();
         config(['local_ai.model' => 'qwen/qwen3.5-35b-a3b']);
@@ -142,7 +142,7 @@ final class WriterBenchTest extends TestCase
         $result = $this->lines(str_replace('.jsonl', '.judged.jsonl', $this->file))[0];
         $this->assertEqualsCanonicalizing(['current', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-35b-a3b'], array_keys($result['judge']['verdicts']));
         $this->assertSame(['A', 'B', 'C'], array_keys($result['judge']['order']), 'the replies by letter, in an order of their own');
-        $this->assertSame(['skipped', 'number_not_in_the_pages'], [$result['writers']['qwen/qwen3.5-35b-a3b']['check']['verdict'], $result['writers']['qwen/qwen3.5-35b-a3b']['check']['reason']], '"(p1)" is a number the pages lack: code removes the answer before any checker');
+        $this->assertSame('skipped', $result['writers']['qwen/qwen3.5-35b-a3b']['check']['verdict'], 'a ref used as a word names nothing the shopper knows: code refuses the answer before any checker');
 
         $summary = json_decode((string) file_get_contents(str_replace('.jsonl', '.summary.json', $this->file)), true);
         $this->assertSame(1, $summary['questions']);

@@ -172,6 +172,30 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('no_info', $this->ask('יש לכם ברגים?')->json('data.outcome'));
     }
 
+    public function test_the_writers_refs_never_reach_the_shopper(): void
+    {
+        // Seen on Gueta: "(p5)" beside a product's name, kept by the checker and shown. The ref is
+        // dropped where it only names the product; the answer stands.
+        $this->replies = [
+            ['found' => true, 'answer' => 'בערך 30 ברגים למטר (s1), ובורג נירוסטה (p1) מתאים לדק.', 'refs' => ['s1'], 'picks' => [['ref' => 'p1', 'why' => 'מתאים לדק - p1']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $data = $this->askWith('כמה ברגים צריך למטר דק?', ['31538'])->json('data');
+        $this->assertSame('בערך 30 ברגים למטר, ובורג נירוסטה מתאים לדק.', $data['answer']);
+        $this->assertSame('מתאים לדק', $data['picks'][0]['why']);
+        $this->assertStringNotContainsString('p1', json_decode($this->calls[1]['user'], true)['answer'], 'the checker reads the answer as the shopper will');
+
+        // A ref used as a word ("p3 is cheaper") names nothing the shopper knows: refused before any checker.
+        $this->replies = [['found' => true, 'answer' => 'p3 זול יותר ומתאים.', 'refs' => ['s1'], 'picks' => [['ref' => 'p1', 'why' => 'זול יותר מ-p3']]]];
+        $data = $this->askWith('איזה בורג מתאים לדק?', ['31538'])->json('data');
+        $this->assertSame('no_match', $data['outcome']);
+        $this->assertSame(['answer_site' => 2, 'verify_site' => 1], array_count_values(array_map(fn (array $c): string => str_contains($c['user'], '"answer"') && str_contains($c['user'], '"passages"') && ! str_contains($c['user'], '"products"') ? 'verify_site' : 'answer_site', $this->calls)), 'no checker for an answer code refused: two writers asked, one checker in all');
+
+        // Model numbers and sizes are not refs.
+        $this->assertSame('ביט PH2 של WERA, 25 מ"מ, למברגה 12V', AnswerSiteQuestion::withoutRefs('ביט PH2 של WERA, 25 מ"מ, למברגה 12V'));
+        $this->assertFalse(AnswerSiteQuestion::hasRef('ביט PH2 של WERA 12V'));
+    }
+
     public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_later(): void
     {
         $this->passages = [];
