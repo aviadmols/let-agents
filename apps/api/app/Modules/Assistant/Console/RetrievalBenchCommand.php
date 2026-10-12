@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Console;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Benchmark\BenchReports;
 use App\Modules\Assistant\Benchmark\RetrievalBench;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Retrieval\Contracts\ChunkExperiments;
@@ -103,10 +104,13 @@ final class RetrievalBenchCommand extends Command
     private function report(string $file): int
     {
         $judged = $this->option('judged') ? array_column(self::read(self::path((string) $this->option('judged'))), null, 'id') : [];
-        $report = RetrievalBench::report(self::read($file), $judged);
+        $records = self::read($file);
+        $report = RetrievalBench::report($records, $judged);
+        // Kept per shop, for the shop's page: the files here go with every deployment.
+        $shops = app(BenchReports::class)->retrieval((string) preg_replace('~(\.labelled)?\.jsonl$~', '', basename($file)), $records, $judged);
         file_put_contents(preg_replace('~(\.labelled)?\.jsonl$~', '', $file).'.report.json', json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        $this->line("{$report['questions']} questions: {$report['answerable_in_store']} answerable from what the store holds, {$report['not_answerable_in_store']} with no answer in the store. Recall below is over the answerable ones only.");
+        $this->line("{$report['questions']} questions: {$report['answerable_in_store']} answerable from what the store holds, {$report['not_answerable_in_store']} with no answer in the store. Recall below is over the answerable ones only. Kept on {$shops} shops' pages.");
         foreach (['reached', 'products', 'pages'] as $part) {
             $this->table([$part, '%'], array_map(fn (string $k, mixed $v): array => [$k, (string) $v], array_keys($report[$part]), array_values($report[$part])));
         }

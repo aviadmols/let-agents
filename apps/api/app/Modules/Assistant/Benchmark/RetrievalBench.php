@@ -231,7 +231,7 @@ final class RetrievalBench
         // How much of what answers reached the writer, question by question.
         $out['reached'] = ['none' => 0, 'under_half' => 0, 'half_or_more' => 0, 'all' => 0];
         foreach ($answerable as $r) {
-            $share = (float) (count(array_intersect($r['labels']['relevant'], [...$r['production']['products'], ...$r['production']['docs']])) / count($r['labels']['relevant']));
+            $share = self::share($r);
             $out['reached'][match (true) {
                 $share === 0.0 => 'none', $share < 0.5 => 'under_half', $share < 1.0 => 'half_or_more', default => 'all'
             }]++;
@@ -271,31 +271,59 @@ final class RetrievalBench
             if ($j === null || ! isset($j['judge'])) {
                 continue;
             }
-            $reached = array_merge($r['production']['products'], $r['production']['docs']);
-            $relevant = $r['labels']['relevant'];
-            $share = $relevant === [] ? 1.0 : (float) (count(array_intersect($relevant, $reached)) / count($relevant));
-            $retrievalMiss = $r['labels']['answerable_in_store'] && $share === 0.0;
-            $currentRight = isset($j['writers'][WriterBench::CURRENT]) && ! isset($j['writers'][WriterBench::CURRENT]['error']) && WriterBench::finalCorrect($j, WriterBench::CURRENT);
-
-            foreach ($j['writers'] as $key => $side) {
+            $partial = self::share($r) < 0.5;
+            foreach (self::layers($r, $j) as $key => $layer) {
                 $out[$key] ??= array_fill_keys([...self::LAYERS, 'correct_from_partial'], 0);
-                $right = ! isset($side['error']) && WriterBench::finalCorrect($j, $key);
-                $layer = match (true) {
-                    isset($side['error']) => 'failed_call',
-                    ! $r['labels']['answerable_in_store'] => WriterBench::shown($j, $key) ? 'no_answer_invented' : 'no_answer_refused',
-                    $retrievalMiss => $right && WriterBench::shown($j, $key) ? 'correct' : 'retrieval',
-                    $right => 'correct',
-                    str_ends_with($key, '@'.WriterBench::V5) && $currentRight => 'facts',
-                    default => 'writer',
-                };
                 $out[$key][$layer]++;
-                if ($layer === 'correct' && $share < 0.5) {
+                if ($layer === 'correct' && $partial) {
                     $out[$key]['correct_from_partial']++;
                 }
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Each writer's answer to one question, put on its layer (see attribution).
+     *
+     * @param  array<string, mixed>  $r  the labelled record
+     * @param  array<string, mixed>  $j  the writer benchmark's judged record of the same question
+     * @return array<string, string> layer by writer
+     */
+    public static function layers(array $r, array $j): array
+    {
+        if (! isset($j['judge'])) {
+            return [];
+        }
+        $retrievalMiss = $r['labels']['answerable_in_store'] && self::share($r) === 0.0;
+        $currentRight = isset($j['writers'][WriterBench::CURRENT]) && ! isset($j['writers'][WriterBench::CURRENT]['error']) && WriterBench::finalCorrect($j, WriterBench::CURRENT);
+        $out = [];
+
+        foreach ($j['writers'] as $key => $side) {
+            $right = ! isset($side['error']) && WriterBench::finalCorrect($j, $key);
+            $out[$key] = match (true) {
+                isset($side['error']) => 'failed_call',
+                ! $r['labels']['answerable_in_store'] => WriterBench::shown($j, $key) ? 'no_answer_invented' : 'no_answer_refused',
+                $retrievalMiss => $right && WriterBench::shown($j, $key) ? 'correct' : 'retrieval',
+                $right => 'correct',
+                str_ends_with($key, '@'.WriterBench::V5) && $currentRight => 'facts',
+                default => 'writer',
+            };
+        }
+
+        return $out;
+    }
+
+    /** The share of what answers a question that reached the writer; 1 when nothing answers it. */
+    private static function share(array $r): float
+    {
+        $relevant = $r['labels']['relevant'];
+        if ($relevant === []) {
+            return 1.0;
+        }
+
+        return (float) (count(array_intersect($relevant, [...$r['production']['products'], ...$r['production']['docs']])) / count($relevant));
     }
 
     /**

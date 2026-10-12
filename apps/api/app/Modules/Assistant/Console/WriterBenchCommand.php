@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Console;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Benchmark\BenchReports;
 use App\Modules\Assistant\Benchmark\LocalWriter;
 use App\Modules\Assistant\Benchmark\WriterBench;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -146,7 +147,10 @@ final class WriterBenchCommand extends Command
 
     private function summary(string $file): int
     {
-        $summary = WriterBench::summary(self::read($file));
+        $records = self::read($file);
+        $summary = WriterBench::summary($records);
+        // Kept per shop, for the shop's page: the files here go with every deployment.
+        $shops = app(BenchReports::class)->factSheet((string) preg_replace('~(\.judged)?\.jsonl$~', '', basename($file)), $records);
         file_put_contents(self::sibling(preg_replace('~\.judged\.jsonl$~', '.jsonl', $file) ?? $file, 'summary', 'json'), json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $writers = $summary['writers'];
         $rows = [];
@@ -165,7 +169,7 @@ final class WriterBenchCommand extends Command
             $rows[] = ["cost per question: {$part} (\$)", ...array_map(fn (array $w): string => (string) ($w['cost_per_question_usd'][$part] ?? '-'), $writers)];
         }
 
-        $this->line("{$summary['questions']} questions, {$summary['answerable']} answerable from the input; judge cost \${$summary['judge_cost_usd']}");
+        $this->line("{$summary['questions']} questions, {$summary['answerable']} answerable from the input; judge cost \${$summary['judge_cost_usd']}; kept on {$shops} shops' pages");
         $this->table(['', ...array_keys($writers)], $rows);
 
         return self::SUCCESS;
