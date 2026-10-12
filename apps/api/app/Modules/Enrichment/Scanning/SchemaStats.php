@@ -10,8 +10,9 @@ use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
  * vocabulary reads a page of numbers instead of thousands of products: the store's own fields
  * (type, tags, categories, attributes, spec fields) and how many products carry each value; every
  * number with a unit in the titles and descriptions, with the words before it ("משקל התכשיט",
- * "בסך הכל"); the "key: value" lines of the descriptions; the words the titles repeat; and how
- * well each ready vocabulary's product types fit the titles.
+ * "בסך הכל"); the "key: value" lines of the descriptions; the words the titles repeat; the words
+ * of each picture's description (colours, shapes, materials); and how well each ready
+ * vocabulary's product types fit the titles.
  *
  * Every list is sorted explicitly (count, then text), so the same products give the same page,
  * and its fingerprint stays the same.
@@ -43,9 +44,10 @@ final class SchemaStats
     /**
      * @param  iterable<CatalogProduct>  $products
      * @param  array<string, VocabularyDefinition>  $templates  by name
+     * @param  array<string, array{caption: string, words: list<string>}>  $pictures  each product's picture as a model described it, by product id
      * @return array<string, mixed>
      */
-    public static function collect(iterable $products, array $templates = []): array
+    public static function collect(iterable $products, array $templates = [], array $pictures = []): array
     {
         $scanner = new MeasurementScanner(40);
         $n = 0;
@@ -58,6 +60,8 @@ final class SchemaStats
         $words = [];
         $pairs = [];
         $fits = array_fill_keys(array_keys($templates), 0);
+        $pictureWords = [];
+        $described = 0;
         $examples = [];
 
         foreach ($products as $product) {
@@ -153,8 +157,20 @@ final class SchemaStats
                 }
             }
 
+            // The words a model used for the picture (colours, shapes, materials), each once a product.
+            $picture = $pictures[$product->id] ?? null;
+            if ($picture !== null) {
+                $described++;
+                foreach (array_unique(array_map(fn ($w): string => mb_strtolower(trim((string) $w)), $picture['words'])) as $word) {
+                    if ($word !== '') {
+                        $pictureWords[$word] = ($pictureWords[$word] ?? 0) + 1;
+                    }
+                }
+            }
+
             if (count($examples) < self::EXAMPLES) {
-                $examples[] = ['id' => (string) $product->external_id, 'title' => mb_substr($title, 0, 160), 'type' => $type, 'tags' => array_slice($tags, 0, 8), 'head' => mb_substr($head, 0, 240)];
+                $examples[] = ['id' => (string) $product->external_id, 'title' => mb_substr($title, 0, 160), 'type' => $type, 'tags' => array_slice($tags, 0, 8), 'head' => mb_substr($head, 0, 240)]
+                    + ($picture === null ? [] : ['picture' => mb_substr($picture['caption'], 0, 240)]);
             }
         }
 
@@ -176,6 +192,7 @@ final class SchemaStats
             'key_values' => self::keyed($keyValues, $share),
             'title_words' => self::frequent($words, $n, self::TOP_WORDS),
             'title_pairs' => self::frequent($pairs, $n, self::TOP_PAIRS),
+            'image_words' => ['share' => $share($described), 'values' => self::top($pictureWords, self::TOP_TAGS)],
             'templates' => self::fits($fits, $share),
             'examples' => $examples,
         ];

@@ -28,9 +28,9 @@ final class CodeReading
 
     /**
      * How sure each source is: the store's own fields (its type, tags, attributes), then the
-     * title, then the start of the description.
+     * title, then the start of the description, then what a model saw in the picture.
      */
-    public const CONFIDENCE = ['category' => 0.95, 'field' => 0.95, 'title' => 0.9, 'description' => 0.8];
+    public const CONFIDENCE = ['category' => 0.95, 'field' => 0.95, 'title' => 0.9, 'description' => 0.8, 'image' => 0.7];
 
     /** The start of the description read for choices, specs and flags: where stores state them. */
     private const HEAD = 600;
@@ -39,9 +39,11 @@ final class CodeReading
      * @param  bool  $readText  also read the vocabulary's choices, specs and flags from the store's
      *                          fields, the title and the start of the description (text_choices,
      *                          text_specs, flags), and the type from them when no category gives it
+     * @param  string|null  $picture  what a model saw in its picture (PictureText): read last, for
+     *                                choices and flags the vocabulary lets a picture tell
      * @return array<string, mixed>
      */
-    public static function read(CatalogProduct $product, BrandResolver $brands, ?VocabularyDefinition $vocabulary, bool $readText = false): array
+    public static function read(CatalogProduct $product, BrandResolver $brands, ?VocabularyDefinition $vocabulary, bool $readText = false, ?string $picture = null): array
     {
         $categories = ProductFamily::categoriesMostSpecificFirst($product);
         $type = $vocabulary?->typeForCategories($categories);
@@ -57,7 +59,7 @@ final class CodeReading
             }
         }
 
-        $text = $readText && $vocabulary !== null ? self::texts($product) : null;
+        $text = $readText && $vocabulary !== null ? self::texts($product) + ['image' => (string) $picture] : null;
 
         // No category gives it: the store's own type field, then the title, when exactly one type fits.
         if ($text !== null && $type === null && ! self::categoryNamesAnotherType($vocabulary, $categories)) {
@@ -121,7 +123,7 @@ final class CodeReading
      * choice named twice in one source ("זהב צהוב" and "זהב לבן" on a one-metal attribute) is
      * not decided here; a choice the category already gave is not read again.
      *
-     * @param  array{field: string, title: string, description: string}  $text
+     * @param  array{field: string, title: string, description: string, image: string}  $text
      * @param  array<string, string>  $fromCategory
      * @return array<string, array{values: list<string>, source: string, quote: string}>
      */
@@ -135,7 +137,7 @@ final class CodeReading
                 continue;
             }
 
-            foreach (['field', 'title', 'description'] as $source) {
+            foreach (self::sources($vocabulary, $key) as $source) {
                 $found = [];
                 foreach ((array) ($attribute['values'] ?? []) as $value) {
                     $quote = self::find($text[$source], (array) ($value['patterns'] ?? []));
@@ -161,7 +163,7 @@ final class CodeReading
      * The vocabulary's numbers the title did not give, read the same way from the start of the
      * description ("משקל התכשיט 1.1 גרם").
      *
-     * @param  array{field: string, title: string, description: string}  $text
+     * @param  array{field: string, title: string, description: string, image: string}  $text
      * @param  array<string, mixed>  $fromTitle
      * @return array<string, array{value: float, unit: string, quote: string, source: string}>
      */
@@ -180,7 +182,7 @@ final class CodeReading
     /**
      * The vocabulary's yes-or-no attributes the text says outright.
      *
-     * @param  array{field: string, title: string, description: string}  $text
+     * @param  array{field: string, title: string, description: string, image: string}  $text
      * @return array<string, array{source: string, quote: string}>
      */
     private static function flags(VocabularyDefinition $vocabulary, ?string $type, array $text): array
@@ -191,7 +193,7 @@ final class CodeReading
             if (($attribute['type'] ?? 'number') !== 'boolean' || ! $vocabulary->appliesTo($key, $type)) {
                 continue;
             }
-            foreach (['field', 'title', 'description'] as $source) {
+            foreach (self::sources($vocabulary, $key) as $source) {
                 $quote = self::find($text[$source], (array) ($attribute['patterns'] ?? []));
                 if ($quote !== null) {
                     $out[$key] = ['source' => $source, 'quote' => $quote];
@@ -201,6 +203,17 @@ final class CodeReading
         }
 
         return $out;
+    }
+
+    /**
+     * Where an attribute is read, in order: the picture last, and only when the vocabulary lets a
+     * picture tell it (not a purity, a weight, a number).
+     *
+     * @return list<string>
+     */
+    private static function sources(VocabularyDefinition $vocabulary, string $key): array
+    {
+        return $vocabulary->readFromImage($key) ? ['field', 'title', 'description', 'image'] : ['field', 'title', 'description'];
     }
 
     /** A category the vocabulary maps names a type the title does not: code leaves it to the model. */

@@ -236,6 +236,15 @@
             "unit": "usd"
         },
         {
+            "name": "schema_rounds",
+            "type": "int",
+            "default": 2,
+            "min": 0,
+            "max": 3,
+            "scope": "global",
+            "unit": "rounds"
+        },
+        {
             "name": "schema_sample",
             "type": "int",
             "default": 300,
@@ -401,7 +410,8 @@
                         "schema_writer_output_usd_per_million"
                     ],
                     "prompts": [
-                        "schema_writer"
+                        "schema_writer",
+                        "schema_revise"
                     ]
                 },
                 {

@@ -13,6 +13,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BrandResolver;
 use App\Modules\Enrichment\Scanning\CodeReading;
+use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\ProductFamily;
 use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -89,6 +90,8 @@ final class ReadProductsInCode
         $brands = BrandResolver::forCatalog(CatalogProduct::query()->whereNull('removed_at')->lazyById(200));
         $autoApprove = Features::enabled('enrichment.auto_approve', $shopId);
         $readText = Features::enabled('enrichment.read_text_in_code', $shopId);
+        // What a model saw in each picture, read last: only where the shop reads its text in code.
+        $pictures = $readText ? PictureText::for() : [];
         $now = now();
 
         $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0];
@@ -99,7 +102,7 @@ final class ReadProductsInCode
         foreach (CatalogProduct::query()->whereNull('removed_at')->lazyById(200) as $product) {
             $counts['products']++;
             $vocabulary = $branchOf[$product->id] ?? null;
-            $reading = CodeReading::read($product, $brands, $vocabulary?->definition(), $readText);
+            $reading = CodeReading::read($product, $brands, $vocabulary?->definition(), $readText, isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : null);
             $hash = hash('sha256', ($vocabulary?->id ?? '-').'|'.json_encode($reading, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
             $counts['with_brand'] += isset($reading['brand']) ? 1 : 0;
@@ -184,7 +187,7 @@ final class ReadProductsInCode
                 // Read from the store's own words, each with how sure its source is and where it was read.
                 foreach ((array) ($reading['text_choices'] ?? []) as $key => $choice) {
                     foreach ($choice['values'] as $value) {
-                        $write(['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$choice['source'],
+                        $write(self::fromPicture($choice['source'], $key, $vocabulary, $status) + ['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$choice['source'],
                             'confidence' => CodeReading::CONFIDENCE[$choice['source']], 'evidence' => ['source' => $choice['source'], 'ref' => mb_substr($choice['quote'], 0, 300)]]);
                     }
                 }
@@ -193,7 +196,7 @@ final class ReadProductsInCode
                         'confidence' => CodeReading::CONFIDENCE[$spec['source']], 'evidence' => ['source' => $spec['source'], 'ref' => $spec['quote']]]);
                 }
                 foreach ((array) ($reading['flags'] ?? []) as $key => $flag) {
-                    $write(['kind' => FactKind::Flag, 'key' => $key, 'value_text' => 'true', 'quote' => mb_substr($flag['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$flag['source'],
+                    $write(self::fromPicture($flag['source'], $key, $vocabulary, $status) + ['kind' => FactKind::Flag, 'key' => $key, 'value_text' => 'true', 'quote' => mb_substr($flag['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$flag['source'],
                         'confidence' => CodeReading::CONFIDENCE[$flag['source']], 'evidence' => ['source' => $flag['source'], 'ref' => mb_substr($flag['quote'], 0, 300)]]);
                 }
             });
@@ -219,5 +222,20 @@ final class ReadProductsInCode
             'types' => number_format($counts['types_from_category']),
             'specs' => number_format($counts['title_specs']),
         ]);
+    }
+
+    /**
+     * A fact read from what a model saw in the picture waits for a person, unless the vocabulary
+     * lets a picture this sure decide it (a colour at 0.6); one from the store's words does not.
+     *
+     * @return array{status?: FactStatus}
+     */
+    private static function fromPicture(string $source, string $key, ?EnrichmentVocabulary $vocabulary, FactStatus $status): array
+    {
+        if ($source !== 'image' || $vocabulary === null || $status !== FactStatus::Approved) {
+            return [];
+        }
+
+        return CodeReading::CONFIDENCE['image'] >= $vocabulary->definition()->imageFilterConfidence($key) ? [] : ['status' => FactStatus::AwaitingReview];
     }
 }

@@ -11,6 +11,7 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
+use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\SchemaStats;
 use App\Modules\Enrichment\Scanning\TextNormalizer;
 use App\Modules\Enrichment\Scanning\Units;
@@ -33,7 +34,8 @@ final class ProposeSchema
     /** A ready vocabulary is a starting point when its types match at least this share of the titles. */
     public const TEMPLATE_FIT = 0.3;
 
-    private const PROMPT_VERSION = 1;
+    /** The released version each prompt is sent at; a released one is never edited. */
+    private const PROMPTS = ['schema_writer' => 2, 'schema_review' => 2, 'schema_revise' => 1];
 
     private const WRITER_OUTPUT_TOKENS = 12000;
 
@@ -93,15 +95,55 @@ final class ProposeSchema
                 return;
             }
 
-            // Code first: what no pattern reads on the sample (a number with no capture, a choice
-            // that matches nothing) is a fact nothing supports, and would be answered with confidence.
-            [$vocabulary, $byCode] = self::drop($vocabulary, self::unread(self::coverage($vocabulary, $texts)));
-            $coverage = self::coverage($vocabulary, $texts);
-            $review = $this->call($run, $reviewer, 'reviewer', 'schema_review', [
-                'stats' => array_diff_key($stats, ['sample' => true, 'examples' => true]),
-                'vocabulary' => array_intersect_key($vocabulary, array_flip(['product_types', 'attributes'])),
-                'coverage' => $coverage,
-            ], self::REVIEW_OUTPUT_TOKENS);
+            $dropped = [];
+            $rounds = [];
+            $notes = array_map('strval', (array) ($written['notes'] ?? []));
+            $limit = (int) Settings::get('enrichment.schema_rounds');
+            for ($round = 0; ; $round++) {
+                // Code first: what no pattern reads on the sample (a number with no capture, a choice
+                // that matches nothing) is a fact nothing supports, and would be answered with confidence.
+                [$vocabulary, $byCode] = self::drop($vocabulary, self::unread(self::coverage($vocabulary, $texts)));
+                $coverage = self::coverage($vocabulary, $texts);
+                $review = $this->call($run, $reviewer, 'reviewer', 'schema_review', [
+                    'stats' => array_diff_key($stats, ['sample' => true, 'examples' => true]),
+                    'vocabulary' => array_intersect_key($vocabulary, array_flip(['product_types', 'attributes'])),
+                    'coverage' => $coverage,
+                ], self::REVIEW_OUTPUT_TOKENS);
+                [$vocabulary, $byReviewer] = self::drop($vocabulary, (array) ($review['drop'] ?? []));
+                $dropped = [
+                    ...$dropped,
+                    ...array_map(fn (array $d): array => $d + ['by' => 'code', 'round' => $round], $byCode),
+                    ...array_map(fn (array $d): array => $d + ['by' => 'reviewer', 'round' => $round], $byReviewer),
+                ];
+                $good = ($review['verdict'] ?? null) === 'good';
+                $rounds[] = ['round' => $round, 'verdict' => $good ? 'good' : 'needs_work', 'dropped' => count($byCode) + count($byReviewer), 'missing' => count((array) ($review['missing'] ?? []))];
+
+                if ($good || $round >= $limit) {
+                    break;
+                }
+
+                // Not good yet: the writer fixes what the reviewer found (what it removed, what is
+                // missing, its notes), and the other family reviews the fix again.
+                $asked = [
+                    'stats' => array_diff_key($stats, ['sample' => true]),
+                    'vocabulary' => $vocabulary,
+                    'coverage' => self::coverage($vocabulary, $texts),
+                    'review' => ['removed' => $byReviewer, 'missing' => (array) ($review['missing'] ?? []), 'notes' => (array) ($review['notes'] ?? [])],
+                    'dimensions' => array_keys(Units::CANONICAL),
+                ];
+                $this->spend->assertCanSpend($this->estimate($asked, 'writer', self::WRITER_OUTPUT_TOKENS) + $this->estimate($asked, 'reviewer', self::REVIEW_OUTPUT_TOKENS));
+                $revised = $this->call($run, $writer, 'writer', 'schema_revise', $asked, self::WRITER_OUTPUT_TOKENS);
+                [$fixed, $more] = $this->repair((array) ($revised['vocabulary'] ?? []), $proposal);
+                $problems = [...$problems, ...$more];
+                if ($fixed === null) {
+                    break;
+                }
+                $vocabulary = $fixed;
+                $written['sources'] = (array) ($revised['sources'] ?? []) + (array) ($written['sources'] ?? []);
+                foreach ((array) ($revised['notes'] ?? []) as $note) {
+                    $notes[] = (string) __('enrichment::ui.schema.round_note', ['n' => $round + 1, 'note' => (string) $note]);
+                }
+            }
         } catch (SpendCapReached $e) {
             $this->fail($run, $proposal, 'assistant::runs.spend_cap', [$e->getMessage()]);
 
@@ -112,11 +154,6 @@ final class ProposeSchema
             return;
         }
 
-        [$vocabulary, $dropped] = self::drop($vocabulary, (array) ($review['drop'] ?? []));
-        $dropped = [
-            ...array_map(fn (array $d): array => $d + ['by' => 'code'], $byCode),
-            ...array_map(fn (array $d): array => $d + ['by' => 'reviewer'], $dropped),
-        ];
         [$parsed, $left] = VocabularyDefinition::parse($vocabulary);
 
         if ($parsed === null) {
@@ -134,7 +171,8 @@ final class ProposeSchema
                 'dropped' => $dropped,
                 'missing' => array_slice(array_values(array_filter((array) ($review['missing'] ?? []), 'is_array')), 0, 15),
                 'notes' => array_slice(array_map('strval', (array) ($review['notes'] ?? [])), 0, 10),
-                'writer' => ['model' => $writer->model, 'sources' => (array) ($written['sources'] ?? []), 'notes' => array_slice(array_map('strval', (array) ($written['notes'] ?? [])), 0, 15)],
+                'writer' => ['model' => $writer->model, 'sources' => (array) ($written['sources'] ?? []), 'notes' => array_slice($notes, 0, 25)],
+                'rounds' => $rounds,
                 'reviewer' => $reviewer->model,
             ],
             'problems' => $problems === [] ? null : $problems,
@@ -201,15 +239,18 @@ final class ProposeSchema
 
     /**
      * What each pattern list matches on the sample: product types on the title and the store's
-     * type, attributes and their values on the title, type, tags and the start of the description.
+     * type, attributes and their values on the title, type, tags and the start of the description,
+     * and choices and flags a picture may tell also on what a model saw in it; numbers never.
      *
-     * @param  list<array{head: string, full: string}>  $texts
+     * @param  list<array{head: string, full: string, picture?: string}>  $texts
      * @return array{product_types: array<string, float>, attributes: array<string, array{share: float, values?: array<string, float>}>}
      */
     public static function coverage(array $vocabulary, array $texts): array
     {
         $heads = array_column($texts, 'head');
         $fulls = array_column($texts, 'full');
+        $seen = array_map(fn (array $t): string => $t['full']."\n".($t['picture'] ?? ''), $texts);
+        $never = (array) ($vocabulary['image']['never'] ?? []);
         $out = ['product_types' => [], 'attributes' => []];
 
         foreach ((array) ($vocabulary['product_types'] ?? []) as $type) {
@@ -218,15 +259,16 @@ final class ProposeSchema
         foreach ((array) ($vocabulary['attributes'] ?? []) as $attribute) {
             $key = (string) $attribute['key'];
             $kind = $attribute['type'] ?? 'number';
+            $read = in_array($key, $never, true) ? $fulls : $seen;
             if ($kind === 'enum') {
                 $values = [];
                 foreach ((array) ($attribute['values'] ?? []) as $value) {
-                    $values[(string) $value['key']] = SchemaStats::share($fulls, (array) ($value['patterns'] ?? []));
+                    $values[(string) $value['key']] = SchemaStats::share($read, (array) ($value['patterns'] ?? []));
                 }
                 $all = array_merge(...array_map(fn (array $v): array => (array) ($v['patterns'] ?? []), (array) ($attribute['values'] ?? [])));
-                $out['attributes'][$key] = ['share' => SchemaStats::share($fulls, $all), 'values' => $values];
+                $out['attributes'][$key] = ['share' => SchemaStats::share($read, $all), 'values' => $values];
             } elseif ($kind === 'boolean') {
-                $out['attributes'][$key] = ['share' => SchemaStats::share($fulls, (array) ($attribute['patterns'] ?? []))];
+                $out['attributes'][$key] = ['share' => SchemaStats::share($read, (array) ($attribute['patterns'] ?? []))];
             } else {
                 $capture = $attribute['title_capture']['pattern'] ?? null;
                 $out['attributes'][$key] = ['share' => is_string($capture) ? SchemaStats::share($fulls, [$capture]) : 0.0, 'read_by' => is_string($capture) ? 'code' : 'model'];
@@ -317,16 +359,19 @@ final class ProposeSchema
      * The sampled products' text as code reads it.
      *
      * @param  list<string>  $ids
-     * @return list<array{head: string, full: string}>
+     * @return list<array{head: string, full: string, picture: string}>
      */
     private function texts(array $ids): array
     {
-        return CatalogProduct::query()->whereIn('id', $ids)->orderBy('external_id')->get()->map(function (CatalogProduct $product): array {
+        $pictures = PictureText::for($ids);
+
+        return CatalogProduct::query()->whereIn('id', $ids)->orderBy('external_id')->get()->map(function (CatalogProduct $product) use ($pictures): array {
             $head = TextNormalizer::clean((string) $product->title).' '.trim((string) ($product->payload['product_type'] ?? ''));
             $tags = implode(' ', array_map('strval', (array) ($product->payload['tags'] ?? [])));
             $description = mb_substr(TextNormalizer::clean(strip_tags($product->description())), 0, self::HEAD);
+            $picture = isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : '';
 
-            return ['head' => $head, 'full' => $head.' '.$tags."\n".$description];
+            return ['head' => $head, 'full' => $head.' '.$tags."\n".$description, 'picture' => $picture];
         })->all();
     }
 
@@ -336,7 +381,7 @@ final class ProposeSchema
         $reply = $this->models->json(
             $model->provider,
             $model->model,
-            (string) file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v'.self::PROMPT_VERSION.'.md'),
+            (string) file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v'.self::PROMPTS[$prompt].'.md'),
             (string) json_encode($input, JSON_UNESCAPED_UNICODE),
             $maxOutput,
             'low',

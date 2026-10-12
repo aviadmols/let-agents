@@ -8,6 +8,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\DecideSchemaProposal;
 use App\Modules\Enrichment\Actions\DiscoverSchema;
 use App\Modules\Enrichment\Actions\ImportVocabulary;
@@ -19,6 +20,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunStatus;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,13 +119,67 @@ final class SchemaDiscoveryTest extends TestCase
         $this->assertSame(['metal', 'total_weight'], array_column($proposal->proposed['attributes'], 'key'), 'the attribute with an unknown dimension is left out');
         $this->assertStringContainsString('attribute shine', implode(' ', $proposal->problems));
         $this->assertSame(['yellow_gold', 'white_gold'], array_column($proposal->proposed['attributes'][0]['values'], 'key'), 'the value nothing in the sample says is gone');
-        $this->assertSame([['kind' => 'value', 'key' => 'metal.rose_gold', 'by' => 'code']], array_map(fn (array $d): array => array_diff_key($d, ['why' => 1]), $proposal->review['dropped']),
+        $this->assertSame([['kind' => 'value', 'key' => 'metal.rose_gold', 'by' => 'code', 'round' => 0]], array_map(fn (array $d): array => array_diff_key($d, ['why' => 1]), $proposal->review['dropped']),
             'removed by code before the review: no pattern reads it, so the reviewer never had to');
         $this->assertStringNotContainsString('rose_gold', $this->calls[1]['user'], 'the reviewer sees what is left');
         $this->assertSame(0.6, $proposal->coverage['attributes']['metal']['values']['yellow_gold'], '3 of 5 products');
         $this->assertEquals(1.0, $proposal->coverage['attributes']['total_weight']['share'], 'the weight is read in code from every description');
         $this->assertSame(0.6, $proposal->coverage['product_types']['ring']);
         $this->assertGreaterThan(0, (float) $run->cost_usd, 'every call is accounted');
+    }
+
+    public function test_needs_work_the_writer_fixes_what_the_reviewer_found_and_the_reviewer_checks_again(): void
+    {
+        $proposal = app(DiscoverSchema::class)->handle($this->shop->id)['proposal'];
+        $fixed = $this->vocabulary();
+        array_pop($fixed['attributes']);
+        $fixed['attributes'][] = ['key' => 'gold_karat', 'type' => 'enum', 'label' => ['he' => 'קראטים', 'en' => 'Karat'], 'values' => [
+            ['key' => 'k14', 'label' => ['he' => '14K', 'en' => '14K'], 'patterns' => ['14K']], ['key' => 'k18', 'label' => ['he' => '18K', 'en' => '18K'], 'patterns' => ['18K']]]];
+        $this->replies = [
+            ['vocabulary' => $this->vocabulary(), 'notes' => ['first']],
+            ['verdict' => 'needs_work', 'drop' => [], 'missing' => [['key' => 'gold_karat', 'why' => '14K in most titles']], 'notes' => []],
+            ['vocabulary' => $fixed, 'notes' => ['Added gold_karat from the titles.']],
+            ['verdict' => 'good', 'drop' => [], 'missing' => []],
+        ];
+
+        app(ProposeSchema::class)->handle($proposal);
+        $proposal->refresh();
+
+        $this->assertSame([AiProviderName::OpenAi, AiProviderName::Anthropic, AiProviderName::OpenAi, AiProviderName::Anthropic], array_column($this->calls, 'provider'));
+        $this->assertStringContainsString('fix the vocabulary', $this->calls[2]['system'], 'the fix prompt');
+        $this->assertStringContainsString('14K in most titles', $this->calls[2]['user'], 'with what the reviewer found missing');
+        $this->assertContains('gold_karat', array_column($proposal->proposed['attributes'], 'key'));
+        $this->assertSame(['needs_work', 'good'], array_column($proposal->review['rounds'], 'verdict'));
+        $this->assertSame('good', $proposal->review['verdict']);
+        $this->assertSame(__('enrichment::ui.schema.round_note', ['n' => 1, 'note' => 'Added gold_karat from the titles.']), collect($proposal->review['writer']['notes'])->last(), 'the fix, by its round');
+    }
+
+    public function test_a_picture_is_read_last_and_its_fact_waits_unless_the_vocabulary_trusts_pictures_for_it(): void
+    {
+        // Nothing the store wrote names the metal of product 3; its picture does.
+        $product = $this->inShop(fn () => CatalogProduct::query()->where('external_id', '5')->sole());
+        $this->inShop(fn () => RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => '5', 'title' => $product->title,
+            'image_url' => 'https://store.test/5.jpg', 'url_hash' => 'h5', 'caption' => 'תליון עגול בזהב לבן עם אבן צהובה', 'caption_words' => ['זהב לבן', 'עגול']]));
+        $this->inShop(fn () => CatalogProduct::query()->whereKey($product->id)->update(['title' => 'תליון סוליטר משובץ ציטרין', 'payload' => ['description' => 'תליון עדין', 'product_type' => 'תליונים', 'tags' => []]]));
+        Features::override('enrichment.read_text_in_code', true, $this->shop->id);
+        $metal = fn (): ?EnrichmentFact => $this->inShop(fn () => EnrichmentFact::query()->where('product_id', $product->id)->where('key', 'metal')->where('status', '!=', FactStatus::Superseded)->first());
+
+        $vocabulary = $this->vocabulary();
+        array_pop($vocabulary['attributes']);
+        $vocabulary += ['schema_version' => 1, 'root_category_external_id' => '*'];
+        $vocabulary['image'] = ['never' => ['total_weight'], 'filter_confidence' => ['default' => 0.8]];
+        app(ImportVocabulary::class)->handle($this->shop->id, $vocabulary, 'test');
+        app(ReadProductsInCode::class)->handle($this->shop->id);
+
+        $this->assertSame('white_gold', $metal()->value_text);
+        $this->assertSame('image', $metal()->evidence['source']);
+        $this->assertSame(0.7, $metal()->confidence);
+        $this->assertSame(FactStatus::AwaitingReview, $metal()->status, 'a picture is not sure enough at 0.8: it waits');
+
+        $vocabulary['image']['filter_confidence']['metal'] = 0.6;
+        app(ImportVocabulary::class)->handle($this->shop->id, $vocabulary, 'test');
+        app(ReadProductsInCode::class)->handle($this->shop->id);
+        $this->assertSame(FactStatus::Approved, $metal()->status, 'the vocabulary trusts pictures for the metal');
     }
 
     public function test_writer_and_reviewer_of_one_family_write_nothing(): void

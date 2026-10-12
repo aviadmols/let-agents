@@ -291,5 +291,8 @@ return [
         'version_n' => 'גרסה :n',
         'operator_edit' => 'עריכה של המפעיל, על בסיס הגרסה הקודמת',
         'author' => 'נכתב ע״י',
+        'round_note' => 'סבב :n: :note',
+        'rounds' => 'סבבים',
+        'round_line' => 'סבב :n: :verdict · הוסרו :dropped · חסרים :missing',
     ],
 ];

@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
+use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\SchemaStats;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -24,7 +25,7 @@ final class DiscoverSchema
     public const ACTION = 'enrichment.discover_schema';
 
     /** The counting's own version, part of the fingerprint: a change here counts again. */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -66,7 +67,7 @@ final class DiscoverSchema
         }
 
         // The sample's ids stay with the counts, so the proposal's patterns are measured on the same products.
-        $stats = SchemaStats::collect(CatalogProduct::query()->whereIn('id', $sample)->orderBy('external_id')->get(), $templates) + ['sample' => $sample];
+        $stats = SchemaStats::collect(CatalogProduct::query()->whereIn('id', $sample)->orderBy('external_id')->get(), $templates, PictureText::for($sample)) + ['sample' => $sample];
         $fingerprint = hash('sha256', self::VERSION.'|'.json_encode($stats, JSON_UNESCAPED_UNICODE));
         $last = EnrichmentSchemaProposal::query()->latest()->first();
         $template = array_key_first($stats['templates'] ?? []);

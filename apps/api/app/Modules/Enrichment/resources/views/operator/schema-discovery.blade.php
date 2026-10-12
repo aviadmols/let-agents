@@ -106,6 +106,9 @@
                             @if ($step['operator']){{ $t('operator_edit') }}@else{{ $t('review_hint', ['writer' => $step['writer'], 'reviewer' => $step['reviewer']]) }}@endif
                         </div>
                     @endforeach
+                    @foreach ($p->review['rounds'] ?? [] as $r)
+                        <div style="{{ $muted }}">{{ $t('round_line', ['n' => $r['round'] + 1, 'verdict' => $t('verdicts.'.$r['verdict']), 'dropped' => $r['dropped'], 'missing' => $r['missing']]) }}</div>
+                    @endforeach
                 </div>
                 <p><x-filament::badge :color="($p->review['verdict'] ?? '') === 'good' ? 'success' : 'warning'">{{ $t('verdicts.'.($p->review['verdict'] ?? 'needs_work')) }}</x-filament::badge></p>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:10px">

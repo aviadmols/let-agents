@@ -291,5 +291,8 @@ return [
         'version_n' => 'Version :n',
         'operator_edit' => 'Edited by the operator, on the version before',
         'author' => 'Written by',
+        'round_note' => 'Round :n: :note',
+        'rounds' => 'Rounds',
+        'round_line' => 'Round :n: :verdict · removed :dropped · missing :missing',
     ],
 ];

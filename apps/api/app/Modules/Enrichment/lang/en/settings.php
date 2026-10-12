@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'schema_rounds' => [
+        'label' => 'Revision rounds for the vocabulary',
+        'description' => 'When the reviewer says "needs work", the writer fixes what was removed, what is missing and the notes, and the reviewer checks again. 0: no revision.',
+    ],
     'max_requests_per_task_file' => [
         'label' => 'Maximum requests in one task file',
         'description' => 'Larger jobs are split: create another file when the first is done.',
