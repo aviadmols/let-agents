@@ -1560,7 +1560,7 @@ final class BuildPageBank
      * then what any shopper asks before buying. No model.
      *
      * @param  list<string>  $asked
-     * @return array{title: string, product: array{id: string, title: string}, tags: list<array{label: string, query: string}>, questions: list<string>}|null
+     * @return array{title: string, placeholder: string, product: array{id: string, title: string}, tags: list<array{label: string, query: string}>, questions: list<array{text: string, about: string}>}|null
      */
     private function assistantBlock(string $shopId, string $externalId, array $asked): ?array
     {
@@ -1575,6 +1575,8 @@ final class BuildPageBank
             ->sortBy(fn (EnrichmentFact $f): int => $order[$f->kind->value])->values();
         $type = $facts->first(fn (EnrichmentFact $f): bool => $f->kind === FactKind::Type);
         $typeLabel = $type === null ? '' : trim($type->valueLabel());
+        // What it is, for a question about others like it: "יש טבעת דומה בזהב צהוב?"
+        $kind = $typeLabel !== '' ? $typeLabel : (string) __('widget::bank.assistant.model', [], $this->locale);
 
         $tags = [];
         foreach ($facts as $fact) {
@@ -1596,15 +1598,21 @@ final class BuildPageBank
                 $copy->value_text = $other->value_text;
                 $value = trim($copy->valueLabel());
                 // "בזהב לבן", but "ב-18K": a prefix letter joins a Hebrew word only.
-                $others[] = (string) __('widget::bank.assistant.other', ['value' => (preg_match('/^\p{Hebrew}/u', $value) === 1 ? '' : '-').$value], $this->locale);
+                $others[] = ['text' => (string) __('widget::bank.assistant.other', ['type' => $kind, 'value' => (preg_match('/^\p{Hebrew}/u', $value) === 1 ? '' : '-').$value], $this->locale), 'about' => 'similar'];
             }
         }
 
-        $questions = array_values(array_unique([
-            ...array_slice($asked, 0, 2),
+        // A question about this product goes with it; one about others like it is searched for.
+        $questions = [];
+        foreach ([
+            ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], array_slice($asked, 0, 2)),
             ...array_slice($others, 0, 2),
-            ...(array) __('widget::bank.assistant.questions', [], $this->locale),
-        ]));
+            ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], (array) __('widget::bank.assistant.questions', [], $this->locale)),
+            ['text' => (string) __('widget::bank.assistant.cheaper', ['type' => $kind], $this->locale), 'about' => 'similar'],
+        ] as $question) {
+            $questions[$question['text']] ??= $question;
+        }
+        $questions = array_values($questions);
 
         return [
             'title' => (string) __('widget::bank.assistant.title', ['shop' => (string) Shop::query()->whereKey($shopId)->value('name')], $this->locale),

@@ -2159,7 +2159,8 @@
     var fallback = el('div', 'as-fallback');
     var fallbackPanel = null;
 
-    function ask(question) {
+    /** about: 'similar' is about others like it, searched for; anything else is about this product. */
+    function ask(question, about) {
       question = String(question || '').trim();
       if (!question) {
         return;
@@ -2167,7 +2168,7 @@
       track('click', AS_SECTION, 'panel');
       var search = window.LetAgentsSearch;
       if (search && typeof search.ask === 'function') {
-        search.ask(question, [String(block.product.id)]);
+        search.ask(question, about === 'similar' ? [] : [String(block.product.id)]);
         return;
       }
       // No search script on this site: the widget's own question box, right here.
@@ -2206,8 +2207,8 @@
       var button = el('button', 'as-q');
       button.type = 'button';
       button.innerHTML = AS_SPARK;
-      button.appendChild(el('span', null, question));
-      button.addEventListener('click', function () { ask(question); });
+      button.appendChild(el('span', null, question.text));
+      button.addEventListener('click', function () { ask(question.text, question.about); });
       wrap.appendChild(button);
     });
 

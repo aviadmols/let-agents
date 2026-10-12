@@ -2929,6 +2929,8 @@
     /** The shop's own results page: WordPress reads ?s=, Shopify reads ?q= and matches the last word as a prefix. */
     /** Our regular results over the store's own search page, whatever the shop shows elsewhere. */
     var forceRegular = false;
+    /** A question from the product page's block: the smart drawer, whatever the shopper chose for the box. */
+    var forceSmart = false;
 
     /**
      * The store's own search page (/search?q= on Shopify, ?s= on WordPress): what was searched for,
@@ -2977,6 +2979,7 @@
     /** @param {boolean} [away] true when the shopper is going elsewhere: the site's field is not focused. */
     function closePanel(away) {
       forceRegular = false;
+      forceSmart = false;
       if (panel) {
         panel.host.parentNode && panel.host.parentNode.removeChild(panel.host);
         panel = null;
@@ -3195,6 +3198,9 @@
     function resultsMode() {
       if (forceRegular) {
         return 'panel';
+      }
+      if (forceSmart) {
+        return 'drawer';
       }
       var shop = state.config && state.config.results;
       var chosen = choosesMode() ? chosenMode() : null;
@@ -4812,6 +4818,7 @@
       ask: function (question, productIds) {
         load().then(function (data) {
           if (data) {
+            forceSmart = true;
             askText(String(question || '').trim(), (productIds || []).map(String));
           }
         });
@@ -4819,6 +4826,7 @@
       search: function (query) {
         load().then(function (data) {
           if (data) {
+            forceSmart = true;
             openPanel(String(query || '').trim());
           }
         });
