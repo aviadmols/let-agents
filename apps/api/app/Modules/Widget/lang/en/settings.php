@@ -11,7 +11,7 @@ return [
     'layout' => [
         'label' => 'Layout',
         'description' => 'Circles: a row of circles with the key sentence above them, each opening a panel. Assistant: one closed line that invites a click and opens into a conversation whose suggestions are the same parts. Tag bank: "you may also want to see" over a row of tags such as "materials for building a deck" or "deck screws", each opening its results; the tags are written at night by themselves, and their order is learned from what shoppers open and buy. Same content, no model call on page load.',
-        'options' => ['circles' => 'Circles', 'chat' => 'Assistant (chat)', 'tags' => 'Tag bank'],
+        'options' => ['circles' => 'Circles', 'chat' => 'Assistant (chat)', 'tags' => 'Tag bank', 'assistant' => 'Under the buy button: tags and questions'],
     ],
     'product_selector' => [
         'label' => 'Where to show it on product pages (CSS selector)',

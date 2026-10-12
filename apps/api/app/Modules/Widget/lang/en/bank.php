@@ -275,4 +275,15 @@ return [
         'callback_consent' => 'I agree that the store keeps my contact in order to come back to me with the answer to this question.',
         'callback_saved' => 'Kept. We will let you know when there is an answer.',
     ],
+    'assistant' => [
+        'title' => 'Ask :shop AI',
+        'placeholder' => 'Ask anything about this product...',
+        'other' => 'Is there a similar one in :value?',
+        'questions' => [
+            0 => 'How soon does it arrive?',
+            1 => 'Can I return or exchange it?',
+            2 => 'Is there a similar one for less?',
+            3 => 'What is special about this product?',
+        ],
+    ],
 ];

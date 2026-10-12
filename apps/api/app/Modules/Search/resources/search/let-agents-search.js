@@ -2755,8 +2755,11 @@
       return products;
     }
 
-    /** A question from the drawer's own field: the answer in the results sheet, the results under it. */
-    function askText(raw) {
+    /**
+     * A question from the drawer's own field: the answer in the results sheet, the results under it.
+     * given: the products it is about (the product page's own), instead of what its words find.
+     */
+    function askText(raw, given) {
       if (!raw) {
         return;
       }
@@ -2772,8 +2775,8 @@
       var below = el('div');
       sheet.appendChild(below);
 
-      var ids = [];
-      if (state.index) {
+      var ids = given && given.length ? given.slice(0, 12) : [];
+      if (!ids.length && state.index) {
         // Sent to be answered, so read as a question: "טבעת הכי זולה" has no question word, and
         // "זולה", which no product holds, must not leave the answer with no products.
         var hits = lookup(raw, true);
@@ -4780,6 +4783,24 @@
     win.addEventListener('click', onSearchTrigger, true);
     doc.addEventListener('focusin', wake, true);
     doc.addEventListener('pointerdown', wake, true);
+    // For the block under a product's add-to-cart (the page widget): a question about the product,
+    // or a search for others like it, in the drawer, as from the search box.
+    win.LetAgentsSearch = {
+      ask: function (question, productIds) {
+        load().then(function (data) {
+          if (data) {
+            askText(String(question || '').trim(), (productIds || []).map(String));
+          }
+        });
+      },
+      search: function (query) {
+        load().then(function (data) {
+          if (data) {
+            openPanel(String(query || '').trim());
+          }
+        });
+      }
+    };
     // The store's own search page: our regular results over it, when the shop wants them there.
     var searched = searchPageQuery();
     if (searched) {

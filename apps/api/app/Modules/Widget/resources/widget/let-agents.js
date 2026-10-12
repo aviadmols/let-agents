@@ -2112,8 +2112,140 @@
     }).filter(Boolean);
   }
 
+  // ---------------------------------------------------------------- the block under the add-to-cart
+
+  var ASSISTANT_CSS = [
+    '.as{display:grid;gap:10px;margin:14px 0;font:inherit;color:inherit}',
+    '.as-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px}',
+    '.as-tags{display:flex;flex-wrap:wrap;gap:6px}',
+    '.as-tag{all:unset;cursor:pointer;padding:5px 12px;border:1px solid rgba(0,0,0,.18);border-radius:999px;font-size:13px;line-height:1.3}',
+    '.as-tag:hover,.as-tag:focus-visible{border-color:currentColor}',
+    '.as-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:8px;background:#111;color:#fff;font-size:14px;line-height:1.4}',
+    '.as-q:hover,.as-q:focus-visible{background:#333}',
+    '.as-q svg{flex:none;width:16px;height:16px}',
+    '.as-form{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 14px;padding-inline-start:14px;border-radius:12px;background:rgba(0,0,0,.05)}',
+    '.as-form input{all:unset;flex:1;min-width:0;font-size:14px;padding:8px 0}',
+    '.as-send{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:999px;display:grid;place-items:center;background:#111;color:#fff}',
+    '.as-send svg{width:18px;height:18px}',
+    '.as-fallback:empty{display:none}'
+  ].join('');
+
+  var AS_SECTION = { candidate: 'assistant', model: 'chat' };
+  var AS_TAGS = { candidate: 'assistant_tags', model: 'tag' };
+  var AS_SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c.5 4.6 2.9 7 7.5 7.5-4.6.5-7 2.9-7.5 7.5-.5-4.6-2.9-7-7.5-7.5 4.6-.5 7-2.9 7.5-7.5Z"/></svg>';
+  var AS_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
+
+  /**
+   * Under the add-to-cart: the shop's assistant by name, the product's tags, a few questions worth
+   * asking, and a field. A question opens the smart drawer of the search script with the answer
+   * about this product; a tag opens the drawer with others like it. Where the site has no search
+   * script, the question is answered here, in the widget's own panel.
+   */
+  function renderAssistant(block, labels, live) {
+    var host = el('div', 'let-agents-widget');
+    host.setAttribute('data-let-agents', PAGE_TYPE);
+    var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+    var style = el('style');
+    style.textContent = CSS + ASSISTANT_CSS;
+    root.appendChild(style);
+
+    var wrap = el('div', 'let-agents as');
+    wrap.setAttribute('dir', bank.dir || 'rtl');
+    wrap.setAttribute('lang', bank.locale || 'he');
+    var head = el('div', 'as-head');
+    head.appendChild(el('strong', null, block.title));
+    wrap.appendChild(head);
+
+    var fallback = el('div', 'as-fallback');
+    var fallbackPanel = null;
+
+    function ask(question) {
+      question = String(question || '').trim();
+      if (!question) {
+        return;
+      }
+      track('click', AS_SECTION, 'panel');
+      var search = window.LetAgentsSearch;
+      if (search && typeof search.ask === 'function') {
+        search.ask(question, [String(block.product.id)]);
+        return;
+      }
+      // No search script on this site: the widget's own question box, right here.
+      if (!fallbackPanel) {
+        fallbackPanel = askPanel({ candidate: 'ask', model: 'chat', title: labels.ask_title }, labels, live);
+        fallback.appendChild(fallbackPanel);
+      }
+      var input = fallbackPanel.querySelector('.ask-input');
+      var form = fallbackPanel.querySelector('.ask-form');
+      if (input && form) {
+        input.value = question;
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    }
+
+    if ((block.tags || []).length) {
+      var tags = el('div', 'as-tags');
+      block.tags.forEach(function (tag) {
+        var button = el('button', 'as-tag', tag.label);
+        button.type = 'button';
+        button.addEventListener('click', function () {
+          track('click', AS_TAGS, 'panel');
+          var search = window.LetAgentsSearch;
+          if (search && typeof search.search === 'function') {
+            search.search(tag.query);
+          } else {
+            ask(tag.label);
+          }
+        });
+        tags.appendChild(button);
+      });
+      wrap.appendChild(tags);
+    }
+
+    (block.questions || []).forEach(function (question) {
+      var button = el('button', 'as-q');
+      button.type = 'button';
+      button.innerHTML = AS_SPARK;
+      button.appendChild(el('span', null, question));
+      button.addEventListener('click', function () { ask(question); });
+      wrap.appendChild(button);
+    });
+
+    var form = el('form', 'as-form');
+    var field = el('input');
+    field.type = 'text';
+    field.maxLength = 200;
+    field.placeholder = block.placeholder || '';
+    field.setAttribute('aria-label', block.title);
+    var send = el('button', 'as-send');
+    send.type = 'submit';
+    send.innerHTML = AS_UP;
+    send.setAttribute('aria-label', labels.ask_send || 'Send');
+    form.appendChild(field);
+    form.appendChild(send);
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      ask(field.value);
+      field.value = '';
+    });
+    wrap.appendChild(form);
+    wrap.appendChild(fallback);
+
+    root.appendChild(wrap);
+    place(host);
+    watchExposure(host, function (ms, ratio) { track('exposure', AS_SECTION, 'panel', { visible_ms: ms, ratio: ratio }); });
+  }
+
   function render(live, previous) {
     var labels = bank.labels || {};
+
+    // The block under the add-to-cart is the whole widget in its layout.
+    if (bank.layout === 'assistant') {
+      if (bank.assistant) {
+        renderAssistant(bank.assistant, labels, live);
+      }
+      return;
+    }
 
     if (previous) {
       bank.sections.push({

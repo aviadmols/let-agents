@@ -229,6 +229,11 @@ final class BuildPageBank
         // The tag bank: what a shopper on this page may want next, written and checked at night,
         // each searched now so it follows stock. Only in the tag view; the other views keep theirs.
         $bank['tags'] = $bank['layout'] === 'tags' ? $this->tenant->run($shopId, fn (): array => $this->tags($shopId, $type, $externalId, $maxProducts)) : [];
+        // Under the add-to-cart: what this product is, as tags, and questions worth asking about it;
+        // a question or a tag opens the smart drawer. Built in code from its facts, cached with the page.
+        $bank['assistant'] = $bank['layout'] === 'assistant' && $type === 'product' && $bank['ask']
+            ? $this->tenant->run($shopId, fn (): ?array => $this->assistantBlock($shopId, $externalId, $bank['questions']))
+            : null;
 
         if ($this->explain) {
             $bank['explain'] = $this->why;
@@ -1540,6 +1545,74 @@ final class BuildPageBank
         }
 
         return $labels;
+    }
+
+    /** Tags and questions the block under the add-to-cart shows at most. */
+    private const ASSISTANT_TAGS = 8;
+
+    private const ASSISTANT_QUESTIONS = 5;
+
+    /**
+     * The block under the add-to-cart: the product's approved facts as tags (its type, its
+     * choices, its yes-or-no attributes), each with the search for others like it ("תליון זהב
+     * צהוב"); and questions worth asking: what shoppers already asked here and got answered, then
+     * whether it comes in a value of its choices the store also sells ("יש דגם דומה בזהב לבן?"),
+     * then what any shopper asks before buying. No model.
+     *
+     * @param  list<string>  $asked
+     * @return array{title: string, product: array{id: string, title: string}, tags: list<array{label: string, query: string}>, questions: list<string>}|null
+     */
+    private function assistantBlock(string $shopId, string $externalId, array $asked): ?array
+    {
+        $product = CatalogProduct::query()->active()->where('external_id', $externalId)->first();
+        if ($product === null) {
+            return null;
+        }
+
+        $order = [FactKind::Type->value => 0, FactKind::Choice->value => 1, FactKind::Flag->value => 2];
+        $facts = EnrichmentFact::query()->with('vocabulary')->where('product_id', $product->id)->where('status', FactStatus::Approved)
+            ->whereIn('kind', [FactKind::Type, FactKind::Choice, FactKind::Flag])->orderBy('id')->get()
+            ->sortBy(fn (EnrichmentFact $f): int => $order[$f->kind->value])->values();
+        $type = $facts->first(fn (EnrichmentFact $f): bool => $f->kind === FactKind::Type);
+        $typeLabel = $type === null ? '' : trim($type->valueLabel());
+
+        $tags = [];
+        foreach ($facts as $fact) {
+            $label = trim($fact->kind === FactKind::Flag ? $fact->keyLabel() : $fact->valueLabel());
+            if ($label === '' || isset($tags[$label])) {
+                continue;
+            }
+            $tags[$label] = ['label' => $label, 'query' => $fact->kind === FactKind::Type || $typeLabel === '' ? $label : $typeLabel.' '.$label];
+        }
+
+        // Another value of one of its choices, the one the most products have: "יש דגם דומה בזהב לבן?"
+        $others = [];
+        foreach ($facts->where('kind', FactKind::Choice)->unique('key')->take(3) as $fact) {
+            $other = EnrichmentFact::query()->where('status', FactStatus::Approved)->where('kind', FactKind::Choice)->where('key', $fact->key)
+                ->where('value_text', '!=', $fact->value_text)->selectRaw('value_text, count(*) as n')->groupBy('value_text')
+                ->orderByDesc('n')->orderBy('value_text')->first();
+            if ($other !== null) {
+                $copy = $fact->replicate();
+                $copy->value_text = $other->value_text;
+                $value = trim($copy->valueLabel());
+                // "בזהב לבן", but "ב-18K": a prefix letter joins a Hebrew word only.
+                $others[] = (string) __('widget::bank.assistant.other', ['value' => (preg_match('/^\p{Hebrew}/u', $value) === 1 ? '' : '-').$value], $this->locale);
+            }
+        }
+
+        $questions = array_values(array_unique([
+            ...array_slice($asked, 0, 2),
+            ...array_slice($others, 0, 2),
+            ...(array) __('widget::bank.assistant.questions', [], $this->locale),
+        ]));
+
+        return [
+            'title' => (string) __('widget::bank.assistant.title', ['shop' => (string) Shop::query()->whereKey($shopId)->value('name')], $this->locale),
+            'placeholder' => (string) __('widget::bank.assistant.placeholder', [], $this->locale),
+            'product' => ['id' => $externalId, 'title' => (string) $product->title],
+            'tags' => array_slice(array_values($tags), 0, self::ASSISTANT_TAGS),
+            'questions' => array_slice($questions, 0, self::ASSISTANT_QUESTIONS),
+        ];
     }
 
     /** What the shop promises, in the order a shopper cares about it, then what a product is. */
