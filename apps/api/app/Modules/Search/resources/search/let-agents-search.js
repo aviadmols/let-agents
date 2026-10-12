@@ -2456,7 +2456,8 @@
             body.appendChild(below);
             renderResults(below, turn.r, turn.q || '', true);
           }
-        } else if (turn.k === 'p' && turn.r) {
+        } else if ((turn.k === 'p' || turn.k === 'm') && turn.r) {
+          // A photo's matches, or the products like one ("similar to…"): products only.
           renderResults(body, { groups: { product: turn.r } }, '', true);
         }
       });
@@ -2667,10 +2668,61 @@
         });
     }
 
-    /** Products like one in the results, in place of the results, with the way back. */
+    /** The products like one, from the server; none when it cannot say. */
+    function similarProducts(item) {
+      return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/similar?id=' + encodeURIComponent(item.external_id), { mode: 'cors', credentials: 'omit' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (json) { return (json && json.products) || []; })
+        .catch(function () { return []; });
+    }
+
+    /** A grid of product cards, their live prices and stock asked for. */
+    function productGrid(products, raw) {
+      var grid = el('div', 'grid');
+      var ids = [];
+      products.forEach(function (product) {
+        grid.appendChild(card(product, raw));
+        ids.push(product.external_id);
+      });
+      liveProducts(ids).then(function () { updateCards(grid); });
+      return grid;
+    }
+
+    /**
+     * Products like one in the results. In the drawer, a turn of its own below the ones before it,
+     * as if the shopper had asked "similar to\u2026", and the drawer goes to its top. Elsewhere, in place
+     * of the results, with the way back.
+     */
     function showSimilar(item, raw) {
+      var asked = label('similar_to', { title: item.title });
+
+      if (drawerMode()) {
+        var turn = openDrawer(asked);
+        countClick(raw, { id: item.id, title: item.title });
+        var status = waiting(label('drawer_thinking'));
+        turn.appendChild(status);
+        var kept = keepTurn({ t: Date.now(), k: 'm', q: asked });
+        showTurn(turn);
+
+        similarProducts(item).then(function (products) {
+          if (status.parentNode) {
+            status.parentNode.removeChild(status);
+          }
+          if (!products.length) {
+            turn.appendChild(el('div', 'section', label('no_similar')));
+            return;
+          }
+          kept({ r: products.slice(0, 12) });
+          var section = el('div', 'section');
+          section.appendChild(productGrid(products, raw));
+          turn.appendChild(section);
+          showTurn(turn);
+        });
+        return;
+      }
+
       // From the suggestions there is no sheet yet: one opens for the similar items.
-      var sheet = currentSheet || openSheet(label('similar_to', { title: item.title }), raw);
+      var sheet = currentSheet || openSheet(asked, raw);
       if (!sheet) {
         return;
       }
@@ -2681,30 +2733,19 @@
       back.type = 'button';
       back.addEventListener('click', function () { openPanel(raw); });
       head.appendChild(back);
-      head.appendChild(el('h3', null, label('similar_to', { title: item.title })));
+      head.appendChild(el('h3', null, asked));
       sheet.appendChild(head);
       var body = el('div', 'section', label('searching'));
       sheet.appendChild(body);
 
-      win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/similar?id=' + encodeURIComponent(item.external_id), { mode: 'cors', credentials: 'omit' })
-        .then(function (response) { return response.ok ? response.json() : null; })
-        .then(function (json) {
-          var products = (json && json.products) || [];
-          body.textContent = '';
-          if (!products.length) {
-            body.textContent = label('no_similar');
-            return;
-          }
-          var grid = el('div', 'grid');
-          var ids = [];
-          products.forEach(function (product) {
-            grid.appendChild(card(product, raw));
-            ids.push(product.external_id);
-          });
-          body.appendChild(grid);
-          liveProducts(ids).then(function () { updateCards(grid); });
-        })
-        .catch(function () { body.textContent = label('no_similar'); });
+      similarProducts(item).then(function (products) {
+        body.textContent = '';
+        if (!products.length) {
+          body.textContent = label('no_similar');
+          return;
+        }
+        body.appendChild(productGrid(products, raw));
+      });
     }
 
     function renderResults(sheet, result, raw, quiet) {
