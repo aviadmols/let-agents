@@ -33,6 +33,29 @@ final class HebrewSearch
         'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
         'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
 
+    /**
+     * A colour is one word whatever its gender and number: "מברגה שחורה" finds a screwdriver whose
+     * colour is "שחור". Normalized (no final letters). Brown is left out: "חומה" is also a wall.
+     */
+    private const COLORS = [['שחור', 'שחורה', 'שחורימ', 'שחורות'], ['לבנ', 'לבנה', 'לבנימ', 'לבנות'], ['אדומ', 'אדומה', 'אדומימ', 'אדומות'], ['כחול', 'כחולה', 'כחולימ', 'כחולות'], ['ירוק', 'ירוקה', 'ירוקימ', 'ירוקות'], ['צהוב', 'צהובה', 'צהובימ', 'צהובות'], ['אפור', 'אפורה', 'אפורימ', 'אפורות'], ['כתומ', 'כתומה', 'כתומימ', 'כתומות'], ['סגול', 'סגולה', 'סגולימ', 'סגולות'], ['ורוד', 'ורודה', 'ורודימ', 'ורודות'], ['כסופ', 'כסופה', 'כסופימ', 'כסופות'], ['זהוב', 'זהובה', 'זהובימ', 'זהובות'], ['שקופ', 'שקופה', 'שקופימ', 'שקופות']];
+
+    /** @var array<string, string>|null form => the family's first form */
+    private static ?array $colorOf = null;
+
+    private static function colorOf(string $word): ?string
+    {
+        if (self::$colorOf === null) {
+            self::$colorOf = [];
+            foreach (self::COLORS as $forms) {
+                foreach ($forms as $form) {
+                    self::$colorOf[$form] = $forms[0];
+                }
+            }
+        }
+
+        return self::$colorOf[$word] ?? null;
+    }
+
     /** Words that say what kind of word follows ("בצבע שחור", "בגוון אפור", "בגימור מט"), normalized. */
     private const DESCRIBES = ['בצבע', 'בגוונ', 'בגימור'];
 
@@ -323,6 +346,7 @@ final class HebrewSearch
             $scores = [];
             $base = self::stem($variant);
             $length = mb_strlen($variant);
+            $colour = self::colorOf($variant);
 
             foreach (self::wordVector($variant) as $piece => $weight) {
                 foreach ($index['postings'][$piece] ?? [] as [$w, $other]) {
@@ -342,6 +366,10 @@ final class HebrewSearch
                     $score = max($score, 0.85);
                 } elseif (mb_strlen($candidate) > 3 && preg_match('/^[והבלמשכ]/u', $candidate) && mb_substr($candidate, 1) === $variant) {
                     $score = max($score, 0.85);
+                }
+
+                if ($colour !== null && self::colorOf($candidate) === $colour) {
+                    $score = max($score, 0.95);
                 }
 
                 if ($position) {

@@ -4,6 +4,7 @@ namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\SearchCatalog;
@@ -52,6 +53,40 @@ final class FocusSearchTest extends TestCase
         $this->assertNull($result['focus'], 'something holds every word: nothing to choose');
     }
 
+    public function test_a_colour_is_one_word_whatever_its_gender(): void
+    {
+        // Gueta: "מברגה שחורה" showed two handles, holding "שחורה" and "הברגה" (threading), and none
+        // of the screwdrivers whose colour is "שחור".
+        $this->catalog([
+            '1' => ['מברגה נטענת Makita', 'שחור'],
+            '2' => ['מברגה רוטטת Einhell', 'כחול'],
+            '3' => ['ידית שחורה 152 מ"מ', 'הברגה'],
+        ]);
+
+        $found = array_column($this->search('מברגה שחורה')['groups']['product'], 'external_id');
+
+        $this->assertSame('1', $found[0], 'the black screwdriver first');
+        $this->assertNotContains('2', $found, 'not the blue one');
+        $this->assertSame('1', $this->search('מברגה שחור')['groups']['product'][0]['external_id'], 'and in the masculine too');
+    }
+
+    public function test_a_guide_or_a_page_shows_only_when_it_holds_every_word(): void
+    {
+        $this->catalog(['1' => ['מברגה נטענת Makita', 'שחור']]);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach (['20' => 'עגלה שחורה לחצר', '21' => 'איך בוחרים מברגה שחורה'] as $id => $title) {
+                CatalogContent::query()->create(['shop_id' => $this->shop->id, 'type' => 'page', 'external_id' => (string) $id, 'title' => $title,
+                    'url' => "https://www.store.test/?p={$id}", 'terms' => [], 'hash' => "h{$id}"]);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $content = array_column($this->search('מברגה שחורה')['groups']['content'], 'external_id');
+
+        $this->assertSame(['21'], $content, 'the guide about black screwdrivers, not the black cart');
+    }
+
     public function test_when_nothing_holds_every_word_the_narrower_searches_are_offered(): void
     {
         $this->catalog([
@@ -85,7 +120,7 @@ final class FocusSearchTest extends TestCase
             ['id' => 'p:4', 'title' => 'מברגה Makita בגוון ירוק', 'keywords' => 'כלי עבודה'],
             ['id' => 'k:1', 'title' => 'מקדחות', 'keywords' => 'כלי עבודה'],
         ];
-        $queries = ['מקדחה בצבע שחור', 'מקדחה שחורה', 'מברגה בגוון אדום', 'קולב בצבע ירוק', 'מקדחה מקיטה ירוקה', 'קרש'];
+        $queries = ['מקדחה בצבע שחור', 'מקדחה שחורה', 'קולב שחור', 'קולב שחורים', 'מברגה בגוון אדום', 'קולב בצבע ירוק', 'מקדחה מקיטה ירוקה', 'קרש'];
         $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const i=e.build('.json_encode($items, JSON_UNESCAPED_UNICODE).');const out={};'
             .'for(const q of '.json_encode($queries, JSON_UNESCAPED_UNICODE).'){out[q]={focus:e.focus(i,q),hits:e.search(i,q).map(h=>h.id+(h.full?"*":""))};}'
             .'process.stdout.write(JSON.stringify(out));';

@@ -116,6 +116,9 @@ final class SearchCatalog
                 $about = HebrewSearch::aboutWords($index['engine'], $query);
                 $spelling = $about !== '' && $about !== $query ? HebrewSearch::search($index['engine'], $about) : [];
             }
+            // A guide or a page is a result only when it holds every word: one that shares a word of
+            // "מברגה שחורה" is not about black screwdrivers. Products keep their wider net.
+            $spelling = array_values(array_filter($spelling, fn (array $hit): bool => ! str_starts_with($hit['id'], 'c:') || $hit['full']));
             $byMeaning = $meaning;
             $meaning = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : [];
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
@@ -834,12 +837,15 @@ final class SearchCatalog
 
         $limit = (int) Settings::get('search.semantic_results');
         $floor = (float) Settings::get('search.semantic_min_similarity');
+        // A guide or a page by meaning only when it is plainly about the words: a page about carts
+        // is a little like anything a hardware store sells.
+        $contentFloor = max($floor, (float) Settings::get('search.content_min_similarity'));
         $ids = [];
 
         foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {
             $id = ($hit['source'] === 'product' ? 'p:' : 'c:').$hit['external_id'];
 
-            if ($hit['similarity'] >= $floor && isset($records[$id])) {
+            if ($hit['similarity'] >= ($hit['source'] === 'product' ? $floor : $contentFloor) && isset($records[$id])) {
                 $ids[] = $id;
             }
         }

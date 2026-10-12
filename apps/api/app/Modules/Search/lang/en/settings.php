@@ -26,6 +26,10 @@ return [
         'label' => 'Results by meaning',
         'description' => 'At most this many documents are taken from the index by meaning before merging with spelling. 0 turns it off.',
     ],
+    'content_min_similarity' => [
+        'label' => 'Minimum similarity for guides and pages',
+        'description' => 'A guide or a page enters the results by meaning only above this, higher than for products, so an unrelated page does not show. By spelling it enters only when it holds every word.',
+    ],
     'semantic_min_similarity' => [
         'label' => 'Minimum similarity by meaning',
         'description' => 'A result by meaning below this is left out. Depends on the embedding model: about 0.3 for text-embedding-3-small.',

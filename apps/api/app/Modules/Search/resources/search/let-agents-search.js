@@ -170,6 +170,7 @@
       var base = stem(variant);
       var length = variant.length;
       var vector = wordVector(variant);
+      var colour = colorOf(variant);
 
       for (var p = 0; p < vector.pieces.length; p++) {
         var piece = vector.pieces[p];
@@ -193,6 +194,9 @@
           score = Math.max(score, 0.85);
         } else if (candidate.length > 3 && PREFIX_LETTER.test(candidate) && candidate.slice(1) === variant) {
           score = Math.max(score, 0.85);
+        }
+        if (colour !== null && colorOf(candidate) === colour) {
+          score = Math.max(score, 0.95);
         }
         if (position) {
           score *= 0.95;
@@ -253,7 +257,18 @@
     'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
     'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
 
+  // A colour is one word whatever its gender and number ("שחורה" is "שחור"): the server's COLORS.
+  var COLOR_OF = {};
+  [['שחור', 'שחורה', 'שחורימ', 'שחורות'], ['לבנ', 'לבנה', 'לבנימ', 'לבנות'], ['אדומ', 'אדומה', 'אדומימ', 'אדומות'], ['כחול', 'כחולה', 'כחולימ', 'כחולות'], ['ירוק', 'ירוקה', 'ירוקימ', 'ירוקות'], ['צהוב', 'צהובה', 'צהובימ', 'צהובות'], ['אפור', 'אפורה', 'אפורימ', 'אפורות'], ['כתומ', 'כתומה', 'כתומימ', 'כתומות'], ['סגול', 'סגולה', 'סגולימ', 'סגולות'], ['ורוד', 'ורודה', 'ורודימ', 'ורודות'], ['כסופ', 'כסופה', 'כסופימ', 'כסופות'], ['זהוב', 'זהובה', 'זהובימ', 'זהובות'], ['שקופ', 'שקופה', 'שקופימ', 'שקופות']].forEach(function (forms) {
+    forms.forEach(function (form) { COLOR_OF[form] = forms[0]; });
+  });
+
+  function colorOf(word) {
+    return Object.prototype.hasOwnProperty.call(COLOR_OF, word) ? COLOR_OF[word] : null;
+  }
+
   // Words that say what kind of word follows ("בצבע שחור"), normalized: the server's DESCRIBES.
+
   var DESCRIBES = ['בצבע', 'בגוונ', 'בגימור'];
 
   function rank(index, query) {
@@ -1133,10 +1148,10 @@
       '.d-hr{border:0;border-top:1px solid var(--rs-line);margin:10px 0;width:100%}',
       '.d-main{padding:18px 20px;display:grid;gap:12px;align-content:start;min-width:0}',
       '.d-prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 22px}',
-      '.d-prod{display:grid;grid-template-columns:88px minmax(0,1fr);gap:14px;align-items:center;color:inherit;text-decoration:none;padding:6px;margin:-6px;border-radius:12px;cursor:pointer;min-width:0}',
+      '.d-prod{display:grid;grid-template-columns:145px minmax(0,1fr);gap:14px;align-items:center;color:inherit;text-decoration:none;padding:6px;margin:-6px;border-radius:12px;cursor:pointer;min-width:0}',
       '.d-cat:hover,.d-art:hover,.d-cat[aria-selected="true"],.d-art[aria-selected="true"]{background:var(--rs-hover)}',
       '.d-prod:hover,.d-prod[aria-selected="true"]{background:var(--rs-soft)}',
-      '.d-pic{position:relative;display:block;width:88px;height:88px;border-radius:10px;background:var(--rs-soft);overflow:hidden;flex:none}',
+      '.d-pic{position:relative;display:block;width:145px;height:145px;border-radius:10px;background:var(--rs-soft);overflow:hidden;flex:none}',
       '.d-pic img{width:100%;height:100%;object-fit:cover;display:block}',
       '.d-tag{position:absolute;top:6px;inset-inline-end:6px;background:var(--rs-fg);color:var(--rs-bg);font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;line-height:1.4}',
       '.d-tag[hidden]{display:none}',
@@ -1217,8 +1232,8 @@
       '.m-chip small{opacity:.6;font-weight:400;margin-inline-start:4px}',
       '.m-list{display:grid;gap:12px}',
       '.m-arts{display:grid}',
-      '.d.m .d-prod{grid-template-columns:86px minmax(0,1fr);gap:12px;margin:0;padding:0}',
-      '.d.m .d-prod .d-pic{width:86px;height:86px}',
+      '.d.m .d-prod{grid-template-columns:145px minmax(0,1fr);gap:12px;margin:0;padding:0}',
+      '.d.m .d-prod .d-pic{width:145px;height:145px}',
       '.d.m .d-art{margin:0;padding:8px 0;border-bottom:1px solid var(--rs-line);border-radius:0}',
       '.d.m .d-all{padding:13px}',
       '.d.m .d-ask{padding:11px 14px}',
@@ -1242,13 +1257,13 @@
       '.la-exact{display:inline-flex;align-items:center;justify-self:start;align-self:start;font-size:12px;font-weight:700;color:var(--rs-accent-text);',
       'border:1px solid color-mix(in srgb,var(--rs-accent) 35%,var(--rs-bg));border-radius:999px;padding:3px 10px}',
       '.d-one{display:grid;gap:10px}',
-      '.d-one>.d-prod{grid-template-columns:132px minmax(0,1fr);gap:18px;padding:12px;margin:0;border:1px solid var(--rs-line);border-radius:14px}',
-      '.d-one>.d-prod .d-pic{width:132px;height:132px}',
+      '.d-one>.d-prod{grid-template-columns:180px minmax(0,1fr);gap:18px;padding:12px;margin:0;border:1px solid var(--rs-line);border-radius:14px}',
+      '.d-one>.d-prod .d-pic{width:180px;height:180px}',
       '.d-one>.d-prod .d-name{font-size:17px;font-weight:600;-webkit-line-clamp:3}',
       '.d-one>.d-prod .d-price{font-size:16px;margin-top:8px}',
       '.d-sku{display:block;font-size:13px;opacity:.65;margin-top:4px;unicode-bidi:plaintext}',
-      '.d.m .d-one>.d-prod{grid-template-columns:104px minmax(0,1fr);gap:14px;padding:10px}',
-      '.d.m .d-one>.d-prod .d-pic{width:104px;height:104px}',
+      '.d.m .d-one>.d-prod{grid-template-columns:180px minmax(0,1fr);gap:14px;padding:10px}',
+      '.d.m .d-one>.d-prod .d-pic{width:180px;height:180px}',
       '.d-also{display:grid;gap:12px}',
       '.d-more{all:unset;box-sizing:border-box;cursor:pointer;justify-self:center;padding:9px 22px;border:1px solid var(--rs-fg);border-radius:var(--rs-radius);font-size:14px;font-weight:600}',
       '.d-more:hover,.d-more:focus-visible,.d-more[aria-selected="true"]{background:var(--rs-soft)}',
@@ -1613,7 +1628,8 @@
             categories.push(record);
           }
         } else {
-          if (!showsGroup('content')) {
+          // A guide or a page only when it holds every word, as on the server.
+          if (!showsGroup('content') || !hits[i].full) {
             continue;
           }
           contentTotal++;
