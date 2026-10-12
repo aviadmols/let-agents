@@ -43,6 +43,8 @@ final class RetrievalBenchTest extends TestCase
             $this->record('facts', relevant: ['product:1'], shown: ['product:1']),
             // It reached the writer and both failed: the writer.
             $this->record('writer', relevant: ['product:1'], shown: ['product:1']),
+            // The store holds an answer, none reached the writer, and it rightly said nothing of what it saw: still retrieval.
+            $this->record('hidden', relevant: ['content:ביטולים'], docs: ['content:אודות']),
             // The store holds no answer: saying nothing is right, an answer is made up.
             $this->record('none', relevant: [], answerable: false),
         ];
@@ -51,12 +53,13 @@ final class RetrievalBenchTest extends TestCase
             'facts' => $this->judged('facts', ['current' => true, 'current@v5' => false]),
             'writer' => $this->judged('writer', ['current' => false, 'current@v5' => false]),
             'none' => $this->judged('none', ['current' => null, 'current@v5' => false]),
+            'hidden' => $this->judged('hidden', ['current' => null, 'current@v5' => null], answerable: false),
         ];
 
         $attribution = RetrievalBench::report($records, $judged)['attribution'];
 
-        $this->assertSame(['correct' => 1, 'no_answer_refused' => 1, 'retrieval' => 1, 'facts' => 0, 'writer' => 1, 'no_answer_invented' => 0, 'failed_call' => 0], $attribution[WriterBench::CURRENT]);
-        $this->assertSame(['correct' => 0, 'no_answer_refused' => 0, 'retrieval' => 1, 'facts' => 1, 'writer' => 1, 'no_answer_invented' => 1, 'failed_call' => 0], $attribution['current@'.WriterBench::V5]);
+        $this->assertSame(['correct' => 1, 'no_answer_refused' => 1, 'retrieval' => 2, 'facts' => 0, 'writer' => 1, 'no_answer_invented' => 0, 'failed_call' => 0, 'correct_from_partial' => 0], $attribution[WriterBench::CURRENT]);
+        $this->assertSame(['correct' => 0, 'no_answer_refused' => 0, 'retrieval' => 2, 'facts' => 1, 'writer' => 1, 'no_answer_invented' => 1, 'failed_call' => 0, 'correct_from_partial' => 0], $attribution['current@'.WriterBench::V5]);
     }
 
     /** @return array<string, mixed> */
@@ -78,7 +81,7 @@ final class RetrievalBenchTest extends TestCase
      * @param  array<string, bool|null>  $right
      * @return array<string, mixed>
      */
-    private function judged(string $id, array $right): array
+    private function judged(string $id, array $right, bool $answerable = true): array
     {
         $writers = [];
         $verdicts = [];
@@ -87,6 +90,6 @@ final class RetrievalBenchTest extends TestCase
             $verdicts[$key] = ['answer_correct' => $ok, 'hallucination' => ! $ok, 'wrong_attribution' => false, 'language_correct' => true];
         }
 
-        return ['id' => $id, 'writers' => $writers, 'judge' => ['answerable' => true, 'verdicts' => $verdicts]];
+        return ['id' => $id, 'writers' => $writers, 'judge' => ['answerable' => $answerable, 'verdicts' => $verdicts]];
     }
 }

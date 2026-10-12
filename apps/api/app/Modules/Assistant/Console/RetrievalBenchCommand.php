@@ -87,6 +87,11 @@ final class RetrievalBenchCommand extends Command
                 $run->output(['ask' => $record['id'], 'relevant' => count($record['labels']['relevant'])]);
             }, $record['shop_id'], ['ask' => $record['id']]);
 
+            if (! isset($record['labels'])) {
+                $this->line(mb_substr($record['question'], 0, 50).'  ->  not labelled (the judge failed); asked again on the next run');
+
+                continue;
+            }
             $records[$id] = $record;
             self::rewrite($out, $records);
             $this->line(mb_substr($record['question'], 0, 50).'  ->  '.count($record['labels']['relevant']).' relevant'.($record['labels']['answerable_in_store'] ? '' : ', not answerable'));
@@ -102,11 +107,11 @@ final class RetrievalBenchCommand extends Command
         file_put_contents(preg_replace('~(\.labelled)?\.jsonl$~', '', $file).'.report.json', json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         $this->line("{$report['questions']} questions: {$report['answerable_in_store']} answerable from what the store holds, {$report['not_answerable_in_store']} with no answer in the store. Recall below is over the answerable ones only.");
-        foreach (['products', 'pages'] as $part) {
+        foreach (['reached', 'products', 'pages'] as $part) {
             $this->table([$part, '%'], array_map(fn (string $k, mixed $v): array => [$k, (string) $v], array_keys($report[$part]), array_values($report[$part])));
         }
         if (isset($report['attribution'])) {
-            $layers = RetrievalBench::LAYERS;
+            $layers = [...RetrievalBench::LAYERS, 'correct_from_partial'];
             $this->table(['writer', ...$layers], array_map(fn (string $w, array $c): array => [$w, ...array_map(fn (string $l): string => (string) $c[$l], $layers)], array_keys($report['attribution']), array_values($report['attribution'])));
         }
 

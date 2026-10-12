@@ -228,6 +228,15 @@ final class RetrievalBench
             $out['pages']["size_{$size}_avg_chars_top6"] = $chars === [] ? 0 : (int) round(array_sum($chars) / count($chars));
         }
 
+        // How much of what answers reached the writer, question by question.
+        $out['reached'] = ['none' => 0, 'under_half' => 0, 'half_or_more' => 0, 'all' => 0];
+        foreach ($answerable as $r) {
+            $share = (float) (count(array_intersect($r['labels']['relevant'], [...$r['production']['products'], ...$r['production']['docs']])) / count($r['labels']['relevant']));
+            $out['reached'][match (true) {
+                $share === 0.0 => 'none', $share < 0.5 => 'under_half', $share < 1.0 => 'half_or_more', default => 'all'
+            }]++;
+        }
+
         // Every wrong answer of the writer benchmark, put on one layer.
         if ($judged !== []) {
             $out['attribution'] = self::attribution($done, $judged);
@@ -237,12 +246,18 @@ final class RetrievalBench
     }
 
     /**
-     * retrieval: the store holds an answer and none of it reached the writer.
+     * retrieval: the store holds an answer and none of it reached the writer. Saying nothing is
+     *        then right by the writer's input, and still no answer for the shopper: it is put on
+     *        retrieval, not counted correct.
      * facts: it reached the writer; the facts-only writer failed where the writer with the
      *        descriptions (the current model, v4) did not, so the answer was in free text only.
      * writer: what answers was in front of it, and the writer missed, invented or misplaced it.
      * On a question the store holds no answer to, apart: no_answer_refused (it showed nothing, the
      * right behaviour) or no_answer_invented (it showed an answer or products: a writer error).
+     *
+     * Beside the layers, not adding to them: correct_from_partial, the correct answers written when
+     * less than half of what answers reached the writer ("the strongest" among the drills it saw,
+     * while a stronger one stayed behind).
      *
      * @param  list<array<string, mixed>>  $records
      * @param  array<string, array<string, mixed>>  $judged
@@ -257,20 +272,26 @@ final class RetrievalBench
                 continue;
             }
             $reached = array_merge($r['production']['products'], $r['production']['docs']);
-            $retrievalMiss = $r['labels']['answerable_in_store'] && array_intersect($r['labels']['relevant'], $reached) === [];
+            $relevant = $r['labels']['relevant'];
+            $share = $relevant === [] ? 1.0 : (float) (count(array_intersect($relevant, $reached)) / count($relevant));
+            $retrievalMiss = $r['labels']['answerable_in_store'] && $share === 0.0;
             $currentRight = isset($j['writers'][WriterBench::CURRENT]) && ! isset($j['writers'][WriterBench::CURRENT]['error']) && WriterBench::finalCorrect($j, WriterBench::CURRENT);
 
             foreach ($j['writers'] as $key => $side) {
-                $out[$key] ??= array_fill_keys(self::LAYERS, 0);
+                $out[$key] ??= array_fill_keys([...self::LAYERS, 'correct_from_partial'], 0);
+                $right = ! isset($side['error']) && WriterBench::finalCorrect($j, $key);
                 $layer = match (true) {
                     isset($side['error']) => 'failed_call',
                     ! $r['labels']['answerable_in_store'] => WriterBench::shown($j, $key) ? 'no_answer_invented' : 'no_answer_refused',
-                    WriterBench::finalCorrect($j, $key) => 'correct',
-                    $retrievalMiss => 'retrieval',
+                    $retrievalMiss => $right && WriterBench::shown($j, $key) ? 'correct' : 'retrieval',
+                    $right => 'correct',
                     str_ends_with($key, '@'.WriterBench::V5) && $currentRight => 'facts',
                     default => 'writer',
                 };
                 $out[$key][$layer]++;
+                if ($layer === 'correct' && $share < 0.5) {
+                    $out[$key]['correct_from_partial']++;
+                }
             }
         }
 
