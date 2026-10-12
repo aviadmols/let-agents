@@ -2924,6 +2924,25 @@
     // ---------------------------------------------------------------- full results
 
     /** The shop's own results page: WordPress reads ?s=, Shopify reads ?q= and matches the last word as a prefix. */
+    /** Our regular results over the store's own search page, whatever the shop shows elsewhere. */
+    var forceRegular = false;
+
+    /**
+     * The store's own search page (/search?q= on Shopify, ?s= on WordPress): what was searched for,
+     * or null on any other page.
+     */
+    function searchPageQuery() {
+      var params;
+      try {
+        params = new URLSearchParams(win.location.search);
+      } catch (e) {
+        return null;
+      }
+      var q = SHOPIFY ? (/\/search\/?$/.test(win.location.pathname) ? params.get('q') : null) : params.get('s');
+      q = q ? String(q).trim() : '';
+      return q && q.length <= 120 ? q : null;
+    }
+
     function siteSearchUrl(raw) {
       var base = String(ctx.searchUrl);
       var join = base.indexOf('?') === -1 ? '?' : '&';
@@ -2954,6 +2973,7 @@
 
     /** @param {boolean} [away] true when the shopper is going elsewhere: the site's field is not focused. */
     function closePanel(away) {
+      forceRegular = false;
       if (panel) {
         panel.host.parentNode && panel.host.parentNode.removeChild(panel.host);
         panel = null;
@@ -3170,6 +3190,9 @@
      * they did. Regular is the shop's own way when that is not the drawer, and the window otherwise.
      */
     function resultsMode() {
+      if (forceRegular) {
+        return 'panel';
+      }
       var shop = state.config && state.config.results;
       var chosen = choosesMode() ? chosenMode() : null;
       if (chosen === 'smart') {
@@ -3547,14 +3570,15 @@
       return sheet;
     }
 
-    function openPanel(raw) {
+    /** @param {boolean} [spelling] the store's search page opening: spelling only, never a model on a page load */
+    function openPanel(raw, spelling) {
       var sheet = openSheet(label('all_results', { query: raw }), raw);
       var body = drawerMode() ? waiting(label('drawer_thinking')) : el('div', 'section', label('searching'));
       sheet.appendChild(body);
       var kept = keepTurn({ t: Date.now(), k: 's', q: raw });
 
       var normalized = normalize(raw);
-      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
+      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '') + (spelling ? '&spelling=1' : '');
       markCounted(normalized);
 
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
@@ -4756,6 +4780,16 @@
     win.addEventListener('click', onSearchTrigger, true);
     doc.addEventListener('focusin', wake, true);
     doc.addEventListener('pointerdown', wake, true);
+    // The store's own search page: our regular results over it, when the shop wants them there.
+    var searched = searchPageQuery();
+    if (searched) {
+      load().then(function (data) {
+        if (data && state.config.resultsPage) {
+          forceRegular = true;
+          openPanel(searched, true);
+        }
+      });
+    }
     win.addEventListener('resize', position);
     win.addEventListener('scroll', position, { passive: true });
     doc.addEventListener('keydown', function (event) {

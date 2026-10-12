@@ -294,6 +294,17 @@ final class SearchFlowTest extends TestCase
         $this->assertSame(0, $this->inShop(fn () => SearchTerm::query()->count()), 'nothing counted while typing');
     }
 
+    public function test_the_stores_own_search_page_is_searched_by_spelling_only_and_counted(): void
+    {
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $result = $this->getJson("/api/v1/search/{$this->site}?q=".urlencode('מקיטא').'&spelling=1', ['Origin' => 'https://www.store.test'])->assertOk()->json();
+
+        $this->assertSame('101', $result['groups']['product'][0]['external_id'] ?? null);
+        $this->assertSame([], $this->meaningAsked, 'a page opening never reaches a model');
+        $this->assertSame(1, $this->inShop(fn () => SearchTerm::query()->count()), 'but it is a search, and counted');
+    }
+
     public function test_a_synonym_finds_the_products_the_store_names_differently(): void
     {
         app(BuildSearchIndex::class)->handle($this->shop->id);

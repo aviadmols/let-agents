@@ -16,6 +16,10 @@
     "provider": "SearchServiceProvider",
     "features": [
         {
+            "name": "results_page",
+            "default": false
+        },
+        {
             "name": "storefront",
             "default": true
         },

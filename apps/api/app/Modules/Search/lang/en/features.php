@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'results_page' => [
+        'label' => 'The store\'s search page shows our results',
+        'description' => 'When the store\'s search page opens (/search?q= on Shopify, ?s= on WordPress), our regular results open over it: with the tags, the phrases ("cheapest") and typo tolerance. Code only, no model.',
+    ],
     'storefront' => [
         'label' => 'Let Agents search in the store\'s search box',
         'description' => 'Typo-tolerant suggestions while typing, and results grouped into products, guides and categories. The store also turns it on in the plugin.',

@@ -38,7 +38,10 @@ final class SearchController
         // While a shopper is still typing (typing=1): spelling only, so no vector is made per
         // keystroke, and nothing is counted until they stop.
         $typing = $request->boolean('typing');
-        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: ! $typing);
+        // The store's own search page opening (spelling=1): counted, but spelling only, as no page
+        // load may reach a model.
+        $spelling = $typing || $request->boolean('spelling');
+        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: ! $spelling);
 
         return response()->json($result, 200, ['Cache-Control' => 'no-store'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
