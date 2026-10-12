@@ -62,6 +62,7 @@ final class QuestionsController
                 ->where($onArticle ? 'content_id' : 'product_id', $page->id)
                 ->where('outcome', AssistantAnswer::ANSWERED)
                 ->where('status', AssistantAnswer::SHOWN)
+                ->shared()
                 ->get(['question', 'answer', 'source', 'asked_count', 'last_asked_at']);
 
             $limit = (int) Settings::get('assistant.suggested_questions', $shopId);

@@ -155,6 +155,12 @@
                                             {{ __('assistant::ui.questions.sources.'.($row->source ?? 'store')) }}
                                             @if ($row->source !== 'team') · {{ $row->model }} · ${{ number_format((float) $row->cost_usd, 4) }} @endif
                                         </div>
+                                        @unless ($row->isShared())
+                                            <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+                                                <span style="{{ $small }}">{{ __('assistant::ui.questions.waiting', ['count' => $row->visitors, 'needed' => $q['share_after']]) }}</span>
+                                                <button type="button" wire:click="show('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.approve') }}</button>
+                                            </div>
+                                        @endunless
                                         <details style="margin-top:6px">
                                             <summary style="{{ $small }};cursor:pointer">{{ __('assistant::ui.questions.edit') }}</summary>
                                             <div style="display:flex;gap:8px;margin-top:6px;align-items:flex-start">

@@ -25,6 +25,8 @@ return [
         'kilobytes' => 'קילובייט',
         'seconds' => 'שניות',
         'questions' => 'שאלות',
+        'hours' => 'שעות',
+        'visitors' => 'גולשים',
     ],
     'errors' => [
         'not_integer' => 'יש להזין מספר שלם.',

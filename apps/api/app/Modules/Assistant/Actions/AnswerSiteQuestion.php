@@ -15,14 +15,20 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
+use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
+use App\Modules\Assistant\Support\Offenders;
+use App\Modules\Assistant\Support\Privacy;
 use App\Modules\Assistant\Support\Question;
+use App\Modules\Assistant\Support\QuestionGuard;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -53,7 +59,10 @@ final class AnswerSiteQuestion
 
     public const ACTION = 'assistant.answer_site';
 
-    public const PROMPT_VERSION = 3;
+    /** 4: the safety rules, the checker's safe and injection, and the topic check (scope_site). */
+    public const PROMPT_VERSION = 4;
+
+    private const SCOPE_OUTPUT_TOKENS = 400;
 
     public const MAX_PRODUCTS = 12;
 
@@ -96,10 +105,29 @@ final class AnswerSiteQuestion
         $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
 
         return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products): array {
-            $result = $this->answer($shopId, $question, $visitorHash, $locale, $products);
+            $result = $this->guarded($shopId, $question, $visitorHash, $locale)
+                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products);
 
             return $this->logged($shopId, $question, $products, $result);
         });
+    }
+
+    /**
+     * The barrier before everything else (see Barrier). Null when the question may go on.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function guarded(string $shopId, string $question, string $visitorHash, string $locale): ?array
+    {
+        $stop = Barrier::check($shopId, $question, $visitorHash, Barrier::ip(), $locale);
+
+        if ($stop === null) {
+            return null;
+        }
+
+        return isset($stop['answer'])
+            ? ['outcome' => $stop['outcome'], 'answer' => $stop['answer'], 'from' => 'none', 'reason' => $stop['reason']]
+            : $this->fixed($stop['outcome'], $locale) + ['reason' => $stop['reason']];
     }
 
     /** Answers that belong to the whole site: asked in the search box, not on a page. */
@@ -127,34 +155,37 @@ final class AnswerSiteQuestion
             $saved = null;
         }
 
-        if ($saved !== null) {
-            $saved->forceFill(['asked_count' => $saved->asked_count + 1, 'last_asked_at' => now()])->save();
+        $answered = $saved !== null && $saved->status === AssistantAnswer::SHOWN && $saved->outcome === AssistantAnswer::ANSWERED;
 
-            if ($saved->status === AssistantAnswer::SHOWN && $saved->outcome === AssistantAnswer::ANSWERED) {
-                return [
-                    'outcome' => AssistantAnswer::ANSWERED,
-                    'answer' => (string) $saved->answer,
-                    'from' => 'bank',
-                    'sources' => (array) $saved->sources,
-                    'picks' => $this->present((array) $saved->picks),
-                    'answer_id' => $saved->id,
-                ];
-            }
+        // A written answer is everyone's once it is shared (enough different visitors got it clean,
+        // or the team approved it). Before that, only a visitor who already got it gets it again,
+        // and asking again changes nothing; a new visitor is answered afresh, through every check.
+        if ($answered && ($saved->isShared() || $saved->askedBy($visitorHash))) {
+            $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
 
+            return [
+                'outcome' => AssistantAnswer::ANSWERED,
+                'answer' => (string) $saved->answer,
+                'from' => 'bank',
+                'sources' => (array) $saved->sources,
+                'picks' => $this->present((array) $saved->picks),
+                'answer_id' => $saved->id,
+            ];
+        }
+
+        // "Not found" and "not ours to answer" are the same for everyone, and show nothing written.
+        if ($saved !== null && ! $answered) {
+            $saved->forceFill(['last_asked_at' => now()])->save();
             $outcome = $saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : ($products === [] ? 'no_info' : 'no_match');
 
             return $this->fixed($outcome, $locale, 'bank') + ['answer_id' => $saved->id];
-        }
-
-        if (Question::hasContactDetails($question)) {
-            return $this->fixed('out_of_scope', $locale);
         }
 
         if (! $this->withinDailyLimits($shopId, $visitorHash)) {
             return $this->fixed('limit', $locale);
         }
 
-        return $this->ask($shopId, $question, $locale, $products);
+        return $this->ask($shopId, $question, $locale, $products, visitorHash: $visitorHash);
     }
 
     private const PAGES_BY_WORDS = 3;
@@ -284,6 +315,15 @@ final class AnswerSiteQuestion
         $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
 
         return $this->tenant->run($shopId, function () use ($shopId, $question, $products, $mode, $locale): array {
+            // The same barrier as a shopper meets, without counting anyone or blocking anyone.
+            $guard = QuestionGuard::inspect($question);
+            if ($guard['action'] === QuestionGuard::SUPPORT) {
+                return ['result' => ['outcome' => 'support', 'answer' => QuestionGuard::supportText($locale), 'from' => 'none'], 'trace' => ['from' => 'guard', 'refused' => 'support']];
+            }
+            if ($guard['action'] === QuestionGuard::REFUSE) {
+                return ['result' => $this->fixed($guard['reason'] === 'personal_data' ? 'personal_data' : 'out_of_scope', $locale), 'trace' => ['from' => 'guard', 'refused' => $guard['reason']]];
+            }
+
             if (($computed = $this->computed($question, $locale, $products)) !== null) {
                 return ['result' => $computed, 'trace' => ['from' => 'code']];
             }
@@ -398,7 +438,7 @@ final class AnswerSiteQuestion
      * @param  array<string, mixed>|null  $trace  filled with what was given and what came of it
      * @return array<string, mixed>
      */
-    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null): array
+    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null): array
     {
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
@@ -409,7 +449,7 @@ final class AnswerSiteQuestion
             shopId: $shopId,
             trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,
             input: ['question' => $question, 'products' => count($shown)] + ($remember ? [] : ['evaluation' => $mode]),
-            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, &$result, &$trace): void {
+            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, &$result, &$trace): void {
                 $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
                 $writer = ['provider' => $writer->provider, 'name' => $writer->provider->value, 'model' => $writer->model];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
@@ -419,6 +459,71 @@ final class AnswerSiteQuestion
                     $run->fail('assistant::runs.site_same_family', ['family' => $writer['provider']->label()]);
 
                     return;
+                }
+
+                $effort = (string) Settings::get('assistant.reasoning_effort');
+                $effort = $effort === 'model_default' ? null : $effort;
+                $replies = [];
+                $flags = ['safe' => null, 'injection' => false, 'harmful' => false, 'personal' => false];
+
+                // Whether the question is the store's to answer at all, and whether it asks for harm or
+                // tries to instruct the assistant: a small model, before any page is read. A sensitive
+                // subject the store deals in is the store's.
+                if (Features::enabled('assistant.site_scope', $shopId)) {
+                    $scoper = AgentModel::from('assistant.scope_provider', 'assistant.scope_model');
+                    $scoper = ['provider' => $scoper->provider, 'name' => $scoper->provider->value, 'model' => $scoper->model];
+
+                    try {
+                        $this->spend->assertCanSpend((800 * $this->price('scope_input') + self::SCOPE_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
+                        $scope = $this->call($run, $scoper, 'scope_site', (string) json_encode([
+                            'store' => $this->storeBrief($shopId),
+                            'question' => $question,
+                            'signals' => QuestionGuard::inspect($question)['signals'],
+                        ], JSON_UNESCAPED_UNICODE), self::SCOPE_OUTPUT_TOKENS, $effort, 'scope');
+                    } catch (SpendCapReached $e) {
+                        $run->fail('assistant::runs.spend_cap', [], $e->getMessage());
+
+                        return;
+                    } catch (ModelCallFailed $e) {
+                        $trace = ['failed' => $e->reason];
+                        $run->fail('assistant::runs.model_failed', ['reason' => $e->reason], $e->getMessage());
+
+                        return;
+                    }
+
+                    $replies[] = [$scope, 'scope'];
+                    $scoped = [
+                        'about_store' => ($scope->data['about_store'] ?? null) === true,
+                        'harmful' => ($scope->data['harmful'] ?? false) === true,
+                        'injection' => ($scope->data['injection'] ?? false) === true,
+                    ];
+                    $flags['harmful'] = $scoped['harmful'];
+                    $flags['injection'] = $scoped['injection'];
+
+                    if ($scoped['harmful'] || $scoped['injection']) {
+                        // A rule broken: counted against the visitor, and nothing is saved, so the next
+                        // asker is checked again.
+                        if ($remember && $visitorHash !== null) {
+                            Offenders::record($shopId, $visitorHash, Barrier::ip());
+                        }
+                        $reason = $scoped['harmful'] ? 'harmful' : 'injection';
+                        $result = $this->fixed('out_of_scope', $locale, 'model') + ['reason' => $reason];
+                        $trace = ['scope' => $scoped, 'refused' => $reason];
+                        $run->output(['outcome' => AssistantAnswer::OUT_OF_SCOPE, 'refused' => $reason, 'scope' => $scoped])->summary('assistant::runs.out_of_scope');
+
+                        return;
+                    }
+
+                    if (! $scoped['about_store']) {
+                        if ($remember) {
+                            $this->save($question, AssistantAnswer::OUT_OF_SCOPE, null, [], [], $scoper['model'], $replies, $run, $flags);
+                        }
+                        $result = $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'not_about_store'];
+                        $trace = ['scope' => $scoped, 'refused' => 'not_about_store'];
+                        $run->output(['outcome' => AssistantAnswer::OUT_OF_SCOPE, 'refused' => 'not_about_store', 'scope' => $scoped])->summary('assistant::runs.out_of_scope');
+
+                        return;
+                    }
                 }
 
                 $prepared = $this->prepare($shopId, $question, $shown, $mode);
@@ -440,9 +545,6 @@ final class AnswerSiteQuestion
 
                 $maxOutput = (int) Settings::get('assistant.answer_max_output_tokens');
                 $checkOutput = (int) Settings::get('assistant.site_check_max_output_tokens');
-                $effort = (string) Settings::get('assistant.reasoning_effort');
-                $effort = $effort === 'model_default' ? null : $effort;
-                $replies = [];
                 // What the checker did with this answer, kept on the run: how often it changes an answer,
                 // for which kind of question, at what cost and how fast. Read by assistant:checker-report.
                 $checked = ['ran' => false];
@@ -478,11 +580,12 @@ final class AnswerSiteQuestion
                     $answerRefusal = match (true) {
                         $answer === '' => 'no_answer',
                         $cited === [] && $picks === [] => 'cites_nothing',
-                        Question::hasContactDetails($answer) => 'contact_details',
+                        Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== [] => 'contact_details',
                         preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 => 'price',
                         self::hasNumberNotIn($answer, $known) => 'number_not_in_the_pages',
                         default => null,
                     };
+                    $flags['personal'] = $answerRefusal === 'contact_details';
 
                     if ($answerRefusal !== null) {
                         $answer = '';
@@ -523,6 +626,18 @@ final class AnswerSiteQuestion
                             $answer = '';
                             $verdict[] = ($check->data['on_topic'] ?? null) !== true ? 'off_topic' : 'unsupported';
                         }
+                        // Not safe for every shopper, or the question was an attempt to instruct the
+                        // assistant: nothing of it is shown, and an attempt counts against the visitor.
+                        $flags['safe'] = ($check->data['safe'] ?? null) === true;
+                        $flags['injection'] = $flags['injection'] || ($check->data['injection'] ?? false) === true;
+                        if (! $flags['safe'] || $flags['injection']) {
+                            $answer = '';
+                            $picks = [];
+                            $verdict[] = $flags['injection'] ? 'injection' : 'unsafe';
+                            if ($flags['injection'] && $remember && $visitorHash !== null) {
+                                Offenders::record($shopId, $visitorHash, Barrier::ip());
+                            }
+                        }
 
                         $refusal = $answer === '' && $picks === [] ? 'check_'.implode('_', $verdict ?: ['empty']) : null;
                         $checked['verdict'] = match (true) {
@@ -546,7 +661,13 @@ final class AnswerSiteQuestion
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $outcome = $refusal === null ? AssistantAnswer::ANSWERED : AssistantAnswer::NO_INFO;
-                $saved = $remember ? $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run) : null;
+                $saved = $remember ? $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run, $flags) : null;
+
+                // This visitor got it clean: checked, safe, no attempt to instruct, nothing personal,
+                // nothing harmful. Counted once; enough different visitors share it with everyone.
+                if ($saved !== null && $refusal === null && $visitorHash !== null && $flags['safe'] === true && ! $flags['injection'] && ! $flags['harmful'] && ! $flags['personal']) {
+                    $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
+                }
 
                 $result = $refusal === null
                     ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id]
@@ -860,7 +981,9 @@ final class AnswerSiteQuestion
         $ask = AssistantSearchAsk::query()->create([
             'shop_id' => $shopId,
             'day' => now()->toDateString(),
-            'question' => $question,
+            // Never personal details, and nothing of a question about hurting oneself: this log is
+            // read by the team and sent to the nightly review.
+            'question' => ($result['reason'] ?? null) === 'support' ? '[support]' : mb_substr(Privacy::redact($question)['text'], 0, 500),
             'products' => $products,
             'outcome' => $result['outcome'],
             'from' => $result['from'],
@@ -948,7 +1071,13 @@ final class AnswerSiteQuestion
      * @param  list<array{external_id: string, title: string, why: string}>  $picks
      * @param  list<array{0: ModelReply, 1: string}>  $replies
      */
-    private function save(string $question, string $outcome, ?string $answer, array $sources, array $picks, ?string $model, array $replies, RunContext $run): AssistantAnswer
+    /**
+     * The question's one saved answer, written or rewritten. A written answer not yet shared is
+     * not replaced by a refusal: one visitor's failed check does not undo what others got clean.
+     *
+     * @param  array<string, mixed>|null  $flags  what the checks said: safe, injection, harmful, personal
+     */
+    private function save(string $question, string $outcome, ?string $answer, array $sources, array $picks, ?string $model, array $replies, RunContext $run, ?array $flags = null): AssistantAnswer
     {
         $cost = 0.0;
         $input = 0;
@@ -960,9 +1089,13 @@ final class AnswerSiteQuestion
             $output += $reply->outputTokens;
         }
 
-        return AssistantAnswer::query()->create([
-            'shop_id' => $this->tenant->require(),
-            'question_key' => Question::key($question),
+        $saved = self::siteAnswers()->where('question_key', Question::key($question))->first();
+
+        if ($saved !== null && $saved->outcome === AssistantAnswer::ANSWERED && $outcome !== AssistantAnswer::ANSWERED) {
+            return $saved;
+        }
+
+        $fields = [
             'question' => $question,
             'answer' => $answer,
             'outcome' => $outcome,
@@ -975,8 +1108,32 @@ final class AnswerSiteQuestion
             'output_tokens' => $output,
             'cost_usd' => round($cost, 6),
             'run_id' => $run->runId,
+            'flags' => $flags,
             'last_asked_at' => now(),
+        ];
+
+        if ($saved !== null) {
+            $saved->forceFill($fields)->save();
+
+            return $saved;
+        }
+
+        // Counted by visitors from here on: asked_count rises once per different visitor.
+        return AssistantAnswer::query()->create($fields + [
+            'shop_id' => $this->tenant->require(),
+            'question_key' => Question::key($question),
+            'asked_count' => 0,
+            'visitors' => 0,
         ]);
+    }
+
+    /** What the store is, for the topic check: its name and what it sells. */
+    private function storeBrief(string $shopId): array
+    {
+        return [
+            'name' => (string) Shop::query()->whereKey($shopId)->value('name'),
+            'categories' => CatalogCategory::query()->whereNull('removed_at')->orderByDesc('product_count')->limit(40)->pluck('name')->all(),
+        ];
     }
 
     private function price(string $name): float

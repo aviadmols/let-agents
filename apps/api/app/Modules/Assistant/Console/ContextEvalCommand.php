@@ -116,8 +116,10 @@ final class ContextEvalCommand extends Command
     /**
      * What an answer got wrong against what the question expects; empty when it passes.
      *
-     *   outcome              answered, no_info or no_match ("no_info" also accepts no_match: nothing made up)
-     *   products_any         SKUs or ids, one of which must be picked
+     *   outcome              answered, no_info or no_match ("no_info" also accepts no_match: nothing made up),
+     *                        or a refusal: out_of_scope, personal_data, support
+     *   outcome_not          outcomes it must not be: a fair question on a sensitive subject is not refused
+     *   products_any        SKUs or ids, one of which must be picked
      *   picks_max_price      every pick at or under this price in the catalog
      *   picks_min_price      every pick at or over it
      *   picks_title_any      every pick's title holds one of these words
@@ -141,6 +143,10 @@ final class ContextEvalCommand extends Command
 
         if ($wanted !== 'any' && $outcome !== $wanted && ! ($wanted === 'no_info' && $empty)) {
             $failures[] = "outcome {$outcome}, expected {$wanted}";
+        }
+
+        if (in_array($outcome, (array) ($expect['outcome_not'] ?? []), true)) {
+            $failures[] = "outcome {$outcome}, which it must not be";
         }
 
         $products = array_map(fn ($p): string => $skus[(string) $p] ?? (string) $p, (array) ($expect['products_any'] ?? []));

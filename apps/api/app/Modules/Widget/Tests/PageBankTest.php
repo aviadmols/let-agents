@@ -226,7 +226,7 @@ final class PageBankTest extends TestCase
     {
         $this->assertSame([], $this->page('product', '10')->json('questions'), 'nothing asked yet');
 
-        $save = function (string $question, string $outcome, int $asked, string $status = AssistantAnswer::SHOWN): void {
+        $save = function (string $question, string $outcome, int $asked, string $status = AssistantAnswer::SHOWN, bool $shared = true): void {
             app(TenantContext::class)->run($this->shop->id, fn () => AssistantAnswer::query()->create([
                 'shop_id' => $this->shop->id,
                 'product_id' => CatalogProduct::query()->where('external_id', '10')->value('id'),
@@ -238,6 +238,7 @@ final class PageBankTest extends TestCase
                 'prompt_version' => 2,
                 'asked_count' => $asked,
                 'last_asked_at' => now(),
+                'shared_at' => $shared ? now() : null,
             ]));
             Cache::flush();
         };
@@ -247,6 +248,8 @@ final class PageBankTest extends TestCase
         $save('מה מזג האוויר מחר?', AssistantAnswer::OUT_OF_SCOPE, 30);
         $save('כמה הוא שוקל בדיוק?', AssistantAnswer::NO_INFO, 40);
         $save('שאלה שהוסתרה', AssistantAnswer::ANSWERED, 50, AssistantAnswer::HIDDEN);
+        // One visitor's answer, not yet shared: never offered to others, however often they asked it.
+        $save('שאלה של גולש אחד', AssistantAnswer::ANSWERED, 60, shared: false);
 
         // Most asked first, and only questions that were really answered here.
         $this->assertSame(['אפשר לנסר איתו מתכת?', 'האם זה מתאים לחוץ?'], $this->page('product', '10')->json('questions'));

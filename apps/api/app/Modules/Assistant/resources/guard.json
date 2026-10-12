@@ -1,0 +1,43 @@
+{
+    "_about": "What code reads in a shopper's question before anything else: before the saved answers are looked up or written and before any model. Patterns are case-insensitive regular expressions; Hebrew final letters match their regular forms. injection, markup: refused, and they count toward blocking the visitor, so each must be something no shopper writes: 'show me the assembly instructions' and 'I forgot the instructions' are questions, 'ignore all previous instructions' is not. support: answered with care and help, never counted. signals: words that only tell the topic check what to look at; they block nothing.",
+    "injection": [
+        "(?:ignore|disregard|forget|override)\\s+(?:all|any|previous|prior|above|your|these|the above|the previous)\\s+(?:\\w+\\s+)?(?:instructions|rules|prompts?|guidelines|directions)",
+        "(?:system|developer|initial)\\s+prompt", "(?:system|developer|hidden)\\s+instructions",
+        "(?:reveal|show|print|repeat|output|tell me|what (?:are|is))\\s+(?:me\\s+)?your\\s+(?:system\\s+)?(?:prompt|instructions)(?!\\s+(?:for|on|to|about|how))",
+        "repeat (?:the|everything|all) (?:text|words) above",
+        "you are now (?:a|an|my|in|acting|going to)\\b", "from now on,? you (?:are|will)", "pretend (?:to be|you are)", "roleplay as",
+        "developer mode", "jailbreak", "do anything now",
+        "<\\s*/?\\s*(?:system|assistant|user|instructions?)\\s*>", "\\[\\s*/?\\s*(?:system|INST)\\s*\\]", "#{2,}\\s*(?:system|instruction)",
+        "\"role\"\\s*:\\s*\"(?:system|assistant|developer)\"",
+        "(?:התעלמ\\S*|תשכח\\S*|שכח(?:י|ו)?)\\s+(?:את\\s+|מ)?כל\\s+(?:ה)?(?:הוראות|הנחיות|כללים)",
+        "(?:התעלמ\\S*|תשכח\\S*|שכח(?:י|ו)?)\\s+(?:את\\s+|מ)?(?:ה)?(?:הוראות|הנחיות|כללים)\\s+(?:ה)?(?:קודמות|קודמים|שלך|שקיבלת|האלה)(?!\\p{L})",
+        "(?:ה)?(?:הוראות|הנחיות)\\s+(?:ה)?(?:שלך|הסודיות|הראשוניות|שקיבלת)(?!\\p{L})",
+        "(?:תראה|הראה|תציג|הצג|תגיד|תכתוב|תדפיס)\\s+(?:לי\\s+)?(?:את\\s+)?(?:ה)?פרומפט",
+        "מה (?:ה)?(?:פרומפט|הוראות|הנחיות) (?:שלך|שקיבלת)(?!\\p{L})",
+        "אתה עכשיו\\s+(?:עוזר|בוט|מודל|מתכנת|מנהל|ה)", "את עכשיו\\s+(?:עוזרת|בוטית|מודל|מתכנתת|מנהלת)", "מעכשיו אתה\\s", "תעמיד פנים", "תתנהג כמו", "תשחק את התפקיד",
+        "מצב (?:ה)?מפתחים", "פרומפט (?:ה)?מערכת"
+    ],
+    "markup": [
+        "<\\s*(?:script|iframe|object|embed|style|svg|img|link|meta|base|form)\\b",
+        "javascript\\s*:", "\\bon(?:error|load|click|mouseover|focus)\\s*=", "data\\s*:\\s*text/html"
+    ],
+    "support": [
+        "להתאבד", "התאבדות", "לפגוע בעצמי", "לשים קץ לחיי", "אין לי (?:סיבה|טעם) לחיות", "רוצה למות", "לא רוצה לחיות", "לחתוך את עצמי",
+        "kill myself", "suicid", "self[- ]?harm", "end my life", "want to die", "hurt myself"
+    ],
+    "support_text": {
+        "he": "נשמע שעובר עליך משהו קשה. לא חייבים להתמודד עם זה לבד. אפשר לדבר עכשיו, בחינם ובאנונימיות, עם ער\"ן: 1201, או בצ'אט באתר של ער\"ן. במצב של סכנה מיידית: מד\"א 101.",
+        "en": "It sounds like you are going through something hard, and you don't have to face it alone. Please reach out now to a crisis line or emergency services in your country, or to someone you trust."
+    },
+    "signals": {
+        "weapons": ["נשק", "אקדח", "רובה", "תחמושת", "חומר נפץ", "weapon", "gun", "rifle", "ammo", "explosive"],
+        "drugs": ["סמים", "קנאביס", "גראס", "קוקאין", "drugs", "cannabis", "cocaine"],
+        "sexual": ["סקס", "פורנו", "עירום", "sex", "porn", "nude"],
+        "violence": ["לרצוח", "להרוג", "לפגוע ב", "kill", "murder", "attack"],
+        "hate": ["גזענ", "נאצי", "racist", "nazi"],
+        "illegal": ["לפרוץ", "פורצ", "פריצ", "לגנוב", "גונב", "זיוף", "מזייפ", "לזייף", "הונאה", "hack", "steal", "fraud", "counterfeit"],
+        "medical": ["תרופה", "מחלה", "רופא", "תסמין", "הריון", "medicine", "disease", "symptom", "pregnan"],
+        "legal": ["עורך דין", "תביעה", "חוקי", "lawyer", "lawsuit", "legal"],
+        "political": ["בחירות", "מפלגה", "ממשלה", "פוליטי", "election", "party", "government", "politic"]
+    }
+}

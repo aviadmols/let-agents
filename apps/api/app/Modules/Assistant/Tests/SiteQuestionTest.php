@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -48,6 +49,9 @@ final class SiteQuestionTest extends TestCase
     {
         parent::setUp();
 
+        // The topic check is its own model call, tested in GuardTest; these test what follows it.
+        Features::override('assistant.site_scope', false);
+
         $this->buildShop();
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => 'https://store.test', 'access_token' => self::TOKEN,
@@ -88,7 +92,7 @@ final class SiteQuestionTest extends TestCase
     {
         $this->replies = [
             ['found' => true, 'answer' => 'בערך 30 ברגים למטר מרובע, שניים בכל מפגש של קרש עם קורה.', 'refs' => ['s1', 's9']],
-            ['supported' => true, 'on_topic' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
         ];
 
         $data = $this->ask('כמה ברגים צריך למטר דק?')->assertOk()->json('data');
@@ -114,7 +118,7 @@ final class SiteQuestionTest extends TestCase
     {
         $this->replies = [
             ['found' => true, 'answer' => 'בערך 30 ברגים למטר מרובע.', 'refs' => ['s1']],
-            ['supported' => true, 'on_topic' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
         ];
         $this->ask('כמה ברגים צריך למטר דק?');
 
@@ -128,7 +132,7 @@ final class SiteQuestionTest extends TestCase
         // The checker refuses what the page does not say.
         $this->replies = [
             ['found' => true, 'answer' => 'שניים בכל מפגש, ועדיף נירוסטה ליד הים.', 'refs' => ['s1']],
-            ['supported' => false, 'on_topic' => true],
+            ['supported' => false, 'on_topic' => true, 'safe' => true],
         ];
         $this->ask('איך מבריגים דק?');
 
@@ -157,7 +161,7 @@ final class SiteQuestionTest extends TestCase
         // The checker finds something the pages do not say.
         $this->replies = [
             ['found' => true, 'answer' => 'שניים בכל מפגש, ועדיף נירוסטה ליד הים.', 'refs' => ['s1']],
-            ['supported' => false, 'on_topic' => true],
+            ['supported' => false, 'on_topic' => true, 'safe' => true],
         ];
         $data = $this->ask('איך מבריגים דק?')->json('data');
         $this->assertSame(['no_info', __('assistant::answers.site.no_info', [], 'he')], [$data['outcome'], $data['answer']]);
@@ -175,7 +179,7 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame([], $this->calls);
 
         $this->passages = [['source' => 'content', 'source_id' => $this->inShop(fn () => CatalogContent::query()->value('id')), 'external_id' => '600', 'title' => 'משלוחים', 'text' => 'יש משלוח לכל הארץ, כולל אילת.', 'similarity' => 0.8]];
-        $this->replies = [['found' => true, 'answer' => 'כן, יש משלוח לכל הארץ, כולל אילת.', 'refs' => ['s1']], ['supported' => true, 'on_topic' => true]];
+        $this->replies = [['found' => true, 'answer' => 'כן, יש משלוח לכל הארץ, כולל אילת.', 'refs' => ['s1']], ['supported' => true, 'on_topic' => true, 'safe' => true]];
 
         $this->assertSame('no_info', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'the same day: from memory');
         $this->travel((int) Settings::get('assistant.site_retry_days') + 1)->days();
@@ -227,7 +231,7 @@ final class SiteQuestionTest extends TestCase
         $this->drills();
         $this->replies = [
             ['found' => true, 'answer' => 'למברגה ביתית, מברגה איינהל.', 'refs' => [], 'picks' => [['ref' => 'p3', 'why' => 'מתאימה לבית']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
 
         $this->askWith('איזו מברגה מתאימה לבית?', ['701', '704', '702', '703'])->assertOk();

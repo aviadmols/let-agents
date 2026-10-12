@@ -97,7 +97,7 @@ final class TagBankTest extends TestCase
             $page = CatalogProduct::query()->where('external_id', '201')->value('id');
             $other = CatalogProduct::query()->where('external_id', '202')->value('id');
             $answer = fn (array $extra) => AssistantAnswer::query()->create(array_merge([
-                'shop_id' => $this->shop->id, 'outcome' => AssistantAnswer::ANSWERED, 'prompt_version' => 3, 'last_asked_at' => now(),
+                'shop_id' => $this->shop->id, 'outcome' => AssistantAnswer::ANSWERED, 'prompt_version' => 3, 'last_asked_at' => now(), 'shared_at' => now(),
             ], $extra));
 
             $answer(['product_id' => $page, 'question_key' => 'k1', 'question' => 'כל כמה זמן לשמן?', 'answer' => 'פעם בשנה.', 'asked_count' => 5]);

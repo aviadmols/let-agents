@@ -31,6 +31,7 @@ final class SuggestQuestions implements SuggestsQuestions
             ->where($isArticle ? 'content_id' : 'product_id', $pageId)
             ->where('outcome', AssistantAnswer::ANSWERED)
             ->where('status', AssistantAnswer::SHOWN)
+            ->shared()
             ->orderByDesc('asked_count')
             ->pluck('question');
 

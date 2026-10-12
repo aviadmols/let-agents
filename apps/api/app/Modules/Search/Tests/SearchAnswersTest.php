@@ -47,13 +47,15 @@ final class SearchAnswersTest extends TestCase
                 'in_stock' => true, 'purchasable' => true, 'hash' => 'h201', 'payload' => [],
             ]);
             $answer = fn (array $extra): AssistantAnswer => AssistantAnswer::query()->create(array_merge([
-                'shop_id' => $this->shop->id, 'outcome' => AssistantAnswer::ANSWERED, 'prompt_version' => 1, 'last_asked_at' => now(),
+                'shop_id' => $this->shop->id, 'outcome' => AssistantAnswer::ANSWERED, 'prompt_version' => 1, 'last_asked_at' => now(), 'shared_at' => now(),
             ], $extra));
 
             $answer(['question' => 'כל כמה זמן צריך לשמן דק?', 'question_key' => 'k1', 'answer' => 'פעם בשנה, לפני הקיץ.', 'product_id' => $product->id, 'asked_count' => 4]);
             $answer(['question' => 'כמה ברגים צריך למטר דק?', 'question_key' => 'k2', 'answer' => 'בערך 30.', 'sources' => [['title' => 'כמה ברגים צריך למטר דק', 'url' => 'https://www.store.test/g/600', 'type' => 'content']]]);
             $answer(['question' => 'האם מגיע עם אחריות?', 'question_key' => 'k3', 'answer' => 'הוסתר.', 'status' => AssistantAnswer::HIDDEN]);
             $answer(['question' => 'האם יש משלוח?', 'question_key' => 'k4', 'answer' => null, 'outcome' => AssistantAnswer::NO_INFO]);
+            // One visitor's answer, not yet shared: never in the box, however often they asked it.
+            $answer(['question' => 'איך מנקים דק?', 'question_key' => 'k5', 'answer' => 'במים וסבון.', 'asked_count' => 50, 'shared_at' => null]);
         });
 
         app(BuildSearchIndex::class)->handle($this->shop->id);

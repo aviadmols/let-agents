@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -53,6 +54,9 @@ final class DynamicContextTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // The topic check is its own model call, tested in GuardTest; these test what follows it.
+        Features::override('assistant.site_scope', false);
 
         $this->buildShop();
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
@@ -239,7 +243,7 @@ final class DynamicContextTest extends TestCase
         Settings::set('assistant.context_mode', AnswerContext::DYNAMIC);
         $this->replies = [
             ['found' => true, 'answer' => 'טבעת הגרנט במידות 6.5 ו-7.', 'refs' => [], 'picks' => [['ref' => 'p4', 'why' => 'הגרנט']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
 
         $data = $this->askOver('באיזו מידה יש את טבעת הגרנט?');
@@ -267,14 +271,14 @@ final class DynamicContextTest extends TestCase
         // The ruby ring is 7th of the 8 shown in full context, and 5th of the 6 kept in dynamic.
         $this->replies = [
             ['found' => true, 'answer' => 'טבעת רובי אדומה.', 'refs' => [], 'picks' => [['ref' => 'p7', 'why' => 'אבן אדומה']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
             ['found' => true, 'answer' => 'טבעת רובי אדומה.', 'refs' => [], 'picks' => [['ref' => 'p5', 'why' => 'אבן אדומה']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
             // q2, a price question: a number that is not the price, in either mode.
             ['found' => true, 'answer' => 'היא עולה בערך 990 בהנחה.', 'refs' => [], 'picks' => [['ref' => 'p8', 'why' => 'גרנט']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
             ['found' => true, 'answer' => 'היא עולה בערך 990 בהנחה.', 'refs' => [], 'picks' => [['ref' => 'p8', 'why' => 'גרנט']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
 
         $this->assertSame(0, Artisan::call('assistant:context-eval', ['shop' => $this->shop->id, '--file' => $this->evalPath(), '--base-url' => 'https://api.test']));

@@ -1436,7 +1436,8 @@ final class BuildPageBank
         return $page === null ? null : AssistantAnswer::query()
             ->where($type === 'product' ? 'product_id' : 'content_id', $page->id)
             ->where('status', AssistantAnswer::SHOWN)
-            ->whereNotNull('answer');
+            ->whereNotNull('answer')
+            ->shared();
     }
 
     /**

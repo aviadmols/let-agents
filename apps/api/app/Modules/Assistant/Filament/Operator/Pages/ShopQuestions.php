@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Filament\Operator\Pages;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Assistant\Actions\ReviewSearchAsks;
@@ -156,6 +157,8 @@ class ShopQuestions extends Page
                 'answered' => $byProduct($shown->where('outcome', AssistantAnswer::ANSWERED)),
                 'refused' => $shown->where('outcome', AssistantAnswer::OUT_OF_SCOPE)->values(),
                 'hidden' => $all->where('status', AssistantAnswer::HIDDEN)->values(),
+                // A model's answer reaches every shopper after this many different visitors, or the team's approval.
+                'share_after' => (int) Settings::get('assistant.share_after_visitors', $this->shop),
                 'totals' => [
                     'questions' => (int) $all->sum('asked_count'),
                     'distinct' => $all->count(),
@@ -182,6 +185,7 @@ class ShopQuestions extends Page
             'outcome' => AssistantAnswer::ANSWERED,
             'source' => self::TEAM,
             'status' => AssistantAnswer::SHOWN,
+            'shared_at' => now(),
         ])->save());
 
         unset($this->drafts[$id]);
@@ -194,6 +198,7 @@ class ShopQuestions extends Page
         $this->setStatus($id, AssistantAnswer::HIDDEN);
     }
 
+    /** The team approves the answer: every shopper may see it now, without waiting for more visitors. */
     public function show(string $id): void
     {
         $this->setStatus($id, AssistantAnswer::SHOWN);
@@ -205,7 +210,21 @@ class ShopQuestions extends Page
             return;
         }
 
-        app(TenantContext::class)->run($this->shop, fn () => AssistantAnswer::query()->whereKey($id)->first()?->forceFill(['status' => $status])->save());
+        app(TenantContext::class)->run($this->shop, function () use ($id, $status): void {
+            $answer = AssistantAnswer::query()->whereKey($id)->first();
+
+            if ($answer === null) {
+                return;
+            }
+
+            $answer->status = $status;
+
+            if ($status === AssistantAnswer::SHOWN && $answer->shared_at === null) {
+                $answer->shared_at = now();
+            }
+
+            $answer->save();
+        });
         Notification::make()->success()->title(__('assistant::ui.questions.saved'))->send();
     }
 }

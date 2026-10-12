@@ -159,7 +159,7 @@ final class BuildSearchIndex
 
         return AssistantAnswer::query()
             ->with(['product:id,title,url,removed_at', 'content:id,title,url'])
-            ->where('outcome', AssistantAnswer::ANSWERED)->where('status', AssistantAnswer::SHOWN)->whereNotNull('answer')
+            ->where('outcome', AssistantAnswer::ANSWERED)->where('status', AssistantAnswer::SHOWN)->whereNotNull('answer')->shared()
             ->orderByDesc('asked_count')->orderBy('id')
             ->limit($limit)
             ->get()

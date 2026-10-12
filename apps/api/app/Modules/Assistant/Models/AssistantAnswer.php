@@ -6,10 +6,12 @@ use App\Core\Tenancy\BelongsToTenant;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A shopper's question about a product and the answer given, kept so the next shopper who asks the
@@ -57,9 +59,62 @@ class AssistantAnswer extends Model
 
     protected $guarded = ['id'];
 
+    /**
+     * Answers every shopper may see, in the search suggestions and on the pages: the team's, or a
+     * model's that enough different visitors got clean (see AnswerSiteQuestion and AnswerQuestion).
+     *
+     * @param  Builder<AssistantAnswer>  $query
+     */
+    public function scopeShared(Builder $query): void
+    {
+        $query->where(fn (Builder $q) => $q->whereNotNull('shared_at')->orWhere('source', 'team'));
+    }
+
+    public function isShared(): bool
+    {
+        return $this->shared_at !== null || $this->source === 'team';
+    }
+
+    /**
+     * This visitor got this answer: the first time it is counted and may share the answer with
+     * everyone; asking again changes nothing. Returns whether the visitor was new.
+     */
+    public function countVisitor(string $visitorHash, int $shareAfter): bool
+    {
+        $new = DB::table('assistant_answer_visitors')->insertOrIgnore([
+            'answer_id' => $this->id,
+            'visitor_hash' => $visitorHash,
+            'created_at' => now(),
+        ]) === 1;
+
+        // Only a new visitor counts, so asking again and again neither shares an answer nor
+        // raises it in the suggestions (ordered by asked_count).
+        if ($new) {
+            $this->visitors = (int) $this->visitors + 1;
+            $this->asked_count = (int) $this->asked_count + 1;
+
+            if ($this->shared_at === null && $this->visitors >= $shareAfter) {
+                $this->shared_at = now();
+            }
+        }
+
+        $this->last_asked_at = now();
+        $this->save();
+
+        return $new;
+    }
+
+    public function askedBy(string $visitorHash): bool
+    {
+        return DB::table('assistant_answer_visitors')->where('answer_id', $this->id)->where('visitor_hash', $visitorHash)->exists();
+    }
+
     protected function casts(): array
     {
         return [
+            'visitors' => 'integer',
+            'shared_at' => 'datetime',
+            'flags' => 'array',
             'asked_count' => 'integer',
             'sources' => 'array',
             'picks' => 'array',

@@ -28,6 +28,8 @@ return [
         'publish' => 'Publish answer',
         'hide' => 'Hide',
         'show' => 'Show again',
+        'approve' => 'Show to everyone',
+        'waiting' => 'Seen only by those who asked: :count of :needed different shoppers before everyone sees it.',
         'edit' => 'Edit or hide',
         'answer_anyway' => 'Answer anyway',
         'answered' => 'Published. The next shopper who asks gets it.',

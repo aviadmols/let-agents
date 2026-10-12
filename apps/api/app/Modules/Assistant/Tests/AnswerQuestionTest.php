@@ -78,7 +78,23 @@ final class AnswerQuestionTest extends TestCase
         $this->assertCount(3, $this->model->calls, 'the same question costs nothing the second time');
 
         $saved = $this->inShop(fn () => AssistantAnswer::query()->sole());
-        $this->assertSame(2, $saved->asked_count);
+        $this->assertSame(1, $saved->asked_count, 'the same visitor asking again counts once');
+        $this->assertNull($saved->shared_at);
+
+        $box = $this->get('/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/questions?id=31538&locale=he', ['Origin' => 'https://store.test'])->assertOk()->json('data');
+        $this->assertSame([], $box['recent'], 'one visitor\'s answer is not shown to others');
+        $this->assertNotContains('האם זה מתאים לחוץ?', $box['suggested']);
+
+        // Two more different visitors are each answered afresh and checked; then it is everyone's.
+        foreach (['anon-visitor2234567890abcd', 'anon-visitor3234567890abcd'] as $visitor) {
+            $this->model->replies = [['about_product' => true], ['answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'source' => 'store'], self::VERIFIED];
+            $this->assertSame('model', $this->ask('האם זה מתאים לחוץ?', vid: $visitor)->json('data.from'));
+        }
+        $saved->refresh();
+        $this->assertSame([3, 3], [$saved->visitors, $saved->asked_count]);
+        $this->assertNotNull($saved->shared_at);
+        $this->assertSame('bank', $this->ask('האם זה מתאים לחוץ?', vid: 'anon-visitor4234567890abcd')->json('data.from'));
+        $this->assertCount(9, $this->model->calls);
 
         $box = $this->get('/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/questions?id=31538&locale=he', ['Origin' => 'https://store.test'])->assertOk()->json('data');
         $this->assertSame('האם זה מתאים לחוץ?', $box['suggested'][0], 'what shoppers asked first, then common questions');
@@ -132,7 +148,7 @@ final class AnswerQuestionTest extends TestCase
 
     public function test_code_refuses_contact_details_prices_the_daily_limit_and_the_spending_cap(): void
     {
-        $this->assertSame('out_of_scope', $this->ask('תתקשרו אליי 052-1234567 לגבי המוצר')->json('data.outcome'));
+        $this->assertSame('personal_data', $this->ask('תתקשרו אליי 052-1234567 לגבי המוצר')->json('data.outcome'));
         $this->assertCount(0, $this->model->calls, 'contact details never reach a model');
 
         $this->model->replies = [['about_product' => true], ['answer' => 'המחיר הוא 89 ₪ למטר.', 'source' => 'store']];
@@ -178,10 +194,10 @@ final class AnswerQuestionTest extends TestCase
         $this->assertNotContains('מה עוד צריך לקנות יחד איתו?', $suggested, 'a guide is not a product');
     }
 
-    private function ask(string $question, string $type = 'product', string $id = '31538'): TestResponse
+    private function ask(string $question, string $type = 'product', string $id = '31538', string $vid = self::VID): TestResponse
     {
         return $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/ask', server: [
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
-        ], content: json_encode(['id' => $id, 'type' => $type, 'question' => $question, 'vid' => self::VID, 'locale' => 'he'], JSON_UNESCAPED_UNICODE));
+        ], content: json_encode(['id' => $id, 'type' => $type, 'question' => $question, 'vid' => $vid, 'locale' => 'he'], JSON_UNESCAPED_UNICODE));
     }
 }

@@ -12,6 +12,7 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\Subject;
@@ -25,9 +26,12 @@ use App\Modules\Runs\Enums\RunTrigger;
  * Answers a shopper's question about one page: a product, or a guide the store published. The
  * Subject says which, carries what the writer may answer from, and picks the prompts for it.
  *
- * 1. The same question asked before about this page: the saved answer, no model. An answer
- *    saved by an older prompt version is asked again.
- * 2. Contact details, too short, over the visitor's or the shop's daily questions: refused in code.
+ * 0. The barrier (see Barrier): a blocked visitor, instructions to the assistant, markup, a flood
+ *    or personal details are refused in code; a shopper who may hurt themselves gets care.
+ * 1. The same question asked before about this page: the saved answer, no model, once it is
+ *    shared (assistant.share_after_visitors different visitors got it clean, or the team's), or
+ *    to a visitor who already got it. An answer saved by an older prompt version is asked again.
+ * 2. Too short, over the visitor's or the shop's daily questions: refused in code.
  * 3. A small model decides whether the question is about the page. When it is not, a fixed
  *    refusal, and the writing model never sees the question.
  * 4. The writing model answers from the store's own information first — the product's checked
@@ -74,6 +78,10 @@ final class AnswerQuestion
         }
 
         return $this->tenant->run($shopId, function () use ($shopId, $onArticle, $externalId, $question, $visitorHash, $locale): array {
+            if (($stop = $this->guarded($shopId, $question, $visitorHash, $locale)) !== null) {
+                return $stop;
+            }
+
             $maxTextChars = (int) Settings::get('assistant.max_text_chars', $shopId);
             $subject = $onArticle
                 ? ($article = CatalogContent::query()->active()->where('external_id', $externalId)->first()) === null ? null : Subject::article($article, $maxTextChars)
@@ -92,28 +100,52 @@ final class AnswerQuestion
                 $saved = null;
             }
 
-            if ($saved !== null) {
-                $saved->forceFill(['asked_count' => $saved->asked_count + 1, 'last_asked_at' => now()])->save();
+            $answered = $saved !== null && $saved->status === AssistantAnswer::SHOWN && $saved->outcome === AssistantAnswer::ANSWERED;
 
-                return $saved->status === AssistantAnswer::SHOWN && $saved->outcome === AssistantAnswer::ANSWERED
-                    ? array_filter(['outcome' => $saved->outcome, 'answer' => (string) $saved->answer, 'from' => 'bank', 'source' => $saved->source])
-                    : $this->fixed($saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : 'no_info', $locale, 'bank');
+            // A written answer is everyone's once it is shared (enough different visitors got it
+            // clean, or the team wrote or approved it); before that, only a visitor who already got
+            // it gets it again, and asking again changes nothing.
+            if ($answered && ($saved->isShared() || $saved->askedBy($visitorHash))) {
+                $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
+
+                return array_filter(['outcome' => $saved->outcome, 'answer' => (string) $saved->answer, 'from' => 'bank', 'source' => $saved->source]);
             }
 
-            if (Question::hasContactDetails($question)) {
-                return $this->fixed('out_of_scope', $locale);
+            // "No information" and "not about this page" are the same for everyone and show nothing written.
+            if ($saved !== null && ! $answered) {
+                $saved->forceFill(['last_asked_at' => now()])->save();
+
+                return $this->fixed($saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : 'no_info', $locale, 'bank');
             }
 
             if (! $this->withinDailyLimits($shopId, $visitorHash)) {
                 return $this->fixed('limit', $locale);
             }
 
-            return $this->ask($shopId, $subject, $question, $locale);
+            return $this->ask($shopId, $subject, $question, $locale, $visitorHash);
         });
     }
 
+    /**
+     * The barrier before the saved answers and any model (see Barrier). Null when the question may go on.
+     *
+     * @return array{outcome: string, answer: string, from: string}|null
+     */
+    private function guarded(string $shopId, string $question, string $visitorHash, string $locale): ?array
+    {
+        $stop = Barrier::check($shopId, $question, $visitorHash, Barrier::ip(), $locale);
+
+        if ($stop === null) {
+            return null;
+        }
+
+        return isset($stop['answer'])
+            ? ['outcome' => $stop['outcome'], 'answer' => $stop['answer'], 'from' => 'none']
+            : $this->fixed($stop['outcome'], $locale);
+    }
+
     /** @return array{outcome: string, answer: string, from: string, source?: string} */
-    private function ask(string $shopId, Subject $subject, string $question, string $locale): array
+    private function ask(string $shopId, Subject $subject, string $question, string $locale, string $visitorHash): array
     {
         $result = $this->fixed('unavailable', $locale);
 
@@ -123,7 +155,7 @@ final class AnswerQuestion
             shopId: $shopId,
             trigger: RunTrigger::Webhook,
             input: [$subject->kind => $subject->externalId, 'question' => $question],
-            work: function (RunContext $run) use ($subject, $question, $locale, &$result): void {
+            work: function (RunContext $run) use ($shopId, $subject, $question, $locale, $visitorHash, &$result): void {
                 $answerModel = (string) Settings::get('assistant.answer_model');
                 $checkModel = (string) Settings::get('assistant.scope_model');
                 $maxOutput = (int) Settings::get('assistant.answer_max_output_tokens');
@@ -187,7 +219,14 @@ final class AnswerQuestion
                 }
 
                 $outcome = $refusal === null ? AssistantAnswer::ANSWERED : AssistantAnswer::NO_INFO;
-                $this->save($subject, $question, $outcome, $refusal === null ? $answer : null, $refusal === null ? $source : null, $answerModel, $replies, $run);
+                // Clean: past the barrier, every code check and the checker; only such an answer
+                // counts its visitor toward sharing it with everyone.
+                $flags = ['safe' => $refusal === null, 'injection' => false, 'personal' => false, 'refused' => $refusal];
+                $saved = $this->save($subject, $question, $outcome, $refusal === null ? $answer : null, $refusal === null ? $source : null, $answerModel, $replies, $run, $flags);
+
+                if ($refusal === null && $saved->outcome === AssistantAnswer::ANSWERED) {
+                    $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
+                }
 
                 $result = $refusal === null
                     ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'source' => (string) $source]
@@ -216,8 +255,14 @@ final class AnswerQuestion
         return DailyQuestions::allow($shopId, $visitorHash, app()->runningInConsole() && ! app()->runningUnitTests() ? null : request()->ip());
     }
 
-    /** @param list<array{0: ModelReply, 1: string}> $replies each reply with the prices it is charged at */
-    private function save(Subject $subject, string $question, string $outcome, ?string $answer, ?string $source, string $model, array $replies, RunContext $run): void
+    /**
+     * One saved answer per question on a page: a new visitor's answer replaces the one before, and
+     * the visitors already counted stay. A refusal never replaces an answer others got clean.
+     *
+     * @param  list<array{0: ModelReply, 1: string}>  $replies  each reply with the prices it is charged at
+     * @param  array<string, mixed>|null  $flags  what the checks said
+     */
+    private function save(Subject $subject, string $question, string $outcome, ?string $answer, ?string $source, string $model, array $replies, RunContext $run, ?array $flags = null): AssistantAnswer
     {
         $cost = 0.0;
         $input = 0;
@@ -228,10 +273,21 @@ final class AnswerQuestion
             $output += $reply->outputTokens;
         }
 
-        AssistantAnswer::query()->create([
+        $saved = AssistantAnswer::query()->where($subject->column(), $subject->id)->where('question_key', Question::key($question))->first();
+
+        if ($saved !== null && $saved->outcome === AssistantAnswer::ANSWERED && $outcome !== AssistantAnswer::ANSWERED) {
+            return $saved;
+        }
+
+        $saved ??= new AssistantAnswer([
             'shop_id' => $subject->shopId,
             $subject->column() => $subject->id,
             'question_key' => Question::key($question),
+            'asked_count' => 0,
+            'visitors' => 0,
+        ]);
+
+        $saved->forceFill([
             'question' => $question,
             'answer' => $answer,
             'outcome' => $outcome,
@@ -242,8 +298,11 @@ final class AnswerQuestion
             'output_tokens' => $output,
             'cost_usd' => round($cost, 6),
             'run_id' => $run->runId,
+            'flags' => $flags,
             'last_asked_at' => now(),
-        ]);
+        ])->save();
+
+        return $saved;
     }
 
     private function price(string $name): float

@@ -75,6 +75,22 @@ return [
         'label' => 'New questions per network address per day',
         'description' => 'Stops a bot that makes up a new identity for every question. An office or home with several people shares one address.',
     ],
+    'block_after_violations' => [
+        'label' => 'Rule breaks before a visitor is blocked',
+        'description' => 'Instructions to the assistant, page code, floods or harmful requests from one visitor in a day. A question with personal details, or one about hurting oneself, never counts.',
+    ],
+    'block_network_after_violations' => [
+        'label' => 'Rule breaks before a network address is blocked',
+        'description' => 'Much higher than for one visitor: many people share an address (an office, a phone carrier, a family). It stops a bot that makes up a new visitor every time.',
+    ],
+    'block_hours' => [
+        'label' => 'How long a block lasts',
+        'description' => 'In hours.',
+    ],
+    'share_after_visitors' => [
+        'label' => 'Visitors before a written answer is shared',
+        'description' => 'A model\'s answer reaches other shoppers (and the search suggestions) only after this many different visitors asked and each got a clean, safe answer; the team\'s approval shares it at once. The same visitor asking again never counts.',
+    ],
     'questions_per_shop_per_day' => [
         'label' => 'New questions per shop per day',
         'description' => 'Past this, shoppers are pointed to the store team until tomorrow.',

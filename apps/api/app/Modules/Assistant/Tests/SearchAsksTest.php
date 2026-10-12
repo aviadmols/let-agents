@@ -44,6 +44,9 @@ final class SearchAsksTest extends TestCase
     {
         parent::setUp();
 
+        // The topic check is its own model call, tested in GuardTest; these test what follows it.
+        Features::override('assistant.site_scope', false);
+
         $this->buildShop();
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => 'https://store.test', 'access_token' => self::TOKEN,
@@ -82,7 +85,7 @@ final class SearchAsksTest extends TestCase
                 ['ref' => 'p9', 'why' => 'לא הוצג.'],
                 ['ref' => 'p2', 'why' => 'שוב.'],
             ]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
 
         $data = $this->ask('מה כדאי לאיטום גג', ['701', '702', '703'])->assertOk()->json('data');
@@ -109,7 +112,7 @@ final class SearchAsksTest extends TestCase
     {
         $this->replies = [
             ['found' => true, 'answer' => '', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'רולר.']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => false],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => false],
         ];
 
         $data = $this->ask('יש לכם גנרטור 5 קילוואט?', ['703'])->json('data');
@@ -126,7 +129,7 @@ final class SearchAsksTest extends TestCase
         // A pick the shopper opens is recorded; a product the assistant never picked is not.
         $this->replies = [
             ['found' => true, 'answer' => 'יריעה ביטומנית.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'לגג שטוח.']]],
-            ['supported' => true, 'on_topic' => true, 'picks_fit' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
         $picked = $this->ask('במה אוטמים גג שטוח', ['701', '703'])->json('data');
         $this->events([
