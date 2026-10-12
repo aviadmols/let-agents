@@ -2402,24 +2402,31 @@
       } catch (e) { /* storage full or blocked: this visit only */ }
     }
 
-    /** A new turn in the drawer's history; returns a function that stores what the turn showed. */
+    /**
+     * A new turn in the drawer's history; returns a function that stores what the turn showed. The
+     * turn is found again by its own id, never by its place: once the history is full, keeping a
+     * new turn drops the oldest and every place moves up by one.
+     */
     function keepTurn(turn) {
       if (!drawerMode()) {
         return function () {};
       }
+      turn.id = turn.t + '-' + Math.random().toString(36).slice(2, 8);
       var turns = chatTurns();
       turns.push(turn);
       saveTurns(turns);
-      var at = turns.length - 1;
       return function (fields) {
         var now = chatTurns();
-        if (now[at] && now[at].t === turn.t) {
-          for (var key in fields) {
-            if (Object.prototype.hasOwnProperty.call(fields, key)) {
-              now[at][key] = fields[key];
+        for (var i = now.length - 1; i >= 0; i--) {
+          if (now[i] && now[i].id === turn.id) {
+            for (var key in fields) {
+              if (Object.prototype.hasOwnProperty.call(fields, key)) {
+                now[i][key] = fields[key];
+              }
             }
+            saveTurns(now);
+            return;
           }
-          saveTurns(now);
         }
       };
     }
@@ -2466,6 +2473,11 @@
     /** The earlier turns of this visit, drawn again from what they showed. */
     function replayTurns(scroll) {
       chatTurns().forEach(function (turn) {
+        // A turn that kept nothing it showed (left before the answer came, or kept before turns had
+        // ids): its question alone over an empty box says nothing.
+        if (!turn || (!turn.d && !turn.r)) {
+          return;
+        }
         var body = turnIn(scroll, turn.q || (turn.k === 'p' ? label('photo_results') : ''));
         if (turn.k === 's' && turn.r) {
           renderResults(body, turn.r, turn.q || '');
