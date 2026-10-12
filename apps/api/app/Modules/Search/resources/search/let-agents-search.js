@@ -3591,7 +3591,12 @@
           first.parentNode.parentNode.removeChild(first.parentNode);
         }
         currentSheet = null;
-        drawerScroll.scrollTop = drawerScroll.scrollHeight;
+        // The conversation opens on its latest turn, not its first: at that turn's top, again as
+        // the pictures of the turns above it load and push it down.
+        var turns = drawerScroll.querySelectorAll('.turn');
+        if (turns.length) {
+          showTurn(turns[turns.length - 1].querySelector('.turn-body'));
+        }
       }
       var field = panel.root.querySelector('.foot input');
       if (field) {
