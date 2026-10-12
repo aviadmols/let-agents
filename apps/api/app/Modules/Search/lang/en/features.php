@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'content_by_meaning' => [
+        'label' => 'Guides and pages by meaning',
+        'description' => 'A guide or a page shows in the results also when it is close in meaning, not only when it holds the words.',
+    ],
     'results_page' => [
         'label' => 'The store\'s search page shows our results',
         'description' => 'When the store\'s search page opens (/search?q= on Shopify, ?s= on WordPress), our regular results open over it: with the tags, the phrases ("cheapest") and typo tolerance. Code only, no model.',

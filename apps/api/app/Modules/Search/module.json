@@ -16,6 +16,10 @@
     "provider": "SearchServiceProvider",
     "features": [
         {
+            "name": "content_by_meaning",
+            "default": false
+        },
+        {
             "name": "results_page",
             "default": false
         },
@@ -107,6 +111,16 @@
             "default": "",
             "min": 0,
             "max": 60,
+            "scope": "shop"
+        },
+        {
+            "name": "dropdown_layout",
+            "type": "enum",
+            "options": [
+                "list",
+                "grid"
+            ],
+            "default": "list",
             "scope": "shop"
         },
         {

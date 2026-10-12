@@ -51,6 +51,8 @@ final class SearchIndexController
             'modeChoice' => Features::enabled('search.mode_choice', $shopId),
             // The store's own search page shows our regular results over it.
             'resultsPage' => Features::enabled('search.results_page', $shopId),
+            // The regular search's suggestions as a list beside the categories, or a grid of large cards.
+            'dropdown' => (string) Settings::get('search.dropdown_layout', $shopId),
             'suggestions' => (int) Settings::get('search.suggestions', $shopId),
             'perGroup' => (int) Settings::get('search.results_per_group', $shopId),
             // The camera shows only where the shop's pictures already have vectors.

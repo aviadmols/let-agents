@@ -340,6 +340,16 @@ return [
                 'label' => 'Shoppers choose: regular or smart search',
                 'help' => 'A "Regular search | Smart search" switch in the search window. Regular: suggestions under the site\'s search box. Smart: the side drawer. Each shopper\'s choice is kept on their device; until they choose, what is picked above is shown.',
             ],
+            'dropdown' => [
+                'label' => 'Regular search display',
+                'help' => 'List: products beside categories and guides. Grid: large product cards across the full width, with no side column.',
+                'list' => 'List',
+                'grid' => 'Large grid',
+            ],
+            'content_meaning' => [
+                'label' => 'Guides and pages by meaning too',
+                'help' => 'Off: a guide or a page shows only when it holds the words searched. On: also when it is close in meaning.',
+            ],
         ],
         'look' => [
             'title' => 'How the results look',

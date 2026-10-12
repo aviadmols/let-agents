@@ -112,6 +112,8 @@ class SearchDisplay extends Page
             'whatsapp_message' => (string) Settings::get('assistant.search_whatsapp_message', $shop),
             'results' => (string) Settings::get('search.results', $shop),
             'mode_choice' => Features::enabled('search.mode_choice', $shop),
+            'dropdown' => (string) Settings::get('search.dropdown_layout', $shop),
+            'content_by_meaning' => Features::enabled('search.content_by_meaning', $shop),
             'drawer_side' => (string) Settings::get('search.drawer_side', $shop),
             'drawer_columns' => (string) Settings::get('search.drawer_columns', $shop),
             'suggestions' => (int) Settings::get('search.suggestions', $shop),
@@ -183,11 +185,13 @@ class SearchDisplay extends Page
                 'assistant.search_whatsapp' => 'whatsapp',
                 'search.similar' => 'similar',
                 'search.mode_choice' => 'mode_choice',
+                'search.content_by_meaning' => 'content_by_meaning',
             ] as $feature => $field) {
                 Features::override($feature, (bool) ($d[$field] ?? false), $shop);
             }
 
             Settings::set('search.results', (string) ($d['results'] ?? 'panel'), $shop);
+            Settings::set('search.dropdown_layout', (string) ($d['dropdown'] ?? 'list'), $shop);
             Settings::set('search.drawer_side', (string) ($d['drawer_side'] ?? 'start'), $shop);
             Settings::set('search.drawer_columns', (string) ($d['drawer_columns'] ?? '2'), $shop);
             Settings::set('search.suggestions', (int) ($d['suggestions'] ?? 6), $shop);

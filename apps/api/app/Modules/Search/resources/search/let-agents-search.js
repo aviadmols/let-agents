@@ -1360,6 +1360,10 @@
       // Nothing holds every word: the narrower searches to choose from.
       '.la-focus{display:grid;gap:8px}',
       '.la-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 10px}',
+      '.d.big .d-prods{grid-template-columns:repeat(5,minmax(0,1fr));gap:22px 18px}',
+      '.d.big .d-prod{grid-template-columns:1fr;align-items:start;gap:10px}',
+      '.d.big .d-pic{width:100%;height:auto;aspect-ratio:1/1}',
+      '.d.big .d-row{display:grid;gap:6px}',
       '.la-bar{display:flex;align-items:center;gap:8px;padding:12px max(16px,calc(50vw - 520px));background:var(--rs-bg,#fff);box-shadow:0 2px 14px rgba(0,0,0,.12)}',
       '.la-bar .m-box input{font-size:17px}',
       '.la-bar-x{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:999px;color:var(--rs-fg)}',
@@ -1614,7 +1618,7 @@
       while (rootNode.childNodes.length > 1) {
         rootNode.removeChild(rootNode.lastChild);
       }
-      var box = el('div', 'd' + (side ? '' : ' one'));
+      var box = el('div', 'd' + (side ? '' : ' one') + (d.big ? ' big' : ''));
       box.setAttribute('role', 'listbox');
       if (choosesMode()) {
         var bar = el('div', 'la-modebar');
@@ -1705,7 +1709,10 @@
       }
       var question = isQuestion(raw);
       var hits = lookup(raw, question);
-      var max = state.config.suggestions || 6;
+      // The shop's look for these suggestions: a list beside categories and guides, or on a wide
+      // screen a grid of large cards across the whole width, two rows of them.
+      var gridLook = state.config.dropdown === 'grid' && !narrow();
+      var max = gridLook ? Math.max(state.config.suggestions || 6, 10) : (state.config.suggestions || 6);
       var products = [];
       // Every product found, for the quick filters; the first few of what they leave are shown.
       var pool = [];
@@ -1785,6 +1792,7 @@
 
       var d = freshDropdown();
       d.raw = raw;
+      d.big = gridLook;
       d.products = one ? [one] : products;
       if (d.field && d.field !== d.root.activeElement && d.field.value !== raw) {
         d.field.value = raw;
@@ -1869,7 +1877,7 @@
           }
           main.appendChild(list);
         }
-      } else if (categories.length || articles.length) {
+      } else if (!gridLook && (categories.length || articles.length)) {
         side = sideColumn(categories, articles, raw);
       }
 
@@ -2460,7 +2468,8 @@
       all.addEventListener('click', function () { submit(input); });
       shown.push({ node: all, all: true });
       foot.appendChild(all);
-      if (state.config.ask) {
+      // The way to ask, unless the shopper chose regular search with the smart one a click away.
+      if (state.config.ask && !(choosesMode() && chosenMode() !== 'smart')) {
         foot.appendChild(askRow(input, raw, question));
       }
       return foot;

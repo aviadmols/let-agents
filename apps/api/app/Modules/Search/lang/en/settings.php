@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'dropdown_layout' => [
+        'label' => 'Regular search display',
+        'description' => 'A list beside categories and guides, or a grid of large product cards across the full width.',
+    ],
     'size_attribute' => [
         'label' => 'What "size" is measured by',
         'description' => 'The key of the store vocabulary attribute (e.g. diamonds_total_carat or diameter) that "biggest", "smallest" and "size X" use. Empty: those phrases do not change results.',

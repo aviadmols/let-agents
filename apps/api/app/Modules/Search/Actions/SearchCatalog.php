@@ -851,7 +851,8 @@ final class SearchCatalog
         $floor = (float) Settings::get('search.semantic_min_similarity');
         // A guide or a page by meaning only when it is plainly about the words: a page about carts
         // is a little like anything a hardware store sells.
-        $contentFloor = max($floor, (float) Settings::get('search.content_min_similarity'));
+        // Only where the shop wants guides by meaning at all; otherwise a guide must hold the words.
+        $contentFloor = Features::enabled('search.content_by_meaning', $shopId) ? max($floor, (float) Settings::get('search.content_min_similarity')) : INF;
         $ids = [];
 
         foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {

@@ -198,6 +198,29 @@
                         <span></span>
                     </label>
                 </div>
+
+                <div class="lad-row" style="border-top:1px solid var(--lad-line)">
+                    <div class="lad-rt">
+                        <b>{{ $t('where.dropdown.label') }}</b>
+                        <small>{{ $t('where.dropdown.help') }}</small>
+                    </div>
+                    <div class="lad-seg" role="radiogroup" aria-label="{{ $t('where.dropdown.label') }}">
+                        @foreach (['list', 'grid'] as $look)
+                            <button type="button" role="radio" aria-checked="{{ ($d['dropdown'] ?? 'list') === $look ? 'true' : 'false' }}" wire:click="$set('data.dropdown', '{{ $look }}')">{{ $t('where.dropdown.'.$look) }}</button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="lad-row" style="border-top:1px solid var(--lad-line)">
+                    <div class="lad-rt">
+                        <b id="lad-content-meaning">{{ $t('where.content_meaning.label') }}</b>
+                        <small>{{ $t('where.content_meaning.help') }}</small>
+                    </div>
+                    <label class="lad-sw">
+                        <input type="checkbox" role="switch" aria-labelledby="lad-content-meaning" wire:model.live="data.content_by_meaning">
+                        <span></span>
+                    </label>
+                </div>
             </section>
 
             {{-- How the results look --}}

@@ -227,6 +227,11 @@ final class SearchFlowTest extends TestCase
             ['source' => 'product', 'source_id' => 'w', 'external_id' => '999', 'title' => 'not in the index', 'similarity' => 0.9],
         ];
 
+        // A guide by meaning alone shows only where the shop wants it.
+        $this->assertSame([], $this->search('משהו לחבר קרשים')->json('groups.content'), 'off by default: a guide must hold the words');
+        $this->meaningAsked = [];
+        Features::override('search.content_by_meaning', true, $this->shop->id);
+
         $result = $this->search('משהו לחבר קרשים')->json();
 
         $this->assertTrue($result['semantic']);
