@@ -52,46 +52,40 @@
         </x-filament::section>
 
         @if ($p->proposed)
-            @php($coverage = $p->coverage ?? [])
-            <x-filament::section :heading="$t('types')">
-                <table style="{{ $table }}">
-                    <thead><tr style="opacity:.7"><th style="{{ $cell }}">{{ $t('key') }}</th><th style="{{ $cell }}">{{ $t('label') }}</th><th style="{{ $cell }}">{{ $t('patterns') }}</th><th style="{{ $cell }}">{{ $t('coverage') }}</th></tr></thead>
-                    <tbody>
-                    @foreach ($p->proposed['product_types'] ?? [] as $type)
-                        <tr>
-                            <td style="{{ $cell }}" dir="ltr">{{ $type['key'] }}</td>
-                            <td style="{{ $cell }}">{{ $type['label']['he'] ?? '' }}</td>
-                            <td style="{{ $cell }};font-size:12px" dir="ltr"><code>{{ implode('  |  ', (array) ($type['patterns'] ?? [])) }}</code></td>
-                            <td style="{{ $cell }}">{{ $pct($coverage['product_types'][$type['key']] ?? 0) }}</td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </x-filament::section>
-
-            <x-filament::section :heading="$t('attributes')">
-                <table style="{{ $table }}">
-                    <thead><tr style="opacity:.7"><th style="{{ $cell }}">{{ $t('key') }}</th><th style="{{ $cell }}">{{ $t('label') }}</th><th style="{{ $cell }}">{{ $t('kind') }}</th><th style="{{ $cell }}">{{ $t('values') }}</th><th style="{{ $cell }}">{{ $t('coverage') }}</th><th style="{{ $cell }}">{{ $t('source') }}</th></tr></thead>
-                    <tbody>
-                    @foreach ($p->proposed['attributes'] ?? [] as $attribute)
-                        @php($c = $coverage['attributes'][$attribute['key']] ?? [])
-                        <tr>
-                            <td style="{{ $cell }}" dir="ltr">{{ $attribute['key'] }}</td>
-                            <td style="{{ $cell }}">{{ $attribute['label']['he'] ?? '' }}</td>
-                            <td style="{{ $cell }}" dir="ltr">{{ $attribute['type'] ?? 'number' }}@if (($attribute['type'] ?? 'number') === 'number') · {{ $attribute['dimension'] ?? '' }} {{ $attribute['min'] ?? '' }}–{{ $attribute['max'] ?? '' }}@endif</td>
-                            <td style="{{ $cell }};font-size:12px">
-                                @foreach ((array) ($attribute['values'] ?? []) as $value)
-                                    <div>{{ $value['label']['he'] ?? $value['key'] }} <span style="{{ $muted }}">{{ $pct($c['values'][$value['key']] ?? 0) }}</span></div>
-                                @endforeach
-                                @if (isset($attribute['title_capture']['pattern']))<code dir="ltr">{{ $attribute['title_capture']['pattern'] }}</code>@endif
-                                @if (($attribute['type'] ?? '') === 'boolean')<code dir="ltr">{{ implode(' | ', (array) ($attribute['patterns'] ?? [])) }}</code>@endif
-                            </td>
-                            <td style="{{ $cell }}">{{ $pct($c['share'] ?? 0) }}@if (($c['read_by'] ?? null) === 'model')<div style="{{ $muted }}">{{ $t('read_by_model') }}</div>@endif</td>
-                            <td style="{{ $cell }}" dir="ltr">{{ $p->review['writer']['sources'][$attribute['key']] ?? '' }}</td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
+            @php($active = $this->activeProducts())
+            @php($decisionColors = ['approved' => 'success', 'proposed' => 'warning', 'rejected' => 'danger', 'removed_by_code' => 'gray', 'removed_by_reviewer' => 'gray'])
+            <x-filament::section :heading="$t('final')" :description="$t('final_hint', ['sampled' => $p->sampled, 'active' => $active])">
+                <div style="overflow-x:auto">
+                    <table style="{{ $table }}">
+                        <thead><tr style="opacity:.7">
+                            <th style="{{ $cell }}">{{ $t('field') }}</th>
+                            <th style="{{ $cell }}">{{ $t('kind') }}</th>
+                            <th style="{{ $cell }}">{{ $t('values') }}</th>
+                            <th style="{{ $cell }}">{{ $t('coverage') }}</th>
+                            <th style="{{ $cell }}">{{ $t('catalog_coverage') }}</th>
+                            <th style="{{ $cell }}">{{ $t('source') }}</th>
+                            <th style="{{ $cell }}">{{ $t('decision') }}</th>
+                        </tr></thead>
+                        <tbody>
+                        @foreach ($this->rows($p) as $row)
+                            <tr style="{{ str_starts_with($row['decision'], 'removed') ? 'opacity:.6' : '' }}">
+                                <td style="{{ $cell }}">{{ $row['label'] }} <code dir="ltr" style="{{ $muted }}">{{ $row['key'] }}</code></td>
+                                <td style="{{ $cell }}" dir="ltr">{{ $row['part'] === 'type' ? $t('product_type') : $row['kind'] }}</td>
+                                <td style="{{ $cell }};font-size:12px">
+                                    @foreach ($row['values'] as $value)<span style="white-space:nowrap">{{ $value['label'] }} <span style="{{ $muted }}">{{ $pct($value['share']) }}</span></span>@if (! $loop->last) · @endif @endforeach
+                                </td>
+                                <td style="{{ $cell }}">{{ $row['sample'] === null ? '' : $pct($row['sample']) }}</td>
+                                <td style="{{ $cell }}">{{ $row['catalog'] === null ? ($p->status === 'approved' && ! str_starts_with($row['decision'], 'removed') ? '0%' : '') : $pct($row['catalog']) }}</td>
+                                <td style="{{ $cell }}" dir="ltr">{{ $row['source'] }}</td>
+                                <td style="{{ $cell }}">
+                                    <x-filament::badge :color="$decisionColors[$row['decision']] ?? 'gray'">{{ $t('decisions.'.$row['decision']) }}</x-filament::badge>
+                                    @if ($row['why'] !== '')<div style="{{ $muted }}" dir="ltr">{{ $row['why'] }}</div>@endif
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </x-filament::section>
         @endif
 
@@ -99,20 +93,23 @@
             <x-filament::section :heading="$t('review')" :description="$t('review_hint', ['writer' => $p->review['writer']['model'] ?? '', 'reviewer' => $p->review['reviewer'] ?? ''])" collapsible>
                 <p><x-filament::badge :color="($p->review['verdict'] ?? '') === 'good' ? 'success' : 'warning'">{{ $t('verdicts.'.($p->review['verdict'] ?? 'needs_work')) }}</x-filament::badge></p>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:10px">
-                    <div style="{{ $card }}"><strong>{{ $t('dropped') }}</strong>
-                        @forelse ($p->review['dropped'] ?? [] as $drop)<div style="font-size:13px"><code dir="ltr">{{ $drop['key'] }}</code> — <span dir="ltr">{{ $drop['why'] }}</span></div>@empty<div style="{{ $muted }}">{{ $t('nothing') }}</div>@endforelse
+                    <div style="{{ $card }}"><strong>{{ $t('writer_proposed') }}</strong>
+                        @forelse ($p->review['writer']['notes'] ?? [] as $note)<div style="font-size:13px" dir="ltr">{{ $note }}</div>@empty<div style="{{ $muted }}">{{ $t('nothing') }}</div>@endforelse
+                    </div>
+                    <div style="{{ $card }}"><strong>{{ $t('removed_why') }}</strong>
+                        @forelse ($p->review['dropped'] ?? [] as $drop)
+                            <div style="font-size:13px"><x-filament::badge size="sm" color="gray">{{ $t('by.'.($drop['by'] ?? 'reviewer')) }}</x-filament::badge> <code dir="ltr">{{ $drop['key'] }}</code> — <span dir="ltr">{{ $drop['why'] }}</span></div>
+                        @empty<div style="{{ $muted }}">{{ $t('nothing') }}</div>@endforelse
+                        @foreach ($p->review['notes'] ?? [] as $note)<div style="font-size:13px;margin-top:4px" dir="ltr">{{ $note }}</div>@endforeach
                     </div>
                     <div style="{{ $card }}"><strong>{{ $t('missing') }}</strong>
                         @forelse ($p->review['missing'] ?? [] as $miss)<div style="font-size:13px"><code dir="ltr">{{ $miss['key'] ?? '' }}</code> — <span dir="ltr">{{ $miss['why'] ?? '' }}</span></div>@empty<div style="{{ $muted }}">{{ $t('nothing') }}</div>@endforelse
-                    </div>
-                    <div style="{{ $card }}"><strong>{{ $t('notes') }}</strong>
-                        @foreach ([...($p->review['writer']['notes'] ?? []), ...($p->review['notes'] ?? [])] as $note)<div style="font-size:13px" dir="ltr">{{ $note }}</div>@endforeach
                     </div>
                 </div>
             </x-filament::section>
         @endif
 
-        <x-filament::section :heading="$t('counted')" :description="$t('counted_hint')" collapsible collapsed>
+        <x-filament::section :heading="$t('counted')" :description="$t('counted_hint', ['sampled' => $p->sampled, 'active' => $this->activeProducts()])" collapsible collapsed>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
                 @foreach (['product_type', 'tags', 'categories'] as $field)
                     <div style="{{ $card }}"><strong>{{ $t('fields.'.$field) }}</strong> <span style="{{ $muted }}">{{ $pct($s['fields'][$field]['share'] ?? 0) }}</span>

@@ -125,7 +125,7 @@ class EnrichmentFact extends Model
         $vocabulary = $this->vocabulary?->definition();
 
         return match ($this->kind) {
-            FactKind::Spec => Measurement::compact((float) $this->value_number).' '.$this->unit,
+            FactKind::Spec => self::readable((float) $this->value_number, (string) $this->unit),
             FactKind::Type => $vocabulary?->label('type', (string) $this->value_text, $locale) ?? (string) $this->value_text,
             FactKind::Tag => $vocabulary?->label('tag', (string) $this->value_text, $locale) ?? (string) $this->value_text,
             FactKind::Choice => $vocabulary?->label('attribute', $this->key, $locale, (string) $this->value_text) ?? (string) $this->value_text,
@@ -137,5 +137,19 @@ class EnrichmentFact extends Model
             // own ("hand made") shows the sentence it was read from. Never throw on a new kind.
             default => (string) ($this->value_text ?? $this->quote ?? ''),
         };
+    }
+
+    /**
+     * A number in the unit a shopper reads it in: a ring of 0.00345 kg is 3.45 g. Stored in the
+     * dimension's own unit, so values still compare.
+     */
+    public static function readable(float $value, string $unit): string
+    {
+        [$value, $unit] = match (true) {
+            $unit === 'kg' && $value > 0 && $value < 1 => [$value * 1000, 'g'],
+            default => [$value, $unit],
+        };
+
+        return Measurement::compact(round($value, 3)).' '.$unit;
     }
 }

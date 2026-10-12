@@ -93,6 +93,9 @@ final class ProposeSchema
                 return;
             }
 
+            // Code first: what no pattern reads on the sample (a number with no capture, a choice
+            // that matches nothing) is a fact nothing supports, and would be answered with confidence.
+            [$vocabulary, $byCode] = self::drop($vocabulary, self::unread(self::coverage($vocabulary, $texts)));
             $coverage = self::coverage($vocabulary, $texts);
             $review = $this->call($run, $reviewer, 'reviewer', 'schema_review', [
                 'stats' => array_diff_key($stats, ['sample' => true, 'examples' => true]),
@@ -110,6 +113,10 @@ final class ProposeSchema
         }
 
         [$vocabulary, $dropped] = self::drop($vocabulary, (array) ($review['drop'] ?? []));
+        $dropped = [
+            ...array_map(fn (array $d): array => $d + ['by' => 'code'], $byCode),
+            ...array_map(fn (array $d): array => $d + ['by' => 'reviewer'], $dropped),
+        ];
         [$parsed, $left] = VocabularyDefinition::parse($vocabulary);
 
         if ($parsed === null) {
@@ -223,6 +230,37 @@ final class ProposeSchema
             } else {
                 $capture = $attribute['title_capture']['pattern'] ?? null;
                 $out['attributes'][$key] = ['share' => is_string($capture) ? SchemaStats::share($fulls, [$capture]) : 0.0, 'read_by' => is_string($capture) ? 'code' : 'model'];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * What the sample shows no pattern reads: each attribute, choice value and product type at 0.
+     *
+     * @param  array{product_types: array<string, float>, attributes: array<string, array<string, mixed>>}  $coverage
+     * @return list<array{kind: string, key: string, why: string}>
+     */
+    public static function unread(array $coverage): array
+    {
+        $why = (string) __('enrichment::ui.schema.unread');
+        $out = [];
+        foreach ($coverage['attributes'] as $key => $attribute) {
+            if ((float) $attribute['share'] === 0.0) {
+                $out[] = ['kind' => 'attribute', 'key' => (string) $key, 'why' => $why];
+
+                continue;
+            }
+            foreach ((array) ($attribute['values'] ?? []) as $value => $share) {
+                if ((float) $share === 0.0) {
+                    $out[] = ['kind' => 'value', 'key' => $key.'.'.$value, 'why' => $why];
+                }
+            }
+        }
+        foreach ($coverage['product_types'] as $key => $share) {
+            if ((float) $share === 0.0) {
+                $out[] = ['kind' => 'product_type', 'key' => (string) $key, 'why' => $why];
             }
         }
 

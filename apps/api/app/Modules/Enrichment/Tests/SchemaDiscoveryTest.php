@@ -115,7 +115,10 @@ final class SchemaDiscoveryTest extends TestCase
         $this->assertSame(EnrichmentSchemaProposal::PROPOSED, $proposal->status);
         $this->assertSame(['metal', 'total_weight'], array_column($proposal->proposed['attributes'], 'key'), 'the attribute with an unknown dimension is left out');
         $this->assertStringContainsString('attribute shine', implode(' ', $proposal->problems));
-        $this->assertSame(['yellow_gold', 'white_gold'], array_column($proposal->proposed['attributes'][0]['values'], 'key'), 'the value the review dropped is gone');
+        $this->assertSame(['yellow_gold', 'white_gold'], array_column($proposal->proposed['attributes'][0]['values'], 'key'), 'the value nothing in the sample says is gone');
+        $this->assertSame([['kind' => 'value', 'key' => 'metal.rose_gold', 'by' => 'code']], array_map(fn (array $d): array => array_diff_key($d, ['why' => 1]), $proposal->review['dropped']),
+            'removed by code before the review: no pattern reads it, so the reviewer never had to');
+        $this->assertStringNotContainsString('rose_gold', $this->calls[1]['user'], 'the reviewer sees what is left');
         $this->assertSame(0.6, $proposal->coverage['attributes']['metal']['values']['yellow_gold'], '3 of 5 products');
         $this->assertEquals(1.0, $proposal->coverage['attributes']['total_weight']['share'], 'the weight is read in code from every description');
         $this->assertSame(0.6, $proposal->coverage['product_types']['ring']);

@@ -4,7 +4,11 @@ namespace App\Modules\Enrichment\Filament\Operator\Pages;
 
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\DecideSchemaProposal;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -67,6 +71,90 @@ final class SchemaDiscovery extends Page
         return $this->proposal !== null
             ? EnrichmentSchemaProposal::query()->find($this->proposal)
             : EnrichmentSchemaProposal::query()->latest()->first();
+    }
+
+    /** How many products the shop has, beside the sample's size. */
+    public function activeProducts(): int
+    {
+        return CatalogProduct::query()->active()->count();
+    }
+
+    /**
+     * One row per product type and attribute, as the operator decides on it: what it is, its share
+     * in the sample, its share in the whole catalog once read (approved facts), where it was read
+     * from, and the decision, with the ones code or the reviewer removed and why.
+     *
+     * @return list<array{part: string, key: string, label: string, kind: string, values: list<array{label: string, share: float}>, sample: float|null, catalog: float|null, source: string, decision: string, why: string}>
+     */
+    public function rows(EnrichmentSchemaProposal $proposal): array
+    {
+        $coverage = $proposal->coverage ?? [];
+        $read = $this->read($proposal);
+        $decision = $proposal->status;
+        $rows = [];
+
+        foreach ((array) ($proposal->proposed['product_types'] ?? []) as $type) {
+            $key = (string) $type['key'];
+            $rows[] = ['part' => 'type', 'key' => $key, 'label' => (string) ($type['label']['he'] ?? $key), 'kind' => '', 'values' => [],
+                'sample' => (float) ($coverage['product_types'][$key] ?? 0), 'catalog' => $read['types'][$key]['share'] ?? null,
+                'source' => self::sources($read['types'][$key]['sources'] ?? []), 'decision' => $decision, 'why' => ''];
+        }
+        foreach ((array) ($proposal->proposed['attributes'] ?? []) as $attribute) {
+            $key = (string) $attribute['key'];
+            $kind = (string) ($attribute['type'] ?? 'number');
+            $values = array_map(fn (array $v): array => ['label' => (string) ($v['label']['he'] ?? $v['key']), 'share' => (float) ($coverage['attributes'][$key]['values'][$v['key']] ?? 0)], (array) ($attribute['values'] ?? []));
+            $rows[] = ['part' => 'attribute', 'key' => $key, 'label' => (string) ($attribute['label']['he'] ?? $key),
+                'kind' => $kind === 'number' ? 'number · '.($attribute['dimension'] ?? '') : $kind, 'values' => $values,
+                'sample' => (float) ($coverage['attributes'][$key]['share'] ?? 0), 'catalog' => $read['attributes'][$key]['share'] ?? null,
+                'source' => self::sources($read['attributes'][$key]['sources'] ?? []) ?: (string) ($proposal->review['writer']['sources'][$key] ?? ''),
+                'decision' => $decision, 'why' => ''];
+        }
+        foreach ((array) ($proposal->review['dropped'] ?? []) as $drop) {
+            $rows[] = ['part' => $drop['kind'] === 'product_type' ? 'type' : 'attribute', 'key' => (string) $drop['key'], 'label' => '', 'kind' => (string) $drop['kind'],
+                'values' => [], 'sample' => null, 'catalog' => null, 'source' => '', 'decision' => 'removed_by_'.($drop['by'] ?? 'reviewer'), 'why' => (string) $drop['why']];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * What code read with an approved proposal, from its approved facts: the share of the active
+     * products each type and attribute holds, and the sources it was read from.
+     *
+     * @return array{types: array<string, array{share: float, sources: array<string, int>}>, attributes: array<string, array{share: float, sources: array<string, int>}>}
+     */
+    private function read(EnrichmentSchemaProposal $proposal): array
+    {
+        $out = ['types' => [], 'attributes' => []];
+        $active = $this->activeProducts();
+        if ($proposal->vocabulary_id === null || $active === 0) {
+            return $out;
+        }
+
+        $products = [];
+        EnrichmentFact::query()->where('vocabulary_id', $proposal->vocabulary_id)->where('status', FactStatus::Approved)->whereNotNull('product_id')
+            ->select(['id', 'product_id', 'kind', 'key', 'value_text', 'evidence'])
+            ->lazyById(2000)->each(function (EnrichmentFact $fact) use (&$out, &$products): void {
+                [$part, $key] = $fact->kind === FactKind::Type ? ['types', (string) $fact->value_text] : ['attributes', $fact->key];
+                $products[$part][$key][$fact->product_id] = true;
+                $source = (string) ($fact->evidence['source'] ?? 'title');
+                $out[$part][$key]['sources'][$source] = ($out[$part][$key]['sources'][$source] ?? 0) + 1;
+            });
+        foreach ($products as $part => $keys) {
+            foreach ($keys as $key => $ids) {
+                $out[$part][$key]['share'] = round(count($ids) / $active, 3);
+            }
+        }
+
+        return $out;
+    }
+
+    /** @param  array<string, int>  $sources */
+    private static function sources(array $sources): string
+    {
+        arsort($sources);
+
+        return implode(' / ', array_keys($sources));
     }
 
     public function open(string $id): void
