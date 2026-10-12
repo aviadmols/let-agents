@@ -226,6 +226,25 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame([], $this->calls, 'no model for arithmetic');
     }
 
+    public function test_a_price_range_is_arithmetic_too_and_only_what_the_question_names_is_picked(): void
+    {
+        $this->product('801', 'עגילים צמודים כדורי זהב חלולים', 'עגילים.', [], ['price' => '450.00', 'in_stock' => true]);
+        $this->product('802', 'עגילי חישוק זהב 14K', 'עגילים.', [], ['price' => '480.00', 'in_stock' => true]);
+        $this->product('803', 'תליון מפתח עדין', 'תליון.', [], ['price' => '350.00', 'in_stock' => true]);
+        $this->product('804', 'עגילי יהלום', 'עגילים.', [], ['price' => '900.00', 'in_stock' => true]);
+
+        $data = $this->askWith('עגילים עד 500 ש"ח?', ['803', '802', '801', '804'])->json('data');
+
+        $this->assertSame(['answered', 'code'], [$data['outcome'], $data['from']]);
+        $this->assertSame(['801', '802'], array_column($data['picks'], 'external_id'), 'earrings up to 500, cheapest first: not the pendant, not the 900');
+        $this->assertStringContainsString('כדורי זהב', $data['answer']);
+        $this->assertSame([], $this->calls, 'no model for arithmetic');
+
+        // Nothing it names in the range: a model reads it, as before.
+        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => []]];
+        $this->assertSame('model', $this->askWith('צמיד עד 500', ['803', '801'])->json('data.from'));
+    }
+
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
     {
         $this->drills();

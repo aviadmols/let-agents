@@ -5,11 +5,13 @@ namespace App\Modules\Search;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
+use App\Modules\Search\Support\HebrewPriceRange;
 use App\Modules\Search\Support\StoredPageTags;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -22,6 +24,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         $this->app->bind(PageTags::class, StoredPageTags::class);
+        $this->app->bind(PriceRange::class, HebrewPriceRange::class);
         Event::listen(CatalogUpdated::class, RebuildSearchIndex::class);
 
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))

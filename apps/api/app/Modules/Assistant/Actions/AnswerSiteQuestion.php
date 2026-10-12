@@ -12,6 +12,7 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
@@ -70,7 +71,7 @@ final class AnswerSiteQuestion
     private const MAX_COMPUTED = 3;
 
     /** Words a question wraps around the product it names. */
-    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'which', 'what', 'the', 'most', 'your'];
+    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than'];
 
     private const MIN_CHARS = 3;
 
@@ -711,10 +712,11 @@ final class AnswerSiteQuestion
     }
 
     /**
-     * A superlative answered in code: the products found that are what the question names (a
-     * drill, not "a bit for a drill"), in stock, ordered by price or on sale. Null when the
-     * question asks for no superlative or none of the products is what it names: then a model
-     * reads it.
+     * A superlative or a price range answered in code: the products found that are what the
+     * question names (a drill, not "a bit for a drill"), in stock, inside the price the shopper
+     * wrote, ordered by price or on sale. "עגילים עד 500" is the cheapest earrings in stock up to
+     * 500, from the products the search already kept to that price. Null when the question asks
+     * for neither or none of the products is what it names: then a model reads it.
      *
      * @param  list<string>  $shown
      * @return array<string, mixed>|null
@@ -727,6 +729,8 @@ final class AnswerSiteQuestion
         }
 
         $asks = self::analysis($question, $productsByRef)['asks'];
+        ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        $asks ??= $min !== null || $max !== null ? 'in_range' : null;
 
         if ($asks === null || $productsByRef === []) {
             return null;
@@ -734,6 +738,7 @@ final class AnswerSiteQuestion
 
         $named = self::named($question);
         $fit = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0
+            && ($min === null || $p['price'] >= $min) && ($max === null || $p['price'] <= $max)
             && ($named === [] || self::titleNames($p['title'], $named)) && ($asks !== 'on_sale' || $p['on_sale']));
 
         if ($fit === []) {
@@ -768,7 +773,9 @@ final class AnswerSiteQuestion
         $out = [];
 
         foreach ($words as $word) {
-            if (mb_strlen($word) >= 3 && ! in_array($word, self::NOT_NAMES, true) && preg_match('/^(זול|יקר|במבצע|מבצע|הנחה|cheap|expensive)/u', $word) !== 1) {
+            // Not an amount or its currency either: "עד 500 ש״ח" names no product.
+            if (mb_strlen($word) >= 3 && ! in_array($word, self::NOT_NAMES, true) && preg_match('/\d/u', $word) !== 1
+                && preg_match('/^(זול|יקר|במבצע|מבצע|הנחה|שקל|cheap|expensive)/u', $word) !== 1) {
                 $out[] = self::stem($word);
             }
         }

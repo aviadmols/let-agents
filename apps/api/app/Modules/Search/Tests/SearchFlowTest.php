@@ -242,6 +242,24 @@ final class SearchFlowTest extends TestCase
         $this->assertSame([], $this->meaningAsked);
     }
 
+    public function test_with_a_price_only_what_holds_the_words_is_shown(): void
+    {
+        // "עגילים עד 500": a pendant is close to earrings by meaning, and the price leaves few earrings.
+        $this->inShop(function (): void {
+            $this->product('201', 'עגילים צמודים כדורי זהב', ['price' => '450.00']);
+            $this->product('202', 'עגילי יהלום', ['price' => '900.00']);
+            $this->product('203', 'תליון מפתח עדין', ['price' => '350.00']);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->meaning = [
+            ['source' => 'product', 'source_id' => 'a', 'external_id' => '203', 'title' => 'תליון מפתח עדין', 'similarity' => 0.6],
+            ['source' => 'product', 'source_id' => 'b', 'external_id' => '201', 'title' => 'עגילים צמודים כדורי זהב', 'similarity' => 0.6],
+        ];
+
+        $this->assertSame(['201'], array_column($this->search('עגילים עד 500 ש"ח?')->json('groups.product'), 'external_id'));
+        $this->assertContains('203', array_column($this->search('עגילים')->json('groups.product'), 'external_id'), 'without a price, meaning still adds');
+    }
+
     public function test_while_typing_the_search_is_spelling_only_and_not_counted(): void
     {
         app(BuildSearchIndex::class)->handle($this->shop->id);

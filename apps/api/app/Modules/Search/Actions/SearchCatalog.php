@@ -115,6 +115,14 @@ final class SearchCatalog
                 $meaning = array_values(array_filter($meaning, $keep));
                 $pictures = array_values(array_filter($pictures, $keep));
             }
+            // "עגילים עד 500": with a price, only the products that hold the words. By meaning a
+            // pendant is close to earrings, and when the price leaves few earrings it would show.
+            $held = array_flip(array_filter(array_column($spelling, 'id'), fn (string $id): bool => str_starts_with($id, 'p:')));
+            if (($minPrice !== null || $maxPrice !== null) && $held !== []) {
+                $keep = fn (string $id): bool => isset($held[$id]) || ! str_starts_with($id, 'p:');
+                $meaning = array_values(array_filter($meaning, $keep));
+                $pictures = array_values(array_filter($pictures, $keep));
+            }
             $pinned = $this->resolved($query, $index['records']);
             // A question about a kind of product ("איזה עץ…") shows that kind first: products of the
             // categories named after it, before products that only mention the word (a bracket
