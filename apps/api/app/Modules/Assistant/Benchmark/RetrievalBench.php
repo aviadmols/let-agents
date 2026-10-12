@@ -189,7 +189,9 @@ final class RetrievalBench
     {
         $done = array_values(array_filter($records, fn (array $r): bool => isset($r['labels'])));
         $answerable = array_values(array_filter($done, fn (array $r): bool => $r['labels']['answerable_in_store']));
-        $out = ['questions' => count($done), 'answerable_in_store' => count($answerable)];
+        // Recall is measured only on the questions the store can answer: one with no source in the store
+        // cannot be retrieved by any net, and would only pull every recall down.
+        $out = ['questions' => count($done), 'answerable_in_store' => count($answerable), 'not_answerable_in_store' => count($done) - count($answerable), 'recall_over' => 'answerable_in_store'];
 
         // Products: what the search showed, and the wider nets at several k.
         $products = fn (array $r): array => array_values(array_filter($r['labels']['relevant'], fn (string $k): bool => str_starts_with($k, 'product:')));

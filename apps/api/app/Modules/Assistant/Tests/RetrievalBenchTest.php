@@ -23,7 +23,7 @@ final class RetrievalBenchTest extends TestCase
             $this->record('c', relevant: [], answerable: false),
         ]);
 
-        $this->assertSame([3, 2], [$report['questions'], $report['answerable_in_store']]);
+        $this->assertSame([3, 2, 1], [$report['questions'], $report['answerable_in_store'], $report['not_answerable_in_store']], 'the unanswerable question is counted apart, and in no recall');
         $this->assertSame(1, $report['products']['questions_with_a_relevant_product']);
         $this->assertSame(50.0, $report['products']['production_recall@shown']);
         $this->assertSame(100.0, $report['products']['production_hit@shown']);

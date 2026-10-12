@@ -101,7 +101,7 @@ final class RetrievalBenchCommand extends Command
         $report = RetrievalBench::report(self::read($file), $judged);
         file_put_contents(preg_replace('~(\.labelled)?\.jsonl$~', '', $file).'.report.json', json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        $this->line("{$report['questions']} questions, {$report['answerable_in_store']} answerable from the store");
+        $this->line("{$report['questions']} questions: {$report['answerable_in_store']} answerable from what the store holds, {$report['not_answerable_in_store']} with no answer in the store. Recall below is over the answerable ones only.");
         foreach (['products', 'pages'] as $part) {
             $this->table([$part, '%'], array_map(fn (string $k, mixed $v): array => [$k, (string) $v], array_keys($report[$part]), array_values($report[$part])));
         }
