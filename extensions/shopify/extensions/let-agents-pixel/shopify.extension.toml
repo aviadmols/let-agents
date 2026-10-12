@@ -5,6 +5,7 @@
 type = "web_pixel_extension"
 name = "Let's search purchases"
 runtime_context = "strict"
+uid = "d9171ca6-f2c3-4af0-5fc3-0bea41b7c00b54063923"
 
 # Runs only where the shopper allowed analytics, as Shopify's consent requires.
 [customer_privacy]
