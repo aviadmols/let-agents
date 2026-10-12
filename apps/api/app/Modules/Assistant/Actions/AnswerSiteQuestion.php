@@ -595,31 +595,8 @@ final class AnswerSiteQuestion
                     $wrote = ['model' => $writer['model'], 'ms' => (int) round((hrtime(true) - $started) / 1e6), 'in' => $reply->inputTokens, 'out' => $reply->outputTokens,
                         'cost_usd' => round($reply->costUsd($this->price('answer_input'), $this->price('answer_output')), 6)];
 
-                    $answer = mb_substr(trim((string) ($reply->data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
-                    $cited = array_values(array_unique(array_filter(array_map('strval', (array) ($reply->data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
-                    $picks = $this->picks((array) ($reply->data['picks'] ?? []), $productsByRef);
-                    $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
-                        ."\n".implode("\n", array_map(fn (array $p): string => $p['title'].' '.$p['about'], $productsByRef))."\n".$question;
-
-                    // A size or a measure the model was given in dynamic mode is in what it was given.
-                    if ($mode === AnswerContext::DYNAMIC) {
-                        $known .= "\n".json_encode($forModel, JSON_UNESCAPED_UNICODE);
-                    }
-
-                    // Code's checks on the answer; the picks stand or fall on their own.
-                    $answerRefusal = match (true) {
-                        $answer === '' => 'no_answer',
-                        $cited === [] && $picks === [] => 'cites_nothing',
-                        Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== [] => 'contact_details',
-                        preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 => 'price',
-                        self::hasNumberNotIn($answer, $known) => 'number_not_in_the_pages',
-                        default => null,
-                    };
+                    ['answer' => $answer, 'cited' => $cited, 'picks' => $picks, 'refusal' => $answerRefusal] = $this->screen($reply->data, $prepared, $question, $mode);
                     $flags['personal'] = $answerRefusal === 'contact_details';
-
-                    if ($answerRefusal !== null) {
-                        $answer = '';
-                    }
 
                     $checked['type'] = self::questionType($analysis['asks'] ?? null, $cited, $picks);
 
@@ -627,15 +604,8 @@ final class AnswerSiteQuestion
                         $refusal = $answerRefusal ?? 'not_found';
                         $checked['skipped'] = $refusal;
                     } else {
-                        $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
                         $started = hrtime(true);
-                        $check = $this->call($run, $checker, 'verify_site', (string) json_encode([
-                            'question' => $question,
-                            'answer' => $answer,
-                            'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
-                            'picks' => array_map(fn (array $pick): array => ['title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
-                            'analysis' => $analysis,
-                        ], JSON_UNESCAPED_UNICODE), $checkOutput, null, 'site_check');
+                        $check = $this->call($run, $checker, 'verify_site', $this->checkInput($question, $answer, $cited, $picks, $prepared), $checkOutput, null, 'site_check');
                         $replies[] = [$check, 'site_check'];
                         $checked += [
                             'model' => $checker['model'],
@@ -647,35 +617,15 @@ final class AnswerSiteQuestion
                         ];
                         $checked['ran'] = true;
 
-                        $verdict = [];
-                        if (($check->data['picks_fit'] ?? null) !== true) {
-                            $picks = [];
-                            $verdict[] = 'picks';
+                        $applied = self::applyCheck($check->data, $answer, $picks);
+                        ['answer' => $answer, 'picks' => $picks, 'refusal' => $refusal] = $applied;
+                        $checked['verdict'] = $applied['verdict'];
+                        // An attempt to instruct the assistant counts against the visitor.
+                        $flags['safe'] = $applied['safe'];
+                        $flags['injection'] = $flags['injection'] || $applied['injection'];
+                        if ($flags['injection'] && $remember && $visitorHash !== null) {
+                            Offenders::record($shopId, $visitorHash, Barrier::ip());
                         }
-                        if (($check->data['supported'] ?? null) !== true || ($check->data['on_topic'] ?? null) !== true) {
-                            $answer = '';
-                            $verdict[] = ($check->data['on_topic'] ?? null) !== true ? 'off_topic' : 'unsupported';
-                        }
-                        // Not safe for every shopper, or the question was an attempt to instruct the
-                        // assistant: nothing of it is shown, and an attempt counts against the visitor.
-                        $flags['safe'] = ($check->data['safe'] ?? null) === true;
-                        $flags['injection'] = $flags['injection'] || ($check->data['injection'] ?? false) === true;
-                        if (! $flags['safe'] || $flags['injection']) {
-                            $answer = '';
-                            $picks = [];
-                            $verdict[] = $flags['injection'] ? 'injection' : 'unsafe';
-                            if ($flags['injection'] && $remember && $visitorHash !== null) {
-                                Offenders::record($shopId, $visitorHash, Barrier::ip());
-                            }
-                        }
-
-                        $refusal = $answer === '' && $picks === [] ? 'check_'.implode('_', $verdict ?: ['empty']) : null;
-                        $checked['verdict'] = match (true) {
-                            $refusal !== null => 'rejected',
-                            $before['answer'] && $answer === '' => 'answer_removed',
-                            $before['picks'] && $picks === [] => 'picks_removed',
-                            default => 'kept',
-                        };
                     }
                 } catch (SpendCapReached $e) {
                     $run->fail('assistant::runs.spend_cap', [], $e->getMessage());
@@ -710,6 +660,123 @@ final class AnswerSiteQuestion
         );
 
         return $result;
+    }
+
+    /**
+     * What the writer is given for a question, built now as the search box would build it (the
+     * same prepare(), the question's stored vector): for the writer benchmark. No model is called.
+     *
+     * @param  list<string>  $products  external ids shown, best first
+     * @return array<string, mixed> prepare()'s output with the mode and the cleaned question
+     */
+    public function snapshot(string $shopId, string $question, array $products, ?string $mode = null): array
+    {
+        $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
+        $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
+
+        return $this->tenant->run($shopId, function () use ($shopId, $question, $products, $mode): array {
+            $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
+
+            return ['mode' => $mode, 'question' => $question] + $this->prepare($shopId, $question, $products, $mode);
+        });
+    }
+
+    /**
+     * Code's gate on a writer's reply: the answer unless code refuses it (empty, citing nothing,
+     * contact details, a price, a number the pages do not have), the passages it may cite, and the
+     * picks it may make. The search box and the writer benchmark pass every writer through it.
+     *
+     * @param  array<string, mixed>  $data  the writer's JSON
+     * @param  array{byRef: array<string, array<string, mixed>>, productsByRef: array<string, array<string, mixed>>, forModel: list<array<string, mixed>>}  $prepared
+     * @return array{answer: string, cited: list<string>, picks: list<array{ref: string, external_id: string, title: string, why: string}>, refusal: string|null}
+     */
+    public function screen(array $data, array $prepared, string $question, string $mode): array
+    {
+        ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'forModel' => $forModel] = $prepared;
+        $answer = mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
+        $cited = array_values(array_unique(array_filter(array_map('strval', (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
+        $picks = $this->picks((array) ($data['picks'] ?? []), $productsByRef);
+        $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
+            ."\n".implode("\n", array_map(fn (array $p): string => $p['title'].' '.$p['about'], $productsByRef))."\n".$question;
+
+        // A size or a measure the model was given in dynamic mode is in what it was given.
+        if ($mode === AnswerContext::DYNAMIC) {
+            $known .= "\n".json_encode($forModel, JSON_UNESCAPED_UNICODE);
+        }
+
+        // Code's checks on the answer; the picks stand or fall on their own.
+        $refusal = match (true) {
+            $answer === '' => 'no_answer',
+            $cited === [] && $picks === [] => 'cites_nothing',
+            Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== [] => 'contact_details',
+            preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 => 'price',
+            self::hasNumberNotIn($answer, $known) => 'number_not_in_the_pages',
+            default => null,
+        };
+
+        return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal];
+    }
+
+    /**
+     * What the checker reads: the question, the answer, the passages it cites, and each pick with
+     * what code measured about it.
+     *
+     * @param  list<string>  $cited
+     * @param  list<array{ref: string, title: string, why: string}>  $picks
+     * @param  array{byRef: array<string, array<string, mixed>>, productsByRef: array<string, array<string, mixed>>, analysis: array<string, mixed>}  $prepared
+     */
+    public function checkInput(string $question, string $answer, array $cited, array $picks, array $prepared): string
+    {
+        ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis] = $prepared;
+
+        return (string) json_encode([
+            'question' => $question,
+            'answer' => $answer,
+            'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
+            'picks' => array_map(fn (array $pick): array => ['title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
+            'analysis' => $analysis,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * What the checker's reply leaves of an answer and its picks: picks that do not fit go, an
+     * answer the pages do not support or off the question goes, and nothing stays of an answer
+     * not safe for every shopper or of an attempt to instruct the assistant.
+     *
+     * @param  array<string, mixed>  $check  the checker's JSON
+     * @param  list<array<string, mixed>>  $picks
+     * @return array{answer: string, picks: list<array<string, mixed>>, safe: bool, injection: bool, refusal: string|null, verdict: string}
+     */
+    public static function applyCheck(array $check, string $answer, array $picks): array
+    {
+        $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
+        $verdict = [];
+
+        if (($check['picks_fit'] ?? null) !== true) {
+            $picks = [];
+            $verdict[] = 'picks';
+        }
+        if (($check['supported'] ?? null) !== true || ($check['on_topic'] ?? null) !== true) {
+            $answer = '';
+            $verdict[] = ($check['on_topic'] ?? null) !== true ? 'off_topic' : 'unsupported';
+        }
+
+        $safe = ($check['safe'] ?? null) === true;
+        $injection = ($check['injection'] ?? false) === true;
+        if (! $safe || $injection) {
+            $answer = '';
+            $picks = [];
+            $verdict[] = $injection ? 'injection' : 'unsafe';
+        }
+
+        $refusal = $answer === '' && $picks === [] ? 'check_'.implode('_', $verdict ?: ['empty']) : null;
+
+        return ['answer' => $answer, 'picks' => $picks, 'safe' => $safe, 'injection' => $injection, 'refusal' => $refusal, 'verdict' => match (true) {
+            $refusal !== null => 'rejected',
+            $before['answer'] && $answer === '' => 'answer_removed',
+            $before['picks'] && $picks === [] => 'picks_removed',
+            default => 'kept',
+        }];
     }
 
     /**
@@ -1241,7 +1308,8 @@ final class AnswerSiteQuestion
         return false;
     }
 
-    private static function prompt(string $name): string
+    /** A released prompt of this version, as the writer and the checker read it. */
+    public static function prompt(string $name): string
     {
         return (string) file_get_contents(__DIR__.'/../Prompts/'.$name.'.v'.self::PROMPT_VERSION.'.md');
     }

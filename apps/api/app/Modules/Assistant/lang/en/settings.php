@@ -179,4 +179,20 @@ return [
         'label' => 'Share of pages that must repeat a sentence',
         'description' => 'The share of pages a sentence must appear on to count as information about the store. 0.6 = sixty percent.',
     ],
+    'bench_judge_provider' => [
+        'label' => 'Judge provider in the writer benchmark',
+        'description' => 'In the benchmark that compares the current writer with another model: the provider of the model that compares the answers without knowing who wrote which. Must be of another family than the writer.',
+    ],
+    'bench_judge_model' => [
+        'label' => 'Judge model in the writer benchmark',
+        'description' => 'The model that compares the two answers. Runs only when the benchmark is run by hand.',
+    ],
+    'bench_judge_input_usd_per_million' => [
+        'label' => 'Judge input price',
+        'description' => 'USD per million tokens, for the benchmark\'s cost.',
+    ],
+    'bench_judge_output_usd_per_million' => [
+        'label' => 'Judge output price',
+        'description' => 'USD per million tokens, for the benchmark\'s cost.',
+    ],
 ];

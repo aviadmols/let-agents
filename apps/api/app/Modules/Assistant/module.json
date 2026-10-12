@@ -419,6 +419,43 @@
             "min": 0.3,
             "max": 1,
             "scope": "global"
+        },
+        {
+            "name": "bench_judge_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "bench_judge_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "bench_judge_input_usd_per_million",
+            "type": "float",
+            "default": 3,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "bench_judge_output_usd_per_million",
+            "type": "float",
+            "default": 15,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
         }
     ],
     "agents": [
