@@ -137,7 +137,7 @@ return [
     ],
     'caption_max_output_tokens' => [
         'label' => 'Longest description',
-        'description' => 'In tokens.',
+        'description' => 'In tokens, the model\'s thinking included: Haiku 5.5 thinks before it answers, and a reply cut short is not read.',
     ],
     'content_weight' => [
         'label' => 'Content against looks',

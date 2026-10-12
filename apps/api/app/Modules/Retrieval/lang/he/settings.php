@@ -137,7 +137,7 @@ return [
     ],
     'caption_max_output_tokens' => [
         'label' => 'אורך תיאור מקסימלי',
-        'description' => 'בטוקנים.',
+        'description' => 'בטוקנים, כולל החשיבה של המודל: Haiku 5.5 חושב לפני שהוא עונה, ותשובה שנקטעה לא נקראת.',
     ],
     'content_weight' => [
         'label' => 'משקל התוכן מול המראה',
