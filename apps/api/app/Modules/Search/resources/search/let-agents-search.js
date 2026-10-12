@@ -1342,6 +1342,7 @@
     }
 
     function closeDropdown() {
+      searchSheet = false;
       if (dropdown) {
         dropdown.host.parentNode && dropdown.host.parentNode.removeChild(dropdown.host);
         if (dropdown.mobile) {
@@ -1364,9 +1365,11 @@
 
     /** The suggestions box, or on a phone the sheet over the page, emptied for new content. */
     function freshDropdown() {
-      var mobile = narrow();
+      var mobile = narrow() || searchSheet;
       if (dropdown && dropdown.mobile !== mobile) {
+        var keep = searchSheet;
         closeDropdown();
+        searchSheet = keep;
       }
       if (!dropdown) {
         dropdown = shadowHost('let-agents-search-suggest');
@@ -1503,13 +1506,19 @@
 
     var lastRect = null;
 
+    /**
+     * The regular search as a sheet of its own, with its own field, on any screen: where the site's
+     * box is hidden (a header with only an icon) when the shopper leaves the drawer for it.
+     */
+    var searchSheet = false;
+
     function position() {
       if (!dropdown) {
         return;
       }
       var s = dropdown.host.style;
       s.zIndex = '2147482000';
-      if (dropdown.mobile !== narrow()) {
+      if (dropdown.mobile !== (narrow() || searchSheet)) {
         closeDropdown();
         return;
       }
@@ -2911,11 +2920,13 @@
     }
 
     /**
-     * Back to the site's own search box, with what was typed in it: the box itself where it shows,
-     * otherwise the theme's search button opens it first.
+     * The regular search, open at once, with what was typed: the site's own box where it shows;
+     * where it is hidden (a header with only an icon), the regular search as a sheet of its own,
+     * with its own field over the page. Never the theme's button: some lead to a page of their own.
      */
     function openThemeSearch(text) {
-      var into = function (field) {
+      var field = visibleField();
+      if (field) {
         attach(field);
         current = field;
         if (text) {
@@ -2925,31 +2936,28 @@
         if (field.value.trim()) {
           suggest(field);
         }
-      };
-      var field = visibleField();
-      if (field) {
-        into(field);
         return;
       }
-      var triggers = doc.querySelectorAll(SEARCH_TRIGGERS);
-      for (var i = 0; i < triggers.length; i++) {
-        var node = triggers[i];
-        var rect = node.getBoundingClientRect();
-        if (node.closest('form') || !(rect.width > 0 && rect.height > 0)) {
-          continue;
-        }
-        node.__letAgentsSearchBypass = true;
-        node.click();
-        node.__letAgentsSearchBypass = false;
-        // The theme's search bar opens with its own animation.
-        setTimeout(function () {
-          var opened = visibleField();
-          if (opened) {
-            into(opened);
-          }
-        }, 350);
+
+      // The sheet types into the site's hidden field, or into one of its own when there is none.
+      var hidden = null;
+      try {
+        hidden = doc.querySelector(fieldSelector());
+      } catch (e) { /* a bad selector finds nothing */ }
+      if (hidden) {
+        attach(hidden);
+      }
+      current = hidden || doc.createElement('input');
+      current.value = text;
+      searchSheet = true;
+      if (text) {
+        suggest(current);
         return;
       }
+      var d = freshDropdown();
+      layout(null, el('div', 'd-main'), null);
+      position();
+      focusField(d);
     }
 
     /**
