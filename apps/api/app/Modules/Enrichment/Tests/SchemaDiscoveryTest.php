@@ -151,7 +151,7 @@ final class SchemaDiscoveryTest extends TestCase
         $this->assertSame('jewelry_store', $vocabulary->key);
         $this->assertSame(EnrichmentSchemaProposal::APPROVED, $proposal->refresh()->status);
         $this->assertSame($vocabulary->id, $proposal->vocabulary_id);
-        $this->assertTrue(Features::enabled('enrichment.read_text_in_code', $this->shop->id), 'and it is read from the store\x27s own words');
+        $this->assertTrue(Features::enabled('enrichment.read_text_in_code', $this->shop->id), 'and it is read from the store\'s own words');
         $this->assertNull(app(DecideSchemaProposal::class)->handle($proposal, false), 'decided once');
     }
 
