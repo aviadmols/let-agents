@@ -8,6 +8,9 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\SuggestQuestions;
+use App\Modules\Assistant\Console\AnswerReportCommand;
+use App\Modules\Assistant\Console\CheckerReportCommand;
+use App\Modules\Assistant\Console\ContextEvalCommand;
 use App\Modules\Assistant\Console\KnowledgeCommand;
 use App\Modules\Assistant\Console\ReviewAsksCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
@@ -71,6 +74,9 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         return [
             ReviewAsksCommand::class,
             KnowledgeCommand::class,
+            CheckerReportCommand::class,
+            AnswerReportCommand::class,
+            ContextEvalCommand::class,
         ];
     }
 }

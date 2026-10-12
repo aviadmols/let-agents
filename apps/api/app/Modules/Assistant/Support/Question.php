@@ -27,6 +27,36 @@ final class Question
         return preg_match(self::CONTACT, $question) === 1;
     }
 
+    /** Words a question is made of that name nothing: asked, not about. */
+    private const QUESTION_WORDS = ['מה', 'מהי', 'מהו', 'איך', 'האם', 'יש', 'אפשר', 'כמה', 'מתי', 'למה', 'של', 'את', 'על', 'עם', 'לי', 'שלכם', 'אצלכם', 'what', 'is', 'the', 'how', 'do', 'you', 'your', 'can', 'i'];
+
+    /**
+     * The words of a question that may name something: a plural as its singular (ביטולים finds
+     * ביטול), and a word with its leading letter dropped as well.
+     *
+     * @return list<string>
+     */
+    public static function words(string $question): array
+    {
+        $words = [];
+
+        foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [] as $word) {
+            if (mb_strlen($word) < 3 || in_array($word, self::QUESTION_WORDS, true)) {
+                continue;
+            }
+
+            $base = mb_strlen($word) > 4 ? (string) preg_replace('/(ים|ות)$/u', '', $word) : $word;
+            $words[] = $base;
+
+            // "הביטולים" is "ביטול" with the letter in front: ה, ו, ב, ל, מ, ש, כ.
+            if (mb_strlen($base) > 3 && preg_match('/^[הובלמשכ]/u', $base) === 1) {
+                $words[] = mb_substr($base, 1);
+            }
+        }
+
+        return array_values(array_unique($words));
+    }
+
     /** Collapses whitespace and cuts to $max characters. */
     public static function clean(string $question, int $max): string
     {

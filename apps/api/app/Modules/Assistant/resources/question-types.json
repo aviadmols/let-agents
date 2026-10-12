@@ -1,0 +1,18 @@
+{
+    "_about": "What a shopper's question asks about, read in code to choose what the writing model is given. The first type whose pattern matches wins, in this order. Patterns are case-insensitive regular expressions; Hebrew final letters match their regular forms. A price in a question of another type is kept as a constraint.",
+    "order": ["superlative", "price_exact", "store", "comparison", "recommendation", "price_range", "size", "stock", "attribute"],
+    "types": {
+        "superlative": ["הכי זול", "הכי יקר", "הזול ביותר", "היקר ביותר", "במחיר הכי נמוך", "הכי משתלם", "cheapest", "most expensive"],
+        "price_exact": ["כמה (?:זה )?עול", "מה המחיר", "מחיר של", "מה העלות", "how much", "price of"],
+        "store": ["משלוח", "שליח", "איסוף", "מגיע", "יגיע", "זמן אספקה", "החז(?:י)?ר", "החלפ", "ביטול", "לבטל", "מבטל", "אחריות", "תשלומ", "סניף", "שעות", "חנות פיזית", "כתובת", "layaway", "הגד(?:י)?ל", "הקט(?:י)?נ", "התאמת מידה", "תיקון", "ניקוי", "אריזת מתנה", "קופון", "shipping", "deliver", "return", "refund", "warranty", "payment", "resiz"],
+        "comparison": ["ההבדל", "מה ההבדל", "לעומת", "להשוות", "השוואה", "עדיף .{1,30} או ", "difference", "compare", "versus", "\\bvs\\b"],
+        "recommendation": ["מתנה", "ממליצ", "תמליצ", "מה מתאים", "מה כדאי", "מה עדיף", "יום הולדת", "יום נישואין", "אירוסין", "לאמא", "לאשתי", "לחברה שלי", "לבת הזוג", "לבת זוג", "לבעלי", "לחבר שלי", "gift", "recommend", "suggest"],
+        "price_range": ["(?:עד|מתחת ל-?|מעל|יותר מ-?|פחות מ-?|בין)\\s*\\d", "\\d[\\d,.]*\\s*(?:₪|ש[\"״]?ח|שקל)", "(?:under|over|below|above|between)\\s*\\d"],
+        "size": ["מיד(?:ה|ות|ת)", "גודל", "אורך", "רוחב", "גובה", "קוטר", "עובי", "משקל", "ס[\"״]?מ", "מ[\"״]?מ", "size", "length", "width", "weight"],
+        "stock": ["במלאי", "זמין", "זמינה", "יש לכם עוד", "אזל", "נגמר", "in stock", "available"],
+        "attribute": ["זהב", "כסף", "פלטינה", "יהלום", "אבן", "אבנים", "צבע", "חומר", "רובי", "ספיר", "אמרלד", "פנינ", "גרנט", "סוליטר", "טניס", "וינטג", "קראט", "קארט", "material", "stone", "colou?r", "gold", "silver", "diamond"]
+    },
+    "constraints": {
+        "price": ["(?:עד|מתחת ל-?|מעל|יותר מ-?|פחות מ-?|בין)\\s*\\d", "\\d[\\d,.]*\\s*(?:₪|ש[\"״]?ח|שקל)", "זול", "יקר", "(?:under|over|below|above|between)\\s*\\d", "cheap"]
+    }
+}

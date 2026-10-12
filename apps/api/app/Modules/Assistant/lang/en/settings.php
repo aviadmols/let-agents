@@ -19,6 +19,26 @@ return [
             'medium' => 'Medium',
         ],
     ],
+    'context_mode' => [
+        'label' => 'What the writing model is given',
+        'description' => 'Full: every product shown and every passage found, as before. Dynamic: the products and passages the question needs, with the fields its kind of question asks about.',
+        'options' => [
+            'full' => 'Full',
+            'dynamic' => 'Dynamic',
+        ],
+    ],
+    'context_min_products' => [
+        'label' => 'Products always given',
+        'description' => 'The first products the shopper was shown are always given, whatever their score: the safety floor against losing the right answer.',
+    ],
+    'context_keep_ratio' => [
+        'label' => 'How close to the best product a product must score',
+        'description' => 'Dynamic only. 0.5: at least half the best score.',
+    ],
+    'context_open_keep_ratio' => [
+        'label' => 'The same, for open questions and recommendations',
+        'description' => 'Dynamic only. Lower, so a recommendation sees more products.',
+    ],
     'answer_input_usd_per_million' => [
         'label' => 'Writing model input price per million tokens',
         'description' => 'From OpenAI\'s price list. Used for the estimate before each call and for the recorded cost. Better too high than too low.',
@@ -73,7 +93,11 @@ return [
     ],
     'site_check_model' => [
         'label' => 'The model that checks search answers',
-        'description' => 'For example claude-haiku-4-5.',
+        'description' => 'For example claude-haiku-5-5.',
+    ],
+    'site_check_max_output_tokens' => [
+        'label' => 'Longest check',
+        'description' => 'In tokens, the model\'s thinking included: Haiku 5.5 thinks before it answers, and a check cut short fails the question.',
     ],
     'site_check_input_usd_per_million' => [
         'label' => 'Input price of the checker, per million tokens',

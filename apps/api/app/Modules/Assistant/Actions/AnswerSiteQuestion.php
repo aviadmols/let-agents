@@ -14,6 +14,7 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -64,8 +65,6 @@ final class AnswerSiteQuestion
 
     private const MIN_CHARS = 3;
 
-    private const CHECK_OUTPUT_TOKENS = 400;
-
     private const MAX_ANSWER_CHARS = 900;
 
     private const MAX_SOURCES = 3;
@@ -78,6 +77,7 @@ final class AnswerSiteQuestion
         private readonly ChatModel $models,
         private readonly SpendGuard $spend,
         private readonly Passages $passages,
+        private readonly AnswerContext $context,
     ) {}
 
     /**
@@ -157,9 +157,6 @@ final class AnswerSiteQuestion
         return $this->ask($shopId, $question, $locale, $products);
     }
 
-    /** Words a question is made of that name no page: asked, not about. */
-    private const QUESTION_WORDS = ['מה', 'מהי', 'מהו', 'איך', 'האם', 'יש', 'אפשר', 'כמה', 'מתי', 'למה', 'של', 'את', 'על', 'עם', 'לי', 'שלכם', 'אצלכם', 'what', 'is', 'the', 'how', 'do', 'you', 'your', 'can', 'i'];
-
     private const PAGES_BY_WORDS = 3;
 
     /** Of the team's answers, how many like the question are read; and how much of an entry. */
@@ -167,31 +164,10 @@ final class AnswerSiteQuestion
 
     private const KNOWLEDGE_CHARS = 2500;
 
-    /**
-     * The words of a question that may name something: a plural as its singular (ביטולים finds
-     * ביטול), and a word with its leading letter dropped as well.
-     *
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function words(string $question): array
     {
-        $words = [];
-
-        foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [] as $word) {
-            if (mb_strlen($word) < 3 || in_array($word, self::QUESTION_WORDS, true)) {
-                continue;
-            }
-
-            $base = mb_strlen($word) > 4 ? (string) preg_replace('/(ים|ות)$/u', '', $word) : $word;
-            $words[] = $base;
-
-            // "הביטולים" is "ביטול" with the letter in front: ה, ו, ב, ל, מ, ש, כ.
-            if (mb_strlen($base) > 3 && preg_match('/^[הובלמשכ]/u', $base) === 1) {
-                $words[] = mb_substr($base, 1);
-            }
-        }
-
-        return array_values(array_unique($words));
+        return Question::words($question);
     }
 
     /**
@@ -227,7 +203,7 @@ final class AnswerSiteQuestion
                 continue;
             }
 
-            $pages[] = ['source' => 'content', 'source_id' => (string) $page->id, 'external_id' => null, 'title' => (string) $page->title, 'text' => mb_substr(trim((string) $page->body), 0, 1500), 'similarity' => 1.0];
+            $pages[] = ['source' => 'content', 'source_id' => (string) $page->id, 'external_id' => null, 'title' => (string) $page->title, 'text' => mb_substr(trim((string) $page->body), 0, 1500), 'similarity' => 1.0, 'kind' => 'title'];
         }
 
         return [...$pages, ...$found];
@@ -263,7 +239,7 @@ final class AnswerSiteQuestion
             }
 
             if ($text !== '') {
-                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0];
+                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge'];
             }
         }
 
@@ -295,20 +271,145 @@ final class AnswerSiteQuestion
     }
 
     /**
+     * One question answered as the search box would, but without the saved answers, the daily
+     * limits, the shopper's log, or saving the answer: for comparing context modes on fixed
+     * questions. The run is recorded (its cost is real) and marked as an evaluation.
+     *
+     * @param  list<string>  $products  external ids shown, best first
+     * @return array{result: array<string, mixed>, trace: array<string, mixed>}
+     */
+    public function evaluate(string $shopId, string $question, array $products, string $mode, string $locale = 'he'): array
+    {
+        $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
+        $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
+
+        return $this->tenant->run($shopId, function () use ($shopId, $question, $products, $mode, $locale): array {
+            if (($computed = $this->computed($question, $locale, $products)) !== null) {
+                return ['result' => $computed, 'trace' => ['from' => 'code']];
+            }
+
+            $trace = [];
+            $result = $this->ask($shopId, $question, $locale, $products, $mode, false, $trace);
+
+            return ['result' => $result, 'trace' => $trace];
+        });
+    }
+
+    /**
+     * What the writing model would be given, in each mode, with why each product and passage was
+     * kept: no model is called. For the dry evaluation.
+     *
+     * @param  list<string>  $products
+     * @return array<string, array<string, mixed>> by mode
+     */
+    public function preview(string $shopId, string $question, array $products): array
+    {
+        $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
+        $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
+
+        return $this->tenant->run($shopId, function () use ($shopId, $question, $products): array {
+            $out = [];
+
+            foreach ([AnswerContext::FULL, AnswerContext::DYNAMIC] as $mode) {
+                $prepared = $this->prepare($shopId, $question, $products, $mode);
+                $out[$mode] = [
+                    'type' => $prepared['type'],
+                    'empty' => $prepared['empty'],
+                    'products' => array_map(fn (array $p): array => ['external_id' => $p['external_id'], 'title' => $p['title']], array_values($prepared['productsByRef'])),
+                    'passages' => array_map(fn (array $p): array => ['title' => $p['title'], 'kind' => $p['kind'] ?? 'meaning', 'chars' => mb_strlen((string) $p['text'])], array_values($prepared['byRef'])),
+                    'input_chars' => mb_strlen($prepared['input']),
+                    'estimated_input_tokens' => (int) ceil(mb_strlen($prepared['input']) / 2) + 600,
+                    'debug' => $prepared['debug'],
+                ];
+            }
+
+            return $out;
+        });
+    }
+
+    /**
+     * What the writer is given for this question: the passages and products found, chosen in
+     * dynamic mode, numbered, read by code, and written as the input. The one place the context
+     * is built, for answering, evaluating and previewing alike.
+     *
      * @param  list<string>  $shown
+     * @return array{type: string, empty: bool, found: int, shown: int, byRef: array<string, array<string, mixed>>, productsByRef: array<string, array<string, mixed>>, analysis: array<string, mixed>, forModel: list<array<string, mixed>>, input: string, debug: array<string, mixed>|null}
+     */
+    private function prepare(string $shopId, string $question, array $shown, string $mode): array
+    {
+        $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
+        $found = array_values(array_filter(
+            $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
+            fn (array $p): bool => $p['similarity'] >= $floor,
+        ));
+        // Code before model: the pages whose title holds the question's words ("ביטול עסקה" for
+        // "מה מדיניות הביטולים") are read first, whatever the meaning search found.
+        $found = $this->pagesByWords($question, $found);
+        // Before all: what the store says about itself on every product page, in its team's words,
+        // and the team's answers to questions like this one.
+        $found = $this->knowledge($question, $shopId, $found);
+        $candidates = $this->candidates($shown);
+        $type = AnswerContext::type($question);
+        $counts = ['found' => count($found), 'shown' => count($candidates)];
+        $debug = null;
+
+        // Nothing at all is the same answer in every mode: decided before any choice is made.
+        if ($found !== [] || $candidates !== []) {
+            if ($mode === AnswerContext::DYNAMIC) {
+                $selection = $this->context->select($shopId, $question, $type, $candidates, $found);
+                [$candidates, $found, $debug] = [$selection['products'], $selection['passages'], $selection['debug']];
+            }
+        }
+
+        $byRef = [];
+        foreach ($found as $i => $passage) {
+            $byRef['s'.($i + 1)] = $passage;
+        }
+        $productsByRef = [];
+        foreach ($candidates as $i => $product) {
+            $productsByRef['p'.($i + 1)] = $product;
+        }
+
+        // Code reads the results before the model: price order among what is in stock, what
+        // is on sale, the brands, and whether the question asks for the cheapest or the dearest.
+        // The model gets ranks, never prices: the page shows the current price.
+        $analysis = self::analysis($question, $productsByRef);
+        $forModel = $this->forModel($productsByRef, $analysis);
+
+        if ($mode === AnswerContext::DYNAMIC) {
+            $forModel = array_map(fn (array $entry): array => AnswerContext::fields($type, $entry, $productsByRef[$entry['ref']], $question), $forModel);
+        }
+
+        $input = (string) json_encode([
+            'question' => $question,
+            'products' => $forModel,
+            'analysis' => $analysis,
+            'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']], array_keys($byRef), $byRef),
+        ], JSON_UNESCAPED_UNICODE);
+
+        return ['type' => $type, 'empty' => $counts['found'] === 0 && $counts['shown'] === 0] + $counts
+            + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug');
+    }
+
+    /**
+     * @param  list<string>  $shown
+     * @param  string|null  $mode  the shop's assistant.context_mode unless given
+     * @param  bool  $remember  false for an evaluation: nothing is saved for the next shopper
+     * @param  array<string, mixed>|null  $trace  filled with what was given and what came of it
      * @return array<string, mixed>
      */
-    private function ask(string $shopId, string $question, string $locale, array $shown): array
+    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null): array
     {
         $result = $this->fixed('unavailable', $locale);
+        $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
 
         $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
-            trigger: RunTrigger::Webhook,
-            input: ['question' => $question, 'products' => count($shown)],
-            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, &$result): void {
+            trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,
+            input: ['question' => $question, 'products' => count($shown)] + ($remember ? [] : ['evaluation' => $mode]),
+            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, &$result, &$trace): void {
                 $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
                 $writer = ['provider' => $writer->provider, 'name' => $writer->provider->value, 'model' => $writer->model];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
@@ -320,68 +421,58 @@ final class AnswerSiteQuestion
                     return;
                 }
 
-                $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
-                $found = array_values(array_filter(
-                    $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
-                    fn (array $p): bool => $p['similarity'] >= $floor,
-                ));
-                // Code before model: the pages whose title holds the question's words ("ביטול עסקה" for
-                // "מה מדיניות הביטולים") are read first, whatever the meaning search found.
-                $found = $this->pagesByWords($question, $found);
-                // Before all: what the store says about itself on every product page, in its team's words,
-                // and the team's answers to questions like this one.
-                $found = $this->knowledge($question, $shopId, $found);
-                $candidates = $this->candidates($shown);
+                $prepared = $this->prepare($shopId, $question, $shown, $mode);
+                ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
+                $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
+                    'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];
+                $trace = ['context' => $context, 'debug' => $prepared['debug']];
                 $noAnswer = $shown === [] ? AssistantAnswer::NO_INFO : 'no_match';
 
-                if ($found === [] && $candidates === []) {
-                    $this->save($question, AssistantAnswer::NO_INFO, null, [], [], null, [], $run);
+                if ($prepared['empty']) {
+                    if ($remember) {
+                        $this->save($question, AssistantAnswer::NO_INFO, null, [], [], null, [], $run);
+                    }
                     $result = $this->fixed($noAnswer, $locale, 'model');
-                    $run->output(['outcome' => AssistantAnswer::NO_INFO, 'passages' => 0, 'products' => 0])->summary('assistant::runs.site_nothing_near');
+                    $run->output(['outcome' => AssistantAnswer::NO_INFO, 'passages' => 0, 'products' => 0, 'context' => $context])->summary('assistant::runs.site_nothing_near');
 
                     return;
                 }
 
-                $byRef = [];
-                foreach ($found as $i => $passage) {
-                    $byRef['s'.($i + 1)] = $passage;
-                }
-                $productsByRef = [];
-                foreach ($candidates as $i => $product) {
-                    $productsByRef['p'.($i + 1)] = $product;
-                }
-
-                // Code reads the results before the model: price order among what is in stock, what
-                // is on sale, the brands, and whether the question asks for the cheapest or the dearest.
-                // The model gets ranks, never prices: the page shows the current price.
-                $analysis = self::analysis($question, $productsByRef);
-
                 $maxOutput = (int) Settings::get('assistant.answer_max_output_tokens');
+                $checkOutput = (int) Settings::get('assistant.site_check_max_output_tokens');
                 $effort = (string) Settings::get('assistant.reasoning_effort');
                 $effort = $effort === 'model_default' ? null : $effort;
                 $replies = [];
+                // What the checker did with this answer, kept on the run: how often it changes an answer,
+                // for which kind of question, at what cost and how fast. Read by assistant:checker-report.
+                $checked = ['ran' => false];
+
+                $wrote = [];
 
                 try {
-                    $input = (string) json_encode([
-                        'question' => $question,
-                        'products' => $this->forModel($productsByRef, $analysis),
-                        'analysis' => $analysis,
-                        'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']], array_keys($byRef), $byRef),
-                    ], JSON_UNESCAPED_UNICODE);
                     $estimated = (int) ceil(mb_strlen($input) / 2) + 600;
                     $this->spend->assertCanSpend((
                         $estimated * $this->price('answer_input') + $maxOutput * $this->price('answer_output')
-                        + ($estimated + 400) * $this->price('site_check_input') + self::CHECK_OUTPUT_TOKENS * $this->price('site_check_output')
+                        + ($estimated + 400) * $this->price('site_check_input') + $checkOutput * $this->price('site_check_output')
                     ) / 1_000_000);
 
+                    $started = hrtime(true);
                     $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
+                    // Token counts as "in" and "out": a key holding "token" is redacted on a run.
+                    $wrote = ['model' => $writer['model'], 'ms' => (int) round((hrtime(true) - $started) / 1e6), 'in' => $reply->inputTokens, 'out' => $reply->outputTokens,
+                        'cost_usd' => round($reply->costUsd($this->price('answer_input'), $this->price('answer_output')), 6)];
 
                     $answer = mb_substr(trim((string) ($reply->data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
                     $cited = array_values(array_unique(array_filter(array_map('strval', (array) ($reply->data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
                     $picks = $this->picks((array) ($reply->data['picks'] ?? []), $productsByRef);
                     $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
                         ."\n".implode("\n", array_map(fn (array $p): string => $p['title'].' '.$p['about'], $productsByRef))."\n".$question;
+
+                    // A size or a measure the model was given in dynamic mode is in what it was given.
+                    if ($mode === AnswerContext::DYNAMIC) {
+                        $known .= "\n".json_encode($forModel, JSON_UNESCAPED_UNICODE);
+                    }
 
                     // Code's checks on the answer; the picks stand or fall on their own.
                     $answerRefusal = match (true) {
@@ -397,17 +488,31 @@ final class AnswerSiteQuestion
                         $answer = '';
                     }
 
+                    $checked['type'] = self::questionType($analysis['asks'] ?? null, $cited, $picks);
+
                     if (($reply->data['found'] ?? null) !== true || ($answer === '' && $picks === [])) {
                         $refusal = $answerRefusal ?? 'not_found';
+                        $checked['skipped'] = $refusal;
                     } else {
+                        $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
+                        $started = hrtime(true);
                         $check = $this->call($run, $checker, 'verify_site', (string) json_encode([
                             'question' => $question,
                             'answer' => $answer,
                             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
                             'picks' => array_map(fn (array $pick): array => ['title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
                             'analysis' => $analysis,
-                        ], JSON_UNESCAPED_UNICODE), self::CHECK_OUTPUT_TOKENS, null, 'site_check');
+                        ], JSON_UNESCAPED_UNICODE), $checkOutput, null, 'site_check');
                         $replies[] = [$check, 'site_check'];
+                        $checked += [
+                            'model' => $checker['model'],
+                            'ms' => (int) round((hrtime(true) - $started) / 1e6),
+                            // Token counts as "in" and "out": a key holding "token" is redacted on a run.
+                            'in' => $check->inputTokens,
+                            'out' => $check->outputTokens,
+                            'cost_usd' => round($check->costUsd($this->price('site_check_input'), $this->price('site_check_output')), 6),
+                        ];
+                        $checked['ran'] = true;
 
                         $verdict = [];
                         if (($check->data['picks_fit'] ?? null) !== true) {
@@ -420,12 +525,19 @@ final class AnswerSiteQuestion
                         }
 
                         $refusal = $answer === '' && $picks === [] ? 'check_'.implode('_', $verdict ?: ['empty']) : null;
+                        $checked['verdict'] = match (true) {
+                            $refusal !== null => 'rejected',
+                            $before['answer'] && $answer === '' => 'answer_removed',
+                            $before['picks'] && $picks === [] => 'picks_removed',
+                            default => 'kept',
+                        };
                     }
                 } catch (SpendCapReached $e) {
                     $run->fail('assistant::runs.spend_cap', [], $e->getMessage());
 
                     return;
                 } catch (ModelCallFailed $e) {
+                    $trace += ['failed' => $e->reason, 'writer' => $wrote, 'check' => $checked];
                     $run->fail('assistant::runs.model_failed', ['reason' => $e->reason], $e->getMessage());
 
                     return;
@@ -434,12 +546,14 @@ final class AnswerSiteQuestion
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $outcome = $refusal === null ? AssistantAnswer::ANSWERED : AssistantAnswer::NO_INFO;
-                $saved = $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run);
+                $saved = $remember ? $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run) : null;
 
                 $result = $refusal === null
-                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved->id]
-                    : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved->id, 'reason' => mb_substr((string) $refusal, 0, 40)];
-                $run->output(['outcome' => $outcome, 'refused' => $refusal, 'cited' => count($cited), 'picks' => count($picks), 'answer' => $answer, 'checker' => $checker['name'].' · '.$checker['model']])
+                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id]
+                    : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)];
+                $trace += ['writer' => $wrote, 'check' => $checked, 'refused' => $refusal, 'picks' => array_column($stored, 'external_id')];
+                $run->output(['outcome' => $outcome, 'refused' => $refusal, 'cited' => count($cited), 'picks' => count($picks), 'answer' => $answer, 'checker' => $checker['name'].' · '.$checker['model'],
+                    'check' => $checked, 'context' => $trace['context'], 'writer' => $wrote])
                     ->summary('assistant::runs.site_'.$outcome);
             },
         );
@@ -620,10 +734,51 @@ final class AnswerSiteQuestion
                 'in_stock' => (bool) $product->in_stock,
                 'on_sale' => (bool) $product->on_sale,
                 'price' => $product->price !== null ? (float) $product->price : null,
-            ];
+            ] + self::details($product);
         }
 
         return $out;
+    }
+
+    /**
+     * What a product says besides its description, for the kinds of question that ask about it in
+     * dynamic mode: its options, its sizes, its measures, and which options are in stock. Full mode
+     * never sends these.
+     *
+     * @return array{sku: string, attributes: list<string>, sizes: list<string>, measures: list<string>, options_in_stock: list<string>}
+     */
+    private static function details(CatalogProduct $product): array
+    {
+        $attributes = array_map(fn (array $a): string => $a['name'].': '.implode(', ', $a['values']), $product->storeAttributes());
+        $sizes = [];
+        foreach ($product->storeAttributes() as $attribute) {
+            if (preg_match('/^(size|מיד|גודל)/iu', (string) $attribute['name']) === 1) {
+                $sizes = [...$sizes, ...$attribute['values']];
+            }
+        }
+
+        $dimensions = (array) ($product->payload['dimensions'] ?? []);
+        $measures = [];
+        foreach (['weight' => 'weight_unit', 'length' => 'dimension_unit', 'width' => 'dimension_unit', 'height' => 'dimension_unit'] as $field => $unit) {
+            if (is_numeric($dimensions[$field] ?? null) && (float) $dimensions[$field] > 0) {
+                $measures[] = $field.': '.$dimensions[$field].' '.($dimensions[$unit] ?? '');
+            }
+        }
+
+        $inStock = [];
+        foreach ((array) ($product->payload['variations'] ?? []) as $variation) {
+            if (($variation['stock']['in_stock'] ?? false) === true) {
+                $inStock = [...$inStock, ...array_map(fn ($a): string => (string) ($a['value'] ?? ''), (array) ($variation['attributes'] ?? []))];
+            }
+        }
+
+        return [
+            'sku' => (string) $product->sku,
+            'attributes' => $attributes,
+            'sizes' => array_values(array_unique(array_map('strval', $sizes))),
+            'measures' => array_map('trim', $measures),
+            'options_in_stock' => array_values(array_unique(array_filter($inStock))),
+        ];
     }
 
     /**
@@ -755,6 +910,25 @@ final class AnswerSiteQuestion
     }
 
     /** @param array{provider: AiProviderName, name: string, model: string} $role */
+    /**
+     * The kind of question, from what code and the writer made of it before the checker: a
+     * superlative, the store's own words (shipping, returns), products, or both. The checker's
+     * record is read by it, to learn where a check is worth its cost.
+     *
+     * @param  list<string>  $cited
+     * @param  list<array<string, mixed>>  $picks
+     */
+    public static function questionType(?string $asks, array $cited, array $picks): string
+    {
+        return match (true) {
+            $asks !== null => 'superlative',
+            $cited !== [] && $picks !== [] => 'mixed',
+            $picks !== [] => 'products',
+            $cited !== [] => 'store_info',
+            default => 'none',
+        };
+    }
+
     private function call(RunContext $run, array $role, string $prompt, string $input, int $maxOutput, ?string $effort, string $prices): ModelReply
     {
         $reply = $this->models->json($role['provider'], $role['model'], self::prompt($prompt), $input, $maxOutput, $effort);

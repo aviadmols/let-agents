@@ -18,6 +18,7 @@ use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -34,7 +35,7 @@ final class SiteQuestionTest extends TestCase
 
     private const VID = 'anon-visitor1234567890abcd';
 
-    /** @var list<array{provider: AiProviderName, model: string, user: string}> */
+    /** @var list<array{provider: AiProviderName, model: string, user: string, max: int}> */
     public array $calls = [];
 
     /** @var list<array<string, mixed>> */
@@ -67,7 +68,7 @@ final class SiteQuestionTest extends TestCase
 
             public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                $this->test->calls[] = ['provider' => $provider, 'model' => $model, 'user' => $user];
+                $this->test->calls[] = ['provider' => $provider, 'model' => $model, 'user' => $user, 'max' => $maxOutputTokens];
 
                 return new ModelReply(array_shift($this->test->replies) ?? [], 700, 120);
             }
@@ -107,6 +108,43 @@ final class SiteQuestionTest extends TestCase
         $saved = $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->sole());
         $this->assertNull($saved->product_id);
         $this->assertNull($saved->content_id);
+    }
+
+    public function test_the_checker_is_haiku_5_5_with_room_to_think_and_what_it_did_is_kept(): void
+    {
+        $this->replies = [
+            ['found' => true, 'answer' => 'בערך 30 ברגים למטר מרובע.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true],
+        ];
+        $this->ask('כמה ברגים צריך למטר דק?');
+
+        $this->assertSame(['claude-haiku-5-5', 1500], [$this->calls[1]['model'], $this->calls[1]['max']], 'its thinking counts as output: 400 tokens would cut it short');
+        $check = Run::query()->where('agent', AnswerSiteQuestion::AGENT)->sole()->output['check'];
+        $this->assertEquals(['ran' => true, 'type' => 'store_info', 'verdict' => 'kept', 'model' => 'claude-haiku-5-5', 'in' => 700, 'out' => 120],
+            array_intersect_key($check, array_flip(['ran', 'type', 'verdict', 'model', 'in', 'out'])));
+        $this->assertSame(0.00013, $check['cost_usd'], '700 in at $0.10 and 120 out at $0.50 a million');
+        $this->assertIsInt($check['ms']);
+
+        // The checker refuses what the page does not say.
+        $this->replies = [
+            ['found' => true, 'answer' => 'שניים בכל מפגש, ועדיף נירוסטה ליד הים.', 'refs' => ['s1']],
+            ['supported' => false, 'on_topic' => true],
+        ];
+        $this->ask('איך מבריגים דק?');
+
+        // Code refuses first, and the checker is not asked.
+        $this->replies = [['found' => true, 'answer' => 'צריך 45 ברגים למטר.', 'refs' => ['s1']]];
+        $this->ask('כמה ברגים צריך?');
+
+        $checks = Run::query()->where('agent', AnswerSiteQuestion::AGENT)->orderBy('id')->get()->map(fn (Run $r): array => $r->output['check'])->all();
+        $this->assertSame('rejected', $checks[1]['verdict']);
+        $this->assertSame(['ran' => false, 'type' => 'store_info', 'skipped' => 'number_not_in_the_pages'], $checks[2]);
+
+        $this->assertSame(0, Artisan::call('assistant:checker-report'));
+        $report = Artisan::output();
+        $this->assertMatchesRegularExpression('/store_info · claude-haiku-5-5\s*\|\s*2\s*\|\s*2\s*\|\s*0\s*\|\s*1\s*\|\s*0\s*\|\s*0\s*\|\s*1\s*\|\s*50%/u', $report,
+            'two checked, one kept and one refused: half changed');
+        $this->assertMatchesRegularExpression('/store_info · —\s*\|\s*1\s*\|\s*0\s*\|\s*1\s*\|/u', $report, 'the one code refused, never checked');
     }
 
     public function test_what_the_pages_do_not_say_is_never_shown(): void
