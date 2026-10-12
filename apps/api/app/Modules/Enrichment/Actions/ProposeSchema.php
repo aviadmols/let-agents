@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
+use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -39,7 +40,7 @@ final class ProposeSchema
 
     private const WRITER_OUTPUT_TOKENS = 12000;
 
-    private const REVIEW_OUTPUT_TOKENS = 4000;
+    private const REVIEW_OUTPUT_TOKENS = 8000;
 
     /** The start of a description patterns are measured on, as code reads it. */
     private const HEAD = 600;
@@ -149,7 +150,7 @@ final class ProposeSchema
 
             return;
         } catch (ModelCallFailed $e) {
-            $this->fail($run, $proposal, 'assistant::runs.model_failed', [$e->reason]);
+            $this->fail($run, $proposal, 'assistant::runs.model_failed', [$e->reason], ['reason' => $e->reason]);
 
             return;
         }
@@ -378,7 +379,7 @@ final class ProposeSchema
     /** @return array<string, mixed> */
     private function call(RunContext $run, AgentModel $model, string $role, string $prompt, array $input, int $maxOutput): array
     {
-        $reply = $this->models->json(
+        $ask = fn (): ModelReply => $this->models->json(
             $model->provider,
             $model->model,
             (string) file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v'.self::PROMPTS[$prompt].'.md'),
@@ -386,6 +387,15 @@ final class ProposeSchema
             $maxOutput,
             'low',
         );
+        try {
+            $reply = $ask();
+        } catch (ModelCallFailed $e) {
+            // A reply that is not JSON (cut short, or wrapped in prose) is asked for once more.
+            if ($e->reason !== 'not_json') {
+                throw $e;
+            }
+            $reply = $ask();
+        }
         $run->usage($model->provider->value, $model->model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($role, 'input'), $this->price($role, 'output')));
 
         return $reply->data;
@@ -404,9 +414,9 @@ final class ProposeSchema
     }
 
     /** @param  list<string>  $problems */
-    private function fail(RunContext $run, EnrichmentSchemaProposal $proposal, string $key, array $problems): void
+    private function fail(RunContext $run, EnrichmentSchemaProposal $proposal, string $key, array $problems, array $params = []): void
     {
         $proposal->update(['status' => EnrichmentSchemaProposal::FAILED, 'problems' => array_slice($problems, 0, 30)]);
-        $run->output(['proposal' => $proposal->id, 'problems' => array_slice($problems, 0, 30)])->fail($key, [], mb_substr(implode('; ', $problems), 0, 2000));
+        $run->output(['proposal' => $proposal->id, 'problems' => array_slice($problems, 0, 30)])->fail($key, $params, mb_substr(implode('; ', $problems), 0, 2000));
     }
 }

@@ -2027,20 +2027,13 @@
     }
 
     /**
-     * The products as chosen: values of one filter are "or" (yellow or white gold), of different
-     * filters "and" (yellow gold, 14K); then on sale, in stock, and the sort, as the actions do.
+     * The products as chosen, as a store's filter narrows: every chosen value at once (yellow gold
+     * and 14K); then on sale, in stock, and the sort, as the actions do.
      */
     function viewOf(pool, c) {
-      var byFacet = {};
-      Object.keys(c.f).forEach(function (code) {
-        var facet = Math.floor(Number(code) / 1000);
-        (byFacet[facet] = byFacet[facet] || []).push(Number(code));
-      });
-      var facets = Object.keys(byFacet);
-      var out = !facets.length ? pool : pool.filter(function (record) {
-        return facets.every(function (facet) {
-          return (record.f || []).some(function (code) { return byFacet[facet].indexOf(code) !== -1; });
-        });
+      var codes = Object.keys(c.f).map(Number);
+      var out = !codes.length ? pool : pool.filter(function (record) {
+        return codes.every(function (code) { return (record.f || []).indexOf(code) !== -1; });
       });
       var parts = c.sort ? c.sort.split(':') : [null, null];
       return applyActions(out, { sort: parts[0], dir: parts[1], sale: c.sale, stock: c.stock, near: null, min: null, max: null });
@@ -2059,16 +2052,20 @@
      * The quick filters for these products, in code from what last night's index knows of each: the
      * sorts that mean something here (by price, by size where the shop measures it), on sale and in
      * stock when only some are, and the shop's own values (yellow gold, 14K, vintage) that some of
-     * these products have and some do not, the most common first. Null when nothing would split them.
-     * changed() runs after each choice, to show the products again.
+     * them have and some do not, the most common first. Counted on what is left after the choices,
+     * as a store's filter: a tag that would find nothing more is not offered. No counts are shown.
+     * Null when nothing would split them. changed() runs after each choice, to show the products again.
      */
     function filterBar(pool, c, changed) {
-      var n = pool.length;
-      if (n < 2) {
+      // What is left after what was chosen: only the tags that still find something, and split it.
+      var left = viewOf(pool, c);
+      var n = left.length;
+      var chosenAny = c.sort || c.sale || c.stock || Object.keys(c.f).length;
+      if (n < 2 && !chosenAny) {
         return null;
       }
       var chips = [];
-      var count = function (test) { return pool.filter(test).length; };
+      var count = function (test) { return left.filter(test).length; };
       var sortChip = function (id, value) {
         var text = actionLabel(id);
         if (text) {
@@ -2087,11 +2084,11 @@
         var some = count(flag[2]);
         var text = actionLabel(flag[0]);
         if (text && (c[flag[1]] || (some > 0 && some < n))) {
-          chips.push({ on: c[flag[1]], text: text, n: some, go: function () { c[flag[1]] = !c[flag[1]]; } });
+          chips.push({ on: c[flag[1]], text: text, go: function () { c[flag[1]] = !c[flag[1]]; } });
         }
       });
       var counts = {};
-      pool.forEach(function (record) {
+      left.forEach(function (record) {
         (record.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; });
       });
       Object.keys(counts).map(Number)
@@ -2102,7 +2099,7 @@
           var facet = (state.facets || [])[Math.floor(code / 1000)];
           var value = facet && facet.v[code % 1000];
           if (value) {
-            chips.push({ on: !!c.f[code], text: value.l, n: counts[code], go: function () {
+            chips.push({ on: !!c.f[code], text: value.l, go: function () {
               if (c.f[code]) {
                 delete c.f[code];
               } else {
@@ -2119,7 +2116,7 @@
       var any = false;
       chips.forEach(function (chip) {
         any = any || chip.on;
-        var button = el('button', 'd-chip', chip.n ? label('filter_count', { label: chip.text, count: chip.n }) : chip.text);
+        var button = el('button', 'd-chip', chip.text);
         button.type = 'button';
         button.setAttribute('aria-pressed', chip.on ? 'true' : 'false');
         button.addEventListener('mousedown', keepFocus);

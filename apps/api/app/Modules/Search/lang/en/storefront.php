@@ -90,7 +90,6 @@ return [
     'focus_category' => 'Category: :title',
     'facet_type' => 'Product type',
     'filters' => 'Quick filters',
-    'filter_count' => ':label (:count)',
     'clear_filters' => 'Clear',
     'sorted_by' => 'Sorted: :label',
 ];
