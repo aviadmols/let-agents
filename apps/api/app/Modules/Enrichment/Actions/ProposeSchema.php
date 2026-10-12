@@ -36,7 +36,7 @@ final class ProposeSchema
     public const TEMPLATE_FIT = 0.3;
 
     /** The released version each prompt is sent at; a released one is never edited. */
-    private const PROMPTS = ['schema_writer' => 2, 'schema_review' => 2, 'schema_revise' => 1];
+    private const PROMPTS = ['schema_writer' => 2, 'schema_review' => 2, 'schema_revise' => 2];
 
     private const WRITER_OUTPUT_TOKENS = 12000;
 
@@ -130,6 +130,8 @@ final class ProposeSchema
                     'vocabulary' => $vocabulary,
                     'coverage' => self::coverage($vocabulary, $texts),
                     'review' => ['removed' => $byReviewer, 'missing' => (array) ($review['missing'] ?? []), 'notes' => (array) ($review['notes'] ?? [])],
+                    // What code left out for its form only, to be written again correctly.
+                    'problems' => array_values(array_slice($problems, -30)),
                     'dimensions' => array_keys(Units::CANONICAL),
                 ];
                 $this->spend->assertCanSpend($this->estimate($asked, 'writer', self::WRITER_OUTPUT_TOKENS) + $this->estimate($asked, 'reviewer', self::REVIEW_OUTPUT_TOKENS));
@@ -201,6 +203,22 @@ final class ProposeSchema
         $vocabulary['key'] = preg_match('/^[a-z][a-z0-9_]{1,40}$/', (string) ($vocabulary['key'] ?? '')) === 1 ? $vocabulary['key'] : ($proposal->template ?? 'store');
         $vocabulary['product_types'] = array_values(array_filter((array) ($vocabulary['product_types'] ?? []), 'is_array'));
         $vocabulary['attributes'] = array_values(array_filter((array) ($vocabulary['attributes'] ?? []), 'is_array'));
+        // A number written as text ("group": "1") is the number it says.
+        foreach ($vocabulary['attributes'] as &$entry) {
+            if (is_array($entry['title_capture'] ?? null)) {
+                foreach (['group' => 'intval', 'factor' => 'floatval'] as $field => $cast) {
+                    if (isset($entry['title_capture'][$field]) && is_string($entry['title_capture'][$field]) && is_numeric($entry['title_capture'][$field])) {
+                        $entry['title_capture'][$field] = $cast($entry['title_capture'][$field]);
+                    }
+                }
+            }
+            foreach (['min', 'max'] as $field) {
+                if (isset($entry[$field]) && is_string($entry[$field]) && is_numeric($entry[$field])) {
+                    $entry[$field] = (float) $entry[$field];
+                }
+            }
+        }
+        unset($entry);
         unset($vocabulary['uses'], $vocabulary['comparison'], $vocabulary['components'], $vocabulary['excluded_category_external_ids']);
         $problems = [];
 
@@ -367,7 +385,9 @@ final class ProposeSchema
         $pictures = PictureText::for($ids);
 
         return CatalogProduct::query()->whereIn('id', $ids)->orderBy('external_id')->get()->map(function (CatalogProduct $product) use ($pictures): array {
-            $head = TextNormalizer::clean((string) $product->title).' '.trim((string) ($product->payload['product_type'] ?? ''));
+            // The title, the store's type and its categories' names: where a store says what a product is.
+            $categories = implode(' ', array_map(fn (array $path): string => (string) end($path), array_filter($product->categoryPaths())));
+            $head = TextNormalizer::clean((string) $product->title).' '.trim((string) ($product->payload['product_type'] ?? '')).' '.$categories;
             $tags = implode(' ', array_map('strval', (array) ($product->payload['tags'] ?? [])));
             $description = mb_substr(TextNormalizer::clean(strip_tags($product->description())), 0, self::HEAD);
             $picture = isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : '';

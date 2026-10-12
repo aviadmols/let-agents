@@ -102,7 +102,11 @@ final class CodeReading
      */
     private static function texts(CatalogProduct $product): array
     {
+        // The store's type, its categories' names, its tags and attributes: what the store itself says.
         $fields = [trim((string) ($product->payload['product_type'] ?? ''))];
+        foreach (array_filter($product->categoryPaths()) as $path) {
+            $fields[] = trim((string) end($path));
+        }
         foreach ((array) ($product->payload['tags'] ?? []) as $tag) {
             $fields[] = trim((string) $tag);
         }
