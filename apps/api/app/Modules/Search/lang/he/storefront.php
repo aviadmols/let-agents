@@ -88,4 +88,9 @@ return [
     'focus_title' => 'לא מצאנו בדיוק ":query". למה התכוונתם?',
     'focus_count' => ':query (:count)',
     'focus_category' => 'קטגוריה: :title',
+    'facet_type' => 'סוג מוצר',
+    'filters' => 'סינון מהיר',
+    'filter_count' => ':label (:count)',
+    'clear_filters' => 'ניקוי',
+    'sorted_by' => 'מסודר: :label',
 ];

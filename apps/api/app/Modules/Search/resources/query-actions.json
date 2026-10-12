@@ -1,0 +1,224 @@
+{
+    "_about": "Phrases that are actions, not words to search for, the same in every shop: 'הכי זול' sorts by price, 'במבצע' keeps what is on sale, 'גדול מ-2' keeps what is bigger than 2. Read in code on the server and in the browser alike (HebrewSearch::actions and readActions), first match of each entry, in this order; comparisons come before the bare 'גדול' and 'קטן'. Patterns are case-insensitive regular expressions matched as whole words; a group captures the number. An entry that needs 'size' is left out in a shop with no size attribute (search.size_attribute), so its words stay words there. A shop's own vocabulary values ('זהב צהוב') are not here: they stay words, and are offered as filters beside the results. 'או' between words searches each side (HebrewSearch::either).",
+    "actions": [
+        {
+            "id": "cheapest",
+            "label": {
+                "he": "הכי זול",
+                "en": "Cheapest"
+            },
+            "patterns": [
+                "הכי זול(?:ה|ים|ות)?",
+                "הזול(?:ה)? ביותר",
+                "הזולים ביותר",
+                "במחיר הכי נמוך",
+                "המחיר הכי נמוך",
+                "הכי משתלמ(?:ת|ים)?",
+                "cheapest",
+                "lowest price"
+            ],
+            "do": {
+                "sort": "price",
+                "dir": "asc"
+            }
+        },
+        {
+            "id": "dearest",
+            "label": {
+                "he": "הכי יקר",
+                "en": "Most expensive"
+            },
+            "patterns": [
+                "הכי יקר(?:ה|ים|ות)?",
+                "היקר(?:ה)? ביותר",
+                "היקרים ביותר",
+                "במחיר הכי גבוה",
+                "most expensive",
+                "highest price"
+            ],
+            "do": {
+                "sort": "price",
+                "dir": "desc"
+            }
+        },
+        {
+            "id": "biggest",
+            "label": {
+                "he": "הכי גדול",
+                "en": "Biggest"
+            },
+            "patterns": [
+                "הכי גדול(?:ה|ים|ות)?",
+                "הגדול(?:ה)? ביותר",
+                "הגדולים ביותר",
+                "biggest",
+                "largest"
+            ],
+            "do": {
+                "sort": "size",
+                "dir": "desc"
+            },
+            "needs": "size"
+        },
+        {
+            "id": "smallest",
+            "label": {
+                "he": "הכי קטן",
+                "en": "Smallest"
+            },
+            "patterns": [
+                "הכי קטנ(?:ה|ים|ות)?",
+                "הכי קטן",
+                "הקטנ(?:ה)? ביותר",
+                "הקטן ביותר",
+                "הקטנים ביותר",
+                "smallest"
+            ],
+            "do": {
+                "sort": "size",
+                "dir": "asc"
+            },
+            "needs": "size"
+        },
+        {
+            "id": "newest",
+            "label": {
+                "he": "הכי חדש",
+                "en": "Newest"
+            },
+            "patterns": [
+                "הכי חדש(?:ה|ים|ות)?",
+                "החדש(?:ה)? ביותר",
+                "החדשים ביותר",
+                "חדש(?:ים|ות)? באתר",
+                "newest",
+                "new arrivals?"
+            ],
+            "do": {
+                "sort": "new",
+                "dir": "desc"
+            }
+        },
+        {
+            "id": "on_sale",
+            "label": {
+                "he": "במבצע",
+                "en": "On sale"
+            },
+            "patterns": [
+                "במבצע",
+                "במבצעים",
+                "בהנחה",
+                "בהנחות",
+                "on sale",
+                "discounted"
+            ],
+            "do": {
+                "filter": "sale"
+            }
+        },
+        {
+            "id": "in_stock",
+            "label": {
+                "he": "במלאי",
+                "en": "In stock"
+            },
+            "patterns": [
+                "במלאי",
+                "שיש במלאי",
+                "זמינ(?:ה|ים|ות) במלאי",
+                "in stock"
+            ],
+            "do": {
+                "filter": "stock"
+            }
+        },
+        {
+            "id": "bigger_than",
+            "label": {
+                "he": "גדול מ",
+                "en": "Bigger than"
+            },
+            "patterns": [
+                "גדול(?:ה|ים|ות)? מ-?\\s?(\\d+(?:[.,]\\d+)?)",
+                "יותר גדול(?:ה|ים|ות)? מ-?\\s?(\\d+(?:[.,]\\d+)?)",
+                "bigger than (\\d+(?:[.,]\\d+)?)",
+                "larger than (\\d+(?:[.,]\\d+)?)"
+            ],
+            "do": {
+                "min": "size"
+            },
+            "needs": "size"
+        },
+        {
+            "id": "smaller_than",
+            "label": {
+                "he": "קטן מ",
+                "en": "Smaller than"
+            },
+            "patterns": [
+                "קטנ(?:ה|ים|ות)? מ-?\\s?(\\d+(?:[.,]\\d+)?)",
+                "קטן מ-?\\s?(\\d+(?:[.,]\\d+)?)",
+                "יותר קטנ(?:ה|ים|ות)? מ-?\\s?(\\d+(?:[.,]\\d+)?)",
+                "smaller than (\\d+(?:[.,]\\d+)?)"
+            ],
+            "do": {
+                "max": "size"
+            },
+            "needs": "size"
+        },
+        {
+            "id": "size",
+            "label": {
+                "he": "בגודל",
+                "en": "Size"
+            },
+            "patterns": [
+                "בגודל (\\d+(?:[.,]\\d+)?)",
+                "בגודל של (\\d+(?:[.,]\\d+)?)",
+                "שווה ל-?\\s?(\\d+(?:[.,]\\d+)?)",
+                "בדיוק (\\d+(?:[.,]\\d+)?)",
+                "size (\\d+(?:[.,]\\d+)?)",
+                "equal to (\\d+(?:[.,]\\d+)?)"
+            ],
+            "do": {
+                "near": "size"
+            },
+            "needs": "size"
+        },
+        {
+            "id": "big",
+            "label": {
+                "he": "גדול",
+                "en": "Big"
+            },
+            "patterns": [
+                "גדול(?:ה|ים|ות)?",
+                "big",
+                "large"
+            ],
+            "do": {
+                "sort": "size",
+                "dir": "desc"
+            },
+            "needs": "size"
+        },
+        {
+            "id": "small",
+            "label": {
+                "he": "קטן",
+                "en": "Small"
+            },
+            "patterns": [
+                "קטנ(?:ה|ים|ות)",
+                "קטן",
+                "small"
+            ],
+            "do": {
+                "sort": "size",
+                "dir": "asc"
+            },
+            "needs": "size"
+        }
+    ]
+}

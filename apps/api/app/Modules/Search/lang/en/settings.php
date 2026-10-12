@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'size_attribute' => [
+        'label' => 'What "size" is measured by',
+        'description' => 'The key of the store vocabulary attribute (e.g. diamonds_total_carat or diameter) that "biggest", "smallest" and "size X" use. Empty: those phrases do not change results.',
+    ],
     'input_selector' => [
         'label' => 'Search boxes on the site',
         'description' => 'CSS selector of the search fields Let Agents search attaches to. Several, separated by commas.',

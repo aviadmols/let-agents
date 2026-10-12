@@ -170,6 +170,117 @@ final class HebrewSearch
         return [trim((string) preg_replace('/\s+/u', ' ', $text)), $min, $max];
     }
 
+    /**
+     * The phrases of a query that are actions, not words (see resources/query-actions.json):
+     * "טבעת יהלום הכי זולה במבצע" is "טבעת יהלום", sorted by price, on sale only. The same in the
+     * browser (readActions).
+     *
+     * @param  list<array<string, mixed>>  $registry
+     * @return array{0: string, 1: array{ids: list<string>, sort: string|null, dir: string|null, sale: bool, stock: bool, near: float|null, min: float|null, max: float|null}}
+     */
+    public static function actions(string $query, array $registry): array
+    {
+        $text = ' '.preg_replace('/[.,!?;:]+(?=\s|$)/u', ' ', mb_strtolower($query)).' ';
+        $found = ['ids' => [], 'sort' => null, 'dir' => null, 'sale' => false, 'stock' => false, 'near' => null, 'min' => null, 'max' => null];
+
+        foreach ($registry as $entry) {
+            foreach ((array) ($entry['patterns'] ?? []) as $pattern) {
+                if (@preg_match('~(^|\s)(?:'.$pattern.')(?=\s|$)~iu', $text, $m) !== 1) {
+                    continue;
+                }
+                $text = self::replaceFirst($text, $m[0], $m[1].' ');
+                $do = (array) ($entry['do'] ?? []);
+                if (isset($do['sort']) && $found['sort'] === null) {
+                    [$found['sort'], $found['dir']] = [(string) $do['sort'], (string) ($do['dir'] ?? 'asc')];
+                }
+                if (($do['filter'] ?? null) === 'sale') {
+                    $found['sale'] = true;
+                }
+                if (($do['filter'] ?? null) === 'stock') {
+                    $found['stock'] = true;
+                }
+                foreach (['near', 'min', 'max'] as $bound) {
+                    if (isset($do[$bound]) && isset($m[2])) {
+                        $found[$bound] = (float) str_replace(',', '.', $m[2]);
+                    }
+                }
+                $found['ids'][] = (string) $entry['id'];
+                break;
+            }
+        }
+
+        return [trim((string) preg_replace('/\s+/u', ' ', $text)), $found];
+    }
+
+    /**
+     * Products as the actions ask: on sale or in stock only, near a size, sorted by price, size or
+     * newness (what has the value first, in stock before out of stock, then the rest in their
+     * order). A product's size and date are its index record's "z" and "d"; with no size, a size
+     * action does nothing. The same in the browser (applyActions).
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @param  array{sort: string|null, dir: string|null, sale: bool, stock: bool, near: float|null, min?: float|null, max?: float|null}  $actions
+     * @return list<array<string, mixed>>
+     */
+    public static function applyActions(array $records, array $actions): array
+    {
+        if ($actions['sale']) {
+            $records = array_values(array_filter($records, fn (array $r): bool => ($r['sl'] ?? 0) === 1));
+        }
+        if ($actions['stock']) {
+            $records = array_values(array_filter($records, fn (array $r): bool => ($r['s'] ?? 0) === 1));
+        }
+        if ($actions['near'] !== null && array_filter($records, fn (array $r): bool => isset($r['z'])) !== []) {
+            $near = $actions['near'];
+            $records = array_values(array_filter($records, fn (array $r): bool => isset($r['z']) && abs((float) $r['z'] - $near) <= max($near * 0.15, 0.0001)));
+        }
+        foreach (['min' => 1, 'max' => -1] as $bound => $side) {
+            $limit = $actions[$bound] ?? null;
+            if ($limit !== null && array_filter($records, fn (array $r): bool => isset($r['z'])) !== []) {
+                $records = array_values(array_filter($records, fn (array $r): bool => isset($r['z']) && $side * ((float) $r['z'] - $limit) >= 0));
+            }
+        }
+        $field = ['price' => 'pr', 'size' => 'z', 'new' => 'd'][$actions['sort'] ?? ''] ?? null;
+        if ($field === null) {
+            return $records;
+        }
+        $sign = $actions['dir'] === 'desc' ? -1 : 1;
+        $at = array_flip(array_map(fn (array $r): string => (string) $r['id'], $records));
+        usort($records, function (array $a, array $b) use ($field, $sign, $at): int {
+            $hasA = is_numeric($a[$field] ?? null);
+            $hasB = is_numeric($b[$field] ?? null);
+            $inA = ($a['s'] ?? 0) === 1;
+            $inB = ($b['s'] ?? 0) === 1;
+
+            return [$hasB, $inB] <=> [$hasA, $inA]
+                ?: ($hasA && $hasB ? $sign * ((float) $a[$field] <=> (float) $b[$field]) : 0)
+                ?: $at[(string) $a['id']] <=> $at[(string) $b['id']];
+        });
+
+        return $records;
+    }
+
+    /**
+     * "טבעת או עגילים", "או טבעת או עגילים": each side searched on its own, its results added to
+     * the other's. One element when the query names no "או". The same in the browser (either).
+     *
+     * @return list<string>
+     */
+    public static function either(string $query): array
+    {
+        $text = trim((string) preg_replace('/^או\s+/u', '', trim($query)));
+        $sides = array_values(array_filter(array_map('trim', preg_split('/\s+או\s+/u', $text) ?: []), fn (string $side): bool => $side !== ''));
+
+        return count($sides) > 1 ? $sides : [$query];
+    }
+
+    private static function replaceFirst(string $text, string $find, string $with): string
+    {
+        $at = strpos($text, $find);
+
+        return $at === false ? $text : substr_replace($text, $with, $at, strlen($find));
+    }
+
     /** Whether a price is inside the range; a product with no price is outside any range. */
     public static function inRange(mixed $price, ?float $min, ?float $max): bool
     {

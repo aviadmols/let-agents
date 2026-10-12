@@ -10,7 +10,8 @@
         "Retrieval",
         "Admin",
         "Assistant",
-        "Analytics"
+        "Analytics",
+        "Enrichment"
     ],
     "provider": "SearchServiceProvider",
     "features": [
@@ -95,6 +96,14 @@
             "max": 12,
             "scope": "shop",
             "unit": "products"
+        },
+        {
+            "name": "size_attribute",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 60,
+            "scope": "shop"
         },
         {
             "name": "results_per_group",

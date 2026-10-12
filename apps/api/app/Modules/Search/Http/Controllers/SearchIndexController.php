@@ -89,6 +89,10 @@ final class SearchIndexController
             'config' => $config,
             'labels' => $labels,
             'items' => $data['items'] ?? [],
+            // The filters beside the results and the phrases that are actions (BuildSearchIndex).
+            'facets' => $data['facets'] ?? [],
+            'size' => $data['size'] ?? null,
+            'actions' => $data['actions'] ?? [],
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 

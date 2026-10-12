@@ -500,6 +500,112 @@
     return typedFound === typed.length && savedFound / saved.length >= 0.6;
   }
 
+  // ---------------------------------------------------------------- query actions (same as HebrewSearch.php)
+
+  /**
+   * The phrases of a query that are actions, not words (the index's "actions", the same in every
+   * shop): "טבעת יהלום הכי זולה במבצע" is "טבעת יהלום", sorted by price, on sale only. As on the
+   * server (HebrewSearch::actions).
+   */
+  function readActions(raw, registry) {
+    var text = ' ' + String(raw == null ? '' : raw).toLowerCase().replace(/[.,!?;:]+(?=\s|$)/g, ' ') + ' ';
+    var found = { ids: [], sort: null, dir: null, sale: false, stock: false, near: null, min: null, max: null };
+    (registry || []).forEach(function (entry) {
+      var patterns = entry.patterns || [];
+      for (var i = 0; i < patterns.length; i++) {
+        var re;
+        try {
+          re = new RegExp('(^|\\s)(?:' + patterns[i] + ')(?=\\s|$)', 'iu');
+        } catch (e) {
+          continue; // a pattern this browser cannot read is skipped, never an error
+        }
+        var m = text.match(re);
+        if (!m) {
+          continue;
+        }
+        var at = text.indexOf(m[0]);
+        text = text.slice(0, at) + m[1] + ' ' + text.slice(at + m[0].length);
+        var act = entry['do'] || {};
+        if (act.sort && found.sort === null) {
+          found.sort = String(act.sort);
+          found.dir = String(act.dir || 'asc');
+        }
+        if (act.filter === 'sale') {
+          found.sale = true;
+        }
+        if (act.filter === 'stock') {
+          found.stock = true;
+        }
+        ['near', 'min', 'max'].forEach(function (bound) {
+          if (act[bound] && m[2] !== undefined) {
+            found[bound] = parseFloat(String(m[2]).replace(',', '.'));
+          }
+        });
+        found.ids.push(String(entry.id));
+        break;
+      }
+    });
+    return { query: text.replace(/\s+/g, ' ').trim(), actions: found };
+  }
+
+  /**
+   * Products as the actions ask: on sale or in stock only, near a size, sorted by price, size or
+   * newness (what has the value first, in stock first, then the rest in their order). As on the
+   * server (HebrewSearch::applyActions).
+   */
+  function applyActions(records, actions) {
+    var out = records.slice();
+    if (actions.sale) {
+      out = out.filter(function (r) { return r.sl === 1; });
+    }
+    if (actions.stock) {
+      out = out.filter(function (r) { return r.s === 1; });
+    }
+    if (actions.near !== null && out.some(function (r) { return typeof r.z === 'number'; })) {
+      var near = actions.near;
+      out = out.filter(function (r) { return typeof r.z === 'number' && Math.abs(r.z - near) <= Math.max(near * 0.15, 0.0001); });
+    }
+    [['min', 1], ['max', -1]].forEach(function (pair) {
+      var limit = actions[pair[0]];
+      if (limit !== null && limit !== undefined && out.some(function (r) { return typeof r.z === 'number'; })) {
+        out = out.filter(function (r) { return typeof r.z === 'number' && pair[1] * (r.z - limit) >= 0; });
+      }
+    });
+    var field = { price: 'pr', size: 'z', 'new': 'd' }[actions.sort || ''];
+    if (!field) {
+      return out;
+    }
+    var sign = actions.dir === 'desc' ? -1 : 1;
+    var at = {};
+    out.forEach(function (r, i) { at[r.id] = i; });
+    return out.sort(function (a, b) {
+      var hasA = typeof a[field] === 'number' ? 1 : 0;
+      var hasB = typeof b[field] === 'number' ? 1 : 0;
+      var inA = a.s === 1 ? 1 : 0;
+      var inB = b.s === 1 ? 1 : 0;
+      if (hasA !== hasB) {
+        return hasB - hasA;
+      }
+      if (inA !== inB) {
+        return inB - inA;
+      }
+      if (hasA && hasB && a[field] !== b[field]) {
+        return sign * (a[field] < b[field] ? -1 : 1);
+      }
+      return at[a.id] - at[b.id];
+    });
+  }
+
+  /**
+   * "טבעת או עגילים", "או טבעת או עגילים": each side searched on its own, its results added to the
+   * other's. One element when the query names no "או". As on the server (HebrewSearch::either).
+   */
+  function either(raw) {
+    var text = String(raw == null ? '' : raw).trim().replace(/^או\s+/u, '').trim();
+    var sides = text.split(/\s+או\s+/u).map(function (side) { return side.trim(); }).filter(function (side) { return side !== ''; });
+    return sides.length > 1 ? sides : [raw];
+  }
+
   // ---------------------------------------------------------------- Shopify helpers (pure, tested in node)
 
   /**
@@ -773,6 +879,9 @@
           }
           state.index = build(source);
           state.codes = codes(data.items);
+          state.facets = data.facets || [];
+          state.size = data.size || null;
+          state.actions = data.actions || [];
           attachAll();
           return data;
         })
@@ -1250,6 +1359,9 @@
       '.la-mode i svg{width:14px;height:14px}',
       // Nothing holds every word: the narrower searches to choose from.
       '.la-focus{display:grid;gap:8px}',
+      '.la-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 10px}',
+      '.la-filters-title{font-size:12px;opacity:.7;margin-inline-end:2px}',
+      '.la-filters .d-chip{padding:4px 12px;font-size:13px}',
       '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
       '.la-focus-row{display:flex;flex-wrap:wrap;gap:8px}',
       'a.d-chip{color:inherit;text-decoration:none}',
@@ -1590,6 +1702,9 @@
       var hits = lookup(raw, question);
       var max = state.config.suggestions || 6;
       var products = [];
+      // Every product found, for the quick filters; the first few of what they leave are shown.
+      var pool = [];
+      var acting = readActions(raw, state.actions).actions.ids.length > 0;
       var categories = [];
       var articles = [];
       var answers = [];
@@ -1619,10 +1734,7 @@
           if (!showsGroup('product') || (whole && !hits[i].full)) {
             continue;
           }
-          total++;
-          if (products.length < max) {
-            products.push(record);
-          }
+          pool.push(record);
         } else if (record.t === 'category') {
           if (showsGroup('category') && categories.length < 5) {
             categories.push(record);
@@ -1639,11 +1751,16 @@
         }
       }
 
+      var picked = chosenFor(raw);
+      var view = viewOf(pool, picked);
+      total = view.length;
+      products = view.slice(0, max);
+
       // A product code, or the only product that holds every word: that product alone and clearly,
       // the rest only when the shopper asks for similar items. As on the server (HebrewSearch::single).
       var one = null;
       var others = [];
-      if (showsGroup('product') && !question && !/[?？]/.test(raw) && !asks(raw) && !withoutWords(raw).out.length) {
+      if (showsGroup('product') && !question && !acting && !/[?？]/.test(raw) && !asks(raw) && !withoutWords(raw).out.length) {
         var priced = priceRange(raw);
         var oneHit = priced.min === null && priced.max === null ? single(state.codes, raw, hits) : null;
         one = oneHit && state.records[oneHit.id] ? state.records[oneHit.id] : null;
@@ -1677,7 +1794,7 @@
 
       // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, above
       // what holds most of the words. Choosing one types it into the box. As on the server.
-      var options = !one && !question && !/[?？]/.test(raw) && !asks(raw) && !withoutWords(raw).out.length
+      var options = !one && !question && !acting && !/[?？]/.test(raw) && !asks(raw) && !withoutWords(raw).out.length
         && priceRange(raw).min === null && priceRange(raw).max === null ? focus(state.index, raw) : [];
       if (options.length) {
         main.appendChild(focusRow(options, null, raw, function (query) {
@@ -1700,6 +1817,12 @@
       if (d.mobile && categories.length) {
         chips = el('div', 'm-cats');
         main.appendChild(chips);
+      }
+
+      // Quick filters for what was found: a choice shows the products again, as chosen.
+      var bar = one ? null : filterBar(pool, picked, function () { suggest(input); });
+      if (bar) {
+        main.appendChild(bar);
       }
 
       var productsAt = null;
@@ -1853,6 +1976,157 @@
       return (min === null || price >= min) && (max === null || price <= max);
     }
 
+    /** The product hits as the actions ask (applyActions), the other hits after them, unchanged. */
+    function actOn(hits, actions) {
+      var products = [];
+      var others = [];
+      var byId = {};
+      hits.forEach(function (hit) {
+        var record = state.records[hit.id];
+        if (record && record.t === 'product') {
+          products.push(record);
+          byId[record.id] = hit;
+        } else {
+          others.push(hit);
+        }
+      });
+      return applyActions(products, actions).map(function (record) { return byId[record.id]; }).concat(others);
+    }
+
+    // ---------------------------------------------------------------- filters beside the results
+
+    /** What the shopper chose beside the results of this query; a new query starts with nothing chosen. */
+    var chosen = { key: null, sort: null, sale: false, stock: false, f: {} };
+
+    function chosenFor(raw) {
+      var key = normalize(raw);
+      if (chosen.key !== key) {
+        chosen = { key: key, sort: null, sale: false, stock: false, f: {} };
+      }
+      return chosen;
+    }
+
+    /**
+     * The products as chosen: values of one filter are "or" (yellow or white gold), of different
+     * filters "and" (yellow gold, 14K); then on sale, in stock, and the sort, as the actions do.
+     */
+    function viewOf(pool, c) {
+      var byFacet = {};
+      Object.keys(c.f).forEach(function (code) {
+        var facet = Math.floor(Number(code) / 1000);
+        (byFacet[facet] = byFacet[facet] || []).push(Number(code));
+      });
+      var facets = Object.keys(byFacet);
+      var out = !facets.length ? pool : pool.filter(function (record) {
+        return facets.every(function (facet) {
+          return (record.f || []).some(function (code) { return byFacet[facet].indexOf(code) !== -1; });
+        });
+      });
+      var parts = c.sort ? c.sort.split(':') : [null, null];
+      return applyActions(out, { sort: parts[0], dir: parts[1], sale: c.sale, stock: c.stock, near: null, min: null, max: null });
+    }
+
+    function actionLabel(id) {
+      for (var i = 0; i < (state.actions || []).length; i++) {
+        if (state.actions[i].id === id) {
+          return state.actions[i].l;
+        }
+      }
+      return '';
+    }
+
+    /**
+     * The quick filters for these products, in code from what last night's index knows of each: the
+     * sorts that mean something here (by price, by size where the shop measures it), on sale and in
+     * stock when only some are, and the shop's own values (yellow gold, 14K, vintage) that some of
+     * these products have and some do not, the most common first. Null when nothing would split them.
+     * changed() runs after each choice, to show the products again.
+     */
+    function filterBar(pool, c, changed) {
+      var n = pool.length;
+      if (n < 2) {
+        return null;
+      }
+      var chips = [];
+      var count = function (test) { return pool.filter(test).length; };
+      var sortChip = function (id, value) {
+        var text = actionLabel(id);
+        if (text) {
+          chips.push({ on: c.sort === value, text: text, go: function () { c.sort = c.sort === value ? null : value; } });
+        }
+      };
+      if (count(function (r) { return typeof r.pr === 'number'; }) >= 2) {
+        sortChip('cheapest', 'price:asc');
+        sortChip('dearest', 'price:desc');
+      }
+      if (state.size && count(function (r) { return typeof r.z === 'number'; }) >= 2) {
+        sortChip('biggest', 'size:desc');
+        sortChip('smallest', 'size:asc');
+      }
+      [['on_sale', 'sale', function (r) { return r.sl === 1; }], ['in_stock', 'stock', function (r) { return r.s === 1; }]].forEach(function (flag) {
+        var some = count(flag[2]);
+        var text = actionLabel(flag[0]);
+        if (text && (c[flag[1]] || (some > 0 && some < n))) {
+          chips.push({ on: c[flag[1]], text: text, n: some, go: function () { c[flag[1]] = !c[flag[1]]; } });
+        }
+      });
+      var counts = {};
+      pool.forEach(function (record) {
+        (record.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; });
+      });
+      Object.keys(counts).map(Number)
+        .filter(function (code) { return c.f[code] || counts[code] < n; })
+        .sort(function (a, b) { return (c.f[b] ? 1 : 0) - (c.f[a] ? 1 : 0) || counts[b] - counts[a] || a - b; })
+        .slice(0, 12)
+        .forEach(function (code) {
+          var facet = (state.facets || [])[Math.floor(code / 1000)];
+          var value = facet && facet.v[code % 1000];
+          if (value) {
+            chips.push({ on: !!c.f[code], text: value.l, n: counts[code], go: function () {
+              if (c.f[code]) {
+                delete c.f[code];
+              } else {
+                c.f[code] = true;
+              }
+            } });
+          }
+        });
+      if (!chips.length) {
+        return null;
+      }
+      var row = el('div', 'la-filters');
+      row.appendChild(el('span', 'la-filters-title', label('filters')));
+      var any = false;
+      chips.forEach(function (chip) {
+        any = any || chip.on;
+        var button = el('button', 'd-chip', chip.n ? label('filter_count', { label: chip.text, count: chip.n }) : chip.text);
+        button.type = 'button';
+        button.setAttribute('aria-pressed', chip.on ? 'true' : 'false');
+        button.addEventListener('mousedown', keepFocus);
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          chip.go();
+          changed();
+        });
+        row.appendChild(button);
+      });
+      if (any) {
+        var clear = el('button', 'd-chip', label('clear_filters'));
+        clear.type = 'button';
+        clear.addEventListener('mousedown', keepFocus);
+        clear.addEventListener('click', function (event) {
+          event.preventDefault();
+          c.sort = null;
+          c.sale = false;
+          c.stock = false;
+          c.f = {};
+          changed();
+        });
+        row.appendChild(clear);
+      }
+      return row;
+    }
+
     function lookup(raw, question) {
       var price = priceRange(raw);
       if (price.min !== null || price.max !== null) {
@@ -1867,6 +2141,28 @@
           var record = state.records[hit.id];
           return !record || record.t !== 'product' || !holdsAny(record.title + ' ' + (record.kw || ''), without.out);
         });
+      }
+      // "הכי זול", "במבצע", "גדול מ-2": actions, not words, as on the server.
+      var acted = readActions(raw, state.actions);
+      if (acted.actions.ids.length) {
+        return actOn(lookup(acted.query, question), acted.actions);
+      }
+      // "טבעת או עגילים": each side on its own, their results taken in turn, as on the server.
+      var sides = either(raw);
+      if (sides.length > 1) {
+        var lists = sides.map(function (side) { return lookup(side, question); });
+        var longest = Math.max.apply(null, lists.map(function (list) { return list.length; }));
+        var merged = [];
+        var taken = {};
+        for (var at = 0; at < longest; at++) {
+          lists.forEach(function (list) {
+            if (list[at] && !taken[list[at].id]) {
+              taken[list[at].id] = true;
+              merged.push(list[at]);
+            }
+          });
+        }
+        return merged;
       }
       var hits = search(state.index, raw);
       if (!question) {
@@ -3341,31 +3637,63 @@
       if (products.length) {
         var section = el('div', 'section');
         section.appendChild(el('h3', null, label('products')));
+        // Quick filters for what was found; each product as last night's index knows it.
+        var byRecord = {};
+        var pool = products.map(function (item) {
+          var record = state.records['p:' + item.external_id] || { id: 'p:' + item.external_id, t: 'product' };
+          byRecord[record.id] = item;
+          return record;
+        });
+        var picked = chosenFor(raw);
+        var barAt = el('div');
+        section.appendChild(barAt);
         var grid = el('div', 'grid');
-        var ids = [];
-        for (var p = 0; p < products.length; p++) {
-          grid.appendChild(card(products[p], raw));
-          ids.push(products[p].external_id);
-        }
         section.appendChild(grid);
-        // The drawer shows a few at a time and the rest on request.
-        if (drawerMode() && products.length > 6) {
-          var cardsInGrid = grid.querySelectorAll('.card');
-          for (var h = 6; h < cardsInGrid.length; h++) {
-            cardsInGrid[h].hidden = true;
+        var moreAt = el('div');
+        section.appendChild(moreAt);
+        var draw = function () {
+          while (grid.firstChild) {
+            grid.removeChild(grid.firstChild);
           }
-          var more = el('button', 'more', label('show_more'));
-          more.type = 'button';
-          more.addEventListener('click', function () {
-            for (var k = 0; k < cardsInGrid.length; k++) {
-              cardsInGrid[k].hidden = false;
-            }
-            more.parentNode.removeChild(more);
+          while (moreAt.firstChild) {
+            moreAt.removeChild(moreAt.firstChild);
+          }
+          var ids = [];
+          viewOf(pool, picked).forEach(function (record) {
+            var item = byRecord[record.id];
+            grid.appendChild(card(item, raw));
+            ids.push(item.external_id);
           });
-          section.appendChild(more);
-        }
+          // The drawer shows a few at a time and the rest on request.
+          var cardsInGrid = grid.querySelectorAll('.card');
+          if (drawerMode() && cardsInGrid.length > 6) {
+            for (var h = 6; h < cardsInGrid.length; h++) {
+              cardsInGrid[h].hidden = true;
+            }
+            var more = el('button', 'more', label('show_more'));
+            more.type = 'button';
+            more.addEventListener('click', function () {
+              for (var k = 0; k < cardsInGrid.length; k++) {
+                cardsInGrid[k].hidden = false;
+              }
+              more.parentNode.removeChild(more);
+            });
+            moreAt.appendChild(more);
+          }
+          liveProducts(ids).then(function () { updateCards(grid); });
+        };
+        var refresh = function () {
+          while (barAt.firstChild) {
+            barAt.removeChild(barAt.firstChild);
+          }
+          var bar = one ? null : filterBar(pool, picked, refresh);
+          if (bar) {
+            barAt.appendChild(bar);
+          }
+          draw();
+        };
+        refresh();
         blocks.product = section;
-        liveProducts(ids).then(function () { updateCards(grid); });
       }
 
       if (content.length) {
@@ -4368,6 +4696,9 @@
     single: single,
     focus: focus,
     closeAnswer: closeAnswer,
+    readActions: readActions,
+    either: either,
+    applyActions: applyActions,
     handleFromUrl: handleFromUrl,
     formatMoney: formatMoney,
     fromShopifyProduct: fromShopifyProduct,

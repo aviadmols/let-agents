@@ -57,6 +57,8 @@ final class LoadedIndex
             'records' => $records,
             'engine' => HebrewSearch::build($source),
             'codes' => HebrewSearch::codes($records),
+            // The phrases that are actions in this shop (HebrewSearch::actions), as the browser has them.
+            'actions' => is_array($data['actions'] ?? null) ? $data['actions'] : [],
         ];
     }
 

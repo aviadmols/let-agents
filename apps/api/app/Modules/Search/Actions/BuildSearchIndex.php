@@ -8,6 +8,10 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -16,6 +20,7 @@ use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\HebrewSearch;
+use App\Modules\Tenancy\Models\Shop;
 
 /**
  * What a shop's search box searches, as one list: every product the store still publishes,
@@ -38,6 +43,9 @@ final class BuildSearchIndex
     public const VERSION = 1;
 
     private const MAX_KEYWORDS = 400;
+
+    /** The phrases that are actions, the same in every shop (HebrewSearch::actions). */
+    public const ACTIONS = __DIR__.'/../resources/query-actions.json';
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -78,7 +86,13 @@ final class BuildSearchIndex
         // What each product's picture shows, in words, joins its words: found by what it looks like.
         $seen = RetrievalImage::query()->whereNotNull('caption_words')->pluck('caption_words', 'product_id')->map(fn ($w): array => is_array($w) ? $w : (array) json_decode((string) $w, true));
 
+        // What each product is, from the shop's approved facts: the filters beside the results.
+        $facets = $this->facets($shopId);
+        $faceted = 0;
+
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
+            $read = $facets['products'][$product->id] ?? [];
+            $faceted += isset($read['f']) ? 1 : 0;
             $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
@@ -89,6 +103,11 @@ final class BuildSearchIndex
                 'buy' => $product->type === 'simple' && $product->purchasable ? 1 : 0,
                 // The code as the store writes it: a search for it shows this product alone.
                 'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
+                // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
+                'sl' => $product->on_sale ? 1 : null,
+                'f' => $read['f'] ?? null,
+                'z' => $read['z'] ?? null,
+                'd' => self::added($product),
             ]);
             $counts['product']++;
         }
@@ -125,7 +144,7 @@ final class BuildSearchIndex
             $counts['answer']++;
         }
 
-        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'], 'actions' => self::actions($this->locale($shopId), $facets['size'] !== null)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
         SearchIndex::query()->updateOrCreate(['shop_id' => $shopId], [
@@ -135,7 +154,7 @@ final class BuildSearchIndex
             'built_at' => now(),
         ]);
 
-        $run->output(['counts' => $counts, 'hash' => $hash, 'bytes' => strlen($json)])
+        $run->output(['counts' => $counts, 'hash' => $hash, 'bytes' => strlen($json), 'faceted_products' => $faceted, 'facets' => count($facets['facets'])])
             ->summary('search::runs.indexed', [
                 'products' => (string) $counts['product'],
                 'content' => (string) $counts['content'],
@@ -143,7 +162,130 @@ final class BuildSearchIndex
             ]);
     }
 
-    /** @return list<string> */
+    /**
+     * The shop's filters from its active vocabularies (each product type and each choice or
+     * yes-or-no attribute, with its values and their names in the shop's language), and for each
+     * product the ones its approved facts give, as numbers into that list (facet * 1000 + value),
+     * with its size: the approved number of the attribute the shop measures size by
+     * (search.size_attribute), when it has one.
+     *
+     * @return array{facets: list<array{k: string, l: string, v: list<array{k: string, l: string}>}>, size: array{k: string, l: string}|null, products: array<string, array{f?: list<int>, z?: float}>}
+     */
+    private function facets(string $shopId): array
+    {
+        $locale = $this->locale($shopId);
+        $facets = [];
+        $where = [];
+        $sizeKey = trim((string) Settings::get('search.size_attribute', $shopId));
+        $size = null;
+
+        foreach (EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get() as $vocabulary) {
+            $definition = $vocabulary->definition();
+            $lists = [['type', 'type', array_map(fn (array $t): string => (string) $t['key'], $definition->productTypes())]];
+            foreach ($definition->attributes() as $attribute) {
+                $kind = $attribute['type'] ?? 'number';
+                if ($kind === 'enum') {
+                    $lists[] = [(string) $attribute['key'], 'attribute', array_map(fn (array $v): string => (string) $v['key'], (array) $attribute['values'])];
+                } elseif ($kind === 'boolean') {
+                    $lists[] = [(string) $attribute['key'], 'flag', ['true']];
+                } elseif ($attribute['key'] === $sizeKey) {
+                    $size ??= ['k' => $sizeKey, 'l' => $definition->label('attribute', $sizeKey, $locale)];
+                }
+            }
+            foreach ($lists as [$key, $kind, $values]) {
+                if (! isset($where[$key])) {
+                    $where[$key] = ['at' => count($facets), 'values' => []];
+                    $facets[] = ['k' => $key, 'l' => $key === 'type' ? (string) __('search::storefront.facet_type', [], $locale) : $definition->label('attribute', $key, $locale), 'v' => []];
+                }
+                $at = $where[$key]['at'];
+                foreach ($values as $value) {
+                    if (isset($where[$key]['values'][$value])) {
+                        continue;
+                    }
+                    $where[$key]['values'][$value] = count($facets[$at]['v']);
+                    $facets[$at]['v'][] = ['k' => $value, 'l' => match ($kind) {
+                        'type' => $definition->label('type', $value, $locale),
+                        'flag' => $facets[$at]['l'],
+                        default => $definition->label('attribute', $key, $locale, $value),
+                    }];
+                }
+            }
+        }
+
+        $products = [];
+        if ($facets !== [] || $size !== null) {
+            EnrichmentFact::query()->where('status', FactStatus::Approved)->whereNotNull('product_id')
+                ->whereIn('kind', [FactKind::Type, FactKind::Choice, FactKind::Flag, FactKind::Spec])
+                ->select(['id', 'product_id', 'kind', 'key', 'value_text', 'value_number'])
+                ->lazyById(2000)->each(function (EnrichmentFact $fact) use (&$products, $where, $sizeKey): void {
+                    if ($fact->kind === FactKind::Spec) {
+                        if ($fact->key === $sizeKey && $fact->value_number !== null) {
+                            $products[$fact->product_id]['z'] = round((float) $fact->value_number, 6);
+                        }
+
+                        return;
+                    }
+                    $key = $fact->kind === FactKind::Type ? 'type' : $fact->key;
+                    $value = $fact->kind === FactKind::Flag ? 'true' : (string) $fact->value_text;
+                    if (isset($where[$key]['values'][$value])) {
+                        $products[$fact->product_id]['f'][] = $where[$key]['at'] * 1000 + $where[$key]['values'][$value];
+                    }
+                });
+            foreach ($products as &$read) {
+                if (isset($read['f'])) {
+                    $read['f'] = array_values(array_unique($read['f']));
+                    sort($read['f']);
+                }
+            }
+            unset($read);
+        }
+
+        return ['facets' => $facets, 'size' => $size, 'products' => $products];
+    }
+
+    /**
+     * The phrases that are actions, the same in every shop, with their names in the shop's language;
+     * those about size only where the shop measures size, so elsewhere "גדול" stays a word.
+     *
+     * @return list<array{id: string, l: string, patterns: list<string>, do: array<string, string>}>
+     */
+    private static function actions(string $locale, bool $hasSize): array
+    {
+        $registry = array_values(array_filter(self::registry(), fn (array $entry): bool => $hasSize || ($entry['needs'] ?? null) !== 'size'));
+
+        return array_map(fn (array $entry): array => [
+            'id' => (string) $entry['id'],
+            'l' => (string) ($entry['label'][$locale] ?? $entry['label']['he'] ?? $entry['id']),
+            'patterns' => array_values((array) $entry['patterns']),
+            'do' => (array) $entry['do'],
+        ], $registry);
+    }
+
+    /**
+     * Every phrase that is an action, before a shop's index leaves out what it cannot do.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function registry(): array
+    {
+        static $registry = null;
+
+        return $registry ??= array_values((array) (json_decode((string) file_get_contents(self::ACTIONS), true)['actions'] ?? []));
+    }
+
+    /** When the store added the product, as a number that sorts (20261012); null when unknown. */
+    private static function added(CatalogProduct $product): ?int
+    {
+        $at = strtotime((string) ($product->payload['created_at'] ?? ''));
+
+        return $at === false || $at <= 0 ? null : (int) date('Ymd', $at);
+    }
+
+    private function locale(string $shopId): string
+    {
+        return (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he');
+    }
+
     /**
      * Answers shoppers already got and the team did not hide, the most asked first: a question
      * typed in the search box finds its answer before anything is asked. A page's answer points to

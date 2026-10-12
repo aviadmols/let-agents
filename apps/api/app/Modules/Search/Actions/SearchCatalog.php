@@ -93,22 +93,26 @@ final class SearchCatalog
             [$priced, $minPrice, $maxPrice] = HebrewSearch::priceRange(mb_substr($raw, 0, 120));
             // "בלי יהלומים": that word is not searched for, and what holds it is kept away.
             [$query, $without] = HebrewSearch::without($priced);
+            $index = trim($query) === '' ? null : LoadedIndex::for($shopId);
+            // "הכי זול", "במבצע", "גדול מ-2": actions, not words. The same phrases in every shop, less
+            // those its index leaves out (no size: "גדול" stays a word).
+            [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
-            $index = $query === '' ? null : LoadedIndex::for($shopId);
 
-            if ($index === null) {
+            if ($index === null || $query === '') {
                 return $empty;
             }
 
-            $spelling = HebrewSearch::search($index['engine'], $query);
+            // "טבעת או עגילים": each side on its own, their results taken in turn.
+            $spelling = self::either($index['engine'], $query);
             // A product code, or the only product that holds every word: shown alone, the rest on request.
             $asks = str_contains($raw, '?') || HebrewSearch::asks($query);
-            $single = $minPrice === null && $maxPrice === null && $without === [] && ! $asks
+            $single = $minPrice === null && $maxPrice === null && $without === [] && $actions['ids'] === [] && ! $asks
                 ? HebrewSearch::single($index['codes'] ?? [], $query, $spelling)
                 : null;
             $single = $single !== null && isset($index['records'][$single['id']]) ? $single : null;
             // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, to choose from.
-            $focus = $minPrice === null && $maxPrice === null && $without === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
+            $focus = $minPrice === null && $maxPrice === null && $without === [] && $actions['ids'] === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
 
             // A sentence ("מה הכי טוב למברגה ביתית וזולה") holds words no product has: search
             // what it is about instead, so a question finds the products it asks about.
@@ -181,6 +185,9 @@ final class SearchCatalog
                 array_values(array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) !== 1)),
             );
 
+            // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
+            $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
+
             // The one product first, wherever the merge put it, and also when only its code found it.
             if ($single !== null) {
                 $groups['product'] = [
@@ -205,7 +212,7 @@ final class SearchCatalog
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 
@@ -979,5 +986,28 @@ final class SearchCatalog
             'answer' => $record['ans'] ?? null,
             'sources' => $record['src'] ?? null,
         ], fn ($value): bool => $value !== null);
+    }
+
+    /**
+     * The spelling search of each side of an "או", their hits taken in turn, each product once.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function either(array $engine, string $query): array
+    {
+        $sides = array_map(fn (string $side): array => HebrewSearch::search($engine, $side), HebrewSearch::either($query));
+        if (count($sides) === 1) {
+            return $sides[0];
+        }
+        $out = [];
+        for ($i = 0; $i < max(array_map('count', $sides)); $i++) {
+            foreach ($sides as $hits) {
+                if (isset($hits[$i]) && ! isset($out[$hits[$i]['id']])) {
+                    $out[$hits[$i]['id']] = $hits[$i];
+                }
+            }
+        }
+
+        return array_values($out);
     }
 }
