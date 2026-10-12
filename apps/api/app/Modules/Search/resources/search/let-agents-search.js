@@ -954,7 +954,7 @@
       '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}',
       '.card{display:flex;flex-direction:column;gap:6px;font-size:14px;min-width:0}',
       '.card a{color:inherit;text-decoration:none}',
-      '.card img,.card .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;background:var(--rs-soft)}',
+      '.card img,.card .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:var(--rs-soft)}',
       '.card .title{line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
       '.la-btn{font:inherit;font-size:13px;font-weight:400;padding:8px 12px;border-radius:var(--rs-radius);border:1px solid var(--rs-accent);',
       'background:var(--rs-accent);color:var(--rs-accent-fg);cursor:pointer;text-align:center;text-decoration:none}',
@@ -1000,7 +1000,6 @@
       ':host(.la-np) .price,:host(.la-np) .d-price,.la-np .price,.la-np .d-price{display:none}',
       '.pics{position:relative;display:block}.pics .alt,.d-pic .alt{position:absolute;inset:0;opacity:0;transition:opacity .3s ease}',
       '@media (hover:hover){.card a:hover .pics .alt,.d-prod:hover .d-pic .alt{opacity:1}}',
-      '.drawer .card{background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:12px;padding:10px}',
       '.drawer .foot{flex-direction:column;align-items:stretch;padding:12px 14px;background:var(--rs-bg);border-top:1px solid var(--rs-line)}',
       '.askbox{display:flex;align-items:center;gap:10px;border:1.5px solid var(--rs-fg);border-radius:14px;padding:6px;padding-inline-start:12px}',
       '.askbox input{all:unset;flex:1;min-width:0;font:inherit;font-size:14px;color:var(--rs-fg)}',
@@ -1590,7 +1589,8 @@
     }
 
     function priceRange(raw) {
-      var text = ' ' + String(raw) + ' ';
+      // "עד 1500." or "עד 1500?": the mark that ends a sentence does not hide the amount before it.
+      var text = ' ' + String(raw).replace(/[.,!?;:]+(?=\s|$)/g, ' ') + ' ';
       var min = null;
       var max = null;
       PRICE_PATTERNS.forEach(function (pattern) {
@@ -3370,6 +3370,14 @@
      */
     function quietThemeSearch(input) {
       var theirs = input.closest ? input.closest('predictive-search') : null;
+      // Prestige keeps its predictive-search beside the form, not around the field: the nearest one
+      // in the panel the field is in is hidden whole.
+      for (var node = input.parentElement, depth = 0; !theirs && node && node !== doc.body && depth < 5; node = node.parentElement, depth++) {
+        theirs = node.querySelector('predictive-search');
+        if (theirs) {
+          theirs.setAttribute('data-let-agents-search-hidden', '');
+        }
+      }
       var owners = [theirs, input.form];
       for (var i = 0; i < owners.length; i++) {
         if (owners[i]) {
@@ -3380,7 +3388,7 @@
         var style = doc.createElement('style');
         style.id = 'let-agents-search-quiet';
         style.textContent = '[data-let-agents-search] .predictive-search,[data-let-agents-search] [data-predictive-search],'
-          + '[data-let-agents-search] [id^="predictive-search-results"]{display:none!important}';
+          + '[data-let-agents-search] [id^="predictive-search-results"],[data-let-agents-search-hidden]{display:none!important}';
         (doc.head || doc.documentElement).appendChild(style);
       }
       if (theirs) {
@@ -3530,6 +3538,71 @@
       load();
     }
 
+    /**
+     * The drawer, open with nothing searched yet and its field ready: what the theme's search
+     * icon opens when the shop shows results in a drawer. Open already: its field is focused.
+     */
+    function openEmptyDrawer() {
+      if (!(panel && drawerScroll && drawerScroll.isConnected)) {
+        var first = openDrawer('');
+        // openDrawer starts a turn for a search; with nothing searched there is no turn to show.
+        if (first && first.parentNode) {
+          first.parentNode.parentNode.removeChild(first.parentNode);
+        }
+        currentSheet = null;
+        drawerScroll.scrollTop = drawerScroll.scrollHeight;
+      }
+      var field = panel.root.querySelector('.foot input');
+      if (field) {
+        field.focus();
+      }
+    }
+
+    /**
+     * The theme's own search buttons and links: a header icon (Prestige's, Dawn's details), a link
+     * to the search page, anything labelled search. Not a button inside a form: that one submits.
+     */
+    var SEARCH_TRIGGERS = 'a[href$="/search"],a[href*="/search?"],[aria-controls*="search" i],.header__search-link,.header__icon--search,'
+      + 'details-modal.header__search>summary,[data-action*="search" i],button[aria-label*="search" i],a[aria-label*="search" i],'
+      + 'button[aria-label*="חיפוש"],a[aria-label*="חיפוש"],.search-toggle,.js-search-toggle';
+
+    function searchTrigger(target) {
+      var node = target && target.closest ? target.closest(SEARCH_TRIGGERS) : null;
+      return node && !node.closest('form') && !node.__letAgentsSearchBypass ? node : null;
+    }
+
+    /**
+     * In a shop that shows results in a drawer, the theme's search icon opens the drawer instead of
+     * the theme's own search bar. Caught before the theme sees the click. Before the shop's settings
+     * are known (the first click of a visit), the click waits for them: a drawer shop gets the
+     * drawer, any other shop gets the click back as it was, and so does a shop whose settings fail.
+     */
+    function onSearchTrigger(event) {
+      var node = searchTrigger(event.target);
+      if (!node || event.defaultPrevented || event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+      if (state.config && !drawerMode()) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (state.config) {
+        openEmptyDrawer();
+        return;
+      }
+      load().then(function (data) {
+        if (data && drawerMode()) {
+          openEmptyDrawer();
+          return;
+        }
+        node.__letAgentsSearchBypass = true;
+        node.click();
+        node.__letAgentsSearchBypass = false;
+      });
+    }
+
+    win.addEventListener('click', onSearchTrigger, true);
     doc.addEventListener('focusin', wake, true);
     doc.addEventListener('pointerdown', wake, true);
     win.addEventListener('resize', position);

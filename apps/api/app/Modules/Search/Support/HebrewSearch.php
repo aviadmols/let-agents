@@ -91,7 +91,8 @@ final class HebrewSearch
      */
     public static function priceRange(string $query): array
     {
-        $text = ' '.$query.' ';
+        // "עד 1500." or "עד 1500?": the mark that ends a sentence does not hide the amount before it.
+        $text = ' '.preg_replace('/[.,!?;:]+(?=\s|$)/u', ' ', $query).' ';
         $num = self::PRICE_NUMBER;
         $cur = self::PRICE_CURRENCY;
         $min = null;
