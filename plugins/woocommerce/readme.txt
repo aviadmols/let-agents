@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.7.0
+Stable tag: 0.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -57,6 +57,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.7.1 =
+* Orders are reported to Let Agents while the search is on, not only while the widget is: the search analytics count the purchases of products added to the cart from the search. As before, an order carries no customer data: a hashed order number, totals, product IDs and quantities, and the anonymous visitor ID.
 
 = 0.7.0 =
 * The email before checkout: when the shop turns it on in Let Agents, a shopper can leave their email before checkout and the cart is saved as an order waiting for payment, with that email, so the shop can follow up. Leaving it again updates the same order; checking out finishes it, or trashes it when the checkout made its own. This is the only thing the plugin writes to the store. The shopper gets no email, stock and payment are not touched.
