@@ -1006,7 +1006,7 @@
       '.la-btn.la-wa{background:#1f9d55;border-color:#1f9d55;color:#fff;display:inline-block;justify-self:start}',
       '.section.answer-box{display:grid;gap:10px}',
       '.section.answer-box .answer{margin:0}',
-      '.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;justify-content:center;align-items:flex-start;padding:min(8vh,64px) 16px 16px;z-index:2147483000}',
+      '.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;justify-content:center;align-items:flex-start;padding:min(8vh,64px) 16px 16px;z-index:2147483647}',
       '.sheet{width:min(1100px,100%);max-height:calc(100vh - min(8vh,64px) - 16px);overflow:auto;background:var(--rs-bg);color:var(--rs-fg);border-radius:14px;',
       'box-shadow:0 30px 80px -20px rgba(0,0,0,.45);font:inherit}',
       '.top{position:sticky;top:0;display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--rs-bg);border-bottom:1px solid var(--rs-line);z-index:1}',
