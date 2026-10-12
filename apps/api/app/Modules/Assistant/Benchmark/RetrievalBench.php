@@ -51,6 +51,9 @@ final class RetrievalBench
 
     private const JUDGE_OUTPUT_TOKENS = 3000;
 
+    /** Where each writer-benchmark answer lands; the first two and no_answer_refused are right. */
+    public const LAYERS = ['correct', 'no_answer_refused', 'retrieval', 'facts', 'writer', 'no_answer_invented', 'failed_call'];
+
     public function __construct(
         private readonly AnswerSiteQuestion $answers,
         private readonly SemanticSearch $semantic,
@@ -238,6 +241,8 @@ final class RetrievalBench
      * facts: it reached the writer; the facts-only writer failed where the writer with the
      *        descriptions (the current model, v4) did not, so the answer was in free text only.
      * writer: what answers was in front of it, and the writer missed, invented or misplaced it.
+     * On a question the store holds no answer to, apart: no_answer_refused (it showed nothing, the
+     * right behaviour) or no_answer_invented (it showed an answer or products: a writer error).
      *
      * @param  list<array<string, mixed>>  $records
      * @param  array<string, array<string, mixed>>  $judged
@@ -256,9 +261,10 @@ final class RetrievalBench
             $currentRight = isset($j['writers'][WriterBench::CURRENT]) && ! isset($j['writers'][WriterBench::CURRENT]['error']) && WriterBench::finalCorrect($j, WriterBench::CURRENT);
 
             foreach ($j['writers'] as $key => $side) {
-                $out[$key] ??= ['correct' => 0, 'retrieval' => 0, 'facts' => 0, 'writer' => 0, 'failed_call' => 0];
+                $out[$key] ??= array_fill_keys(self::LAYERS, 0);
                 $layer = match (true) {
                     isset($side['error']) => 'failed_call',
+                    ! $r['labels']['answerable_in_store'] => WriterBench::shown($j, $key) ? 'no_answer_invented' : 'no_answer_refused',
                     WriterBench::finalCorrect($j, $key) => 'correct',
                     $retrievalMiss => 'retrieval',
                     str_ends_with($key, '@'.WriterBench::V5) && $currentRight => 'facts',

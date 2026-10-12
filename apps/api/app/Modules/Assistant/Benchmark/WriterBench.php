@@ -520,7 +520,7 @@ final class WriterBench
     }
 
     /** Whether anything (an answer or a pick) is left to show after code's gate and the checker. */
-    private static function shown(array $record, string $key): bool
+    public static function shown(array $record, string $key): bool
     {
         $side = $record['writers'][$key];
         $verdict = $side['check']['verdict'] ?? null;

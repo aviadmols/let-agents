@@ -106,7 +106,7 @@ final class RetrievalBenchCommand extends Command
             $this->table([$part, '%'], array_map(fn (string $k, mixed $v): array => [$k, (string) $v], array_keys($report[$part]), array_values($report[$part])));
         }
         if (isset($report['attribution'])) {
-            $layers = ['correct', 'retrieval', 'facts', 'writer', 'failed_call'];
+            $layers = RetrievalBench::LAYERS;
             $this->table(['writer', ...$layers], array_map(fn (string $w, array $c): array => [$w, ...array_map(fn (string $l): string => (string) $c[$l], $layers)], array_keys($report['attribution']), array_values($report['attribution'])));
         }
 

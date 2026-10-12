@@ -43,17 +43,20 @@ final class RetrievalBenchTest extends TestCase
             $this->record('facts', relevant: ['product:1'], shown: ['product:1']),
             // It reached the writer and both failed: the writer.
             $this->record('writer', relevant: ['product:1'], shown: ['product:1']),
+            // The store holds no answer: saying nothing is right, an answer is made up.
+            $this->record('none', relevant: [], answerable: false),
         ];
         $judged = [
             'miss' => $this->judged('miss', ['current' => false, 'current@v5' => false]),
             'facts' => $this->judged('facts', ['current' => true, 'current@v5' => false]),
             'writer' => $this->judged('writer', ['current' => false, 'current@v5' => false]),
+            'none' => $this->judged('none', ['current' => null, 'current@v5' => false]),
         ];
 
         $attribution = RetrievalBench::report($records, $judged)['attribution'];
 
-        $this->assertSame(['correct' => 1, 'retrieval' => 1, 'facts' => 0, 'writer' => 1, 'failed_call' => 0], $attribution[WriterBench::CURRENT]);
-        $this->assertSame(['correct' => 0, 'retrieval' => 1, 'facts' => 1, 'writer' => 1, 'failed_call' => 0], $attribution['current@'.WriterBench::V5]);
+        $this->assertSame(['correct' => 1, 'no_answer_refused' => 1, 'retrieval' => 1, 'facts' => 0, 'writer' => 1, 'no_answer_invented' => 0, 'failed_call' => 0], $attribution[WriterBench::CURRENT]);
+        $this->assertSame(['correct' => 0, 'no_answer_refused' => 0, 'retrieval' => 1, 'facts' => 1, 'writer' => 1, 'no_answer_invented' => 1, 'failed_call' => 0], $attribution['current@'.WriterBench::V5]);
     }
 
     /** @return array<string, mixed> */
@@ -70,9 +73,9 @@ final class RetrievalBenchTest extends TestCase
     }
 
     /**
-     * A judged writer-benchmark record: each writer answered, right or wrong by the judge.
+     * A judged writer-benchmark record: each writer answered, right or wrong by the judge, or (null) said nothing.
      *
-     * @param  array<string, bool>  $right
+     * @param  array<string, bool|null>  $right
      * @return array<string, mixed>
      */
     private function judged(string $id, array $right): array
@@ -80,7 +83,7 @@ final class RetrievalBenchTest extends TestCase
         $writers = [];
         $verdicts = [];
         foreach ($right as $key => $ok) {
-            $writers[$key] = ['answer' => 'תשובה', 'picks' => [], 'check' => ['verdict' => 'kept'], 'code' => ['internal_ids' => [], 'foreign_script' => [], 'language_ok' => true]];
+            $writers[$key] = ['answer' => $ok === null ? '' : 'תשובה', 'picks' => [], 'check' => ['verdict' => 'kept'], 'code' => ['internal_ids' => [], 'foreign_script' => [], 'language_ok' => true]];
             $verdicts[$key] = ['answer_correct' => $ok, 'hallucination' => ! $ok, 'wrong_attribution' => false, 'language_correct' => true];
         }
 
