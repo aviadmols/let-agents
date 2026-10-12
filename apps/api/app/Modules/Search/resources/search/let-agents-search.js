@@ -1360,6 +1360,11 @@
       // Nothing holds every word: the narrower searches to choose from.
       '.la-focus{display:grid;gap:8px}',
       '.la-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 10px}',
+      '.la-bar{display:flex;align-items:center;gap:8px;padding:12px max(16px,calc(50vw - 520px));background:var(--rs-bg,#fff);box-shadow:0 2px 14px rgba(0,0,0,.12)}',
+      '.la-bar .m-box input{font-size:17px}',
+      '.la-bar-x{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:999px;color:var(--rs-fg)}',
+      '.la-bar-x:hover{background:var(--rs-soft,rgba(0,0,0,.05))}',
+      '.la-bar-x svg{width:20px;height:20px}',
       '.la-filters-title{font-size:12px;opacity:.7;margin-inline-end:2px}',
       '.la-filters .d-chip{padding:4px 12px;font-size:13px}',
       '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
@@ -1976,6 +1981,21 @@
       return (min === null || price >= min) && (max === null || price <= max);
     }
 
+    /** A product of the index as the server presents it (SearchCatalog::present), for a card. */
+    function presented(record) {
+      return {
+        id: record.id,
+        type: record.t,
+        external_id: String(record.id).slice(2),
+        title: record.title,
+        url: record.url,
+        image: record.img,
+        image2: record.i2,
+        buy: record.buy === 1,
+        sku: record.sku
+      };
+    }
+
     /** The product hits as the actions ask (applyActions), the other hits after them, unchanged. */
     function actOn(hits, actions) {
       var products = [];
@@ -2103,6 +2123,7 @@
         button.type = 'button';
         button.setAttribute('aria-pressed', chip.on ? 'true' : 'false');
         button.addEventListener('mousedown', keepFocus);
+        holdClicks(button);
         button.addEventListener('click', function (event) {
           event.preventDefault();
           chip.go();
@@ -2114,6 +2135,7 @@
         var clear = el('button', 'd-chip', label('clear_filters'));
         clear.type = 'button';
         clear.addEventListener('mousedown', keepFocus);
+        holdClicks(clear);
         clear.addEventListener('click', function (event) {
           event.preventDefault();
           c.sort = null;
@@ -3234,6 +3256,71 @@
     }
 
     /**
+     * On a wide screen where the site's field is hidden (a header with only an icon): a search
+     * field of our own across the top of the page, and the suggestions under it, laid out as
+     * everywhere on a desktop. A phone keeps the sheet over the page.
+     */
+    var bar = null;
+
+    function openBar(text) {
+      if (!bar) {
+        var made = shadowHost('let-agents-search-bar');
+        var s = made.host.style;
+        s.position = 'fixed';
+        s.top = '0';
+        s.left = '0';
+        s.width = '100%';
+        s.zIndex = '2147482001';
+        var wrap = el('div', 'la-bar');
+        var box = el('div', 'm-box');
+        var field = el('input');
+        field.type = 'search';
+        field.setAttribute('aria-label', label('search_label'));
+        field.setAttribute('autocomplete', 'off');
+        field.setAttribute('enterkeyhint', 'search');
+        box.appendChild(field);
+        wrap.appendChild(box);
+        var close = el('button', 'la-bar-x');
+        close.type = 'button';
+        close.innerHTML = CLEAR;
+        close.setAttribute('aria-label', label('back'));
+        close.addEventListener('click', function () {
+          closeBar();
+          closeDropdown();
+        });
+        wrap.appendChild(close);
+        made.root.appendChild(wrap);
+        bar = { host: made.host, field: field };
+        attach(field);
+      }
+      current = bar.field;
+      bar.field.value = text || '';
+      bar.field.focus();
+      if (bar.field.value.trim()) {
+        suggest(bar.field);
+      }
+    }
+
+    function closeBar() {
+      if (bar) {
+        if (bar.host.parentNode) {
+          bar.host.parentNode.removeChild(bar.host);
+        }
+        if (current === bar.field) {
+          current = null;
+        }
+        bar = null;
+      }
+    }
+
+    /** A click inside our boxes is ours: the theme must not take it for a click outside its search. */
+    function holdClicks(node) {
+      ['pointerdown', 'mousedown', 'click'].forEach(function (type) {
+        node.addEventListener(type, function (event) { event.stopPropagation(); });
+      });
+    }
+
+    /**
      * The regular search, open at once, with what was typed: the site's own box where it shows;
      * where it is hidden (a header with only an icon), the regular search as a sheet of its own,
      * with its own field over the page. Never the theme's button: some lead to a page of their own.
@@ -3250,6 +3337,11 @@
         if (field.value.trim()) {
           suggest(field);
         }
+        return;
+      }
+
+      if (!narrow()) {
+        openBar(text);
         return;
       }
 
@@ -3637,13 +3729,23 @@
       if (products.length) {
         var section = el('div', 'section');
         section.appendChild(el('h3', null, label('products')));
-        // Quick filters for what was found; each product as last night's index knows it.
+        // Quick filters for everything found (the server sends every product's id, in order), each
+        // product as last night's index knows it; the cards a page at a time.
         var byRecord = {};
         var pool = products.map(function (item) {
           var record = state.records['p:' + item.external_id] || { id: 'p:' + item.external_id, t: 'product' };
           byRecord[record.id] = item;
           return record;
         });
+        ((result && result.ids) || []).forEach(function (id) {
+          var record = state.records[id];
+          if (record && record.t === 'product' && !byRecord[id]) {
+            byRecord[id] = presented(record);
+            pool.push(record);
+          }
+        });
+        var page = drawerMode() ? 6 : 24;
+        var showing = page;
         var picked = chosenFor(raw);
         var barAt = el('div');
         section.appendChild(barAt);
@@ -3659,30 +3761,26 @@
             moreAt.removeChild(moreAt.firstChild);
           }
           var ids = [];
-          viewOf(pool, picked).forEach(function (record) {
+          var view = viewOf(pool, picked);
+          view.slice(0, showing).forEach(function (record) {
             var item = byRecord[record.id];
             grid.appendChild(card(item, raw));
             ids.push(item.external_id);
           });
-          // The drawer shows a few at a time and the rest on request.
-          var cardsInGrid = grid.querySelectorAll('.card');
-          if (drawerMode() && cardsInGrid.length > 6) {
-            for (var h = 6; h < cardsInGrid.length; h++) {
-              cardsInGrid[h].hidden = true;
-            }
+          // A page at a time; the rest on request.
+          if (view.length > showing) {
             var more = el('button', 'more', label('show_more'));
             more.type = 'button';
             more.addEventListener('click', function () {
-              for (var k = 0; k < cardsInGrid.length; k++) {
-                cardsInGrid[k].hidden = false;
-              }
-              more.parentNode.removeChild(more);
+              showing += page;
+              draw();
             });
             moreAt.appendChild(more);
           }
           liveProducts(ids).then(function () { updateCards(grid); });
         };
         var refresh = function () {
+          showing = page;
           while (barAt.firstChild) {
             barAt.removeChild(barAt.firstChild);
           }
@@ -4540,7 +4638,7 @@
           if (!dropdown || dropdown.mobile || dropdown.upload || dropdown.sticky) {
             return;
           }
-          if (doc.activeElement !== input && doc.activeElement !== dropdown.host) {
+          if (doc.activeElement !== input && doc.activeElement !== dropdown.host && !(bar && doc.activeElement === bar.host)) {
             closeDropdown();
           }
         }, 150);
@@ -4669,10 +4767,18 @@
       }
       if (panel) {
         closePanel();
-      } else if (dropdown) {
+      } else if (dropdown || bar) {
         closeDropdown();
+        closeBar();
       }
     });
+    // The bar of our own closes with a click outside it and outside the suggestions.
+    doc.addEventListener('pointerdown', function (event) {
+      if (bar && event.target !== bar.host && !(dropdown && event.target === dropdown.host)) {
+        closeDropdown();
+        closeBar();
+      }
+    }, true);
     // An answer or the photo area stays open while the shopper reads; a click elsewhere closes it.
     doc.addEventListener('pointerdown', function (event) {
       var target = event.target;

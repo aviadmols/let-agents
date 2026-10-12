@@ -31,6 +31,9 @@ use App\Modules\Search\Support\PhotoPlacer;
  */
 final class SearchCatalog
 {
+    /** The most product ids a search returns besides the shown ones: what the filters and the next pages work on. */
+    private const ALL_IDS = 600;
+
     public const GROUPS = ['answer', 'product', 'content', 'category'];
 
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
@@ -196,6 +199,8 @@ final class SearchCatalog
                 ];
             }
 
+            // Every product found, in order, for the quick filters and the pages beyond the first.
+            $all = $only === null || in_array('product', $only, true) ? array_slice(array_column($groups['product'], 'id'), 0, self::ALL_IDS) : [];
             $counts = array_map('count', $groups);
             $total = array_sum($counts);
 
@@ -212,7 +217,7 @@ final class SearchCatalog
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 

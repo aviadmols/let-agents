@@ -288,5 +288,8 @@ return [
         'reviewer_model' => 'Reviewer',
         'change_models' => 'Change models on the agents screen',
         'same_family' => 'Writer and reviewer are of one family: discovery will not run',
+        'version_n' => 'Version :n',
+        'operator_edit' => 'Edited by the operator, on the version before',
+        'author' => 'Written by',
     ],
 ];

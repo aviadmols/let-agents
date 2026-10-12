@@ -71,6 +71,7 @@
                             <th style="{{ $cell }}">{{ $t('coverage') }}</th>
                             <th style="{{ $cell }}">{{ $t('catalog_coverage') }}</th>
                             <th style="{{ $cell }}">{{ $t('source') }}</th>
+                            <th style="{{ $cell }}">{{ $t('author') }}</th>
                             <th style="{{ $cell }}">{{ $t('decision') }}</th>
                         </tr></thead>
                         <tbody>
@@ -84,6 +85,7 @@
                                 <td style="{{ $cell }}">{{ $row['sample'] === null ? '' : $pct($row['sample']) }}</td>
                                 <td style="{{ $cell }}">{{ $row['catalog'] === null ? ($p->status === 'approved' && ! str_starts_with($row['decision'], 'removed') ? '0%' : '') : $pct($row['catalog']) }}</td>
                                 <td style="{{ $cell }}" dir="ltr">{{ $row['source'] }}</td>
+                                <td style="{{ $cell }};font-size:12px" dir="ltr">{{ $row['author'] }}</td>
                                 <td style="{{ $cell }}">
                                     <x-filament::badge :color="$decisionColors[$row['decision']] ?? 'gray'">{{ $t('decisions.'.$row['decision']) }}</x-filament::badge>
                                     @if ($row['why'] !== '')<div style="{{ $muted }}" dir="ltr">{{ $row['why'] }}</div>@endif
@@ -97,7 +99,14 @@
         @endif
 
         @if ($p->review)
-            <x-filament::section :heading="$t('review')" :description="$t('review_hint', ['writer' => $p->review['writer']['model'] ?? '', 'reviewer' => $p->review['reviewer'] ?? ''])" collapsible>
+            <x-filament::section :heading="$t('review')" collapsible>
+                <div style="display:grid;gap:4px;margin-bottom:10px;font-size:13px">
+                    @foreach ($this->lineage($p) as $step)
+                        <div><strong>{{ $t('version_n', ['n' => $loop->iteration]) }}</strong> <span style="{{ $muted }}">{{ $step['at'] }}</span> ·
+                            @if ($step['operator']){{ $t('operator_edit') }}@else{{ $t('review_hint', ['writer' => $step['writer'], 'reviewer' => $step['reviewer']]) }}@endif
+                        </div>
+                    @endforeach
+                </div>
                 <p><x-filament::badge :color="($p->review['verdict'] ?? '') === 'good' ? 'success' : 'warning'">{{ $t('verdicts.'.($p->review['verdict'] ?? 'needs_work')) }}</x-filament::badge></p>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:10px">
                     <div style="{{ $card }}"><strong>{{ $t('writer_proposed') }}</strong>

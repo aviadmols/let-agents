@@ -14,6 +14,7 @@ use App\Modules\Enrichment\Actions\ImportVocabulary;
 use App\Modules\Enrichment\Actions\ProposeSchema;
 use App\Modules\Enrichment\Actions\ReadProductsInCode;
 use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Filament\Operator\Pages\SchemaDiscovery;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
@@ -157,6 +158,30 @@ final class SchemaDiscoveryTest extends TestCase
         $this->assertSame($vocabulary->id, $proposal->vocabulary_id);
         $this->assertTrue(Features::enabled('enrichment.read_text_in_code', $this->shop->id), 'and it is read from the store\'s own words');
         $this->assertNull(app(DecideSchemaProposal::class)->handle($proposal, false), 'decided once');
+    }
+
+    public function test_an_operators_edit_shows_who_wrote_and_reviewed_the_version_it_was_made_on(): void
+    {
+        $first = app(DiscoverSchema::class)->handle($this->shop->id)['proposal'];
+        $this->replies = [['vocabulary' => $this->vocabulary()], ['verdict' => 'good', 'drop' => []]];
+        app(ProposeSchema::class)->handle($first);
+        $first->refresh();
+        $edited = $first->proposed;
+        $edited['attributes'][] = ['key' => 'chain_included', 'type' => 'enum', 'label' => ['he' => 'שרשרת', 'en' => 'Chain'], 'values' => [
+            ['key' => 'yes', 'label' => ['he' => 'כולל', 'en' => 'Yes'], 'patterns' => ['כולל שרשרת']], ['key' => 'no', 'label' => ['he' => 'ללא', 'en' => 'No'], 'patterns' => ['ללא שרשרת']]]];
+        $second = $this->inShop(fn () => EnrichmentSchemaProposal::query()->create(['shop_id' => $this->shop->id, 'status' => EnrichmentSchemaProposal::PROPOSED, 'sampled' => $first->sampled,
+            'stats' => $first->stats, 'proposed' => $edited, 'coverage' => $first->coverage, 'fingerprint' => 'edit',
+            'review' => ['verdict' => 'good', 'reviewer' => 'operator', 'based_on' => $first->id, 'dropped' => [], 'writer' => ['model' => 'operator', 'notes' => []]]]));
+
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        $page = $this->withSession(['operator.shop' => $this->shop->id])->get('/operator/enrichment/schema?proposal='.$second->id)->assertOk();
+
+        $page->assertSee('Version 1')->assertSee('gpt-5.4-mini (OpenAI)')->assertSee('claude-sonnet-5-5 (Anthropic)')
+            ->assertSee('Version 2')->assertSee('Edited by the operator, on the version before');
+        $rows = collect(app(SchemaDiscovery::class)->rows($second))->keyBy('key');
+        $this->assertSame('gpt-5.4-mini (OpenAI)', $rows['metal']['author'], 'from the version it was made on');
+        $this->assertSame('Operator', $rows['chain_included']['author'], 'added by the operator');
     }
 
     public function test_with_the_shops_flag_code_reads_the_vocabulary_from_its_fields_title_and_description(): void

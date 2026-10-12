@@ -91,6 +91,10 @@ final class SchemaDiscovery extends Page
     {
         $coverage = $proposal->coverage ?? [];
         $read = $this->read($proposal);
+        // Who wrote each field: in an operator's edit, what came from the proposal it was made on is that proposal's writer's.
+        $base = isset($proposal->review['based_on']) ? EnrichmentSchemaProposal::query()->find($proposal->review['based_on']) : null;
+        $baseKeys = $base === null ? [] : array_flip([...array_column((array) ($base->proposed['product_types'] ?? []), 'key'), ...array_column((array) ($base->proposed['attributes'] ?? []), 'key')]);
+        $author = fn (string $key): string => self::who(isset($baseKeys[$key]) ? (string) ($base->review['writer']['model'] ?? '') : (string) ($proposal->review['writer']['model'] ?? ''));
         $decision = $proposal->status;
         $rows = [];
 
@@ -98,7 +102,7 @@ final class SchemaDiscovery extends Page
             $key = (string) $type['key'];
             $rows[] = ['part' => 'type', 'key' => $key, 'label' => (string) ($type['label']['he'] ?? $key), 'kind' => '', 'values' => [],
                 'sample' => (float) ($coverage['product_types'][$key] ?? 0), 'catalog' => $read['types'][$key]['share'] ?? null,
-                'source' => self::sources($read['types'][$key]['sources'] ?? []), 'decision' => $decision, 'why' => ''];
+                'source' => self::sources($read['types'][$key]['sources'] ?? []), 'decision' => $decision, 'why' => '', 'author' => $author($key)];
         }
         foreach ((array) ($proposal->proposed['attributes'] ?? []) as $attribute) {
             $key = (string) $attribute['key'];
@@ -108,11 +112,11 @@ final class SchemaDiscovery extends Page
                 'kind' => $kind === 'number' ? 'number · '.($attribute['dimension'] ?? '') : $kind, 'values' => $values,
                 'sample' => (float) ($coverage['attributes'][$key]['share'] ?? 0), 'catalog' => $read['attributes'][$key]['share'] ?? null,
                 'source' => self::sources($read['attributes'][$key]['sources'] ?? []) ?: (string) ($proposal->review['writer']['sources'][$key] ?? ''),
-                'decision' => $decision, 'why' => ''];
+                'decision' => $decision, 'why' => '', 'author' => $author($key)];
         }
         foreach ((array) ($proposal->review['dropped'] ?? []) as $drop) {
             $rows[] = ['part' => $drop['kind'] === 'product_type' ? 'type' : 'attribute', 'key' => (string) $drop['key'], 'label' => '', 'kind' => (string) $drop['kind'],
-                'values' => [], 'sample' => null, 'catalog' => null, 'source' => '', 'decision' => 'removed_by_'.($drop['by'] ?? 'reviewer'), 'why' => (string) $drop['why']];
+                'values' => [], 'sample' => null, 'catalog' => null, 'source' => '', 'decision' => 'removed_by_'.($drop['by'] ?? 'reviewer'), 'why' => (string) $drop['why'], 'author' => ''];
         }
 
         return $rows;
@@ -148,6 +152,43 @@ final class SchemaDiscovery extends Page
         }
 
         return $out;
+    }
+
+    /**
+     * Who wrote and who reviewed the proposal, from the first version: an operator's edit names the
+     * proposal it was made on, and that one its writer and reviewer.
+     *
+     * @return list<array{at: string, operator: bool, writer: string, reviewer: string}>
+     */
+    public function lineage(EnrichmentSchemaProposal $proposal): array
+    {
+        $steps = [];
+        for ($p = $proposal, $n = 0; $p !== null && $n < 6; $n++) {
+            $writer = (string) ($p->review['writer']['model'] ?? '');
+            $steps[] = ['at' => (string) $p->created_at?->format('d/m/Y H:i'), 'operator' => $writer === 'operator', 'writer' => self::who($writer), 'reviewer' => self::who((string) ($p->review['reviewer'] ?? ''))];
+            $p = isset($p->review['based_on']) ? EnrichmentSchemaProposal::query()->find($p->review['based_on']) : null;
+        }
+
+        return array_reverse($steps);
+    }
+
+    /** A model with its company, or the operator. */
+    private static function who(string $model): string
+    {
+        if ($model === '') {
+            return '-';
+        }
+        if ($model === 'operator') {
+            return (string) __('enrichment::ui.schema.by.operator');
+        }
+        $company = match (true) {
+            str_starts_with($model, 'claude') => 'Anthropic',
+            str_starts_with($model, 'gemini') => 'Google',
+            (bool) preg_match('/^(gpt|o\d|text-)/', $model) => 'OpenAI',
+            default => null,
+        };
+
+        return $company === null ? $model : $model.' ('.$company.')';
     }
 
     /** @param  array<string, int>  $sources */
