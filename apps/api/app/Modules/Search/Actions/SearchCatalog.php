@@ -115,11 +115,17 @@ final class SearchCatalog
                 $meaning = array_values(array_filter($meaning, $keep));
                 $pictures = array_values(array_filter($pictures, $keep));
             }
-            // "עגילים עד 500": with a price, only the products that hold the words. By meaning a
-            // pendant is close to earrings, and when the price leaves few earrings it would show.
-            $held = array_flip(array_filter(array_column($spelling, 'id'), fn (string $id): bool => str_starts_with($id, 'p:')));
-            if (($minPrice !== null || $maxPrice !== null) && $held !== []) {
+            // "עגילים עד 500": with a price, what the words name is decided before the price, never
+            // after it. Only products that hold the words: by meaning a pendant is close to
+            // earrings. And when some hold them as typed (in the title, a category, an attribute or
+            // a synonym), only those: "צמיד" is close to "צמודים" by spelling, and when no bracelet
+            // is that cheap the stud earrings would be all that is left.
+            $products = array_values(array_filter($spelling, fn (array $hit): bool => str_starts_with($hit['id'], 'p:')));
+            if (($minPrice !== null || $maxPrice !== null) && $products !== []) {
+                $exact = array_values(array_filter($products, fn (array $hit): bool => $hit['exact']));
+                $held = array_flip(array_column($exact !== [] ? $exact : $products, 'id'));
                 $keep = fn (string $id): bool => isset($held[$id]) || ! str_starts_with($id, 'p:');
+                $spelling = array_values(array_filter($spelling, fn (array $hit): bool => $keep($hit['id'])));
                 $meaning = array_values(array_filter($meaning, $keep));
                 $pictures = array_values(array_filter($pictures, $keep));
             }

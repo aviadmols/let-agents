@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -258,6 +259,27 @@ final class SearchFlowTest extends TestCase
 
         $this->assertSame(['201'], array_column($this->search('עגילים עד 500 ש"ח?')->json('groups.product'), 'external_id'));
         $this->assertContains('203', array_column($this->search('עגילים')->json('groups.product'), 'external_id'), 'without a price, meaning still adds');
+    }
+
+    public function test_the_assistant_reads_what_a_question_names_the_way_the_search_reads_its_words(): void
+    {
+        $this->inShop(function (): void {
+            $earrings = CatalogCategory::query()->create($this->category('9', 'עגילים', 2));
+            $this->product('201', 'עגילים צמודים כדורי זהב', ['price' => '450.00']);
+            $this->product('203', 'תליון מפתח עדין', ['price' => '350.00']);
+            $this->product('204', 'חישוקי זהב 14K', ['price' => '300.00'])->categories()->attach($earrings->id);
+            $this->product('205', 'שרשרת חוליות זהב', ['price' => '700.00']);
+            $this->product('206', 'צמיד טניס זהב', ['price' => '900.00']);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $named = fn (string $question, array $ids): array => $this->inShop(fn () => app(ProductsNamed::class)->among($this->shop->id, $question, $ids));
+
+        $this->assertSame(['201', '204'], $named('עגילים עד 500 ש"ח?', ['203', '201', '204']), 'the hoops by their category, not the pendant');
+        $this->assertSame(['205'], $named('שרשראות עד 1000', ['203', '205']), 'a plural names the singular');
+        // "צמיד" is close to "צמודים" by spelling; with bracelets in the store, studs are not bracelets.
+        $this->assertSame([], $named('צמיד עד 500', ['201', '203']));
+        $this->assertSame([], array_column($this->search('צמיד עד 500')->json('groups.product'), 'external_id'), 'no bracelet that cheap: nothing, not the studs');
+        $this->assertSame(['206'], array_column($this->search('צמיד עד 1000')->json('groups.product'), 'external_id'));
     }
 
     public function test_while_typing_the_search_is_spelling_only_and_not_counted(): void

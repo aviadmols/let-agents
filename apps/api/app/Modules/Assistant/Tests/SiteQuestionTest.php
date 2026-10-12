@@ -9,6 +9,7 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -232,12 +233,21 @@ final class SiteQuestionTest extends TestCase
         $this->product('802', 'עגילי חישוק זהב 14K', 'עגילים.', [], ['price' => '480.00', 'in_stock' => true]);
         $this->product('803', 'תליון מפתח עדין', 'תליון.', [], ['price' => '350.00', 'in_stock' => true]);
         $this->product('804', 'עגילי יהלום', 'עגילים.', [], ['price' => '900.00', 'in_stock' => true]);
+        $this->product('805', 'חישוקי זהב 14K', 'חישוקים.', [], ['price' => '300.00', 'in_stock' => true]);
+        // The search reads the words (see SearchFlowTest): the hoops are in the earrings category.
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return str_contains($question, 'עגילים') ? array_values(array_intersect($externalIds, ['801', '802', '804', '805'])) : [];
+            }
+        });
 
-        $data = $this->askWith('עגילים עד 500 ש"ח?', ['803', '802', '801', '804'])->json('data');
+        $data = $this->askWith('עגילים עד 500 ש"ח?', ['803', '802', '801', '804', '805'])->json('data');
 
         $this->assertSame(['answered', 'code'], [$data['outcome'], $data['from']]);
-        $this->assertSame(['801', '802'], array_column($data['picks'], 'external_id'), 'earrings up to 500, cheapest first: not the pendant, not the 900');
-        $this->assertStringContainsString('כדורי זהב', $data['answer']);
+        $this->assertSame(['805', '801', '802'], array_column($data['picks'], 'external_id'), 'earrings up to 500 as the search reads them, cheapest first: the hoops whose title never says earrings, not the pendant, not the 900');
+        $this->assertStringContainsString('חישוקי זהב', $data['answer']);
         $this->assertSame([], $this->calls, 'no model for arithmetic');
 
         // Nothing it names in the range: a model reads it, as before.

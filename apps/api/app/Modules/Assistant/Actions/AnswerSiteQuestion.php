@@ -13,6 +13,7 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\PriceRange;
+use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
@@ -736,10 +737,18 @@ final class AnswerSiteQuestion
             return null;
         }
 
+        // What the question names. With a price, as the store's search reads the words (categories,
+        // attributes, synonyms, plurals): hoops titled "חישוקי זהב" are earrings too, and a price
+        // must not narrow the kind further. Without one, the title must name it: "the cheapest
+        // drill" is never a drill bit.
         $named = self::named($question);
+        $byWords = ($min !== null || $max !== null) && app()->bound(ProductsNamed::class)
+            ? array_flip(app(ProductsNamed::class)->among($this->tenant->require(), $question, array_column($productsByRef, 'external_id')))
+            : null;
         $fit = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0
             && ($min === null || $p['price'] >= $min) && ($max === null || $p['price'] <= $max)
-            && ($named === [] || self::titleNames($p['title'], $named)) && ($asks !== 'on_sale' || $p['on_sale']));
+            && ($byWords !== null ? isset($byWords[(string) $p['external_id']]) : ($named === [] || self::titleNames($p['title'], $named)))
+            && ($asks !== 'on_sale' || $p['on_sale']));
 
         if ($fit === []) {
             return null;
