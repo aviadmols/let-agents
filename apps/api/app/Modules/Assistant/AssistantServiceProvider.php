@@ -12,6 +12,7 @@ use App\Modules\Assistant\Console\AnswerReportCommand;
 use App\Modules\Assistant\Console\CheckerReportCommand;
 use App\Modules\Assistant\Console\ContextEvalCommand;
 use App\Modules\Assistant\Console\KnowledgeCommand;
+use App\Modules\Assistant\Console\RetrievalBenchCommand;
 use App\Modules\Assistant\Console\ReviewAsksCommand;
 use App\Modules\Assistant\Console\WriterBenchCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
@@ -79,6 +80,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
             AnswerReportCommand::class,
             ContextEvalCommand::class,
             WriterBenchCommand::class,
+            RetrievalBenchCommand::class,
         ];
     }
 }

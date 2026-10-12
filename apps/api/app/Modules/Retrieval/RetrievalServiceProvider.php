@@ -10,6 +10,7 @@ use App\Modules\Retrieval\Candidates\MentionedTogether;
 use App\Modules\Retrieval\Candidates\SimilarProducts;
 use App\Modules\Retrieval\Console\RetrievalCommand;
 use App\Modules\Retrieval\Contracts\CaptionsPictures;
+use App\Modules\Retrieval\Contracts\ChunkExperiments;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
@@ -17,6 +18,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Sources\ContentDocuments;
 use App\Modules\Retrieval\Sources\ProductDocuments;
 use App\Modules\Retrieval\Sources\PurchaseDocuments;
+use App\Modules\Retrieval\Support\InMemoryChunkExperiments;
 use App\Modules\Retrieval\Support\PassageSearch;
 use App\Modules\Retrieval\Support\RetrievalRunner;
 use App\Modules\Retrieval\Support\VectorSearch;
@@ -37,6 +39,8 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(SemanticSearch::class, VectorSearch::class);
         $this->app->bind(Passages::class, PassageSearch::class);
+        // One per process: the pieces it embeds are kept for the next question of the same experiment.
+        $this->app->singleton(ChunkExperiments::class, InMemoryChunkExperiments::class);
         $this->app->bind(RunsRetrieval::class, RetrievalRunner::class);
         $this->app->bind(CaptionsPictures::class, CaptionImages::class);
         $this->app->bind(PictureContent::class, VectorSearch::class);

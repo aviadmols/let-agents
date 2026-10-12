@@ -539,7 +539,7 @@ final class WriterBench
      * What a shopper finally sees, after code's gate and the checker, is right: nothing shown is
      * right only when the input does not answer the question; what is shown must be correct.
      */
-    private static function finalCorrect(array $record, string $key): bool
+    public static function finalCorrect(array $record, string $key): bool
     {
         $side = $record['writers'][$key];
         $check = $side['check'] ?? [];
