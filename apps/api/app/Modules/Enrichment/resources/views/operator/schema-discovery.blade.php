@@ -13,6 +13,13 @@
             <x-filament::button wire:click="readCatalog" color="gray" icon="heroicon-o-arrow-path">{{ $t('read_catalog') }}</x-filament::button>
             <span style="{{ $muted }}">{{ $t('how') }}</span>
         </div>
+        @php($m = $this->models())
+        <div style="margin-top:10px;font-size:13px">
+            {{ $t('writer_model') }}: <code dir="ltr">{{ $m['writer']->model }}</code> ({{ $m['writer']->provider->label() }})
+            · {{ $t('reviewer_model') }}: <code dir="ltr">{{ $m['reviewer']->model }}</code> ({{ $m['reviewer']->provider->label() }})
+            · <a href="{{ url('/operator/agents?agent=enrichment.schema_discovery') }}" style="text-decoration:underline">{{ $t('change_models') }}</a>
+            @if ($m['same_family'])<x-filament::badge color="danger">{{ $t('same_family') }}</x-filament::badge>@endif
+        </div>
         @php($proposals = $this->proposals())
         @if ($proposals->isNotEmpty())
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">

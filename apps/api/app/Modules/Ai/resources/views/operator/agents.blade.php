@@ -17,7 +17,7 @@
 
     <div style="display:grid;gap:16px">
         @foreach ($agents as $agent)
-            <x-filament::section collapsible :collapsed="! $loop->first">
+            <x-filament::section collapsible :collapsed="$this->agent === null ? ! $loop->first : $this->agent !== $agent['key']" :id="'agent-'.str_replace('.', '-', $agent['key'])">
                 <x-slot name="heading">
                     <span style="display:inline-flex;flex-wrap:wrap;gap:8px;align-items:center">
                         {{ __($agent['slug'].'::agents.'.$agent['name']) }}

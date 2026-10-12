@@ -4,6 +4,7 @@ namespace App\Modules\Enrichment\Filament\Operator\Pages;
 
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\DecideSchemaProposal;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -155,6 +156,19 @@ final class SchemaDiscovery extends Page
         arsort($sources);
 
         return implode(' / ', array_keys($sources));
+    }
+
+    /**
+     * Who writes the vocabulary and who reviews it, as set on the agents screen.
+     *
+     * @return array{writer: AgentModel, reviewer: AgentModel, same_family: bool}
+     */
+    public function models(): array
+    {
+        $writer = AgentModel::from('enrichment.schema_writer_provider', 'enrichment.schema_writer_model');
+        $reviewer = AgentModel::from('enrichment.schema_reviewer_provider', 'enrichment.schema_reviewer_model');
+
+        return ['writer' => $writer, 'reviewer' => $reviewer, 'same_family' => $writer->provider->family() === $reviewer->provider->family()];
     }
 
     public function open(string $id): void

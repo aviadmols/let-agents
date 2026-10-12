@@ -284,5 +284,9 @@ return [
             'operator' => 'Operator',
         ],
         'unread' => 'No pattern reads it in the sample (0%): a fact with no source.',
+        'writer_model' => 'Writer',
+        'reviewer_model' => 'Reviewer',
+        'change_models' => 'Change models on the agents screen',
+        'same_family' => 'Writer and reviewer are of one family: discovery will not run',
     ],
 ];

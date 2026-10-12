@@ -16,6 +16,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
@@ -36,6 +37,10 @@ final class Agents extends Page
     protected static ?string $slug = 'agents';
 
     protected string $view = 'ai::operator.agents';
+
+    /** The agent opened when the page is reached from another screen ("enrichment.schema_discovery"). */
+    #[Url]
+    public ?string $agent = null;
 
     /** @var array<string, string|float> setting key => what the form holds */
     public array $values = [];

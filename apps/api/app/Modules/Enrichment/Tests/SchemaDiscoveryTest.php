@@ -146,7 +146,8 @@ final class SchemaDiscoveryTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('operator'));
         $this->actingAs(User::factory()->operator()->create());
         $this->withSession(['operator.shop' => $this->shop->id])->get('/operator/enrichment/schema')->assertOk()
-            ->assertSee('total_weight')->assertSee('60%');
+            ->assertSee('total_weight')->assertSee('60%')->assertSee('gpt-5.4-mini')->assertSee('claude-sonnet-5-5')->assertSee('agents?agent=enrichment.schema_discovery', false);
+        $this->get('/operator/agents?agent=enrichment.schema_discovery')->assertOk()->assertSee('agent-enrichment-schema_discovery', false);
 
         app(DecideSchemaProposal::class)->handle($proposal->refresh(), true);
 
