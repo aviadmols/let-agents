@@ -2459,7 +2459,9 @@
 
       var ids = [];
       if (state.index) {
-        var hits = lookup(raw, isQuestion(raw));
+        // Sent to be answered, so read as a question: "טבעת הכי זולה" has no question word, and
+        // "זולה", which no product holds, must not leave the answer with no products.
+        var hits = lookup(raw, true);
         for (var i = 0; i < hits.length && ids.length < 12; i++) {
           var record = state.records[hits[i].id];
           if (record && record.t === 'product') {
