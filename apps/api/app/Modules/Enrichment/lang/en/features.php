@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'relations' => [
+        'label' => 'Product relations computed at night',
+        'description' => 'Complements, alternatives and other sizes are computed every night and kept. Off: the same sections come from the indexes (closeness in meaning, the same product type, the size family) and what the store set.',
+    ],
     'read_text_in_code' => [
         'label' => 'Read attributes from the store\'s text in code',
         'description' => 'Code reads the vocabulary\'s choices, numbers and flags from the store\'s fields (type, tags, attributes), the title and the start of the description, in that order, and keeps where each fact was read and how sure its source is.',

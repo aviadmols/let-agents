@@ -28,6 +28,8 @@ final class NightlyReadingTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // These sections are built here from the relations computed at night.
+        Features::override('enrichment.relations', true, $this->shop->id);
     }
 
     public function test_one_night_reads_the_products_the_promises_and_the_articles(): void

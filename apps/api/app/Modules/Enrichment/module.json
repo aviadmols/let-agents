@@ -13,6 +13,10 @@
     "provider": "EnrichmentServiceProvider",
     "features": [
         {
+            "name": "relations",
+            "default": false
+        },
+        {
             "name": "read_text_in_code",
             "default": false
         },

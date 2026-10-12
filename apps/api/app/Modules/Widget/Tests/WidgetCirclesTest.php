@@ -2,6 +2,7 @@
 
 namespace App\Modules\Widget\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -35,6 +36,8 @@ final class WidgetCirclesTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // These sections are built here from the relations computed at night.
+        Features::override('enrichment.relations', true, $this->shop->id);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => 'https://store.test', 'access_token' => self::TOKEN,
         ]));

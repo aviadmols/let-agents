@@ -2,6 +2,7 @@
 
 namespace App\Modules\Widget\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Analytics\Models\AnalyticsEvent;
@@ -34,6 +35,8 @@ final class CurationTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // These sections are built here from the relations computed at night.
+        Features::override('enrichment.relations', true, $this->shop->id);
         $this->page = $this->product('10', 'מסור אנכי', 'x', []);
 
         foreach (['21', '22', '23', '24', '25'] as $i => $id) {

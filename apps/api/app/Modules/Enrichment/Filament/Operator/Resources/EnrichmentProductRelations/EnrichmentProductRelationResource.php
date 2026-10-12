@@ -2,7 +2,9 @@
 
 namespace App\Modules\Enrichment\Filament\Operator\Resources\EnrichmentProductRelations;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\NeedsShopContext;
+use App\Core\Tenancy\TenantContext;
 use App\Modules\Enrichment\Enums\RelationKind;
 use App\Modules\Enrichment\Filament\Operator\Resources\EnrichmentProductRelations\Pages\ListEnrichmentProductRelations;
 use App\Modules\Enrichment\Models\EnrichmentProductRelation;
@@ -21,7 +23,9 @@ use UnitEnum;
 /** What shows next to each product, and why: complements, other sizes, alternatives. */
 final class EnrichmentProductRelationResource extends Resource
 {
-    use NeedsShopContext;
+    use NeedsShopContext {
+        shouldRegisterNavigation as shopNavigation;
+    }
 
     protected static ?string $model = EnrichmentProductRelation::class;
 
@@ -32,6 +36,14 @@ final class EnrichmentProductRelationResource extends Resource
     protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'enrichment/relations';
+
+    /** Shown only to a shop that still computes relations at night; elsewhere the indexes fill those sections. */
+    public static function shouldRegisterNavigation(...$arguments): bool
+    {
+        $shop = app(TenantContext::class)->id();
+
+        return self::shopNavigation(...$arguments) && $shop !== null && Features::enabled('enrichment.relations', $shop);
+    }
 
     public static function getNavigationLabel(): string
     {

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Widget\Tests;
 
+use App\Core\Facades\Features;
 use App\Modules\Analytics\Models\AnalyticsScore;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentProductRelation;
@@ -23,6 +24,8 @@ final class LearnedOrderTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // These sections are built here from the relations computed at night.
+        Features::override('enrichment.relations', true, $this->shop->id);
         $this->page = $this->product('10', 'מסור אנכי', 'x', []);
 
         foreach (['21', '22', '23', '24', '25', '26'] as $i => $id) {

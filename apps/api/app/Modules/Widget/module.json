@@ -11,7 +11,8 @@
         "Assistant",
         "Admin",
         "Leads",
-        "Search"
+        "Search",
+        "Retrieval"
     ],
     "provider": "WidgetServiceProvider",
     "features": [

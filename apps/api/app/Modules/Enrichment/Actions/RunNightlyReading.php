@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Actions;
 
+use App\Core\Facades\Features;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Models\Run;
@@ -55,6 +56,10 @@ final class RunNightlyReading
                 $failed = [];
 
                 foreach (self::STEPS as $name => $action) {
+                    // Relations only where the shop still has them; elsewhere the indexes fill those sections.
+                    if ($name === 'relations' && ! Features::enabled('enrichment.relations', $shopId)) {
+                        continue;
+                    }
                     try {
                         $step = app($action)->handle($shopId);
                         $done[$name] = $step->status->value;

@@ -25,6 +25,7 @@ use App\Modules\Enrichment\Models\EnrichmentRanking;
 use App\Modules\Enrichment\Models\EnrichmentRelationRules;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
+use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Tenancy\Models\Shop;
 use App\Modules\Widget\Models\WidgetCuration;
@@ -435,62 +436,68 @@ final class BuildPageBank
             $sections[] = $this->section('specs', ['specs' => $specs]);
         }
 
-        // Products shown with this one, as ComputeProductRelations found them.
-        $relations = EnrichmentProductRelation::query()
-            ->with('related')
-            ->where('product_id', $product->id)
-            ->whereHas('related', fn ($q) => $q->whereNull('removed_at')->where('in_stock', true)->where('purchasable', true))
-            ->orderByDesc('score')
-            ->get()
-            ->groupBy(fn (EnrichmentProductRelation $r): string => $r->kind->value);
+        // Relations computed at night, where the shop still has them; otherwise the same sections
+        // from the indexes (sectionsFromIndex).
+        if (Features::enabled('enrichment.relations', $this->shopId)) {
+            // Products shown with this one, as ComputeProductRelations found them.
+            $relations = EnrichmentProductRelation::query()
+                ->with('related')
+                ->where('product_id', $product->id)
+                ->whereHas('related', fn ($q) => $q->whereNull('removed_at')->where('in_stock', true)->where('purchasable', true))
+                ->orderByDesc('score')
+                ->get()
+                ->groupBy(fn (EnrichmentProductRelation $r): string => $r->kind->value);
 
-        $version = max($version, (int) collect($relations->flatten())->max(fn (EnrichmentProductRelation $r): int => (int) $r->computed_at->timestamp));
-        $ruleLabels = $this->ruleLabels();
+            $version = max($version, (int) collect($relations->flatten())->max(fn (EnrichmentProductRelation $r): int => (int) $r->computed_at->timestamp));
+            $ruleLabels = $this->ruleLabels();
 
-        if ($this->explain) {
-            foreach ($relations->flatten() as $relation) {
-                $why = ['source' => $relation->source, 'score' => $relation->score, 'reasons' => $relation->reasons, 'label' => $this->relationReason($relation, $ruleLabels)];
-                foreach ($relation->kind === RelationKind::Alternative ? ['alternatives', 'on_sale'] : [$relation->kind === RelationKind::Family ? 'family' : 'complement'] as $candidate) {
-                    $this->note($candidate, (string) $relation->related->external_id, $why);
+            if ($this->explain) {
+                foreach ($relations->flatten() as $relation) {
+                    $why = ['source' => $relation->source, 'score' => $relation->score, 'reasons' => $relation->reasons, 'label' => $this->relationReason($relation, $ruleLabels)];
+                    foreach ($relation->kind === RelationKind::Alternative ? ['alternatives', 'on_sale'] : [$relation->kind === RelationKind::Family ? 'family' : 'complement'] as $candidate) {
+                        $this->note($candidate, (string) $relation->related->external_id, $why);
+                    }
                 }
             }
-        }
 
-        // Another size of this product is shown under other sizes, not again as a complement.
-        $sizes = $relations->get(RelationKind::Family->value, collect())->pluck('related_product_id')->all();
-        $complementKinds = self::kinds($relations->get(RelationKind::Complement->value, collect())
-            ->reject(fn (EnrichmentProductRelation $r): bool => in_array($r->related_product_id, $sizes, true)));
-        $complements = self::varied($complementKinds, $maxProducts);
-        if ($complements->isNotEmpty()) {
-            $sections[] = $this->section('complement', array_filter([
-                'products' => $this->cards(
-                    $complements->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related),
-                    $complements->mapWithKeys(fn (EnrichmentProductRelation $r): array => [$r->related_product_id => $this->relationReason($r, $ruleLabels)]),
-                ),
-                'categories' => $this->browseLinks(array_map(fn (array $kind): array => array_map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related, $kind), $complementKinds)),
-            ]));
-        } elseif (($crossSells = $this->merchantCrossSells($product, $maxProducts))->isNotEmpty()) {
-            // Relations not computed yet: the merchant's own cross-sells.
-            $sections[] = $this->section('complement', ['products' => $this->cards($crossSells)]);
-        }
-
-        $family = $relations->get(RelationKind::Family->value, collect())->take(self::MAX_FAMILY);
-        if ($family->isNotEmpty()) {
-            $sections[] = $this->section('family', ['products' => $this->cards($family->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related))]);
-        }
-
-        $alternatives = $relations->get(RelationKind::Alternative->value, collect());
-        if ($alternatives->isNotEmpty()) {
-            $sections[] = $this->section('alternatives', array_filter([
-                'products' => $this->cards($alternatives->take($maxProducts)->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related)),
-                'categories' => $this->browseLinks([$alternatives->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related)->all()]),
-            ]));
-
-            // The widget checks "on sale" again with live prices.
-            $onSale = $alternatives->filter(fn (EnrichmentProductRelation $r): bool => $r->related->on_sale)->take($maxProducts);
-            if ($onSale->isNotEmpty()) {
-                $sections[] = $this->section('on_sale', ['products' => $this->cards($onSale->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related)), 'require_sale' => true]);
+            // Another size of this product is shown under other sizes, not again as a complement.
+            $sizes = $relations->get(RelationKind::Family->value, collect())->pluck('related_product_id')->all();
+            $complementKinds = self::kinds($relations->get(RelationKind::Complement->value, collect())
+                ->reject(fn (EnrichmentProductRelation $r): bool => in_array($r->related_product_id, $sizes, true)));
+            $complements = self::varied($complementKinds, $maxProducts);
+            if ($complements->isNotEmpty()) {
+                $sections[] = $this->section('complement', array_filter([
+                    'products' => $this->cards(
+                        $complements->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related),
+                        $complements->mapWithKeys(fn (EnrichmentProductRelation $r): array => [$r->related_product_id => $this->relationReason($r, $ruleLabels)]),
+                    ),
+                    'categories' => $this->browseLinks(array_map(fn (array $kind): array => array_map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related, $kind), $complementKinds)),
+                ]));
+            } elseif (($crossSells = $this->merchantCrossSells($product, $maxProducts))->isNotEmpty()) {
+                // Relations not computed yet: the merchant's own cross-sells.
+                $sections[] = $this->section('complement', ['products' => $this->cards($crossSells)]);
             }
+
+            $family = $relations->get(RelationKind::Family->value, collect())->take(self::MAX_FAMILY);
+            if ($family->isNotEmpty()) {
+                $sections[] = $this->section('family', ['products' => $this->cards($family->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related))]);
+            }
+
+            $alternatives = $relations->get(RelationKind::Alternative->value, collect());
+            if ($alternatives->isNotEmpty()) {
+                $sections[] = $this->section('alternatives', array_filter([
+                    'products' => $this->cards($alternatives->take($maxProducts)->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related)),
+                    'categories' => $this->browseLinks([$alternatives->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related)->all()]),
+                ]));
+
+                // The widget checks "on sale" again with live prices.
+                $onSale = $alternatives->filter(fn (EnrichmentProductRelation $r): bool => $r->related->on_sale)->take($maxProducts);
+                if ($onSale->isNotEmpty()) {
+                    $sections[] = $this->section('on_sale', ['products' => $this->cards($onSale->map(fn (EnrichmentProductRelation $r): CatalogProduct => $r->related)), 'require_sale' => true]);
+                }
+            }
+        } else {
+            array_push($sections, ...$this->sectionsFromIndex($product, $maxProducts));
         }
 
         // Good for: approved jobs, with guides matched to the product or to those jobs.
@@ -832,6 +839,58 @@ final class BuildPageBank
      * @param  Collection<string, string>|null  $reasons  product id => sentence
      * @return list<array<string, mixed>>
      */
+    /** Neighbours by meaning read from the index before the ones in stock are kept. */
+    private const INDEX_NEIGHBOURS = 40;
+
+    /**
+     * The sections relations used to fill, from what the indexes already hold, with no model and
+     * nothing computed at night: other sizes (the family code read), alternatives (its nearest
+     * products by the vectors the index keeps, of the same type when it has one, in stock) and
+     * those of them on sale, and complements as the store set them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sectionsFromIndex(CatalogProduct $product, int $maxProducts): array
+    {
+        $sections = [];
+        $available = fn ($q) => $q->whereNull('removed_at')->where('in_stock', true)->where('purchasable', true);
+
+        $crossSells = $this->merchantCrossSells($product, $maxProducts);
+        if ($crossSells->isNotEmpty()) {
+            $sections[] = $this->section('complement', ['products' => $this->cards($crossSells)]);
+        }
+
+        $familyKey = EnrichmentCodeReading::query()->where('product_id', $product->id)->value('family_key');
+        $family = $familyKey === null ? collect() : CatalogProduct::query()->where($available)->where('id', '!=', $product->id)
+            ->whereIn('id', EnrichmentCodeReading::query()->where('family_key', $familyKey)->select('product_id'))
+            ->orderBy('title')->limit(self::MAX_FAMILY)->get();
+        if ($family->isNotEmpty()) {
+            $sections[] = $this->section('family', ['products' => $this->cards($family)]);
+        }
+
+        $near = array_values(array_unique(array_map(fn (array $hit): string => (string) $hit['source_id'],
+            app(SemanticSearch::class)->similarTo('product', (string) $product->id, ['product'], self::INDEX_NEIGHBOURS))));
+        $type = EnrichmentFact::query()->where('product_id', $product->id)->where('kind', FactKind::Type)->where('status', FactStatus::Approved)->value('value_text');
+        if ($type !== null && $near !== []) {
+            $sameType = EnrichmentFact::query()->whereIn('product_id', $near)->where('kind', FactKind::Type)->where('status', FactStatus::Approved)
+                ->where('value_text', $type)->pluck('product_id')->all();
+            $near = $sameType !== [] ? array_values(array_intersect($near, $sameType)) : $near;
+        }
+        $order = array_flip($near);
+        $alternatives = CatalogProduct::query()->where($available)->whereIn('id', $near)->whereNotIn('id', $family->pluck('id'))->get()
+            ->sortBy(fn (CatalogProduct $p): int => $order[$p->id])->values();
+        if ($alternatives->isNotEmpty()) {
+            $sections[] = $this->section('alternatives', ['products' => $this->cards($alternatives->take($maxProducts))]);
+            // The widget checks "on sale" again with live prices.
+            $onSale = $alternatives->filter(fn (CatalogProduct $p): bool => (bool) $p->on_sale)->take($maxProducts);
+            if ($onSale->isNotEmpty()) {
+                $sections[] = $this->section('on_sale', ['products' => $this->cards($onSale), 'require_sale' => true]);
+            }
+        }
+
+        return $sections;
+    }
+
     private function cards(Collection $products, ?Collection $reasons = null): array
     {
         return ProductCard::many($products, $reasons);
