@@ -19,6 +19,8 @@ return [
         'unavailable' => 'We could not answer right now. Please try again later.',
         'computed' => [
             'cheapest' => 'The cheapest in stock of what we found: :title.',
+            'cheapest_store' => 'The cheapest in stock in the store: :title.',
+            'most_expensive_store' => 'The most expensive in stock in the store: :title.',
             'most_expensive' => 'The most expensive in stock of what we found: :title.',
             'on_sale' => 'On sale now, of what we found: :title.',
             'in_range' => 'In your price range, the cheapest in stock of what we found: :title.',

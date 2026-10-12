@@ -72,7 +72,10 @@ final class AnswerSiteQuestion
     private const MAX_COMPUTED = 3;
 
     /** Words a question wraps around the product it names. */
-    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than'];
+    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than',
+        // Words for the store and its products in general: "מה הכי זול בין המוצרים" names no product.
+        'בין', 'מכל', 'ביותר', 'המוצרים', 'מוצרים', 'המוצר', 'מוצר', 'הפריטים', 'פריטים', 'הפריט', 'פריט', 'באתר', 'בחנות', 'האתר', 'החנות', 'שיש', 'כאן', 'משהו', 'דבר',
+        'products', 'product', 'items', 'item', 'store', 'shop', 'site', 'all', 'have', 'you', 'here', 'something', 'anything'];
 
     private const MIN_CHARS = 3;
 
@@ -716,22 +719,26 @@ final class AnswerSiteQuestion
      * A superlative or a price range answered in code: the products found that are what the
      * question names (a drill, not "a bit for a drill"), in stock, inside the price the shopper
      * wrote, ordered by price or on sale. "עגילים עד 500" is the cheapest earrings in stock up to
-     * 500, from the products the search already kept to that price. Null when the question asks
-     * for neither or none of the products is what it names: then a model reads it.
+     * 500, from the products the search already kept to that price. "מה הכי זול באתר" names no
+     * product: the cheapest in the whole store, not of the few its words happened to find. Null
+     * when the question asks for neither or none of the products is what it names: then a model
+     * reads it.
      *
      * @param  list<string>  $shown
      * @return array<string, mixed>|null
      */
     private function computed(string $question, string $locale, array $shown): ?array
     {
-        $productsByRef = [];
-        foreach ($this->candidates($shown) as $i => $product) {
-            $productsByRef['p'.($i + 1)] = $product;
-        }
-
-        $asks = self::analysis($question, $productsByRef)['asks'];
+        $asks = self::analysis($question, [])['asks'];
         ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
+        $named = self::named($question);
+        $wholeStore = $named === [] && in_array($asks, ['cheapest', 'most_expensive'], true);
+
+        $productsByRef = [];
+        foreach ($this->candidates($wholeStore ? $this->storeWide($asks, $min, $max) : $shown) as $i => $product) {
+            $productsByRef['p'.($i + 1)] = $product;
+        }
 
         if ($asks === null || $productsByRef === []) {
             return null;
@@ -741,8 +748,7 @@ final class AnswerSiteQuestion
         // attributes, synonyms, plurals): hoops titled "חישוקי זהב" are earrings too, and a price
         // must not narrow the kind further. Without one, the title must name it: "the cheapest
         // drill" is never a drill bit.
-        $named = self::named($question);
-        $byWords = ($min !== null || $max !== null) && app()->bound(ProductsNamed::class)
+        $byWords = ! $wholeStore && ($min !== null || $max !== null) && app()->bound(ProductsNamed::class)
             ? array_flip(app(ProductsNamed::class)->among($this->tenant->require(), $question, array_column($productsByRef, 'external_id')))
             : null;
         $fit = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0
@@ -763,11 +769,32 @@ final class AnswerSiteQuestion
 
         return [
             'outcome' => AssistantAnswer::ANSWERED,
-            'answer' => (string) __('assistant::answers.site.computed.'.$asks, ['title' => $picks[0]['title']], $locale),
+            'answer' => (string) __('assistant::answers.site.computed.'.$asks.($wholeStore ? '_store' : ''), ['title' => $picks[0]['title']], $locale),
             'from' => 'code',
             'sources' => [],
             'picks' => $this->present($picks),
         ];
+    }
+
+    /**
+     * The store's cheapest (or dearest) products in stock, inside the price if one was written. What
+     * is not merchandise stays out: a gift card by its name, and, in a store that gives most of its
+     * products a kind (Shopify's product type), whatever has none, such as a ring sizer at 5.
+     *
+     * @return list<string> external ids, in price order
+     */
+    private function storeWide(string $asks, ?float $min, ?float $max): array
+    {
+        $base = CatalogProduct::query()->whereNull('removed_at')->where('in_stock', true)->where('price', '>', 0)
+            ->when($min !== null, fn ($q) => $q->where('price', '>=', $min))
+            ->when($max !== null, fn ($q) => $q->where('price', '<=', $max));
+        $typed = fn ($q) => $q->whereNotNull('payload->product_type')->where('payload->product_type', '!=', '');
+        $all = (clone $base)->count();
+        $query = $all > 0 && 2 * $typed(clone $base)->count() >= $all ? $typed(clone $base) : $base;
+
+        return $query->orderBy('price', $asks === 'most_expensive' ? 'desc' : 'asc')->limit(self::MAX_COMPUTED * 5)->get(['external_id', 'title'])
+            ->reject(fn (CatalogProduct $p): bool => preg_match('/gift\s*card|כרטיס\s+מתנה|גיפט\s*קארד|שובר\s+מתנה|voucher/iu', (string) $p->title) === 1)
+            ->take(self::MAX_COMPUTED)->map(fn (CatalogProduct $p): string => (string) $p->external_id)->values()->all();
     }
 
     /**

@@ -255,6 +255,34 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('model', $this->askWith('צמיד עד 500', ['803', '801'])->json('data.from'));
     }
 
+    public function test_the_cheapest_with_no_product_named_is_the_whole_stores_merchandise(): void
+    {
+        // What the words happened to find: a ring and a pendant, far from the cheapest.
+        $typed = fn (string $type): array => ['payload' => ['title' => '', 'description' => '', 'categories' => [], 'attributes' => [], 'meta' => [], 'product_type' => $type]];
+        $this->product('901', 'טבעת יהלום', 'טבעת.', [], ['price' => '4900.00'] + $typed('טבעות'));
+        $this->product('902', 'תליון לב משובץ', 'תליון.', [], ['price' => '2200.00'] + $typed('תליונים'));
+        $this->product('903', 'תליון מפתח עדין', 'תליון.', [], ['price' => '350.00'] + $typed('תליונים'));
+        $this->product('904', 'עגילים צמודים כדורי זהב', 'עגילים.', [], ['price' => '450.00'] + $typed('עגילים'));
+        $this->product('905', 'עגילים שאזלו', 'עגילים.', [], ['price' => '100.00', 'in_stock' => false] + $typed('עגילים'));
+        // Not merchandise: a ring sizer with no kind, a gift card.
+        $this->product('906', 'מדיד טבעות', 'מדיד.', [], ['price' => '5.00']);
+        $this->product('907', 'כרטיס מתנה - Gift Card', 'שובר.', [], ['price' => '100.00'] + $typed('כרטיס מתנה'));
+
+        foreach (['מה הכי זול בין המוצרים?', 'מה הכי זול באתר', 'יש לכם משהו זול?'] as $question) {
+            $data = $this->askWith($question, ['901', '902'])->json('data');
+
+            $this->assertSame(['answered', 'code'], [$data['outcome'], $data['from']], $question);
+            $this->assertSame(['903', '904', '902'], array_column($data['picks'], 'external_id'), $question.': the store\'s cheapest in stock');
+            $this->assertStringContainsString('באתר', $data['answer']);
+        }
+
+        $this->assertSame(['901', '902', '904'], array_column($this->askWith('מה הכי יקר שיש לכם?', [])->json('data.picks'), 'external_id'), 'and the dearest, even when the words found nothing');
+        $this->assertSame([], $this->calls, 'no model for arithmetic');
+
+        // A product named still means that product, of what was found.
+        $this->assertSame(['902'], array_column($this->askWith('איזה תליון הכי זול?', ['901', '902'])->json('data.picks'), 'external_id'));
+    }
+
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
     {
         $this->drills();
