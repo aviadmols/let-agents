@@ -29,6 +29,24 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
 
     private const VARIANTS_PER_PRODUCT = 25;
 
+    /**
+     * The details are read apart from the page (see DETAILS), a few products a request: their
+     * variants carry a weight and a picture each, which costs about 150 points a product.
+     */
+    private const DETAILS_PER_REQUEST = 5;
+
+    private const METAFIELDS_PER_PRODUCT = 25;
+
+    /** A custom field's value is a label or a spec, not a document: longer ones are cut, as in the plugin. */
+    private const MAX_META_VALUE_CHARS = 500;
+
+    /** Shopify's measurement units, in the short form the plugin sends. */
+    private const UNITS = [
+        'GRAMS' => 'g', 'KILOGRAMS' => 'kg', 'OUNCES' => 'oz', 'POUNDS' => 'lbs',
+        'MILLIMETERS' => 'mm', 'CENTIMETERS' => 'cm', 'METERS' => 'm', 'INCHES' => 'in', 'FEET' => 'ft', 'YARDS' => 'yd',
+        'MILLILITERS' => 'ml', 'CENTILITERS' => 'cl', 'LITERS' => 'l', 'CUBIC_METERS' => 'm3', 'FLUID_OUNCES' => 'fl oz', 'GALLONS' => 'gal',
+    ];
+
     /** A runaway cursor stops here, far above any catalog cap. */
     private const MAX_PAGES = 5000;
 
@@ -62,6 +80,23 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
               variants(first: $variants) { nodes { id title sku price compareAtPrice availableForSale } }
             }
             pageInfo { hasNextPage endCursor }
+          }
+        }
+        GRAPHQL;
+
+    // What the products page leaves out: the store's custom fields, and each variant's options,
+    // barcode, picture and weight. A query of its own, so a store whose answer to it fails (a
+    // field the app may not read, a cost over the limit) still has its catalog read, without them.
+    private const DETAILS = <<<'GRAPHQL'
+        query ProductDetails($ids: [ID!]!, $metafields: Int!, $variants: Int!) {
+          nodes(ids: $ids) {
+            ... on Product {
+              id
+              metafields(first: $metafields) { nodes { namespace key type value } }
+              variants(first: $variants) {
+                nodes { id barcode selectedOptions { name value } image { url } inventoryItem { measurement { weight { unit value } } } }
+              }
+            }
           }
         }
         GRAPHQL;
@@ -132,16 +167,14 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
         $variables = ['first' => self::PRODUCTS_PER_PAGE, 'collections' => self::COLLECTIONS_PER_PRODUCT, 'variants' => self::VARIANTS_PER_PRODUCT];
 
         foreach ($this->pages($install, self::PRODUCTS, 'products', $variables) as $nodes) {
+            // Active but not on the Online Store (another sales channel only, or unlisted):
+            // a visitor cannot reach it, so it is not part of the catalog.
+            $nodes = array_values(array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) === 'ACTIVE' && is_string($node['onlineStoreUrl'] ?? null)));
+            $details = $this->details($install, array_column($nodes, 'id'));
             $records = [];
 
             foreach ($nodes as $node) {
-                // Active but not on the Online Store (another sales channel only, or unlisted):
-                // a visitor cannot reach it, so it is not part of the catalog.
-                if (($node['status'] ?? null) !== 'ACTIVE' || ! is_string($node['onlineStoreUrl'] ?? null)) {
-                    continue;
-                }
-
-                $records[] = $this->product($node, $shop);
+                $records[] = $this->product($node, $shop, $details[$node['id']] ?? null);
             }
 
             if ($records !== []) {
@@ -237,11 +270,16 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
     /**
      * @param  array<string, mixed>  $node
      * @param  array{currency: string, base: string}  $shop
+     * @param  array{meta: array<string, string>, variants: array<string, array<string, mixed>>}|null  $details  null when they could not be read
      * @return array<string, mixed>
      */
-    private function product(array $node, array $shop): array
+    private function product(array $node, array $shop, ?array $details = null): array
     {
         $variants = array_values(array_filter((array) data_get($node, 'variants.nodes', []), 'is_array'));
+        $more = fn (array $variant): array => $details['variants'][$variant['id'] ?? ''] ?? [];
+        // The variant the product page opens on stands for a product without options.
+        $first = $variants === [] ? [] : $more($variants[0]);
+        $weighed = array_values(array_filter(array_map($more, $variants), fn (array $v): bool => ($v['weight'] ?? '') !== ''));
         $variantsCount = (int) data_get($node, 'variantsCount.count', count($variants));
         $truncated = $variantsCount > count($variants);
 
@@ -280,6 +318,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
             'handle' => (string) ($node['handle'] ?? ''),
             'url' => (string) ($node['onlineStoreUrl'] ?? $shop['base'].'/products/'.($node['handle'] ?? '')),
             'sku' => (string) ($variants[0]['sku'] ?? ''),
+            'gtin' => (string) ($first['barcode'] ?? ''),
             'short_description' => '',
             'description' => self::text($node['descriptionHtml'] ?? ''),
             'images' => self::images($image, (array) data_get($node, 'media.nodes', [])),
@@ -294,7 +333,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
             'vendor' => $vendor,
             'product_type' => self::line($node['productType'] ?? ''),
             'attributes' => $simple ? [] : $this->attributes((array) ($node['options'] ?? [])),
-            'meta' => [],
+            'meta' => $details['meta'] ?? [],
             'relations' => [],
             'price' => [
                 'currency' => $shop['currency'],
@@ -311,10 +350,26 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
             ],
             // Published, active and priced: Shopify lets it into a cart (stock aside, as in WooCommerce).
             'purchasable' => $price !== '',
+            // Shopify weighs variants, not products: the first one weighed stands for the product,
+            // as the variant the page opens on stands for its price. No measurements besides weight.
+            'dimensions' => [
+                'weight' => (string) ($weighed[0]['weight'] ?? ''),
+                'length' => '',
+                'width' => '',
+                'height' => '',
+                'weight_unit' => (string) ($weighed[0]['weight_unit'] ?? ''),
+                'dimension_unit' => '',
+            ],
             'variations' => $simple ? [] : array_map(fn (array $v): array => [
                 'external_id' => self::id($v['id']),
                 'title' => self::line($v['title'] ?? ''),
                 'sku' => (string) ($v['sku'] ?? ''),
+                'barcode' => (string) ($more($v)['barcode'] ?? ''),
+                // Which value of each option this variant is ("מידה: 7"), in the plugin's shape.
+                'attributes' => $more($v)['attributes'] ?? [],
+                'image' => (string) ($more($v)['image'] ?? ''),
+                'weight' => (string) ($more($v)['weight'] ?? ''),
+                'weight_unit' => (string) ($more($v)['weight_unit'] ?? ''),
                 'price' => [
                     'price' => is_numeric($v['price'] ?? null) ? self::decimal($v['price']) : '',
                     'regular_price' => is_numeric($v['compareAtPrice'] ?? null) && (float) $v['compareAtPrice'] > (float) ($v['price'] ?? 0) ? self::decimal($v['compareAtPrice']) : (is_numeric($v['price'] ?? null) ? self::decimal($v['price']) : ''),
@@ -358,6 +413,127 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
         }
 
         return $attributes;
+    }
+
+    /**
+     * The details of a page of products, by product id. A request that fails leaves its products
+     * without them: the catalog is read either way, and the next sync tries again.
+     *
+     * @param  list<string>  $ids  product gids
+     * @return array<string, array{meta: array<string, string>, variants: array<string, array<string, mixed>>}>
+     */
+    private function details(ShopifyInstall $install, array $ids): array
+    {
+        $details = [];
+
+        foreach (array_chunk($ids, self::DETAILS_PER_REQUEST) as $chunk) {
+            try {
+                $nodes = (array) ($this->api->query($install, self::DETAILS, [
+                    'ids' => $chunk,
+                    'metafields' => self::METAFIELDS_PER_PRODUCT,
+                    'variants' => self::VARIANTS_PER_PRODUCT,
+                ])['nodes'] ?? []);
+            } catch (StoreFeedUnavailable) {
+                continue;
+            }
+
+            foreach ($nodes as $node) {
+                if (! is_array($node) || ! isset($node['id'])) {
+                    continue;
+                }
+
+                $meta = [];
+                foreach ((array) data_get($node, 'metafields.nodes', []) as $field) {
+                    $key = is_array($field) ? trim((string) ($field['namespace'] ?? '')).'.'.trim((string) ($field['key'] ?? '')) : '';
+                    $value = is_array($field) ? self::metafield((string) ($field['type'] ?? ''), $field['value'] ?? null) : '';
+
+                    // An app's own fields are its internals, as "_" keys are in WordPress.
+                    if ($value !== '' && $key !== '.' && ! preg_match('/^(\$app|app--)/', $key)) {
+                        $meta[$key] = mb_substr($value, 0, self::MAX_META_VALUE_CHARS);
+                    }
+                }
+
+                $variants = [];
+                foreach ((array) data_get($node, 'variants.nodes', []) as $variant) {
+                    if (! is_array($variant) || ! isset($variant['id'])) {
+                        continue;
+                    }
+
+                    $weight = data_get($variant, 'inventoryItem.measurement.weight');
+                    $weighed = is_array($weight) && is_numeric($weight['value'] ?? null) && (float) $weight['value'] > 0;
+
+                    $variants[$variant['id']] = [
+                        'barcode' => self::line($variant['barcode'] ?? ''),
+                        'attributes' => array_values(array_map(fn (array $o): array => [
+                            'key' => self::line($o['name'] ?? ''),
+                            'name' => self::line($o['name'] ?? ''),
+                            'value' => self::line($o['value'] ?? ''),
+                        ], array_filter((array) ($variant['selectedOptions'] ?? []), fn ($o): bool => is_array($o)
+                            && self::line($o['name'] ?? '') !== '' && ($o['value'] ?? '') !== 'Default Title'))),
+                        'image' => (string) data_get($variant, 'image.url', ''),
+                        'weight' => $weighed ? self::decimal($weight['value']) : '',
+                        'weight_unit' => $weighed ? (self::UNITS[$weight['unit'] ?? ''] ?? strtolower((string) ($weight['unit'] ?? ''))) : '',
+                    ];
+                }
+
+                $details[$node['id']] = ['meta' => $meta, 'variants' => $variants];
+            }
+        }
+
+        return $details;
+    }
+
+    /**
+     * A custom field's value as text a person or a reader of specs can use: "1.6 g" for a weight,
+     * "זהב, כסף" for a list. References to other records and raw JSON say nothing on their own.
+     */
+    private static function metafield(string $type, mixed $value): string
+    {
+        if (! is_scalar($value) || str_contains($type, 'reference') || $type === 'json') {
+            return '';
+        }
+
+        $value = (string) $value;
+
+        if (str_starts_with($type, 'list.')) {
+            $items = json_decode($value, true);
+
+            return is_array($items) ? implode(', ', array_filter(array_map(fn ($item): string => self::metafield(substr($type, 5), is_array($item) ? json_encode($item) : $item), $items))) : '';
+        }
+
+        if (in_array($type, ['weight', 'dimension', 'volume'], true)) {
+            $measure = json_decode($value, true);
+
+            return is_array($measure) && is_numeric($measure['value'] ?? null)
+                ? self::decimal($measure['value']).' '.(self::UNITS[strtoupper((string) ($measure['unit'] ?? ''))] ?? strtolower((string) ($measure['unit'] ?? '')))
+                : '';
+        }
+
+        if ($type === 'money') {
+            $money = json_decode($value, true);
+
+            return is_array($money) && is_numeric($money['amount'] ?? null) ? self::decimal($money['amount']).' '.($money['currency_code'] ?? '') : '';
+        }
+
+        if ($type === 'rating') {
+            $rating = json_decode($value, true);
+
+            return is_array($rating) && is_numeric($rating['value'] ?? null) ? $rating['value'].'/'.($rating['scale_max'] ?? '') : '';
+        }
+
+        if ($type === 'rich_text_field') {
+            $text = [];
+            $tree = (array) json_decode($value, true);
+            array_walk_recursive($tree, function ($leaf, $key) use (&$text): void {
+                if ($key === 'value' && is_string($leaf)) {
+                    $text[] = $leaf;
+                }
+            });
+
+            return self::line(implode(' ', $text));
+        }
+
+        return $type === 'multi_line_text_field' ? self::text($value) : self::line($value);
     }
 
     /**

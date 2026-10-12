@@ -29,6 +29,9 @@ final class ShopifyStoreFeedTest extends TestCase
 
     private ShopifyInstall $install;
 
+    /** The details query answers with an error, as for a store whose app may not read a field. */
+    private bool $failDetails = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -131,6 +134,58 @@ final class ShopifyStoreFeedTest extends TestCase
             && $request->hasHeader('X-Shopify-Access-Token', 'shpat_test'));
     }
 
+    public function test_custom_fields_options_barcodes_and_weights_are_read_like_the_plugin_sends_them(): void
+    {
+        $run = app(SyncCatalog::class)->handle($this->shop->id);
+
+        $this->assertSame(RunStatus::Succeeded, $run->status, (string) $run->error);
+
+        $this->inShop(function (): void {
+            $saw = CatalogProduct::query()->where('external_id', '8001')->sole();
+            $this->assertSame([
+                'custom.blade_material' => 'קרביד',
+                'custom.cut_depth' => '6.5 cm',
+                'custom.in_the_box' => "מגיע במזוודה.\nכולל מפתח.",
+                'custom.materials' => 'עץ, לבידים',
+            ], $saw->payload['meta'], 'the app\x27s own fields, references, raw JSON and costs are left out');
+            $this->assertSame('7290001234567', $saw->payload['gtin'], 'the barcode of the variant the page opens on');
+            $this->assertSame(['3.2', 'kg'], [$saw->payload['dimensions']['weight'], $saw->payload['dimensions']['weight_unit']]);
+
+            $variations = collect($saw->payload['variations'])->keyBy('external_id');
+            $this->assertSame([['key' => 'קוטר להב', 'name' => 'קוטר להב', 'value' => '210']], $variations['9101']['attributes']);
+            $this->assertSame(['185', '3000', 'g'], [$variations['9102']['attributes'][0]['value'], $variations['9102']['weight'], $variations['9102']['weight_unit']]);
+            $this->assertSame('https://cdn.shopify.com/saw-185.jpg', $variations['9102']['image']);
+
+            $blade = CatalogProduct::query()->where('external_id', '8002')->sole();
+            $this->assertSame(['0.2', 'kg'], [$blade->payload['dimensions']['weight'], $blade->payload['dimensions']['weight_unit']], 'a product without options is weighed by its one variant');
+            $this->assertSame([], $blade->payload['variations']);
+
+            $drill = CatalogProduct::query()->where('external_id', '8004')->sole();
+            $this->assertSame(['', ''], [$drill->payload['dimensions']['weight'], $drill->payload['gtin']], 'a weight of 0 is no weight');
+        });
+
+        Http::assertSent(fn (Request $request): bool => str_contains((string) data_get($request->data(), 'query', ''), 'query ProductDetails')
+            && data_get($request->data(), 'variables.ids') === ['gid://shopify/Product/8001', 'gid://shopify/Product/8002']);
+    }
+
+    public function test_a_store_whose_details_cannot_be_read_still_has_its_catalog_read(): void
+    {
+        $this->failDetails = true;
+
+        $run = app(SyncCatalog::class)->handle($this->shop->id);
+
+        $this->assertSame(RunStatus::Succeeded, $run->status, (string) $run->error);
+        $this->assertSame(3, $run->output['products']['created']);
+
+        $this->inShop(function (): void {
+            $saw = CatalogProduct::query()->where('external_id', '8001')->sole();
+            $this->assertSame([], $saw->payload['meta']);
+            $this->assertSame('', $saw->payload['gtin']);
+            $this->assertSame([], $saw->payload['variations'][0]['attributes']);
+            $this->assertSame('299.00', $saw->price, 'everything the products page has is there');
+        });
+    }
+
     public function test_a_second_sync_of_an_unchanged_store_changes_nothing(): void
     {
         app(SyncCatalog::class)->handle($this->shop->id);
@@ -175,6 +230,12 @@ final class ShopifyStoreFeedTest extends TestCase
         preg_match('/^\s*query\s+(\w+)/', $query, $match);
         $operation = $match[1] ?? '';
 
+        if ($operation === 'ProductDetails') {
+            return $this->failDetails
+                ? Http::response(['errors' => [['message' => 'Access denied for inventoryItem field.', 'extensions' => ['code' => 'ACCESS_DENIED']]]], 200)
+                : Http::response(['data' => ['nodes' => array_map(fn (string $id): ?array => $this->details()[$id] ?? null, (array) data_get($request->data(), 'variables.ids', []))]]);
+        }
+
         return Http::response(['data' => match ($operation) {
             'Shop' => ['shop' => ['currencyCode' => 'ILS', 'primaryDomain' => ['url' => 'https://kli.co.il']]],
             'Collections' => ['collections' => $this->connection([
@@ -197,6 +258,53 @@ final class ShopifyStoreFeedTest extends TestCase
             ])],
             default => null,
         }]);
+    }
+
+    /**
+     * What the details query answers per product: custom fields of every kind Shopify has, and
+     * each variant's options, barcode, picture and weight.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function details(): array
+    {
+        $variant = fn (string $id, string $barcode, array $options, ?array $weight, ?string $image = null): array => [
+            'id' => "gid://shopify/ProductVariant/{$id}",
+            'barcode' => $barcode,
+            'selectedOptions' => $options,
+            'image' => $image === null ? null : ['url' => $image],
+            'inventoryItem' => ['measurement' => ['weight' => $weight]],
+        ];
+
+        return [
+            'gid://shopify/Product/8001' => [
+                'id' => 'gid://shopify/Product/8001',
+                'metafields' => ['nodes' => [
+                    ['namespace' => 'custom', 'key' => 'blade_material', 'type' => 'single_line_text_field', 'value' => 'קרביד'],
+                    ['namespace' => 'custom', 'key' => 'cut_depth', 'type' => 'dimension', 'value' => '{"value":6.5,"unit":"CENTIMETERS"}'],
+                    ['namespace' => 'custom', 'key' => 'materials', 'type' => 'list.single_line_text_field', 'value' => '["עץ","לבידים"]'],
+                    ['namespace' => 'custom', 'key' => 'in_the_box', 'type' => 'multi_line_text_field', 'value' => "מגיע במזוודה.\nכולל מפתח."],
+                    ['namespace' => 'custom', 'key' => 'cost_price', 'type' => 'money', 'value' => '{"amount":"180.0","currency_code":"ILS"}'],
+                    ['namespace' => 'shopify', 'key' => 'color-pattern', 'type' => 'list.metaobject_reference', 'value' => '["gid://shopify/Metaobject/1"]'],
+                    ['namespace' => 'custom', 'key' => 'specs_raw', 'type' => 'json', 'value' => '{"a":1}'],
+                    ['namespace' => '$app:reviews', 'key' => 'state', 'type' => 'single_line_text_field', 'value' => 'synced'],
+                ]],
+                'variants' => ['nodes' => [
+                    $variant('9101', '7290001234567', [['name' => 'קוטר להב', 'value' => '210']], ['unit' => 'KILOGRAMS', 'value' => 3.2]),
+                    $variant('9102', '7290001234568', [['name' => 'קוטר להב', 'value' => '185']], ['unit' => 'GRAMS', 'value' => 3000], 'https://cdn.shopify.com/saw-185.jpg'),
+                ]],
+            ],
+            'gid://shopify/Product/8002' => [
+                'id' => 'gid://shopify/Product/8002',
+                'metafields' => ['nodes' => []],
+                'variants' => ['nodes' => [$variant('9201', '7290009999999', [['name' => 'Title', 'value' => 'Default Title']], ['unit' => 'KILOGRAMS', 'value' => 0.2])]],
+            ],
+            'gid://shopify/Product/8004' => [
+                'id' => 'gid://shopify/Product/8004',
+                'metafields' => ['nodes' => []],
+                'variants' => ['nodes' => [$variant('9401', '', [], ['unit' => 'GRAMS', 'value' => 0])]],
+            ],
+        ];
     }
 
     /**
