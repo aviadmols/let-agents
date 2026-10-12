@@ -68,6 +68,36 @@ final class FactSheetTest extends TestCase
         $this->assertSame(['משלוח מהיר לכל הארץ', 'אחריות 12 חודשים'], array_column($sheet['store'], 'say'), 'the store\'s statements, one per line');
     }
 
+    public function test_a_budget_is_said_per_product_without_its_price(): void
+    {
+        $sheet = $this->inShop(fn () => FactSheet::build($this->prepared, 'מברגה עד 500 ש"ח?', 'he'));
+        $budget = fn (string $ref): ?string => collect(collect($sheet['products'])->firstWhere('ref', $ref)['facts'])->firstWhere('ref', $ref.'.budget')['say'] ?? null;
+
+        $this->assertSame('מחוץ לתקציב ששאלתם עליו', $budget('p1'), '890 is over 500');
+        $this->assertSame('בתוך התקציב ששאלתם עליו', $budget('p2'));
+        $this->assertStringNotContainsString('890', FactSheet::input('מברגה עד 500 ש"ח?', $sheet), 'never the price itself');
+
+        $plain = $this->inShop(fn () => FactSheet::build($this->prepared, 'מה המברגה הכי זולה?', 'he'));
+        $this->assertNull(collect(collect($plain['products'])->firstWhere('ref', 'p1')['facts'])->firstWhere('ref', 'p1.budget'), 'no budget named, no budget fact');
+    }
+
+    public function test_the_stores_approved_promises_from_its_pages_are_store_facts(): void
+    {
+        $page = $this->page('900', 'מדיניות החזרות', 'ניתן להחזיר מוצר תוך 14 ימים מיום קבלתו, ארוז וסגור באריזתו המקורית.');
+        $this->inShop(function () use ($page): void {
+            foreach ([[FactStatus::Approved, 'returns', '14 ימים'], [FactStatus::AwaitingReview, 'warranty', 'שנתיים']] as $i => [$status, $key, $value]) {
+                EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'content_id' => $page->id, 'kind' => FactKind::Promise, 'key' => $key, 'value_text' => $value,
+                    'quote' => 'ניתן להחזיר מוצר תוך 14 ימים מיום קבלתו, ארוז וסגור באריזתו המקורית.', 'origin' => FactOrigin::Code, 'status' => $status, 'input_hash' => "p{$i}"]);
+            }
+        });
+
+        $store = array_column($this->inShop(fn () => FactSheet::build($this->prepared, 'מה מדיניות ההחזרות?', 'he'))['store'], 'say');
+
+        $this->assertStringContainsString('14 ימים', $store[0], 'the promise first, with its sentence');
+        $this->assertStringContainsString('ארוז וסגור', $store[0]);
+        $this->assertCount(3, $store, 'the approved promise and the two knowledge lines; the one awaiting review is not given');
+    }
+
     public function test_the_gate_is_hard_on_refs_and_owners_and_soft_on_words(): void
     {
         $sheet = $this->inShop(fn () => FactSheet::build($this->prepared, 'מה המברגה הכי זולה?', 'he'));

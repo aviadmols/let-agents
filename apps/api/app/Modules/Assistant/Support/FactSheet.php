@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Support;
 
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
@@ -36,6 +37,11 @@ final class FactSheet
     private const STORE_LINES = 30;
 
     private const MIN_LINE = 6;
+
+    /** The store's approved promises given, and the length of the sentence each comes with. */
+    private const POLICIES = 12;
+
+    private const QUOTE = 240;
 
     /** A sentence with no ref is only a link between others: short, no number, about nothing. */
     private const LINK_WORDS = 10;
@@ -93,6 +99,9 @@ final class FactSheet
 
         try {
             $ranks = array_flip((array) ($prepared['analysis']['in_stock_cheapest_first'] ?? []));
+            // The budget the shopper named ("עד 3500 ש״ח"), read in code; each product is said to be
+            // in it or over it, never its price.
+            ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
             $catalog = CatalogProduct::query()->whereIn('external_id', array_column($prepared['productsByRef'], 'external_id'))->get()->keyBy('external_id');
             $facts = EnrichmentFact::query()->with('vocabulary')
                 ->whereIn('product_id', $catalog->pluck('id'))->where('status', FactStatus::Approved)
@@ -133,11 +142,16 @@ final class FactSheet
                         ? __('assistant::facts.cheapest')
                         : __('assistant::facts.rank', ['rank' => $ranks[$ref] + 1, 'of' => count($ranks)])];
                 }
+                $price = isset($product['price']) && $product['price'] !== null ? (float) $product['price'] : null;
+                if (($min !== null || $max !== null) && $price !== null && $price > 0) {
+                    $inside = ($min === null || $price >= $min) && ($max === null || $price <= $max);
+                    $sheetFacts[] = ['ref' => $ref.'.budget', 'say' => __('assistant::facts.'.($inside ? 'in_budget' : 'over_budget'))];
+                }
 
                 $products[] = ['ref' => $ref, 'name' => (string) $product['title'], 'facts' => $sheetFacts];
             }
 
-            return ['asks' => $prepared['analysis']['asks'] ?? null, 'products' => $products, 'store' => self::store($prepared['byRef'])];
+            return ['asks' => $prepared['analysis']['asks'] ?? null, 'products' => $products, 'store' => self::store($prepared['byRef'], self::policies())];
         } finally {
             app()->setLocale($previous);
         }
@@ -385,15 +399,34 @@ final class FactSheet
     }
 
     /**
-     * The store's own statements, one per line, from its knowledge entries only (the information on
-     * every product page, the team's answers): never a page's or an article's passage.
+     * What the store promises on its own pages, approved: the returns, the delivery, the warranty,
+     * each with the sentence it was read from, so its conditions come with it.
+     *
+     * @return list<string>
+     */
+    private static function policies(): array
+    {
+        return EnrichmentFact::query()->where('kind', FactKind::Promise)->whereNull('product_id')->whereNotNull('content_id')
+            ->where('status', FactStatus::Approved)->orderBy('key')->orderBy('id')->limit(self::POLICIES)->get()
+            ->map(function (EnrichmentFact $fact): string {
+                $quote = trim((string) preg_replace('/\s+/u', ' ', (string) $fact->quote));
+
+                return trim($fact->keyLabel()).': '.trim($fact->valueLabel()).($quote !== '' ? ' — "'.mb_substr($quote, 0, self::QUOTE).'"' : '');
+            })->all();
+    }
+
+    /**
+     * The store's own statements, one per line: its approved promises from its pages first, then
+     * its knowledge entries (the information on every product page, the team's answers); never a
+     * page's or an article's passage.
      *
      * @param  array<string, array<string, mixed>>  $byRef
+     * @param  list<string>  $policies
      * @return list<array{ref: string, say: string}>
      */
-    private static function store(array $byRef): array
+    private static function store(array $byRef, array $policies = []): array
     {
-        $lines = [];
+        $lines = array_values(array_unique($policies));
 
         foreach ($byRef as $passage) {
             if (($passage['kind'] ?? null) !== 'knowledge') {

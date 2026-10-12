@@ -13,5 +13,7 @@ return [
     'tags' => 'Store tags: :tags',
     'sku' => 'SKU: :sku',
     'options_in_stock' => 'Options in stock: :options',
+    'in_budget' => 'Within the budget you asked about',
+    'over_budget' => 'Outside the budget you asked about',
     'store' => 'The store',
 ];
