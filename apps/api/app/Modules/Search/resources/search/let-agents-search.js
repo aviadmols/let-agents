@@ -582,8 +582,16 @@
       } catch (e) { /* private mode: may count twice, nothing worse */ }
     }
 
-    function send(events) {
-      var body = JSON.stringify({ events: events });
+    /**
+     * @param {boolean} [withVisitor] adds to the cart only: the anonymous id, so an order by the same
+     *   visitor is counted as the search's. A plain search never makes one.
+     */
+    function send(events, withVisitor) {
+      var payload = { events: events };
+      if (withVisitor) {
+        payload.vid = visitor();
+      }
+      var body = JSON.stringify(payload);
       var url = API + '/search/' + encodeURIComponent(ctx.site) + '/events';
       try {
         if (win.navigator.sendBeacon && win.navigator.sendBeacon(url, new Blob([body], { type: 'text/plain' }))) {
@@ -632,6 +640,15 @@
       }
       events.push({ type: 'click', q: normalized, id: item.id, title: item.title });
       send(events);
+    }
+
+    /** A product the store's cart took from the search: its results or the assistant's picks. */
+    function countAdd(query, item) {
+      var normalized = normalize(query);
+      if (!normalized) {
+        return;
+      }
+      send([{ type: 'add_to_cart', q: normalized, id: item.id, title: item.title, path: win.location.pathname }], true);
     }
 
     // ---------------------------------------------------------------- data
@@ -766,7 +783,7 @@
      * Shopify: the variant in stock goes to the theme's own cart (cart/add.js). A product with several
      * variants (sizes, colours) is not guessed: the shopper chooses on its page.
      */
-    function shopifyAddToCart(externalId, button) {
+    function shopifyAddToCart(externalId, button, onAdded) {
       button.disabled = true;
       liveProducts([externalId]).then(function () {
         var product = live[externalId];
@@ -793,6 +810,9 @@
           button.textContent = response.ok ? label('added') : label('add_failed');
           if (!response.ok) {
             return;
+          }
+          if (onAdded) {
+            onAdded();
           }
           return response.json().catch(function () { return null; }).then(function (json) {
             // Dawn and its relatives redraw and open their drawer from the sections that came back.
@@ -874,9 +894,10 @@
       }, 400);
     }
 
-    function addToCart(externalId, button) {
+    /** @param {Function} [onAdded] called once the store's cart took it, never on a failure or a redirect */
+    function addToCart(externalId, button, onAdded) {
       if (SHOPIFY) {
-        shopifyAddToCart(externalId, button);
+        shopifyAddToCart(externalId, button, onAdded);
         return;
       }
       if (!STORE_API) {
@@ -899,6 +920,9 @@
         }
         button.textContent = response.ok ? label('added') : label('add_failed');
         if (response.ok) {
+          if (onAdded) {
+            onAdded();
+          }
           if (win.jQuery) {
             win.jQuery(doc.body).trigger('wc_fragment_refresh');
           }
@@ -2241,7 +2265,7 @@
           action.type = 'button';
           action.addEventListener('click', function () {
             counted();
-            addToCart(id, action);
+            addToCart(id, action, function () { countAdd(q, { id: 'p:' + id, title: pick.title }); });
           });
         } else {
           action = el('a', 'd-buy', label('view'));
@@ -2920,7 +2944,7 @@
         action.type = 'button';
         action.addEventListener('click', function () {
           countClick(raw, { id: item.id, title: item.title });
-          addToCart(item.external_id, action);
+          addToCart(item.external_id, action, function () { countAdd(raw, { id: item.id, title: item.title }); });
         });
       } else {
         action = el('a', 'la-btn la-ghost', label('view'));

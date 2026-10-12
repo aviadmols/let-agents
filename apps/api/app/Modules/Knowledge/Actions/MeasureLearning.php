@@ -105,6 +105,8 @@ final class MeasureLearning
             ->where('occurred_at', '>=', now()->subDays(self::DAYS))
             ->where('preview', false)
             ->where('holdout', $holdout)
+            // Adds from the store's search are not part of the widget's holdout: both sides search.
+            ->where(fn ($q) => $q->whereNull('source')->orWhere('source', '!=', AnalyticsEvent::SOURCE_SEARCH))
             ->select('type', DB::raw('count(*) as c'))
             ->groupBy('type')
             ->pluck('c', 'type')

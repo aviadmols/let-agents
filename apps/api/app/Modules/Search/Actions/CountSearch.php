@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Actions;
 
+use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\HebrewSearch;
@@ -73,6 +74,57 @@ final class CountSearch
         ]);
 
         SearchClick::query()->whereDate('day', $day)->where('query', $query)->where('item', $item)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
+    }
+
+    /**
+     * A product added to the cart from the search: its results, or the assistant's picks. Counted
+     * on the query and the product, and, when the visitor is known, kept with the shop's events so
+     * an order by the same visitor is attributed to the search (Analytics\Actions\RecordOrder).
+     */
+    public function added(string $shopId, string $raw, string $item, string $title, ?string $visitorId, string $path): void
+    {
+        $query = $this->query($raw);
+
+        if ($query === '' || ! preg_match('/^p:([A-Za-z0-9_.:-]{1,64})$/', $item, $m)) {
+            return;
+        }
+
+        $day = now()->toDateString();
+        $this->ensure($shopId, $query);
+        SearchTerm::query()->whereDate('day', $day)->where('query', $query)->incrementEach(['added' => 1], ['updated_at' => now()]);
+
+        SearchClick::query()->insertOrIgnore([
+            'id' => (string) Str::ulid(),
+            'shop_id' => $shopId,
+            'day' => $day,
+            'query' => $query,
+            'item' => $item,
+            'title' => mb_substr($title, 0, 300),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        SearchClick::query()->whereDate('day', $day)->where('query', $query)->where('item', $item)->incrementEach(['added' => 1], ['updated_at' => now()]);
+
+        if ($visitorId === null || ! preg_match('/^anon-[A-Za-z0-9_-]{16,64}$/', $visitorId)) {
+            return;
+        }
+
+        AnalyticsEvent::query()->insertOrIgnore([
+            'shop_id' => $shopId,
+            'event_id' => (string) Str::ulid(),
+            'type' => 'add_to_cart',
+            'page_type' => 'search',
+            'page_path' => mb_substr($path !== '' && str_starts_with($path, '/') ? $path : '/', 0, 512),
+            'item_external_id' => $m[1],
+            'source' => AnalyticsEvent::SOURCE_SEARCH,
+            'result' => 'added',
+            'quantity' => 1,
+            'visitor_hash' => AnalyticsEvent::visitorHash($shopId, $visitorId),
+            // The search keeps no session of its own.
+            'session_id' => 'search',
+            'occurred_at' => now(),
+            'created_at' => now(),
+        ]);
     }
 
     private function query(string $raw): string

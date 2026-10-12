@@ -3,6 +3,7 @@
 namespace App\Modules\Shopify;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Shopify\Console\ConnectPixelCommand;
 use App\Modules\Shopify\Feed\ShopifyStoreFeed;
 use App\Modules\Shopify\Http\Middleware\FrameInsideShopify;
 use App\Modules\Shopify\Support\EmbeddedApp;
@@ -29,5 +30,12 @@ final class ShopifyServiceProvider extends ModuleServiceProvider
         // carries App Bridge, the admin's bridge to the frame.
         $this->app->make(Kernel::class)->pushMiddleware(FrameInsideShopify::class);
         FilamentView::registerRenderHook(PanelsRenderHook::HEAD_START, fn (): string => EmbeddedApp::head());
+    }
+
+    protected function moduleCommands(): array
+    {
+        return [
+            ConnectPixelCommand::class,
+        ];
     }
 }

@@ -23,11 +23,15 @@
     @if ($r === null)
         <x-filament::section>{{ __('search::ui.no_shop') }}</x-filament::section>
     @else
+        @php($money = ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][$r['currency']] ?? $r['currency'].' ')
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
             @foreach ([
                 'searches' => number_format($r['totals']['searches']),
                 'empty' => $r['totals']['empty'].'%',
                 'clicks' => $r['totals']['clicks'].'%',
+                'added' => number_format($r['totals']['added']),
+                'purchases' => number_format($r['totals']['purchases']),
+                'revenue' => $money.number_format($r['totals']['revenue'], 2),
                 'photos' => number_format($r['totals']['photos']),
                 'questions' => number_format($r['totals']['questions']),
                 'answered' => $r['totals']['answered'].'%',
@@ -62,20 +66,22 @@
                 <table style="width:100%;border-collapse:collapse;font-size:13px">
                     <thead>
                         <tr>
-                            @foreach (['day', 'searches', 'queries', 'empty', 'clicks', 'photos', 'questions'] as $col)
+                            @foreach (['day', 'searches', 'queries', 'empty', 'clicks', 'added', 'purchases', 'photos', 'questions'] as $col)
                                 <th style="{{ $cell }};{{ $small }}">{{ __('search::ui.analytics.cols.'.$col) }}</th>
                             @endforeach
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (array_reverse($r['daily']) as $d)
-                            @continue($d['searches'] + $d['photos'] + $d['questions'] === 0)
+                            @continue($d['searches'] + $d['photos'] + $d['questions'] + $d['added'] + $d['purchases'] === 0)
                             <tr wire:click="pick('{{ $d['day'] }}')" style="cursor:pointer;{{ $r['day'] === $d['day'] ? 'background:rgba(79,70,229,.08)' : '' }}" data-day="{{ $d['day'] }}">
                                 <td style="{{ $cell }}">{{ \Illuminate\Support\Carbon::parse($d['day'])->translatedFormat('D d/m') }}</td>
                                 <td style="{{ $cell }}">{{ $d['searches'] }}</td>
                                 <td style="{{ $cell }}">{{ $d['queries'] }}</td>
                                 <td style="{{ $cell }}">{{ $d['empty'] }}</td>
                                 <td style="{{ $cell }}">{{ $d['clicks'] }}</td>
+                                <td style="{{ $cell }}">{{ $d['added'] }}</td>
+                                <td style="{{ $cell }}">{{ $d['purchases'] }}</td>
                                 <td style="{{ $cell }}">{{ $d['photos'] }}</td>
                                 <td style="{{ $cell }}">{{ $d['questions'] }}</td>
                             </tr>
@@ -97,7 +103,7 @@
                     @else
                         <table style="width:100%;border-collapse:collapse;font-size:13px">
                             <thead><tr>
-                                @foreach (['query', 'searches', 'results', 'clicks'] as $col)
+                                @foreach (['query', 'searches', 'results', 'clicks', 'added'] as $col)
                                     <th style="{{ $cell }};{{ $small }}">{{ __('search::ui.analytics.cols.'.$col) }}</th>
                                 @endforeach
                             </tr></thead>
@@ -108,6 +114,7 @@
                                         <td style="{{ $cell }}">{{ (int) $t->searches }}</td>
                                         <td style="{{ $cell }}">{{ (int) $t->results }}</td>
                                         <td style="{{ $cell }}">{{ (int) $t->clicks }}</td>
+                                        <td style="{{ $cell }}">{{ (int) $t->added }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -125,6 +132,25 @@
                                     <tr>
                                         <td style="{{ $cell }}">{{ $c->title ?: $c->item }}</td>
                                         <td style="{{ $cell }};width:60px">{{ (int) $c->clicks }}</td>
+                                        <td style="{{ $cell }};width:90px" title="{{ __('search::ui.analytics.cols.added') }}">@if ((int) $c->added > 0){{ __('search::ui.analytics.added_times', ['count' => (int) $c->added]) }}@endif</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+                <div data-bought>
+                    <div style="font-weight:600;margin-bottom:6px">{{ __('search::ui.analytics.bought') }}</div>
+                    <div style="{{ $small }};margin-bottom:6px">{{ __('search::ui.analytics.bought_about') }}</div>
+                    @if ($r['bought'] === [])
+                        <div style="{{ $small }}">{{ __('search::ui.analytics.none') }}</div>
+                    @else
+                        <table style="width:100%;border-collapse:collapse;font-size:13px">
+                            <tbody>
+                                @foreach ($r['bought'] as $b)
+                                    <tr>
+                                        <td style="{{ $cell }}">{{ $b['title'] }}</td>
+                                        <td style="{{ $cell }};width:90px">{{ trans_choice('search::ui.analytics.orders', $b['orders'], ['count' => $b['orders']]) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

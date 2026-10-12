@@ -26,7 +26,8 @@ use Illuminate\Support\Str;
  *   3. connection   a store connection with a key of its own, so the storefront's site key
  *                   never changes when Shopify renews the access token
  *   4. owner        the store's owner as the shop's manager, who opens the panel from Shopify
- *   5. theme        the site key and the API address written on the store, for the app embed
+ *   5. theme        the site key and the API address written on the store, for the app embed,
+ *                   and the web pixel on, for purchases that came through the search
  *   6. catalogue    a first sync, on the long queue
  */
 final class InstallStore
@@ -50,6 +51,7 @@ final class InstallStore
         private readonly ShopifyApi $api,
         private readonly CreatesShops $shops,
         private readonly TenantContext $tenant,
+        private readonly ConnectPixel $pixel,
     ) {}
 
     /** @param array<string, mixed> $tokenAnswer what Shopify answered for the access token */
@@ -110,6 +112,8 @@ final class InstallStore
         }
 
         $this->writeThemeSettings($install->refresh());
+        // Quietly off when the scope is not granted: the store still works, without purchase counts.
+        $this->pixel->handle($install);
         Artisan::queue('catalog:sync', ['shop' => $install->shop->slug])->onQueue('long');
 
         return $install;

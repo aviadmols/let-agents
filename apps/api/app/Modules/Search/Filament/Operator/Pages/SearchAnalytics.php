@@ -3,7 +3,9 @@
 namespace App\Modules\Search\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Analytics\Models\AnalyticsOrder;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\CountSearch;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchTerm;
@@ -93,13 +95,16 @@ class SearchAnalytics extends Page
 
         return app(TenantContext::class)->run($this->shop, function () use ($days, $since): array {
             $rows = SearchTerm::query()->where('day', '>=', $since->toDateString())
-                ->selectRaw('day, query, searches, empty, clicks')->get();
+                ->selectRaw('day, query, searches, empty, clicks, added')->get();
             $asks = AssistantSearchAsk::query()->where('day', '>=', $since->toDateString())->get(['day', 'outcome']);
+            // Orders with products the same visitor added to the cart from the search (RecordOrder).
+            $orders = AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->whereNotNull('search_items')
+                ->where('ordered_at', '>=', $since)->get(['ordered_at', 'search_total', 'search_items']);
 
             $daily = [];
             for ($i = 0; $i < $days; $i++) {
                 $key = $since->copy()->addDays($i)->toDateString();
-                $daily[$key] = ['day' => $key, 'searches' => 0, 'empty' => 0, 'clicks' => 0, 'photos' => 0, 'questions' => 0, 'answered' => 0, 'queries' => 0];
+                $daily[$key] = ['day' => $key, 'searches' => 0, 'empty' => 0, 'clicks' => 0, 'added' => 0, 'purchases' => 0, 'revenue' => 0.0, 'photos' => 0, 'questions' => 0, 'answered' => 0, 'queries' => 0];
             }
 
             foreach ($rows as $row) {
@@ -115,8 +120,26 @@ class SearchAnalytics extends Page
                 $daily[$key]['searches'] += (int) $row->searches;
                 $daily[$key]['empty'] += (int) $row->empty;
                 $daily[$key]['clicks'] += (int) $row->clicks;
+                $daily[$key]['added'] += (int) $row->added;
                 $daily[$key]['queries']++;
             }
+
+            $bought = [];
+            foreach ($orders as $order) {
+                $key = $order->ordered_at->toDateString();
+                if (isset($daily[$key])) {
+                    $daily[$key]['purchases']++;
+                    $daily[$key]['revenue'] += (float) $order->search_total;
+                }
+                if ($this->day === '' || $this->day === $key) {
+                    foreach ((array) $order->search_items as $item) {
+                        $bought[(string) $item] = ($bought[(string) $item] ?? 0) + 1;
+                    }
+                }
+            }
+            arsort($bought);
+            $bought = array_slice($bought, 0, 10, true);
+            $titles = CatalogProduct::query()->whereIn('external_id', array_keys($bought))->pluck('title', 'external_id');
 
             foreach ($asks as $ask) {
                 $key = Carbon::parse($ask->day)->toDateString();
@@ -132,12 +155,12 @@ class SearchAnalytics extends Page
 
             $terms = SearchTerm::query()->where('query', '!=', CountSearch::PHOTO)
                 ->when($day !== null, fn ($q) => $q->whereDate('day', $day), fn ($q) => $q->where('day', '>=', $since->toDateString()))
-                ->select('query')->selectRaw('SUM(searches) as searches, SUM(empty) as empty, SUM(clicks) as clicks, MAX(last_results) as results')
+                ->select('query')->selectRaw('SUM(searches) as searches, SUM(empty) as empty, SUM(clicks) as clicks, SUM(added) as added, MAX(last_results) as results')
                 ->groupBy('query')->orderByDesc(DB::raw('SUM(searches)'))->orderBy('query')->limit(self::TOP)->get();
 
             $clicked = SearchClick::query()
                 ->when($day !== null, fn ($q) => $q->whereDate('day', $day), fn ($q) => $q->where('day', '>=', $since->toDateString()))
-                ->select('item')->selectRaw('MAX(title) as title, SUM(clicks) as clicks')
+                ->select('item')->selectRaw('MAX(title) as title, SUM(clicks) as clicks, SUM(added) as added')
                 ->groupBy('item')->orderByDesc(DB::raw('SUM(clicks)'))->limit(10)->get();
 
             return [
@@ -147,6 +170,9 @@ class SearchAnalytics extends Page
                     'searches' => $searches,
                     'empty' => $searches > 0 ? (int) round(100 * $sum('empty') / $searches) : 0,
                     'clicks' => $searches > 0 ? (int) round(100 * min($searches, $sum('clicks')) / $searches) : 0,
+                    'added' => $sum('added'),
+                    'purchases' => $sum('purchases'),
+                    'revenue' => round(array_sum(array_column($daily, 'revenue')), 2),
                     'photos' => $sum('photos'),
                     'questions' => $sum('questions'),
                     'answered' => $sum('questions') > 0 ? (int) round(100 * $sum('answered') / $sum('questions')) : 0,
@@ -154,6 +180,8 @@ class SearchAnalytics extends Page
                 'day' => $day,
                 'terms' => $terms,
                 'clicked' => $clicked,
+                'bought' => array_map(fn (string $id, int $n): array => ['title' => (string) ($titles[$id] ?? $id), 'orders' => $n], array_map('strval', array_keys($bought)), array_values($bought)),
+                'currency' => (string) Shop::query()->whereKey($this->shop)->value('currency'),
             ];
         });
     }

@@ -16,8 +16,12 @@ use Illuminate\Http\Response;
  *
  *   {"type":"search","q":"מקיטא","results":11}           the shopper paused over suggestions
  *   {"type":"click","q":"מקיטא","id":"p:1203","title":"…"}  a result was opened
+ *   {"type":"add_to_cart","q":"מקיטא","id":"p:1203","title":"…","path":"/"}  added to the cart from
+ *                                                           the results or the assistant's picks
  *
- * Queries and titles only: nothing about the shopper.
+ * With them, "vid": the anonymous id the storefront scripts keep, only so an order by the same
+ * visitor is attributed to the search; stored as a hash salted per shop. Nothing else about the
+ * shopper.
  */
 final class SearchEventsController
 {
@@ -33,8 +37,9 @@ final class SearchEventsController
 
         $body = json_decode((string) $request->getContent(), true);
         $events = is_array($body['events'] ?? null) ? array_slice($body['events'], 0, self::MAX_EVENTS) : [];
+        $visitor = is_string($body['vid'] ?? null) ? $body['vid'] : null;
 
-        $tenant->run($connection->shop_id, function () use ($events, $count, $connection): void {
+        $tenant->run($connection->shop_id, function () use ($events, $count, $connection, $visitor): void {
             foreach ($events as $event) {
                 if (! is_array($event) || ! is_string($event['q'] ?? null)) {
                     continue;
@@ -43,6 +48,7 @@ final class SearchEventsController
                 match ($event['type'] ?? null) {
                     'search' => $count->search($connection->shop_id, $event['q'], (int) ($event['results'] ?? 0)),
                     'click' => $count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? '')),
+                    'add_to_cart' => $count->added($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visitor, (string) ($event['path'] ?? '/')),
                     'ask_whatsapp' => self::onAsk($event, fn (AssistantSearchAsk $ask) => $ask->forceFill(['whatsapp_clicked' => true])->save()),
                     'ask_pick' => self::onAsk($event, function (AssistantSearchAsk $ask) use ($event): void {
                         $id = (string) ($event['id'] ?? '');

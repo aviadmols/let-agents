@@ -89,9 +89,9 @@ final class RecordBeacon
         return ['accepted' => $accepted, 'problems' => []];
     }
 
-    /** Visitors are stored only as a hash salted per shop: the same visitor in two shops cannot be joined. */
+    /** Visitors are stored only as a hash salted per shop (see AnalyticsEvent::visitorHash). */
     public static function visitorHash(string $shopId, string $visitorId): string
     {
-        return hash('sha256', $shopId.'|'.$visitorId);
+        return AnalyticsEvent::visitorHash($shopId, $visitorId);
     }
 }

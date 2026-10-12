@@ -38,6 +38,15 @@ class AnalyticsEvent extends Model
 
     public const UPDATED_AT = null;
 
+    /** An add to the cart from the store's search (its results or the assistant's picks), written by the Search module. */
+    public const SOURCE_SEARCH = 'search';
+
+    /** Visitors are stored only as a hash salted per shop: the same visitor in two shops cannot be joined. */
+    public static function visitorHash(string $shopId, string $visitorId): string
+    {
+        return hash('sha256', $shopId.'|'.$visitorId);
+    }
+
     protected $guarded = ['id'];
 
     protected function casts(): array

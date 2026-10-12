@@ -19,6 +19,9 @@ use Illuminate\Support\Carbon;
  * @property bool $assisted the visitor used the widget before ordering
  * @property string $attributed_total the part of the order added to the cart from the widget
  * @property list<string>|null $attributed_items
+ * @property string $search_total the part of the order added to the cart from the store's search
+ * @property list<string>|null $search_items
+ * @property string|null $reported_by plugin or pixel
  * @property Carbon $ordered_at
  */
 class AnalyticsOrder extends Model
@@ -30,6 +33,12 @@ class AnalyticsOrder extends Model
     /** Past orders the plugin sent once: no visitor, no attribution, not in the report of what Let Agents did. */
     public const SOURCE_HISTORY = 'history';
 
+    /** The WooCommerce plugin, from the store's server. */
+    public const REPORTED_BY_PLUGIN = 'plugin';
+
+    /** The Shopify pixel, from the shopper's browser at the thank-you page: reported, not verified. */
+    public const REPORTED_BY_PIXEL = 'pixel';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -40,6 +49,8 @@ class AnalyticsOrder extends Model
             'assisted' => 'boolean',
             'total' => 'decimal:2',
             'attributed_total' => 'decimal:2',
+            'search_items' => 'array',
+            'search_total' => 'decimal:2',
             'items_count' => 'integer',
             'ordered_at' => 'datetime',
         ];

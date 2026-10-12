@@ -204,8 +204,10 @@ final class Census
     {
         $since = now()->subDays(self::SIGNAL_DAYS);
 
+        // What the widget learns from: adds from the store's search are the search's.
         $counts = AnalyticsEvent::query()
             ->where('occurred_at', '>=', $since)
+            ->where(fn ($q) => $q->whereNull('source')->orWhere('source', '!=', AnalyticsEvent::SOURCE_SEARCH))
             ->select('type', DB::raw('count(*) as c'))
             ->groupBy('type')
             ->pluck('c', 'type')

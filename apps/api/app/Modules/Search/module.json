@@ -9,7 +9,8 @@
         "Catalog",
         "Retrieval",
         "Admin",
-        "Assistant"
+        "Assistant",
+        "Analytics"
     ],
     "provider": "SearchServiceProvider",
     "features": [

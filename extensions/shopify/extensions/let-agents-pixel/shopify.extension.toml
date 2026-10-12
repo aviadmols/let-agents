@@ -1,0 +1,31 @@
+# Purchases that came through the store's search: at checkout_completed, this pixel reports the order
+# (its number, totals, product ids, quantities, and the anonymous visitor id the storefront scripts
+# keep) to apps/api, module Analytics (PixelOrdersController). No name, email, address or payment.
+# The app turns it on for each store with webPixelCreate (Shopify\Actions\ConnectPixel).
+type = "web_pixel_extension"
+name = "Let's search purchases"
+runtime_context = "strict"
+
+# Runs only where the shopper allowed analytics, as Shopify's consent requires.
+[customer_privacy]
+analytics = true
+marketing = false
+preferences = false
+sale_of_data = "disabled"
+
+[settings]
+type = "object"
+
+[settings.fields.siteKey]
+name = "Site key"
+description = "The store's Let Agents site key, set by the app."
+type = "single_line_text_field"
+validations = [
+  { name = "min", value = "24" },
+  { name = "max", value = "24" }
+]
+
+[settings.fields.api]
+name = "API address"
+description = "Where the order is reported, set by the app."
+type = "single_line_text_field"

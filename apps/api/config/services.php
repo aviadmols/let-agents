@@ -40,7 +40,8 @@ return [
         'key' => env('SHOPIFY_API_KEY'),
         'secret' => env('SHOPIFY_API_SECRET'),
         'version' => env('SHOPIFY_API_VERSION', '2026-07'),
-        'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_content,read_online_store_pages,read_legal_policies,write_draft_orders'),
+        // write_pixels and read_customer_events: the web pixel that reports purchases from the search.
+        'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_content,read_online_store_pages,read_legal_policies,write_draft_orders,write_pixels,read_customer_events'),
         'handle' => env('SHOPIFY_APP_HANDLE', 'let-agents'),
         // Custom-distribution apps for single stores, "client_id:secret" pairs separated by commas.
         'more_apps' => env('SHOPIFY_MORE_APPS', ''),

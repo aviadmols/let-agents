@@ -4,6 +4,7 @@ namespace App\Modules\Shopify\Http\Controllers;
 
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Models\User;
+use App\Modules\Shopify\Actions\ConnectPixel;
 use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
 use App\Modules\Shopify\Models\ShopifyInstall;
@@ -99,7 +100,7 @@ final class ShopifyAppController
         return $this->onward($request, $install, $billing);
     }
 
-    public function open(Request $request, InstallStore $installer, ManageSubscription $billing, ShopifyApi $api): RedirectResponse|Response
+    public function open(Request $request, InstallStore $installer, ManageSubscription $billing, ShopifyApi $api, ConnectPixel $pixel): RedirectResponse|Response
     {
         $query = $request->query();
         $shop = ShopifySignatures::shopDomain($request->query('shop'));
@@ -128,6 +129,9 @@ final class ShopifyAppController
 
             $install = $installer->handle($shop, $answer);
             $install->forceFill(['client_id' => $app])->save();
+        } else {
+            // A store from before the pixel: on once the merchant approved the app's new scopes.
+            $pixel->once($install);
         }
 
         return $this->onward($request, $install, $billing);

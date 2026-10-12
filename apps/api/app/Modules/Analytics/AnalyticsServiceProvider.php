@@ -32,6 +32,10 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
         RateLimiter::for('plugin-api', fn (Request $request): Limit => Limit::perMinute(120)
             ->by('plugin:'.$request->route('site')));
 
+        // A shopper completes a checkout or two, not dozens a minute: the floor under made-up orders.
+        RateLimiter::for('pixel-orders', fn (Request $request): Limit => Limit::perMinute(10)
+            ->by('pixel:'.$request->ip().'|'.$request->route('site')));
+
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->command('model:prune', ['--model' => [AnalyticsEvent::class]])->dailyAt('03:45')->name('analytics:prune');
 

@@ -1,6 +1,9 @@
 {
   "name": "let-agents-shopify",
   "private": true,
+  "workspaces": [
+    "extensions/*"
+  ],
   "scripts": {
     "config:link": "shopify app config link",
     "deploy": "shopify app deploy",

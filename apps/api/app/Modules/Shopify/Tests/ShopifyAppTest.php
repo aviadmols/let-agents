@@ -39,6 +39,12 @@ final class ShopifyAppTest extends TestCase
     /** @var list<array<string, mixed>> GraphQL calls made, in order */
     private array $graphql = [];
 
+    /** Whether the fake store has the app's web pixel already. */
+    private bool $pixelTaken = false;
+
+    /** Whether the fake store refuses the pixel: the write_pixels scope not approved yet. */
+    private bool $pixelDenied = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -56,7 +62,16 @@ final class ShopifyAppTest extends TestCase
             $this->graphql[] = $body;
             $query = (string) ($body['query'] ?? '');
 
+            if ($this->pixelDenied && str_contains($query, 'webPixel')) {
+                return Http::response(['data' => null, 'errors' => [['message' => 'Access denied', 'extensions' => ['code' => 'ACCESS_DENIED']]]]);
+            }
+
             return Http::response(['data' => match (true) {
+                str_contains($query, 'webPixelCreate') => ['webPixelCreate' => $this->pixelTaken
+                    ? ['webPixel' => null, 'userErrors' => [['field' => null, 'message' => 'taken', 'code' => 'TAKEN']]]
+                    : ['webPixel' => ['id' => 'gid://shopify/WebPixel/1'], 'userErrors' => []]],
+                str_contains($query, 'webPixelUpdate') => ['webPixelUpdate' => ['webPixel' => ['id' => 'gid://shopify/WebPixel/1'], 'userErrors' => []]],
+                str_contains($query, 'webPixel {') => ['webPixel' => ['id' => 'gid://shopify/WebPixel/1']],
                 str_contains($query, 'appSubscriptionCreate') => ['appSubscriptionCreate' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'PENDING'], 'confirmationUrl' => 'https://gueta-test.myshopify.com/admin/charges/confirm', 'userErrors' => []]],
                 str_contains($query, 'activeSubscriptions') => ['currentAppInstallation' => ['activeSubscriptions' => $this->subscriptions], 'shop' => ['plan' => ['partnerDevelopment' => true]]],
                 str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => []]],
@@ -100,6 +115,27 @@ final class ShopifyAppTest extends TestCase
         ], '$49 every 30 days, in test mode on a development store');
 
         Queue::assertPushed(QueuedCommand::class);
+
+        $pixel = collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'webPixelCreate'));
+        $this->assertSame(['siteKey' => $connection->site_key, 'api' => 'https://agents.lets.co.il/api/v1'], json_decode($pixel['variables']['settings'], true), 'the purchase pixel is on, with the store\'s site key');
+    }
+
+    public function test_a_store_that_has_the_pixel_gets_it_updated_and_one_without_the_scope_keeps_working(): void
+    {
+        $install = $this->installed();
+        $this->pixelTaken = true;
+        $this->graphql = [];
+
+        $this->artisan('shopify:connect-pixel', ['shop' => self::SHOP])->expectsOutputToContain('on')->assertSuccessful();
+        $this->assertSame(['webPixelCreate', 'webPixel {', 'webPixelUpdate'], array_map(
+            fn (array $call): string => collect(['webPixelCreate', 'webPixelUpdate', 'webPixel {'])->first(fn (string $op): bool => str_contains((string) $call['query'], $op)),
+            $this->graphql,
+        ), 'the same pixel, updated: never a second one');
+
+        // Without write_pixels Shopify refuses: the store stays installed, the pixel is tried again later.
+        $this->pixelDenied = true;
+        $this->artisan('shopify:connect-pixel')->expectsOutputToContain('not yet')->assertSuccessful();
+        $this->assertTrue($install->refresh()->installed());
     }
 
     public function test_while_charging_is_off_an_install_is_active_at_once_and_free(): void
