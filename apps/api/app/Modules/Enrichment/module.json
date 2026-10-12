@@ -230,6 +230,89 @@
             "max": 400,
             "scope": "global",
             "unit": "usd"
+        },
+        {
+            "name": "schema_sample",
+            "type": "int",
+            "default": 300,
+            "min": 50,
+            "max": 1000,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "schema_writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "schema_writer_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "schema_writer_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "schema_writer_output_usd_per_million",
+            "type": "float",
+            "default": 8.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "schema_reviewer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "schema_reviewer_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "schema_reviewer_input_usd_per_million",
+            "type": "float",
+            "default": 3.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "schema_reviewer_output_usd_per_million",
+            "type": "float",
+            "default": 15.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
         }
     ],
     "agents": [
@@ -296,6 +379,43 @@
             "run": {
                 "command": "enrichment",
                 "step": "audit",
+                "shop_argument": "target"
+            }
+        },
+        {
+            "name": "schema_discovery",
+            "action": "discover_schema",
+            "when": "on_request",
+            "features": [],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "schema_writer_provider",
+                    "model": "schema_writer_model",
+                    "prices": [
+                        "schema_writer_input_usd_per_million",
+                        "schema_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "schema_writer"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "schema_reviewer_provider",
+                    "model": "schema_reviewer_model",
+                    "prices": [
+                        "schema_reviewer_input_usd_per_million",
+                        "schema_reviewer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "schema_review"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "enrichment",
+                "step": "schema",
                 "shop_argument": "target"
             }
         }

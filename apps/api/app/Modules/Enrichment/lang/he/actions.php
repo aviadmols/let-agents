@@ -9,4 +9,6 @@ return [
     'read_in_code' => 'קריאת מוצרים בקוד',
     'compute_relations' => 'חישוב קשרים בין מוצרים',
     'import_relation_rules' => 'שמירת כללי התאמה',
+    'discover_schema' => 'ספירת מדגם מוצרים',
+    'propose_schema' => 'כתיבת אוצר מילים ובדיקתו',
 ];

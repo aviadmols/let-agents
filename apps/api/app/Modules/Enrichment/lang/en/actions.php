@@ -9,4 +9,6 @@ return [
     'read_in_code' => 'Products read in code',
     'compute_relations' => 'Product relations computed',
     'import_relation_rules' => 'Matching rules saved',
+    'discover_schema' => 'Counting a sample of products',
+    'propose_schema' => 'Writing and reviewing a vocabulary',
 ];

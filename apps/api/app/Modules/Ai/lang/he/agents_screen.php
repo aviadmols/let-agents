@@ -8,6 +8,7 @@ return [
         'live' => 'בזמן אמת, כשגולש מבקש',
         'weekly' => 'פעם בשבוע',
         'hourly' => 'כל שעה',
+        'on_request' => 'לפי בקשה',
         'at' => 'כל לילה ב־:time',
     ],
     'week' => ':runs ריצות השבוע · :failed נכשלו · $:cost',

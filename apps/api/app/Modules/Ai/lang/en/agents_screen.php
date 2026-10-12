@@ -8,6 +8,7 @@ return [
         'live' => 'Live, when a shopper asks',
         'weekly' => 'Once a week',
         'hourly' => 'Every hour',
+        'on_request' => 'On request',
         'at' => 'Every night at :time',
     ],
     'week' => ':runs runs this week · :failed failed · $:cost',

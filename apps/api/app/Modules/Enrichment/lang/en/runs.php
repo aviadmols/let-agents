@@ -24,4 +24,10 @@ return [
     'relations_computed' => ':relations relations: :complements complements for :products products, :families other sizes, :alternatives alternatives.',
     'relation_rules_saved' => 'Matching rules saved, version :version: :rules rules.',
     'relation_rules_invalid' => 'The matching rules were not saved: :count problems.',
+    'schema_nothing' => 'No active products to sample.',
+    'schema_unchanged' => 'The sample is the same as the last proposal\'s: no new proposal was written.',
+    'schema_discovered' => 'Sampled :products products and found :keys candidate keys. Closest vocabulary: :template (:fit% of titles).',
+    'schema_proposed' => 'Proposed a vocabulary: :types product types and :attributes attributes. The reviewer dropped :dropped. Waiting for approval.',
+    'schema_invalid' => 'The written vocabulary did not pass code\'s check.',
+    'schema_same_family' => 'The writer and the reviewer are of the same model family: nothing was written.',
 ];

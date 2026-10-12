@@ -37,6 +37,9 @@
                 @empty
                     <div style="{{ $muted }}">{{ $t('no_vocabulary') }}</div>
                 @endforelse
+                @if ($scanned['schema'])
+                    <div style="{{ $muted }};margin-top:4px"><a href="{{ url('/operator/enrichment/schema') }}" style="text-decoration:underline">{{ $t('schema', ['status' => __('enrichment::ui.schema.statuses.'.$scanned['schema']->status), 'when' => $scanned['schema']->created_at?->format('d/m/Y'), 'n' => $scanned['schema']->sampled]) }}</a></div>
+                @endif
             </div>
             <div style="{{ $card }}">
                 <div style="font-weight:600">{{ $t('facts') }}</div>

@@ -89,4 +89,40 @@ return [
         'label' => 'מחיר פלט של הבודק, למיליון טוקנים',
         'description' => 'לפי המחירון של הספק.',
     ],
+    'schema_sample' => [
+        'label' => 'כמה מוצרים נדגמים לגילוי אוצר המילים',
+        'description' => 'מכל סוגי המוצרים בחנות, בתורות. הקוד סופר אותם; מודל קורא רק את הספירה.',
+    ],
+    'schema_writer_provider' => [
+        'label' => 'הספק שכותב את אוצר המילים',
+        'description' => 'משפחה אחרת מזו של הבודק.',
+    ],
+    'schema_writer_model' => [
+        'label' => 'המודל שכותב את אוצר המילים',
+        'description' => 'כותב סוגי מוצרים ומאפיינים מתוך הספירה של הקוד.',
+    ],
+    'schema_writer_input_usd_per_million' => [
+        'label' => 'מחיר קלט לכותב (למיליון טוקנים)',
+        'description' => 'לחשבון העלות של כל ריצה.',
+    ],
+    'schema_writer_output_usd_per_million' => [
+        'label' => 'מחיר פלט לכותב (למיליון טוקנים)',
+        'description' => 'לחשבון העלות של כל ריצה.',
+    ],
+    'schema_reviewer_provider' => [
+        'label' => 'הספק שבודק את אוצר המילים',
+        'description' => 'משפחה אחרת מזו של הכותב.',
+    ],
+    'schema_reviewer_model' => [
+        'label' => 'המודל שבודק את אוצר המילים',
+        'description' => 'מוריד מה שהספירה לא תומכת בו או מה שהדפוסים שלו תופסים דברים אחרים.',
+    ],
+    'schema_reviewer_input_usd_per_million' => [
+        'label' => 'מחיר קלט לבודק (למיליון טוקנים)',
+        'description' => 'לחשבון העלות של כל ריצה.',
+    ],
+    'schema_reviewer_output_usd_per_million' => [
+        'label' => 'מחיר פלט לבודק (למיליון טוקנים)',
+        'description' => 'לחשבון העלות של כל ריצה.',
+    ],
 ];

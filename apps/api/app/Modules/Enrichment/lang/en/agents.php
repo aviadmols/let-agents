@@ -12,4 +12,5 @@ return [
     'relator' => 'Product relations calculator',
     'nightly_model' => 'Reads products and articles',
     'auditor' => 'Checks how articles are read',
+    'schema_discovery' => 'Discovers the store\'s vocabulary',
 ];

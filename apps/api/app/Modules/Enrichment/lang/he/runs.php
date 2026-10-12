@@ -24,4 +24,10 @@ return [
     'relations_computed' => ':relations קשרים: :complements מוצרים משלימים ל־:products מוצרים, :families מידות נוספות, :alternatives חלופות.',
     'relation_rules_saved' => 'נשמרו כללי ההתאמה, גרסה :version: :rules כללים.',
     'relation_rules_invalid' => 'כללי ההתאמה לא נשמרו: :count בעיות.',
+    'schema_nothing' => 'אין מוצרים פעילים לדגום.',
+    'schema_unchanged' => 'המדגם זהה להצעה האחרונה: לא נכתבה הצעה חדשה.',
+    'schema_discovered' => 'נדגמו :products מוצרים ונמצאו :keys מפתחות מועמדים. אוצר המילים הקרוב: :template (:fit% מהכותרות).',
+    'schema_proposed' => 'הוצע אוצר מילים: :types סוגי מוצרים ו-:attributes מאפיינים. הבודק הוריד :dropped. מחכה לאישור.',
+    'schema_invalid' => 'אוצר המילים שנכתב לא עמד בבדיקת הקוד.',
+    'schema_same_family' => 'הכותב והבודק מאותה משפחת מודלים: לא נכתב דבר.',
 ];

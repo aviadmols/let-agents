@@ -10,9 +10,11 @@ use App\Modules\Enrichment\Actions\AuditContentReading;
 use App\Modules\Enrichment\Actions\ComputeProductRelations;
 use App\Modules\Enrichment\Actions\ComputeRankings;
 use App\Modules\Enrichment\Actions\CreateTaskFile;
+use App\Modules\Enrichment\Actions\DiscoverSchema;
 use App\Modules\Enrichment\Actions\ImportRelationRules;
 use App\Modules\Enrichment\Actions\ImportTaskResults;
 use App\Modules\Enrichment\Actions\ImportVocabulary;
+use App\Modules\Enrichment\Actions\ProposeSchema;
 use App\Modules\Enrichment\Actions\ReadContentInCode;
 use App\Modules\Enrichment\Actions\ReadProductsInCode;
 use App\Modules\Enrichment\Actions\ReadPromisesInCode;
@@ -39,7 +41,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, vocabulary, code, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, vocabulary, schema, code, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results}
         {--template= : vocabulary template name}
@@ -65,6 +67,13 @@ final class EnrichmentCommand extends Command
             'nightly' => $this->shopStep(fn (Shop $shop): Run => app(RunNightlyReading::class)->handle($shop->id), 'enrichment.nightly'),
             'rankings' => $this->rankings(),
             'code' => $this->shopStep(fn (Shop $shop): Run => app(ReadProductsInCode::class)->handle($shop->id)),
+            // The shop's own vocabulary: counted in code, then written and reviewed, for the operator to approve.
+            'schema' => $this->shopStep(function (Shop $shop): Run {
+                ['run' => $run, 'proposal' => $proposal] = app(DiscoverSchema::class)->handle($shop->id);
+                $this->line((string) $run->summary());
+
+                return $proposal === null ? $run : app(ProposeSchema::class)->handle($proposal);
+            }),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),
             'content' => $this->shopStep(fn (Shop $shop): Run => app(ReadContentInCode::class)->handle($shop->id)),
             'promises' => $this->shopStep(fn (Shop $shop): Run => app(ReadPromisesInCode::class)->handle($shop->id)),

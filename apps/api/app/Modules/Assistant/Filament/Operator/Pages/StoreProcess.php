@@ -10,6 +10,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentCodeReading;
 use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Runs\Models\Run;
@@ -85,6 +86,7 @@ final class StoreProcess extends Page
                 ->groupBy('source', 'embedding_model')->get()->map(fn ($row): array => ['source' => $row->source, 'model' => $row->embedding_model, 'n' => (int) $row->n, 'last' => $row->last])->all(),
             'vocabularies' => EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get(['key', 'version', 'created_at', 'author'])->all(),
             'code_readings' => EnrichmentCodeReading::query()->count(),
+            'schema' => EnrichmentSchemaProposal::query()->latest()->first(['id', 'status', 'sampled', 'created_at']),
             'facts_by_status' => (clone $facts)->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n', 'status')->all(),
             'approved_by_kind' => EnrichmentFact::query()->where('status', FactStatus::Approved->value)->selectRaw('kind, count(*) as n')->groupBy('kind')->orderByDesc('n')->pluck('n', 'kind')->all(),
             'approved_by_origin' => EnrichmentFact::query()->where('status', FactStatus::Approved->value)->selectRaw('origin, count(*) as n')->groupBy('origin')->pluck('n', 'origin')->all(),

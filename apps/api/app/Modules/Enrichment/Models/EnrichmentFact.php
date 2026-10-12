@@ -58,6 +58,8 @@ class EnrichmentFact extends Model
             'review_verdict' => Verdict::class,
             'review_tier' => 'integer',
             'decided_at' => 'datetime',
+            'confidence' => 'float',
+            'evidence' => 'array',
         ];
     }
 

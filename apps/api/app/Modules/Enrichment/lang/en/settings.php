@@ -89,4 +89,40 @@ return [
         'label' => 'Output price of the checker, per million tokens',
         'description' => 'From the price list of the provider.',
     ],
+    'schema_sample' => [
+        'label' => 'Products sampled to discover the vocabulary',
+        'description' => 'From every kind the store sells, in turn. Code counts them; a model reads only the counts.',
+    ],
+    'schema_writer_provider' => [
+        'label' => 'Provider that writes the vocabulary',
+        'description' => 'A family other than the reviewer\'s.',
+    ],
+    'schema_writer_model' => [
+        'label' => 'Model that writes the vocabulary',
+        'description' => 'Writes product types and attributes from code\'s counts.',
+    ],
+    'schema_writer_input_usd_per_million' => [
+        'label' => 'Writer input price (per million tokens)',
+        'description' => 'For each run\'s cost.',
+    ],
+    'schema_writer_output_usd_per_million' => [
+        'label' => 'Writer output price (per million tokens)',
+        'description' => 'For each run\'s cost.',
+    ],
+    'schema_reviewer_provider' => [
+        'label' => 'Provider that reviews the vocabulary',
+        'description' => 'A family other than the writer\'s.',
+    ],
+    'schema_reviewer_model' => [
+        'label' => 'Model that reviews the vocabulary',
+        'description' => 'Drops what the counts do not support or whose patterns catch other things.',
+    ],
+    'schema_reviewer_input_usd_per_million' => [
+        'label' => 'Reviewer input price (per million tokens)',
+        'description' => 'For each run\'s cost.',
+    ],
+    'schema_reviewer_output_usd_per_million' => [
+        'label' => 'Reviewer output price (per million tokens)',
+        'description' => 'For each run\'s cost.',
+    ],
 ];
