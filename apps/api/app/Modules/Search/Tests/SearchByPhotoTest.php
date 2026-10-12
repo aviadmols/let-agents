@@ -560,6 +560,28 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(['41', '40'], array_column($result['groups']['product'], 'external_id'), 'the drill before the closer-scoring tool box');
     }
 
+    public function test_what_the_reader_calls_the_object_comes_first_whatever_category_it_chose(): void
+    {
+        // Gueta: a photo of a bit set was read as "סט ביטים", but the category chosen was "סטים",
+        // the power-tool kits, by the shared word; the bit sets are in "ביטים" and never showed.
+        $this->inShop(function (): void {
+            $kits = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k1', 'name' => 'סטים', 'path' => ['סטים'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 2]);
+            $bits = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k2', 'name' => 'ביטים', 'path' => ['ביטים'], 'depth' => 0, 'hash' => 'k2', 'product_count' => 2]);
+            foreach (['50' => ['מולטיטול 18 וולט עם 2 סוללות', $kits], '51' => ['סט מקדחי SDS ואיזמלים במזוודה', $kits], '52' => ['סט ביטים 37 חלקים WIDER', $bits], '53' => ['סט ביטים IMPAKTOR WERA', $bits]] as $id => [$title, $category]) {
+                CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []])
+                    ->categories()->attach($category->id);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'סט ביטים לבורג בבסיס פלסטיק אדום', 'main' => 'סטים', 'details' => ['בסיס פלסטיק אדום', 'ביטים מתכת כסופים'], 'around' => [], 'sure' => 0.8, 'sellable' => true]);
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertEqualsCanonicalizing(['52', '53'], array_slice(array_column($result['groups']['product'], 'external_id'), 0, 2), 'the bit sets first');
+        $this->assertSame([true, true], array_slice(array_column($result['groups']['product'], 'kind'), 0, 2), 'and of the kind photographed');
+    }
+
     public function test_a_tap_is_placed_among_taps_never_iron_and_the_pictures_can_demand_a_second_look(): void
     {
         $taps = $this->shopWithTapsHandlesAndIron();

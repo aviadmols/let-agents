@@ -58,6 +58,12 @@ final class SearchCatalog
     /** A category tag brings all its products, up to this many. */
     private const PHOTO_CATEGORY_ALL = 5000;
 
+    /** The reader's words for the object are read from at most this many of their first words. */
+    private const OBJECT_WORDS = 4;
+
+    /** Products the object's words name, put first in a photo's results. */
+    private const OBJECT_NAMED = 24;
+
     /** Products of the asked-about kind put first for a question. */
     private const SUBJECT_PRODUCTS = 12;
 
@@ -350,7 +356,7 @@ final class SearchCatalog
                 // ring is matched with the pictures described so, not with every gold ring.
                 $words = $look->details !== [] ? [$look->object, ...$look->details] : array_column($tags, 'title');
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
-                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details])), $look->lacks));
+                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details])), $look->lacks, $look->object));
                 $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products, self::described($look)) : $products;
                 $record && $this->counter->photo($shopId, count($products));
                 $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
@@ -496,9 +502,14 @@ final class SearchCatalog
      * @param  list<array{external_id: string, similarity: float}>  $hits
      * @return list<array<string, mixed>>
      */
-    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = [], array $description = [], array $lacks = []): array
+    private function taggedProducts(array $index, array $tags, array $hits, string $shopId, array $content = [], array $description = [], array $lacks = [], ?string $object = null): array
     {
         $members = [];
+        // What the reader's own words for the object name: of the kind photographed, whatever category it chose.
+        $objectNamed = array_flip(self::objectNamed($index, $object));
+        foreach (array_keys($objectNamed) as $id) {
+            $members[$id] ??= [];
+        }
 
         foreach ($tags as $at => $tag) {
             $ids = isset($tag['id'])
@@ -552,8 +563,13 @@ final class SearchCatalog
         // how many of the photo's tags a product shares. Likeness alone would put a scanned tool box
         // above a drill whose picture is not scanned yet.
         $main = array_keys(array_filter($tags, fn (array $t): bool => ($t['main'] ?? false) === true));
-        $isMain = fn (array $c): int => array_intersect($members[$c['external_id']], $main) !== [] ? 1 : 0;
-        usort($candidates, fn (array $a, array $b): int => $isMain($b) <=> $isMain($a) ?: $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
+        $isMain = fn (array $c): int => isset($objectNamed[$c['external_id']]) || array_intersect($members[$c['external_id']], $main) !== [] ? 1 : 0;
+        // When the main category holds none of what the object's own words name, the category was
+        // chosen by a shared word: "סטים" (power-tool kits) for "סט ביטים". Then the bit sets come
+        // first. When it holds some ("טבעת" among the rings), the picture orders them as before.
+        $missed = $objectNamed !== [] && array_filter(array_keys($objectNamed), fn ($id): bool => array_intersect($members[$id] ?? [], $main) !== []) === [];
+        $byObject = fn (array $c): int => $missed && isset($objectNamed[$c['external_id']]) ? 1 : 0;
+        usort($candidates, fn (array $a, array $b): int => $byObject($b) <=> $byObject($a) ?: $isMain($b) <=> $isMain($a) ?: $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
         $brandOf = fn (array $c): string => mb_strtolower(trim((string) $rows->get($c['external_id'])?->brand)) ?: 'id:'.$c['external_id'];
 
         $out = [];
@@ -573,6 +589,41 @@ final class SearchCatalog
         }
 
         return $out;
+    }
+
+    /**
+     * The products the reader's words for the object name, as the store's search reads them: the
+     * whole description first, then its first words, until some product holds all of them. "סט
+     * ביטים לבורג בבסיס פלסטיק אדום" names the bit sets ("סט ביטים"), whichever category the
+     * reader chose. One short word alone ("סט") names nothing; at most OBJECT_NAMED products.
+     *
+     * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
+     * @return list<string> external ids
+     */
+    private static function objectNamed(array $index, ?string $object): array
+    {
+        $words = preg_split('/\s+/u', trim((string) $object), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        for ($n = min(count($words), self::OBJECT_WORDS); $n >= 1; $n--) {
+            $phrase = implode(' ', array_slice($words, 0, $n));
+
+            if ($n === 1 && mb_strlen(HebrewSearch::normalize($phrase)) < 3) {
+                break;
+            }
+
+            $ids = [];
+            foreach (HebrewSearch::search($index['engine'], $phrase) as $hit) {
+                if ($hit['full'] && str_starts_with($hit['id'], 'p:') && isset($index['records'][$hit['id']])) {
+                    $ids[] = substr($hit['id'], 2);
+                }
+            }
+
+            if ($ids !== []) {
+                return array_slice($ids, 0, self::OBJECT_NAMED);
+            }
+        }
+
+        return [];
     }
 
     /**
