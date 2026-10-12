@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Models;
 
+use App\Modules\Shopify\Support\ShopifySignatures;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -73,5 +74,29 @@ class ShopifyInstall extends Model
     public function subscribed(): bool
     {
         return $this->installed() && in_array($this->subscription_status, [self::ACTIVE, self::FREE], true);
+    }
+
+    /** How old a request through the app proxy may be: Shopify signs it as it passes. */
+    public const PROXY_WINDOW_SECONDS = 300;
+
+    /**
+     * The installed store a request through the app proxy (/apps/letagents/...) came from, when
+     * Shopify signed it and it is fresh; null otherwise. Shopify adds the signed-in customer to
+     * the same signed query (logged_in_customer_id), so it can be trusted with it.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    public static function fromProxy(array $query, ?int $now = null): ?self
+    {
+        $shop = ShopifySignatures::shopDomain(is_string($query['shop'] ?? null) ? $query['shop'] : null);
+        $timestamp = (string) ($query['timestamp'] ?? '');
+
+        if ($shop === null || ! ctype_digit($timestamp) || abs(($now ?? time()) - (int) $timestamp) > self::PROXY_WINDOW_SECONDS || ! ShopifySignatures::proxy($query)) {
+            return null;
+        }
+
+        $install = self::query()->where('shop_domain', $shop)->first();
+
+        return $install !== null && $install->installed() ? $install : null;
     }
 }

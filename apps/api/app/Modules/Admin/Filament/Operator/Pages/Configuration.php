@@ -124,6 +124,14 @@ class Configuration extends Page implements HasForms
             'shoppers.signup_consent',
             'shoppers.signup_note',
         ],
+        'shortlist' => [
+            'shortlist.compare',
+            'shortlist.wishlist',
+            'shortlist.compare_max',
+            'shortlist.wishlist_max',
+            'shortlist.product_selector',
+            'shortlist.card_selector',
+        ],
         'recovery' => [
             'recovery.capture',
             'recovery.report',

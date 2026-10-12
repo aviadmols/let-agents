@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
  *   site key      public, in storefront pages: tells the Let Agents API which store this is
  *   preview key   private: shows the widget to the store team while the store is in preview
  *   signature     private: signs what the plugin sends to Let Agents (orders, report requests)
+ *   customer      private: names the signed-in store account in a page, for the wishlist
  */
 final class SiteKeys {
 
@@ -47,6 +48,22 @@ final class SiteKeys {
 			'X-LetAgents-Timestamp' => $timestamp,
 			'X-LetAgents-Signature' => hash_hmac( 'sha256', $timestamp . "\n" . strtoupper( $method ) . "\n" . $path . "\n" . $body, $hash ),
 		);
+	}
+
+	/**
+	 * The signed-in store account, as the page tells Let Agents: "<user id>.<time>.<hmac>". Only
+	 * Let Agents can check it, so a shopper cannot claim another account's wishlist.
+	 */
+	public static function customer( int $user_id ): ?string {
+		$hash = self::token_hash();
+
+		if ( null === $hash || $user_id <= 0 ) {
+			return null;
+		}
+
+		$timestamp = (string) time();
+
+		return $user_id . '.' . $timestamp . '.' . hash_hmac( 'sha256', 'let-agents-customer|' . $user_id . '|' . $timestamp, $hash );
 	}
 
 	private static function token_hash(): ?string {

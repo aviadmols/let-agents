@@ -41,5 +41,12 @@ api_version = "2026-07"
   compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
   uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
 
+# The wishlist of a signed-in customer: the store calls /apps/letagents/wishlist on its own address,
+# and Shopify forwards it here signed, with the customer it vouches for (logged_in_customer_id).
+[app_proxy]
+url = "https://agents.lets.co.il/api/v1/shortlist/proxy"
+subpath = "letagents"
+prefix = "apps"
+
 [pos]
 embedded = false

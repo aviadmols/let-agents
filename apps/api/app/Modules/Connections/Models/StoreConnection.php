@@ -112,6 +112,14 @@ class StoreConnection extends Model
         return SiteKeys::verify((string) $this->access_token, $timestamp, $method, $path, $body, $signature);
     }
 
+    /** The signed-in store account a page of the plugin names (SiteKeys::customer), as wordpress:<user id>; null when unproven. */
+    public function customerFromProof(string $proof): ?string
+    {
+        $id = SiteKeys::verifyCustomer((string) $this->access_token, $proof);
+
+        return $id === null ? null : 'wordpress:'.$id;
+    }
+
     /** Hosts the storefront widget may run on: the connected site and the shop's domain. */
     public function allowedHosts(): array
     {

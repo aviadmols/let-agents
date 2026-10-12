@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.7.1
+Stable tag: 0.7.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -57,6 +57,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.7.2 =
+* The wishlist of a signed-in shopper: when the shop turns the wishlist on in Let Agents, the page tells Let Agents which store account is signed in, signed with the store's key, so the list is kept in that account and waits on any device. Only the user ID is sent, never a name or an email.
 
 = 0.7.1 =
 * Orders are reported to Let Agents while the search is on, not only while the widget is: the search analytics count the purchases of products added to the cart from the search. As before, an order carries no customer data: a hashed order number, totals, product IDs and quantities, and the anonymous visitor ID.

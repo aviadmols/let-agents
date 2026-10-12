@@ -80,6 +80,8 @@ final class Search {
 			'cartUrl'   => $woocommerce ? wc_get_cart_url() : null,
 			'searchUrl' => home_url( '/' ),
 			'version'   => LET_AGENTS_VERSION,
+			// The signed-in account, signed: the wishlist is kept in it. Pages of signed-in users are not cached.
+			'customer'  => is_user_logged_in() ? SiteKeys::customer( get_current_user_id() ) : null,
 		);
 
 		wp_enqueue_script(

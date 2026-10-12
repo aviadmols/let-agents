@@ -30,7 +30,8 @@
       "cartUrl": {{ routes.cart_url | json }},
       "currency": {{ cart.currency.iso_code | default: shop.currency | json }},
       "shopCurrency": {{ shop.currency | json }},
-      "moneyFormat": {{ shop.money_format | strip_html | json }}
+      "moneyFormat": {{ shop.money_format | strip_html | json }},
+      "loggedIn": {% if customer %}true{% else %}false{% endif %}
     };
   </script>
   <script src="{{ api | append: '/search/let-agents-search.js' | escape }}" defer></script>

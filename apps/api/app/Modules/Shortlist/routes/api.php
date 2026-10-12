@@ -1,0 +1,19 @@
+<?php
+
+use App\Modules\Shortlist\Http\Controllers\ShortlistController;
+use App\Modules\Shortlist\Http\Controllers\ShortlistScriptController;
+use Illuminate\Support\Facades\Route;
+
+// Prefixed /api/v1 by the module loader. Public: the storefront calls these from every visitor.
+Route::get('shortlist/let-agents-shortlist.js', ShortlistScriptController::class)->name('api.shortlist.script');
+
+Route::middleware('throttle:shortlist')->group(function (): void {
+    // Shopify's app proxy: /apps/letagents/wishlist on the store's own address, signed by Shopify. Before the
+    // routes by site key, which would read "proxy" as one.
+    Route::match(['get', 'post'], 'shortlist/proxy/wishlist', [ShortlistController::class, 'proxy'])->name('api.shortlist.proxy');
+    Route::get('shortlist/{site}/config', [ShortlistController::class, 'config'])->name('api.shortlist.config');
+    Route::get('shortlist/{site}/compare', [ShortlistController::class, 'compare'])->name('api.shortlist.compare');
+    Route::get('shortlist/{site}/paths', [ShortlistController::class, 'paths'])->name('api.shortlist.paths');
+    Route::post('shortlist/{site}/wishlist', [ShortlistController::class, 'wishlist'])->name('api.shortlist.wishlist');
+    Route::get('shortlist/{site}/shared/{code}', [ShortlistController::class, 'shared'])->name('api.shortlist.shared');
+});

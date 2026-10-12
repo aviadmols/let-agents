@@ -3978,7 +3978,15 @@
         sim.addEventListener('click', function () { showSimilar(item, raw); });
         node.appendChild(sim);
       }
+      shortlisted(node, item);
       return node;
+    }
+
+    /** The heart and the compare box over a result, in a shop that has them (let-agents-shortlist.js). */
+    function shortlisted(node, item) {
+      if (win.LetAgentsShortlist && item.external_id) {
+        win.LetAgentsShortlist.decorate(node, { id: item.external_id, title: item.title, image: item.image, url: item.url });
+      }
     }
 
     /** The one product a search is plainly for, in the results: large, with its code, the cart and the page. */
@@ -4034,6 +4042,7 @@
       buttons.appendChild(view);
       info.appendChild(buttons);
       node.appendChild(info);
+      shortlisted(node, item);
       section.appendChild(node);
       liveProducts([item.external_id]).then(function () { updateCards(section); });
       return section;
@@ -4818,6 +4827,28 @@
         });
       }
     };
+    // Compare and wishlist: the shop's settings once the page is idle (a small cached answer), and
+    // their script only in a shop that turned either on.
+    var shortlistStart = function () {
+      fetch(API + '/shortlist/' + encodeURIComponent(ctx.site) + '/config?locale=' + LOCALE, { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (config) {
+          if (!config || (!config.compare && !config.wishlist) || win.LetAgentsShortlistConfig) {
+            return;
+          }
+          win.LetAgentsShortlistConfig = config;
+          var script = doc.createElement('script');
+          script.src = API + '/shortlist/let-agents-shortlist.js';
+          script.async = true;
+          doc.head.appendChild(script);
+        })
+        .catch(function () {});
+    };
+    if (win.requestIdleCallback) {
+      win.requestIdleCallback(shortlistStart, { timeout: 3000 });
+    } else {
+      win.setTimeout(shortlistStart, 1200);
+    }
     // The store's own search page: our regular results over it, when the shop wants them there.
     var searched = searchPageQuery();
     if (searched) {
