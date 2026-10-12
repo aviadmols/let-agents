@@ -56,7 +56,7 @@ final class MeasurementScanner
         $measurements = [];
         $index = [];
         foreach ($accepted as $match) {
-            $key = $match['dimension'].'|'.round($match['value'], 3);
+            $key = $match['dimension'].'|'.Measurement::compact($match['value']);
 
             if (isset($index[$key])) {
                 $measurements[$index[$key]]['occurrences']++;

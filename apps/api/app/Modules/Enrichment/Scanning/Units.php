@@ -25,6 +25,8 @@ final class Units
         'pressure' => 'bar',
         'volume' => 'L',
         'count' => 'pcs',
+        // A gemstone's weight. Gold's purity ("14 קארט", "18K") is a choice in the vocabulary, not a unit.
+        'carat' => 'ct',
     ];
 
     /** A double quote mark in any of its forms, including two apostrophes ("מ''מ"). */
@@ -71,6 +73,9 @@ final class Units
             ['dimension' => 'pressure', 'factor' => 0.0689476, 'unit' => "psi{$end}", 'mode' => 'suffix'],
             ['dimension' => 'volume', 'factor' => 1.0, 'unit' => "(?:ליטר(?:ים)?|L{$end})", 'mode' => 'suffix'],
             ['dimension' => 'volume', 'factor' => 0.001, 'unit' => "(?:ml{$end}|מ{$q}ל)", 'mode' => 'suffix'],
+            // A stone's weight: "0.31 קראט", "1.5ct". Stores also spell gold's karat "קראט"; the
+            // vocabulary's range for a stone (well under 9) keeps "14 קראט" out.
+            ['dimension' => 'carat', 'factor' => 1.0, 'unit' => "(?:ct{$end}|carats?{$end}|קראט(?![\p{L}]))", 'mode' => 'suffix'],
             // Pack sizes: "100 יח'", "10 יחידות", "700 יחידות".
             ['dimension' => 'count', 'factor' => 1.0, 'unit' => "(?:יח{$a}|יחידות|יחידה(?![\p{L}])|pcs{$end})", 'mode' => 'suffix'],
         ];

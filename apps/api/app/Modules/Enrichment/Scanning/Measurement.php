@@ -57,10 +57,13 @@ final class Measurement
         );
     }
 
-    /** 18.0 becomes 18, 184.15 stays; fewer tokens and no false precision. */
+    /**
+     * 18.0 becomes 18, 184.15 stays; fewer tokens and no false precision. A value under 1 keeps
+     * three significant digits: a 1.6 g jewel is 0.0016 kg, not 0.
+     */
     public static function compact(float $value): float|int
     {
-        $rounded = round($value, 2);
+        $rounded = abs($value) >= 1 || $value == 0.0 ? round($value, 2) : round($value, max(2, 2 - (int) floor(log10(abs($value)))));
 
         return floor($rounded) === $rounded ? (int) $rounded : $rounded;
     }

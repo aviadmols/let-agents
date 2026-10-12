@@ -56,6 +56,9 @@ final class ScanningTest extends TestCase
             'model names are not measurements' => ['מקיטה DTD153 סדרת V20', []],
             'a quoted phrase is not inches' => ['"10 מקדחים" במארז', []],
             'impact rate in Hebrew' => ['עד כ‑3,800 פעימות לדקה', [['rate', 3800, 'bpm']]],
+            'a stone\x27s weight in carats' => ['טבעת וינטג\' משובצת רובי במשקל 0.31 קראט ויהלומים', [['carat', 0.31, 'ct']]],
+            'a jewel weighed in grams' => ['עגילים זהב צהוב 14 קארט, משקל התכשיט 1.6 גרם', [['mass', 0.0016, 'kg']]],
+            'gold\x27s karat spelled קארט is not a weight' => ['טבעת זהב 18 קארט', []],
             'torque with non-breaking space' => ["מומנט מירבי: 110\u{00A0}Nm", [['torque', 110, 'Nm']]],
         ];
     }

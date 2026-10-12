@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * The active products in one vocabulary's branch of the catalog: the root category's branch plus
  * any store category a product type names (brushes filed outside the paints root), outside the
- * excluded categories.
+ * excluded categories. A root of "*" is the whole catalog, for a store that sells one kind of thing.
  */
 final class VocabularyBranch
 {
@@ -20,7 +20,7 @@ final class VocabularyBranch
         $categories = CatalogCategory::query()->whereNull('removed_at')->get();
         $root = $categories->firstWhere('external_id', $vocabulary->rootCategoryExternalId());
 
-        if ($root === null) {
+        if ($root === null && ! $vocabulary->coversWholeCatalog()) {
             return CatalogProduct::query()->whereRaw('1 = 0');
         }
 
@@ -36,6 +36,13 @@ final class VocabularyBranch
                 $category = $categories->firstWhere('external_id', (string) $externalId);
                 $named = [...$named, ...($category?->branchExternalIds($categories) ?? [(string) $externalId])];
             }
+        }
+
+        // The whole catalog: every active product, outside the excluded categories.
+        if ($root === null) {
+            return CatalogProduct::query()
+                ->whereNull('removed_at')
+                ->when($excluded !== [], fn (Builder $q) => $q->whereDoesntHave('categories', fn (Builder $c) => $c->whereIn('catalog_categories.external_id', $excluded)));
         }
 
         return CatalogProduct::query()

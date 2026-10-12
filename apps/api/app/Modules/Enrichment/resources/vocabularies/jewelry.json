@@ -1,0 +1,371 @@
+{
+    "schema_version": 1,
+    "key": "jewelry",
+    "name": {
+        "he": "תכשיטים",
+        "en": "Jewelry"
+    },
+    "root_category_external_id": "*",
+    "excluded_category_external_ids": [],
+    "product_types": [
+        {
+            "key": "ring",
+            "label": { "he": "טבעת", "en": "Ring" },
+            "patterns": ["^\\s*(?:זוג\\s)?טבע(?:ת|ות)", "(?<!תליון )(?<!תליון בצורת )טבעת (?:אירוסין|נישואין|יהלום|סוליטר|חותם)"]
+        },
+        {
+            "key": "earrings",
+            "label": { "he": "עגילים", "en": "Earrings" },
+            "patterns": ["^\\s*(?:זוג\\s)?עגיל(?:ים|י)?(?![\\p{L}])"]
+        },
+        {
+            "key": "necklace",
+            "label": { "he": "שרשרת", "en": "Necklace" },
+            "hint": "שרשרת שנמכרת כשרשרת, עם תליון או בלי. תליון שנמכר בלי שרשרת הוא תליון.",
+            "patterns": ["^\\s*(?:שרשר(?:ת|אות)|קולייה|קולייר)(?! רגל)"]
+        },
+        {
+            "key": "pendant",
+            "label": { "he": "תליון", "en": "Pendant" },
+            "hint": "גם כשהוא מצולם על שרשרת, וגם כשהשרשרת כלולה במחיר.",
+            "patterns": ["^\\s*תליו(?:ן|נים)", "תליון[^.,]{0,40}(?:ללא|בלי|לא כולל) שרשרת"]
+        },
+        {
+            "key": "bracelet",
+            "label": { "he": "צמיד", "en": "Bracelet" },
+            "patterns": ["^\\s*צמיד(?:ים)?(?! רגל)"]
+        },
+        {
+            "key": "anklet",
+            "label": { "he": "צמיד רגל", "en": "Anklet" },
+            "patterns": ["צמיד רגל", "שרשרת רגל"]
+        },
+        {
+            "key": "brooch",
+            "label": { "he": "סיכה", "en": "Brooch" },
+            "patterns": ["^\\s*סיכ(?:ה|ת)(?![\\p{L}])", "^\\s*ברוש"]
+        },
+        {
+            "key": "cufflinks",
+            "label": { "he": "חפתים", "en": "Cufflinks" },
+            "patterns": ["חפתי(?:ם|ת)"]
+        },
+        {
+            "key": "charm",
+            "label": { "he": "צ'ארם", "en": "Charm" },
+            "patterns": ["צ['׳]?ארם", "^\\s*קמע"]
+        },
+        {
+            "key": "set",
+            "label": { "he": "סט תכשיטים", "en": "Jewelry set" },
+            "patterns": ["^\\s*סט(?![\\p{L}])", "^\\s*מארז"]
+        },
+        {
+            "key": "watch",
+            "label": { "he": "שעון", "en": "Watch" },
+            "patterns": ["^\\s*שעו(?:ן|ני)"]
+        },
+        {
+            "key": "gift_card",
+            "label": { "he": "כרטיס מתנה", "en": "Gift card" },
+            "patterns": ["גיפט ?קארד", "gift ?card", "כרטיס מתנה", "שובר מתנה"]
+        }
+    ],
+    "attributes": [
+        {
+            "key": "metal",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "מתכת", "en": "Metal" },
+            "values": [
+                { "key": "yellow_gold", "label": { "he": "זהב צהוב", "en": "Yellow gold" }, "patterns": ["זהב צהוב", "yellow gold"] },
+                { "key": "white_gold", "label": { "he": "זהב לבן", "en": "White gold" }, "patterns": ["זהב לבן", "white gold"] },
+                { "key": "rose_gold", "label": { "he": "זהב אדום", "en": "Rose gold" }, "patterns": ["זהב (?:אדום|ורוד)", "רוז ?גולד", "rose gold"] },
+                { "key": "two_tone", "label": { "he": "זהב משולב", "en": "Two-tone gold" }, "patterns": ["(?:שני|דו)[\\s-]?(?:צבעי|גוונ)", "זהב (?:צהוב|לבן) ו(?:זהב )?(?:לבן|צהוב)", "two[\\s-]?tone"] },
+                { "key": "gold", "label": { "he": "זהב", "en": "Gold" }, "hint": "זהב בלי צבע שנאמר", "patterns": ["(?<!ציפוי )(?<!מצופה )זהב(?! (?:צהוב|לבן|אדום|ורוד))", "\\d{1,2}\\s?(?:K|קארט)(?![\\p{L}])"] },
+                { "key": "silver", "label": { "he": "כסף", "en": "Silver" }, "patterns": ["כסף(?: 925| סטרלינג)?(?![\\p{L}])", "sterling silver", "\\b925\\b"] },
+                { "key": "platinum", "label": { "he": "פלטינה", "en": "Platinum" }, "patterns": ["פלטינה", "platinum"] },
+                { "key": "gold_plated", "label": { "he": "ציפוי זהב", "en": "Gold plated" }, "patterns": ["ציפוי זהב", "מצופ(?:ה|ים|ות) זהב", "gold[\\s-]plated"] },
+                { "key": "stainless_steel", "label": { "he": "נירוסטה", "en": "Stainless steel" }, "patterns": ["נירוסטה", "פלדת אל[\\s-]?חלד", "stainless"] }
+            ]
+        },
+        {
+            "key": "gold_karat",
+            "type": "enum",
+            "label": { "he": "קראטים בזהב", "en": "Gold karat" },
+            "hint": "טוהר הזהב, לא משקל אבן",
+            "values": [
+                { "key": "k9", "label": { "he": "9K", "en": "9K" }, "patterns": ["(?<![\\d.,])9\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] },
+                { "key": "k10", "label": { "he": "10K", "en": "10K" }, "patterns": ["(?<![\\d.,])10\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] },
+                { "key": "k14", "label": { "he": "14K", "en": "14K" }, "patterns": ["(?<![\\d.,])14\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] },
+                { "key": "k18", "label": { "he": "18K", "en": "18K" }, "patterns": ["(?<![\\d.,])18\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] },
+                { "key": "k21", "label": { "he": "21K", "en": "21K" }, "patterns": ["(?<![\\d.,])21\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] },
+                { "key": "k22", "label": { "he": "22K", "en": "22K" }, "patterns": ["(?<![\\d.,])22\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] },
+                { "key": "k24", "label": { "he": "24K", "en": "24K" }, "patterns": ["(?<![\\d.,])24\\s?(?:K|קארט|קרט|קראט)(?![\\p{L}\\d])"] }
+            ]
+        },
+        {
+            "key": "stone",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "אבן", "en": "Stone" },
+            "hint": "רק אבן שהחנות קוראת בשמה. 'אבנים צבעוניות' הן צבע, לא אבן.",
+            "values": [
+                { "key": "diamond", "label": { "he": "יהלום", "en": "Diamond" }, "patterns": ["יהלו(?:ם|מים)(?! מעבדה)", "בריליאנט", "diamonds?(?! lab)"] },
+                { "key": "lab_diamond", "label": { "he": "יהלום מעבדה", "en": "Lab-grown diamond" }, "patterns": ["יהלו(?:ם|מים) מעבדה", "lab[\\s-]?grown"] },
+                { "key": "ruby", "label": { "he": "רובי", "en": "Ruby" }, "patterns": ["רובי(?![\\p{L}])", "ruby"] },
+                { "key": "sapphire", "label": { "he": "ספיר", "en": "Sapphire" }, "patterns": ["ספיר(?![\\p{L}])", "סאפיר", "sapphire"] },
+                { "key": "emerald", "label": { "he": "אמרלד", "en": "Emerald" }, "patterns": ["אמרלד(?! ?קאט)", "אזמרגד", "emerald(?! cut)"] },
+                { "key": "garnet", "label": { "he": "גרנט", "en": "Garnet" }, "patterns": ["גרנט", "garnet"] },
+                { "key": "amethyst", "label": { "he": "אמטיסט", "en": "Amethyst" }, "patterns": ["אמטיסט", "אמתיסט", "amethyst"] },
+                { "key": "topaz", "label": { "he": "טופז", "en": "Topaz" }, "patterns": ["טופז", "topaz"] },
+                { "key": "citrine", "label": { "he": "ציטרין", "en": "Citrine" }, "patterns": ["ציטרין", "citrine"] },
+                { "key": "aquamarine", "label": { "he": "אקווה מרין", "en": "Aquamarine" }, "patterns": ["אקוו?ה?\\s?מרין", "aquamarine"] },
+                { "key": "tanzanite", "label": { "he": "טנזנייט", "en": "Tanzanite" }, "patterns": ["טנזני(?:י)?ט", "tanzanite"] },
+                { "key": "morganite", "label": { "he": "מורגנייט", "en": "Morganite" }, "patterns": ["מורגני(?:י)?ט", "morganite"] },
+                { "key": "peridot", "label": { "he": "פרידוט", "en": "Peridot" }, "patterns": ["פרידו(?:ט|ת)", "peridot"] },
+                { "key": "tourmaline", "label": { "he": "טורמלין", "en": "Tourmaline" }, "patterns": ["טורמלין", "tourmaline"] },
+                { "key": "opal", "label": { "he": "אופל", "en": "Opal" }, "patterns": ["אופל(?![\\p{L}])", "opal"] },
+                { "key": "onyx", "label": { "he": "אוניקס", "en": "Onyx" }, "patterns": ["אוניקס", "onyx"] },
+                { "key": "turquoise", "label": { "he": "טורקיז", "en": "Turquoise" }, "patterns": ["טורקיז", "turquoise"] },
+                { "key": "pearl", "label": { "he": "פנינה", "en": "Pearl" }, "patterns": ["פני(?:נה|נים|נת)(?![\\p{L}])", "pearls?"] },
+                { "key": "cameo", "label": { "he": "קמאו", "en": "Cameo" }, "patterns": ["קמאו", "cameo"] },
+                { "key": "corundum", "label": { "he": "קורונדום", "en": "Corundum" }, "patterns": ["קורונדום", "corundum"] },
+                { "key": "moissanite", "label": { "he": "מואסניט", "en": "Moissanite" }, "patterns": ["מו(?:א|י)סני(?:י)?ט", "moissanite"] },
+                { "key": "zircon", "label": { "he": "זירקון", "en": "Zircon" }, "patterns": ["זירקו(?:ן|נים)", "zircon", "cubic zirconia"] }
+            ]
+        },
+        {
+            "key": "stone_color",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "צבע האבן", "en": "Stone color" },
+            "hint": "צבע של אבן, לא של המתכת: 'זהב אדום' הוא מתכת.",
+            "values": [
+                { "key": "red", "label": { "he": "אדום", "en": "Red" }, "patterns": ["(?<!זהב )אדו(?:ם|מה|מים|מות)", "(?<!rose )red"] },
+                { "key": "pink", "label": { "he": "ורוד", "en": "Pink" }, "patterns": ["(?<!זהב )ורו(?:ד|דה|דים|דות)", "pink"] },
+                { "key": "blue", "label": { "he": "כחול", "en": "Blue" }, "patterns": ["כחו(?:ל|לה|לים|לות)", "blue"] },
+                { "key": "light_blue", "label": { "he": "תכלת", "en": "Light blue" }, "patterns": ["תכלת", "light blue", "sky blue"] },
+                { "key": "green", "label": { "he": "ירוק", "en": "Green" }, "patterns": ["ירו(?:ק|קה|קים|קות)", "green"] },
+                { "key": "yellow", "label": { "he": "צהוב", "en": "Yellow" }, "patterns": ["(?<!זהב )צהו(?:ב|בה|בים|בות)"] },
+                { "key": "purple", "label": { "he": "סגול", "en": "Purple" }, "patterns": ["סגו(?:ל|לה|לים|לות)", "purple", "violet"] },
+                { "key": "black", "label": { "he": "שחור", "en": "Black" }, "patterns": ["שחו(?:ר|רה|רים|רות)", "black"] },
+                { "key": "white", "label": { "he": "לבן", "en": "White" }, "patterns": ["(?<!זהב )לב(?:ן|נה|נים|נות)(?![\\p{L}])"] },
+                { "key": "clear", "label": { "he": "שקוף", "en": "Clear" }, "patterns": ["שקו(?:ף|פה|פים|פות)", "clear", "colorless"] },
+                { "key": "brown", "label": { "he": "חום", "en": "Brown" }, "patterns": ["(?<![\\p{L}])חו(?:ם|מה|מים)(?![\\p{L}])", "שמפניה", "brown", "champagne"] },
+                { "key": "orange", "label": { "he": "כתום", "en": "Orange" }, "patterns": ["כתו(?:ם|מה|מים)", "orange"] },
+                { "key": "multicolor", "label": { "he": "צבעוני", "en": "Multicolor" }, "patterns": ["צבעוני(?:ת|ים|ות)?", "multi[\\s-]?colou?r"] }
+            ]
+        },
+        {
+            "key": "stone_shape",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "צורה וחיתוך", "en": "Shape and cut" },
+            "values": [
+                { "key": "round", "label": { "he": "עגול", "en": "Round" }, "patterns": ["עגו(?:ל|לה|לים|לות)", "בריליאנט", "round"] },
+                { "key": "oval", "label": { "he": "אובלי", "en": "Oval" }, "patterns": ["אובלי(?:ת|ים|ות)?", "אובל(?![\\p{L}])", "oval"] },
+                { "key": "princess", "label": { "he": "פרינסס", "en": "Princess" }, "patterns": ["פרינסס", "מרוב(?:ע|עת|עים)", "princess", "square"] },
+                { "key": "emerald_cut", "label": { "he": "אמרלד קאט", "en": "Emerald cut" }, "patterns": ["אמרלד ?קאט", "מלבני(?:ת|ים|ות)?", "emerald cut"] },
+                { "key": "pear", "label": { "he": "טיפה", "en": "Pear" }, "patterns": ["טיפ(?:ה|ות)(?![\\p{L}])", "pear", "teardrop"] },
+                { "key": "marquise", "label": { "he": "מרקיזה", "en": "Marquise" }, "patterns": ["מרקיז(?:ה|ות)", "marquise"] },
+                { "key": "heart", "label": { "he": "לב", "en": "Heart" }, "patterns": ["(?:בצורת|חיתוך) לב", "heart[\\s-]shaped?"] },
+                { "key": "cushion", "label": { "he": "קושן", "en": "Cushion" }, "patterns": ["קושן", "cushion"] },
+                { "key": "baguette", "label": { "he": "באגט", "en": "Baguette" }, "patterns": ["בא?גט", "baguette"] },
+                { "key": "cabochon", "label": { "he": "קבושון", "en": "Cabochon" }, "patterns": ["קבושון", "cabochon"] }
+            ]
+        },
+        {
+            "key": "setting_style",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "סגנון שיבוץ", "en": "Setting style" },
+            "values": [
+                { "key": "solitaire", "label": { "he": "סוליטר", "en": "Solitaire" }, "patterns": ["סוליטר", "solitaire"] },
+                { "key": "halo", "label": { "he": "הילה", "en": "Halo" }, "patterns": ["הילה", "(?<![\\p{L}])הלו(?![\\p{L}])", "מוקפ(?:ת|ים|ות)", "halo"] },
+                { "key": "three_stone", "label": { "he": "שלוש אבנים", "en": "Three stone" }, "patterns": ["(?:שלוש|3) אבנים", "שלושה יהלומים", "טריו", "three[\\s-]stone"] },
+                { "key": "eternity", "label": { "he": "איטרניטי", "en": "Eternity" }, "patterns": ["איטרנ(?:י)?טי", "eternity"] },
+                { "key": "cluster", "label": { "he": "אשכול", "en": "Cluster" }, "patterns": ["אשכול", "cluster"] },
+                { "key": "pave", "label": { "he": "פאווה", "en": "Pavé" }, "patterns": ["פא?וו?ה", "pav[eé]"] },
+                { "key": "bezel", "label": { "he": "שיבוץ שפה", "en": "Bezel" }, "patterns": ["שיבוץ (?:שפה|מסגרת)", "bezel"] },
+                { "key": "tennis", "label": { "he": "טניס", "en": "Tennis" }, "patterns": ["טניס", "tennis"] },
+                { "key": "channel", "label": { "he": "שיבוץ תעלה", "en": "Channel" }, "patterns": ["שיבוץ תעלה", "channel[\\s-]set"] },
+                { "key": "signet", "label": { "he": "חותם", "en": "Signet" }, "patterns": ["חותם", "signet"] }
+            ]
+        },
+        {
+            "key": "style",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "סגנון", "en": "Style" },
+            "values": [
+                { "key": "vintage", "label": { "he": "וינטג'", "en": "Vintage" }, "patterns": ["וינט(?:א)?ג", "עתיק(?:ה)?", "vintage", "antique"] },
+                { "key": "minimal", "label": { "he": "מינימליסטי", "en": "Minimal" }, "patterns": ["מינימליסט", "עדי(?:ן|נה)(?![\\p{L}])", "minimal"] },
+                { "key": "classic", "label": { "he": "קלאסי", "en": "Classic" }, "patterns": ["קלאסי(?:ת)?", "classic"] },
+                { "key": "statement", "label": { "he": "בולט", "en": "Statement" }, "patterns": ["מרשי(?:ם|מה)", "statement"] }
+            ]
+        },
+        {
+            "key": "motif",
+            "type": "enum",
+            "multiple": true,
+            "label": { "he": "מוטיב", "en": "Motif" },
+            "values": [
+                { "key": "heart", "label": { "he": "לב", "en": "Heart" }, "patterns": ["(?:מוטיב|תליון|בצורת) לב", "לבבות"] },
+                { "key": "flower", "label": { "he": "פרח", "en": "Flower" }, "patterns": ["פר(?:ח|חים|חוני)", "flower", "floral"] },
+                { "key": "leaf", "label": { "he": "עלה", "en": "Leaf" }, "patterns": ["(?<![\\p{L}])על(?:ה|ים|י)(?![\\p{L}])", "leaf", "leaves"] },
+                { "key": "star", "label": { "he": "כוכב", "en": "Star" }, "patterns": ["כוכב", "star"] },
+                { "key": "moon", "label": { "he": "ירח", "en": "Moon" }, "patterns": ["ירח", "סהר", "moon"] },
+                { "key": "infinity", "label": { "he": "אינסוף", "en": "Infinity" }, "patterns": ["אינסוף", "infinity"] },
+                { "key": "hamsa", "label": { "he": "חמסה", "en": "Hamsa" }, "patterns": ["חמסה", "hamsa"] },
+                { "key": "evil_eye", "label": { "he": "עין", "en": "Evil eye" }, "patterns": ["עין(?: הרע)?(?![\\p{L}])", "evil eye"] },
+                { "key": "star_of_david", "label": { "he": "מגן דוד", "en": "Star of David" }, "patterns": ["מגן ?דוד", "star of david"] },
+                { "key": "cross", "label": { "he": "צלב", "en": "Cross" }, "patterns": ["צלב", "cross"] },
+                { "key": "letter", "label": { "he": "אות או שם", "en": "Letter or name" }, "patterns": ["(?<![\\p{L}])אות(?![\\p{L}])", "ראשי תיבות", "שרשרת שם", "initial"] },
+                { "key": "horseshoe", "label": { "he": "פרסה", "en": "Horseshoe" }, "patterns": ["פרסה", "horseshoe"] },
+                { "key": "animal", "label": { "he": "חיה", "en": "Animal" }, "patterns": ["אריה", "נחש", "פרפר", "ציפור", "דוב", "חתול", "lion", "snake", "butterfly", "bird"] },
+                { "key": "wave", "label": { "he": "גל", "en": "Wave" }, "patterns": ["(?<![\\p{L}])גל(?:ים|י)?(?![\\p{L}])", "wave"] },
+                { "key": "knot", "label": { "he": "קשר", "en": "Knot" }, "patterns": ["קשר", "knot"] },
+                { "key": "spiral", "label": { "he": "ספירלה", "en": "Spiral" }, "patterns": ["ספירל(?:ה|י)", "spiral"] }
+            ]
+        },
+        {
+            "key": "earring_style",
+            "type": "enum",
+            "label": { "he": "סוג עגיל", "en": "Earring style" },
+            "applies_to": ["earrings"],
+            "values": [
+                { "key": "studs", "label": { "he": "צמודים", "en": "Studs" }, "patterns": ["צמוד(?:ים|ות)", "סט(?:א)?ד", "studs?"] },
+                { "key": "hoops", "label": { "he": "חישוקים", "en": "Hoops" }, "patterns": ["חישוק(?:ים)?", "hoops?"] },
+                { "key": "drops", "label": { "he": "תלויים", "en": "Drops" }, "patterns": ["תלו(?:י)?(?:ים|ות)", "תלייה", "משתלשל(?:ים|ות)", "drops?", "dangle"] },
+                { "key": "climbers", "label": { "he": "מטפסים", "en": "Climbers" }, "patterns": ["מטפס(?:ים)?", "climbers?"] }
+            ]
+        },
+        {
+            "key": "chain_style",
+            "type": "enum",
+            "label": { "he": "סוג שרשרת", "en": "Chain style" },
+            "applies_to": ["necklace", "bracelet", "anklet"],
+            "values": [
+                { "key": "gourmette", "label": { "he": "גורמט", "en": "Curb" }, "patterns": ["גורמט", "curb"] },
+                { "key": "rope", "label": { "he": "חבל", "en": "Rope" }, "patterns": ["חבל(?![\\p{L}])", "rope"] },
+                { "key": "venetian", "label": { "he": "ונציאני", "en": "Box" }, "patterns": ["ונציאני", "box chain"] },
+                { "key": "figaro", "label": { "he": "פיגרו", "en": "Figaro" }, "patterns": ["פיגרו", "figaro"] },
+                { "key": "beads", "label": { "he": "כדורים", "en": "Beads" }, "patterns": ["כדורי(?:ם)?", "beads?"] },
+                { "key": "links", "label": { "he": "חוליות", "en": "Links" }, "patterns": ["חוליות", "links?"] }
+            ]
+        },
+        {
+            "key": "gender",
+            "type": "enum",
+            "label": { "he": "למי", "en": "For" },
+            "values": [
+                { "key": "women", "label": { "he": "לאישה", "en": "Women" }, "patterns": ["לאיש(?:ה)", "לנשים", "women"] },
+                { "key": "men", "label": { "he": "לגבר", "en": "Men" }, "patterns": ["לגבר(?:ים)?", "גברי(?:ת)?", "men(?:'s)?(?![\\p{L}])"] },
+                { "key": "kids", "label": { "he": "לילדים", "en": "Kids" }, "patterns": ["לילד(?:ים|ות|ה)?", "לתינוק(?:ות)?", "kids"] }
+            ]
+        },
+        {
+            "key": "carat_weight",
+            "label": { "he": "משקל האבן", "en": "Stone weight" },
+            "hint": "משקל אבן בקראטים. '14 קארט' של זהב הוא טוהר, לא משקל.",
+            "dimension": "carat",
+            "min": 0.01,
+            "max": 8
+        },
+        {
+            "key": "jewel_weight",
+            "label": { "he": "משקל התכשיט", "en": "Jewel weight" },
+            "dimension": "mass",
+            "min": 0.0002,
+            "max": 0.5
+        },
+        {
+            "key": "chain_length",
+            "label": { "he": "אורך שרשרת", "en": "Chain length" },
+            "dimension": "length",
+            "applies_to": ["necklace", "bracelet", "anklet", "pendant"],
+            "min": 100,
+            "max": 1200
+        },
+        {
+            "key": "adjustable",
+            "type": "boolean",
+            "label": { "he": "מתכוונן", "en": "Adjustable" },
+            "patterns": ["מתכוונ(?:ן|נת)", "ניתן להתאמה", "adjustable"]
+        },
+        {
+            "key": "includes_chain",
+            "type": "boolean",
+            "label": { "he": "כולל שרשרת", "en": "Chain included" },
+            "patterns": ["כולל שרשרת", "עם שרשרת"],
+            "exclude_patterns": ["(?:ללא|בלי|לא כולל) שרשרת"]
+        },
+        {
+            "key": "certified",
+            "type": "boolean",
+            "label": { "he": "עם תעודה", "en": "Certified" },
+            "patterns": ["תעודה גמולוגית", "תעודת (?:יהלום|אבן|מעבדה)", "\\b(?:GIA|IGI|HRD)\\b"]
+        },
+        {
+            "key": "handmade",
+            "type": "boolean",
+            "label": { "he": "עבודת יד", "en": "Handmade" },
+            "patterns": ["עבודת יד", "בעבודת יד", "handmade"]
+        }
+    ],
+    "components": [
+        {
+            "key": "center",
+            "label": { "he": "אבן מרכזית", "en": "Center stone" },
+            "patterns": ["מרכזי(?:ת)?", "במרכז", "באמצע", "אבן ראשית"],
+            "attributes": ["stone", "stone_color", "stone_shape", "carat_weight"]
+        },
+        {
+            "key": "side",
+            "label": { "he": "אבני צד", "en": "Side stones" },
+            "patterns": ["אבני צד", "בצד(?:דים|יה|ה)?", "בכתפי(?:ים| הטבעת)", "לצד(?:ה|ו)"],
+            "attributes": ["stone", "stone_color", "stone_shape"]
+        },
+        {
+            "key": "halo",
+            "label": { "he": "הילה", "en": "Halo" },
+            "patterns": ["מוקפ(?:ת|ים|ות)", "הילה", "(?<![\\p{L}])הלו(?![\\p{L}])", "מסביב"],
+            "attributes": ["stone", "stone_color"]
+        },
+        {
+            "key": "band",
+            "label": { "he": "שוק הטבעת", "en": "Band" },
+            "patterns": ["(?<![\\p{L}])שוק(?![\\p{L}])", "חישוק הטבעת", "band"],
+            "attributes": ["metal", "setting_style"]
+        },
+        {
+            "key": "chain",
+            "label": { "he": "שרשרת", "en": "Chain" },
+            "patterns": ["שרשרת", "chain"],
+            "attributes": ["metal", "chain_style", "chain_length"]
+        },
+        {
+            "key": "pendant",
+            "label": { "he": "תליון", "en": "Pendant" },
+            "patterns": ["תליון", "pendant"],
+            "attributes": ["stone", "stone_color", "stone_shape", "motif"]
+        }
+    ],
+    "image": {
+        "filter_confidence": {
+            "default": 0.8,
+            "product_type": 0.85,
+            "metal": 0.8,
+            "stone": 0.92,
+            "stone_color": 0.75,
+            "stone_shape": 0.8,
+            "setting_style": 0.8,
+            "style": 0.85,
+            "motif": 0.8,
+            "earring_style": 0.8,
+            "chain_style": 0.85
+        },
+        "never": ["gold_karat", "carat_weight", "jewel_weight", "chain_length", "gender", "includes_chain", "adjustable", "certified", "handmade"]
+    }
+}

@@ -18,6 +18,18 @@ final class VocabularyDefinition
 
     public const RANK_DIRECTIONS = ['min', 'max'];
 
+    /** A root of "*" is the whole catalog: a store that sells one kind of thing has no one category above it. */
+    public const WHOLE_CATALOG = '*';
+
+    /**
+     * How sure a reading of a product's picture must be before its value filters results, when
+     * the vocabulary does not say. Below it the value only helps the order.
+     */
+    public const DEFAULT_IMAGE_FILTER_CONFIDENCE = 0.8;
+
+    /** The key `image.filter_confidence` uses for the product type, beside attribute keys and `default`. */
+    public const PRODUCT_TYPE = 'product_type';
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -84,6 +96,10 @@ final class VocabularyDefinition
                 }
             }
 
+            if (isset($attribute['multiple']) && ($type !== 'enum' || ! is_bool($attribute['multiple']))) {
+                $problems[] = "{$at}.multiple is true or false, on a choice only";
+            }
+
             if ($type === 'enum') {
                 $valueKeys = [];
                 foreach ((array) ($attribute['values'] ?? []) as $j => $value) {
@@ -146,6 +162,19 @@ final class VocabularyDefinition
             }
         }
 
+        $componentKeys = [];
+        foreach ((array) ($data['components'] ?? []) as $i => $component) {
+            $problems = [...$problems, ...self::checkEntry("components[{$i}]", $component, $componentKeys, patternsRequired: true)];
+
+            foreach ((array) ($component['attributes'] ?? []) as $key) {
+                if (! in_array($key, $attributeKeys, true)) {
+                    $problems[] = "components[{$i}].attributes: unknown attribute {$key}";
+                }
+            }
+        }
+
+        $problems = [...$problems, ...self::checkImage((array) ($data['image'] ?? []), $attributeKeys)];
+
         return $problems === [] ? [new self($data), []] : [null, $problems];
     }
 
@@ -174,6 +203,45 @@ final class VocabularyDefinition
     public function rootCategoryExternalId(): string
     {
         return (string) $this->data['root_category_external_id'];
+    }
+
+    public function coversWholeCatalog(): bool
+    {
+        return $this->rootCategoryExternalId() === self::WHOLE_CATALOG;
+    }
+
+    /** Whether a choice holds several values at once: a ring set with diamonds and a ruby has both stones. */
+    public function isMultiple(string $attributeKey): bool
+    {
+        return ($this->attribute($attributeKey)['multiple'] ?? false) === true;
+    }
+
+    /**
+     * The parts a product is described by, each with the words that name its place ("מרכזי",
+     * "מוקפת") and the attributes that describe it, so "אבן אדומה באמצע" is a red center stone.
+     *
+     * @return list<array{key: string, label: array<string, string>, patterns: list<string>, attributes?: list<string>, hint?: string}>
+     */
+    public function components(): array
+    {
+        return array_values((array) ($this->data['components'] ?? []));
+    }
+
+    /**
+     * How sure a picture's reading of this attribute (or `product_type`) must be before its value
+     * filters results. Each attribute has its own risk: a colour seen wrong costs less than a stone.
+     */
+    public function imageFilterConfidence(string $key): float
+    {
+        $thresholds = (array) ($this->data['image']['filter_confidence'] ?? []);
+
+        return (float) ($thresholds[$key] ?? $thresholds['default'] ?? self::DEFAULT_IMAGE_FILTER_CONFIDENCE);
+    }
+
+    /** Whether a picture may say this at all: a karat, a weight or a size is never read from one. */
+    public function readFromImage(string $key): bool
+    {
+        return ! in_array($key, (array) ($this->data['image']['never'] ?? []), true);
     }
 
     /** @return list<string> */
@@ -417,6 +485,34 @@ final class VocabularyDefinition
         }
 
         return [...$problems, ...self::checkPatterns("{$at}.patterns", $entry['patterns'] ?? null, $patternsRequired)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $image
+     * @param  list<string>  $attributeKeys
+     * @return list<string>
+     */
+    private static function checkImage(array $image, array $attributeKeys): array
+    {
+        $problems = [];
+        $known = [...$attributeKeys, self::PRODUCT_TYPE];
+
+        foreach ((array) ($image['filter_confidence'] ?? []) as $key => $threshold) {
+            if ($key !== 'default' && ! in_array($key, $known, true)) {
+                $problems[] = "image.filter_confidence: unknown attribute {$key}";
+            }
+            if (! is_numeric($threshold) || (float) $threshold < 0 || (float) $threshold > 1) {
+                $problems[] = "image.filter_confidence.{$key} must be between 0 and 1";
+            }
+        }
+
+        foreach ((array) ($image['never'] ?? []) as $key) {
+            if (! in_array($key, $known, true)) {
+                $problems[] = "image.never: unknown attribute {$key}";
+            }
+        }
+
+        return $problems;
     }
 
     /** @return list<string> */

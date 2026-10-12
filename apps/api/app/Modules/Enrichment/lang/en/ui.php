@@ -201,6 +201,7 @@ return [
         'hand-tools' => 'Hand tools',
         'adhesives' => 'Adhesives and sealants',
         'paints' => 'Paints and finishes',
+        'jewelry' => 'Jewelry',
         'hardware-store' => 'Hardware and tools store',
     ],
 ];
