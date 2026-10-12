@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Benchmark;
 
 use App\Core\Facades\Settings;
+use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
@@ -12,6 +13,7 @@ use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
+use App\Modules\Assistant\Support\FactSheet;
 use App\Modules\Runs\Contracts\RunContext;
 use Illuminate\Support\Facades\DB;
 
@@ -32,9 +34,14 @@ final class WriterBench
 {
     public const CURRENT = 'current';
 
-    public const JUDGE_PROMPT = __DIR__.'/../Prompts/writer_judge.v1.md';
+    /** The writer that reads only facts (FactSheet), not descriptions or pages. Benchmark only. */
+    public const V5 = 'v5';
 
-    private const JUDGE_OUTPUT_TOKENS = 3000;
+    public const V5_PROMPT = __DIR__.'/../Prompts/answer_site.v5.md';
+
+    public const JUDGE_PROMPT = __DIR__.'/../Prompts/writer_judge.v2.md';
+
+    private const JUDGE_OUTPUT_TOKENS = 5000;
 
     /** What the judge calls the replies, in the shuffled order it reads them. */
     private const LETTERS = ['A', 'B', 'C', 'D', 'E'];
@@ -43,6 +50,7 @@ final class WriterBench
         private readonly AnswerSiteQuestion $answers,
         private readonly ChatModel $models,
         private readonly SpendGuard $spend,
+        private readonly TenantContext $tenant,
     ) {}
 
     // ------------------------------------------------------------------ 1. snapshot
@@ -73,34 +81,44 @@ final class WriterBench
                 + ['constraints' => AnswerContext::constraints($context['question']), 'max_output' => (int) Settings::get('assistant.answer_max_output_tokens')],
         ];
 
+        // The same question as facts only: what v5 reads. Read from the shop's approved facts and fields.
+        $record['context']['sheet'] = $this->tenant->run($ask->shop_id, fn (): array => FactSheet::build($context, $context['question'], $record['language'] === 'en' ? 'en' : 'he'));
+        $record['context']['input_v5'] = FactSheet::input($context['question'], $record['context']['sheet']);
+
         $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
         $effort = (string) Settings::get('assistant.reasoning_effort');
-        $current = $this->current($record, $run, $writer->provider, $writer->model, $effort === 'model_default' ? null : $effort);
-        $current['check'] = $this->check($record, $current, $run);
-        $record['writers'] = [self::CURRENT => $current];
+        $effort = $effort === 'model_default' ? null : $effort;
+        $record['writers'] = [];
+
+        // The current writer twice: as the search box runs it (v4), and on the facts alone (v5).
+        foreach (['v4' => self::CURRENT, self::V5 => self::CURRENT.'@'.self::V5] as $version => $key) {
+            $side = $this->current($record, $run, $writer->provider, $writer->model, $effort, $version);
+            $side['check'] = $this->check($record, $side, $run);
+            $record['writers'][$key] = $side;
+        }
 
         return $record;
     }
 
     /** @return array<string, mixed> */
-    private function current(array $record, RunContext $run, AiProviderName $provider, string $model, ?string $effort): array
+    private function current(array $record, RunContext $run, AiProviderName $provider, string $model, ?string $effort, string $version = 'v4'): array
     {
-        $input = $record['context']['input'];
+        $input = $version === self::V5 ? $record['context']['input_v5'] : $record['context']['input'];
         $prices = [(float) Settings::get('assistant.answer_input_usd_per_million'), (float) Settings::get('assistant.answer_output_usd_per_million')];
         $max = $record['context']['max_output'];
         $this->spend->assertCanSpend(((int) ceil(mb_strlen($input) / 2) + 600) * $prices[0] / 1e6 + $max * $prices[1] / 1e6);
         $started = hrtime(true);
 
         try {
-            $reply = $this->models->json($provider, $model, AnswerSiteQuestion::prompt('answer_site'), $input, $max, $effort);
+            $reply = $this->models->json($provider, $model, self::system($version), $input, $max, $effort);
         } catch (ModelCallFailed $e) {
-            return ['model' => $model, 'error' => $e->reason, 'latency_ms' => (int) round((hrtime(true) - $started) / 1e6)];
+            return ['model' => $model, 'version' => $version, 'error' => $e->reason, 'latency_ms' => (int) round((hrtime(true) - $started) / 1e6)];
         }
 
         $cost = $reply->costUsd(...$prices);
         $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $cost);
 
-        return $this->screened($record, $reply->data) + [
+        return $this->screened($record, $reply->data, $version) + [
             'model' => $model,
             'latency_ms' => (int) round((hrtime(true) - $started) / 1e6),
             'tokens' => ['in' => $reply->inputTokens, 'out' => $reply->outputTokens],
@@ -132,7 +150,11 @@ final class WriterBench
             return ['verdict' => 'error', 'reason' => 'no_checker'];
         }
 
-        $input = $this->answers->checkInput($record['question'], $side['answer'], $side['cited'], $side['picks_screened'], $this->prepared($record));
+        // A v5 reply rests on facts: the checker reads the facts it cites, and each pick's facts as its description.
+        $prepared = ($side['version'] ?? 'v4') === self::V5
+            ? FactSheet::forChecker($record['context']['sheet'], $side['cited'], $record['context']['productsByRef']) + ['analysis' => $record['context']['analysis'], 'forModel' => $record['context']['forModel']]
+            : $this->prepared($record);
+        $input = $this->answers->checkInput($record['question'], $side['answer'], $side['cited'], $side['picks_screened'], $prepared);
         $this->spend->assertCanSpend(((int) ceil(mb_strlen($input) / 2) + 600) * $prices[0] / 1e6 + $max * $prices[1] / 1e6);
         $started = hrtime(true);
 
@@ -153,17 +175,18 @@ final class WriterBench
     // ------------------------------------------------------------------ 2. another writer
 
     /** @return array<string, mixed> one writer's side of a record */
-    public function write(array $record, LocalWriter $writer): array
+    public function write(array $record, LocalWriter $writer, string $version = 'v4'): array
     {
         $started = hrtime(true);
+        $v5 = $version === self::V5;
 
         try {
-            $reply = $writer->write(AnswerSiteQuestion::prompt('answer_site'), $record['context']['input'], (int) ($record['context']['max_output'] ?? 1500));
+            $reply = $writer->write(self::system($version), $v5 ? $record['context']['input_v5'] : $record['context']['input'], (int) ($record['context']['max_output'] ?? 1500), $v5 ? FactSheet::SCHEMA : null);
         } catch (ModelCallFailed $e) {
-            return ['model' => LocalWriter::model(), 'error' => $e->reason, 'detail' => mb_substr($e->getMessage(), 0, 300), 'latency_ms' => (int) round((hrtime(true) - $started) / 1e6)];
+            return ['model' => LocalWriter::model(), 'version' => $version, 'error' => $e->reason, 'detail' => mb_substr($e->getMessage(), 0, 300), 'latency_ms' => (int) round((hrtime(true) - $started) / 1e6)];
         }
 
-        return $this->screened($record, $reply->data) + [
+        return $this->screened($record, $reply->data, $version) + [
             'model' => LocalWriter::model(),
             'latency_ms' => (int) round((hrtime(true) - $started) / 1e6),
             'tokens' => ['in' => $reply->inputTokens, 'out' => $reply->outputTokens],
@@ -178,11 +201,30 @@ final class WriterBench
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function screened(array $record, array $data): array
+    private function screened(array $record, array $data, string $version = 'v4'): array
     {
+        if ($version === self::V5) {
+            // The sentences and their refs through FactSheet's gate; the rest of the bench reads the reply as one answer.
+            $screen = FactSheet::screen($data, $record['context']['sheet'], $record['context']['productsByRef'], $record['question']);
+            $flat = FactSheet::flat($data);
+
+            return [
+                'version' => self::V5,
+                'raw' => $flat,
+                'raw_v5' => $data,
+                'answer' => $screen['answer'],
+                'refusal' => $screen['refusal'],
+                'cited' => $screen['cited'],
+                'picks_screened' => $screen['picks'],
+                'picks' => array_column($screen['picks'], 'external_id'),
+                'code' => $this->measures($record, $flat, $screen) + ['sentences_kept' => $screen['sentences']],
+            ];
+        }
+
         $screen = $this->answers->screen($data, $this->prepared($record), $record['question'], $record['context']['mode']);
 
         return [
+            'version' => 'v4',
             'raw' => $data,
             'answer' => $screen['answer'],
             'refusal' => $screen['refusal'],
@@ -230,7 +272,10 @@ final class WriterBench
                 'most_expensive' => self::ordered($pickRanks, -1),
                 default => true,
             },
-            'invented_number' => $screen['refusal'] === 'number_not_in_the_pages',
+            'invented_number' => in_array($screen['refusal'], ['number_not_in_the_pages', 'number_not_in_facts'], true),
+            // v5 only: code itself caught a fact said of a product it does not belong to, or a fact that does not exist.
+            'code_wrong_owner' => $screen['refusal'] === 'wrong_owner',
+            'code_unknown_ref' => $screen['refusal'] === 'unknown_ref',
             'wrote_price' => $screen['refusal'] === 'price',
             'internal_ids' => array_values(array_unique($refs[0])),
             'foreign_script' => array_values(array_unique($foreign[0])),
@@ -276,6 +321,8 @@ final class WriterBench
             'products' => array_map(fn (array $entry): array => $entry + array_filter(['price' => $record['context']['productsByRef'][$entry['ref']]['price'] ?? null]), $record['context']['forModel']),
             'analysis' => $record['context']['analysis'],
             'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']], array_keys($record['context']['byRef']), $record['context']['byRef']),
+            // The facts code holds about each product and the store's statements: a statement from them is grounded too.
+            'facts' => isset($record['context']['sheet']) ? array_intersect_key($record['context']['sheet'], array_flip(['products', 'store'])) : null,
             'replies' => array_map(fn (string $key): array => $this->forJudge($record, $record['writers'][$key]), $letters),
         ], JSON_UNESCAPED_UNICODE);
 
@@ -365,6 +412,10 @@ final class WriterBench
                 'checker_intervention_pct' => self::pct($count(fn (array $r): bool => in_array($r['writers'][$key]['check']['verdict'] ?? null, ['answer_removed', 'picks_removed', 'rejected'], true), $ok), count($ok)),
                 'checker_rejection_pct' => self::pct($count(fn (array $r): bool => ($r['writers'][$key]['check']['verdict'] ?? null) === 'rejected', $ok), count($ok)),
                 'checker_verdicts' => array_count_values(array_map(fn (array $r): string => (string) ($r['writers'][$key]['check']['verdict'] ?? 'none'), $ok)),
+                // Of the questions the input answers, how many end with something shown to the shopper.
+                'coverage_pct' => self::pct($count(fn (array $r): bool => self::shown($r, $key), $answerable), count($answerable)),
+                'code_refusals' => array_count_values(array_map(fn (array $r): string => (string) ($r['writers'][$key]['refusal'] ?? 'none'), $ok)),
+                'code_wrong_owner' => $count(fn (array $r): bool => ($r['writers'][$key]['code']['code_wrong_owner'] ?? false) === true, $ok),
                 'raw_accuracy_pct' => self::pct($count(fn (array $r): bool => self::rawCorrect($r, $key), $ok), count($ok)),
                 'final_accuracy_after_checker_pct' => self::pct($count(fn (array $r): bool => self::finalCorrect($r, $key), $ok), count($ok)),
                 'final_accuracy_by_language' => $byLanguage,
@@ -373,6 +424,10 @@ final class WriterBench
                     'avg' => (int) round(array_sum($latency) / count($latency)),
                     'p50' => $latency[(int) floor((count($latency) - 1) * 0.5)],
                     'p95' => $latency[(int) floor((count($latency) - 1) * 0.95)],
+                ],
+                'tokens_avg' => $ok === [] ? null : [
+                    'in' => (int) round(array_sum(array_map(fn (array $r): int => (int) ($r['writers'][$key]['tokens']['in'] ?? 0), $ok)) / count($ok)),
+                    'out' => (int) round(array_sum(array_map(fn (array $r): int => (int) ($r['writers'][$key]['tokens']['out'] ?? 0), $ok)) / count($ok)),
                 ],
                 'cost_per_question_usd' => $ok === [] ? null : [
                     'writer' => round($writerCost / count($ok), 6),
@@ -462,6 +517,22 @@ final class WriterBench
         }
 
         return ! self::missed($record, $key) && self::answerOk($record, $key) && self::picksOk($record, $key);
+    }
+
+    /** Whether anything (an answer or a pick) is left to show after code's gate and the checker. */
+    private static function shown(array $record, string $key): bool
+    {
+        $side = $record['writers'][$key];
+        $verdict = $side['check']['verdict'] ?? null;
+
+        return ($side['answer'] !== '' && in_array($verdict, ['kept', 'picks_removed'], true))
+            || ($side['picks'] !== [] && in_array($verdict, ['kept', 'answer_removed'], true));
+    }
+
+    /** The system prompt of a version: the search box's own (v4), or the facts-only writer (v5). */
+    private static function system(string $version): string
+    {
+        return $version === self::V5 ? (string) file_get_contents(self::V5_PROMPT) : AnswerSiteQuestion::prompt('answer_site');
     }
 
     /**

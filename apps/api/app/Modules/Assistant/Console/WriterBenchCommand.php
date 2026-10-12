@@ -28,7 +28,9 @@ final class WriterBenchCommand extends Command
     public const AGENT = 'assistant.writer_bench';
 
     protected $signature = 'assistant:writer-bench {step : snapshot, write, judge or summary} {file : JSON lines, in storage/app/bench unless a path}
-        {--limit=100 : snapshot: how many questions} {--shop= : snapshot: one shop\'s questions only (id)}';
+        {--limit=100 : snapshot: how many questions} {--shop= : snapshot: one shop\'s questions only (id)}
+        {--ids= : snapshot: these asks only, comma separated, so a set can be asked again}
+        {--prompt=v4 : write: v4 (the search box\'s input) or v5 (facts only, FactSheet)}';
 
     protected $description = 'Compare the search box\'s writer with other writers on the questions shoppers asked, with the same input.';
 
@@ -57,7 +59,9 @@ final class WriterBenchCommand extends Command
         $asks = $tenant->runUnscoped(fn () => AssistantSearchAsk::query()
             ->where('from', 'model')->whereIn('outcome', ['answered', 'no_match', 'no_info'])
             ->when($this->option('shop'), fn ($q, $shop) => $q->where('shop_id', $shop))
-            ->latest()->limit($limit * 4)->get());
+            ->when($this->option('ids'), fn ($q, $ids) => $q->whereIn('id', array_filter(array_map('trim', explode(',', (string) $ids)))))
+            ->latest()->limit($this->option('ids') ? 1000 : $limit * 4)->get());
+        $limit = $this->option('ids') ? $asks->count() : $limit;
 
         foreach ($asks as $ask) {
             $key = $ask->shop_id.'|'.Question::key((string) $ask->question);
@@ -94,7 +98,8 @@ final class WriterBenchCommand extends Command
             return $this->refuse('Set LOCAL_AI_ENABLED=true and LOCAL_AI_MODEL first.');
         }
 
-        $model = LocalWriter::model();
+        $version = (string) $this->option('prompt') === WriterBench::V5 ? WriterBench::V5 : 'v4';
+        $model = LocalWriter::model().($version === WriterBench::V5 ? '@'.WriterBench::V5 : '');
         $out = str_ends_with($file, '.writers.jsonl') ? $file : self::sibling($file, 'writers');
         $records = self::byId(self::read($out)) + self::byId(self::read($file));
         $writer = new LocalWriter;
@@ -105,7 +110,7 @@ final class WriterBenchCommand extends Command
             if (isset($record['writers'][$model])) {
                 continue;
             }
-            $records[$id]['writers'][$model] = $side = $bench->write($record, $writer);
+            $records[$id]['writers'][$model] = $side = $bench->write($record, $writer, $version);
             self::rewrite($out, $records);
             $this->line("{$n}/".count($records).'  '.round(($side['latency_ms'] ?? 0) / 1000, 1).'s  '
                 .(isset($side['error']) ? 'ERROR '.$side['error'] : mb_substr((string) $side['answer'], 0, 70)));
@@ -146,19 +151,22 @@ final class WriterBenchCommand extends Command
         $writers = $summary['writers'];
         $rows = [];
 
-        foreach (['correct_product_selection_pct', 'missed_answer_pct', 'hallucination_pct', 'wrong_attribution_pct', 'internal_id_leak_pct', 'language_issue_pct',
-            'checker_intervention_pct', 'checker_rejection_pct', 'raw_accuracy_pct', 'final_accuracy_after_checker_pct', 'best_by_judge'] as $metric) {
+        foreach (['final_accuracy_after_checker_pct', 'raw_accuracy_pct', 'hallucination_pct', 'wrong_attribution_pct', 'code_wrong_owner', 'coverage_pct', 'missed_answer_pct',
+            'correct_product_selection_pct', 'internal_id_leak_pct', 'language_issue_pct', 'checker_intervention_pct', 'checker_rejection_pct', 'best_by_judge'] as $metric) {
             $rows[] = [$metric, ...array_map(fn (array $w): string => (string) ($w[$metric] ?? '-'), $writers)];
         }
         foreach (['avg', 'p95'] as $at) {
             $rows[] = ["latency {$at} (s)", ...array_map(fn (array $w): string => isset($w['latency_ms'][$at]) ? (string) round($w['latency_ms'][$at] / 1000, 1) : '-', $writers)];
+        }
+        foreach (['in', 'out'] as $part) {
+            $rows[] = ["tokens {$part} (avg)", ...array_map(fn (array $w): string => (string) ($w['tokens_avg'][$part] ?? '-'), $writers)];
         }
         foreach (['writer', 'checker', 'total'] as $part) {
             $rows[] = ["cost per question: {$part} (\$)", ...array_map(fn (array $w): string => (string) ($w['cost_per_question_usd'][$part] ?? '-'), $writers)];
         }
 
         $this->line("{$summary['questions']} questions, {$summary['answerable']} answerable from the input; judge cost \${$summary['judge_cost_usd']}");
-        $this->table(['', ...array_map(fn (array $w): string => (string) $w['model'], $writers)], $rows);
+        $this->table(['', ...array_keys($writers)], $rows);
 
         return self::SUCCESS;
     }

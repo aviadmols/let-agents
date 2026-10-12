@@ -9,8 +9,10 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Benchmark\LocalWriter;
+use App\Modules\Assistant\Benchmark\WriterBench;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\FactSheet;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
@@ -76,7 +78,7 @@ final class WriterBenchTest extends TestCase
 
             public function near(string $shopId, string $text, array $sources, int $limit): array
             {
-                CatalogProduct::query()->where('external_id', '31538')->update(['title' => 'written while reading']);
+                CatalogProduct::query()->where('external_id', '31538')->update(['hash' => 'written while reading']);
 
                 return array_slice($this->test->passages, 0, $limit);
             }
@@ -100,31 +102,46 @@ final class WriterBenchTest extends TestCase
         $this->replies = [
             ['found' => true, 'answer' => 'בערך 30 ברגים למטר מרובע, שניים בכל מפגש.', 'refs' => ['s1'], 'picks' => [['ref' => 'p1', 'why' => 'בורג נירוסטה לדק']]],
             ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+            // The same writer on the facts alone (v5), and the checker on that.
+            ['found' => true, 'sentences' => [['text' => 'בורג נירוסטה לדק 5X50 נמצא במלאי.', 'about' => ['p1'], 'refs' => ['p1.stock']]], 'picks' => [['ref' => 'p1', 'why' => 'זמין עכשיו במלאי', 'refs' => ['p1.stock']]]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
         $this->artisan('assistant:writer-bench', ['step' => 'snapshot', 'file' => $this->file, '--limit' => 3])->assertSuccessful();
 
-        $this->assertSame('בורג נירוסטה לדק 5X50', $this->inShop(fn () => CatalogProduct::query()->where('external_id', '31538')->value('title')), 'what building the context wrote is undone');
+        $this->assertNotSame('written while reading', $this->inShop(fn () => CatalogProduct::query()->where('external_id', '31538')->value('hash')), 'what building the context wrote is undone');
         $record = $this->lines($this->file)[0];
         $this->assertSame(['31538'], $record['writers']['current']['picks']);
         $this->assertSame('kept', $record['writers']['current']['check']['verdict']);
         $this->assertSame($this->calls[0]['user'], $record['context']['input'], 'the input the current writer got is the one kept');
+        // v5: the facts alone. The product's description never reaches the writer; its answer stands on its refs.
+        $this->assertSame($this->calls[2]['user'], $record['context']['input_v5']);
+        $this->assertStringNotContainsString('בורג לעץ קשה', $record['context']['input_v5'], 'no description in the facts-only input');
+        $this->assertSame(['kept', 'בורג נירוסטה לדק 5X50 נמצא במלאי.'], [$record['writers']['current@v5']['check']['verdict'], $record['writers']['current@v5']['answer']]);
 
         // 2. Two other writers through OpenRouter, each on that very input.
         $reply = fn (string $answer, array $picks): array => ['choices' => [['message' => ['content' => json_encode(['found' => true, 'answer' => $answer, 'refs' => ['s1'], 'picks' => $picks], JSON_UNESCAPED_UNICODE)]]],
             'usage' => ['prompt_tokens' => 1200, 'completion_tokens' => 80, 'cost' => 0.0014], 'provider' => 'Alibaba'];
         Http::fake(['router.test/api/v1/chat/completions' => Http::sequence()
             ->push($reply('צריך כ-30 ברגים למטר מרובע של דק.', [['ref' => 'p1', 'why' => 'מתאים לדק']]))
-            ->push($reply('p1 מספיק, כ-30 ברגים למטר.', []))]);
+            ->push($reply('p1 מספיק, כ-30 ברגים למטר.', []))
+            // The same cheap writer, then, on the facts alone.
+            ->push(['choices' => [['message' => ['content' => json_encode(['found' => true, 'sentences' => [['text' => 'הבורג במלאי עכשיו.', 'about' => ['p1'], 'refs' => ['p1.stock']]], 'picks' => []], JSON_UNESCAPED_UNICODE)]]],
+                'usage' => ['prompt_tokens' => 300, 'completion_tokens' => 40, 'cost' => 0.0002]])]);
         config(['local_ai.model' => 'qwen/qwen3.5-27b']);
         $this->artisan('assistant:writer-bench', ['step' => 'write', 'file' => $this->file])->assertSuccessful();
         config(['local_ai.model' => 'qwen/qwen3.5-35b-a3b']);
         $this->artisan('assistant:writer-bench', ['step' => 'write', 'file' => $this->file])->assertSuccessful();
+        config(['local_ai.model' => 'qwen/qwen3.5-27b']);
+        $this->artisan('assistant:writer-bench', ['step' => 'write', 'file' => $this->file, '--prompt' => 'v5'])->assertSuccessful();
 
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer k') && $request['temperature'] === 0
             && $request['messages'][0]['content'] === AnswerSiteQuestion::prompt('answer_site') && $request['messages'][1]['content'] === $record['context']['input']
             && $request['response_format']['json_schema']['schema'] === LocalWriter::SCHEMA && $request['usage'] === ['include' => true]);
+        Http::assertSent(fn (Request $request): bool => $request['messages'][0]['content'] === file_get_contents(WriterBench::V5_PROMPT)
+            && $request['messages'][1]['content'] === $record['context']['input_v5'] && $request['response_format']['json_schema']['schema'] === FactSheet::SCHEMA);
         $writers = $this->lines(str_replace('.jsonl', '.writers.jsonl', $this->file))[0]['writers'];
-        $this->assertSame(['current', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-35b-a3b'], array_keys($writers));
+        $this->assertSame(['current', 'current@v5', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-35b-a3b', 'qwen/qwen3.5-27b@v5'], array_keys($writers));
+        $this->assertSame([300, 'הבורג במלאי עכשיו.'], [$writers['qwen/qwen3.5-27b@v5']['tokens']['in'], $writers['qwen/qwen3.5-27b@v5']['answer']]);
         $this->assertSame(0.0014, $writers['qwen/qwen3.5-27b']['cost_usd']);
         $this->assertSame(['p1'], $writers['qwen/qwen3.5-35b-a3b']['code']['internal_ids'], 'an internal ref shown to the shopper is caught');
 
@@ -132,7 +149,8 @@ final class WriterBenchTest extends TestCase
         $judged = ['picks_correct' => true, 'answer_correct' => true, 'hallucination' => false, 'wrong_attribution' => false, 'language_correct' => true, 'language_issues' => [], 'ok' => true];
         $this->replies = [
             ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
-            ['answerable' => true, 'replies' => ['A' => $judged, 'B' => $judged, 'C' => $judged], 'best' => 'A', 'reason' => 'x'],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+            ['answerable' => true, 'replies' => ['A' => $judged, 'B' => $judged, 'C' => $judged, 'D' => $judged, 'E' => $judged], 'best' => 'A', 'reason' => 'x'],
         ];
         $this->artisan('assistant:writer-bench', ['step' => 'judge', 'file' => str_replace('.jsonl', '.writers.jsonl', $this->file)])->assertSuccessful();
 
@@ -140,13 +158,17 @@ final class WriterBenchTest extends TestCase
         $this->assertSame([AiProviderName::Anthropic, 'claude-sonnet-5-5'], [$judge['provider'], $judge['model']]);
         $this->assertStringNotContainsString('qwen', $judge['user'], 'blind: the judge is not told who wrote what');
         $result = $this->lines(str_replace('.jsonl', '.judged.jsonl', $this->file))[0];
-        $this->assertEqualsCanonicalizing(['current', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-35b-a3b'], array_keys($result['judge']['verdicts']));
-        $this->assertSame(['A', 'B', 'C'], array_keys($result['judge']['order']), 'the replies by letter, in an order of their own');
+        $this->assertEqualsCanonicalizing(['current', 'current@v5', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-35b-a3b', 'qwen/qwen3.5-27b@v5'], array_keys($result['judge']['verdicts']));
+        $this->assertSame(['A', 'B', 'C', 'D', 'E'], array_keys($result['judge']['order']), 'the replies by letter, in an order of their own');
+        $this->assertSame('kept', $result['writers']['qwen/qwen3.5-27b@v5']['check']['verdict']);
+        $this->assertStringContainsString('"facts":', $judge['user'], 'the judge reads the facts too');
         $this->assertSame('skipped', $result['writers']['qwen/qwen3.5-35b-a3b']['check']['verdict'], 'a ref used as a word names nothing the shopper knows: code refuses the answer before any checker');
 
         $summary = json_decode((string) file_get_contents(str_replace('.jsonl', '.summary.json', $this->file)), true);
         $this->assertSame(1, $summary['questions']);
         $this->assertEquals(100, $summary['writers']['current']['final_accuracy_after_checker_pct']);
+        $this->assertEquals(100, $summary['writers']['current@v5']['final_accuracy_after_checker_pct']);
+        $this->assertSame(['in' => 300, 'out' => 40], $summary['writers']['qwen/qwen3.5-27b@v5']['tokens_avg']);
         $this->assertEquals(100, $summary['writers']['qwen/qwen3.5-35b-a3b']['internal_id_leak_pct']);
         $this->assertSame(0.0014, $summary['writers']['qwen/qwen3.5-27b']['cost_per_question_usd']['writer']);
         $this->assertEquals(0, $summary['writers']['qwen/qwen3.5-35b-a3b']['final_accuracy_after_checker_pct'], 'an answerable question left with nothing to show');
@@ -205,12 +227,12 @@ final class WriterBenchTest extends TestCase
         config(['local_ai.model' => 'qwen/qwen3.5-27b']);
         $this->artisan('assistant:writer-bench', ['step' => 'write', 'file' => $this->file])->assertSuccessful();
 
-        $this->replies = [['answerable' => true, 'replies' => ['A' => ['picks_correct' => true, 'answer_correct' => true, 'ok' => true]], 'best' => 'A', 'reason' => 'x']];
+        $this->replies = [['answerable' => true, 'replies' => ['A' => ['picks_correct' => true, 'answer_correct' => true, 'ok' => true], 'B' => ['picks_correct' => true, 'answer_correct' => true, 'ok' => true]], 'best' => 'A', 'reason' => 'x']];
         $this->artisan('assistant:writer-bench', ['step' => 'judge', 'file' => str_replace('.jsonl', '.writers.jsonl', $this->file)])->assertSuccessful();
 
         $result = $this->lines(str_replace('.jsonl', '.judged.jsonl', $this->file))[0];
         $this->assertSame('provider_error', $result['writers']['qwen/qwen3.5-27b']['error']);
-        $this->assertSame(['current'], array_values($result['judge']['order']), 'the judge reads only the replies there are');
+        $this->assertEqualsCanonicalizing(['current', 'current@v5'], array_values($result['judge']['order']), 'the judge reads only the replies there are');
         $summary = json_decode((string) file_get_contents(str_replace('.jsonl', '.summary.json', $this->file)), true);
         $this->assertSame(1, $summary['writers']['qwen/qwen3.5-27b']['failures']);
     }
