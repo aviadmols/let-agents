@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'read_text_in_code' => [
+        'label' => 'Read attributes from the store\'s text in code',
+        'description' => 'Code reads the vocabulary\'s choices, numbers and flags from the store\'s fields (type, tags, attributes), the title and the start of the description, in that order, and keeps where each fact was read and how sure its source is.',
+    ],
     'auto_approve' => [
         'label' => 'Approve checked facts automatically',
         'description' => 'When code and a model agree, or a reviewer model confirms, the fact is approved. When off, every fact waits for a person.',

@@ -2,13 +2,15 @@
 
 namespace App\Modules\Enrichment\Actions;
 
+use App\Core\Facades\Features;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use Illuminate\Support\Facades\Auth;
 
 /**
  * The operator's decision on a proposed vocabulary. Approved, it becomes the shop's next version
  * of that vocabulary, exactly as an imported one (see ImportVocabulary), and code reads the
- * catalog with it on its next run; rejected, it stays only as a record.
+ * catalog with it on its next run, from the store's fields, titles and descriptions; rejected,
+ * it stays only as a record.
  */
 final class DecideSchemaProposal
 {
@@ -32,6 +34,9 @@ final class DecideSchemaProposal
         if ($vocabulary === null) {
             return $run->summary();
         }
+
+        // A vocabulary discovered from the store's own words is read from them: its fields, titles, descriptions.
+        Features::override('enrichment.read_text_in_code', true, $proposal->shop_id);
 
         $proposal->update([
             'status' => EnrichmentSchemaProposal::APPROVED,

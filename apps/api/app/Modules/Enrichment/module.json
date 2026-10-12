@@ -13,6 +13,10 @@
     "provider": "EnrichmentServiceProvider",
     "features": [
         {
+            "name": "read_text_in_code",
+            "default": false
+        },
+        {
             "name": "auto_approve",
             "default": true
         },

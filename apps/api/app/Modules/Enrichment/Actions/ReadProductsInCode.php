@@ -88,9 +88,10 @@ final class ReadProductsInCode
 
         $brands = BrandResolver::forCatalog(CatalogProduct::query()->whereNull('removed_at')->lazyById(200));
         $autoApprove = Features::enabled('enrichment.auto_approve', $shopId);
+        $readText = Features::enabled('enrichment.read_text_in_code', $shopId);
         $now = now();
 
-        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'rentals' => 0];
+        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0];
         $brandSources = [];
         $families = [];
         $samples = [];
@@ -98,7 +99,7 @@ final class ReadProductsInCode
         foreach (CatalogProduct::query()->whereNull('removed_at')->lazyById(200) as $product) {
             $counts['products']++;
             $vocabulary = $branchOf[$product->id] ?? null;
-            $reading = CodeReading::read($product, $brands, $vocabulary?->definition());
+            $reading = CodeReading::read($product, $brands, $vocabulary?->definition(), $readText);
             $hash = hash('sha256', ($vocabulary?->id ?? '-').'|'.json_encode($reading, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
             $counts['with_brand'] += isset($reading['brand']) ? 1 : 0;
@@ -106,6 +107,9 @@ final class ReadProductsInCode
             $counts['title_specs'] += count($reading['specs'] ?? []);
             $counts['with_choices'] += isset($reading['choices']) ? 1 : 0;
             $counts['rentals'] += isset($reading['rental']) ? 1 : 0;
+            $counts['text_choices'] += count($reading['text_choices'] ?? []);
+            $counts['text_specs'] += count($reading['text_specs'] ?? []);
+            $counts['flags'] += count($reading['flags'] ?? []);
             $source = $reading['brand']['source'] ?? 'none';
             $brandSources[$source] = ($brandSources[$source] ?? 0) + 1;
 
@@ -164,7 +168,9 @@ final class ReadProductsInCode
                 }
 
                 if (isset($reading['type'])) {
-                    $write(['kind' => FactKind::Type, 'key' => 'type', 'value_text' => $reading['type']['key'], 'quote' => $product->title, 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_category']);
+                    $source = $reading['type']['source'];
+                    $write(['kind' => FactKind::Type, 'key' => 'type', 'value_text' => $reading['type']['key'], 'quote' => $product->title, 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$source,
+                        'confidence' => CodeReading::CONFIDENCE[$source] ?? null, 'evidence' => ['source' => $source]]);
                 }
 
                 foreach ((array) ($reading['category_choices'] ?? []) as $key => $value) {
@@ -173,6 +179,22 @@ final class ReadProductsInCode
 
                 foreach ((array) ($reading['specs'] ?? []) as $key => $spec) {
                     $write(['kind' => FactKind::Spec, 'key' => $key, 'value_number' => $spec['value'], 'unit' => $spec['unit'], 'quote' => $spec['quote'], 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_title']);
+                }
+
+                // Read from the store's own words, each with how sure its source is and where it was read.
+                foreach ((array) ($reading['text_choices'] ?? []) as $key => $choice) {
+                    foreach ($choice['values'] as $value) {
+                        $write(['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$choice['source'],
+                            'confidence' => CodeReading::CONFIDENCE[$choice['source']], 'evidence' => ['source' => $choice['source'], 'ref' => mb_substr($choice['quote'], 0, 300)]]);
+                    }
+                }
+                foreach ((array) ($reading['text_specs'] ?? []) as $key => $spec) {
+                    $write(['kind' => FactKind::Spec, 'key' => $key, 'value_number' => $spec['value'], 'unit' => $spec['unit'], 'quote' => $spec['quote'], 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$spec['source'],
+                        'confidence' => CodeReading::CONFIDENCE[$spec['source']], 'evidence' => ['source' => $spec['source'], 'ref' => $spec['quote']]]);
+                }
+                foreach ((array) ($reading['flags'] ?? []) as $key => $flag) {
+                    $write(['kind' => FactKind::Flag, 'key' => $key, 'value_text' => 'true', 'quote' => mb_substr($flag['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$flag['source'],
+                        'confidence' => CodeReading::CONFIDENCE[$flag['source']], 'evidence' => ['source' => $flag['source'], 'ref' => mb_substr($flag['quote'], 0, 300)]]);
                 }
             });
         }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -9,7 +10,11 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Enrichment\Actions\DecideSchemaProposal;
 use App\Modules\Enrichment\Actions\DiscoverSchema;
+use App\Modules\Enrichment\Actions\ImportVocabulary;
 use App\Modules\Enrichment\Actions\ProposeSchema;
+use App\Modules\Enrichment\Actions\ReadProductsInCode;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
@@ -146,7 +151,35 @@ final class SchemaDiscoveryTest extends TestCase
         $this->assertSame('jewelry_store', $vocabulary->key);
         $this->assertSame(EnrichmentSchemaProposal::APPROVED, $proposal->refresh()->status);
         $this->assertSame($vocabulary->id, $proposal->vocabulary_id);
+        $this->assertTrue(Features::enabled('enrichment.read_text_in_code', $this->shop->id), 'and it is read from the store\x27s own words');
         $this->assertNull(app(DecideSchemaProposal::class)->handle($proposal, false), 'decided once');
+    }
+
+    public function test_with_the_shops_flag_code_reads_the_vocabulary_from_its_fields_title_and_description(): void
+    {
+        $vocabulary = $this->vocabulary();
+        array_pop($vocabulary['attributes']);
+        $vocabulary += ['schema_version' => 1, 'root_category_external_id' => '*'];
+        $vocabulary['image']['never'] = ['total_weight'];
+        app(ImportVocabulary::class)->handle($this->shop->id, $vocabulary, 'test');
+        $ring = fn (): array => $this->inShop(fn () => EnrichmentFact::query()->whereHas('product', fn ($q) => $q->where('external_id', '1'))
+            ->where('status', '!=', FactStatus::Superseded)->get()->keyBy(fn (EnrichmentFact $f): string => $f->kind->value.':'.$f->key)->all());
+
+        app(ReadProductsInCode::class)->handle($this->shop->id);
+        $this->assertArrayNotHasKey('choice:metal', $ring(), 'off by default: nothing new is read');
+
+        Features::override('enrichment.read_text_in_code', true, $this->shop->id);
+        app(ReadProductsInCode::class)->handle($this->shop->id);
+        $facts = $ring();
+
+        $this->assertSame('ring', $facts['type:type']->value_text);
+        $this->assertSame(['source' => 'field'], $facts['type:type']->evidence, 'the store\'s own type field');
+        $this->assertSame('yellow_gold', $facts['choice:metal']->value_text);
+        $this->assertSame('field', $facts['choice:metal']->evidence['source'], 'from the tags, before the title or the description');
+        $this->assertSame(0.95, $facts['choice:metal']->confidence);
+        $this->assertEqualsWithDelta(0.0011, (float) $facts['spec:total_weight']->value_number, 1e-9, '1.1 grams, in kg');
+        $this->assertSame('description', $facts['spec:total_weight']->evidence['source']);
+        $this->assertSame(0.8, $facts['spec:total_weight']->confidence);
     }
 
     /** @return array<string, mixed> a vocabulary as a writer would return it, one attribute broken */
