@@ -2,6 +2,7 @@
 
 namespace App\Modules\Knowledge\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Enrichment\Actions\RunNightlyReading;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -36,6 +37,8 @@ final class ContentOnlySiteTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // The whole night, relations included.
+        Features::override('enrichment.relations', true, $this->shop->id);
 
         $this->article('900', 'איך בוחרים פרקט לבית', implode("\n", [
             'פרקט עץ מביא חום לחלל, והבחירה בו משנה את אופי החדר לאורך שנים רבות קדימה.',

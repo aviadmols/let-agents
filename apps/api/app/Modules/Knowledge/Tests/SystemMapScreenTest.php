@@ -2,6 +2,7 @@
 
 namespace App\Modules\Knowledge\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -36,6 +37,8 @@ final class SystemMapScreenTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // The whole night, relations included.
+        Features::override('enrichment.relations', true, $this->shop->id);
         $this->product('10', 'מקדחה נטענת 18V', 'מקדחה נטענת חזקה עם סוללה ליתיום, לקידוח בעץ ובמתכת.');
         $this->product('11', 'מקדחה נטענת 12V', 'מקדחה נטענת קלה עם סוללה ליתיום, לקידוח בעץ ובמתכת.');
         $this->product('20', 'סט מקדחים לבטון', 'סט מקדחים מוקשים לקידוח בבטון.');

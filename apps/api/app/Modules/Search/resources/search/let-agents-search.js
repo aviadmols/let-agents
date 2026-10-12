@@ -4798,29 +4798,6 @@
     win.addEventListener('click', onSearchTrigger, true);
     doc.addEventListener('focusin', wake, true);
     doc.addEventListener('pointerdown', wake, true);
-    // Shopify: the page widget on a product page where the theme has no block of its own, with the
-    // context the block would give it. The widget asks for its page and shows nothing when the shop
-    // has it off.
-    if (SHOPIFY && !win.LetAgentsContext) {
-      var meta = win.ShopifyAnalytics && win.ShopifyAnalytics.meta && win.ShopifyAnalytics.meta.product;
-      if (meta && meta.id && /\/products\//.test(win.location.pathname)) {
-        win.LetAgentsContext = {
-          platform: 'shopify',
-          site: ctx.site,
-          api: ctx.api,
-          mode: 'live',
-          page: { type: 'product', id: String(meta.id), url: win.location.pathname },
-          locale: ctx.locale,
-          root: ctx.root,
-          cartUrl: ctx.cartUrl,
-          moneyFormat: ctx.moneyFormat
-        };
-        var widget = doc.createElement('script');
-        widget.src = API + '/widget/let-agents.js';
-        widget.defer = true;
-        doc.head.appendChild(widget);
-      }
-    }
     // For the block under a product's add-to-cart (the page widget): a question about the product,
     // or a search for others like it, in the drawer, as from the search box.
     win.LetAgentsSearch = {
