@@ -2204,11 +2204,17 @@
     }
 
     (block.questions || []).forEach(function (question) {
+      // A bank cached before questions said what they are about holds plain text: about this product.
+      var text = typeof question === 'string' ? question : String(question.text || '');
+      var about = typeof question === 'string' ? 'product' : question.about;
+      if (!text) {
+        return;
+      }
       var button = el('button', 'as-q');
       button.type = 'button';
       button.innerHTML = AS_SPARK;
-      button.appendChild(el('span', null, question.text));
-      button.addEventListener('click', function () { ask(question.text, question.about); });
+      button.appendChild(el('span', null, text));
+      button.addEventListener('click', function () { ask(text, about); });
       wrap.appendChild(button);
     });
 
