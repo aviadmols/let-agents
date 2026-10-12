@@ -87,6 +87,8 @@ final class BuildSearchIndex
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
                 'pr' => $product->price === null ? null : (int) round((float) $product->price),
                 'buy' => $product->type === 'simple' && $product->purchasable ? 1 : 0,
+                // The code as the store writes it: a search for it shows this product alone.
+                'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
             ]);
             $counts['product']++;
         }

@@ -59,6 +59,7 @@ final class SearchDisplayTest extends TestCase
             ->set('data.own_color', true)
             ->set('data.color', '#C4452D')
             ->set('data.suggestions', 4)
+            ->set('data.mode_choice', true)
             ->call('moveGroup', 2, -1)
             ->set('groups.2.on', false)
             ->set('shop', $theirs->id)
@@ -73,12 +74,14 @@ final class SearchDisplayTest extends TestCase
         $this->assertTrue(Settings::get('search.hover_image', $mine->id));
         $this->assertSame('#c4452d', Settings::get('search.button_color', $mine->id));
         $this->assertSame(4, Settings::get('search.suggestions', $mine->id));
+        $this->assertTrue(Features::enabled('search.mode_choice', $mine->id), 'shoppers may choose regular or smart search');
         // Guides moved above categories, and categories turned off.
         $this->assertSame('product,content', Settings::get('search.groups', $mine->id));
 
         // The address cannot point the screen at another shop.
         $this->assertSame('panel', Settings::get('search.results', $theirs->id));
         $this->assertTrue(Settings::get('search.show_price', $theirs->id));
+        $this->assertFalse(Features::enabled('search.mode_choice', $theirs->id));
 
         // Every group off is refused: the results need at least one.
         Livewire::test(SearchDisplay::class)
@@ -104,6 +107,7 @@ final class SearchDisplayTest extends TestCase
         Settings::set('search.show_price', false, $shop->id);
         Settings::set('search.hover_image', true, $shop->id);
         Settings::set('search.button_color', '#c4452d', $shop->id);
+        Features::override('search.mode_choice', true, $shop->id);
 
         $this->assertSame('succeeded', app(BuildSearchIndex::class)->handle($shop->id)->status->value);
 
@@ -114,6 +118,7 @@ final class SearchDisplayTest extends TestCase
         $this->assertTrue($index['config']['cart']);
         $this->assertTrue($index['config']['hover']);
         $this->assertSame('#c4452d', $index['config']['buttonColor']);
+        $this->assertTrue($index['config']['modeChoice'], 'the shopper is offered regular or smart search');
 
         $ring = collect($index['items'])->firstWhere('id', 'p:7');
         $this->assertSame('https://www.rings.test/side.jpg', $ring['i2'], 'the second picture, for hover');

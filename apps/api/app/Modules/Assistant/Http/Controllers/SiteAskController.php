@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /api/v1/search/{site}/ask   {"question": "...", "vid": "anon-...", "locale": "he", "products": ["<shown ids>"]}
+ * POST /api/v1/search/{site}/ask   {"question": "...", "vid": "anon-...", "locale": "he", "products": ["<shown ids>"], "previous": ["<ids>"]}
  *
  * A question typed in the store's search box, about the whole site. Sent as text/plain from the
  * storefront so the browser sends no preflight; the body is JSON. Called only when the shopper
@@ -37,18 +37,26 @@ final class SiteAskController
         $visitor = is_array($body) ? (string) ($body['vid'] ?? '') : '';
         $locale = is_array($body) && ($body['locale'] ?? 'he') === 'en' ? 'en' : 'he';
         // The products the search showed with the question: the assistant picks only from them.
-        $products = array_values(array_filter(
-            array_map('strval', array_slice(is_array($body['products'] ?? null) ? $body['products'] : [], 0, AnswerSiteQuestion::MAX_PRODUCTS)),
-            fn (string $id): bool => preg_match('/^[A-Za-z0-9_.:-]{1,64}$/', $id) === 1,
-        ));
+        $products = self::ids(is_array($body) ? ($body['products'] ?? null) : null);
+        // In the drawer's conversation, the products the turn before showed: "מה הכי זול?" is about them.
+        $previous = self::ids(is_array($body) ? ($body['previous'] ?? null) : null);
 
         if (! preg_match(self::VISITOR_PATTERN, $visitor) || trim($question) === '') {
             return response()->json(['error' => 'invalid_question'], 422);
         }
 
         // The visitor only counts toward a daily limit, as a hash salted per shop, like analytics.
-        $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products);
+        $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products, $previous);
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
+    }
+
+    /** @return list<string> product ids as the storefront sends them, at most AnswerSiteQuestion::MAX_PRODUCTS */
+    private static function ids(mixed $list): array
+    {
+        return array_values(array_filter(
+            array_map('strval', array_slice(is_array($list) ? $list : [], 0, AnswerSiteQuestion::MAX_PRODUCTS)),
+            fn (string $id): bool => preg_match('/^[A-Za-z0-9_.:-]{1,64}$/', $id) === 1,
+        ));
     }
 }

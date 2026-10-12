@@ -43,6 +43,10 @@
             "default": true
         },
         {
+            "name": "mode_choice",
+            "default": false
+        },
+        {
             "name": "photo_tags",
             "default": true
         },

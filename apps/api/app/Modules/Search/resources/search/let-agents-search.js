@@ -344,6 +344,44 @@
     return found;
   }
 
+  /** Whether a query holds a question or filler word (the server's HebrewSearch::asks). */
+  function asks(raw) {
+    return normalize(raw).split(' ').some(function (word) { return FILLER.indexOf(word) !== -1; });
+  }
+
+  /** A product code as compared: "DDF-485", "ddf 485" and "DDF485" are one code. */
+  function code(text) {
+    return normalize(text).replace(/ /g, '');
+  }
+
+  /** The products by their code (SKU): code -> ids. Codes under three characters are left out. */
+  function codes(items) {
+    var found = {};
+    for (var i = 0; i < items.length; i++) {
+      var key = items[i].t === 'product' ? code(items[i].sku || '') : '';
+      if (key.length >= 3) {
+        (found[key] = found[key] || []).push(String(items[i].id));
+      }
+    }
+    return found;
+  }
+
+  /**
+   * The one product a search is plainly for, or null: the product whose code (SKU) is what was
+   * typed, or the only product that holds every word. Same rule as HebrewSearch::single().
+   */
+  function single(byCode, raw, hits) {
+    var key = code(raw);
+    if (!key) {
+      return null;
+    }
+    if (Object.prototype.hasOwnProperty.call(byCode, key) && byCode[key].length === 1) {
+      return { id: byCode[key][0], by: 'sku' };
+    }
+    var whole = hits.filter(function (hit) { return hit.full && String(hit.id).indexOf('p:') === 0; });
+    return whole.length === 1 ? { id: whole[0].id, by: 'words' } : null;
+  }
+
   // ---------------------------------------------------------------- storefront
 
   /**
@@ -515,7 +553,7 @@
     var PAUSE_MS = 2000;
     var TYPE_MS = 60;
 
-    var state = { loading: null, data: null, index: null, records: {}, labels: {}, config: null };
+    var state = { loading: null, data: null, index: null, codes: {}, records: {}, labels: {}, config: null };
     var live = {};
     var inflight = {}; // Shopify: product id -> the request already on its way, so typing asks once
     var urls = {}; // Shopify: product id -> its link, where the handle comes from
@@ -674,6 +712,7 @@
             source.push({ id: item.id, title: item.title, keywords: item.kw || '' });
           }
           state.index = build(source);
+          state.codes = codes(data.items);
           attachAll();
           return data;
         })
@@ -1139,6 +1178,40 @@
       '.d.m .d-all{padding:13px}',
       '.d.m .d-ask{padding:11px 14px}',
       '.d.m .d-foot{padding-bottom:env(safe-area-inset-bottom)}',
+      // Regular or smart search: two choices in one pill.
+      '.la-modebar{display:flex;justify-content:flex-end;padding:8px 14px;border-bottom:1px solid var(--rs-line);background:var(--rs-bg);flex:none}',
+      '.drawer .la-modebar{justify-content:center}',
+      '.la-mode{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--rs-soft);flex:none;font-size:13px}',
+      '.la-mode button{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;line-height:1.2;color:var(--rs-fg);opacity:.72;white-space:nowrap}',
+      '.la-mode button:hover{opacity:1}',
+      '.la-mode button[aria-checked="true"]{background:var(--rs-bg);opacity:1;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.14);cursor:default}',
+      '.la-mode button:focus-visible{outline:2px solid var(--rs-accent);outline-offset:1px}',
+      '.la-mode i{display:inline-grid;color:var(--rs-accent-text)}',
+      '.la-mode i svg{width:14px;height:14px}',
+      // The one product a search is plainly for: alone and large, the rest on request.
+      '.la-exact{display:inline-flex;align-items:center;justify-self:start;align-self:start;font-size:12px;font-weight:700;color:var(--rs-accent-text);',
+      'border:1px solid color-mix(in srgb,var(--rs-accent) 35%,var(--rs-bg));border-radius:999px;padding:3px 10px}',
+      '.d-one{display:grid;gap:10px}',
+      '.d-one>.d-prod{grid-template-columns:132px minmax(0,1fr);gap:18px;padding:12px;margin:0;border:1px solid var(--rs-line);border-radius:14px}',
+      '.d-one>.d-prod .d-pic{width:132px;height:132px}',
+      '.d-one>.d-prod .d-name{font-size:17px;font-weight:600;-webkit-line-clamp:3}',
+      '.d-one>.d-prod .d-price{font-size:16px;margin-top:8px}',
+      '.d-sku{display:block;font-size:13px;opacity:.65;margin-top:4px;unicode-bidi:plaintext}',
+      '.d.m .d-one>.d-prod{grid-template-columns:104px minmax(0,1fr);gap:14px;padding:10px}',
+      '.d.m .d-one>.d-prod .d-pic{width:104px;height:104px}',
+      '.d-also{display:grid;gap:12px}',
+      '.d-more{all:unset;box-sizing:border-box;cursor:pointer;justify-self:center;padding:9px 22px;border:1px solid var(--rs-fg);border-radius:var(--rs-radius);font-size:14px;font-weight:600}',
+      '.d-more:hover,.d-more:focus-visible,.d-more[aria-selected="true"]{background:var(--rs-soft)}',
+      '.one{display:grid;gap:12px}',
+      '.one-card{display:grid;grid-template-columns:minmax(120px,240px) minmax(0,1fr);gap:20px;align-items:center;padding:14px;border:1px solid var(--rs-line);border-radius:14px;background:var(--rs-bg)}',
+      '.one-card img,.one-card .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--rs-soft);display:block}',
+      '.one-info{display:grid;gap:8px;min-width:0}',
+      '.one-info .title{font-size:19px;font-weight:600;line-height:1.35;color:inherit;text-decoration:none}',
+      '.one-info .price{font-size:17px;font-weight:700}',
+      '.one-btns{display:flex;flex-wrap:wrap;gap:8px}',
+      '.drawer .one-card{grid-template-columns:120px minmax(0,1fr);gap:14px;padding:10px}',
+      '.drawer .one-info .title{font-size:16px}',
+      '@media (max-width:600px){.one-card{grid-template-columns:120px minmax(0,1fr);gap:14px;padding:10px}.one-info .title{font-size:16px}}',
       '@media (prefers-reduced-motion:no-preference){.sheet{animation:in .25s ease}@keyframes in{from{transform:translateY(8px);opacity:0}}}'
     ].join('');
 
@@ -1333,9 +1406,15 @@
     /** Puts the parts in place: a side column and the main area on a wide screen, one scroll on a phone. */
     function layout(side, main, foot) {
       var d = dropdown;
+      var typed = function () { return current ? current.value : ''; };
       if (d.mobile) {
         while (d.frame.childNodes.length > 1) {
           d.frame.removeChild(d.frame.lastChild);
+        }
+        if (choosesMode()) {
+          var strip = el('div', 'la-modebar');
+          strip.appendChild(modeSwitch(typed));
+          d.frame.appendChild(strip);
         }
         var scroll = el('div', 'm-body');
         scroll.appendChild(main);
@@ -1352,6 +1431,11 @@
       }
       var box = el('div', 'd' + (side ? '' : ' one'));
       box.setAttribute('role', 'listbox');
+      if (choosesMode()) {
+        var bar = el('div', 'la-modebar');
+        bar.appendChild(modeSwitch(typed));
+        box.appendChild(bar);
+      }
       var cols = el('div', 'd-cols');
       if (side) {
         cols.appendChild(side);
@@ -1480,9 +1564,31 @@
         }
       }
 
+      // A product code, or the only product that holds every word: that product alone and clearly,
+      // the rest only when the shopper asks for similar items. As on the server (HebrewSearch::single).
+      var one = null;
+      var others = [];
+      if (showsGroup('product') && !question && !/[?？]/.test(raw) && !asks(raw) && !withoutWords(raw).out.length) {
+        var priced = priceRange(raw);
+        var oneHit = priced.min === null && priced.max === null ? single(state.codes, raw, hits) : null;
+        one = oneHit && state.records[oneHit.id] ? state.records[oneHit.id] : null;
+      }
+      if (one) {
+        for (var o = 0; o < hits.length && others.length < max; o++) {
+          var other = state.records[hits[o].id];
+          if (other && other.t === 'product' && other.id !== one.id) {
+            others.push(other);
+          }
+        }
+        products = [];
+        categories = [];
+        articles = [];
+        answers = [];
+      }
+
       var d = freshDropdown();
       d.raw = raw;
-      d.products = products;
+      d.products = one ? [one] : products;
       if (d.field && d.field !== d.root.activeElement && d.field.value !== raw) {
         d.field.value = raw;
       }
@@ -1494,7 +1600,9 @@
         main.appendChild(answerBlock(answers[0].title, answers[0].ans, answers[0].src, raw, answers[0]));
       }
 
-      if (!products.length && !categories.length && !articles.length && !answers.length && !question) {
+      if (one) {
+        main.appendChild(oneSuggestion(one, raw, oneHit.by, others));
+      } else if (!products.length && !categories.length && !articles.length && !answers.length && !question) {
         var empty = el('div', 'd-empty');
         empty.appendChild(el('span', null, label('no_results', { query: raw.trim() })));
         empty.appendChild(el('span', 'muted', label('try_other')));
@@ -1862,6 +1970,85 @@
       return row;
     }
 
+    /**
+     * The one product a search is plainly for, large, with its code; under it "similar items",
+     * which open in place: alike by picture or meaning where the shop has them, otherwise the
+     * other products the words found.
+     */
+    function oneSuggestion(record, raw, by, others) {
+      var box = el('div', 'd-one');
+      box.appendChild(el('span', 'la-exact', label(by === 'sku' ? 'exact_sku' : 'exact_match')));
+      var link = linkTo('d-prod', record, raw);
+      link.setAttribute('data-pid', String(record.id).slice(2));
+      rememberUrl(String(record.id).slice(2), record.url);
+      link.appendChild(picture(safeUrl(record.img), true, hoverSrc(record.i2)));
+      var info = el('span', 'd-info');
+      info.appendChild(el('span', 'd-name', record.title));
+      if (record.sku) {
+        info.appendChild(el('span', 'd-sku', label('sku', { sku: record.sku })));
+      }
+      var price = el('span', 'd-price');
+      if (record.s === 0) {
+        price.className = 'd-price out';
+        price.textContent = label('out_of_stock');
+      }
+      info.appendChild(price);
+      link.appendChild(info);
+      box.appendChild(link);
+      fillPrices(box, [record]);
+
+      var similar = !!(state.config && state.config.similar);
+      if (!similar && !others.length) {
+        return box;
+      }
+      var also = el('div', 'd-also');
+      var more = el('button', 'd-more', label('show_similar'));
+      more.type = 'button';
+      more.setAttribute('role', 'option');
+      shown.push({ node: more, more: true });
+      also.appendChild(more);
+      box.appendChild(also);
+
+      var draw = function (list, heading) {
+        also.textContent = '';
+        shown = shown.filter(function (item) { return item.node !== more; });
+        active = -1;
+        if (!list.length) {
+          also.appendChild(el('span', 'muted', label('no_similar')));
+          return;
+        }
+        also.appendChild(el('h4', 'd-h', heading));
+        var grid = el('div', dropdown && dropdown.mobile ? 'm-list' : 'd-prods');
+        list.forEach(function (item) { grid.appendChild(productRow(item, raw)); });
+        also.appendChild(grid);
+        fillPrices(grid, list);
+      };
+      more.addEventListener('click', function () {
+        if (dropdown) {
+          dropdown.sticky = true; // open while the shopper looks, like an answer
+        }
+        countClick(raw, record);
+        if (!similar) {
+          draw(others, label('more_results'));
+          return;
+        }
+        also.textContent = '';
+        also.appendChild(el('div', 'd-thinking', label('searching')));
+        similarProducts({ external_id: String(record.id).slice(2) }).then(function (products) {
+          if (also.isConnected === false) {
+            return; // the shopper typed on
+          }
+          var list = products.slice(0, (state.config && state.config.suggestions) || 6).map(fromServer);
+          if (list.length) {
+            draw(list, label('similar'));
+          } else {
+            draw(others, label('more_results'));
+          }
+        });
+      });
+      return box;
+    }
+
     function footer(input, raw, total, question) {
       var foot = el('div', 'd-foot');
       var text = total > 1 ? label('show_all', { count: total }) : (total === 1 ? label('show_all_one') : label('all_results', { query: raw.trim() }));
@@ -2033,13 +2220,18 @@
       return block;
     }
 
-    function requestAnswer(raw, ids) {
+    /** @param {Array} [previous] the products the drawer's turn before showed, for "מה הכי זול?" */
+    function requestAnswer(raw, ids, previous) {
+      var body = { question: raw, vid: visitor(), locale: LOCALE, products: ids.slice(0, 12) };
+      if (previous && previous.length) {
+        body.previous = previous.slice(0, 12);
+      }
       return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/ask', {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ question: raw, vid: visitor(), locale: LOCALE, products: ids.slice(0, 12) })
+        body: JSON.stringify(body)
       })
         .then(function (response) { return response.ok ? response.json() : null; })
         .then(function (json) { return (json && json.data) || null; })
@@ -2168,6 +2360,8 @@
       }
       closeDropdown();
       clearTimeout(pauseTimer);
+      // The conversation so far: a question that names no product is about what the turn before showed.
+      var previous = drawerMode() ? previousProducts() : [];
       var sheet = openSheet(raw, raw);
       var box = el('div', 'section d-reply');
       box.appendChild(drawerMode() ? waiting(label('ask_thinking')) : el('div', 'd-thinking', label('ask_thinking')));
@@ -2186,14 +2380,28 @@
           }
         }
       }
-      requestAnswer(raw, ids).then(function (data) { renderReply(box, data, raw); kept({ d: data }); });
+      var answered = requestAnswer(raw, ids, previous).then(function (data) {
+        renderReply(box, data, raw);
+        // Answered about the turn before: this turn stands for the same products, for the next question.
+        kept(data && data.context === 'previous' ? { d: data, p: previous } : { d: data });
+        return data;
+      });
 
       var normalized = normalize(raw);
       var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
       markCounted(normalized);
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
         .then(function (response) { return response.ok ? response.json() : null; })
-        .then(function (result) { renderResults(below, result, raw, true); kept({ r: result }); })
+        .then(function (result) {
+          return answered.then(function (data) {
+            // "מה הכי זול?" about the products above: what its own words find would be beside the point.
+            if (data && data.context === 'previous') {
+              return;
+            }
+            renderResults(below, result, raw, true);
+            kept({ r: result });
+          });
+        })
         .catch(function () { /* the answer stands alone */ });
     }
 
@@ -2328,7 +2536,7 @@
       }
       closeDropdown();
       clearTimeout(pauseTimer);
-      if ((state.config && state.config.results) === 'page') {
+      if (resultsMode() === 'page') {
         var form = input.form;
         if (form) {
           form.submit();
@@ -2340,13 +2548,14 @@
       openPanel(raw);
     }
 
-    function closePanel() {
+    /** @param {boolean} [away] true when the shopper is going elsewhere: the site's field is not focused. */
+    function closePanel(away) {
       if (panel) {
         panel.host.parentNode && panel.host.parentNode.removeChild(panel.host);
         panel = null;
         doc.documentElement.style.overflow = '';
       }
-      if (current) {
+      if (current && away !== true) {
         current.focus();
       }
     }
@@ -2385,6 +2594,8 @@
     /** The drawer's searches this visit, kept in the browser so they are there on the next page too. */
     var CHAT_KEY = 'let_agents_chat:' + ctx.site;
     var CHAT_TURNS = 8;
+    // Words that ask about products already shown, as the assistant's code reads them (AnswerSiteQuestion::analysis).
+    var FOLLOW_UP = /זול|יקר|מבצע|הנחה|מהם|ביניהם|מתוכם|cheap|expensive|sale|discount|of them|these/i;
     var drawerScroll = null;
 
     function chatTurns() {
@@ -2394,6 +2605,31 @@
       } catch (e) {
         return [];
       }
+    }
+
+    /**
+     * The products the latest turn that showed any showed, by id, best first: a search's products,
+     * the products like one or like a photo, an answer's picks; an answer about the turn before
+     * stands for that turn's products, so "ומה הכי יקר?" after "מה הכי זול?" is about them too.
+     */
+    function previousProducts() {
+      var turns = chatTurns();
+      for (var i = turns.length - 1; i >= 0; i--) {
+        var turn = turns[i] || {};
+        var list = turn.p || null;
+        if (!list && turn.r) {
+          var products = Array.isArray(turn.r) ? turn.r : ((turn.r.groups || {}).product || []);
+          list = products.map(function (product) { return product && product.external_id; });
+        }
+        if ((!list || !list.length) && turn.d && Array.isArray(turn.d.picks)) {
+          list = turn.d.picks.map(function (pick) { return pick && pick.external_id; });
+        }
+        list = (list || []).filter(function (id) { return id != null && id !== ''; }).map(String);
+        if (list.length) {
+          return list.slice(0, 12);
+        }
+      }
+      return [];
     }
 
     function saveTurns(turns) {
@@ -2500,7 +2736,158 @@
     }
 
     function drawerMode() {
-      return !!(state.config && state.config.results === 'drawer');
+      return resultsMode() === 'drawer';
+    }
+
+    // ---------------------------------------------------------------- regular or smart search
+
+    /** The shopper's own choice, kept in this browser: "regular" (the site's box) or "smart" (the drawer). */
+    var MODE_KEY = 'let_agents_search_mode:' + ctx.site;
+    var modeNow = null; // this page's choice, for a browser that keeps nothing
+
+    function choosesMode() {
+      return !!(state.config && state.config.modeChoice);
+    }
+
+    function chosenMode() {
+      if (modeNow) {
+        return modeNow;
+      }
+      try {
+        var kept = win.localStorage.getItem(MODE_KEY);
+        return kept === 'regular' || kept === 'smart' ? kept : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    /**
+     * Where all the results open: the shop's setting, unless the shop lets the shopper choose and
+     * they did. Regular is the shop's own way when that is not the drawer, and the window otherwise.
+     */
+    function resultsMode() {
+      var shop = state.config && state.config.results;
+      var chosen = choosesMode() ? chosenMode() : null;
+      if (chosen === 'smart') {
+        return 'drawer';
+      }
+      if (chosen === 'regular' && shop === 'drawer') {
+        return 'panel';
+      }
+      return shop;
+    }
+
+    /** "Regular search | Smart search"; text() is what the shopper has typed at the moment of the click. */
+    function modeSwitch(text) {
+      var bar = el('div', 'la-mode');
+      bar.setAttribute('role', 'radiogroup');
+      bar.setAttribute('aria-label', label('mode_label'));
+      var smartNow = drawerMode();
+      [['regular', label('mode_regular')], ['smart', label('mode_smart')]].forEach(function (pair) {
+        var on = (pair[0] === 'smart') === smartNow;
+        var button = el('button', null, pair[1]);
+        button.type = 'button';
+        button.setAttribute('role', 'radio');
+        button.setAttribute('aria-checked', on ? 'true' : 'false');
+        if (pair[0] === 'smart') {
+          var mark = el('i');
+          mark.innerHTML = SPARK;
+          button.insertBefore(mark, button.firstChild);
+        }
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!on) {
+            switchMode(pair[0], text());
+          }
+        });
+        bar.appendChild(button);
+      });
+      bar.addEventListener('mousedown', keepFocus);
+      return bar;
+    }
+
+    /** Kept for the next pages, and what was typed moves to the other search at once. */
+    function switchMode(mode, raw) {
+      modeNow = mode;
+      try {
+        win.localStorage.setItem(MODE_KEY, mode);
+      } catch (e) { /* this page only */ }
+      var text = String(raw || '').trim();
+      closeDropdown();
+      if (panel) {
+        closePanel(true);
+      }
+      if (mode === 'smart') {
+        if (text) {
+          openPanel(text);
+        } else {
+          openEmptyDrawer();
+        }
+        return;
+      }
+      if (text && resultsMode() === 'page' && ctx.searchUrl) {
+        win.location.href = siteSearchUrl(text);
+        return;
+      }
+      openThemeSearch(text);
+    }
+
+    /** A search field of the site the shopper can see, or null. */
+    function visibleField() {
+      var nodes = [];
+      try {
+        nodes = doc.querySelectorAll(fieldSelector());
+      } catch (e) { /* a bad selector finds nothing */ }
+      for (var i = 0; i < nodes.length; i++) {
+        var rect = nodes[i].getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return nodes[i];
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Back to the site's own search box, with what was typed in it: the box itself where it shows,
+     * otherwise the theme's search button opens it first.
+     */
+    function openThemeSearch(text) {
+      var into = function (field) {
+        attach(field);
+        current = field;
+        if (text) {
+          field.value = text;
+        }
+        field.focus();
+        if (field.value.trim()) {
+          suggest(field);
+        }
+      };
+      var field = visibleField();
+      if (field) {
+        into(field);
+        return;
+      }
+      var triggers = doc.querySelectorAll(SEARCH_TRIGGERS);
+      for (var i = 0; i < triggers.length; i++) {
+        var node = triggers[i];
+        var rect = node.getBoundingClientRect();
+        if (node.closest('form') || !(rect.width > 0 && rect.height > 0)) {
+          continue;
+        }
+        node.__letAgentsSearchBypass = true;
+        node.click();
+        node.__letAgentsSearchBypass = false;
+        // The theme's search bar opens with its own animation.
+        setTimeout(function () {
+          var opened = visibleField();
+          if (opened) {
+            into(opened);
+          }
+        }, 350);
+        return;
+      }
     }
 
     /**
@@ -2574,6 +2961,11 @@
       top.appendChild(el('h2', null, label('drawer_title')));
       top.appendChild(again);
       sheet.appendChild(top);
+      if (choosesMode()) {
+        var strip = el('div', 'la-modebar');
+        strip.appendChild(modeSwitch(function () { return field.value; }));
+        sheet.appendChild(strip);
+      }
 
       var scroll = el('div', 'scroll');
       sheet.appendChild(scroll);
@@ -2610,7 +3002,8 @@
           return;
         }
         field.value = '';
-        if (state.config.ask && isQuestion(text)) {
+        // "הכי זול" after a search is a question about it, even without the words of a question.
+        if (state.config.ask && (isQuestion(text) || (FOLLOW_UP.test(text) && previousProducts().length))) {
           askText(text);
         } else {
           openPanel(text);
@@ -2663,6 +3056,10 @@
       sheet.setAttribute('aria-modal', 'true');
       var top = el('div', 'top');
       top.appendChild(el('h2', null, titleText));
+      // Photo results have no words to carry over; a search has its own.
+      if (choosesMode() && raw) {
+        top.appendChild(modeSwitch(function () { return raw; }));
+      }
       var x = el('button', 'x', '\u00D7');
       x.type = 'button';
       x.setAttribute('aria-label', label('close'));
@@ -2793,7 +3190,25 @@
       // Each group is built, then put on the sheet in the shop's order.
       var blocks = {};
 
-      if (answers.length && !quiet && closeAnswer(raw, answers[0].title)) {
+      // A product code, or the only product that holds every word: that product alone, and the
+      // rest of the results only after "similar items".
+      var one = null;
+      for (var s = 0; !quiet && result && result.single && s < products.length; s++) {
+        if (products[s].id === result.single.id) {
+          one = products[s];
+        }
+      }
+      var place = sheet;
+      if (one) {
+        products = products.filter(function (product) { return product !== one; });
+        sheet.appendChild(oneResult(one, raw, result.single.by));
+        place = el('div');
+        place.hidden = true;
+        sheet.appendChild(similarButton(one, raw, place));
+        sheet.appendChild(place);
+      }
+
+      if (answers.length && !quiet && !one && closeAnswer(raw, answers[0].title)) {
         var said = el('div', 'section answer-box');
         said.appendChild(answerBlock(answers[0].title, answers[0].answer, answers[0].sources, raw, answers[0]));
         sheet.appendChild(said);
@@ -2805,7 +3220,7 @@
         sheet.appendChild(related);
       }
 
-      if (!products.length && !content.length && !categories.length) {
+      if (!products.length && !content.length && !categories.length && !one) {
         if (quiet) {
           return;
         }
@@ -2886,7 +3301,7 @@
 
       groupOrder().forEach(function (type) {
         if (blocks[type]) {
-          sheet.appendChild(blocks[type]);
+          place.appendChild(blocks[type]);
         }
       });
 
@@ -2976,6 +3391,111 @@
         node.appendChild(sim);
       }
       return node;
+    }
+
+    /** The one product a search is plainly for, in the results: large, with its code, the cart and the page. */
+    function oneResult(item, raw, by) {
+      var section = el('div', 'section one');
+      section.appendChild(el('span', 'la-exact', label(by === 'sku' ? 'exact_sku' : 'exact_match')));
+      var node = el('div', 'one-card');
+      node.setAttribute('data-product', item.external_id);
+      rememberUrl(item.external_id, item.url);
+      var href = safeUrl(item.url);
+      var pic = el('a');
+      if (href) {
+        pic.href = href;
+      }
+      if (safeUrl(item.image)) {
+        var img = el('img');
+        img.src = item.image;
+        img.alt = '';
+        pic.appendChild(img);
+      } else {
+        pic.appendChild(el('div', 'ph'));
+      }
+      bindClick(pic, raw, item);
+      node.appendChild(pic);
+
+      var info = el('div', 'one-info');
+      var title = el('a', 'title', item.title);
+      if (href) {
+        title.href = href;
+      }
+      bindClick(title, raw, item);
+      info.appendChild(title);
+      if (item.sku) {
+        info.appendChild(el('div', 'muted', label('sku', { sku: item.sku })));
+      }
+      info.appendChild(el('div', 'price'));
+      var buttons = el('div', 'one-btns');
+      if (showsCart() && item.buy && CAN_BUY) {
+        var action = el('button', 'la-btn', label('add'));
+        action.type = 'button';
+        action.setAttribute('data-action', '1');
+        action.addEventListener('click', function () {
+          countClick(raw, { id: item.id, title: item.title });
+          addToCart(item.external_id, action, function () { countAdd(raw, { id: item.id, title: item.title }); });
+        });
+        buttons.appendChild(action);
+      }
+      var view = el('a', 'la-btn la-ghost', label('to_product'));
+      if (href) {
+        view.href = href;
+      }
+      bindClick(view, raw, item);
+      buttons.appendChild(view);
+      info.appendChild(buttons);
+      node.appendChild(info);
+      section.appendChild(node);
+      liveProducts([item.external_id]).then(function () { updateCards(section); });
+      return section;
+    }
+
+    /**
+     * "Similar items" under the one product: alike by picture or meaning where the shop has them,
+     * then the rest of the results on request; without them, the rest of the results at once.
+     */
+    function similarButton(item, raw, rest) {
+      var holder = el('div', 'section');
+      var button = el('button', 'more', label('show_similar'));
+      button.type = 'button';
+      holder.appendChild(button);
+      var showRest = function () {
+        holder.textContent = '';
+        if (rest.childNodes.length) {
+          rest.hidden = false;
+        } else {
+          holder.appendChild(el('p', 'muted', label('no_similar')));
+        }
+      };
+      button.addEventListener('click', function () {
+        countClick(raw, { id: item.id, title: item.title });
+        if (!(state.config && state.config.similar)) {
+          showRest();
+          return;
+        }
+        holder.textContent = '';
+        holder.appendChild(drawerMode() ? waiting(label('drawer_thinking')) : el('p', null, label('searching')));
+        similarProducts(item).then(function (products) {
+          if (!products.length) {
+            showRest();
+            return;
+          }
+          holder.textContent = '';
+          holder.appendChild(el('h3', null, label('similar')));
+          holder.appendChild(productGrid(products, raw));
+          if (rest.childNodes.length) {
+            var more = el('button', 'more', label('more_results'));
+            more.type = 'button';
+            more.addEventListener('click', function () {
+              rest.hidden = false;
+              more.parentNode.removeChild(more);
+            });
+            holder.appendChild(more);
+          }
+        });
+      });
+      return holder;
     }
 
     function updateCards(grid) {
@@ -3506,11 +4026,14 @@
         } else if (picked && picked.all) {
           event.preventDefault();
           submit(input);
+        } else if (picked && picked.more) {
+          event.preventDefault();
+          picked.node.click();
         } else if (picked && picked.record && picked.node.href) {
           event.preventDefault();
           countClick(input.value, picked.record);
           win.location.href = picked.node.href;
-        } else if (fromSheet || (state.config && state.config.results) !== 'page') {
+        } else if (fromSheet || resultsMode() !== 'page') {
           event.preventDefault();
           submit(input);
         } else {
@@ -3578,7 +4101,7 @@
       if (input.form && !input.form.__letAgentsSearch) {
         input.form.__letAgentsSearch = true;
         input.form.addEventListener('submit', function (event) {
-          if ((state.config && state.config.results) !== 'page' && input.value.trim()) {
+          if (resultsMode() !== 'page' && input.value.trim()) {
             event.preventDefault();
             submit(input);
           }
@@ -3718,6 +4241,8 @@
     closeWords: closeWords,
     search: search,
     isQuestion: isQuestion,
+    codes: codes,
+    single: single,
     closeAnswer: closeAnswer,
     handleFromUrl: handleFromUrl,
     formatMoney: formatMoney,

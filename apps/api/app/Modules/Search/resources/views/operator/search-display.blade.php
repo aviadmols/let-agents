@@ -187,6 +187,17 @@
                         </div>
                     </div>
                 @endif
+
+                <div class="lad-row" style="margin-top:16px;border-top:1px solid var(--lad-line)">
+                    <div class="lad-rt">
+                        <b id="lad-mode-choice">{{ $t('where.choice.label') }}</b>
+                        <small>{{ $t('where.choice.help') }}</small>
+                    </div>
+                    <label class="lad-sw">
+                        <input type="checkbox" role="switch" aria-labelledby="lad-mode-choice" wire:model.live="data.mode_choice">
+                        <span></span>
+                    </label>
+                </div>
             </section>
 
             {{-- How the results look --}}

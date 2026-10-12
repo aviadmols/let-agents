@@ -283,6 +283,54 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(['902'], array_column($this->askWith('איזה תליון הכי זול?', ['901', '902'])->json('data.picks'), 'external_id'));
     }
 
+    public function test_a_question_that_names_nothing_is_about_what_the_conversation_just_showed(): void
+    {
+        $typed = fn (string $type): array => ['payload' => ['title' => '', 'description' => '', 'categories' => [], 'attributes' => [], 'meta' => [], 'product_type' => $type]];
+        $this->product('901', 'טבעת יהלום', 'טבעת.', [], ['price' => '4900.00'] + $typed('טבעות'));
+        $this->product('902', 'תליון לב משובץ', 'תליון.', [], ['price' => '2200.00'] + $typed('תליונים'));
+        $this->product('903', 'תליון מפתח עדין', 'תליון.', [], ['price' => '350.00'] + $typed('תליונים'));
+        $this->product('904', 'עגילים צמודים כדורי זהב', 'עגילים.', [], ['price' => '450.00'] + $typed('עגילים'));
+        // The drawer's turn before showed these three; the words of the question found the ring alone.
+        $before = ['901', '902', '904'];
+
+        foreach (['מה הכי זול?', 'הכי זול', 'איזה מהם הכי זול?'] as $question) {
+            $data = $this->askWith($question, ['901'], $before)->json('data');
+
+            $this->assertSame(['answered', 'code', 'previous'], [$data['outcome'], $data['from'], $data['context'] ?? null], $question);
+            $this->assertSame(['904', '902', '901'], array_column($data['picks'], 'external_id'), $question.': the cheapest of what was shown');
+            $this->assertStringNotContainsString('באתר', $data['answer']);
+        }
+
+        $this->assertSame(['901', '902', '904'], array_column($this->askWith('ומה הכי יקר?', [], $before)->json('data.picks'), 'external_id'));
+
+        // The whole store, when the shopper says so; and with no turn before, as always.
+        $store = $this->askWith('מה הכי זול באתר?', [], $before)->json('data');
+        $this->assertSame(['903', '904', '902'], array_column($store['picks'], 'external_id'));
+        $this->assertArrayNotHasKey('context', $store);
+        $this->assertSame(['903', '904', '902'], array_column($this->askWith('מה הכי זול?', [])->json('data.picks'), 'external_id'));
+
+        // A product named is that product, not the turn before.
+        $this->assertSame(['903', '902'], array_column($this->askWith('איזה תליון הכי זול?', ['902', '903'], $before)->json('data.picks'), 'external_id'));
+        $this->assertSame([], $this->calls, 'no model for arithmetic');
+    }
+
+    public function test_a_follow_up_the_model_answers_is_about_those_products_and_is_never_kept(): void
+    {
+        $this->drills();
+        $this->replies = [
+            ['found' => true, 'answer' => 'לבית, מברגה איינהל.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'מתאימה לבית']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('איזה מהם מתאים לבית?', [], ['701', '702'])->json('data');
+
+        $sent = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['products']));
+        $this->assertNotNull($sent, 'the writer was asked');
+        $this->assertCount(2, $sent['products'], 'the products of the turn before, and only them');
+        $this->assertSame('previous', $data['context'] ?? null);
+        $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'an answer about one conversation is not the next shopper\'s');
+    }
+
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
     {
         $this->drills();
@@ -310,11 +358,14 @@ final class SiteQuestionTest extends TestCase
         $this->product('704', 'ביט למברגה 25 מ"מ', 'ביט.', [], ['price' => '7.00', 'in_stock' => true]);
     }
 
-    /** @param list<string> $products */
-    private function askWith(string $question, array $products): TestResponse
+    /**
+     * @param  list<string>  $products
+     * @param  list<string>  $previous  what the drawer's turn before showed
+     */
+    private function askWith(string $question, array $products, array $previous = []): TestResponse
     {
         return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
-        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products], JSON_UNESCAPED_UNICODE));
+        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products] + ($previous === [] ? [] : ['previous' => $previous]), JSON_UNESCAPED_UNICODE));
     }
 }

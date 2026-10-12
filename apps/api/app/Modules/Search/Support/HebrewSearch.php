@@ -462,6 +462,61 @@ final class HebrewSearch
         return $found;
     }
 
+    /** A product code as compared: "DDF-485", "ddf 485" and "DDF485" are one code. */
+    public static function code(?string $text): string
+    {
+        return str_replace(' ', '', self::normalize($text));
+    }
+
+    /**
+     * The products by their code (SKU), for single(): code => ids. Codes shorter than three
+     * characters are left out; "14" is a karat or a size more often than a product.
+     *
+     * @param  iterable<array<string, mixed>>  $items  records of the index (id, t, sku)
+     * @return array<string, list<string>>
+     */
+    public static function codes(iterable $items): array
+    {
+        $codes = [];
+
+        foreach ($items as $item) {
+            $code = ($item['t'] ?? null) === 'product' ? self::code((string) ($item['sku'] ?? '')) : '';
+
+            if (mb_strlen($code) >= 3) {
+                $codes[$code][] = (string) $item['id'];
+            }
+        }
+
+        return $codes;
+    }
+
+    /**
+     * The one product a search is plainly for, or null: the product whose code (SKU) is what was
+     * typed, or the only product that holds every word. Shown on its own, with the rest behind
+     * "similar items". Not for questions or price ranges; the caller decides that.
+     * let-agents-search.js has the same rule (single()); change both or neither.
+     *
+     * @param  array<string, list<string>>  $codes  from codes()
+     * @param  list<array{id: string, full?: bool}>  $hits  from search()
+     * @return array{id: string, by: string}|null by: "sku" or "words"
+     */
+    public static function single(array $codes, ?string $raw, array $hits): ?array
+    {
+        $code = self::code($raw);
+
+        if ($code === '') {
+            return null;
+        }
+
+        if (count($codes[$code] ?? []) === 1) {
+            return ['id' => $codes[$code][0], 'by' => 'sku'];
+        }
+
+        $whole = array_values(array_filter($hits, fn (array $hit): bool => ($hit['full'] ?? false) && str_starts_with($hit['id'], 'p:')));
+
+        return count($whole) === 1 ? ['id' => $whole[0]['id'], 'by' => 'words'] : null;
+    }
+
     private static function allTokensStartWords(string $name, array $tokens): bool
     {
         foreach ($tokens as $token) {

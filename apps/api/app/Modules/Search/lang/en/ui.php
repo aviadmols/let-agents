@@ -336,6 +336,10 @@ return [
             'columns' => 'Products in each row of the drawer',
             'columns_2' => 'Two products',
             'columns_1' => 'One large product',
+            'choice' => [
+                'label' => 'Shoppers choose: regular or smart search',
+                'help' => 'A "Regular search | Smart search" switch in the search window. Regular: suggestions under the site\'s search box. Smart: the side drawer. Each shopper\'s choice is kept on their device; until they choose, what is picked above is shown.',
+            ],
         ],
         'look' => [
             'title' => 'How the results look',

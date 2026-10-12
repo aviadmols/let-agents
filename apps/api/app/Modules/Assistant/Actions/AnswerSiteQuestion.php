@@ -72,10 +72,18 @@ final class AnswerSiteQuestion
     private const MAX_COMPUTED = 3;
 
     /** Words a question wraps around the product it names. */
-    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than',
+    private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'ומה', 'ומהו', 'ואיזה', 'ואיזו', 'ואילו', 'ויש', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than',
         // Words for the store and its products in general: "מה הכי זול בין המוצרים" names no product.
         'בין', 'מכל', 'ביותר', 'המוצרים', 'מוצרים', 'המוצר', 'מוצר', 'הפריטים', 'פריטים', 'הפריט', 'פריט', 'באתר', 'בחנות', 'האתר', 'החנות', 'שיש', 'כאן', 'משהו', 'דבר',
-        'products', 'product', 'items', 'item', 'store', 'shop', 'site', 'all', 'have', 'you', 'here', 'something', 'anything'];
+        'products', 'product', 'items', 'item', 'store', 'shop', 'site', 'all', 'have', 'you', 'here', 'something', 'anything',
+        // Words for the products just shown: "איזה מהם הכי זול" names none either.
+        'מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'אלה', 'אלו', 'them', 'these', 'those', 'ones'];
+
+    /** Words that point back at the products the conversation just showed. */
+    private const REFERS = ['מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'them', 'these', 'those', 'ones'];
+
+    /** Words that ask about the whole store, whatever was shown before: "מה הכי זול באתר". */
+    private const STORE_WIDE = ['באתר', 'בחנות', 'מכל', 'האתר', 'החנות', 'בכל', 'store', 'shop', 'site', 'all'];
 
     private const MIN_CHARS = 3;
 
@@ -96,10 +104,12 @@ final class AnswerSiteQuestion
 
     /**
      * @param  list<string>  $products  external ids of the products the shopper was shown, best first
+     * @param  list<string>  $previous  external ids of the products the conversation's turn before showed
      * @return array<string, mixed> outcome: answered, no_match, no_info, out_of_scope, invalid, limit or
-     *                              unavailable; from: bank, model or none; with sources, picks, ask_id and whatsapp
+     *                              unavailable; from: bank, model or none; with sources, picks, ask_id and whatsapp;
+     *                              context: "previous" when the question was answered about the turn before
      */
-    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = []): array
+    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = []): array
     {
         $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
 
@@ -108,10 +118,16 @@ final class AnswerSiteQuestion
         }
 
         $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
+        $previous = array_slice(array_values(array_unique(array_map('strval', $previous))), 0, self::MAX_PRODUCTS);
+        // "מה הכי זול?" after a search for pressure washers is about those washers: the products of
+        // the turn before stand in for what the question's own words found.
+        $followUp = $previous !== [] && self::followsUp($question);
+        $products = $followUp ? $previous : $products;
 
-        return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp): array {
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
-                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products);
+                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $followUp);
+            $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
 
             return $this->logged($shopId, $question, $products, $result);
         });
@@ -143,14 +159,22 @@ final class AnswerSiteQuestion
 
     /**
      * @param  list<string>  $products
+     * @param  bool  $followUp  the products are the turn before's: no saved answer is read or written,
+     *                          since the same words were about other products for anyone else
      * @return array<string, mixed>
      */
-    private function answer(string $shopId, string $question, string $visitorHash, string $locale, array $products): array
+    private function answer(string $shopId, string $question, string $visitorHash, string $locale, array $products, bool $followUp = false): array
     {
         // "The cheapest drill" is arithmetic: code answers it from the products found, before any
         // saved answer (prices and stock change) and without a model.
-        if (($computed = $this->computed($question, $locale, $products)) !== null) {
+        if (($computed = $this->computed($question, $locale, $products, $followUp)) !== null) {
             return $computed;
+        }
+
+        if ($followUp) {
+            return $this->withinDailyLimits($shopId, $visitorHash)
+                ? $this->ask($shopId, $question, $locale, $products, visitorHash: $visitorHash, keep: false)
+                : $this->fixed('limit', $locale);
         }
 
         $saved = self::siteAnswers()->where('question_key', Question::key($question))->first();
@@ -441,9 +465,10 @@ final class AnswerSiteQuestion
      * @param  string|null  $mode  the shop's assistant.context_mode unless given
      * @param  bool  $remember  false for an evaluation: nothing is saved for the next shopper
      * @param  array<string, mixed>|null  $trace  filled with what was given and what came of it
+     * @param  bool  $keep  false for a follow-up: the answer is about this conversation's products, never saved for the next shopper
      * @return array<string, mixed>
      */
-    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null): array
+    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true): array
     {
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
@@ -454,7 +479,7 @@ final class AnswerSiteQuestion
             shopId: $shopId,
             trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,
             input: ['question' => $question, 'products' => count($shown)] + ($remember ? [] : ['evaluation' => $mode]),
-            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, &$result, &$trace): void {
+            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, &$result, &$trace): void {
                 $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
                 $writer = ['provider' => $writer->provider, 'name' => $writer->provider->value, 'model' => $writer->model];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
@@ -520,7 +545,7 @@ final class AnswerSiteQuestion
                     }
 
                     if (! $scoped['about_store']) {
-                        if ($remember) {
+                        if ($remember && $keep) {
                             $this->save($question, AssistantAnswer::OUT_OF_SCOPE, null, [], [], $scoper['model'], $replies, $run, $flags);
                         }
                         $result = $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'not_about_store'];
@@ -539,7 +564,7 @@ final class AnswerSiteQuestion
                 $noAnswer = $shown === [] ? AssistantAnswer::NO_INFO : 'no_match';
 
                 if ($prepared['empty']) {
-                    if ($remember) {
+                    if ($remember && $keep) {
                         $this->save($question, AssistantAnswer::NO_INFO, null, [], [], null, [], $run);
                     }
                     $result = $this->fixed($noAnswer, $locale, 'model');
@@ -666,7 +691,7 @@ final class AnswerSiteQuestion
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $outcome = $refusal === null ? AssistantAnswer::ANSWERED : AssistantAnswer::NO_INFO;
-                $saved = $remember ? $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run, $flags) : null;
+                $saved = $remember && $keep ? $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run, $flags) : null;
 
                 // This visitor got it clean: checked, safe, no attempt to instruct, nothing personal,
                 // nothing harmful. Counted once; enough different visitors share it with everyone.
@@ -724,16 +749,18 @@ final class AnswerSiteQuestion
      * when the question asks for neither or none of the products is what it names: then a model
      * reads it.
      *
+     * After a search, "מה הכי זול?" is a follow-up: the cheapest of what the turn before showed.
+     *
      * @param  list<string>  $shown
      * @return array<string, mixed>|null
      */
-    private function computed(string $question, string $locale, array $shown): ?array
+    private function computed(string $question, string $locale, array $shown, bool $followUp = false): ?array
     {
         $asks = self::analysis($question, [])['asks'];
         ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
         $named = self::named($question);
-        $wholeStore = $named === [] && in_array($asks, ['cheapest', 'most_expensive'], true);
+        $wholeStore = ! $followUp && $named === [] && in_array($asks, ['cheapest', 'most_expensive'], true);
 
         $productsByRef = [];
         foreach ($this->candidates($wholeStore ? $this->storeWide($asks, $min, $max) : $shown) as $i => $product) {
@@ -795,6 +822,22 @@ final class AnswerSiteQuestion
         return $query->orderBy('price', $asks === 'most_expensive' ? 'desc' : 'asc')->limit(self::MAX_COMPUTED * 5)->get(['external_id', 'title'])
             ->reject(fn (CatalogProduct $p): bool => preg_match('/gift\s*card|כרטיס\s+מתנה|גיפט\s*קארד|שובר\s+מתנה|voucher/iu', (string) $p->title) === 1)
             ->take(self::MAX_COMPUTED)->map(fn (CatalogProduct $p): string => (string) $p->external_id)->values()->all();
+    }
+
+    /**
+     * Whether a question is about the products the conversation just showed: it points back at them
+     * ("איזה מהם"), or names no product at all ("מה הכי זול?"). Not when it asks about the whole
+     * store ("מה הכי זול באתר").
+     */
+    public static function followsUp(string $question): bool
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(Question::normalize($question)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if (array_intersect($words, self::STORE_WIDE) !== []) {
+            return false;
+        }
+
+        return array_intersect($words, self::REFERS) !== [] || self::named($question) === [];
     }
 
     /**

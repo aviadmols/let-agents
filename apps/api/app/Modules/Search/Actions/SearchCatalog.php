@@ -75,7 +75,7 @@ final class SearchCatalog
 
     /**
      * @param  list<string>|null  $only  groups to return; null for all
-     * @return array{query: string, total: int, semantic: bool, groups: array<string, list<array<string, mixed>>>, counts: array<string, int>}
+     * @return array{query: string, total: int, semantic: bool, single: array{id: string, by: string}|null, groups: array<string, list<array<string, mixed>>>, counts: array<string, int>}
      */
     /**
      * @param  bool  $meaning  false while a shopper is still typing: spelling only, code only, no vector
@@ -95,10 +95,16 @@ final class SearchCatalog
             }
 
             $spelling = HebrewSearch::search($index['engine'], $query);
+            // A product code, or the only product that holds every word: shown alone, the rest on request.
+            $asks = str_contains($raw, '?') || HebrewSearch::asks($query);
+            $single = $minPrice === null && $maxPrice === null && $without === [] && ! $asks
+                ? HebrewSearch::single($index['codes'] ?? [], $query, $spelling)
+                : null;
+            $single = $single !== null && isset($index['records'][$single['id']]) ? $single : null;
 
             // A sentence ("מה הכי טוב למברגה ביתית וזולה") holds words no product has: search
             // what it is about instead, so a question finds the products it asks about.
-            if ($spelling === [] && str_contains($query, ' ') && (str_contains($raw, '?') || HebrewSearch::asks($query))) {
+            if ($spelling === [] && str_contains($query, ' ') && $asks) {
                 $about = HebrewSearch::aboutWords($index['engine'], $query);
                 $spelling = $about !== '' && $about !== $query ? HebrewSearch::search($index['engine'], $about) : [];
             }
@@ -133,7 +139,7 @@ final class SearchCatalog
             // A question about a kind of product ("איזה עץ…") shows that kind first: products of the
             // categories named after it, before products that only mention the word (a bracket
             // "לעמודי עץ"). The assistant then picks from them too.
-            $subject = str_contains($query, ' ') && (str_contains($raw, '?') || HebrewSearch::asks($query))
+            $subject = str_contains($query, ' ') && $asks
                 ? $this->subjectProducts($index, $query, $spelling)
                 : [];
             $ranked = $this->merge($spelling, [$meaning, $pictures], [...$pinned, ...$subject]);
@@ -164,6 +170,14 @@ final class SearchCatalog
                 array_values(array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) !== 1)),
             );
 
+            // The one product first, wherever the merge put it, and also when only its code found it.
+            if ($single !== null) {
+                $groups['product'] = [
+                    $index['records'][$single['id']],
+                    ...array_values(array_filter($groups['product'], fn (array $r): bool => $r['id'] !== $single['id'])),
+                ];
+            }
+
             $counts = array_map('count', $groups);
             $total = array_sum($counts);
 
@@ -177,7 +191,7 @@ final class SearchCatalog
                     : [];
             }
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'single' => $single, 'groups' => $groups, 'counts' => $counts];
         });
     }
 
@@ -899,6 +913,7 @@ final class SearchCatalog
             'kind' => $record['kind'] ?? null,
             'products' => $record['n'] ?? null,
             'buy' => isset($record['buy']) ? $record['buy'] === 1 : null,
+            'sku' => $record['sku'] ?? null,
             'answer' => $record['ans'] ?? null,
             'sources' => $record['src'] ?? null,
         ], fn ($value): bool => $value !== null);

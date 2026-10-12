@@ -76,4 +76,13 @@ return [
     'drawer_thinking' => 'מחפש עבורך את הפריטים הכי מתאימים…',
     'chat_you' => 'את/ה',
     'chat_ai' => ':shop AI',
+    'mode_label' => 'סוג החיפוש',
+    'mode_regular' => 'חיפוש רגיל',
+    'mode_smart' => 'חיפוש חכם',
+    'exact_match' => 'התאמה מדויקת',
+    'exact_sku' => 'נמצא לפי מק״ט',
+    'sku' => 'מק״ט: :sku',
+    'show_similar' => 'הצג פריטים דומים',
+    'more_results' => 'עוד תוצאות',
+    'to_product' => 'לעמוד המוצר',
 ];

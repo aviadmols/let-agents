@@ -47,6 +47,8 @@ final class SearchIndexController
         $config = [
             'selector' => (string) Settings::get('search.input_selector', $shopId),
             'results' => (string) Settings::get('search.results', $shopId),
+            // The shopper may switch between the regular search (under the site's box) and the smart one (the drawer); the browser remembers it.
+            'modeChoice' => Features::enabled('search.mode_choice', $shopId),
             'suggestions' => (int) Settings::get('search.suggestions', $shopId),
             'perGroup' => (int) Settings::get('search.results_per_group', $shopId),
             // The camera shows only where the shop's pictures already have vectors.

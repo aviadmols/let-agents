@@ -111,6 +111,7 @@ class SearchDisplay extends Page
             'whatsapp' => Features::enabled('assistant.search_whatsapp', $shop),
             'whatsapp_message' => (string) Settings::get('assistant.search_whatsapp_message', $shop),
             'results' => (string) Settings::get('search.results', $shop),
+            'mode_choice' => Features::enabled('search.mode_choice', $shop),
             'drawer_side' => (string) Settings::get('search.drawer_side', $shop),
             'drawer_columns' => (string) Settings::get('search.drawer_columns', $shop),
             'suggestions' => (int) Settings::get('search.suggestions', $shop),
@@ -181,6 +182,7 @@ class SearchDisplay extends Page
                 'assistant.on_search' => 'ask',
                 'assistant.search_whatsapp' => 'whatsapp',
                 'search.similar' => 'similar',
+                'search.mode_choice' => 'mode_choice',
             ] as $feature => $field) {
                 Features::override($feature, (bool) ($d[$field] ?? false), $shop);
             }

@@ -15,13 +15,14 @@ final class LoadedIndex
 {
     private const KEEP = 16;
 
-    /** @var array<string, array{hash: string, records: array<string, array<string, mixed>>, engine: array<string, mixed>}> */
+    /** @var array<string, array{hash: string, records: array<string, array<string, mixed>>, engine: array<string, mixed>, codes: array<string, list<string>>}> */
     private static array $loaded = [];
 
     /**
-     * The shop's records by id, as stored, and the lookup structure HebrewSearch reads.
+     * The shop's records by id, as stored, the lookup structure HebrewSearch reads, and the
+     * products by their code (SKU).
      *
-     * @return array{hash: string, records: array<string, array<string, mixed>>, engine: array<string, mixed>}|null
+     * @return array{hash: string, records: array<string, array<string, mixed>>, engine: array<string, mixed>, codes: array<string, list<string>>}|null
      */
     public static function for(string $shopId): ?array
     {
@@ -55,6 +56,7 @@ final class LoadedIndex
             'hash' => $row->hash,
             'records' => $records,
             'engine' => HebrewSearch::build($source),
+            'codes' => HebrewSearch::codes($records),
         ];
     }
 

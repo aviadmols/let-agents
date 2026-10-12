@@ -76,4 +76,13 @@ return [
     'drawer_thinking' => 'Finding the best matches for you…',
     'chat_you' => 'You',
     'chat_ai' => ':shop AI',
+    'mode_label' => 'Search type',
+    'mode_regular' => 'Regular search',
+    'mode_smart' => 'Smart search',
+    'exact_match' => 'Exact match',
+    'exact_sku' => 'Found by SKU',
+    'sku' => 'SKU: :sku',
+    'show_similar' => 'Show similar items',
+    'more_results' => 'More results',
+    'to_product' => 'View product',
 ];
