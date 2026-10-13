@@ -4,6 +4,8 @@ namespace App\Modules\Assistant\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
+use App\Modules\Assistant\Jobs\ReadPostKnowledgeJob;
+use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -15,8 +17,9 @@ use UnitEnum;
 
 /**
  * What the assistant knows about the store before it reads any page: what the product pages
- * repeat, the store's policies, what the team wrote, and the team's answers. The team sees each
- * part, removes a sentence that is not the store's, and adds what the site does not say.
+ * repeat, the store's policies, what its posts say about it, what the team wrote, and the team's
+ * answers. The team sees each part, removes a sentence that is not the store's, and adds what the
+ * site does not say.
  */
 class AboutStore extends Page
 {
@@ -85,7 +88,7 @@ class AboutStore extends Page
     /**
      * Each part, ready for the screen.
      *
-     * @return array{repeated: list<string>, read_at: string|null, pages: int, policies: list<array{title: string, url: string|null}>, team: list<array{question: string, answer: string}>}|null
+     * @return array{repeated: list<string>, read_at: string|null, pages: int, policies: list<array{title: string, url: string|null}>, posts: list<array{fact: string, title: string}>, team: list<array{question: string, answer: string}>}|null
      */
     public function knowledge(): ?array
     {
@@ -97,6 +100,8 @@ class AboutStore extends Page
             $entries = app(BuildShopKnowledge::class)->entries();
             $repeated = $entries[BuildShopKnowledge::REPEATED] ?? null;
             $team = $entries[BuildShopKnowledge::TEAM] ?? null;
+            $posts = $entries[BuildShopKnowledge::POSTS] ?? null;
+            $hidden = (array) ($posts?->terms['hidden'] ?? []);
 
             return [
                 'repeated' => $repeated === null || $repeated->removed_at !== null ? [] : array_values(array_filter(array_map(
@@ -108,6 +113,10 @@ class AboutStore extends Page
                 'policies' => CatalogContent::query()->active()->where('type', CatalogContent::PAGE)->orderBy('title')->get(['title', 'url'])
                     ->filter(fn (CatalogContent $page): bool => preg_match(self::POLICY_WORDS, (string) $page->title) === 1)
                     ->map(fn (CatalogContent $page): array => ['title' => (string) $page->title, 'url' => $page->url])
+                    ->values()->all(),
+                'posts' => collect((array) ($posts?->terms['read'] ?? []))
+                    ->flatMap(fn (array $post): array => array_map(fn (string $fact): array => ['fact' => $fact, 'title' => (string) $post['title']], (array) $post['facts']))
+                    ->reject(fn (array $line): bool => in_array(RepeatedText::key($line['fact']), $hidden, true))
                     ->values()->all(),
                 'team' => $team === null || $team->removed_at !== null ? [] : array_values(array_filter(array_map(
                     function (string $pair): ?array {
@@ -140,6 +149,27 @@ class AboutStore extends Page
 
         $this->inShop(fn () => app(BuildShopKnowledge::class)->hide($sentence));
         Notification::make()->success()->title(__('assistant::ui.knowledge.removed'))->send();
+    }
+
+    public function removePostFact(string $fact): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->hidePostFact($fact));
+        Notification::make()->success()->title(__('assistant::ui.knowledge.removed'))->send();
+    }
+
+    /** The posts read now, in the background: a model call or two a post. */
+    public function readPosts(): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        ReadPostKnowledgeJob::dispatch((string) $this->shop);
+        Notification::make()->success()->title(__('assistant::ui.knowledge.posts.reading'))->send();
     }
 
     public function readAgain(): void

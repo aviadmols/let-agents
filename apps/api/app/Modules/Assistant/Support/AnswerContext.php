@@ -286,6 +286,7 @@ final class AnswerContext
                 // What the team wrote itself, when it speaks of the question's words ("לחתוך לפי מידה"
                 // asks about a size, and the team wrote about cutting): the store's own word stays.
                 $kind === 'knowledge' && ($p['from'] ?? null) === 'store_team' && array_filter($words, fn (string $w): bool => mb_stripos((string) $p['text'], $w) !== false) !== [] => [true, 'team_wrote_about_it'],
+                $kind === 'knowledge' && ($p['speaks'] ?? false) === true => [true, 'posts_speak_of_it'],
                 $kind === 'knowledge' => [false, 'store_text_not_needed_for_product_question'],
                 $kind === 'title' => [true, 'title_matches_question'],
                 $p['source'] === 'product' => isset($keptProducts[(string) ($p['external_id'] ?? '')]) ? [true, 'product_kept'] : [false, 'product_not_kept'],

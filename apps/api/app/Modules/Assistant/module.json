@@ -456,6 +456,116 @@
             "max": 400,
             "scope": "global",
             "unit": "usd"
+        },
+        {
+            "name": "post_reader_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "post_reader_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "post_reader_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "post_reader_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "post_reader_max_output_tokens",
+            "type": "int",
+            "default": 800,
+            "min": 100,
+            "max": 4000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "post_check_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "post_check_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "post_check_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "post_check_output_usd_per_million",
+            "type": "float",
+            "default": 5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "post_check_max_output_tokens",
+            "type": "int",
+            "default": 800,
+            "min": 100,
+            "max": 4000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "post_knowledge_posts",
+            "type": "int",
+            "default": 40,
+            "min": 0,
+            "max": 300,
+            "scope": "shop",
+            "unit": "posts"
+        },
+        {
+            "name": "post_knowledge_per_run",
+            "type": "int",
+            "default": 15,
+            "min": 0,
+            "max": 100,
+            "scope": "shop",
+            "unit": "posts"
         }
     ],
     "agents": [
@@ -555,6 +665,44 @@
             ],
             "run": {
                 "command": "assistant:review-asks",
+                "shop_argument": "shop"
+            }
+        },
+        {
+            "name": "post_reader",
+            "action": "read_posts",
+            "when": "03:40",
+            "features": [
+                "knowledge"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "post_reader_provider",
+                    "model": "post_reader_model",
+                    "prices": [
+                        "post_reader_input_usd_per_million",
+                        "post_reader_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "post_facts"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "post_check_provider",
+                    "model": "post_check_model",
+                    "prices": [
+                        "post_check_input_usd_per_million",
+                        "post_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "post_facts_check"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "assistant:read-posts",
                 "shop_argument": "shop"
             }
         }

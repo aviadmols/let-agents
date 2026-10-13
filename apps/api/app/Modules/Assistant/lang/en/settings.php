@@ -195,4 +195,52 @@ return [
         'label' => 'Judge output price',
         'description' => 'USD per million tokens, for the benchmark\'s cost.',
     ],
+    'post_reader_provider' => [
+        'label' => 'Provider of the model that reads the posts',
+        'description' => 'Reads each new or changed post and writes what it says about the store.',
+    ],
+    'post_reader_model' => [
+        'label' => 'The model that reads the posts',
+        'description' => 'For example gpt-5.4-mini.',
+    ],
+    'post_reader_input_usd_per_million' => [
+        'label' => 'Input price of the post reader, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'post_reader_output_usd_per_million' => [
+        'label' => 'Output price of the post reader, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'post_reader_max_output_tokens' => [
+        'label' => 'Length of the post reader\'s reply',
+        'description' => 'Tokens per post at most.',
+    ],
+    'post_check_provider' => [
+        'label' => 'Provider of the model that checks what was read from the posts',
+        'description' => 'Another family than the reader.',
+    ],
+    'post_check_model' => [
+        'label' => 'The model that checks what was read from the posts',
+        'description' => 'For example claude-haiku-4-5.',
+    ],
+    'post_check_input_usd_per_million' => [
+        'label' => 'Input price of the post checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'post_check_output_usd_per_million' => [
+        'label' => 'Output price of the post checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'post_check_max_output_tokens' => [
+        'label' => 'Length of the post checker\'s reply',
+        'description' => 'Tokens per post at most.',
+    ],
+    'post_knowledge_posts' => [
+        'label' => 'How many posts are read',
+        'description' => 'The latest updated. 0 reads no posts.',
+    ],
+    'post_knowledge_per_run' => [
+        'label' => 'How many new or changed posts are read each night',
+        'description' => 'The rest wait for the next night. A post that did not change is not read again.',
+    ],
 ];

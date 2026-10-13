@@ -47,6 +47,20 @@
             @endforelse
         </x-filament::section>
 
+        <x-filament::section :heading="$t('posts.title')" :description="$t('posts.help')">
+            <x-slot name="afterHeader">
+                <x-filament::button size="sm" color="gray" wire:click="readPosts">{{ $t('posts.read_now') }}</x-filament::button>
+            </x-slot>
+            @forelse ($k['posts'] as $line)
+                <div style="{{ $row }}" wire:key="p-{{ md5($line['fact']) }}">
+                    <span style="font-size:14px">{{ $line['fact'] }}<br><span style="{{ $small }}">{{ $t('posts.from', ['title' => $line['title']]) }}</span></span>
+                    <x-filament::link tag="button" size="sm" color="gray" wire:click="removePostFact(@js($line['fact']))" wire:confirm="{{ $t('posts.remove_confirm') }}">{{ $t('posts.remove') }}</x-filament::link>
+                </div>
+            @empty
+                <p style="{{ $small }}">{{ $t('posts.none') }}</p>
+            @endforelse
+        </x-filament::section>
+
         <x-filament::section :heading="$t('own.title')" :description="$t('own.help')">
             <form wire:submit="saveOwn" style="display:grid;gap:10px">
                 <textarea wire:model="own" rows="7" maxlength="6000" aria-label="{{ $t('own.title') }}" placeholder="{{ $t('own.placeholder') }}"

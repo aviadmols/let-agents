@@ -14,4 +14,7 @@ return [
     'review_quiet' => 'No questions were asked in the search on :day.',
     'review_same_family' => 'The daily reviewer is from the same family as the answering model (:family). Choose a reviewer from another family.',
     'review_done_score' => 'Search questions report for :day: :asks questions, score :score.',
+    'posts_off' => 'What the assistant knows about the store is off: no post was read.',
+    'posts_same_family' => 'The post reader and its checker are of the same family (:family). The checker must be of another.',
+    'posts_read' => 'Read :read new or changed posts of :posts. The assistant knows :facts things from the posts.',
 ];

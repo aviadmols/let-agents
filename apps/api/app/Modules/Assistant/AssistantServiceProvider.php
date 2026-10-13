@@ -12,6 +12,7 @@ use App\Modules\Assistant\Console\AnswerReportCommand;
 use App\Modules\Assistant\Console\CheckerReportCommand;
 use App\Modules\Assistant\Console\ContextEvalCommand;
 use App\Modules\Assistant\Console\KnowledgeCommand;
+use App\Modules\Assistant\Console\ReadPostsCommand;
 use App\Modules\Assistant\Console\RetrievalBenchCommand;
 use App\Modules\Assistant\Console\ReviewAsksCommand;
 use App\Modules\Assistant\Console\WriterBenchCommand;
@@ -68,6 +69,15 @@ final class AssistantServiceProvider extends ModuleServiceProvider
                 ->withoutOverlapping()
                 ->onOneServer()
                 ->runInBackground();
+
+            // At night: what the new or changed posts say about the store.
+            $schedule->command('assistant:read-posts --all')
+                ->dailyAt('03:40')
+                ->timezone('Asia/Jerusalem')
+                ->name('assistant:read-posts')
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->runInBackground();
         });
     }
 
@@ -76,6 +86,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         return [
             ReviewAsksCommand::class,
             KnowledgeCommand::class,
+            ReadPostsCommand::class,
             CheckerReportCommand::class,
             AnswerReportCommand::class,
             ContextEvalCommand::class,

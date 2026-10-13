@@ -73,7 +73,12 @@ final class AnswerSiteQuestion
         BuildShopKnowledge::OWN => 'store_team',
         BuildShopKnowledge::TEAM => 'team_answers',
         BuildShopKnowledge::REPEATED => 'every_product_page',
+        // What the posts say about the store: a post, as the writer is told of any page.
+        BuildShopKnowledge::POSTS => null,
     ];
+
+    /** Lines of what the posts say, of those that speak of the question. */
+    private const POST_LINES = 8;
 
     private const SCOPE_OUTPUT_TOKENS = 400;
 
@@ -293,29 +298,36 @@ final class AnswerSiteQuestion
         $words = $this->words($question);
         $first = [];
 
-        // The team's own words first, then its answers, then what every product page repeats.
+        // The team's own words first, then its answers, then what every product page repeats, then
+        // what the posts say.
         $order = array_flip(array_keys(self::WRITTEN_BY));
         $entries = CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->orderBy('external_id')->get(['id', 'external_id', 'title', 'body'])
             ->sortBy(fn (CatalogContent $entry): int => $order[(string) $entry->external_id] ?? count($order));
+        $speaks = function (string $piece) use ($words): bool {
+            foreach ($words as $word) {
+                if (mb_stripos($piece, $word) !== false) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
 
         foreach ($entries as $entry) {
             $text = trim((string) $entry->body);
 
             if ($entry->external_id === BuildShopKnowledge::TEAM) {
-                $pairs = array_filter(preg_split('/\n{2,}/u', $text) ?: [], function (string $pair) use ($words): bool {
-                    foreach ($words as $word) {
-                        if (mb_stripos($pair, $word) !== false) {
-                            return true;
-                        }
-                    }
+                $text = implode("\n\n", array_slice(array_filter(preg_split('/\n{2,}/u', $text) ?: [], $speaks), 0, self::TEAM_PAIRS));
+            }
 
-                    return false;
-                });
-                $text = implode("\n\n", array_slice($pairs, 0, self::TEAM_PAIRS));
+            if ($entry->external_id === BuildShopKnowledge::POSTS) {
+                $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
             }
 
             if ($text !== '') {
-                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => self::WRITTEN_BY[(string) $entry->external_id] ?? null];
+                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => self::WRITTEN_BY[(string) $entry->external_id] ?? null]
+                    // Cut to what speaks of the question: kept for a question about a product too.
+                    + ($entry->external_id === BuildShopKnowledge::POSTS ? ['speaks' => true] : []);
             }
         }
 

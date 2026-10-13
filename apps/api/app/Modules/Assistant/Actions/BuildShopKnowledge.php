@@ -11,12 +11,13 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * What a shop says about itself, kept as three entries the assistant reads before anything else:
+ * What a shop says about itself, kept as entries the assistant reads before anything else:
  *
  *   - what the store prints on most product pages (refunds, warranty, layaway, shipping), read by
  *     code from the pages themselves, the most repeated first;
  *   - what the team wrote about the store, in their own words;
- *   - the answers the team gave to shoppers' questions.
+ *   - the answers the team gave to shoppers' questions;
+ *   - what the store's posts and articles say about the store (read by ReadPostKnowledge).
  *
  * Each is a content row of the shop, so it is also cut into passages and found by meaning. No
  * model is called here. Inside the shop's tenant.
@@ -28,6 +29,8 @@ final class BuildShopKnowledge
     public const OWN = CatalogContent::OWN_PREFIX.'knowledge-own';
 
     public const TEAM = CatalogContent::OWN_PREFIX.'knowledge-team';
+
+    public const POSTS = CatalogContent::OWN_PREFIX.'knowledge-posts';
 
     /** The pause between two pages, and before the one try again after "too many requests". */
     private const PAUSE_MS = 1000;
@@ -101,6 +104,43 @@ final class BuildShopKnowledge
         $this->put(self::OWN, 'own', trim($text), []);
     }
 
+    /**
+     * What the store's posts say about the store, a line each with the post it came from; the
+     * ones the team removed are left out, now and at every later reading.
+     *
+     * @param  array<string, array{fingerprint: string, title: string, facts: list<string>}>  $read  by content id
+     */
+    public function posts(array $read): void
+    {
+        $hidden = (array) ($this->row(self::POSTS)?->terms['hidden'] ?? []);
+        $lines = [];
+
+        foreach ($read as $post) {
+            foreach ($post['facts'] as $fact) {
+                if (! in_array(RepeatedText::key($fact), $hidden, true)) {
+                    $lines[] = '- '.$fact.' ('.$post['title'].')';
+                }
+            }
+        }
+
+        $this->put(self::POSTS, 'posts', implode("\n", array_values(array_unique($lines))), ['read' => $read, 'hidden' => $hidden, 'read_at' => now()->toIso8601String()]);
+    }
+
+    /** A fact from a post the team does not want told: left out now and at every later reading. */
+    public function hidePostFact(string $fact): void
+    {
+        $row = $this->row(self::POSTS);
+
+        if ($row === null) {
+            return;
+        }
+
+        $terms = (array) $row->terms;
+        $terms['hidden'] = array_values(array_unique([...(array) ($terms['hidden'] ?? []), RepeatedText::key($fact)]));
+        $row->forceFill(['terms' => $terms])->save();
+        $this->posts((array) ($terms['read'] ?? []));
+    }
+
     /** The team's answers to shoppers, one question and answer after another. */
     public function team(): void
     {
@@ -115,11 +155,11 @@ final class BuildShopKnowledge
         $this->put(self::TEAM, 'team', implode("\n\n", $pairs), []);
     }
 
-    /** @return array<string, CatalogContent> the shop's three entries that exist, by their id */
+    /** @return array<string, CatalogContent> the shop's entries that exist, by their id */
     public function entries(): array
     {
         return CatalogContent::query()->where('type', CatalogContent::KNOWLEDGE)
-            ->whereIn('external_id', [self::REPEATED, self::OWN, self::TEAM])
+            ->whereIn('external_id', [self::REPEATED, self::OWN, self::TEAM, self::POSTS])
             ->get()->keyBy('external_id')->all();
     }
 

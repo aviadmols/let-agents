@@ -195,4 +195,52 @@ return [
         'label' => 'מחיר פלט של השופט',
         'description' => 'דולר למיליון טוקנים, לחישוב העלות של הבדיקה.',
     ],
+    'post_reader_provider' => [
+        'label' => 'ספק המודל שקורא את הפוסטים',
+        'description' => 'קורא כל פוסט חדש או ששונה וכותב מה הוא אומר על החנות.',
+    ],
+    'post_reader_model' => [
+        'label' => 'המודל שקורא את הפוסטים',
+        'description' => 'למשל gpt-5.4-mini.',
+    ],
+    'post_reader_input_usd_per_million' => [
+        'label' => 'מחיר קלט של קורא הפוסטים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'post_reader_output_usd_per_million' => [
+        'label' => 'מחיר פלט של קורא הפוסטים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'post_reader_max_output_tokens' => [
+        'label' => 'אורך התשובה של קורא הפוסטים',
+        'description' => 'עד כמה טוקנים לכל פוסט.',
+    ],
+    'post_check_provider' => [
+        'label' => 'ספק המודל שבודק את מה שנקרא מהפוסטים',
+        'description' => 'משפחה אחרת מהקורא.',
+    ],
+    'post_check_model' => [
+        'label' => 'המודל שבודק את מה שנקרא מהפוסטים',
+        'description' => 'למשל claude-haiku-4-5.',
+    ],
+    'post_check_input_usd_per_million' => [
+        'label' => 'מחיר קלט של בודק הפוסטים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'post_check_output_usd_per_million' => [
+        'label' => 'מחיר פלט של בודק הפוסטים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'post_check_max_output_tokens' => [
+        'label' => 'אורך התשובה של בודק הפוסטים',
+        'description' => 'עד כמה טוקנים לכל פוסט.',
+    ],
+    'post_knowledge_posts' => [
+        'label' => 'כמה פוסטים נקראים',
+        'description' => 'האחרונים שעודכנו. 0 לא קורא פוסטים.',
+    ],
+    'post_knowledge_per_run' => [
+        'label' => 'כמה פוסטים חדשים או ששונו נקראים בכל לילה',
+        'description' => 'השאר מחכים ללילה הבא. פוסט שלא השתנה לא נקרא שוב.',
+    ],
 ];
