@@ -554,7 +554,7 @@
    * The block stays visible whatever the theme's stylesheet says about divs (Dawn hides every empty one):
    * said with !important on the element, no rule can override it.
    */
-  function shown(node) {
+  function keepVisible(node) {
     node.style.setProperty('display', 'block', 'important');
     node.style.setProperty('visibility', 'visible', 'important');
     node.style.setProperty('opacity', '1', 'important');
@@ -2182,7 +2182,7 @@
     host.setAttribute('data-let-agents', PAGE_TYPE);
     // Its content is in the shadow root, so to the theme it is an empty div, and themes like Dawn hide
     // every empty div (div:empty { display: none }). Said on the element itself, that rule loses.
-    shown(host);
+    keepVisible(host);
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var style = el('style');
     style.textContent = CSS + ASSISTANT_CSS;
@@ -2398,7 +2398,7 @@
     var host = el('div', 'let-agents-widget');
     host.setAttribute('data-let-agents', PAGE_TYPE);
     // Not taken for an empty div by the theme (div:empty { display: none }).
-    shown(host);
+    keepVisible(host);
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
 
     var style = el('style');
