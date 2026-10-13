@@ -1095,7 +1095,7 @@
           return;
         }
         if (!product || !product.variant || !product.is_in_stock) {
-          button.textContent = label('add_failed');
+          failedAdd(externalId, button);
           return;
         }
         return win.fetch(ROOT + 'cart/add.js', {
@@ -1109,7 +1109,11 @@
             sections_url: win.location.pathname
           })
         }).then(function (response) {
-          button.textContent = response.ok ? label('added') : label('add_failed');
+          if (response.ok) {
+          button.textContent = label('added');
+        } else {
+          failedAdd(externalId, button);
+        }
           if (!response.ok) {
             return;
           }
@@ -1131,7 +1135,7 @@
           });
         });
       }).catch(function () {
-        button.textContent = label('add_failed');
+        failedAdd(externalId, button);
       });
     }
 
@@ -1196,6 +1200,20 @@
       }, 400);
     }
 
+    /**
+     * The store's cart did not take it (a variant to choose, a quantity rule, out of stock): the
+     * shopper goes on to the product's page, where the store adds it its own way. A note only when
+     * there is no page to go to.
+     */
+    function failedAdd(externalId, button) {
+      var page = safeUrl(urls[externalId]) || safeUrl((state.records['p:' + externalId] || {}).url);
+      if (page) {
+        win.location.href = page;
+        return;
+      }
+      button.textContent = label('add_failed');
+    }
+
     /** @param {Function} [onAdded] called once the store's cart took it, never on a failure or a redirect */
     function addToCart(externalId, button, onAdded) {
       if (SHOPIFY) {
@@ -1220,7 +1238,11 @@
         if (fresh) {
           nonce = fresh;
         }
-        button.textContent = response.ok ? label('added') : label('add_failed');
+        if (response.ok) {
+          button.textContent = label('added');
+        } else {
+          failedAdd(externalId, button);
+        }
         if (response.ok) {
           if (onAdded) {
             onAdded();
@@ -1231,7 +1253,7 @@
           doc.body.dispatchEvent(new CustomEvent('let-agents:added_to_cart', { detail: { id: externalId } }));
         }
       }).catch(function () {
-        button.textContent = label('add_failed');
+        failedAdd(externalId, button);
       });
     }
 
