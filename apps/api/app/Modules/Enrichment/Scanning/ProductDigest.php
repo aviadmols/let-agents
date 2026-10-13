@@ -157,8 +157,10 @@ final class ProductDigest
         $best = null;
 
         foreach ($patterns as $pattern) {
-            if (@preg_match('~'.$pattern.'~imu', $text, $match, PREG_OFFSET_CAPTURE) === 1 && ($best === null || $match[0][1] < $best[1])) {
-                $best = [$match[0][0], $match[0][1]];
+            // A whole word only: "ספיר" inside "ספירלה" is no sapphire (PatternMatch).
+            $match = PatternMatch::first($text, [$pattern]);
+            if ($match !== null && ($best === null || $match[0] < $best[1])) {
+                $best = [substr($text, $match[0], $match[1]), $match[0]];
             }
         }
 

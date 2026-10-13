@@ -98,27 +98,33 @@ final class CodeReading
     /**
      * The product's text by source, in the order code trusts them.
      *
-     * @return array{field: string, title: string, description: string}
+     * @return array{field: string, title: string, description: string, names: list<string>, attributes: list<string>}
      */
     private static function texts(CatalogProduct $product): array
     {
         // The store's type, its categories' names, its tags and attributes: what the store itself says.
-        $fields = [trim((string) ($product->payload['product_type'] ?? ''))];
+        // Names (type, categories, tags) group products; attributes describe this one (textChoices).
+        $names = [trim((string) ($product->payload['product_type'] ?? ''))];
         foreach (array_filter($product->categoryPaths()) as $path) {
-            $fields[] = trim((string) end($path));
+            $names[] = trim((string) end($path));
         }
         foreach ((array) ($product->payload['tags'] ?? []) as $tag) {
-            $fields[] = trim((string) $tag);
+            $names[] = trim((string) $tag);
         }
+        $attributes = [];
         foreach ($product->storeAttributes() as $attribute) {
-            $fields[] = $attribute['name'].': '.implode(', ', $attribute['values']);
+            $attributes[] = $attribute['name'].': '.implode(', ', $attribute['values']);
         }
+        $names = array_values(array_filter($names, fn (string $f): bool => $f !== ''));
+        $fields = [...$names, ...$attributes];
         $description = strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>', '</li>'], "\n", $product->description()));
 
         return [
             'field' => implode("\n", array_filter($fields, fn (string $f): bool => $f !== '')),
             'title' => TextNormalizer::clean($product->title),
             'description' => mb_substr(TextNormalizer::clean($description), 0, self::HEAD),
+            'names' => $names,
+            'attributes' => $attributes,
         ];
     }
 
@@ -142,9 +148,10 @@ final class CodeReading
             }
 
             foreach (self::sources($vocabulary, $key) as $source) {
+                $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
                 $found = [];
                 foreach ((array) ($attribute['values'] ?? []) as $value) {
-                    $quote = self::find($text[$source], (array) ($value['patterns'] ?? []));
+                    $quote = self::find($read, (array) ($value['patterns'] ?? []));
                     if ($quote !== null) {
                         $found[(string) $value['key']] = $quote;
                     }
@@ -161,6 +168,34 @@ final class CodeReading
         }
 
         return $out;
+    }
+
+    /**
+     * The store's own words for one attribute, without the names that group products: a category or
+     * a tag that names more than one of its values ("ספיר, רובי, אמרלד", a collection) says nothing
+     * about which one this product is. A store attribute that lists several (stones: ruby, diamond)
+     * describes this product, and stays.
+     *
+     * @param  array{names?: list<string>, attributes?: list<string>, field: string}  $text
+     * @param  list<array<string, mixed>>  $values
+     */
+    private static function withoutGroups(array $text, array $values): string
+    {
+        if (! isset($text['names'])) {
+            return $text['field'];
+        }
+
+        $names = array_filter($text['names'], function (string $name) use ($values): bool {
+            $named = 0;
+            foreach ($values as $value) {
+                $named += self::find($name, (array) ($value['patterns'] ?? [])) !== null ? 1 : 0;
+            }
+
+            return $named < 2;
+        });
+
+        return implode('
+', [...$names, ...($text['attributes'] ?? [])]);
     }
 
     /**
@@ -236,13 +271,10 @@ final class CodeReading
         if ($text === '') {
             return null;
         }
-        foreach ($patterns as $pattern) {
-            if (@preg_match('~'.$pattern.'~imu', $text, $match, PREG_OFFSET_CAPTURE) === 1) {
-                return Snippet::around($text, $match[0][1], strlen($match[0][0]));
-            }
-        }
+        // A whole word only: "ספיר" inside "ספירלה" is no sapphire (PatternMatch).
+        $match = PatternMatch::first($text, $patterns);
 
-        return null;
+        return $match === null ? null : Snippet::around($text, $match[0], $match[1]);
     }
 
     private static function packCount(string $title): ?int

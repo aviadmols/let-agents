@@ -211,13 +211,8 @@ final class SchemaStats
     /** @param  list<string>  $patterns */
     public static function matchesAny(string $text, array $patterns): bool
     {
-        foreach ($patterns as $pattern) {
-            if (@preg_match('~'.$pattern.'~iu', $text) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        // As the code reads them: a whole word only, so a proposal's coverage is what code will find.
+        return PatternMatch::any($text, $patterns);
     }
 
     /** The two words right before a measurement's first appearance, for its name ("משקל התכשיט"). */
