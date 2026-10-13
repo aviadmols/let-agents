@@ -66,4 +66,38 @@ final class AiSpendTest extends TestCase
         $merchant->attachShop($gueta);
         $this->actingAs($merchant)->get('/operator/ai-spend')->assertForbidden();
     }
+
+    public function test_the_operator_reads_every_call_with_its_model_and_cost_the_latest_first(): void
+    {
+        $gueta = Shop::factory()->create(['name' => 'גואטה']);
+        $other = Shop::factory()->create(['name' => 'חנות אחרת']);
+        app(RecordsRuns::class)->track(agent: 'assistant.site_answerer', action: 'assistant.answer_site', shopId: $gueta->id, trigger: RunTrigger::Manual,
+            work: function (RunContext $run): void {
+                $run->usage('openai', 'gpt-5.4-mini', 2400, 310, 0, 0.00488);
+                $run->usage('anthropic', 'claude-haiku-4-5', 1900, 40, 0, 0.0021);
+            });
+        DB::table('ai_usage')->insert(['shop_id' => $other->id, 'agent' => 'search.photo_reader', 'action' => 'search.read_photo', 'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5-5', 'input_tokens' => 5000, 'output_tokens' => 200, 'cache_read_tokens' => 0, 'cost_usd' => 0.75, 'day' => now()->subDays(30)->toDateString(), 'created_at' => now()->subDays(30)]);
+
+        $this->actingAs(User::factory()->operator()->create());
+
+        $this->get('/operator/model-calls')
+            ->assertOk()
+            ->assertSee(__('runs::calls.title'))
+            ->assertSeeInOrder(['anthropic/claude-haiku-4-5', 'openai/gpt-5.4-mini'])
+            ->assertSee('$0.00488')
+            ->assertSee('2,400')
+            ->assertSee('גואטה')
+            ->assertDontSee('claude-sonnet-5-5</code>', false);
+
+        $this->get('/operator/model-calls?from='.now()->subDays(40)->toDateString().'&model=anthropic|claude-sonnet-5-5')
+            ->assertOk()
+            ->assertSee('$0.75000')
+            ->assertSee('חנות אחרת')
+            ->assertDontSee('gpt-5.4-mini</code>', false);
+
+        $merchant = User::factory()->create();
+        $merchant->attachShop($gueta);
+        $this->actingAs($merchant)->get('/operator/model-calls')->assertForbidden();
+    }
 }
