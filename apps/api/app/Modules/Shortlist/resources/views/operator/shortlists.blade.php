@@ -96,6 +96,7 @@
                                 <input type="text" wire:model="data.card_selector" class="lsl-field code" placeholder=".product-card, li.product" style="flex:1">
                                 <button type="button" class="lsl-save" style="background:transparent;color:inherit;border:1px solid var(--lsl-line);white-space:nowrap" wire:click="findCards" wire:loading.attr="disabled" wire:target="findCards">{{ $t('find_cards') }}</button>
                             </div>
+                            <input type="url" wire:model="cardsPage" class="lsl-field code" style="margin-top:6px" placeholder="{{ $t('cards_page') }}" dir="ltr">
                         </div>
                     </div>
                     <div class="lsl-row">

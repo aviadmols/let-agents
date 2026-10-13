@@ -26,5 +26,7 @@ return [
     'cards_not_found' => 'We did not find the product cards',
     'cards_not_found_body' => 'You can write the selector yourselves, or ask our team for help.',
     'cards_no_page' => 'We found no category page of the store. It will be there after the next sync.',
+    'cards_page' => 'You can paste a link to a category page of the site here, and the check starts there (optional)',
+    'cards_tried' => ':page: code :status, :links product links',
     'none_yet' => 'No data yet.',
 ];

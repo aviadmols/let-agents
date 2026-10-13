@@ -117,6 +117,19 @@ final class ThemeCards
         return ['selector' => $selector, 'cards' => $nodes->length, 'products' => count($products)];
     }
 
+    /**
+     * How many of the store's products a page links to: none means the page is not a list of them
+     * (a block page, a login, an empty collection).
+     *
+     * @param  list<string>  $productPaths
+     */
+    public static function linkCount(string $html, array $productPaths): int
+    {
+        [$doc, $xpath] = self::parse($html);
+
+        return $doc === null ? 0 : count(self::productLinks($xpath, array_flip(array_map([self::class, 'path'], $productPaths))));
+    }
+
     /** A product address as compared: its path, decoded, lower case, without the last slash. */
     public static function path(string $url): string
     {

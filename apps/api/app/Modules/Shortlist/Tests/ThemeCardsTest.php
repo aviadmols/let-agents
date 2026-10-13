@@ -41,6 +41,8 @@ final class ThemeCardsTest extends TestCase
 
     private string $page = '';
 
+    private int $status = 200;
+
     public function test_code_finds_the_cards_from_the_links_to_the_stores_products(): void
     {
         $found = ThemeCards::find($this->wooPage(), self::PATHS);
@@ -83,7 +85,7 @@ final class ThemeCardsTest extends TestCase
 
         // Code finds them: no model.
         $this->page = $this->wooPage();
-        Http::fake(fn () => Http::response($this->page));
+        Http::fake(fn () => Http::response($this->page, $this->status));
         Livewire::test(Shortlists::class)->call('findCards')->assertSet('data.card_selector', '.product-card');
         $this->assertSame(0, $this->asked);
         Http::assertSent(fn ($request): bool => $request->url() === 'https://shop.test/products/boards/');
@@ -96,7 +98,15 @@ final class ThemeCardsTest extends TestCase
         $kept = app(FindThemeCards::class)->handle($shop->id);
         $this->assertSame([true, '.tile', 4, 'model'], [$kept['found'], $kept['selector'], $kept['cards'], $kept['by']]);
         $this->assertSame(2, $this->asked);
-        $this->assertSame(2, Run::query()->where('agent', FindThemeCards::AGENT)->count(), 'each call is a run, accounted');
+        $this->assertSame(3, Run::query()->where('agent', FindThemeCards::AGENT)->count(), 'every check is a run, with the pages it read');
+
+        // A store that answers our server with a block page: nothing is guessed, and the manager sees why.
+        [$this->page, $this->status] = ['Access denied', 403];
+        $blocked = app(FindThemeCards::class)->handle($shop->id, 'https://elsewhere.test/collections/all');
+        $this->assertSame([false, 'no_links'], [$blocked['found'], $blocked['reason']]);
+        $this->assertSame([403, 0], [$blocked['tried'][0]['status'], $blocked['tried'][0]['links']]);
+        $this->assertNotContains('https://elsewhere.test/collections/all', array_column($blocked['tried'], 'page'), 'only the store\x27s own pages');
+        $this->assertSame(2, $this->asked, 'no model for a page with no product on it');
         $this->assertSame('openai', (string) Settings::get('shortlist.card_finder_provider'));
     }
 

@@ -5,4 +5,5 @@ return [
     'model_failed' => 'המודל לא ענה (:reason).',
     'cards_found' => 'נמצאו כרטיסי המוצר בדף הקטגוריה: :selector (:cards כרטיסים).',
     'cards_refused' => 'המודל הציע :selector, והקוד לא מצא שזה כרטיסי המוצר. לא נשמר.',
+    'cards_none' => 'לא נמצאו כרטיסי מוצר באף אחד מ־:pages הדפים שנבדקו.',
 ];

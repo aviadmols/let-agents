@@ -455,7 +455,7 @@
     '.list{flex:1;overflow:auto;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:18px 14px;align-content:start}',
     '.list .msg{grid-column:1/-1}',
     '.item{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0}',
-    '.item img{display:block;width:100%;height:auto;aspect-ratio:1/1;border-radius:12px;object-fit:contain;background:#f6f6f7;cursor:pointer}',
+    '.item img{display:block;width:100%;height:auto;aspect-ratio:1/1;border-radius:12px;object-fit:cover;background:#f6f6f7;cursor:pointer}',
     '.item a{font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
     '.item a{color:#111827;text-decoration:none;font-weight:600}',
     '.item .meta{flex:1;min-width:0}',

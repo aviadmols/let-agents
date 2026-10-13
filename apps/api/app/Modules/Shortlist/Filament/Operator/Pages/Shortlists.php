@@ -135,6 +135,9 @@ class Shortlists extends Page
         $this->load();
     }
 
+    /** A page of the store to look for the cards on first, when the manager names one. */
+    public string $cardsPage = '';
+
     /** The theme's product cards, found on the store's own category page and put in the field, not saved. */
     public function findCards(): void
     {
@@ -142,11 +145,13 @@ class Shortlists extends Page
             return;
         }
 
-        $found = app(FindThemeCards::class)->handle($this->shop);
+        $found = app(FindThemeCards::class)->handle($this->shop, $this->cardsPage !== '' ? $this->cardsPage : null);
 
         if (! $found['found']) {
             $no = ($found['reason'] ?? '') === 'no_page';
-            Notification::make()->warning()->title(__($no ? 'shortlist::ui.cards_no_page' : 'shortlist::ui.cards_not_found'))->body($no ? null : __('shortlist::ui.cards_not_found_body'))->send();
+            // What each page answered, so the manager sees why: blocked, empty, or no cards found.
+            $tried = implode("\n", array_map(fn (array $t): string => __('shortlist::ui.cards_tried', ['page' => rawurldecode($t['page']), 'status' => (string) ($t['status'] ?? '—'), 'links' => (string) $t['links']]), $found['tried']));
+            Notification::make()->warning()->title(__($no ? 'shortlist::ui.cards_no_page' : 'shortlist::ui.cards_not_found'))->body($no ? null : __('shortlist::ui.cards_not_found_body')."\n".$tried)->persistent()->send();
 
             return;
         }
