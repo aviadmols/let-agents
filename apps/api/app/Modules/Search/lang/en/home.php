@@ -4,8 +4,8 @@ return [
     'open' => 'Open',
     'search' => [
         'name' => 'Site search',
-        'on' => ':count searches on the site in the last 7 days',
-        'setup' => 'On, but no searches were seen on the site this week. It is probably not connected to the theme\'s search box yet.',
+        'on' => ':products products in the search · :count searches on the site in the last 7 days',
+        'setup' => ':products products in the search, but no searches were seen on the site this week. It is probably not connected to the theme\'s search box yet.',
         'off' => 'Off: the theme\'s own search works on the site',
         'connect' => 'How to connect',
     ],

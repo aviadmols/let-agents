@@ -2,6 +2,8 @@
 
 namespace App\Modules\Runs\Support;
 
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Jobs\FirstScanStep;
@@ -10,6 +12,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 /**
  * The shop's scan and learning, started by its manager from the overview rather than waiting for
@@ -39,8 +42,16 @@ final class FirstScan
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
     ];
 
+    /**
+     * The shop manager's scan after the first: what changed and what is new. Each of these steps
+     * already reads only what changed since it last ran (an unchanged product is not read again);
+     * what the store says about itself, its posts and the page tags are left to the night. The
+     * whole chain again is the operator's (start(full: true)).
+     */
+    public const CHANGES = ['catalog', 'products', 'pages', 'search'];
+
     /** A manager starts it again at most this often; the night runs it anyway. */
-    public const AGAIN_AFTER_HOURS = 6;
+    public const AGAIN_AFTER_HOURS = 1;
 
     private const KEEP_DAYS = 7;
 
@@ -50,20 +61,35 @@ final class FirstScan
         return ! Cache::has(self::key($shop->id, 'lock'));
     }
 
-    public static function start(Shop $shop): bool
+    /**
+     * The whole chain for a new shop, or when an operator asks for it; otherwise the changes only.
+     * An operator's full scan goes ahead even while a manager's is locked.
+     */
+    public static function start(Shop $shop, bool $full = false): bool
     {
-        if (! Cache::add(self::key($shop->id, 'lock'), true, now()->addHours(self::AGAIN_AFTER_HOURS))) {
+        // Only an operator's full scan passes the lock; a new shop's manager scans it all, once.
+        if (! Cache::add(self::key($shop->id, 'lock'), true, now()->addHours(self::AGAIN_AFTER_HOURS)) && ! $full) {
             return false;
         }
 
+        $full = $full || self::isNew($shop);
+
+        $steps = $full ? self::STEPS : array_intersect_key(self::STEPS, array_flip(self::CHANGES));
         Cache::put(self::key($shop->id, 'started'), now()->toIso8601String(), now()->addDays(self::KEEP_DAYS));
+        Cache::put(self::key($shop->id, 'steps'), array_keys($steps), now()->addDays(self::KEEP_DAYS));
 
         foreach (array_keys(self::STEPS) as $step) {
+            Cache::forget(self::key($shop->id, 'began:'.$step));
+            Cache::forget(self::key($shop->id, 'ended:'.$step));
+            Cache::forget(self::key($shop->id, 'step:'.$step));
+        }
+
+        foreach (array_keys($steps) as $step) {
             self::mark($shop->id, $step, self::WAITING);
         }
 
         $jobs = [];
-        foreach (self::STEPS as $step => [$command, $parameters]) {
+        foreach ($steps as $step => [$command, $parameters]) {
             $jobs[] = new FirstScanStep($shop->id, $step, $command, array_map(fn (string $value): string => str_replace('{shop}', (string) $shop->slug, $value), $parameters));
         }
 
@@ -92,7 +118,7 @@ final class FirstScan
      */
     public static function notes(Shop $shop): array
     {
-        $steps = array_keys(self::STEPS);
+        $steps = self::steps($shop);
         $notes = [];
 
         foreach ($steps as $i => $step) {
@@ -138,7 +164,7 @@ final class FirstScan
         }
 
         $steps = [];
-        foreach (array_keys(self::STEPS) as $step) {
+        foreach (self::steps($shop) as $step) {
             $steps[$step] = (string) Cache::get(self::key($shop->id, 'step:'.$step), self::WAITING);
         }
 
@@ -147,6 +173,41 @@ final class FirstScan
             'steps' => $steps,
             'finished' => ! in_array(self::WAITING, $steps, true) && ! in_array(self::RUNNING, $steps, true),
         ];
+    }
+
+    /**
+     * The steps of the scan last started here, in order; every step when none was.
+     *
+     * @return list<string>
+     */
+    public static function steps(Shop $shop): array
+    {
+        $steps = Cache::get(self::key($shop->id, 'steps'));
+
+        return is_array($steps) && $steps !== [] ? array_values(array_intersect(array_keys(self::STEPS), $steps)) : array_keys(self::STEPS);
+    }
+
+    /**
+     * What each step learned, from every module that answers for it (Admin\Contracts\ScanDetails),
+     * inside the shop. A module that fails is left out.
+     *
+     * @return array<string, list<array{title: string, rows: list<array{0: string, 1: string}>}>>
+     */
+    public static function details(Shop $shop): array
+    {
+        $details = [];
+
+        foreach (app()->tagged(ScanDetails::TAG) as $source) {
+            try {
+                foreach (app(TenantContext::class)->run((string) $shop->id, fn (): array => $source->scanDetails($shop)) as $step => $sections) {
+                    $details[$step] = [...($details[$step] ?? []), ...$sections];
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $details;
     }
 
     /** A shop the night has not scanned yet: the overview offers the scan as its first thing to do. */

@@ -8,7 +8,7 @@ return [
     'title' => 'Scan and learn the store',
     'title_running' => 'Scanning and learning the store',
     'body_new' => 'For the search, the assistant and the suggestions to work, the system reads every product, page and picture and learns them. It happens every night by itself; here it starts now, without waiting.',
-    'body' => 'The system scans and learns the store every night by itself. Added many products or changed pages? A scan can start now.',
+    'body' => 'The system scans and learns the store every night by itself. Added products or changed something? Here only what changed and the new products are scanned, now.',
     'body_running' => 'Started at :time. A large store can take a few hours; you can close this screen, the scan goes on.',
     'body_done' => 'The last scan from here started on :time. From now on the system keeps learning every night.',
     'start' => 'Start scanning and learning',
@@ -31,4 +31,9 @@ return [
         'done' => 'Done',
         'failed' => 'Tries again tonight',
     ],
+    'changes' => 'Scan changes and new products',
+    'full' => 'Full rescan (operator)',
+    'full_confirm' => 'Scan the whole store again, with what it says about itself, its posts and the tags?',
+    'click_step' => 'Click a step to see what it learned.',
+    'no_details' => 'No details for this step yet.',
 ];

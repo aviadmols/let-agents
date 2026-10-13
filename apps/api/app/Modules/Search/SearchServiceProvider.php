@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Catalog\Events\CatalogUpdated;
@@ -17,6 +18,7 @@ use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
 use App\Modules\Search\Support\HebrewPriceRange;
 use App\Modules\Search\Support\SearchHome;
+use App\Modules\Search\Support\SearchScanDetails;
 use App\Modules\Search\Support\SpellingProductsForQuery;
 use App\Modules\Search\Support\SpellingProductsNamed;
 use App\Modules\Search\Support\StoredPageTags;
@@ -30,6 +32,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        // What this module learned, under its step of the store's scan.
+        $this->app->tag([SearchScanDetails::class], ScanDetails::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([SearchHome::class], HomeSource::TAG);
     }

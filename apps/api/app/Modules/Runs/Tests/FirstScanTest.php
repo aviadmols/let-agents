@@ -81,4 +81,32 @@ final class FirstScanTest extends TestCase
             ->assertSee('נקראו 1,240 מוצרים')
             ->assertDontSee('התקרה החודשית');
     }
+
+    public function test_after_the_first_the_manager_scans_the_changes_and_only_an_operator_scans_it_all(): void
+    {
+        $shop = Shop::factory()->create();
+        // The night has scanned it: no longer new.
+        Run::query()->create(['shop_id' => $shop->id, 'agent' => 'catalog.sync', 'action' => 'catalog.sync', 'status' => 'succeeded', 'trigger' => 'schedule', 'started_at' => now()->subDay(), 'created_at' => now()->subDay()]);
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        Bus::fake();
+        $this->actingAs($merchant);
+        Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
+        Filament::setTenant($shop);
+
+        $operator = User::factory()->operator()->create();
+        Livewire::actingAs($operator)->test(FirstScanCard::class)->assertSee('סריקה מלאה מחדש');
+
+        Livewire::actingAs($merchant)->test(FirstScanCard::class)
+            ->assertSee('לסרוק שינויים ומוצרים חדשים')
+            ->assertDontSee('סריקה מלאה מחדש')
+            ->call('startFull')
+            ->call('start');
+
+        Bus::assertChained(array_fill(0, count(FirstScan::CHANGES), FirstScanStep::class));
+        $this->assertSame(FirstScan::CHANGES, FirstScan::steps($shop), 'the changes only: catalogue, products, pages, search');
+
+        Livewire::actingAs($operator)->test(FirstScanCard::class)->call('startFull');
+        $this->assertSame(array_keys(FirstScan::STEPS), FirstScan::steps($shop), 'the operator scans it all, even while the manager is locked');
+    }
 }

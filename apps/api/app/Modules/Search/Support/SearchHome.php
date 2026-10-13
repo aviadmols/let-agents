@@ -36,7 +36,7 @@ final class SearchHome implements HomeSource
                 key: 'search',
                 name: __('search::home.search.name'),
                 state: ! $on ? HomeStatus::OFF : ($week > 0 ? HomeStatus::ON : HomeStatus::SETUP),
-                note: ! $on ? __('search::home.search.off') : ($week > 0 ? __('search::home.search.on', ['count' => number_format($week)]) : __('search::home.search.setup')),
+                note: ! $on ? __('search::home.search.off') : ($week > 0 ? __('search::home.search.on', ['count' => number_format($week), 'products' => number_format(SearchScanDetails::products())]) : __('search::home.search.setup', ['products' => number_format(SearchScanDetails::products())])),
                 url: $display,
                 action: $on && $week === 0 ? __('search::home.search.connect') : __('search::home.open'),
                 order: 10,

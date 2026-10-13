@@ -3,15 +3,19 @@
 namespace App\Modules\Enrichment;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Enrichment\Actions\RereadPage;
 use App\Modules\Enrichment\Console\EnrichmentCommand;
 use App\Modules\Enrichment\Contracts\RereadsPages;
+use App\Modules\Enrichment\Support\EnrichmentScanDetails;
 use Illuminate\Console\Scheduling\Schedule;
 
 final class EnrichmentServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        // What this module learned, under its step of the store's scan.
+        $this->app->tag([EnrichmentScanDetails::class], ScanDetails::TAG);
         // Another module may ask for one page to be read again; it gets the code readers only.
         $this->app->bind(RereadsPages::class, RereadPage::class);
     }
