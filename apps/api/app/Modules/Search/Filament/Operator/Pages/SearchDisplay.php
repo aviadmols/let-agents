@@ -217,7 +217,17 @@ class SearchDisplay extends Page
         $this->load();
     }
 
-    /** What the shop has ready, for the lines under each switch. */
+    /** The shop's platform: the field's name and where the switch is differ between them. */
+    public function shopPlatform(): string
+    {
+        return $this->shop === null ? '' : (string) Shop::query()->whereKey($this->shop)->first()?->platform->value;
+    }
+
+    /**
+     * What the shop has ready, for the lines under each switch.
+     *
+     * @return array{pictures: bool, number: ?string}
+     */
     public function status(): array
     {
         $shop = $this->shop;

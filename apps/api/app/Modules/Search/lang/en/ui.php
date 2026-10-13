@@ -435,4 +435,36 @@ return [
         'from' => 'Came from :from',
         'session' => 'Session :session',
     ],
+    // When the search does not take over the theme's by itself (search display screen).
+    'manual' => [
+        'title' => 'Search not showing on the site? Connect it by hand',
+        'intro' => 'Our search usually takes over the theme\'s search box by itself. If your theme\'s is not caught, these are the ways to connect it by hand, simplest first.',
+        'on' => [
+            'title' => 'Make sure the search is on in the site',
+            'shopify' => 'On Shopify: theme editor → App embeds (the third icon on the side) → turn on Let\'s search → Save.',
+            'woocommerce' => 'On WordPress: the Let Agents plugin is active and its key is connected on the plugin\'s settings screen.',
+        ],
+        'selector' => [
+            'title' => 'Tell us where the theme\'s search box is',
+            'help' => 'On the site: right-click the search box → Inspect. Copy the field\'s name, id or class and paste it here as a CSS selector, for example input.header__search-input or #search-field. Several, separated by commas.',
+            'save' => 'Save with the button below. Within minutes our search takes over the box, and the theme\'s suggestions are hidden.',
+        ],
+        'field' => [
+            'title' => 'Add a search box of your own',
+            'help' => 'Paste this line into the theme where you want the search (in the header, for example). It is caught by itself.',
+            'placeholder' => 'Search the site',
+        ],
+        'button' => [
+            'title' => 'Open the search from any button',
+            'help' => 'Any button or link in the theme can open our search:',
+            'label' => 'Search',
+            'ask' => 'Or open it straight with a question for the assistant:',
+            'question' => 'What would make a good gift?',
+        ],
+        'takeover' => [
+            'title' => 'Take over the theme\'s button',
+            'help' => 'A button or link to /search, or one with data-action="search", already opens our search instead of the theme\'s. If the theme\'s search icon is not caught, give it this attribute:',
+        ],
+        'check' => 'To check: open the site in a private window and type in the box. If our suggestions show, it works.',
+    ],
 ];

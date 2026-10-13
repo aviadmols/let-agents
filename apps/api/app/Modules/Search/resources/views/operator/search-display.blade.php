@@ -278,11 +278,43 @@
                     </div>
                 </div>
 
-                <details style="margin-top:16px">
-                    <summary style="cursor:pointer;font-weight:600">{{ $t('look.advanced') }}</summary>
-                    <p class="lad-help">{{ $t('look.selector_help') }}</p>
-                    <input class="lad-field code" type="text" maxlength="300" wire:model.blur="data.selector" aria-label="{{ $t('look.selector') }}" style="margin-top:8px">
-                </details>
+            </section>
+
+            {{-- When the search does not take over the theme's by itself: the ways to put it there by hand. --}}
+            @php($field = $this->shopPlatform() === 'shopify' ? 'q' : 's')
+            <section class="lad-card" data-manual-install>
+                <h2>{{ __('search::ui.manual.title') }}</h2>
+                <p class="lad-help">{{ __('search::ui.manual.intro') }}</p>
+                <ol style="display:grid;gap:14px;margin:14px 0 0;padding-inline-start:20px">
+                    <li>
+                        <b>{{ __('search::ui.manual.on.title') }}</b>
+                        <p class="lad-help">{{ __($this->shopPlatform() === 'shopify' ? 'search::ui.manual.on.shopify' : 'search::ui.manual.on.woocommerce') }}</p>
+                    </li>
+                    <li>
+                        <b>{{ __('search::ui.manual.selector.title') }}</b>
+                        <p class="lad-help">{{ __('search::ui.manual.selector.help') }}</p>
+                        <input class="lad-field code" type="text" maxlength="300" wire:model.blur="data.selector" aria-label="{{ $t('look.selector') }}" placeholder="input.header__search-input" style="margin-top:8px">
+                        <p class="lad-help" style="margin-top:6px">{{ __('search::ui.manual.selector.save') }}</p>
+                    </li>
+                    <li>
+                        <b>{{ __('search::ui.manual.field.title') }}</b>
+                        <p class="lad-help">{{ __('search::ui.manual.field.help') }}</p>
+                        <pre class="lad-field code" dir="ltr" style="white-space:pre-wrap;margin-top:8px">{{ '<input type="search" name="'.$field.'" placeholder="'.__('search::ui.manual.field.placeholder').'">' }}</pre>
+                    </li>
+                    <li>
+                        <b>{{ __('search::ui.manual.button.title') }}</b>
+                        <p class="lad-help">{{ __('search::ui.manual.button.help') }}</p>
+                        <pre class="lad-field code" dir="ltr" style="white-space:pre-wrap;margin-top:8px">{{ '<button type="button" onclick="LetAgentsSearch.search(\'\')">'.__('search::ui.manual.button.label').'</button>' }}</pre>
+                        <p class="lad-help" style="margin-top:6px">{{ __('search::ui.manual.button.ask') }}</p>
+                        <pre class="lad-field code" dir="ltr" style="white-space:pre-wrap;margin-top:8px">{{ 'LetAgentsSearch.ask("'.__('search::ui.manual.button.question').'")' }}</pre>
+                    </li>
+                    <li>
+                        <b>{{ __('search::ui.manual.takeover.title') }}</b>
+                        <p class="lad-help">{{ __('search::ui.manual.takeover.help') }}</p>
+                        <pre class="lad-field code" dir="ltr" style="white-space:pre-wrap;margin-top:8px">{{ '<a href="/search" data-action="search">'.__('search::ui.manual.button.label').'</a>' }}</pre>
+                    </li>
+                </ol>
+                <p class="lad-help" style="margin-top:14px">{{ __('search::ui.manual.check') }}</p>
             </section>
 
             <div>
