@@ -1454,6 +1454,10 @@
       '.d.m .d-foot{padding-bottom:env(safe-area-inset-bottom)}',
       // Regular or smart search: two choices in one pill.
       '.la-modebar{display:flex;justify-content:flex-end;padding:8px 14px;border-bottom:1px solid var(--rs-line);background:var(--rs-bg);flex:none}',
+      // In the drawer the pictures-a-row choice shares the row with the search switch, at its other end.
+      '.drawer .la-modebar{justify-content:space-between;align-items:center;gap:10px}',
+      '.la-cols button{padding:6px 9px}',
+      '.la-cols svg{width:17px;height:17px;display:block}',
       '.drawer .la-modebar{justify-content:center}',
       '.la-mode{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--rs-soft);flex:none;font-size:13px}',
       '.la-mode button{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;line-height:1.2;color:var(--rs-fg);opacity:.72;white-space:nowrap}',
@@ -3641,34 +3645,45 @@
       var again = el('button', 'x', '\u21BB');
       again.type = 'button';
       again.setAttribute('aria-label', label('new_search'));
-      // One picture a row or two: the shopper's choice, kept in this browser; the shop's setting until then.
-      var cols = el('button', 'x cols');
-      cols.type = 'button';
+      // One picture a row or two: the shopper's choice, kept in this browser; the shop's setting until
+      // then. Two buttons beside the search switch, the one in use marked, as the switch marks its own.
+      var cols = el('div', 'la-mode la-cols');
+      cols.setAttribute('role', 'radiogroup');
+      cols.setAttribute('aria-label', label('columns_two'));
+      [[true, COLUMNS_ONE, 'columns_one'], [false, COLUMNS_TWO, 'columns_two']].forEach(function (choice) {
+        var button = el('button');
+        button.type = 'button';
+        button.setAttribute('role', 'radio');
+        button.innerHTML = choice[1];
+        button.setAttribute('aria-label', label(choice[2]));
+        button.title = label(choice[2]);
+        button.addEventListener('click', function () {
+          sheet.classList.toggle('one', choice[0]);
+          try {
+            win.localStorage.setItem(COLUMNS_KEY, choice[0] ? '1' : '2');
+          } catch (e) { /* this page only */ }
+          paintCols();
+        });
+        button.setAttribute('data-one', choice[0] ? '1' : '0');
+        cols.appendChild(button);
+      });
       var paintCols = function () {
         var one = sheet.classList.contains('one');
-        cols.innerHTML = one ? COLUMNS_TWO : COLUMNS_ONE;
-        cols.setAttribute('aria-label', label(one ? 'columns_two' : 'columns_one'));
-        cols.title = cols.getAttribute('aria-label');
+        Array.prototype.forEach.call(cols.querySelectorAll('button'), function (button) {
+          button.setAttribute('aria-checked', (button.getAttribute('data-one') === '1') === one ? 'true' : 'false');
+        });
       };
-      cols.addEventListener('click', function () {
-        var one = !sheet.classList.contains('one');
-        sheet.classList.toggle('one', one);
-        try {
-          win.localStorage.setItem(COLUMNS_KEY, one ? '1' : '2');
-        } catch (e) { /* this page only */ }
-        paintCols();
-      });
       paintCols();
       top.appendChild(x);
       top.appendChild(el('h2', null, label('drawer_title')));
-      top.appendChild(cols);
       top.appendChild(again);
       sheet.appendChild(top);
+      var strip = el('div', 'la-modebar');
       if (choosesMode()) {
-        var strip = el('div', 'la-modebar');
         strip.appendChild(modeSwitch(function () { return field.value; }));
-        sheet.appendChild(strip);
       }
+      strip.appendChild(cols);
+      sheet.appendChild(strip);
 
       var scroll = el('div', 'scroll');
       sheet.appendChild(scroll);
