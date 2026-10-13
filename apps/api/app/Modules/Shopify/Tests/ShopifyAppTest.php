@@ -46,6 +46,9 @@ final class ShopifyAppTest extends TestCase
     /** Whether the fake store refuses the pixel: the write_pixels scope not approved yet. */
     private bool $pixelDenied = false;
 
+    /** A token Shopify has withdrawn: its calls answer 401. */
+    private ?string $withdrawn = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -57,6 +60,10 @@ final class ShopifyAppTest extends TestCase
         Http::fake(function (HttpRequest $request) {
             if (str_ends_with($request->url(), '/admin/oauth/access_token')) {
                 return Http::response(['access_token' => 'shpat_123', 'scope' => 'read_products', 'expires_in' => 86400, 'refresh_token' => 'shprt_1', 'refresh_token_expires_in' => 7776000]);
+            }
+
+            if ($this->withdrawn !== null && $request->header('X-Shopify-Access-Token') === [$this->withdrawn]) {
+                return Http::response(['errors' => '[API] Invalid API key or access token'], 401);
             }
 
             $body = (array) json_decode($request->body(), true);
@@ -240,6 +247,20 @@ final class ShopifyAppTest extends TestCase
 
         $this->assertGuest();
         $this->assertSame($overview, session('url.intended'), 'the sign-in page comes back to this shop');
+    }
+
+    public function test_a_token_shopify_withdrew_is_renewed_when_the_app_opens_never_a_500(): void
+    {
+        $install = $this->installed();
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->toIso8601String()]];
+        // Installed again, and the notice that it was removed never read: the token we kept is dead.
+        $install->forceFill(['access_token' => 'shpat_withdrawn', 'client_id' => 'test-key'])->save();
+        $this->withdrawn = 'shpat_withdrawn';
+
+        $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => self::idToken()])))
+            ->assertRedirect();
+
+        $this->assertSame('shpat_123', $install->fresh()->access_token, 'the session token was exchanged for a fresh one');
     }
 
     public function test_a_declined_plan_keeps_the_shop_paused_and_its_storefront_quiet(): void

@@ -4,6 +4,7 @@ namespace App\Modules\Shopify\Http\Controllers;
 
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Models\User;
+use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Shopify\Actions\ConnectPixel;
 use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
@@ -119,8 +120,10 @@ final class ShopifyAppController
 
         $app = $claims['app'] ?? ShopifySignatures::queryApp($query) ?? ShopifyApps::key();
         $install = ShopifyInstall::query()->where('shop_domain', $shop)->first();
+        // A token another app was given for this store: this app needs its own.
+        $otherApp = $install !== null && $claims !== null && $install->client_id !== null && $install->client_id !== $app;
 
-        if ($install === null || ! $install->installed()) {
+        if ($install === null || ! $install->installed() || $otherApp) {
             // Shopify installed the app already; the store still needs our token, from the same app.
             if ($claims === null) {
                 return $this->outward($request, '/shopify/install?'.http_build_query(['shop' => $shop, 'app' => $app]), $app);
@@ -140,7 +143,30 @@ final class ShopifyAppController
             $pixel->once($install);
         }
 
-        return $this->onward($request, $install, $billing);
+        try {
+            return $this->onward($request, $install, $billing);
+        } catch (StoreFeedUnavailable $refused) {
+            // Shopify withdrew the token we kept (the app was installed again, perhaps before this
+            // server could read the notice that it was removed): a fresh one, then on as before.
+            if ($refused->reason !== 'not_installed') {
+                throw $refused;
+            }
+
+            if ($claims === null) {
+                return $this->outward($request, '/shopify/install?'.http_build_query(['shop' => $shop, 'app' => $app]), $app);
+            }
+
+            $answer = $api->exchange($shop, $app, (string) $request->query('id_token'));
+
+            if ($answer === null) {
+                return response(__('shopify::app.unreachable'), 502);
+            }
+
+            $install = $installer->handle($shop, $answer);
+            $install->forceFill(['client_id' => $app])->save();
+
+            return $this->onward($request, $install, $billing);
+        }
     }
 
     public function billingReturn(Request $request, ManageSubscription $billing): RedirectResponse|Response
