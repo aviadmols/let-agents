@@ -125,7 +125,7 @@ final class AnswerSiteQuestion
      *                              unavailable; from: bank, model or none; with sources, picks, ask_id and whatsapp;
      *                              context: "previous" when the question was answered about the turn before
      */
-    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = []): array
+    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false): array
     {
         $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
 
@@ -140,9 +140,15 @@ final class AnswerSiteQuestion
         $followUp = $previous !== [] && self::followsUp($question);
         $products = $followUp ? $previous : $products;
 
-        return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp): array {
+        // "What is special about this product?" asked on a product page is about that product: like a
+        // question about the turn before, no saved answer is read or written, since the same words are
+        // about another product on the next page (and a refusal saved before the product was synced
+        // would answer every product).
+        $bound = $followUp || ($fromPage && $products !== []);
+
+        return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp, $bound): array {
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
-                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $followUp);
+                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound);
             $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
 
             return $this->logged($shopId, $question, $products, $result);

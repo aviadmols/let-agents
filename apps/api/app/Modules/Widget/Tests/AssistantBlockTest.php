@@ -5,6 +5,7 @@ namespace App\Modules\Widget\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
@@ -62,12 +63,21 @@ final class AssistantBlockTest extends TestCase
         $this->assertSame('שאלו את Rocks and Gold AI', $block['title']);
         $this->assertSame(['id' => '1', 'title' => 'תליון 1'], $block['product']);
         $this->assertSame([['label' => 'תליון', 'query' => 'תליון'], ['label' => 'זהב צהוב', 'query' => 'תליון זהב צהוב'], ['label' => '14K', 'query' => 'תליון 14K']], $block['tags']);
-        $this->assertSame(['text' => 'יש תליון דומה בזהב לבן?', 'about' => 'similar', 'query' => 'תליון זהב לבן'], $block['questions'][0], 'a value of its choice the store also sells, as a search');
-        $this->assertSame('יש תליון דומה ב-18K?', $block['questions'][1]['text'], 'a prefix letter joins a Hebrew word only');
-        $this->assertSame('תליון 18K', $block['questions'][1]['query']);
-        $this->assertCount(5, $block['questions']);
-        $this->assertSame(['text' => 'יש תליון דומה במחיר נמוך יותר?', 'about' => 'similar', 'query' => 'תליון עד 899'], $block['questions'][2], 'cheaper than this one, as a price range');
-        $this->assertSame(['text' => 'תוך כמה זמן זה מגיע?', 'about' => 'product'], $block['questions'][3], 'then what any shopper asks about this one');
+        // Next steps that lead somewhere: similar items, a comparison (named in the browser), more of its type,
+        // another value of its choices, a cheaper one; returns and delivery only where the store says something.
+        $this->assertSame(['text' => 'לראות פריטים דומים', 'about' => 'similar_items'], $block['questions'][0]);
+        $this->assertSame('compare', $block['questions'][1]['about']);
+        $this->assertSame('להשוות עם :title', $block['questions'][1]['named']);
+        $this->assertSame(['text' => 'עוד 2 תליון', 'about' => 'similar', 'query' => 'תליון'], $block['questions'][2], 'the other products of its type');
+        $this->assertSame(['text' => 'יש תליון דומה בזהב לבן?', 'about' => 'similar', 'query' => 'תליון זהב לבן'], $block['questions'][3], 'a value of its choice the store also sells, as a search');
+        $this->assertSame(['text' => 'יש תליון דומה במחיר נמוך יותר?', 'about' => 'similar', 'query' => 'תליון עד 899'], $block['questions'][4], 'cheaper than this one, as a price range');
+        $this->assertNotContains('אפשר להחזיר או להחליף?', array_column($block['questions'], 'text'), 'the store says nothing about returns: not asked');
+
+        // A refund policy of its own: now the question has an answer.
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogContent::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'policy-1', 'type' => 'page', 'status' => 'publish',
+            'title' => 'מדיניות החזרות', 'slug' => 'refund_policy', 'url' => 'https://store.test/policies/refund-policy', 'hash' => 'p1', 'payload' => []]));
+        $again = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
+        $this->assertContains('אפשר להחזיר או להחליף?', array_column($again['questions'], 'text'));
 
         Settings::set('widget.layout', 'circles', $this->shop->id);
         $this->assertNull(app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant']);

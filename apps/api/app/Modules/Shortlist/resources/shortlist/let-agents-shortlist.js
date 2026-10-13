@@ -479,7 +479,9 @@
   host.id = 'la-shortlist';
   // Its content is in the shadow root, so to the theme it is an empty div, and themes like Dawn hide
   // every empty div (div:empty { display: none }). Said on the element itself, that rule loses.
-  host.style.display = 'block';
+  host.style.setProperty('display', 'block', 'important');
+  host.style.setProperty('visibility', 'visible', 'important');
+  host.style.setProperty('opacity', '1', 'important');
   var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
   var CSS = [
     ':host{all:initial}',

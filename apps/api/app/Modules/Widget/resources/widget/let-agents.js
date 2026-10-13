@@ -550,6 +550,16 @@
     } catch (e) { /* the theme has no mini cart */ }
   }
 
+  /**
+   * The block stays visible whatever the theme's stylesheet says about divs (Dawn hides every empty one):
+   * said with !important on the element, no rule can override it.
+   */
+  function shown(node) {
+    node.style.setProperty('display', 'block', 'important');
+    node.style.setProperty('visibility', 'visible', 'important');
+    node.style.setProperty('opacity', '1', 'important');
+  }
+
   // ---------------------------------------------------------------- memory of viewed products
 
   function seenProducts() {
@@ -567,6 +577,32 @@
       list.unshift(entry);
       window.localStorage.setItem(SEEN_KEY, JSON.stringify(list.slice(0, MAX_SEEN)));
     } catch (e) { /* private mode */ }
+  }
+
+  /** A product's name short enough for a button. */
+  function shortTitle(title) {
+    title = String(title || '').trim();
+    return title.length > 38 ? title.slice(0, 36).trim() + '…' : title;
+  }
+
+  /** The page's own picture of the product (its share image). */
+  function pageImage() {
+    var meta = document.querySelector('meta[property="og:image"]');
+    var src = meta ? String(meta.getAttribute('content') || '') : '';
+    return src.indexOf('//') === 0 ? 'https:' + src : src;
+  }
+
+  /** The product viewed before this one, of any kind, within 30 days: the block offers to compare with it. */
+  function viewedBefore() {
+    var limit = Date.now() - 30 * 86400000;
+    var list = seenProducts();
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (item && item.id && item.id !== PAGE_ID && item.title && item.at > limit) {
+        return item;
+      }
+    }
+    return null;
   }
 
   /** The most recent other product of the same type, viewed within 30 days. */
@@ -2146,7 +2182,7 @@
     host.setAttribute('data-let-agents', PAGE_TYPE);
     // Its content is in the shadow root, so to the theme it is an empty div, and themes like Dawn hide
     // every empty div (div:empty { display: none }). Said on the element itself, that rule loses.
-    host.style.display = 'block';
+    shown(host);
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var style = el('style');
     style.textContent = CSS + ASSISTANT_CSS;
@@ -2206,12 +2242,25 @@
       wrap.appendChild(tags);
     }
 
+    // Five next steps at most; the bank holds one more for when there is nothing to compare with.
+    var shownSteps = 0;
     (block.questions || []).forEach(function (question) {
+      if (shownSteps >= 5) {
+        return;
+      }
       // A bank cached before questions said what they are about holds plain text: about this product.
       var text = typeof question === 'string' ? question : String(question.text || '');
       var about = typeof question === 'string' ? 'product' : question.about;
       if (!text) {
         return;
+      }
+      // The comparison names the product viewed before, and is left out when there is none.
+      var before = about === 'compare' ? viewedBefore() : null;
+      if (about === 'compare') {
+        if (!before) {
+          return;
+        }
+        text = String(question.named || text).replace(':title', shortTitle(before.title));
       }
       var button = el('button', 'as-q');
       button.type = 'button';
@@ -2219,8 +2268,26 @@
       button.appendChild(el('span', null, text));
       // About others like it: a search ("טבעת זהב צהוב", "טבעת עד 649"), in code, with its tags.
       var query = typeof question === 'string' ? '' : String(question.query || '');
+      shownSteps++;
       button.addEventListener('click', function () {
+        // Looked for now: the search script may have loaded after this block was drawn.
         var search = window.LetAgentsSearch;
+        if (about === 'similar_items' && search && typeof search.similar === 'function') {
+          track('click', AS_SECTION, 'panel');
+          search.similar({ id: 'p:' + block.product.id, external_id: String(block.product.id), title: block.product.title, image: pageImage(), url: location.href.split('?')[0], buy: true });
+          return;
+        }
+        if (about === 'compare' && search && typeof search.ask === 'function') {
+          track('click', AS_SECTION, 'panel');
+          var asked = String(question.question || '').replace(':this', block.product.title).replace(':that', before.title);
+          search.ask(asked || text, [String(block.product.id), String(before.id)]);
+          return;
+        }
+        // Without the search script: similar items are searched for by name, the comparison asked here.
+        if (about === 'similar_items') {
+          ask(block.product.title, 'similar');
+          return;
+        }
         if (query && search && typeof search.search === 'function') {
           track('click', AS_SECTION, 'panel');
           search.search(query);
@@ -2325,7 +2392,7 @@
     var host = el('div', 'let-agents-widget');
     host.setAttribute('data-let-agents', PAGE_TYPE);
     // Not taken for an empty div by the theme (div:empty { display: none }).
-    host.style.display = 'block';
+    shown(host);
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
 
     var style = el('style');
@@ -3728,17 +3795,17 @@
 
   /** Remember this product for a later comparison, with its live title and link. */
   function rememberCurrent(live) {
-    if (PAGE_TYPE !== 'product' || !bank || !bank.compare) {
+    if (PAGE_TYPE !== 'product' || !bank) {
       return;
     }
     var data = live && live[PAGE_ID];
     var heading = document.querySelector('h1');
     rememberProduct({
       id: PAGE_ID,
-      key: bank.compare.key,
+      key: bank.compare ? bank.compare.key : null,
       title: data ? decodeEntities(data.name) : (heading ? heading.textContent.trim().slice(0, 120) : ''),
       url: data ? data.permalink : location.href.split('?')[0],
-      rows: bank.compare.rows,
+      rows: bank.compare ? bank.compare.rows : null,
       at: Date.now()
     });
   }

@@ -1609,14 +1609,17 @@ final class BuildPageBank
     /** Tags and questions the block under the add-to-cart shows at most. */
     private const ASSISTANT_TAGS = 8;
 
-    private const ASSISTANT_QUESTIONS = 5;
+    /** One more than shown: the comparison is dropped in the browser when nothing was viewed before. */
+    private const ASSISTANT_QUESTIONS = 6;
 
     /**
      * The block under the add-to-cart: the product's approved facts as tags (its type, its
      * choices, its yes-or-no attributes), each with the search for others like it ("תליון זהב
-     * צהוב"); and questions worth asking: what shoppers already asked here and got answered, then
-     * whether it comes in a value of its choices the store also sells ("יש דגם דומה בזהב לבן?"),
-     * then what any shopper asks before buying. No model.
+     * צהוב"); and next steps that lead somewhere, never a question nobody can answer: what
+     * shoppers already asked here and got answered; similar items; a comparison with the product
+     * viewed before (filled in the browser); more of its type ("עוד 5 חיתולי טטרה"); another value
+     * of its choices the store also sells ("יש דגם דומה בזהב לבן?") or a cheaper one; and returns
+     * or delivery only where the store's own pages say something about them. No model.
      *
      * @param  list<string>  $asked
      * @return array{title: string, placeholder: string, product: array{id: string, title: string}, tags: list<array{label: string, query: string}>, questions: list<array{text: string, about: string, query?: string}>}|null
@@ -1661,17 +1664,35 @@ final class BuildPageBank
             }
         }
 
-        // A question about this product goes with it; one about others like it is searched for.
+        // More of its type: how many other products the store has of it, searched for by its name.
+        $moreOfType = [];
+        if ($type !== null && $typeLabel !== '') {
+            $count = EnrichmentFact::query()->where('status', FactStatus::Approved)->where('kind', FactKind::Type)
+                ->where('value_text', $type->value_text)->where('product_id', '!=', $product->id)->distinct()->count('product_id');
+            if ($count > 0) {
+                $moreOfType[] = ['text' => (string) __('widget::bank.assistant.more_of_type', ['count' => $count, 'type' => $typeLabel], $this->locale), 'about' => 'similar', 'query' => $typeLabel];
+            }
+        }
+
+        // Returns and delivery are asked only where the store says something about them.
+        $policies = $this->policiesKnown();
+
+        // A question about this product goes with it; one about others like it is searched for;
+        // similar items and the comparison are actions the browser takes.
         $questions = [];
         foreach ([
             ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], array_slice($asked, 0, 2)),
-            ...array_slice($others, 0, 2),
+            ['text' => (string) __('widget::bank.assistant.similar_items', [], $this->locale), 'about' => 'similar_items'],
+            ['text' => (string) __('widget::bank.assistant.compare', [], $this->locale), 'about' => 'compare', 'named' => (string) __('widget::bank.assistant.compare_named', [], $this->locale), 'question' => (string) __('widget::bank.assistant.compare_question', [], $this->locale)],
+            ...$moreOfType,
+            ...array_slice($others, 0, 1),
             // Cheaper than this one: searched as "טבעת עד 649", the price range the search reads in code.
             ...($product->price !== null && (float) $product->price > 1
                 ? [['text' => (string) __('widget::bank.assistant.cheaper', ['type' => $kind], $this->locale), 'about' => 'similar',
                     'query' => (string) __('widget::bank.assistant.cheaper_query', ['type' => $kind, 'price' => (string) ((int) ceil((float) $product->price) - 1)], $this->locale)]]
                 : []),
-            ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], (array) __('widget::bank.assistant.questions', [], $this->locale)),
+            ...($policies['returns'] ? [['text' => (string) __('widget::bank.assistant.returns', [], $this->locale), 'about' => 'product']] : []),
+            ...($policies['delivery'] ? [['text' => (string) __('widget::bank.assistant.delivery', [], $this->locale), 'about' => 'product']] : []),
         ] as $question) {
             $questions[$question['text']] ??= $question;
         }
@@ -1683,6 +1704,27 @@ final class BuildPageBank
             'product' => ['id' => $externalId, 'title' => (string) $product->title],
             'tags' => array_slice(array_values($tags), 0, self::ASSISTANT_TAGS),
             'questions' => array_slice($questions, 0, self::ASSISTANT_QUESTIONS),
+        ];
+    }
+
+    /**
+     * Whether the store says anything about returns and about delivery: a promise read from its
+     * pages, or a policy page of its own (Shopify's refund and shipping policies), so the block asks
+     * those only when there is an answer to give.
+     *
+     * @return array{returns: bool, delivery: bool}
+     */
+    private function policiesKnown(): array
+    {
+        $promises = EnrichmentFact::query()->where('kind', FactKind::Promise)->where('status', FactStatus::Approved)->whereNull('product_id')->pluck('key')->all();
+        $pages = CatalogContent::query()->whereNull('removed_at')->where(fn (Builder $q) => $q->where('external_id', 'like', 'policy-%')
+            ->orWhere('title', 'like', '%החזר%')->orWhere('title', 'like', '%משלוח%')->orWhere('title', 'like', '%return%')->orWhere('title', 'like', '%shipping%'))
+            ->get(['slug', 'title']);
+        $page = fn (string $slug, string $words): bool => $pages->contains(fn (CatalogContent $c): bool => $c->slug === $slug || preg_match($words, (string) $c->title) === 1);
+
+        return [
+            'returns' => in_array('returns', $promises, true) || $page('refund_policy', '/החזר|החלפ|ביטול|return|refund/iu'),
+            'delivery' => array_intersect(['delivery', 'free_shipping'], $promises) !== [] || $page('shipping_policy', '/משלוח|אספק|shipping|delivery/iu'),
         ];
     }
 

@@ -355,6 +355,24 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'an answer about one conversation is not the next shopper\'s');
     }
 
+    public function test_a_question_from_a_product_page_is_about_that_product_never_a_saved_answer(): void
+    {
+        $this->drills();
+        // Saved before the product was synced: "not ours to answer", for these words, for every product.
+        $this->inShop(fn () => AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'question' => 'מה מיוחד במוצר הזה?', 'question_key' => Question::key('מה מיוחד במוצר הזה?'),
+            'answer' => null, 'outcome' => AssistantAnswer::OUT_OF_SCOPE, 'status' => AssistantAnswer::SHOWN, 'prompt_version' => AnswerSiteQuestion::PROMPT_VERSION, 'asked_count' => 3, 'last_asked_at' => now()]));
+        $this->replies = [
+            ['found' => true, 'answer' => 'מברגה נטענת של מקיטה, 18V.', 'refs' => [], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('מה מיוחד במוצר הזה?', ['701'], page: true)->json('data');
+
+        $this->assertNotSame('bank', $data['from'] ?? null, 'the saved refusal is not the answer about this product');
+        $this->assertNotEmpty($this->calls, 'the product was read and answered from');
+        $this->assertSame(1, $this->inShop(fn () => AssistantAnswer::query()->count()), 'and nothing about this product is kept for the next one');
+    }
+
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
     {
         $this->drills();
@@ -386,10 +404,10 @@ final class SiteQuestionTest extends TestCase
      * @param  list<string>  $products
      * @param  list<string>  $previous  what the drawer's turn before showed
      */
-    private function askWith(string $question, array $products, array $previous = []): TestResponse
+    private function askWith(string $question, array $products, array $previous = [], bool $page = false): TestResponse
     {
         return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
-        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products] + ($previous === [] ? [] : ['previous' => $previous]), JSON_UNESCAPED_UNICODE));
+        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products] + ($previous === [] ? [] : ['previous' => $previous]) + ($page ? ['page' => 1] : []), JSON_UNESCAPED_UNICODE));
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /api/v1/search/{site}/ask   {"question": "...", "vid": "anon-...", "locale": "he", "products": ["<shown ids>"], "previous": ["<ids>"]}
+ * POST /api/v1/search/{site}/ask   {"question": "...", "vid": "anon-...", "locale": "he", "products": ["<shown ids>"], "previous": ["<ids>"], "page": 1}
  *
  * A question typed in the store's search box, about the whole site. Sent as text/plain from the
  * storefront so the browser sends no preflight; the body is JSON. Called only when the shopper
@@ -40,13 +40,15 @@ final class SiteAskController
         $products = self::ids(is_array($body) ? ($body['products'] ?? null) : null);
         // In the drawer's conversation, the products the turn before showed: "מה הכי זול?" is about them.
         $previous = self::ids(is_array($body) ? ($body['previous'] ?? null) : null);
+        // Asked from a product page: the products are the page's own, and the question is about them.
+        $page = is_array($body) && ! empty($body['page']);
 
         if (! preg_match(self::VISITOR_PATTERN, $visitor) || trim($question) === '') {
             return response()->json(['error' => 'invalid_question'], 422);
         }
 
         // The visitor only counts toward a daily limit, as a hash salted per shop, like analytics.
-        $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products, $previous);
+        $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products, $previous, $page);
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }

@@ -1344,7 +1344,7 @@
         pickerHost = doc.createElement('div');
         pickerHost.setAttribute('data-let-agents-variants', '');
         // Not taken for an empty div by the theme (div:empty { display: none }).
-        pickerHost.style.display = 'block';
+        shown(pickerHost, 'block');
         var root = pickerHost.attachShadow({ mode: 'open' });
         var style = doc.createElement('style');
         style.textContent = [
@@ -1938,12 +1938,22 @@
       host.dir = doc.documentElement.dir || (LOCALE === 'he' ? 'rtl' : 'ltr');
     }
 
+    /**
+     * A container of ours stays visible whatever the theme's stylesheet says about divs (Dawn hides every
+     * empty one) or about what it covers: said with !important on the element, no rule can override it.
+     */
+    function shown(node, display) {
+      node.style.setProperty('display', display, 'important');
+      node.style.setProperty('visibility', 'visible', 'important');
+      node.style.setProperty('opacity', '1', 'important');
+    }
+
     function shadowHost(id) {
       var host = doc.createElement('div');
       host.id = id;
       // Its content is in the shadow root, so to the theme it is an empty div, and themes like Dawn hide
       // every empty div (div:empty { display: none }). Said on the element itself, that rule loses.
-      host.style.display = 'block';
+      shown(host, 'block');
       theme(host);
       var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
       var style = doc.createElement('style');
@@ -3158,8 +3168,12 @@
     }
 
     /** @param {Array} [previous] the products the drawer's turn before showed, for "מה הכי זול?" */
-    function requestAnswer(raw, ids, previous) {
+    /** @param {boolean} [fromPage] the products are the page's own (asked from a product page), not what the words found */
+    function requestAnswer(raw, ids, previous, fromPage) {
       var body = { question: raw, vid: visitor(), locale: LOCALE, products: ids.slice(0, 12) };
+      if (fromPage) {
+        body.page = 1;
+      }
       if (previous && previous.length) {
         body.previous = previous.slice(0, 12);
       }
@@ -3322,7 +3336,7 @@
           }
         }
       }
-      var answered = requestAnswer(raw, ids, previous).then(function (data) {
+      var answered = requestAnswer(raw, ids, previous, !!(given && given.length)).then(function (data) {
         renderReply(box, data, raw);
         // Answered about the turn before: this turn stands for the same products, for the next question.
         kept(data && data.context === 'previous' ? { d: data, p: previous } : { d: data });
@@ -4798,7 +4812,7 @@
       input.__letAgentsCamera = true;
       var host = doc.createElement('span');
       host.className = 'let-agents-search-camera';
-      host.style.display = 'inline-block';
+      shown(host, 'inline-block');
       host.style.verticalAlign = 'middle';
       theme(host);
       var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
