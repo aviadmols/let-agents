@@ -223,6 +223,25 @@ final class ShopifyAppTest extends TestCase
             ->assertRedirect(route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]));
     }
 
+    public function test_a_store_owned_by_an_operators_email_opens_after_signing_in_never_on_someone_elses_session(): void
+    {
+        // The store's owner email is an operator's: Shopify never signs an operator in.
+        User::factory()->operator()->create(['email' => 'owner@gueta.test']);
+        $install = $this->installed();
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->toIso8601String()]];
+
+        // Another store's manager is signed in on this browser, from that store's app.
+        $other = User::factory()->create();
+        $other->attachShop(Shop::factory()->create());
+        $this->actingAs($other);
+
+        $overview = route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]);
+        $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertRedirect($overview);
+
+        $this->assertGuest();
+        $this->assertSame($overview, session('url.intended'), 'the sign-in page comes back to this shop');
+    }
+
     public function test_a_declined_plan_keeps_the_shop_paused_and_its_storefront_quiet(): void
     {
         $install = $this->installed();

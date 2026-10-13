@@ -190,6 +190,17 @@ final class ShopifyAppController
             $request->session()->regenerate();
         }
 
+        // Someone else is signed in on this browser (another store's manager, from that store's app):
+        // they may not open this shop, and the panel would answer 404. Out, to the sign-in page, which
+        // comes back here. An operator who owns the store signs in once; Shopify never signs them in.
+        $user = Auth::user();
+
+        if ($user instanceof User && ! $user->canAccessTenant($install->shop)) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
         $url = route(self::MERCHANT_OVERVIEW_ROUTE, ['tenant' => $install->shop->slug]);
         // After a refresh inside Shopify: the screen the merchant was on, in their own shop's panel.
         $path = (string) $request->route('path');
@@ -197,6 +208,10 @@ final class ShopifyAppController
         if (preg_match('#^merchant(/[A-Za-z0-9_-]+)+$#', $path) === 1) {
             $parts = parse_url($url);
             $url = $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '').'/'.$path;
+        }
+
+        if (! Auth::check()) {
+            $request->session()->put('url.intended', $url);
         }
 
         if (EmbeddedApp::framed($request)) {
