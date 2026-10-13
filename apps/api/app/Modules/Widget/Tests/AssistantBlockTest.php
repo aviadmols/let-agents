@@ -75,7 +75,7 @@ final class AssistantBlockTest extends TestCase
 
         // A refund policy of its own: now the question has an answer.
         app(TenantContext::class)->run($this->shop->id, fn () => CatalogContent::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'policy-1', 'type' => 'page', 'status' => 'publish',
-            'title' => 'מדיניות החזרות', 'slug' => 'refund_policy', 'url' => 'https://store.test/policies/refund-policy', 'hash' => 'p1', 'payload' => []]));
+            'title' => 'מדיניות', 'url' => 'https://store.test/policies/refund-policy', 'hash' => 'p1']));
         $again = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
         $this->assertContains('אפשר להחזיר או להחליף?', array_column($again['questions'], 'text'));
 

@@ -1046,6 +1046,9 @@ final class AnswerSiteQuestion
         }
 
         $products = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $shown)->get()->keyBy('external_id');
+        // A question about one product or two (from its page, a comparison) reads their descriptions
+        // whole enough to say what is special; a list of results needs a line each.
+        $aboutChars = count($shown) <= 2 ? 1500 : 300;
         $out = [];
 
         foreach ($shown as $id) {
@@ -1058,7 +1061,7 @@ final class AnswerSiteQuestion
             $out[] = [
                 'external_id' => (string) $product->external_id,
                 'title' => (string) $product->title,
-                'about' => mb_substr(trim(strip_tags((string) $product->shortDescription())), 0, 300),
+                'about' => mb_substr(self::about($product), 0, $aboutChars),
                 'category' => implode(' > ', $product->categoryPaths()[0] ?? []),
                 'brand' => $product->brand,
                 'in_stock' => (bool) $product->in_stock,
@@ -1068,6 +1071,22 @@ final class AnswerSiteQuestion
         }
 
         return $out;
+    }
+
+    /**
+     * What the product says about itself: its short description where the store writes one (WooCommerce),
+     * else its description (Shopify has no short one).
+     */
+    private static function about(CatalogProduct $product): string
+    {
+        foreach ([$product->shortDescription(), $product->description()] as $text) {
+            $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags($text)));
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return '';
     }
 
     /**

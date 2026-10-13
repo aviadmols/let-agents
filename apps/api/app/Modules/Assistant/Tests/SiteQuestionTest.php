@@ -370,6 +370,9 @@ final class SiteQuestionTest extends TestCase
 
         $this->assertNotSame('bank', $data['from'] ?? null, 'the saved refusal is not the answer about this product');
         $this->assertNotEmpty($this->calls, 'the product was read and answered from');
+        // A Shopify product has no short description: its description is what the writer reads.
+        $input = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['products']));
+        $this->assertSame('מברגה נטענת.', $input['products'][0]['about'] ?? null, 'the description reaches the writer');
         $this->assertSame(1, $this->inShop(fn () => AssistantAnswer::query()->count()), 'and nothing about this product is kept for the next one');
     }
 

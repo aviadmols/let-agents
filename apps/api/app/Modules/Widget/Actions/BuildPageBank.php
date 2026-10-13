@@ -1719,12 +1719,13 @@ final class BuildPageBank
         $promises = EnrichmentFact::query()->where('kind', FactKind::Promise)->where('status', FactStatus::Approved)->whereNull('product_id')->pluck('key')->all();
         $pages = CatalogContent::query()->whereNull('removed_at')->where(fn (Builder $q) => $q->where('external_id', 'like', 'policy-%')
             ->orWhere('title', 'like', '%החזר%')->orWhere('title', 'like', '%משלוח%')->orWhere('title', 'like', '%return%')->orWhere('title', 'like', '%shipping%'))
-            ->get(['slug', 'title']);
-        $page = fn (string $slug, string $words): bool => $pages->contains(fn (CatalogContent $c): bool => $c->slug === $slug || preg_match($words, (string) $c->title) === 1);
+            ->get(['external_id', 'title', 'url']);
+        // A Shopify policy is known by its address (/policies/refund-policy), any page by its title.
+        $page = fn (string $address, string $words): bool => $pages->contains(fn (CatalogContent $c): bool => str_contains(strtolower((string) $c->url), $address) || preg_match($words, (string) $c->title) === 1);
 
         return [
-            'returns' => in_array('returns', $promises, true) || $page('refund_policy', '/החזר|החלפ|ביטול|return|refund/iu'),
-            'delivery' => array_intersect(['delivery', 'free_shipping'], $promises) !== [] || $page('shipping_policy', '/משלוח|אספק|shipping|delivery/iu'),
+            'returns' => in_array('returns', $promises, true) || $page('refund-policy', '/החזר|החלפ|ביטול|return|refund/iu'),
+            'delivery' => array_intersect(['delivery', 'free_shipping'], $promises) !== [] || $page('shipping-policy', '/משלוח|אספק|shipping|delivery/iu'),
         ];
     }
 

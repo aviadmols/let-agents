@@ -2198,6 +2198,11 @@
     var fallback = el('div', 'as-fallback');
     var fallbackPanel = null;
 
+    /** This page's product, as the search draws its card. */
+    function thisProduct() {
+      return { external_id: String(block.product.id), title: block.product.title, image: pageImage(), url: location.href.split('?')[0], buy: true };
+    }
+
     /** about: 'similar' is about others like it, searched for; anything else is about this product. */
     function ask(question, about) {
       question = String(question || '').trim();
@@ -2207,7 +2212,8 @@
       track('click', AS_SECTION, 'panel');
       var search = window.LetAgentsSearch;
       if (search && typeof search.ask === 'function') {
-        search.ask(question, about === 'similar' ? [] : [String(block.product.id)]);
+        // About this product: the conversation opens with its card, so it is clear what is asked about.
+        search.ask(question, about === 'similar' ? [] : [String(block.product.id)], about === 'similar' ? null : thisProduct());
         return;
       }
       // No search script on this site: the widget's own question box, right here.
@@ -2274,13 +2280,13 @@
         var search = window.LetAgentsSearch;
         if (about === 'similar_items' && search && typeof search.similar === 'function') {
           track('click', AS_SECTION, 'panel');
-          search.similar({ id: 'p:' + block.product.id, external_id: String(block.product.id), title: block.product.title, image: pageImage(), url: location.href.split('?')[0], buy: true });
+          search.similar(thisProduct());
           return;
         }
         if (about === 'compare' && search && typeof search.ask === 'function') {
           track('click', AS_SECTION, 'panel');
           var asked = String(question.question || '').replace(':this', block.product.title).replace(':that', before.title);
-          search.ask(asked || text, [String(block.product.id), String(before.id)]);
+          search.ask(asked || text, [String(block.product.id), String(before.id)], thisProduct());
           return;
         }
         // Without the search script: similar items are searched for by name, the comparison asked here.

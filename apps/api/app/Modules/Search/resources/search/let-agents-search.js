@@ -3308,7 +3308,8 @@
      * A question from the drawer's own field: the answer in the results sheet, the results under it.
      * given: the products it is about (the product page's own), instead of what its words find.
      */
-    function askText(raw, given) {
+    /** @param {Object} [about] the product a question from its page is about: its card opens the turn */
+    function askText(raw, given, about) {
       if (!raw) {
         return;
       }
@@ -3317,10 +3318,13 @@
       // The conversation so far: a question that names no product is about what the turn before showed.
       var previous = drawerMode() ? previousProducts() : [];
       var sheet = openSheet(raw, raw);
+      if (about) {
+        askedProduct(sheet, about, raw, true);
+      }
       var box = el('div', 'section d-reply');
       box.appendChild(drawerMode() ? waiting(label('ask_thinking')) : el('div', 'd-thinking', label('ask_thinking')));
       sheet.appendChild(box);
-      var kept = keepTurn({ t: Date.now(), k: 'a', q: raw });
+      var kept = keepTurn(about ? { t: Date.now(), k: 'a', q: raw, i: askedFields(about) } : { t: Date.now(), k: 'a', q: raw });
       var below = el('div');
       sheet.appendChild(below);
 
@@ -3691,18 +3695,19 @@
     }
 
     /**
-     * The product a "similar to" turn is about, in place of the words: its picture beside its name,
-     * the price under it, the cart and its page, and the heart and compare box where the shop has them.
+     * The product a turn is about: its picture beside its name, the price under it, the cart and its
+     * page, and the heart and compare box where the shop has them. A "similar to" turn shows it in place
+     * of its words; a question asked from the product's page (question) shows it above the question.
      */
-    function askedProduct(body, item, raw) {
+    function askedProduct(body, item, raw, question) {
       var turn = body && body.parentNode;
       var said = turn && turn.querySelector('.said');
-      if (!said || !item || !item.external_id) {
+      if ((!said && !question) || !item || !item.external_id) {
         return;
       }
       var node = el('div', 'asked');
       node.setAttribute('data-product', item.external_id);
-      node.setAttribute('aria-label', label('similar_to', { title: item.title || '' }));
+      node.setAttribute('aria-label', question ? label('asked_about') + ' ' + (item.title || '') : label('similar_to', { title: item.title || '' }));
       rememberUrl(item.external_id, item.url);
       var href = safeUrl(item.url);
       var pic = el('a', 'asked-pic');
@@ -3718,7 +3723,7 @@
       bindClick(pic, raw, item);
       node.appendChild(pic);
       var info = el('div', 'asked-info');
-      info.appendChild(el('span', 'asked-for', label('similar_for')));
+      info.appendChild(el('span', 'asked-for', label(question ? 'asked_about' : 'similar_for')));
       var title = el('a', 'asked-title', item.title || '');
       if (href) {
         title.href = href;
@@ -3745,12 +3750,18 @@
       }
       info.appendChild(buttons);
       node.appendChild(info);
-      said.parentNode.replaceChild(node, said);
+      if (!question) {
+        said.parentNode.replaceChild(node, said);
+      } else if (said) {
+        said.parentNode.insertBefore(node, said);
+      } else {
+        body.appendChild(node);
+      }
       shortlisted(node, item);
-      liveProducts([item.external_id]).then(function () { updateCards(turn); });
+      liveProducts([item.external_id]).then(function () { updateCards(turn || body); });
     }
 
-    /** What a "similar to" turn keeps of its product, to draw the card again. */
+    /** What a turn keeps of the product it is about, to draw the card again. */
     function askedFields(item) {
       return { id: item.id, external_id: item.external_id, title: item.title, image: item.image, url: item.url, buy: item.buy };
     }
@@ -3767,6 +3778,9 @@
         if (turn.k === 's' && turn.r) {
           renderResults(body, turn.r, turn.q || '');
         } else if (turn.k === 'a') {
+          if (turn.i) {
+            askedProduct(body, turn.i, '', true);
+          }
           var box = el('div', 'section d-reply');
           body.appendChild(box);
           if (turn.d) {
@@ -5557,6 +5571,12 @@
     doc.addEventListener('pointerdown', wake, true);
     // For the block under a product's add-to-cart (the page widget): a question about the product,
     // or a search for others like it, in the drawer, as from the search box.
+    /** A product as the page's block gives it, as the search's cards hold one. */
+    function pageProduct(item) {
+      var id = String(item.external_id || item.id || '').replace(/^p:/, '');
+      return { id: 'p:' + id, external_id: id, title: item.title || '', image: item.image || null, url: item.url || null, buy: item.buy !== false };
+    }
+
     win.LetAgentsSearch = {
       // From the wishlist: the store's cart (sizes chosen here), and similar items in the smart search.
       addToCart: function (externalId, button, onAdded) {
@@ -5575,15 +5595,16 @@
         load().then(function (data) {
           if (data) {
             forceSmart = true;
-            showSimilar({ id: 'p:' + item.id, external_id: String(item.id), title: item.title || '', image: item.image || null, url: item.url || null }, item.title || '');
+            showSimilar(pageProduct(item), item.title || '');
           }
         });
       },
-      ask: function (question, productIds) {
+      // about: the product whose page it was asked from ({ external_id, title, image, url }), shown above it.
+      ask: function (question, productIds, about) {
         load().then(function (data) {
           if (data) {
             forceSmart = true;
-            askText(String(question || '').trim(), (productIds || []).map(String));
+            askText(String(question || '').trim(), (productIds || []).map(String), about ? pageProduct(about) : null);
           }
         });
       },
