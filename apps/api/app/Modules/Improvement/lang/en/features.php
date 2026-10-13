@@ -9,4 +9,8 @@ return [
         'label' => 'Synonyms join search without approval',
         'description' => 'A synonym both models agreed on joins the search at once, and can be taken back. Off: every suggestion waits for approval.',
     ],
+    'post_to_store' => [
+        'label' => 'Post to the site\'s blog',
+        'description' => 'A published post goes to the site\'s blog on Shopify or WordPress as a draft, with links, pictures, search fields and questions.',
+    ],
 ];

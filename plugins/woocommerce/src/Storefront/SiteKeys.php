@@ -66,6 +66,21 @@ final class SiteKeys {
 		return $user_id . '.' . $timestamp . '.' . hash_hmac( 'sha256', 'let-agents-customer|' . $user_id . '|' . $timestamp, $hash );
 	}
 
+	/**
+	 * Whether a request from Let Agents was signed with this store's key, within five minutes: the
+	 * same signature the plugin puts on what it sends (signed_headers), the other way round. $route
+	 * is the REST route ("/let-agents/v1/posts").
+	 */
+	public static function verify( string $timestamp, string $method, string $route, string $body, string $signature ): bool {
+		$hash = self::token_hash();
+
+		if ( null === $hash || ! ctype_digit( $timestamp ) || abs( time() - (int) $timestamp ) > 300 || '' === $signature ) {
+			return false;
+		}
+
+		return hash_equals( hash_hmac( 'sha256', $timestamp . "\n" . strtoupper( $method ) . "\n" . $route . "\n" . $body, $hash ), $signature );
+	}
+
 	private static function token_hash(): ?string {
 		$token = AccessToken::current();
 

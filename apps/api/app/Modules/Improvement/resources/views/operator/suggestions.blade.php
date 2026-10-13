@@ -16,6 +16,8 @@
             </select>
         @endif
         <button type="button" wire:click="reviewNow" wire:loading.attr="disabled" style="{{ $btn }}">{{ __('improvement::ui.review_now') }}</button>
+        @php($quota = $this->postsLeft())
+        <span style="{{ $small }}" data-quota>{{ __('improvement::ui.post.quota', ['used' => $quota['used'], 'cap' => $quota['cap']]) }}</span>
     </div>
 
     @if ($s === null)
@@ -76,6 +78,30 @@
                                     <input type="text" wire:model="titles.{{ $p->id }}" style="{{ $field }}">
                                     <label style="{{ $small }}">{{ __('improvement::ui.post.body') }}</label>
                                     <textarea wire:model="drafts.{{ $p->id }}" rows="14" style="{{ $field }};font-family:inherit"></textarea>
+                                    <details style="border:1px solid #e4e4e7;border-radius:8px;padding:8px 10px" open>
+                                        <summary style="cursor:pointer;font-weight:600;font-size:13px">{{ __('improvement::ui.post.seo') }}</summary>
+                                        <div style="display:grid;gap:6px;margin-top:8px">
+                                            <label style="{{ $small }}">{{ __('improvement::ui.post.seo_title') }}</label>
+                                            <input type="text" maxlength="70" wire:model="seo.{{ $p->id }}.seo_title" style="{{ $field }}">
+                                            <label style="{{ $small }}">{{ __('improvement::ui.post.meta_description') }}</label>
+                                            <textarea rows="2" maxlength="170" wire:model="seo.{{ $p->id }}.meta_description" style="{{ $field }}"></textarea>
+                                            @if (! empty($p->post->seo['focus_keyword']))
+                                                <div style="{{ $small }}">{{ __('improvement::ui.post.focus_keyword') }} <b>{{ $p->post->seo['focus_keyword'] }}</b></div>
+                                            @endif
+                                            @if (! empty($p->post->seo['tags']))
+                                                <div>@foreach ($p->post->seo['tags'] as $tag)<span style="{{ $chip }};margin-inline-end:4px">{{ $tag }}</span>@endforeach</div>
+                                            @endif
+                                            @if (! empty($p->post->seo['faq']))
+                                                <div style="font-size:13px" data-faq>
+                                                    <div style="font-weight:600">{{ __('improvement::ui.post.faq') }}</div>
+                                                    @foreach ($p->post->seo['faq'] as $item)
+                                                        <div style="margin-top:6px"><b>{{ $item['q'] }}</b><br>{{ $item['a'] }}</div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                            <div style="{{ $small }}">{{ __('improvement::ui.post.store_note') }}</div>
+                                        </div>
+                                    </details>
                                     @if ($p->post->products !== [])
                                         <div style="{{ $small }}">{{ __('improvement::ui.post.products', ['count' => count($p->post->products)]) }}</div>
                                     @endif
@@ -107,14 +133,18 @@
                             <div style="display:flex;flex-wrap:wrap;gap:8px">
                                 @if ($p->kind === 'content_gap' && $p->post === null)
                                     @unless ($this->drafting($p->id))
-                                        <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $dark }}">{{ __('improvement::ui.post.write') }}</button>
+                                        @if ($quota['left'] > 0)
+                                            <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $dark }}">{{ __('improvement::ui.post.write') }}</button>
+                                        @else
+                                            <span style="{{ $small }}">{{ __('improvement::ui.post.cap_reached') }}</span>
+                                        @endif
                                     @endunless
                                 @else
                                     <button type="button" wire:click="approve('{{ $p->id }}')" style="{{ $dark }}">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
                                     @if ($p->kind === 'faq' && ! $this->drafting($p->id))
                                         <button type="button" wire:click="draftAnswer('{{ $p->id }}')" style="{{ $btn }}">{{ __(isset($p->detail['ai']) ? 'improvement::ui.answer.rewrite' : 'improvement::ui.answer.write') }}</button>
                                     @endif
-                                    @if ($p->kind === 'content_gap' && ! $this->drafting($p->id))
+                                    @if ($p->kind === 'content_gap' && ! $this->drafting($p->id) && $quota['left'] > 0)
                                         <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.rewrite') }}</button>
                                     @endif
                                 @endif
@@ -137,6 +167,16 @@
                             {{ $p->title }}
                             @if ($p->status === 'applied' && $p->kind === 'content_gap' && $p->post?->status === 'published')
                                 <a href="{{ $this->guideUrl($p->post) }}" target="_blank" rel="noopener" style="{{ $chip }}">{{ __('improvement::ui.post.open') }} ↗</a>
+                                @php($remote = $p->post->remote ?? [])
+                                @if ($this->sending($p->post))
+                                    <span style="{{ $chip }}" wire:poll.5s>{{ __('improvement::ui.post.sending') }}</span>
+                                @elseif (($remote['status'] ?? null) === 'draft')
+                                    <a href="{{ $remote['admin_url'] ?? $remote['url'] }}" target="_blank" rel="noopener" style="{{ $chip }}" data-remote>{{ __('improvement::ui.post.on_store') }} ↗</a>
+                                    <button type="button" wire:click="resendPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.resend') }}</button>
+                                @elseif (($remote['status'] ?? null) === 'failed')
+                                    <span style="{{ $chip }};background:rgba(235,104,52,.15)" data-remote-failed>{{ __('connections::runs.failures.'.($remote['error'] ?? 'http_error'), ['status' => 0]) }}</span>
+                                    <button type="button" wire:click="resendPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.retry') }}</button>
+                                @endif
                             @elseif ($p->status === 'applied' && $p->kind === 'faq')
                                 <span style="{{ $chip }}">{{ __('improvement::ui.answer.live') }}</span>
                             @endif

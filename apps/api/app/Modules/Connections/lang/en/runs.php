@@ -12,5 +12,8 @@ return [
         'unreachable' => 'Cannot connect to the site. Check the address and that the site is up.',
         'unsupported_platform' => 'There is no way yet to read a store on this platform.',
         'not_installed' => 'The app is not installed in the store, or its access expired. It needs to be installed again.',
+        'plugin_outdated' => 'The plugin on the site is too old to take posts. Update the Let Agents plugin to 0.8.0 or later.',
+        'missing_scope' => 'The Shopify app may not write to the blog yet. Open the app in the Shopify admin and approve the new permission.',
+        'rejected' => 'The store did not take the post.',
     ],
 ];

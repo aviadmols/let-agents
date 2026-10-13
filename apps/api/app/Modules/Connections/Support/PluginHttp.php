@@ -41,6 +41,38 @@ final class PluginHttp
         return [$response, $url];
     }
 
+    /**
+     * One POST to the plugin's write route, with the token and a signature over the time, the
+     * method, the route and the body (SiteKeys::signature), which the plugin checks.
+     *
+     * @return array{0: Response, 1: string} the response and the URL that produced it
+     */
+    public static function post(StoreConnection $connection, string $route, string $body, int $timeoutSeconds = 30): array
+    {
+        $route = '/'.ltrim($route, '/');
+        $timestamp = (string) time();
+        $client = Http::acceptJson()
+            ->withHeaders([
+                'X-LetAgents-Token' => $connection->access_token,
+                'X-LetAgents-Timestamp' => $timestamp,
+                'X-LetAgents-Signature' => SiteKeys::signature((string) $connection->access_token, $timestamp, 'POST', $route, $body),
+                'User-Agent' => 'Let Agents/'.config('app.name'),
+            ])
+            ->withBody($body, 'application/json')
+            ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+            ->timeout($timeoutSeconds);
+
+        $url = $connection->site_url.'/wp-json'.$route;
+        $response = $client->post($url);
+
+        if ($response->status() === 404 && ! is_string($response->json('code'))) {
+            $url = $connection->site_url.'/?rest_route='.$route;
+            $response = $client->post($url);
+        }
+
+        return [$response, $url];
+    }
+
     /** @param array<string, scalar> $query */
     private static function queryString(array $query, string $prefix = '?'): string
     {

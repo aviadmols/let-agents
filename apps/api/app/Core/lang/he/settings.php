@@ -21,6 +21,7 @@ return [
         'days' => 'ימים',
         'products' => 'מוצרים',
         'items' => 'פריטים',
+        'posts' => 'פוסטים',
         'characters' => 'תווים',
         'kilobytes' => 'קילובייט',
         'seconds' => 'שניות',

@@ -2,12 +2,15 @@
 
 namespace App\Modules\Improvement\Filament\Operator\Pages;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Improvement\Actions\DecideProposal;
 use App\Modules\Improvement\Actions\RunDailyReview;
 use App\Modules\Improvement\Jobs\DraftAnswerJob;
 use App\Modules\Improvement\Jobs\DraftPostJob;
+use App\Modules\Improvement\Jobs\SendPostJob;
 use App\Modules\Improvement\Models\ImprovementPost;
+use App\Modules\Improvement\Models\ImprovementPostWrite;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -48,6 +51,9 @@ class SiteSuggestions extends Page
 
     /** @var array<string, string> the post's title as the team leaves it, by proposal */
     public array $titles = [];
+
+    /** @var array<string, array{seo_title: string, meta_description: string}> the post's search-result title and description as the team leaves them */
+    public array $seo = [];
 
     public static function getNavigationLabel(): string
     {
@@ -104,6 +110,7 @@ class SiteSuggestions extends Page
             } elseif ($p->post !== null) {
                 $this->drafts[$p->id] ??= (string) $p->post->body;
                 $this->titles[$p->id] ??= (string) $p->post->title;
+                $this->seo[$p->id] ??= ['seo_title' => (string) ($p->post->seo['seo_title'] ?? ''), 'meta_description' => (string) ($p->post->seo['meta_description'] ?? '')];
             }
         }
 
@@ -148,7 +155,13 @@ class SiteSuggestions extends Page
             return;
         }
 
-        unset($this->drafts[$id], $this->titles[$id]);
+        if ($this->postsLeft()['left'] <= 0) {
+            Notification::make()->warning()->title(__('improvement::ui.post.cap_reached'))->send();
+
+            return;
+        }
+
+        unset($this->drafts[$id], $this->titles[$id], $this->seo[$id]);
         Cache::put(DraftPostJob::WRITING.$id, now()->timestamp, now()->addSeconds(DraftPostJob::WRITING_SECONDS));
         DraftPostJob::dispatch($this->shop, $id);
         Notification::make()->success()->title(__('improvement::ui.post.writing'))->send();
@@ -197,7 +210,7 @@ class SiteSuggestions extends Page
                 return null;
             }
 
-            return app(DecideProposal::class)->approve($proposal, auth()->id(), $this->drafts[$id] ?? null, $this->titles[$id] ?? null);
+            return app(DecideProposal::class)->approve($proposal, auth()->id(), $this->drafts[$id] ?? null, $this->titles[$id] ?? null, $this->seo[$id] ?? null);
         });
 
         if ($problem !== null) {
@@ -206,8 +219,46 @@ class SiteSuggestions extends Page
             return;
         }
 
-        unset($this->drafts[$id], $this->titles[$id]);
+        unset($this->drafts[$id], $this->titles[$id], $this->seo[$id]);
         Notification::make()->success()->title(__($approve ? 'improvement::ui.approved' : 'improvement::ui.rejected'))->send();
+    }
+
+    /**
+     * The posts a model wrote for this shop this month, and how many more the operator allows.
+     *
+     * @return array{used: int, cap: int, left: int}
+     */
+    public function postsLeft(): array
+    {
+        if ($this->shop === null) {
+            return ['used' => 0, 'cap' => 0, 'left' => 0];
+        }
+
+        $cap = (int) Settings::get('improvement.posts_per_month', $this->shop);
+        $used = app(TenantContext::class)->run($this->shop, fn (): int => ImprovementPostWrite::thisMonth());
+
+        return ['used' => $used, 'cap' => $cap, 'left' => max(0, $cap - $used)];
+    }
+
+    /** Whether a published post is on its way to the store's blog right now. */
+    public function sending(ImprovementPost $post): bool
+    {
+        return Cache::has(SendPostJob::SENDING.$post->id);
+    }
+
+    /** Sends a published post to the store's blog again: after a failure, or to update its draft there. */
+    public function resendPost(string $proposalId): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        $post = app(TenantContext::class)->run($this->shop, fn (): ?ImprovementPost => ImprovementPost::query()->where('proposal_id', $proposalId)->where('status', ImprovementPost::PUBLISHED)->first());
+
+        if ($post !== null && ! $this->sending($post)) {
+            DecideProposal::send($post->shop_id, $post->id);
+            Notification::make()->success()->title(__('improvement::ui.post.sending'))->send();
+        }
     }
 
     /** Where a published post is read. */

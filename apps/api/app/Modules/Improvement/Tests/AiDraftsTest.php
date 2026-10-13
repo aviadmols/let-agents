@@ -157,10 +157,6 @@ final class AiDraftsTest extends TestCase
         $this->assertSame('failed', Run::query()->where('agent', DraftPost::AGENT)->sole()->status->value);
     }
 
-    /**
-     * @param  array<string, mixed>  $detail
-     * @param  list<array<string, mixed>>  $evidence
-     */
     public function test_a_question_gets_an_answer_written_from_the_stores_own_text_and_checked_by_the_other_family(): void
     {
         $this->app->instance(Passages::class, new class implements Passages
@@ -206,6 +202,10 @@ final class AiDraftsTest extends TestCase
         Queue::assertPushed(DraftAnswerJob::class, 1);
     }
 
+    /**
+     * @param  array<string, mixed>  $detail
+     * @param  list<array<string, mixed>>  $evidence
+     */
     private function proposal(string $kind, string $title, array $detail, array $evidence): ImprovementProposal
     {
         return $this->inShop(function () use ($kind, $title, $detail, $evidence): ImprovementProposal {

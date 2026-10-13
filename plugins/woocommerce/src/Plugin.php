@@ -4,10 +4,12 @@ namespace LetAgents;
 
 use LetAgents\Admin\ReportsPage;
 use LetAgents\Admin\SettingsPage;
+use LetAgents\Rest\PostRoutes;
 use LetAgents\Rest\Routes;
 use LetAgents\Storefront\CallToAction;
 use LetAgents\Storefront\OrderHistory;
 use LetAgents\Storefront\OrderReporter;
+use LetAgents\Storefront\PostSchema;
 use LetAgents\Storefront\Search;
 use LetAgents\Storefront\Widget;
 
@@ -24,11 +26,14 @@ final class Plugin {
 		add_action( 'init', array( self::class, 'load_translations' ) );
 		add_action( 'init', array( self::class, 'forget_cart_capture' ) );
 		add_action( 'rest_api_init', array( Routes::class, 'register' ) );
+		// The one write route: drafts of the posts the store team publishes in Let Agents.
+		add_action( 'rest_api_init', array( PostRoutes::class, 'register' ) );
 
 		Widget::register();
 		Search::register();
 		CallToAction::register();
 		OrderReporter::register();
+		PostSchema::register();
 		// Outside is_admin(): its pages are sent by Action Scheduler, which also runs from cron.
 		OrderHistory::register();
 

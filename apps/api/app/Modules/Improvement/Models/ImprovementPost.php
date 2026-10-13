@@ -26,6 +26,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $checked_by
  * @property string|null $run_id
  * @property Carbon|null $published_at
+ * @property array{seo_title?: string, meta_description?: string, focus_keyword?: string, excerpt?: string, tags?: list<string>, faq?: list<array{q: string, a: string}>}|null $seo
+ * @property array{platform?: string, id?: string, url?: string, admin_url?: string, status?: string, error?: string, at?: string}|null $remote where it went on the store's own site
  */
 class ImprovementPost extends Model
 {
@@ -42,7 +44,7 @@ class ImprovementPost extends Model
 
     protected function casts(): array
     {
-        return ['products' => 'array', 'checked' => 'boolean', 'problems' => 'array', 'published_at' => 'datetime'];
+        return ['products' => 'array', 'checked' => 'boolean', 'problems' => 'array', 'published_at' => 'datetime', 'seo' => 'array', 'remote' => 'array'];
     }
 
     public function proposal(): BelongsTo

@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.7.2
+Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,7 +23,7 @@ Let Agents gets read-only access through a token created by a store manager:
 
 Customer details are never shared: orders reach Let Agents only as totals, product IDs and quantities, at checkout and once from the last 24 months. Custom fields that look like costs, supplier details or internal notes are never shared either.
 
-The plugin only reads the store: nothing in the store is ever changed, and the token gives Let Agents no write access.
+The plugin reads the store, and writes only one thing: a draft post on the site's blog, when the store team publishes a guide in Let Agents. The owner publishes it from WordPress; once published it is never changed again. Nothing else in the store is ever changed, and the write needs both the token and a signature only Let Agents can make.
 
 = The widget on the store =
 
@@ -53,6 +53,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.8.0 =
+* Guides to the site's blog: when the store team publishes a guide in Let Agents, it arrives as a draft post, with links and pictures of the store's products, its excerpt and tags, a featured image, its SEO title, description and focus keyword in Yoast or Rank Math, and its questions as FAQ structured data. The owner publishes it from WordPress. Sent again, the draft is updated; a published post is left as it is.
 
 = 0.7.2 =
 * The email before checkout and the abandoned carts are removed: the plugin no longer asks for an email, saves no pending payment orders and has no write route. It only reads the store again. Orders it saved before stay in the store as they are.

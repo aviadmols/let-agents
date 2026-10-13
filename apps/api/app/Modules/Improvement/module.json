@@ -9,7 +9,9 @@
         "Search",
         "Assistant",
         "Admin",
-        "Retrieval"
+        "Retrieval",
+        "Connections",
+        "Enrichment"
     ],
     "provider": "ImprovementServiceProvider",
     "features": [
@@ -20,6 +22,10 @@
         {
             "name": "auto_synonyms",
             "default": false
+        },
+        {
+            "name": "post_to_store",
+            "default": true
         }
     ],
     "settings": [
@@ -229,6 +235,15 @@
             "max": 8000,
             "scope": "global",
             "unit": "tokens"
+        },
+        {
+            "name": "posts_per_month",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 200,
+            "scope": "shop",
+            "unit": "posts"
         }
     ],
     "agents": [

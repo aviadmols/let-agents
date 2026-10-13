@@ -21,6 +21,7 @@ return [
         'days' => 'days',
         'products' => 'products',
         'items' => 'items',
+        'posts' => 'posts',
         'characters' => 'characters',
         'kilobytes' => 'KB',
         'seconds' => 'seconds',

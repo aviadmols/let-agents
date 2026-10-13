@@ -37,6 +37,17 @@
   <script src="{{ api | append: '/search/let-agents-search.js' | escape }}" defer></script>
 {%- endif -%}
 
+{%- comment -%} A guide Let Agents wrote carries its questions in let_agents.faq: search engines read them as FAQPage. {%- endcomment -%}
+{%- if template.name == 'article' and article.metafields.let_agents.faq.value != blank -%}
+  <script type="application/ld+json">
+    {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+    {%- for item in article.metafields.let_agents.faq.value -%}
+      {"@type": "Question", "name": {{ item.q | json }}, "acceptedAnswer": {"@type": "Answer", "text": {{ item.a | json }}}}{% unless forloop.last %},{% endunless %}
+    {%- endfor -%}
+    ]}
+  </script>
+{%- endif -%}
+
 {% schema %}
 {
   "name": "t:blocks.app_embed.name",

@@ -97,4 +97,8 @@ return [
         'label' => 'Longest reply, answer checker',
         'description' => 'In tokens.',
     ],
+    'posts_per_month' => [
+        'label' => 'Posts per month',
+        'description' => 'How many posts a model may write for the shop in a month, rewrites included. Set by the operator.',
+    ],
 ];

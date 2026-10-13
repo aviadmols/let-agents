@@ -5,13 +5,14 @@ namespace App\Modules\Improvement\Http\Controllers;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Improvement\Models\ImprovementPost;
+use App\Modules\Improvement\Support\PostDocument;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\Response;
-use Illuminate\Support\Str;
 
 /**
  * GET /g/{shop}/{post} — a published post of the store's own, as a shopper reads it: the guide,
- * and the store's products it is about, each linking to the store.
+ * and the store's products it is about, each linking to the store, its questions, and the data
+ * search engines read (FAQPage, BlogPosting).
  */
 final class GuideController
 {
@@ -28,12 +29,17 @@ final class GuideController
             ->sortBy(fn (CatalogProduct $p): int => (int) array_search((string) $p->external_id, $guide->products, true))
             ->values());
 
+        $document = new PostDocument($guide, $products, (string) $store->name);
+        $url = route('improvement.guide', ['shop' => $store->slug, 'post' => $guide->id]);
+
         return response(view('improvement::guide', [
             'shop' => $store,
             'post' => $guide,
-            'html' => Str::markdown($guide->body, ['html_input' => 'strip', 'allow_unsafe_links' => false]),
+            'document' => $document,
+            'html' => $document->body(),
             'products' => $products,
-            'rtl' => preg_match('/\p{Hebrew}/u', $guide->title.$guide->body) === 1,
+            'rtl' => $document->rtl(),
+            'schemas' => array_values(array_filter([$document->articleSchema($url), $document->faqSchema()])),
         ]))->header('Cache-Control', 'public, max-age=300');
     }
 }

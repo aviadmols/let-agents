@@ -15,4 +15,5 @@ return [
     'answer_spend_cap' => 'כתיבת תשובה: הגענו לתקרת ההוצאה.',
     'answer_failed' => 'כתיבת תשובה נכשלה (:reason).',
     'answer_drafted' => 'כתיבת תשובה: ":question" מוכנה לעריכה, :problems הערות מהבודק.',
+    'post_cap' => 'כתיבת פוסט: החנות הגיעה ל־:cap פוסטים החודש.',
 ];

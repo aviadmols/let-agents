@@ -20,7 +20,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The read-only API Let Agents uses. Every route needs the access token. There is no write route
- * here, and no route for customers or orders.
+ * here, and no route for customers or orders. The plugin's one write route, for drafts of posts,
+ * lives apart in PostRoutes and needs a signature as well.
  *
  *   GET /let-agents/v1/status
  *   GET /let-agents/v1/feed/manifest

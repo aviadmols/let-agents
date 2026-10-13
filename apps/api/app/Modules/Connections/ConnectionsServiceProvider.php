@@ -4,9 +4,12 @@ namespace App\Modules\Connections;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Connections\Console\BundlePluginCommand;
+use App\Modules\Connections\Contracts\StoreBlog;
 use App\Modules\Connections\Contracts\StoreFeed;
 use App\Modules\Connections\Support\FollowShopDomain;
+use App\Modules\Connections\Support\PlatformBlogs;
 use App\Modules\Connections\Support\PlatformFeeds;
+use App\Modules\Connections\Support\PluginBlog;
 use App\Modules\Connections\Support\PluginStoreFeed;
 use App\Modules\Tenancy\Models\Shop;
 
@@ -17,6 +20,9 @@ final class ConnectionsServiceProvider extends ModuleServiceProvider
         // Each platform's reader is tagged; the store feed picks the one for a connection's platform.
         $this->app->tag([PluginStoreFeed::class], 'connections.store_feeds');
         $this->app->bind(StoreFeed::class, fn ($app) => new PlatformFeeds($app->tagged('connections.store_feeds')));
+        // And its blog: where a post goes as a draft.
+        $this->app->tag([PluginBlog::class], 'connections.store_blogs');
+        $this->app->bind(StoreBlog::class, fn ($app) => new PlatformBlogs($app->tagged('connections.store_blogs')));
     }
 
     protected function bootModule(): void

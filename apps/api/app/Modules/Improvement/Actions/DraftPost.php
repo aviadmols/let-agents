@@ -11,7 +11,11 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Improvement\Models\ImprovementPost;
+use App\Modules\Improvement\Models\ImprovementPostWrite;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -28,6 +32,11 @@ use App\Modules\Tenancy\Models\Shop;
  * their titles and categories) and hands them with ids; the writer may name only those, and
  * code keeps only ids from that list. The checker's findings are shown to the team, not acted
  * on: a draft with problems is still the team's to fix.
+ *
+ * A post is written for the store's own blog: with its SEO title and description, focus keyword,
+ * excerpt, tags and questions with answers (prompt v2). Links to the products and their pictures
+ * are added by code (PostDocument), never by the model. Each store writes at most the number of
+ * posts a month the operator set (improvement.posts_per_month), rewrites included.
  */
 final class DraftPost
 {
@@ -35,7 +44,7 @@ final class DraftPost
 
     public const ACTION = 'improvement.draft_post';
 
-    private const PROMPT_VERSION = 'v1';
+    private const PROMPT_VERSION = 'v2';
 
     private const PROMPTS = __DIR__.'/../Prompts/';
 
@@ -43,7 +52,14 @@ final class DraftPost
 
     private const MAX_TITLE = 120;
 
-    private const MAX_BODY = 12000;
+    private const MAX_BODY = 20000;
+
+    private const MAX_FAQ = 6;
+
+    private const MAX_TAGS = 8;
+
+    /** Facts of each candidate product the writer gets, so it describes them as the store does. */
+    private const MAX_FACTS = 8;
 
     private const MAX_PROBLEMS = 6;
 
@@ -80,6 +96,14 @@ final class DraftPost
                     return;
                 }
 
+                $cap = (int) Settings::get('improvement.posts_per_month', $proposal->shop_id);
+
+                if ($this->tenant->run($proposal->shop_id, fn (): int => ImprovementPostWrite::thisMonth()) >= $cap) {
+                    $run->fail('improvement::runs.post_cap', ['cap' => (string) $cap]);
+
+                    return;
+                }
+
                 $input = $this->tenant->run($proposal->shop_id, fn (): array => $this->input($proposal));
 
                 try {
@@ -107,6 +131,7 @@ final class DraftPost
                     'title' => $draft['title'],
                     'body' => $draft['body'],
                     'products' => $draft['products'],
+                    'seo' => $draft['seo'],
                     'status' => ImprovementPost::DRAFT,
                     'checked' => $verdict['ok'],
                     'problems' => $verdict['problems'],
@@ -115,6 +140,7 @@ final class DraftPost
                     'run_id' => $run->runId,
                     'published_at' => null,
                 ]));
+                $this->tenant->run($proposal->shop_id, fn () => ImprovementPostWrite::query()->create(['shop_id' => $proposal->shop_id, 'proposal_id' => $proposal->id, 'run_id' => $run->runId, 'created_at' => now()]));
 
                 $run->output(['title' => $draft['title'], 'products' => count($draft['products']), 'problems' => $verdict['problems']])
                     ->summary('improvement::runs.post_drafted', ['title' => $draft['title'], 'problems' => (string) count($verdict['problems'])]);
@@ -171,10 +197,14 @@ final class DraftPost
         arsort($scores);
         $products = CatalogProduct::query()->with('categories')->whereIn('id', array_slice(array_keys($scores), 0, self::CANDIDATES))->get();
 
+        $facts = EnrichmentFact::query()->with('vocabulary')->whereIn('product_id', $products->pluck('id'))->where('status', FactStatus::Approved)
+            ->whereIn('kind', [FactKind::Type, FactKind::Brand, FactKind::Choice, FactKind::Spec, FactKind::Flag])->orderBy('id')->get()->groupBy('product_id');
+
         return array_values(array_map(fn (CatalogProduct $p): array => [
             'id' => (string) $p->external_id,
             'title' => (string) $p->title,
             'category' => (string) ($p->categories->first()?->name ?? ''),
+            'facts' => $facts->get($p->id, collect())->take(self::MAX_FACTS)->map(fn (EnrichmentFact $f): string => trim($f->keyLabel()).': '.trim($f->valueLabel()))->values()->all(),
             'about' => mb_substr(trim((string) preg_replace('/\s+/u', ' ', strip_tags($p->description()))), 0, 200),
         ], array_values(array_filter(
             array_map(fn (string $id) => $products->firstWhere('id', $id), array_slice(array_keys($scores), 0, self::CANDIDATES)),
@@ -184,7 +214,7 @@ final class DraftPost
     /**
      * @param  array{provider: AiProviderName, name: string, model: string}  $writer
      * @param  array<string, mixed>  $input
-     * @return array{title: string, body: string, products: list<string>}|null
+     * @return array{title: string, body: string, products: list<string>, seo: array<string, mixed>}|null
      */
     private function write(RunContext $run, array $writer, array $input): ?array
     {
@@ -200,18 +230,40 @@ final class DraftPost
             }
         }
 
-        return $title === '' || $body === '' ? null : ['title' => $title, 'body' => $body, 'products' => $products];
+        if ($title === '' || $body === '') {
+            return null;
+        }
+
+        $line = fn (string $key, int $max): string => mb_substr(trim((string) preg_replace('/\s+/u', ' ', (string) ($data[$key] ?? ''))), 0, $max);
+        $faq = [];
+        foreach ((array) ($data['faq'] ?? []) as $item) {
+            $q = is_array($item) ? mb_substr(trim((string) ($item['q'] ?? '')), 0, 200) : '';
+            $a = is_array($item) ? mb_substr(trim((string) ($item['a'] ?? '')), 0, 700) : '';
+            if ($q !== '' && $a !== '') {
+                $faq[] = ['q' => $q, 'a' => $a];
+            }
+        }
+        $tags = array_values(array_unique(array_filter(array_map(fn ($t): string => mb_substr(trim((string) $t), 0, 40), (array) ($data['tags'] ?? [])))));
+
+        return ['title' => $title, 'body' => $body, 'products' => $products, 'seo' => [
+            'seo_title' => $line('seo_title', 70),
+            'meta_description' => $line('meta_description', 170),
+            'focus_keyword' => $line('focus_keyword', 80),
+            'excerpt' => $line('excerpt', 240),
+            'tags' => array_slice($tags, 0, self::MAX_TAGS),
+            'faq' => array_slice($faq, 0, self::MAX_FAQ),
+        ]];
     }
 
     /**
      * @param  array{provider: AiProviderName, name: string, model: string}  $checker
      * @param  array<string, mixed>  $input
-     * @param  array{title: string, body: string, products: list<string>}  $draft
+     * @param  array{title: string, body: string, products: list<string>, seo: array<string, mixed>}  $draft
      * @return array{ok: bool, problems: list<string>}
      */
     private function check(RunContext $run, array $checker, array $input, array $draft): array
     {
-        $data = $this->call($run, $checker, 'auditor', $this->prompt('post_check'), ['topic' => $input['topic'], 'draft' => $draft, 'products' => $input['products']]);
+        $data = $this->call($run, $checker, 'auditor', $this->prompt('post_check'), ['topic' => $input['topic'], 'draft' => ['title' => $draft['title'], 'seo_title' => $draft['seo']['seo_title'], 'meta_description' => $draft['seo']['meta_description'], 'body' => $draft['body'], 'faq' => $draft['seo']['faq'], 'products' => $draft['products']], 'products' => $input['products']]);
         $problems = [];
 
         foreach ((array) ($data['problems'] ?? []) as $problem) {

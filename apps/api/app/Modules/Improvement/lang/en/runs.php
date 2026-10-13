@@ -15,4 +15,5 @@ return [
     'answer_spend_cap' => 'Answer writing: the spending cap was reached.',
     'answer_failed' => 'Answer writing failed (:reason).',
     'answer_drafted' => 'Answer writing: ":question" is ready to edit, :problems notes from the checker.',
+    'post_cap' => 'Post writing: the shop reached :cap posts this month.',
 ];
