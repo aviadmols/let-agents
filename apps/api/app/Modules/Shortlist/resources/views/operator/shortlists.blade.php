@@ -76,6 +76,18 @@
                         <div class="lsl-rt"><b>{{ $t('wish_link') }}</b><small>{{ $t('wish_link_help') }}</small><code class="lsl-field code" style="display:inline-block;width:auto">#wishlist</code></div>
                     </div>
                     <div class="lsl-row">
+                        <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_floating.label') }}</b><small>{{ __('shortlist::settings.wishlist_floating.description') }}</small></div>
+                        <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_floating"><span></span></label>
+                    </div>
+                    <div class="lsl-row">
+                        <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_header.label') }}</b><small>{{ __('shortlist::settings.wishlist_header.description') }}</small></div>
+                        <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_header"><span></span></label>
+                    </div>
+                    <div class="lsl-row">
+                        <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_whatsapp.label') }}</b><small>{{ __('shortlist::settings.wishlist_whatsapp.description') }}</small></div>
+                        <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_whatsapp"><span></span></label>
+                    </div>
+                    <div class="lsl-row">
                         <div class="lsl-rt">
                             <b>{{ __('shortlist::settings.wishlist_place.label') }}</b>
                             <small>{{ __('shortlist::settings.wishlist_place.description') }}</small>

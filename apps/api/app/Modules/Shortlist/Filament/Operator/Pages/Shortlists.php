@@ -101,6 +101,9 @@ class Shortlists extends Page
             'wishlist_max' => (int) Settings::get('shortlist.wishlist_max', $shop),
             'card_selector' => (string) Settings::get('shortlist.card_selector', $shop),
             'product_selector' => (string) Settings::get('shortlist.product_selector', $shop),
+            'wishlist_floating' => (bool) Settings::get('shortlist.wishlist_floating', $shop),
+            'wishlist_header' => (bool) Settings::get('shortlist.wishlist_header', $shop),
+            'wishlist_whatsapp' => (bool) Settings::get('shortlist.wishlist_whatsapp', $shop),
             'wishlist_place' => (string) Settings::get('shortlist.wishlist_place', $shop),
         ];
     }
@@ -120,6 +123,9 @@ class Shortlists extends Page
             Features::override('shortlist.wishlist', (bool) ($d['wishlist'] ?? false), $shop);
             Settings::set('shortlist.compare_max', (int) ($d['compare_max'] ?? 5), $shop);
             Settings::set('shortlist.wishlist_max', (int) ($d['wishlist_max'] ?? 100), $shop);
+            Settings::set('shortlist.wishlist_floating', (bool) ($d['wishlist_floating'] ?? true), $shop);
+            Settings::set('shortlist.wishlist_header', (bool) ($d['wishlist_header'] ?? false), $shop);
+            Settings::set('shortlist.wishlist_whatsapp', (bool) ($d['wishlist_whatsapp'] ?? true), $shop);
 
             // Empty: no buttons there (no category cards; not on the product page; no heart in the header).
             foreach (['card_selector', 'product_selector', 'wishlist_place'] as $key) {

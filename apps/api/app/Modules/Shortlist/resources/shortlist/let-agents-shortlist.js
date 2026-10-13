@@ -209,20 +209,73 @@
     if (!cfg.wishlist) {
       return;
     }
-    if (cfg.wishlistPlace && !doc.querySelector('[data-la-heart-placed]')) {
+    if ((cfg.wishlistPlace || cfg.wishlistHeader) && !doc.querySelector('[data-la-heart-placed]')) {
       var after = null;
       try {
-        after = doc.querySelector(cfg.wishlistPlace);
+        after = cfg.wishlistPlace ? doc.querySelector(cfg.wishlistPlace) : headerSearch();
       } catch (e) { /* a bad selector in the settings places nothing */ }
       if (after && after.parentNode) {
         var link = doc.createElement('a');
         link.href = WISH_HASH;
         link.setAttribute('data-let-agents-wishlist', '');
         link.setAttribute('data-la-heart-placed', '1');
-        after.parentNode.insertBefore(link, after.nextSibling);
+        var place = inRow(after);
+        if (place.tagName === 'LI' && place.parentNode) {
+          // A list of header icons (Rocks and Gold's): an item of its own, as the theme draws the others.
+          var item = doc.createElement('li');
+          item.className = String(place.className || '').split(/\s+/).filter(function (c) { return c && !/search/i.test(c); }).join(' ');
+          item.appendChild(link);
+          place.parentNode.insertBefore(item, place.nextSibling);
+        } else {
+          place.parentNode.insertBefore(link, place.nextSibling);
+        }
       }
     }
     paintHearts();
+  }
+
+  /**
+   * The element beside which a new icon sits in the header's row: up from the search while its
+   * container lays out in a block (Gueta's bar is a block inside the row; beside it, the heart would
+   * drop under the bar), to the one the row lays out (flex or grid). A list's item is its own place.
+   */
+  function inRow(node) {
+    var row = function (box) {
+      var display = win.getComputedStyle ? win.getComputedStyle(box).display : '';
+      return /flex|grid/.test(display);
+    };
+    while (node.parentNode && node.parentNode.nodeType === 1 && node.parentNode !== doc.body && node.tagName !== 'LI'
+      && !(node.parentNode.matches && node.parentNode.matches('header, [role="banner"]')) && !row(node.parentNode)) {
+      node = node.parentNode;
+    }
+    return node;
+  }
+
+  /**
+   * The search in the site's header, its icon or its box, as themes draw it: the heart goes right
+   * after it. The whole widget (a details, a form), not the input inside it. Null when none shows.
+   */
+  function headerSearch() {
+    var headers = doc.querySelectorAll('header, [role="banner"], #header, .header, .site-header, #shopify-section-header, .elementor-location-header');
+    var looks = ['.header__icon--search', 'details-modal.header__search', '[aria-label*="search" i]', '[aria-label*="חיפוש"]', 'a[href*="/search"]', 'form[role="search"]', 'form[action*="search"]', 'form.search-form', 'input[type="search"]', 'input[name="s"]', 'input[name="q"]'];
+    var shown = function (node) { return !!(node && node.getClientRects && node.getClientRects().length); };
+    for (var h = 0; h < headers.length; h++) {
+      for (var l = 0; l < looks.length; l++) {
+        var found = headers[h].querySelectorAll(looks[l]);
+        for (var f = 0; f < found.length; f++) {
+          var node = found[f];
+          if (node.closest && node.closest('#la-shortlist, [data-let-agents-wishlist]')) {
+            continue;
+          }
+          var whole = node.closest && (node.closest('details') || node.closest('form'));
+          node = whole && headers[h].contains(whole) ? whole : node;
+          if (shown(node)) {
+            return node;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   function paintHearts() {
@@ -238,7 +291,7 @@
         node.setAttribute('role', node.tagName === 'A' ? 'link' : 'button');
         node.setAttribute('tabindex', '0');
         node.setAttribute('aria-label', label('wish_title'));
-        node.setAttribute('style', 'position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;color:inherit;cursor:pointer;text-decoration:none;vertical-align:middle;');
+        node.setAttribute('style', 'position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:none;color:inherit;cursor:pointer;text-decoration:none;vertical-align:middle;');
         node.innerHTML = HEART + '<i style="position:absolute;top:0;inset-inline-end:-2px;min-width:16px;height:16px;border-radius:999px;background:#e11d48;color:#fff;font:600 10px/16px system-ui,sans-serif;font-style:normal;text-align:center;padding:0 4px;box-sizing:border-box"></i>';
         node.querySelector('path').setAttribute('fill', 'none');
         node.addEventListener('keydown', function (event) {
@@ -723,7 +776,8 @@
       return;
     }
     own('fab');
-    if (!state.wish.length || drawerOpen) {
+    // The shop may have no floating heart: the list opens from its header or a link.
+    if (!state.wish.length || drawerOpen || cfg.wishlistFloating === false) {
       return;
     }
     var fab = el('button', 'fab');
@@ -838,7 +892,10 @@
           }
         });
       });
-      row.appendChild(wa);
+      // The shop may share by link only.
+      if (cfg.wishlistWhatsapp !== false) {
+        row.appendChild(wa);
+      }
       row.appendChild(copy);
       foot.appendChild(row);
     }
@@ -899,7 +956,7 @@
     scan();
     repaint();
     var timer = null;
-    if ((cfg.cardSelector || cfg.wishlistPlace) && win.MutationObserver) {
+    if ((cfg.cardSelector || cfg.wishlistPlace || cfg.wishlistHeader) && win.MutationObserver) {
       // Infinite scroll and filters add cards after the page loaded.
       new MutationObserver(function () {
         clearTimeout(timer);

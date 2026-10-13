@@ -13,6 +13,18 @@ return [
         'label' => 'Product card on category pages (CSS selector)',
         'description' => 'The selector of a product card in the site\'s theme, such as li.product or .card-wrapper. Empty: the buttons show only in the search results and on the product page.',
     ],
+    'wishlist_floating' => [
+        'label' => 'The floating heart in the corner',
+        'description' => 'A heart in the corner of the screen that opens the list, once a shopper saved a product. Off: the list opens only from the header heart or a link.',
+    ],
+    'wishlist_header' => [
+        'label' => 'A heart beside the search in the header',
+        'description' => 'The heart is placed beside the header\'s search field or icon on its own, with the number saved. If it is not in the right place, write a selector in the field below.',
+    ],
+    'wishlist_whatsapp' => [
+        'label' => 'Sharing the list on WhatsApp',
+        'description' => 'A "Send on WhatsApp" button beside "Copy link". Off: the link can only be copied.',
+    ],
     'wishlist_place' => [
         'label' => 'Wishlist heart in the site header (CSS selector)',
         'description' => 'The heart shows right after this element, such as the search or cart icon: .header__icon--search. Empty: no heart is added to the header.',

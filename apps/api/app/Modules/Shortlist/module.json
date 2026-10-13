@@ -58,6 +58,24 @@
             "scope": "shop"
         },
         {
+            "name": "wishlist_floating",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "wishlist_header",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
+            "name": "wishlist_whatsapp",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "wishlist_place",
             "type": "string",
             "default": "",
