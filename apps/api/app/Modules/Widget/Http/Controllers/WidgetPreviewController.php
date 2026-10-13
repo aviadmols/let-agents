@@ -53,6 +53,9 @@ final class WidgetPreviewController
             'bank' => $data,
             'script' => route('api.widget.script'),
             'api' => url('/api/v1'),
-        ])->header('Cache-Control', 'no-store')->header('X-Frame-Options', 'SAMEORIGIN');
+        ])->header('Cache-Control', 'no-store')
+            // Framed by our own display screen only, which itself may sit inside the Shopify admin: every
+            // ancestor is checked, so SAMEORIGIN alone refused it there.
+            ->header('Content-Security-Policy', "frame-ancestors 'self' https://admin.shopify.com https://*.myshopify.com;");
     }
 }

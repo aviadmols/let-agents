@@ -49,7 +49,8 @@ final class WidgetPreviewTest extends TestCase
         $page->assertSee('"layout":"tags"', false);
         $page->assertSee('let-agents.js', false);
         $page->assertSee('navigator.sendBeacon = function () { return true; }', false);
-        $this->assertSame('SAMEORIGIN', $page->headers->get('X-Frame-Options'));
+        $this->assertSame("frame-ancestors 'self' https://admin.shopify.com https://*.myshopify.com;", $page->headers->get('Content-Security-Policy'), 'our own screen, also inside the Shopify admin');
+        $this->assertNull($page->headers->get('X-Frame-Options'));
 
         $this->actingAs($merchant)->followingRedirects()->get("/merchant/{$this->shop->slug}/display")
             ->assertOk()

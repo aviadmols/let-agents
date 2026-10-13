@@ -33,6 +33,13 @@ final class DisplaySettings extends OperatorConfiguration
 
     protected static ?string $slug = 'display';
 
+    /**
+     * Which area is open, kept in the component only. The operator's screen writes it into the
+     * address; inside the Shopify admin the address belongs to App Bridge, which syncs it with the
+     * admin's, and the screen stopped answering. A merchant reopens on the first area.
+     */
+    public string $area = '';
+
     public static function getNavigationLabel(): string
     {
         return __('admin::configuration.display_title');
