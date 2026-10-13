@@ -50,14 +50,36 @@ window.__letAgentsFetch = window.fetch ? window.fetch.bind(window) : null;
         return /\/livewire[^\/]*\/update/.test(url) ? own(input, init) : bridged.apply(this, arguments);
     };
 })();
-// An expired page (a deploy, a long pause) asks to reload with confirm(), which the frame does not
-// show: it reloads by itself.
+// An expired page (a deploy, a long pause, a session that is gone) asks to reload with confirm(),
+// which the frame does not show. It goes back in through the app's own entry with a fresh session
+// token from the Shopify admin, which signs the shop's manager in again and returns to this same
+// screen; a plain reload of the panel's address would land on its sign-in page.
+function letAgentsEnterAgain() {
+    var go = function (token) {
+        if (!token) { location.reload(); return; }
+        var params = new URLSearchParams(location.search);
+        var url = new URL(@js(rtrim((string) config('app.url'), '/').'/shopify/app') + location.pathname, location.href);
+        ['host', 'shop'].forEach(function (name) {
+            var value = params.get(name);
+            try { value = value || sessionStorage.getItem('shopify_' + name); } catch (e) {}
+            if (value) { url.searchParams.set(name, value); }
+        });
+        url.searchParams.set('embedded', '1');
+        url.searchParams.set('id_token', token);
+        location.href = url.toString();
+    };
+    try {
+        window.shopify && window.shopify.idToken ? window.shopify.idToken().then(go, function () { go(null); }) : go(null);
+    } catch (e) {
+        go(null);
+    }
+}
 document.addEventListener('livewire:init', function () {
     Livewire.hook('request', function (request) {
         request.fail(function (failed) {
-            if (failed.status === 419) {
+            if (failed.status === 419 || failed.status === 401) {
                 failed.preventDefault();
-                location.reload();
+                letAgentsEnterAgain();
             }
         });
     });
