@@ -11,6 +11,7 @@ use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shortlist\Actions\BuildComparison;
 use App\Modules\Shortlist\Actions\KeepWishlist;
 use App\Modules\Shortlist\Actions\ProductCards;
+use App\Modules\Shortlist\Models\ShortlistCount;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,15 @@ final class ShortlistController
         }
 
         $ids = ProductCards::ids($request->query('ids', ''), (int) Settings::get('shortlist.compare_max', $shopId));
-        $table = $tenant->run($shopId, fn (): array => $comparison->handle($ids, self::locale($request)));
+        $table = $tenant->run($shopId, function () use ($comparison, $ids, $request, $shopId): array {
+            $table = $comparison->handle($ids, self::locale($request));
+            // Counted for the shop's screen: the comparison, and each product in it.
+            if (count($table['products']) >= 2) {
+                ShortlistCount::add($shopId, ShortlistCount::COMPARE, array_column($table['products'], 'id'));
+            }
+
+            return $table;
+        });
 
         return response()->json($table, 200, ['Cache-Control' => 'public, max-age=300'], self::JSON);
     }
