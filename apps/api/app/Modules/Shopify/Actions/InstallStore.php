@@ -131,6 +131,37 @@ final class InstallStore
             'password' => Str::random(40),
         ]);
         $user->attachShop($shop, ShopRole::Owner);
+        $this->manager($install);
+    }
+
+    /**
+     * Who Shopify signs in when the app opens: the store's owner. When the owner's email is an
+     * operator's, the store gets an account of its own (owner@{store}.myshopify.com, this shop only):
+     * Shopify vouches for whoever manages the store, never for an operator's whole panel.
+     */
+    public function manager(ShopifyInstall $install): ?User
+    {
+        $shop = $install->shop;
+
+        if ($shop === null) {
+            return null;
+        }
+
+        $owner = User::query()->where('is_operator', false)
+            ->whereHas('shops', fn ($q) => $q->where('shops.id', $shop->id)->where('shop_user.role', ShopRole::Owner->value))
+            ->first();
+
+        if ($owner !== null || $install->owner_email === null || ! User::query()->where('email', $install->owner_email)->where('is_operator', true)->exists()) {
+            return $owner;
+        }
+
+        $own = User::query()->firstOrCreate(['email' => 'owner@'.$install->shop_domain], [
+            'name' => $shop->name,
+            'password' => Str::random(40),
+        ]);
+        $own->attachShop($shop, ShopRole::Owner);
+
+        return $own;
     }
 
     /** The site key and the API address, on the store, where the app embed reads them. */

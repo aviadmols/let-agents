@@ -230,7 +230,7 @@ final class ShopifyAppTest extends TestCase
             ->assertRedirect(route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]));
     }
 
-    public function test_a_store_owned_by_an_operators_email_opens_after_signing_in_never_on_someone_elses_session(): void
+    public function test_a_store_owned_by_an_operators_email_opens_with_its_own_account_never_the_operator_or_someone_else(): void
     {
         // The store's owner email is an operator's: Shopify never signs an operator in.
         User::factory()->operator()->create(['email' => 'owner@gueta.test']);
@@ -245,8 +245,11 @@ final class ShopifyAppTest extends TestCase
         $overview = route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]);
         $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertRedirect($overview);
 
-        $this->assertGuest();
-        $this->assertSame($overview, session('url.intended'), 'the sign-in page comes back to this shop');
+        // Shopify vouches for the store's manager: the store's own account, never the operator.
+        $own = User::query()->where('email', 'owner@'.self::SHOP)->sole();
+        $this->assertAuthenticatedAs($own);
+        $this->assertFalse($own->is_operator);
+        $this->assertSame([$install->shop_id], $own->shops()->pluck('shops.id')->all(), 'this shop only');
     }
 
     public function test_a_token_shopify_withdrew_is_renewed_when_the_app_opens_never_a_500(): void

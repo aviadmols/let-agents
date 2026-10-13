@@ -204,7 +204,7 @@ final class ShopifyAppController
      */
     private function intoPanel(Request $request, ShopifyInstall $install): RedirectResponse
     {
-        $owner = User::query()->whereHas('shops', fn ($q) => $q->where('shops.id', $install->shop_id)->where('shop_user.role', 'owner'))->first();
+        $owner = app(InstallStore::class)->manager($install);
 
         if ($owner !== null && ! $owner->is_operator) {
             // The merchant's language in Shopify is theirs here too, until they choose another.
