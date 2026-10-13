@@ -40,8 +40,31 @@
                             @if ($p->kind === 'faq')
                                 {{-- The drafted answer, the team's to finish: what is published is what is in the box. --}}
                                 <label style="{{ $small }}">{{ __('improvement::ui.answer.label') }}</label>
-                                <textarea wire:model="drafts.{{ $p->id }}" rows="5" style="{{ $field }}"></textarea>
-                                <div style="{{ $small }}">{{ __('improvement::ui.answer.about') }}</div>
+                                @if ($this->drafting($p->id))
+                                    <div style="{{ $small }}" wire:poll.4s>{{ __('improvement::ui.answer.writing_now') }}</div>
+                                @else
+                                    <textarea wire:model="drafts.{{ $p->id }}" rows="5" style="{{ $field }}"></textarea>
+                                    @php($ai = $p->detail['ai'] ?? null)
+                                    @if ($ai)
+                                        @if (($ai['problems'] ?? []) !== [])
+                                            <div style="padding:8px 10px;border-radius:8px;background:rgba(235,104,52,.1);font-size:13px" data-problems>
+                                                <div style="font-weight:600">{{ __('improvement::ui.answer.problems') }}</div>
+                                                <ul style="margin:4px 0 0;padding-inline-start:18px">
+                                                    @foreach ($ai['problems'] as $problem)
+                                                        <li>{{ $problem }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @else
+                                            <div style="{{ $small }}">{{ __('improvement::ui.answer.checked_ok') }}</div>
+                                        @endif
+                                        @if (($ai['sources'] ?? []) !== [])
+                                            <div style="{{ $small }}">{{ __('improvement::ui.answer.sources') }} {{ implode(' · ', $ai['sources']) }}</div>
+                                        @endif
+                                    @else
+                                        <div style="{{ $small }}">{{ __('improvement::ui.answer.about') }}</div>
+                                    @endif
+                                @endif
                             @elseif ($p->kind === 'content_gap')
                                 <div>{{ $p->detail['why'] ?? '' }}</div>
                                 @if ($p->post === null)
@@ -88,6 +111,9 @@
                                     @endunless
                                 @else
                                     <button type="button" wire:click="approve('{{ $p->id }}')" style="{{ $dark }}">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
+                                    @if ($p->kind === 'faq' && ! $this->drafting($p->id))
+                                        <button type="button" wire:click="draftAnswer('{{ $p->id }}')" style="{{ $btn }}">{{ __(isset($p->detail['ai']) ? 'improvement::ui.answer.rewrite' : 'improvement::ui.answer.write') }}</button>
+                                    @endif
                                     @if ($p->kind === 'content_gap' && ! $this->drafting($p->id))
                                         <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.rewrite') }}</button>
                                     @endif

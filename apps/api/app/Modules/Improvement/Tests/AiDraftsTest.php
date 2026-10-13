@@ -12,15 +12,19 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Improvement\Actions\DraftAnswer;
 use App\Modules\Improvement\Actions\DraftPost;
 use App\Modules\Improvement\Filament\Operator\Pages\SiteSuggestions;
+use App\Modules\Improvement\Jobs\DraftAnswerJob;
 use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
+use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -157,6 +161,51 @@ final class AiDraftsTest extends TestCase
      * @param  array<string, mixed>  $detail
      * @param  list<array<string, mixed>>  $evidence
      */
+    public function test_a_question_gets_an_answer_written_from_the_stores_own_text_and_checked_by_the_other_family(): void
+    {
+        $this->app->instance(Passages::class, new class implements Passages
+        {
+            public function near(string $shopId, string $text, array $sources, int $limit): array
+            {
+                return [
+                    ['source' => 'content', 'source_id' => 'x', 'external_id' => 'ship', 'title' => 'משלוחים', 'text' => 'משלוח לכל הארץ, כולל אילת, תוך 3 עד 5 ימי עסקים.', 'similarity' => 0.9],
+                    ['source' => 'product', 'source_id' => 'y', 'external_id' => '1', 'title' => 'פרקט למרפסת דגם טיק', 'text' => 'פרקט עמיד.', 'similarity' => 0.5],
+                ];
+            }
+        });
+        $proposal = $this->proposal(ImprovementProposal::FAQ, 'האם יש משלוח לאילת?', ['question' => 'האם יש משלוח לאילת?', 'answer' => 'כן, תוך [לבדוק] ימים.'], [['question' => 'יש משלוח לאילת', 'asked' => 4]]);
+        $this->replies = [
+            ['answer' => 'כן, אנחנו שולחים גם לאילת, תוך 3 עד 5 ימי עסקים.', 'sources' => ['p1', 'p9']],
+            ['ok' => true, 'problems' => []],
+        ];
+
+        $written = app(DraftAnswer::class)->handle($proposal);
+
+        $this->assertSame(AiProviderName::OpenAi, $this->calls[0]['provider'], 'OpenAI writes by default');
+        $this->assertSame(AiProviderName::Anthropic, $this->calls[1]['provider'], 'the other family checks');
+        $this->assertSame(['p1', 'p2'], array_column($this->calls[0]['input']['passages'], 'id'), 'the writer gets the store\'s text with ids');
+        $this->assertSame('כן, תוך [לבדוק] ימים.', $this->calls[0]['input']['draft']);
+        $this->assertSame('כן, אנחנו שולחים גם לאילת, תוך 3 עד 5 ימי עסקים.', $this->calls[1]['input']['answer']);
+        $fresh = $this->inShop(fn () => $written->fresh());
+        $this->assertSame('כן, אנחנו שולחים גם לאילת, תוך 3 עד 5 ימי עסקים.', $fresh->detail['answer']);
+        $this->assertSame(['משלוחים'], $fresh->detail['ai']['sources'], 'only passages it was given');
+        $this->assertSame([], $fresh->detail['ai']['problems']);
+        $this->assertSame(ImprovementProposal::PENDING, $fresh->status, 'an answer is not a decision');
+        $this->assertSame('improvement.answer_writer', Run::query()->latest('id')->value('agent'));
+
+        // On the screen: the new answer in the box, ready to edit and publish.
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])
+            ->assertSet("drafts.{$proposal->id}", 'כן, אנחנו שולחים גם לאילת, תוך 3 עד 5 ימי עסקים.')
+            ->assertSee('לכתוב שוב עם AI')
+            ->assertSee('משלוחים');
+
+        Queue::fake();
+        Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])->call('draftAnswer', $proposal->id)->assertSee('מודל כותב את התשובה');
+        Queue::assertPushed(DraftAnswerJob::class, 1);
+    }
+
     private function proposal(string $kind, string $title, array $detail, array $evidence): ImprovementProposal
     {
         return $this->inShop(function () use ($kind, $title, $detail, $evidence): ImprovementProposal {

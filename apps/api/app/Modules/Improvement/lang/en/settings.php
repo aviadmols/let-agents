@@ -57,4 +57,44 @@ return [
         'label' => 'Address for the daily summary',
         'description' => 'The summary is sent here every morning. Empty: it is kept in the panel only.',
     ],
+    'answer_writer_provider' => [
+        'label' => 'Provider of the model that writes answers',
+        'description' => 'openai or anthropic. Of another family than the checker.',
+    ],
+    'answer_writer_model' => [
+        'label' => 'The model that writes answers',
+        'description' => 'For example gpt-5.4-mini. Runs only when the team presses.',
+    ],
+    'answer_writer_input_usd_per_million' => [
+        'label' => 'Input price, answer writer',
+        'description' => 'Dollars per million tokens.',
+    ],
+    'answer_writer_output_usd_per_million' => [
+        'label' => 'Output price, answer writer',
+        'description' => 'Dollars per million tokens.',
+    ],
+    'answer_writer_max_output_tokens' => [
+        'label' => 'Longest reply, answer writer',
+        'description' => 'In tokens.',
+    ],
+    'answer_checker_provider' => [
+        'label' => 'Provider of the model that checks answers',
+        'description' => 'openai or anthropic. Of another family than the writer.',
+    ],
+    'answer_checker_model' => [
+        'label' => 'The model that checks answers',
+        'description' => 'For example claude-haiku-4-5.',
+    ],
+    'answer_checker_input_usd_per_million' => [
+        'label' => 'Input price, answer checker',
+        'description' => 'Dollars per million tokens.',
+    ],
+    'answer_checker_output_usd_per_million' => [
+        'label' => 'Output price, answer checker',
+        'description' => 'Dollars per million tokens.',
+    ],
+    'answer_checker_max_output_tokens' => [
+        'label' => 'Longest reply, answer checker',
+        'description' => 'In tokens.',
+    ],
 ];

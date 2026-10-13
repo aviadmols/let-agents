@@ -10,4 +10,9 @@ return [
     'post_spend_cap' => 'כתיבת פוסט: הגענו לתקרת ההוצאה.',
     'post_failed' => 'כתיבת פוסט נכשלה (:reason).',
     'post_drafted' => 'כתיבת פוסט: ":title" מוכן לעריכה, :problems הערות מהבודק.',
+    'answer_no_provider' => 'כתיבת תשובה: ספק לא מוכר באחד התפקידים.',
+    'answer_empty' => 'כתיבת תשובה: המודל לא החזיר תשובה.',
+    'answer_spend_cap' => 'כתיבת תשובה: הגענו לתקרת ההוצאה.',
+    'answer_failed' => 'כתיבת תשובה נכשלה (:reason).',
+    'answer_drafted' => 'כתיבת תשובה: ":question" מוכנה לעריכה, :problems הערות מהבודק.',
 ];

@@ -8,7 +8,8 @@
         "Catalog",
         "Search",
         "Assistant",
-        "Admin"
+        "Admin",
+        "Retrieval"
     ],
     "provider": "ImprovementServiceProvider",
     "features": [
@@ -142,6 +143,92 @@
             "min": 0,
             "max": 200,
             "scope": "shop"
+        },
+        {
+            "name": "answer_writer_provider",
+            "type": "string",
+            "default": "openai",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "answer_writer_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "answer_writer_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "answer_writer_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "answer_writer_max_output_tokens",
+            "type": "int",
+            "default": 1500,
+            "min": 300,
+            "max": 8000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "answer_checker_provider",
+            "type": "string",
+            "default": "anthropic",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "answer_checker_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "answer_checker_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "answer_checker_output_usd_per_million",
+            "type": "float",
+            "default": 5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "answer_checker_max_output_tokens",
+            "type": "int",
+            "default": 1500,
+            "min": 300,
+            "max": 8000,
+            "scope": "global",
+            "unit": "tokens"
         }
     ],
     "agents": [
@@ -214,6 +301,40 @@
                     ],
                     "prompts": [
                         "post_check"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "answer_writer",
+            "action": "draft_answer",
+            "when": "manual",
+            "features": [
+                "daily_review"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "answer_writer_provider",
+                    "model": "answer_writer_model",
+                    "prices": [
+                        "answer_writer_input_usd_per_million",
+                        "answer_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "answer"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "answer_checker_provider",
+                    "model": "answer_checker_model",
+                    "prices": [
+                        "answer_checker_input_usd_per_million",
+                        "answer_checker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "answer_check"
                     ]
                 }
             ]

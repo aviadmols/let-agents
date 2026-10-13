@@ -43,6 +43,13 @@ return [
         'label' => 'The answer that will be published (you can edit it)',
         'about' => 'The draft was written from the shoppers\' questions. What is in the box is what is published: check the facts and fill in every [to check].',
         'live' => 'The answer is shown on the site',
+        'write' => 'Write the answer with AI',
+        'rewrite' => 'Write it again with AI',
+        'writing' => 'The answer is being written in the background',
+        'writing_now' => 'A model is writing the answer from the shop\'s pages and products…',
+        'problems' => 'The checker found something to fix:',
+        'checked_ok' => 'A second model checked it: everything in it is in the shop\'s text. Fill in every [to check] before publishing.',
+        'sources' => 'Written from:',
     ],
     'post' => [
         'write' => 'Write a post with AI',

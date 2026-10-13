@@ -10,4 +10,9 @@ return [
     'post_spend_cap' => 'Post writing: the spending cap was reached.',
     'post_failed' => 'Post writing failed (:reason).',
     'post_drafted' => 'Post writing: ":title" is ready to edit, :problems notes from the checker.',
+    'answer_no_provider' => 'Answer writing: an unknown provider in one of the roles.',
+    'answer_empty' => 'Answer writing: the model returned no answer.',
+    'answer_spend_cap' => 'Answer writing: the spending cap was reached.',
+    'answer_failed' => 'Answer writing failed (:reason).',
+    'answer_drafted' => 'Answer writing: ":question" is ready to edit, :problems notes from the checker.',
 ];

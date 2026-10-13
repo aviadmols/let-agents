@@ -5,6 +5,7 @@ namespace App\Modules\Improvement\Filament\Operator\Pages;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Improvement\Actions\DecideProposal;
 use App\Modules\Improvement\Actions\RunDailyReview;
+use App\Modules\Improvement\Jobs\DraftAnswerJob;
 use App\Modules\Improvement\Jobs\DraftPostJob;
 use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementProposal;
@@ -96,7 +97,10 @@ class SiteSuggestions extends Page
         // The drafts as written, until the team edits them.
         foreach ($s['pending'] as $p) {
             if ($p->kind === ImprovementProposal::FAQ) {
-                $this->drafts[$p->id] ??= (string) ($p->detail['answer'] ?? '');
+                // While a model writes it, the box waits for the new answer rather than keeping the old one.
+                if (! $this->drafting($p->id)) {
+                    $this->drafts[$p->id] ??= (string) ($p->detail['answer'] ?? '');
+                }
             } elseif ($p->post !== null) {
                 $this->drafts[$p->id] ??= (string) $p->post->body;
                 $this->titles[$p->id] ??= (string) $p->post->title;
@@ -109,7 +113,26 @@ class SiteSuggestions extends Page
     /** Whether a post is being written for this proposal right now. */
     public function drafting(string $id): bool
     {
-        return Cache::has(DraftPostJob::WRITING.$id);
+        return Cache::has(DraftPostJob::WRITING.$id) || Cache::has(DraftAnswerJob::WRITING.$id);
+    }
+
+    /** Asks a model for the answer to a question, from the store's own text, written in the background. */
+    public function draftAnswer(string $id): void
+    {
+        if ($this->shop === null || $this->drafting($id)) {
+            return;
+        }
+
+        $proposal = app(TenantContext::class)->run($this->shop, fn (): ?ImprovementProposal => ImprovementProposal::query()->whereKey($id)->where('kind', ImprovementProposal::FAQ)->first());
+
+        if ($proposal === null) {
+            return;
+        }
+
+        unset($this->drafts[$id]);
+        Cache::put(DraftAnswerJob::WRITING.$id, now()->timestamp, now()->addSeconds(DraftAnswerJob::WRITING_SECONDS));
+        DraftAnswerJob::dispatch($this->shop, $id);
+        Notification::make()->success()->title(__('improvement::ui.answer.writing'))->send();
     }
 
     /** Asks for a post on a missing topic, written in the background; the screen shows it when it is there. */
