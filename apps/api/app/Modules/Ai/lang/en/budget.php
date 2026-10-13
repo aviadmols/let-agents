@@ -25,6 +25,12 @@ return [
         'edit' => 'Shop allowances',
     ],
 
+    // The card on the shop's home once the allowance is near its end. A share, never an amount.
+    'home' => [
+        'title' => ':percent% of the monthly allowance is used',
+        'near' => 'At the end of it, night scans and suggestions wait for next month. To raise it, contact Let\'s.',
+    ],
+
     // Operator screen: every shop's allowance.
     'screen' => [
         'title' => 'Shop allowances',

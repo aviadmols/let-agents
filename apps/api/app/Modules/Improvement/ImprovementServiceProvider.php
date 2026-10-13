@@ -3,11 +3,19 @@
 namespace App\Modules\Improvement;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Improvement\Console\ImprovementCommand;
+use App\Modules\Improvement\Support\ImprovementHome;
 use Illuminate\Console\Scheduling\Schedule;
 
 final class ImprovementServiceProvider extends ModuleServiceProvider
 {
+    protected function registerModule(): void
+    {
+        // What this module shows on the shop's home and notices.
+        $this->app->tag([ImprovementHome::class], HomeSource::TAG);
+    }
+
     protected function bootModule(): void
     {
         // After the night's work (index, matching, scores at 04:15), so the review sees a whole day.

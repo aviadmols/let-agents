@@ -25,6 +25,12 @@ return [
         'edit' => 'מכסות החנויות',
     ],
 
+    // The card on the shop's home once the allowance is near its end. A share, never an amount.
+    'home' => [
+        'title' => 'ניצלתם :percent% מהמכסה החודשית',
+        'near' => 'בסוף המכסה סריקות הלילה וההצעות ממתינות לחודש הבא. להגדלה, פנו ל־Let\'s.',
+    ],
+
     // Operator screen: every shop's allowance.
     'screen' => [
         'title' => 'מכסות החנויות',

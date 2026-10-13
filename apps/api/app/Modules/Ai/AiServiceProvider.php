@@ -3,12 +3,14 @@
 namespace App\Modules\Ai;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ListsProviderModels;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\VisionModel;
+use App\Modules\Ai\Support\AllowanceHome;
 use App\Modules\Ai\Support\Drivers\AnthropicChat;
 use App\Modules\Ai\Support\Drivers\GeminiEmbeddings;
 use App\Modules\Ai\Support\Drivers\OpenAiChat;
@@ -36,6 +38,8 @@ final class AiServiceProvider extends ModuleServiceProvider
 
     protected function registerModule(): void
     {
+        // What this module shows on the shop's home and notices.
+        $this->app->tag([AllowanceHome::class], HomeSource::TAG);
         $this->app->bind(ListsProviderModels::class, SdkModelLister::class);
         $this->app->bind(SpendGuard::class, MonthlySpendGuard::class);
 

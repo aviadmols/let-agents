@@ -4,9 +4,11 @@ namespace App\Modules\Analytics;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\HomeNumbers;
 use App\Modules\Analytics\Console\ComputeScoresCommand;
 use App\Modules\Analytics\Filament\Widgets\ReportChart;
 use App\Modules\Analytics\Models\AnalyticsEvent;
+use App\Modules\Analytics\Support\AnalyticsHomeNumbers;
 use App\Modules\Analytics\Support\BeaconSchema;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -19,6 +21,8 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->singleton(BeaconSchema::class);
+        // The row of numbers at the top of the shop's home.
+        $this->app->bind(HomeNumbers::class, AnalyticsHomeNumbers::class);
     }
 
     protected function bootModule(): void
