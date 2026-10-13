@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -295,6 +296,20 @@ final class ShopifyAppTest extends TestCase
         $this->assertStringContainsString('/merchant/search/photos?embedded=1', $location);
         $this->assertSame(parse_url($panel, PHP_URL_HOST), parse_url($location, PHP_URL_HOST), 'the shop\'s own panel, never another address');
         $this->get('/shopify/app/elsewhere?'.http_build_query(self::signed(['embedded' => '1', 'id_token' => self::idToken()])))->assertNotFound();
+    }
+
+    public function test_a_refresh_at_the_apps_own_address_is_a_screen_never_the_panels_login(): void
+    {
+        $reload = '#^'.ShopifyAppController::RELOAD_PATH.'$#';
+
+        foreach (['merchant/analytics/search', 'merchant/display', 'merchant/search/photos'] as $screen) {
+            $this->assertSame(1, preg_match($reload, $screen), $screen);
+        }
+
+        // These live at the app's own address too: the merchant signs in there.
+        foreach (['merchant', 'merchant/login', 'merchant/logout'] as $panel) {
+            $this->assertSame(0, preg_match($reload, $panel), $panel);
+        }
     }
 
     public function test_a_forged_or_stale_session_token_opens_nothing(): void

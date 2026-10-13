@@ -18,6 +18,6 @@ Route::middleware('throttle:shopify')->group(function (): void {
 // that address: the shops' own addresses keep their panels.
 if (filled(config('upsell.shop_domain'))) {
     Route::domain((string) config('upsell.shop_domain'))->middleware('throttle:shopify')->group(function (): void {
-        Route::get('{path}', [ShopifyAppController::class, 'open'])->where('path', 'merchant(/[A-Za-z0-9_-]+)*')->name('shopify.app.reload');
+        Route::get('{path}', [ShopifyAppController::class, 'open'])->where('path', ShopifyAppController::RELOAD_PATH)->name('shopify.app.reload');
     });
 }

@@ -47,6 +47,12 @@ final class ShopifyAppController
 
     private const MERCHANT_OVERVIEW_ROUTE = 'filament.merchant.pages.overview';
 
+    /**
+     * A screen of a shop's panel, as the Shopify admin asks for it after a refresh, at the app's own
+     * address. Never the panel's login or logout, which live at that address too.
+     */
+    public const RELOAD_PATH = 'merchant/(?!(?:login|logout)(?:/|$))[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*';
+
     public function install(Request $request): RedirectResponse|Response
     {
         $shop = ShopifySignatures::shopDomain($request->query('shop'));
