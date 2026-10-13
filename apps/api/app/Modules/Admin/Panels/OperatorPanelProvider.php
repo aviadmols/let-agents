@@ -7,7 +7,6 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\CurrentShop;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Icons\Heroicon;
@@ -93,9 +92,15 @@ final class OperatorPanelProvider extends PanelProvider
     private static function viewAsUrl(): ?string
     {
         $id = CurrentShop::effective();
-        $shop = $id === null ? null : Shop::query()->find($id);
+        $slug = $id === null ? null : Shop::query()->whereKey($id)->value('slug');
+        $domain = (string) config('upsell.shop_domain');
 
-        // The panel's own address for the shop: its subdomain where shops have one ({slug}.shop_domain).
-        return $shop === null ? null : Filament::getPanel(User::MERCHANT_PANEL)->getUrl($shop);
+        // The shop's own address ({slug}.shop_domain) where shops have one: at the app's address,
+        // /merchant/{slug} is the Shopify admin's reload route, not the panel.
+        return match (true) {
+            $slug === null => null,
+            $domain !== '' => Request::getScheme().'://'.$slug.'.'.$domain.'/'.User::MERCHANT_PANEL,
+            default => url('/'.User::MERCHANT_PANEL.'/'.$slug),
+        };
     }
 }

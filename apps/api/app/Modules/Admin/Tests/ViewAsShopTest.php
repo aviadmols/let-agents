@@ -33,6 +33,19 @@ final class ViewAsShopTest extends TestCase
             ->assertSee(__('admin::panels.view_as_shop'));
     }
 
+    public function test_where_shops_have_their_own_address_the_button_leads_there(): void
+    {
+        config(['upsell.shop_domain' => 'agents.test']);
+        $shop = Shop::factory()->create(['slug' => 'gueta-avigdor']);
+
+        $this->actingAs(User::factory()->operator()->create())
+            ->withSession([CurrentShop::SESSION_KEY => $shop->id])
+            ->get('/operator/agents')
+            ->assertOk()
+            ->assertSee('://gueta-avigdor.agents.test/merchant', false)
+            ->assertDontSee('/merchant/gueta-avigdor', false);
+    }
+
     public function test_the_button_leads_to_the_shop_panel_with_a_banner_that_says_whose_it_is(): void
     {
         $shop = Shop::factory()->create(['name' => 'גואטה אביגדור']);
