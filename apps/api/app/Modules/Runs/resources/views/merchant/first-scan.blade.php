@@ -33,14 +33,20 @@
                 </div>
 
                 @if ($state || $isNew)
-                    <ol style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none">
+                    <ol style="display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border: 1px solid var(--la-line); border-radius: 10px; overflow: hidden">
                         @foreach ($steps as $step)
                             @php($at = $state['steps'][$step] ?? null)
-                            <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--la-line); border-radius: 8px; font-size: 13px" data-step="{{ $step }}" data-state="{{ $at ?? 'idle' }}">
-                                <span class="la-dot" data-tone="{{ ['done' => 'good', 'running' => 'info', 'failed' => 'bad'][$at] ?? '' }}"></span>
-                                <span class="la-grow">{{ __("runs::first_scan.steps.{$step}") }}</span>
-                                @if ($at && $at !== 'waiting')
-                                    <small style="color: var(--la-muted)">{{ __("runs::first_scan.states.{$at}") }}</small>
+                            <li style="display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 14px; font-size: 14px; {{ $loop->first ? '' : 'border-block-start: 1px solid var(--la-line-2);' }}" data-step="{{ $step }}" data-state="{{ $at ?? 'idle' }}">
+                                <span class="la-dot" data-tone="{{ ['done' => 'good', 'running' => 'info', 'failed' => 'bad'][$at] ?? '' }}" style="justify-self: center"></span>
+                                <span style="font-weight: 600">{{ __("runs::first_scan.steps.{$step}") }}</span>
+                                <small style="color: var(--la-muted)">{{ $at && $at !== 'waiting' ? __("runs::first_scan.states.{$at}") : '' }}</small>
+                                @foreach ($notes[$step] ?? [] as $note)
+                                    <span></span>
+                                    <span style="grid-column: 2 / -1; font-size: 13px; color: var(--la-ink-2)" data-step-note>{{ $note }}</span>
+                                @endforeach
+                                @if ($at === 'done' && array_key_exists($step, $notes) && $notes[$step] === [])
+                                    <span></span>
+                                    <span style="grid-column: 2 / -1; font-size: 13px; color: var(--la-muted)">{{ __('runs::first_scan.nothing_new') }}</span>
                                 @endif
                             </li>
                         @endforeach

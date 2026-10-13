@@ -5,12 +5,14 @@ namespace App\Modules\Runs\Tests;
 use App\Modules\Admin\Models\User;
 use App\Modules\Runs\Filament\Merchant\Widgets\FirstScanCard;
 use App\Modules\Runs\Jobs\FirstScanStep;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Runs\Support\FirstScan;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -55,5 +57,28 @@ final class FirstScanTest extends TestCase
         (new FirstScanStep($shop->id, 'search', 'search', ['step' => 'index', 'target' => 'books']))->handle();
 
         $this->assertSame(FirstScan::DONE, cache()->get("first-scan:{$shop->id}:step:search"));
+    }
+
+    public function test_the_card_says_what_each_step_did_without_models_or_money(): void
+    {
+        $shop = Shop::factory()->create();
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        Cache::put("first-scan:{$shop->id}:started", now()->toIso8601String());
+        FirstScan::mark($shop->id, 'catalog', FirstScan::RUNNING);
+
+        $run = fn (string $key, array $params) => Run::query()->create(['shop_id' => $shop->id, 'agent' => 'catalog.sync', 'action' => 'catalog.sync', 'status' => 'succeeded', 'trigger' => 'manual', 'summary_key' => $key, 'summary_params' => $params, 'started_at' => now(), 'created_at' => now()]);
+        $run('catalog::runs.synced', ['products' => '1,240', 'created' => '30', 'updated' => '2', 'removed' => '0', 'categories' => '12', 'content' => '4']);
+        $run('ai::budget.cap_reached', ['spent' => '5.00', 'estimate' => '0.10', 'cap' => '6.00']);
+        FirstScan::mark($shop->id, 'catalog', FirstScan::DONE);
+
+        $notes = FirstScan::notes($shop);
+        $this->assertSame(['נקראו 1,240 מוצרים: 30 חדשים, 2 השתנו, 0 כבר לא מפורסמים. 12 קטגוריות, 4 מאמרים.'], $notes['catalog']);
+
+        $this->actingAs($merchant)->withHeader('Accept-Language', 'he')
+            ->get("/merchant/{$shop->slug}/overview")
+            ->assertOk()
+            ->assertSee('נקראו 1,240 מוצרים')
+            ->assertDontSee('התקרה החודשית');
     }
 }

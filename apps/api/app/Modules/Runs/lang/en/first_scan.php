@@ -25,6 +25,7 @@ return [
         'posts' => 'Reading posts and articles',
         'tags' => 'Tags for pages',
     ],
+    'nothing_new' => 'Nothing to update in this step.',
     'states' => [
         'running' => 'Now',
         'done' => 'Done',

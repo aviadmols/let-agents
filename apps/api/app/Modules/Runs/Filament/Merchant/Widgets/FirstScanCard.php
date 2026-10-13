@@ -52,6 +52,7 @@ final class FirstScanCard extends Widget implements OverviewBlock
             'isNew' => FirstScan::isNew($shop),
             'canStart' => FirstScan::canStart($shop),
             'steps' => array_keys(FirstScan::STEPS),
+            'notes' => FirstScan::notes($shop),
         ];
     }
 }

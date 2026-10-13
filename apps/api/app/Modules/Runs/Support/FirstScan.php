@@ -75,6 +75,52 @@ final class FirstScan
     public static function mark(string $shopId, string $step, string $state): void
     {
         Cache::put(self::key($shopId, 'step:'.$step), $state, now()->addDays(self::KEEP_DAYS));
+
+        // When the step began and ended, to find what its runs reported.
+        if ($state === self::RUNNING || $state === self::DONE || $state === self::FAILED) {
+            Cache::put(self::key($shopId, ($state === self::RUNNING ? 'began:' : 'ended:').$step), now()->toIso8601String(), now()->addDays(self::KEEP_DAYS));
+        }
+    }
+
+    /**
+     * What each step reported, in the viewer's language: the summary line of every run the step
+     * made ("Read 1,240 products: 30 new …"), from when it began until the next step began, and a
+     * few minutes more for the last. Lines about models, tokens or money are the operator's and
+     * stay out.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function notes(Shop $shop): array
+    {
+        $steps = array_keys(self::STEPS);
+        $notes = [];
+
+        foreach ($steps as $i => $step) {
+            $began = Cache::get(self::key($shop->id, 'began:'.$step));
+
+            if ($began === null) {
+                continue;
+            }
+
+            $next = isset($steps[$i + 1]) ? Cache::get(self::key($shop->id, 'began:'.$steps[$i + 1])) : null;
+            $ended = Cache::get(self::key($shop->id, 'ended:'.$step));
+            $until = $next !== null ? Carbon::parse($next) : ($ended !== null ? Carbon::parse($ended)->addMinutes(15) : now());
+
+            $notes[$step] = Run::query()
+                ->where('shop_id', $shop->id)
+                ->whereBetween('created_at', [Carbon::parse($began)->subSecond(), $until])
+                ->whereNotNull('summary_key')
+                ->orderBy('created_at')
+                ->get()
+                ->map(fn (Run $run): string => trim((string) $run->summary()))
+                ->reject(fn (string $line): bool => $line === '' || preg_match('/\$|\btokens?\b|gpt-|claude|gemini|openai|anthropic|מודל|model/iu', $line) === 1)
+                ->unique()
+                ->take(3)
+                ->values()
+                ->all();
+        }
+
+        return $notes;
     }
 
     /**
