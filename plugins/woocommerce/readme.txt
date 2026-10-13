@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.8.1 =
+* [let_agents_wishlist]: the wishlist heart, with the number of products saved, wherever the shop places it (a header, a menu). A click opens the list.
 
 = 0.8.0 =
 * Guides to the site's blog: when the store team publishes a guide in Let Agents, it arrives as a draft post, with links and pictures of the store's products, its excerpt and tags, a featured image, its SEO title, description and focus keyword in Yoast or Rank Math, and its questions as FAQ structured data. The owner publishes it from WordPress. Sent again, the draft is updated; a published post is left as it is.

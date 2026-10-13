@@ -29,6 +29,8 @@ return [
     'share_whatsapp' => 'Send on WhatsApp',
     'copy_link' => 'Copy link',
     'copied' => 'Link copied',
+    'wish_saved' => 'Saved to your wishlist',
+    'wish_removed' => 'Removed from your wishlist',
     'share_text' => 'My wishlist at :shop',
     'shared_title' => 'A list shared with you',
     'save_all' => 'Save to my list',

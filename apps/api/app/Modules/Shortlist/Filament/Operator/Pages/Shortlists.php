@@ -100,6 +100,7 @@ class Shortlists extends Page
             'wishlist_max' => (int) Settings::get('shortlist.wishlist_max', $shop),
             'card_selector' => (string) Settings::get('shortlist.card_selector', $shop),
             'product_selector' => (string) Settings::get('shortlist.product_selector', $shop),
+            'wishlist_place' => (string) Settings::get('shortlist.wishlist_place', $shop),
         ];
     }
 
@@ -119,8 +120,8 @@ class Shortlists extends Page
             Settings::set('shortlist.compare_max', (int) ($d['compare_max'] ?? 5), $shop);
             Settings::set('shortlist.wishlist_max', (int) ($d['wishlist_max'] ?? 100), $shop);
 
-            // Empty: no buttons there (no category cards; not on the product page).
-            foreach (['card_selector', 'product_selector'] as $key) {
+            // Empty: no buttons there (no category cards; not on the product page; no heart in the header).
+            foreach (['card_selector', 'product_selector', 'wishlist_place'] as $key) {
                 Settings::set("shortlist.{$key}", trim((string) ($d[$key] ?? '')), $shop);
             }
         } catch (InvalidSettingValue $e) {

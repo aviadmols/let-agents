@@ -50,6 +50,7 @@ final class ShortlistController
                 'compareMax' => (int) Settings::get('shortlist.compare_max', $shopId),
                 'cardSelector' => trim((string) Settings::get('shortlist.card_selector', $shopId)),
                 'productSelector' => trim((string) Settings::get('shortlist.product_selector', $shopId)),
+                'wishlistPlace' => $wishlist ? trim((string) Settings::get('shortlist.wishlist_place', $shopId)) : '',
                 // For the share message: "My wishlist at Rocks and Gold".
                 'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
                 'labels' => trans('shortlist::storefront', [], $locale),

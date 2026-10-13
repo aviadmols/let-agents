@@ -12,6 +12,7 @@ use LetAgents\Storefront\OrderReporter;
 use LetAgents\Storefront\PostSchema;
 use LetAgents\Storefront\Search;
 use LetAgents\Storefront\Widget;
+use LetAgents\Storefront\WishlistHeart;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,6 +33,7 @@ final class Plugin {
 		Widget::register();
 		Search::register();
 		CallToAction::register();
+		WishlistHeart::register();
 		OrderReporter::register();
 		PostSchema::register();
 		// Outside is_admin(): its pages are sent by Action Scheduler, which also runs from cron.

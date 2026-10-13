@@ -75,6 +75,16 @@
                     <div class="lsl-row">
                         <div class="lsl-rt"><b>{{ $t('wish_link') }}</b><small>{{ $t('wish_link_help') }}</small><code class="lsl-field code" style="display:inline-block;width:auto">#wishlist</code></div>
                     </div>
+                    <div class="lsl-row">
+                        <div class="lsl-rt">
+                            <b>{{ __('shortlist::settings.wishlist_place.label') }}</b>
+                            <small>{{ __('shortlist::settings.wishlist_place.description') }}</small>
+                            <input type="text" wire:model="data.wishlist_place" class="lsl-field code" placeholder=".header__icon--search">
+                            <small style="margin-top:6px">{{ $t('wish_heart_help') }}</small>
+                            <code class="lsl-field code" style="display:inline-block;width:auto">&lt;span data-let-agents-wishlist&gt;&lt;/span&gt;</code>
+                            <code class="lsl-field code" style="display:inline-block;width:auto">[let_agents_wishlist]</code>
+                        </div>
+                    </div>
                 @endif
 
                 @if (($data['compare'] ?? false) || ($data['wishlist'] ?? false))

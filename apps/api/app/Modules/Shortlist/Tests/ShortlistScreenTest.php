@@ -65,11 +65,15 @@ final class ShortlistScreenTest extends TestCase
             ->set('data.wishlist', true)
             ->assertSee('#wishlist')
             ->set('data.card_selector', '.product-card')
+            ->assertSee('[let_agents_wishlist]')
+            ->set('data.wishlist_place', '.header__icon--search')
             ->call('save');
 
         $this->assertTrue(Features::enabled('shortlist.compare', $this->mine->id));
         $this->assertTrue(Features::enabled('shortlist.wishlist', $this->mine->id));
         $this->assertSame('.product-card', Settings::get('shortlist.card_selector', $this->mine->id));
+        $this->assertSame('.header__icon--search', Settings::get('shortlist.wishlist_place', $this->mine->id));
+        $this->getJson('/api/v1/shortlist/'.SiteKeys::site(self::TOKEN).'/config')->assertJsonPath('wishlistPlace', '.header__icon--search');
         $this->assertFalse(Features::enabled('shortlist.wishlist', $this->theirs->id), 'their own shop only');
 
         // Shoppers keep lists and compare.

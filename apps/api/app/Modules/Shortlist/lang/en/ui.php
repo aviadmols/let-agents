@@ -19,5 +19,6 @@ return [
     'top_compared' => 'Products compared most',
     'wish_link' => 'A permanent way in',
     'wish_link_help' => 'The floating heart shows once a shopper saved a product. For a way in at any time, add a link to this address to the site menu or header (for example "Wishlist"). Clicking it opens the list.',
+    'wish_heart_help' => 'Or place the heart yourselves: paste this tag in the site\'s theme, and on WordPress the shortcode works too. The heart shows how many products are saved and opens the list.',
     'none_yet' => 'No data yet.',
 ];

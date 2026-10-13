@@ -11,7 +11,8 @@
  * from the store's approved facts. Wishlist: kept in this browser and on our side, so it waits on the
  * next visit; signed in to the store, it is the account's (Shopify vouches for the customer through
  * the app proxy, the WordPress plugin signs the user). A list is shared by link or WhatsApp. A link
- * of the theme's own to "#wishlist" (a menu item, a header icon) opens the list, even empty.
+ * of the theme's own to "#wishlist" (a menu item, a header icon) opens the list, even empty; an
+ * empty <span data-let-agents-wishlist> (or the WordPress shortcode) becomes a heart with the count.
  *
  * Nothing here calls a model; every request is a cached table or a few rows.
  */
@@ -196,6 +197,63 @@
     buttons.forEach(paint);
     renderTray();
     renderWishButton();
+    paintHearts();
+  }
+
+  /**
+   * The shop's own way to the list: an element it placed (<span data-let-agents-wishlist>, the
+   * WordPress shortcode) and the heart after the element its setting names (the search icon).
+   * Each shows how many products are saved; a click opens the list, even empty.
+   */
+  function placeHearts() {
+    if (!cfg.wishlist) {
+      return;
+    }
+    if (cfg.wishlistPlace && !doc.querySelector('[data-la-heart-placed]')) {
+      var after = null;
+      try {
+        after = doc.querySelector(cfg.wishlistPlace);
+      } catch (e) { /* a bad selector in the settings places nothing */ }
+      if (after && after.parentNode) {
+        var link = doc.createElement('a');
+        link.href = WISH_HASH;
+        link.setAttribute('data-let-agents-wishlist', '');
+        link.setAttribute('data-la-heart-placed', '1');
+        after.parentNode.insertBefore(link, after.nextSibling);
+      }
+    }
+    paintHearts();
+  }
+
+  function paintHearts() {
+    var nodes = doc.querySelectorAll('[data-let-agents-wishlist]');
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (!node.getAttribute('data-la-heart')) {
+        // A shop's element with its own content keeps it; an empty one gets the heart.
+        if (node.children.length || node.textContent.trim()) {
+          continue;
+        }
+        node.setAttribute('data-la-heart', '1');
+        node.setAttribute('role', node.tagName === 'A' ? 'link' : 'button');
+        node.setAttribute('tabindex', '0');
+        node.setAttribute('aria-label', label('wish_title'));
+        node.setAttribute('style', 'position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;color:inherit;cursor:pointer;text-decoration:none;vertical-align:middle;');
+        node.innerHTML = HEART + '<i style="position:absolute;top:0;inset-inline-end:-2px;min-width:16px;height:16px;border-radius:999px;background:#e11d48;color:#fff;font:600 10px/16px system-ui,sans-serif;font-style:normal;text-align:center;padding:0 4px;box-sizing:border-box"></i>';
+        node.querySelector('path').setAttribute('fill', 'none');
+        node.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openDrawer();
+          }
+        });
+      }
+      var count = node.querySelector('i');
+      if (count) {
+        count.textContent = String(state.wish.length);
+        count.style.display = state.wish.length ? '' : 'none';
+      }
+    }
   }
 
   /**
@@ -393,14 +451,17 @@
     'td.prod .rm{margin-top:6px;border:0;background:none;color:#6b7280;text-decoration:underline;cursor:pointer;padding:0;font:inherit;font-size:13px}',
     '.none{color:#9ca3af}',
     '.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer}',
-    '.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(420px,100vw);background:#fff;z-index:2147483002;display:flex;flex-direction:column;box-shadow:0 0 30px rgba(0,0,0,.25)}',
-    '.list{flex:1;overflow:auto;padding:8px 18px}',
-    '.item{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0}',
-    '.item img{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#f3f4f6;flex:none}',
+    '.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(520px,100vw);background:#fff;z-index:2147483002;display:flex;flex-direction:column;box-shadow:0 0 30px rgba(0,0,0,.25)}',
+    '.list{flex:1;overflow:auto;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:18px 14px;align-content:start}',
+    '.list .msg{grid-column:1/-1}',
+    '.item{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0}',
+    '.item img{display:block;width:100%;height:auto;aspect-ratio:1/1;border-radius:12px;object-fit:contain;background:#f6f6f7;cursor:pointer}',
+    '.item a{font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
     '.item a{color:#111827;text-decoration:none;font-weight:600}',
     '.item .meta{flex:1;min-width:0}',
     '.item .price{color:#374151;font-size:13px;margin-top:2px}',
-    '.item button{border:0;background:none;color:#6b7280;cursor:pointer;font-size:18px;padding:4px}',
+    '.item button{position:absolute;top:8px;inset-inline-end:8px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(0,0,0,.18);color:#374151;cursor:pointer;font-size:18px;line-height:1;padding:0}',
+    '@media (max-width:360px){.list{grid-template-columns:1fr}}',
     '.foot{border-top:1px solid #e5e7eb;padding:12px 18px;display:grid;gap:8px}',
     '.note{color:#6b7280;font-size:12.5px}',
     '.share{display:flex;gap:8px;flex-wrap:wrap}',
@@ -646,6 +707,7 @@
     state.pending = adding ? [id].concat(state.pending) : state.pending.filter(function (w) { return w !== id; });
     save();
     repaint();
+    flash(label(adding ? 'wish_saved' : 'wish_removed'));
     send(adding ? { add: [id] } : { remove: [id] }).then(function (data) {
       take(data);
       if (drawerOpen) {
@@ -728,6 +790,9 @@
       }
       meta.appendChild(a);
       meta.appendChild(el('div', 'price', money(p.price, p.currency)));
+      if (a.href) {
+        img.addEventListener('click', function () { win.location.href = a.href; });
+      }
       item.appendChild(img);
       item.appendChild(meta);
       if (!shared) {
@@ -764,7 +829,8 @@
       copy.type = 'button';
       copy.addEventListener('click', function () {
         share(function (link) {
-          var done = function () { copy.textContent = label('copied'); };
+          // The drawer may be drawn again meanwhile: the message is said where it is seen.
+          var done = function () { copy.textContent = label('copied'); flash(label('copied')); };
           if (win.navigator.clipboard && win.navigator.clipboard.writeText) {
             win.navigator.clipboard.writeText(link).then(done, function () { win.prompt('', link); });
           } else {
@@ -826,13 +892,14 @@
   function scan() {
     decorateTheme();
     decorateProductPage();
+    placeHearts();
   }
 
   function start() {
     scan();
     repaint();
     var timer = null;
-    if (cfg.cardSelector && win.MutationObserver) {
+    if ((cfg.cardSelector || cfg.wishlistPlace) && win.MutationObserver) {
       // Infinite scroll and filters add cards after the page loaded.
       new MutationObserver(function () {
         clearTimeout(timer);
