@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string $outcome answered, no_match, no_info, out_of_scope, limit or unavailable
  * @property string $from bank, model or none
  * @property string|null $answer_id
+ * @property string|null $answer what was shown, when no saved answer holds it
  * @property list<array{external_id: string, title: string, why: string}>|null $picks
  * @property bool $whatsapp_shown
  * @property bool $whatsapp_clicked

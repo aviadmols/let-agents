@@ -1226,6 +1226,9 @@ final class AnswerSiteQuestion
             // Why it got no answer, for the operator: what refused it.
             'reason' => $result['reason'] ?? null,
             'answer_id' => $result['answer_id'] ?? null,
+            // An answer kept nowhere else (about the page's product, or the turn before), for the nightly review.
+            'answer' => ($result['answer_id'] ?? null) === null && $result['outcome'] === AssistantAnswer::ANSWERED
+                ? mb_substr(Privacy::redact((string) ($result['answer'] ?? ''))['text'], 0, 2000) : null,
             'picks' => array_map(fn (array $p): array => ['external_id' => $p['external_id'], 'title' => $p['title'], 'why' => $p['why']], (array) ($result['picks'] ?? [])),
             'whatsapp_shown' => $whatsapp,
         ]);

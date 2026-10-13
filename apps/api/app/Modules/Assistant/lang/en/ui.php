@@ -40,6 +40,23 @@ return [
             'team' => 'Written by the team',
         ],
     ],
+    'weak' => [
+        'title' => 'Answers to check',
+        'subheading' => 'From every shop, from the daily reports of the last :days days: answers scored :score or lower out of 5, and answers marked. Marked ones first.',
+        'none' => 'No answers to check right now.',
+        'score' => 'Score :score/5',
+        'flags' => [
+            'invented' => 'Said something the product does not',
+            'refused_answerable' => 'Refused with the answer at hand',
+            'wrong_products' => 'Suggested products that do not fit',
+        ],
+        'question' => 'Question:',
+        'answer' => 'Answer:',
+        'no_answer' => 'No answer given (:outcome)',
+        'picks' => 'Products suggested:',
+        'note' => 'Reviewer\'s note:',
+        'open_shop' => 'The shop\'s questions',
+    ],
     'asks' => [
         'heading' => 'Questions in the search box: the daily report',
         'description' => 'Every morning yesterday\'s questions are checked: what the assistant answered and picked, and what shoppers did next. A score for the day, and what to improve.',

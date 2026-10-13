@@ -18,6 +18,7 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Support\Collection;
 
 /**
  * Once a day: how the assistant did with the questions asked in the search box yesterday.
@@ -35,7 +36,13 @@ final class ReviewSearchAsks
 
     public const ACTION = 'assistant.review_asks';
 
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
+
+    /** What the reviewer may mark an item for the operator: an answer that invents, a refusal with the answer at hand, picks off the question. */
+    public const FLAGS = ['invented', 'refused_answerable', 'wrong_products'];
+
+    /** How much of a product's page the reviewer reads, for a question about one or two products. */
+    private const PRODUCT_TEXT_CHARS = 700;
 
     private const MAX_IMPROVEMENTS = 5;
 
@@ -95,7 +102,8 @@ final class ReviewSearchAsks
         }
 
         $answers = AssistantAnswer::query()->whereIn('id', $asks->pluck('answer_id')->filter()->unique()->values())->get(['id', 'answer'])->keyBy('id');
-        $titles = CatalogProduct::query()->whereIn('external_id', $asks->pluck('products')->flatten()->unique()->values())->pluck('title', 'external_id');
+        $products = CatalogProduct::query()->whereIn('external_id', $asks->pluck('products')->flatten()->unique()->values())->get(['external_id', 'title', 'payload'])->keyBy('external_id');
+        $titles = $products->map(fn (CatalogProduct $p): string => (string) $p->title);
         $byRef = [];
         $items = [];
 
@@ -106,13 +114,13 @@ final class ReviewSearchAsks
                 'id' => $ref,
                 'question' => $ask->question,
                 'shown' => array_values(array_filter(array_map(fn ($id) => $titles[$id] ?? null, array_slice((array) $ask->products, 0, 8)))),
-                'answer' => (string) ($answers->get($ask->answer_id)?->answer ?? ''),
+                'answer' => (string) ($answers->get($ask->answer_id)?->answer ?? $ask->answer ?? ''),
                 'picks' => array_map(fn (array $p): string => $p['title'].' — '.$p['why'], (array) $ask->picks),
                 'outcome' => $ask->outcome,
                 'whatsapp_offered' => $ask->whatsapp_shown,
                 'whatsapp_clicked' => $ask->whatsapp_clicked,
                 'opened_picks' => array_values(array_filter(array_map(fn ($id) => $titles[$id] ?? null, (array) $ask->picked))),
-            ];
+            ] + self::productText($ask, $products);
         }
 
         $shopName = (string) (Shop::query()->whereKey($shopId)->value('name') ?? '');
@@ -144,7 +152,9 @@ final class ReviewSearchAsks
             $score = is_array($item) ? (int) ($item['score'] ?? 0) : 0;
 
             if (isset($byRef[$ref]) && $score >= 1 && $score <= 5 && ! isset($scored[$ref])) {
-                $scored[$ref] = ['ask_id' => $byRef[$ref]->id, 'score' => $score, 'note' => mb_substr(trim((string) ($item['note'] ?? '')), 0, 200)];
+                $flag = (string) ($item['flag'] ?? '');
+                $scored[$ref] = ['ask_id' => $byRef[$ref]->id, 'score' => $score, 'note' => mb_substr(trim((string) ($item['note'] ?? '')), 0, 200)]
+                    + (in_array($flag, self::FLAGS, true) ? ['flag' => $flag] : []);
             }
         }
 
@@ -158,8 +168,34 @@ final class ReviewSearchAsks
     }
 
     /**
+     * What the pages of the one or two products a question was about say: the only facts the
+     * assistant had, so the reviewer can tell an answer that invents.
+     *
+     * @param  Collection<string, CatalogProduct>  $products
+     * @return array{product_text?: list<string>}
+     */
+    private static function productText(AssistantSearchAsk $ask, $products): array
+    {
+        $ids = (array) $ask->products;
+        if ($ids === [] || count($ids) > 2) {
+            return [];
+        }
+
+        $texts = [];
+        foreach ($ids as $id) {
+            $product = $products->get($id);
+            if ($product !== null) {
+                $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) ($product->payload['short_description'] ?? '').' '.(string) ($product->payload['description'] ?? ''))));
+                $texts[] = $product->title.': '.mb_substr($text, 0, self::PRODUCT_TEXT_CHARS);
+            }
+        }
+
+        return $texts === [] ? [] : ['product_text' => $texts];
+    }
+
+    /**
      * @param  list<string>  $improvements
-     * @param  list<array{ask_id: string, score: int, note: string}>  $items
+     * @param  list<array{ask_id: string, score: int, note: string, flag?: string}>  $items
      * @param  array<string, int>  $counts
      */
     private function save(string $day, string $status, ?int $score, ?string $summary, array $improvements, array $items, array $counts, ?string $by, RunContext $run): void

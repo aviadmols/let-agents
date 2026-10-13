@@ -189,6 +189,45 @@ final class SearchAsksTest extends TestCase
         $page->assertDontSee('$0.', false);
     }
 
+    public function test_an_answer_that_invents_or_scores_low_reaches_the_operators_list_of_every_shop(): void
+    {
+        $this->travel(1)->days();
+        $yesterday = now()->subDay();
+        $this->inShop(function () use ($yesterday): void {
+            // Asked on the product's page: its answer is kept on the question's row, nowhere else.
+            foreach ([['למה מתאימה היריעה?', 'היריעה מתאימה גם לבריכות שחייה.'], ['במה אוטמים גג', 'ביריעה ביטומנית.']] as [$q, $answer]) {
+                AssistantSearchAsk::query()->create([
+                    'shop_id' => $this->shop->id, 'day' => $yesterday->toDateString(), 'question' => $q, 'products' => ['701'],
+                    'outcome' => 'answered', 'from' => 'model', 'answer' => $answer, 'whatsapp_shown' => false, 'whatsapp_clicked' => false,
+                    'created_at' => $yesterday, 'updated_at' => $yesterday,
+                ]);
+            }
+        });
+        $this->replies = [[
+            'items' => [['id' => 'a1', 'score' => 3, 'note' => 'לא כתוב במוצר.', 'flag' => 'invented'], ['id' => 'a2', 'score' => 5, 'note' => 'מדויק.', 'flag' => 'anything']],
+            'summary' => 'יום סביר.',
+            'improvements' => [],
+        ]];
+
+        app(ReviewSearchAsks::class)->handle($this->shop->id);
+
+        $sent = json_decode($this->calls[0]['user'], true);
+        $this->assertSame('היריעה מתאימה גם לבריכות שחייה.', $sent['items'][0]['answer'], 'the answer kept on the question reaches the reviewer');
+        $this->assertStringContainsString('יריעה לאיטום גג בטון שטוח.', $sent['items'][0]['product_text'][0], 'with what the product page says, to tell an invention');
+        $items = $this->inShop(fn () => AssistantAskReview::query()->sole()->items);
+        $this->assertSame('invented', $items[0]['flag']);
+        $this->assertArrayNotHasKey('flag', $items[1], 'a flag it does not know is dropped');
+
+        $this->actingAs(User::factory()->operator()->create())->get('/operator/assistant/weak-answers')->assertOk()
+            ->assertSee('היריעה מתאימה גם לבריכות שחייה.')
+            ->assertSee(__('assistant::ui.weak.flags.invented'))
+            ->assertDontSee('במה אוטמים גג');
+
+        $merchant = User::factory()->create();
+        $merchant->attachShop($this->shop);
+        $this->actingAs($merchant)->get('/operator/assistant/weak-answers')->assertForbidden();
+    }
+
     public function test_a_reviewer_never_checks_its_own_family(): void
     {
         $this->inShop(fn () => AssistantSearchAsk::query()->create([

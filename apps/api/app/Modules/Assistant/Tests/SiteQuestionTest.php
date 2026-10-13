@@ -11,6 +11,7 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -391,6 +392,7 @@ final class SiteQuestionTest extends TestCase
         $data = $this->askWith('מה מיוחד במוצר הזה?', ['701'], page: true)->json('data');
 
         $this->assertSame('answered', $data['outcome'], 'answered from the product, not refused as off topic');
+        $this->assertSame('מברגה נטענת של מקיטה, 18V.', $this->inShop(fn () => AssistantSearchAsk::query()->sole()->answer), 'kept on the question for the nightly review');
 
         // Harm is refused wherever it is asked from.
         $this->calls = [];

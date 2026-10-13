@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $score
  * @property string|null $summary
  * @property list<string>|null $improvements
- * @property list<array{ask_id: string, score: int, note: string}> $items
+ * @property list<array{ask_id: string, score: int, note: string, flag?: string}> $items flag: what the operator should check (ReviewSearchAsks::FLAGS)
  * @property array{asks: int, answered: int, no_match: int, whatsapp_shown: int, whatsapp_clicked: int, picked: int} $counts
  * @property string $status reviewed, quiet (no questions) or failed
  * @property string|null $reviewed_by

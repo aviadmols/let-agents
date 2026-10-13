@@ -395,6 +395,24 @@
             "unit": "tokens"
         },
         {
+            "name": "weak_answer_max_score",
+            "type": "int",
+            "default": 2,
+            "min": 1,
+            "max": 4,
+            "scope": "global",
+            "unit": "score"
+        },
+        {
+            "name": "weak_answer_days",
+            "type": "int",
+            "default": 7,
+            "min": 1,
+            "max": 60,
+            "scope": "global",
+            "unit": "days"
+        },
+        {
             "name": "review_max_asks",
             "type": "int",
             "default": 80,

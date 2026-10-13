@@ -167,6 +167,14 @@ return [
         'label' => 'Token cap for the daily report',
         'description' => 'Including thinking.',
     ],
+    'weak_answer_max_score' => [
+        'label' => 'Score that puts an answer up for checking',
+        'description' => 'An answer the daily report scored this or lower (out of 5) appears in "Answers to check". One marked as invented, or refused for no reason, appears at any score.',
+    ],
+    'weak_answer_days' => [
+        'label' => 'How many days back "Answers to check" reads',
+        'description' => 'The daily reports of these days, from every shop.',
+    ],
     'review_max_asks' => [
         'label' => 'How many questions are reviewed a day',
         'description' => 'The first of that day.',
