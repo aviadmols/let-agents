@@ -1328,6 +1328,11 @@
       '@media (hover:hover){.card a:hover .pics .alt,.d-prod:hover .d-pic .alt{opacity:1}}',
       '.drawer .foot{flex-direction:column;align-items:stretch;padding:12px 14px;background:var(--rs-bg);border-top:1px solid var(--rs-line)}',
       '.askbox{display:flex;align-items:center;gap:10px;border:1.5px solid var(--rs-fg);border-radius:14px;padding:6px;padding-inline-start:12px}',
+      '.foot{position:relative}',
+      '.la-photo-menu{position:absolute;bottom:calc(100% - 4px);inset-inline-start:14px;z-index:5;min-width:210px;display:grid;gap:2px;padding:6px;background:var(--rs-bg);color:var(--rs-fg);border:1px solid var(--rs-line);border-radius:16px;box-shadow:0 12px 32px -8px rgba(0,0,0,.28)}',
+      '.la-photo-menu button{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;font-size:16px}',
+      '.la-photo-menu button:active{background:var(--rs-soft)}',
+      '.la-photo-menu svg{width:22px;height:22px;flex:none}',
       '.askbox input{all:unset;flex:1;min-width:0;font:inherit;font-size:14px;color:var(--rs-fg)}',
       '@media (hover:none) and (pointer:coarse){.askbox input{font-size:16px}}',
       '.askbox button{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:50%;background:var(--rs-fg);color:var(--rs-bg);display:grid;place-items:center}',
@@ -3678,7 +3683,10 @@
         cam.setAttribute('aria-label', label('photo_search'));
         cam.title = label('photo_search');
         cam.innerHTML = CAMERA;
-        cam.addEventListener('click', function () { fileInput(false, true).click(); });
+        cam.addEventListener('click', function (event) {
+          event.preventDefault();
+          photoMenu(foot, true);
+        });
         box.appendChild(cam);
       }
       box.appendChild(send);
@@ -4373,6 +4381,56 @@
       return picker;
     }
 
+    /**
+     * Take a photo or pick one. On a phone the choice is ours: Android's photo picker (Chrome on a
+     * Samsung, for one) opens the gallery alone for a plain file field, with no camera, so the
+     * camera is asked for by its own field (capture). On a computer, the file is picked at once.
+     */
+    function photoMenu(holder, inSheet) {
+      var phone = win.matchMedia && win.matchMedia('(hover:none) and (pointer:coarse)').matches;
+      if (!phone) {
+        fileInput(false, inSheet).click();
+        return;
+      }
+      var open = holder.querySelector('.la-photo-menu');
+      if (open) {
+        open.parentNode.removeChild(open);
+        return;
+      }
+      var menu = el('div', 'la-photo-menu');
+      menu.setAttribute('role', 'menu');
+      [[true, 'photo_take', CAMERA], [false, 'photo_choose', PICTURE]].forEach(function (choice) {
+        var item = el('button');
+        item.type = 'button';
+        item.setAttribute('role', 'menuitem');
+        item.innerHTML = choice[2];
+        item.appendChild(el('span', null, label(choice[1])));
+        item.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (menu.parentNode) {
+            menu.parentNode.removeChild(menu);
+          }
+          fileInput(choice[0], inSheet).click();
+        });
+        menu.appendChild(item);
+      });
+      holder.appendChild(menu);
+      // A tap anywhere else closes it.
+      setTimeout(function () {
+        var away = function (event) {
+          var path = event.composedPath ? event.composedPath() : [];
+          if (path.indexOf(menu) === -1) {
+            if (menu.parentNode) {
+              menu.parentNode.removeChild(menu);
+            }
+            doc.removeEventListener('pointerdown', away, true);
+          }
+        };
+        doc.addEventListener('pointerdown', away, true);
+      }, 0);
+    }
+
     /** The upload area, inside the suggestions (or the phone sheet), until the shopper leaves it. */
     function openUpload() {
       var d = freshDropdown();
@@ -4713,7 +4771,7 @@
         var foot = el('div', 'foot');
         var again = el('button', 'la-btn la-ghost', label('photo_again'));
         again.type = 'button';
-        again.addEventListener('click', function () { fileInput(false, true).click(); });
+        again.addEventListener('click', function () { photoMenu(foot, true); });
         foot.appendChild(again);
         sheet.appendChild(foot);
       });
