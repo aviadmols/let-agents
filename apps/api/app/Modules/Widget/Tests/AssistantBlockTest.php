@@ -62,6 +62,7 @@ final class AssistantBlockTest extends TestCase
         $block = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
 
         $this->assertSame('שאלו את Rocks and Gold AI', $block['title']);
+        $this->assertFalse($block['photo'], 'no camera where the shop pictures are not scanned');
         $this->assertSame(['id' => '1', 'title' => 'תליון 1', 'kinds' => ['fact:pendant']], $block['product'], 'its kind, for a comparison only with another pendant');
         $this->assertSame([['label' => 'תליון', 'query' => 'תליון'], ['label' => 'זהב צהוב', 'query' => 'תליון זהב צהוב'], ['label' => '14K', 'query' => 'תליון 14K']], $block['tags']);
         // Next steps that lead somewhere: similar items, a comparison (named in the browser), more of its type,

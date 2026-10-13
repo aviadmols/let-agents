@@ -1715,6 +1715,8 @@ final class BuildPageBank
             'product' => ['id' => $externalId, 'title' => (string) $product->title, 'kinds' => $marks],
             'tags' => array_slice(array_values($tags), 0, self::ASSISTANT_TAGS),
             'questions' => array_slice($questions, 0, self::ASSISTANT_QUESTIONS),
+            // A camera beside the question box: the shop's photo search, where its pictures are scanned.
+            'photo' => Features::enabled('search.photos', $shopId) && app(SemanticSearch::class)->picturesReady(),
         ];
     }
 

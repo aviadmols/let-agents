@@ -5080,14 +5080,21 @@
           }
         }, 1000);
         if (picker.files && picker.files[0]) {
+          var file = picker.files[0];
           // A photo goes on in the smart search, in the side drawer, where the shopper can ask about it;
-          // where the shop shows results in the drawer anyway, they go there too.
-          toSmart();
-          if (inSheet || drawerMode()) {
-            searchPhotoSheet(picker.files[0]);
-          } else {
-            searchPhoto(picker.files[0]);
-          }
+          // where the shop shows results in the drawer anyway, they go there too. Picked before the
+          // search was ever opened (from the block under a product), it waits for the search to load.
+          load().then(function (data) {
+            if (!data) {
+              return;
+            }
+            toSmart();
+            if (inSheet || drawerMode()) {
+              searchPhotoSheet(file);
+            } else {
+              searchPhoto(file);
+            }
+          });
         }
       };
       picker.addEventListener('change', chosen);
@@ -5803,6 +5810,12 @@
         });
       },
       // about: the product whose page it was asked from ({ external_id, title, image, url }), shown above it.
+      // From the block under a product: the photo picker, opened by the shopper's own click (a
+      // browser opens it only then); the search loads once a photo is chosen.
+      photo: function (capture) {
+        forceSmart = true;
+        fileInput(!!capture, true).click();
+      },
       ask: function (question, productIds, about) {
         load().then(function (data) {
           if (data) {

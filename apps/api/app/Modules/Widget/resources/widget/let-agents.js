@@ -2170,11 +2170,14 @@
     '.as-form input{all:unset;flex:1;min-width:0;font-size:14px;padding:8px 0}',
     '.as-send{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:999px;display:grid;place-items:center;background:#111;color:#fff}',
     '.as-send svg{width:18px;height:18px}',
+    '.as-cam{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:999px;display:grid;place-items:center;color:#111;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12)}',
+    '.as-cam svg{width:20px;height:20px}',
     '.as-fallback:empty{display:none}'
   ].join('');
 
   var AS_SECTION = { candidate: 'assistant', model: 'chat' };
   var AS_TAGS = { candidate: 'assistant_tags', model: 'tag' };
+  var AS_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5V8a3 3 0 0 1 3-3h1.8l1.2-1.6h5l1.2 1.6h1.8a3 3 0 0 1 3 3v1.5"/><path d="M20.5 14.5V17a3 3 0 0 1-3 3H15"/><path d="M9 20H6.5a3 3 0 0 1-3-3v-2.5"/><circle cx="12" cy="12.5" r="3.2"/><circle cx="12" cy="12.5" r="1" fill="currentColor" stroke="none"/></svg>';
   var AS_SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c.5 4.6 2.9 7 7.5 7.5-4.6.5-7 2.9-7.5 7.5-.5-4.6-2.9-7-7.5-7.5 4.6-.5 7-2.9 7.5-7.5Z"/></svg>';
   var AS_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
 
@@ -2336,6 +2339,23 @@
     send.innerHTML = AS_UP;
     send.setAttribute('aria-label', labels.ask_send || 'Send');
     form.appendChild(field);
+    // Search by a photo, where the shop has it: the picker opens on this click, the search loads after.
+    if (block.photo) {
+      var cam = el('button', 'as-cam');
+      cam.type = 'button';
+      cam.innerHTML = AS_CAMERA;
+      cam.setAttribute('aria-label', labels.photo_search || 'Search by photo');
+      cam.title = labels.photo_search || '';
+      cam.addEventListener('click', function () {
+        track('click', AS_SECTION, 'panel');
+        // On a phone, the camera; on a computer, a file.
+        var search = window.LetAgentsSearch;
+        if (search && typeof search.photo === 'function') {
+          search.photo(!!(window.matchMedia && window.matchMedia('(hover:none) and (pointer:coarse)').matches));
+        }
+      });
+      form.appendChild(cam);
+    }
     form.appendChild(send);
     form.addEventListener('submit', function (event) {
       event.preventDefault();

@@ -156,6 +156,7 @@ return [
         'ask_title' => 'Ask about this product',
         'ask_placeholder' => 'For example: can I use it outdoors?',
         'ask_send' => 'Ask',
+        'photo_search' => 'Search by photo',
         'ask_thinking' => 'Checking the product information…',
         'ask_recent' => 'What shoppers asked',
         'ask_note' => 'Answers are written automatically from the product information only.',
