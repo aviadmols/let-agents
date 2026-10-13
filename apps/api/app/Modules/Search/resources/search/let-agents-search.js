@@ -3335,6 +3335,11 @@
             if (data && data.context === 'previous') {
               return;
             }
+            // No answer and nothing picked ("can I return a ring by your courier?"): what its words
+            // happen to find is not related, and only the reply and the shop's WhatsApp stay.
+            if (data && data.outcome !== 'answered' && !(data.picks && data.picks.length)) {
+              return;
+            }
             renderResults(below, result, raw, true);
             kept({ r: result });
           });

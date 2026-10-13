@@ -5,6 +5,7 @@ namespace App\Modules\Assistant\Models;
 use App\Core\Tenancy\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -40,5 +41,11 @@ class AssistantSearchAsk extends Model
             'whatsapp_shown' => 'boolean',
             'whatsapp_clicked' => 'boolean',
         ];
+    }
+
+    /** @return BelongsTo<AssistantAnswer, $this> the saved answer the shopper was shown */
+    public function answer(): BelongsTo
+    {
+        return $this->belongsTo(AssistantAnswer::class, 'answer_id');
     }
 }

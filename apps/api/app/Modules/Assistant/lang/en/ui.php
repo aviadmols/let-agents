@@ -61,6 +61,7 @@ return [
         ],
         'list_heading' => 'Latest questions in the search',
         'list_description' => 'Each question, what the assistant answered and picked, and what the shopper did. With the score from the daily report.',
+        'answer' => 'The answer the shopper got',
         'none' => 'No questions were asked in the search box yet.',
         'outcomes' => [
             'answered' => 'Answered',

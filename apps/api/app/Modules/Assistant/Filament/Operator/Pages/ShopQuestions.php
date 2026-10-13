@@ -117,7 +117,7 @@ class ShopQuestions extends Page
             return [
                 'latest' => $latest,
                 'trend' => $reviews->where('status', AssistantAskReview::REVIEWED)->sortBy('day')->map(fn (AssistantAskReview $r): array => ['day' => $r->day->format('d/m'), 'score' => $r->score])->values()->all(),
-                'asks' => AssistantSearchAsk::query()->latest('created_at')->orderByDesc('id')->limit(40)->get(),
+                'asks' => AssistantSearchAsk::query()->with('answer:id,answer')->latest('created_at')->orderByDesc('id')->limit(40)->get(),
                 'notes' => $notes,
             ];
         });

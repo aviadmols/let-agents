@@ -91,6 +91,9 @@
                                     @if ($ask->picked)<span style="padding:1px 9px;border-radius:999px;background:rgba(126,34,206,.12)">{{ __('assistant::ui.asks.picked') }}</span>@endif
                                     @if ($note)<span style="padding:1px 9px;border-radius:999px;background:rgba(127,127,127,.14)">{{ __('assistant::ui.asks.score', ['score' => $note['score']]) }}</span>@endif
                                 </div>
+                                @if (filled($ask->answer?->answer))
+                                    <div style="padding:8px 12px;border-inline-start:3px solid var(--la-accent,#3b5bdb);background:var(--la-sunk,#fafaf8);border-radius:6px;white-space:pre-line" data-ask-answer><span style="{{ $small }};display:block;margin-bottom:2px">{{ __('assistant::ui.asks.answer') }}</span>{{ $ask->answer->answer }}</div>
+                                @endif
                                 @if ($ask->picks)
                                     <ol style="margin:0;padding-inline-start:20px;font-size:13.5px">
                                         @foreach ($ask->picks as $pick)<li><strong>{{ $pick['title'] }}</strong> · <span style="opacity:.8">{{ $pick['why'] }}</span></li>@endforeach
@@ -153,7 +156,7 @@
                                         <div style="margin-top:4px">{{ $row->answer }}</div>
                                         <div style="{{ $small }};margin-top:4px">
                                             {{ __('assistant::ui.questions.sources.'.($row->source ?? 'store')) }}
-                                            @if ($row->source !== 'team') · {{ $row->model }} · ${{ number_format((float) $row->cost_usd, 4) }} @endif
+                                            @if ($row->source !== 'team' && $this->operatorView()) · {{ $row->model }} · ${{ number_format((float) $row->cost_usd, 4) }} @endif
                                         </div>
                                         @unless ($row->isShared())
                                             <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
