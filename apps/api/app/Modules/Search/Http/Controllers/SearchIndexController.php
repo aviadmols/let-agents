@@ -64,6 +64,12 @@ final class SearchIndexController
             'whatsapp' => self::whatsapp($shopId),
             'askWhatsapp' => Features::enabled('assistant.search_whatsapp', $shopId),
             'whatsappMessage' => trim((string) Settings::get('assistant.search_whatsapp_message', $shopId)) ?: (string) __('search::storefront.wa_message', [], $locale),
+            // When the shop answers its WhatsApp, one range a day from Sunday ("09:00-18:00", empty: closed),
+            // read in the browser at the shop's time: this answer is cached.
+            'hours' => ['timezone' => (string) Settings::get('widget.whatsapp_timezone', $shopId),
+                'days' => array_map(fn (string $day): string => trim((string) Settings::get('widget.hours_'.$day, $shopId)), ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'])],
+            // Without a WhatsApp, or after hours: the chat asks for a name and a way back, kept as a callback.
+            'callbacks' => Features::enabled('shoppers.callbacks', $shopId),
             'drawerSide' => (string) Settings::get('search.drawer_side', $shopId),
             // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
             'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),

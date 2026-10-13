@@ -10,6 +10,7 @@ use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -58,6 +59,28 @@ final class CallbackTest extends TestCase
             $this->shop->id,
             fn () => ShopperIdentity::query()->sole()->getRawOriginal('contact'),
         ));
+    }
+
+    public function test_from_the_search_chat_a_name_comes_with_the_way_back_and_no_code_to_type(): void
+    {
+        Mail::fake();
+
+        $response = $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/signup', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['vid' => self::VID, 'contact' => 'dana@example.com', 'name' => 'דנה כהן', 'consent' => true, 'locale' => 'he',
+            'question' => 'יש לכם משלוח לאילת?', 'type' => 'search', 'id' => '01m4vd6kdtaj9fmtjyhf99fx1e'], JSON_UNESCAPED_UNICODE));
+
+        $this->assertSame('saved', $response->assertOk()->json('data.status'), 'asked to be called back about one question: nothing to type back');
+        Mail::assertNothingSent();
+        $callback = app(TenantContext::class)->run($this->shop->id, fn () => ShopperCallback::query()->sole());
+        $this->assertSame(['search', '01m4vd6kdtaj9fmtjyhf99fx1e', 'דנה כהן'], [$callback->page_type, $callback->page_id, $callback->name]);
+        $this->assertStringNotContainsString('דנה', (string) $callback->getRawOriginal('name'), 'kept encrypted, like the contact');
+
+        // Anything but a name is no name.
+        $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/signup', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['vid' => self::VID, 'contact' => '0501234567', 'name' => '<b>x</b>', 'consent' => true, 'question' => 'שאלה', 'type' => 'search', 'id' => 'search']))->assertOk();
+        $this->assertNull(app(TenantContext::class)->run($this->shop->id, fn () => ShopperCallback::query()->latest('id')->first()->name));
     }
 
     public function test_it_is_refused_when_the_shop_turned_it_off(): void

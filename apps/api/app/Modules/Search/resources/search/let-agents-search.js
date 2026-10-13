@@ -1794,6 +1794,14 @@
       '.d-contact{border:1.5px solid #1f9d55;background:color-mix(in srgb,#1f9d55 7%,var(--rs-bg));border-radius:14px;padding:14px 16px;display:grid;gap:10px;font-size:14.5px;line-height:1.55}',
       '.d-wa{display:inline-flex;align-items:center;gap:8px;background:#1f9d55;color:#fff;border-radius:999px;padding:9px 16px;font-weight:600;font-size:14px;text-decoration:none;justify-self:start}',
       '.d-wa svg{width:18px;height:18px;flex:none}',
+      '.d-lead{display:grid;gap:8px}',
+      '.d-lead-talk{display:grid;gap:6px}',
+      '.d-lead-us,.d-lead-me{border-radius:12px;padding:8px 12px;max-width:90%;overflow-wrap:anywhere}',
+      '.d-lead-us{background:var(--rs-bg);justify-self:start}',
+      '.d-lead-me{background:color-mix(in srgb,var(--rs-fg) 8%,var(--rs-bg));justify-self:end}',
+      '.d-lead-form{display:flex;gap:8px}',
+      '.d-lead-form input{flex:1;min-width:0;font:inherit;padding:9px 12px;border:1px solid color-mix(in srgb,var(--rs-fg) 25%,transparent);border-radius:999px;background:var(--rs-bg);color:var(--rs-fg)}',
+      '.d-lead-note{font-size:12px;opacity:.7}',
       '.d-zone{margin:0;padding:28px 18px;background:var(--rs-soft)}',
       '.d-zone strong{font-size:16px}',
       '.d-yours{display:flex;align-items:center;gap:14px}',
@@ -3461,7 +3469,14 @@
       box.appendChild(el('div', 'd-a', answered ? label('contact_more') : ((data && data.answer) || label('no_answer'))));
       var number = String((state.config && state.config.whatsapp) || '').replace(/\D/g, '');
       var offered = (data && data.whatsapp === true) || (state.config && state.config.askWhatsapp !== false);
-      if (offered && /^\d{8,15}$/.test(number)) {
+      var hasNumber = offered && /^\d{8,15}$/.test(number);
+      var open = shopOpen(state.config && state.config.hours);
+      // No WhatsApp, or the team is not there now: a name and a way back, asked for in the chat.
+      if (!(hasNumber && open) && state.config && state.config.callbacks) {
+        box.appendChild(leaveDetails(raw, askId, hasNumber));
+        return box;
+      }
+      if (hasNumber) {
         var template = typeof state.config.whatsappMessage === 'string' && state.config.whatsappMessage ? state.config.whatsappMessage : label('wa_message');
         var text = template.split(':question').join(raw).split(':url').join(win.location.href);
         var wa = el('a', 'd-wa');
@@ -3480,6 +3495,148 @@
         box.appendChild(wa);
       }
       return box;
+    }
+
+    /**
+     * Whether the shop's team answers now: one range a day from Sunday ("09:00-18:00", empty: closed),
+     * at the shop's time. A shop that set no hours at all is taken as always there.
+     */
+    function shopOpen(hours) {
+      var days = (hours && hours.days) || [];
+      if (!days.some(function (d) { return String(d || '').trim() !== ''; })) {
+        return true;
+      }
+      var now = new Date();
+      var day;
+      var minutes;
+      try {
+        var read = {};
+        new Intl.DateTimeFormat('en-GB', { timeZone: hours.timezone || 'UTC', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+          .formatToParts(now).forEach(function (part) { read[part.type] = part.value; });
+        day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(read.weekday);
+        minutes = parseInt(read.hour, 10) % 24 * 60 + parseInt(read.minute, 10);
+      } catch (e) {
+        day = now.getDay();
+        minutes = now.getHours() * 60 + now.getMinutes();
+      }
+      var match = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/.exec(String(days[day] || '').trim());
+      if (!match) {
+        return false;
+      }
+      var from = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+      var until = parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
+      // A day that runs past midnight ends on the day it started.
+      return until > from ? (minutes >= from && minutes < until) : (minutes >= from || minutes < until);
+    }
+
+    /** Words around a name, never part of it: "קוראים לי דנה, טלפון 050...", "my name is Dana". */
+    var AROUND_NAME = ['שמי', 'השם', 'שם', 'שלי', 'קוראים', 'לי', 'אני', 'זה', 'זו', 'טלפון', 'הטלפון', 'והטלפון', 'טל', 'נייד', 'הנייד', 'מספר', 'המספר', 'מייל', 'המייל', 'והמייל', 'אימייל', 'דואל', 'שלום', 'היי', 'הי', 'תודה', 'ו', 'תחזרו', 'תחזור', 'תחזרי', 'לחזור', 'אליי', 'אלי', 'בבקשה', 'רוצה', 'אפשר', 'מחר', 'היום',
+      'my', 'name', 'is', 'i', 'am', 'im', 'phone', 'email', 'mail', 'tel', 'and', 'hi', 'hello', 'thanks', 'number', 'please', 'call', 'me', 'back', 'contact'];
+
+    /**
+     * A name and a phone or email from what the shopper typed, in any order and words. The name is
+     * what is left once the contact and the words around it are taken out: a few words of letters,
+     * never a sentence.
+     */
+    function readDetails(text) {
+      var out = { name: '', contact: '' };
+      var rest = String(text || '');
+      var email = /[^\s@,;:]+@[^\s@,;:]+\.[^\s@,;:]+/.exec(rest);
+      var phone = email ? null : /\+?\d[\d\s().-]{7,18}\d/.exec(rest);
+      if (email) {
+        out.contact = email[0];
+        rest = rest.replace(email[0], ' ');
+      } else if (phone && phone[0].replace(/\D/g, '').length >= 9) {
+        out.contact = phone[0].replace(/[^\d+]/g, '');
+        rest = rest.replace(phone[0], ' ');
+      }
+      var words = rest.replace(/[,;:!?()\[\]]/g, ' ').split(/\s+/).filter(function (word) {
+        var bare = word.replace(/[."'׳״]/g, '').toLowerCase();
+        return bare !== '' && AROUND_NAME.indexOf(bare) === -1;
+      });
+      var letters = words.every(function (word) { return /^[\u0590-\u05FFA-Za-z\u00C0-\u024F][\u0590-\u05FFA-Za-z\u00C0-\u024F'"׳״.-]*$/.test(word); });
+      if (words.length >= 1 && words.length <= 3 && letters) {
+        out.name = words.join(' ').slice(0, 60);
+      }
+      return out;
+    }
+
+    /**
+     * A short conversation in the reply: the shopper writes anything, and the chat asks again for
+     * what is still missing until it has a name and a phone or email; then the shop's team has it
+     * as a callback about this question.
+     */
+    function leaveDetails(raw, askId, hasNumber) {
+      var wrap = el('div', 'd-lead');
+      var talk = el('div', 'd-lead-talk');
+      wrap.appendChild(talk);
+      var say = function (text, mine) {
+        talk.appendChild(el('div', mine ? 'd-lead-me' : 'd-lead-us', text));
+      };
+      say(label(hasNumber ? 'lead_ask_closed' : 'lead_ask'));
+      var form = el('form', 'd-lead-form');
+      var input = el('input');
+      input.type = 'text';
+      input.maxLength = 160;
+      input.placeholder = label('lead_placeholder');
+      input.setAttribute('aria-label', label('lead_placeholder'));
+      var go = el('button', 'la-btn', label('lead_send'));
+      go.type = 'submit';
+      form.appendChild(input);
+      form.appendChild(go);
+      wrap.appendChild(form);
+      wrap.appendChild(el('div', 'd-lead-note', label('lead_note')));
+      var got = { name: '', contact: '' };
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var text = String(input.value || '').trim();
+        if (!text || go.disabled) {
+          return;
+        }
+        input.value = '';
+        say(text, true);
+        var read = readDetails(text);
+        got.contact = read.contact || got.contact;
+        got.name = read.name || got.name;
+        if (!got.name && !got.contact) {
+          say(label('lead_again'));
+          return;
+        }
+        if (!got.name) {
+          say(label('lead_need_name'));
+          return;
+        }
+        if (!got.contact) {
+          say(label('lead_need_contact', { name: got.name }));
+          return;
+        }
+        go.disabled = true;
+        win.fetch(API + '/widget/' + encodeURIComponent(ctx.site) + '/signup', {
+          method: 'POST', mode: 'cors', credentials: 'omit', headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ vid: visitor(), contact: got.contact, name: got.name, consent: true, locale: LOCALE, question: raw, type: 'search', id: askId || 'search' })
+        })
+          .then(function (response) { return response.json().catch(function () { return null; }); })
+          .then(function (json) {
+            go.disabled = false;
+            var status = json && json.data ? json.data.status : null;
+            if (status === 'invalid_contact') {
+              got.contact = '';
+              say(label('lead_bad_contact'));
+            } else if (status === 'saved' || status === 'code_sent') {
+              say(label('lead_saved', { name: got.name }));
+              if (form.parentNode) {
+                form.parentNode.removeChild(form);
+              }
+            } else {
+              say(label('lead_error'));
+            }
+          })
+          .catch(function () {
+            go.disabled = false;
+            say(label('lead_error'));
+          });
+      });
+      return wrap;
     }
 
     // ---------------------------------------------------------------- full results

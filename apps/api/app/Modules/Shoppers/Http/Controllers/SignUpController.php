@@ -71,16 +71,25 @@ final class SignUpController
      * sign-up. Anything malformed is treated as a plain sign-up rather than half a callback.
      *
      * @param  array<string, mixed>  $body
-     * @return array{question: string, type: string, id: string}|null
+     * @return array{question: string, type: string, id: string, name: string|null}|null
      */
     private static function waitingFor(array $body): ?array
     {
         $question = trim((string) ($body['question'] ?? ''));
-        $type = ($body['type'] ?? '') === 'content' ? 'content' : 'product';
+        // Asked in the search chat: the id is the question's own.
+        $type = in_array($body['type'] ?? '', ['content', 'search'], true) ? (string) $body['type'] : 'product';
         $id = (string) ($body['id'] ?? '');
 
         return $question === '' || ! preg_match(self::ID_PATTERN, $id)
             ? null
-            : ['question' => $question, 'type' => $type, 'id' => $id];
+            : ['question' => $question, 'type' => $type, 'id' => $id, 'name' => self::name($body['name'] ?? null)];
+    }
+
+    /** A name as people write one: letters, spaces, an apostrophe or a hyphen; anything else is no name. */
+    private static function name(mixed $name): ?string
+    {
+        $name = trim((string) preg_replace('/\s+/u', ' ', is_string($name) ? $name : ''));
+
+        return $name !== '' && mb_strlen($name) <= 60 && preg_match("/^[\\p{L}][\\p{L}\\p{M} '\"׳״.-]*$/u", $name) === 1 ? $name : null;
     }
 }

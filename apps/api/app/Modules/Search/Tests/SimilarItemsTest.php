@@ -155,6 +155,10 @@ final class SimilarItemsTest extends TestCase
 
         $config = $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index')->assertOk()->json('config');
         $this->assertSame(['drawer', 'end', true], [$config['results'], $config['drawerSide'], $config['similar']]);
+        // When the team answers WhatsApp, read in the browser; and whether a name and a way back can be left instead.
+        $this->assertCount(7, $config['hours']['days']);
+        $this->assertSame('Asia/Jerusalem', $config['hours']['timezone']);
+        $this->assertTrue($config['callbacks']);
 
         Features::override('search.similar', false, $this->shop->id);
         $this->similar('301')->assertNotFound();

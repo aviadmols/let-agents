@@ -114,6 +114,7 @@ class ShopSignUps extends Page
             ->map(fn (ShopperCallback $row): array => [
                 'id' => $row->id,
                 'question' => $row->question,
+                'name' => $row->name,
                 'contact' => $row->identity?->contact_masked,
                 'channel' => $row->identity?->channel,
                 'page' => $row->page_id,

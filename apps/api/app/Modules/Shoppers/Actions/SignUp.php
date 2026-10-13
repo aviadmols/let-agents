@@ -32,8 +32,8 @@ final class SignUp
      *                                                                                 status: saved, code_sent, invalid_contact, no_consent or too_many
      */
     /**
-     * @param  array{question: string, type: string, id: string}|null  $waitingFor  a question they want
-     *                                                                              the team to come back to them about
+     * @param  array{question: string, type: string, id: string, name?: string|null}|null  $waitingFor  a question they want
+     *                                                                                                  the team to come back to them about
      */
     public function handle(string $shopId, string $visitorHash, string $typed, bool $consent, string $locale, ?array $waitingFor = null): array
     {
@@ -78,13 +78,15 @@ final class SignUp
                 ShopperCallback::query()->create([
                     'shop_id' => $shopId,
                     'identity_id' => $identity->id,
+                    'name' => $waitingFor['name'] ?? null,
                     'question' => mb_substr($waitingFor['question'], 0, 500),
                     'page_type' => $waitingFor['type'],
                     'page_id' => $waitingFor['id'],
                 ]);
             }
 
-            if (! Channels::canVerify($contact->channel, $shopId)) {
+            // Asked in the search chat to be called back about one question: nothing to type back.
+            if (! Channels::canVerify($contact->channel, $shopId) || ($waitingFor['type'] ?? null) === 'search') {
                 return ['status' => 'saved', 'channel' => $contact->channel, 'masked' => $contact->masked];
             }
 

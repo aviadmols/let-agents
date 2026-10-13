@@ -8,7 +8,7 @@
                         <div style="flex-grow:1;min-width:0">
                             <div style="font-size:13px;line-height:1.4">{{ $row['question'] }}</div>
                             <div style="margin-top:2px;font-size:11.5px;color:#9ca3af">
-                                {{ $row['contact'] }} · {{ $row['at']?->diffForHumans() }} · #{{ $row['page'] }}
+                                @if ($row['name'] ?? null)<strong style="color:#374151">{{ $row['name'] }}</strong> · @endif{{ $row['contact'] }} · {{ $row['at']?->diffForHumans() }} · #{{ $row['page'] }}
                             </div>
                         </div>
                         <x-filament::button size="xs" color="gray" wire:click="answered({{ $row['id'] }})">
