@@ -3,6 +3,7 @@
 return [
     'title' => 'Let Agents · סיכום יומי · :shop · :date',
     'searches' => 'אתמול: :searches חיפושים, :empty בלי תוצאות, :clicks לחיצות על תוצאות.',
+    'new_products' => 'מוצרים חדשים שנכנסו למערכת ביממה האחרונה: :count (מהם :read כבר נקראו ותוארו). סך הכול בקטלוג: :total.',
     'evidence' => 'נבדקו: :empty חיפושים שלא מצאו כלום, :unclicked חיפושים שאף אחד לא לחץ עליהם, :questions שאלות בלי תשובה באתר.',
     'quiet' => 'אין משהו חדש היום.',
     'proposals' => 'הצעות: :proposed, מהן :accepted עברו בדיקה ו־:applied כבר נכנסו לחיפוש.',

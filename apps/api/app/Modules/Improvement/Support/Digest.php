@@ -4,6 +4,9 @@ namespace App\Modules\Improvement\Support;
 
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
 use App\Modules\Search\Models\SearchTerm;
@@ -18,6 +21,18 @@ use Throwable;
 final class Digest
 {
     private const LISTED = 5;
+
+    /**
+     * The products the store added in the last day, as the sync brought them in, and how many of them
+     * the reading has already described (an approved fact). Inside the shop's tenant.
+     */
+    private static function newProducts(): string
+    {
+        $ids = CatalogProduct::query()->where('created_at', '>=', now()->subDay())->pluck('id');
+        $read = $ids->isEmpty() ? 0 : EnrichmentFact::query()->whereIn('product_id', $ids)->where('status', FactStatus::Approved)->distinct()->count('product_id');
+
+        return __('improvement::digest.new_products', ['count' => number_format($ids->count()), 'read' => number_format($read), 'total' => number_format(CatalogProduct::query()->active()->count())]);
+    }
 
     /** @param list<ImprovementProposal> $proposals */
     public static function write(string $shopId, ImprovementReview $review, array $proposals, ?string $stopped = null): string
@@ -35,6 +50,7 @@ final class Digest
                 'empty' => number_format((int) $searches->empty),
                 'clicks' => number_format((int) $searches->clicks),
             ]),
+            self::newProducts(),
             __('improvement::digest.evidence', [
                 'empty' => (string) count($evidence['empty'] ?? []),
                 'unclicked' => (string) count($evidence['unclicked'] ?? []),

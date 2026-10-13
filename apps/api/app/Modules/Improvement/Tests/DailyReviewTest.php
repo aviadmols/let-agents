@@ -10,10 +10,16 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogCategory;
+use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactOrigin;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Improvement\Actions\RunDailyReview;
 use App\Modules\Improvement\Filament\Operator\Pages\SiteSuggestions;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
+use App\Modules\Improvement\Support\Digest;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Models\SearchTerm;
@@ -174,6 +180,26 @@ final class DailyReviewTest extends TestCase
         $this->replies = [['proposals' => [['kind' => 'content_gap', 'refs' => ['s1'], 'topic' => 'פרקט למרפסת', 'why' => 'שוב.']]]];
         app(RunDailyReview::class)->handle($this->shop->id);
         $this->assertSame(1, $this->inShop(fn () => ImprovementProposal::query()->where('kind', 'content_gap')->count()));
+    }
+
+    public function test_the_report_counts_the_products_that_came_in_since_yesterday(): void
+    {
+        $this->inShop(function (): void {
+            foreach (['1' => now()->subHours(3), '2' => now()->subHours(20), '3' => now()->subDays(3)] as $id => $at) {
+                $product = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "קרש {$id}",
+                    'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                CatalogProduct::query()->whereKey($product->id)->update(['created_at' => $at]);
+                if ((string) $id === '1') {
+                    EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'kind' => FactKind::Type, 'key' => 'type', 'value_text' => 'board',
+                        'origin' => FactOrigin::Code, 'status' => FactStatus::Approved, 'input_hash' => 'h']);
+                }
+            }
+        });
+        $review = $this->inShop(fn () => ImprovementReview::query()->create(['shop_id' => $this->shop->id, 'day' => now()->toDateString(), 'status' => ImprovementReview::QUIET, 'evidence' => [], 'digest' => '']));
+
+        $digest = $this->inShop(fn (): string => Digest::write($this->shop->id, $review, []));
+
+        $this->assertStringContainsString('מוצרים חדשים שנכנסו למערכת ביממה האחרונה: 2 (מהם 1 כבר נקראו ותוארו). סך הכול בקטלוג: 3.', $digest);
     }
 
     private function inShop(callable $callback): mixed
