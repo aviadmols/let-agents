@@ -66,7 +66,7 @@ final class AnswerSiteQuestion
      * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
      * 5 is the facts-only writer the bench tries, never released here).
      */
-    public const PROMPT_VERSION = 6;
+    public const PROMPT_VERSION = 7;
 
     /** Who wrote a knowledge entry, as the writer is told. */
     private const WRITTEN_BY = [
@@ -145,10 +145,12 @@ final class AnswerSiteQuestion
         // about another product on the next page (and a refusal saved before the product was synced
         // would answer every product).
         $bound = $followUp || ($fromPage && $products !== []);
+        // The product whose page it is: the writer says what matters about it.
+        $viewing = $fromPage && ! $followUp && $products !== [] ? $products[0] : null;
 
-        return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp, $bound): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp, $bound, $viewing): array {
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
-                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound);
+                ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound, $viewing);
             $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
 
             return $this->logged($shopId, $question, $products, $result);
@@ -185,7 +187,7 @@ final class AnswerSiteQuestion
      *                          since the same words were about other products for anyone else
      * @return array<string, mixed>
      */
-    private function answer(string $shopId, string $question, string $visitorHash, string $locale, array $products, bool $followUp = false): array
+    private function answer(string $shopId, string $question, string $visitorHash, string $locale, array $products, bool $followUp = false, ?string $viewing = null): array
     {
         // "The cheapest drill" is arithmetic: code answers it from the products found, before any
         // saved answer (prices and stock change) and without a model.
@@ -195,7 +197,7 @@ final class AnswerSiteQuestion
 
         if ($followUp) {
             return $this->withinDailyLimits($shopId, $visitorHash)
-                ? $this->ask($shopId, $question, $locale, $products, visitorHash: $visitorHash, keep: false)
+                ? $this->ask($shopId, $question, $locale, $products, visitorHash: $visitorHash, keep: false, viewing: $viewing)
                 : $this->fixed('limit', $locale);
         }
 
@@ -438,7 +440,7 @@ final class AnswerSiteQuestion
      * @param  list<string>  $shown
      * @return array{type: string, empty: bool, found: int, shown: int, byRef: array<string, array<string, mixed>>, productsByRef: array<string, array<string, mixed>>, analysis: array<string, mixed>, forModel: list<array<string, mixed>>, input: string, debug: array<string, mixed>|null}
      */
-    private function prepare(string $shopId, string $question, array $shown, string $mode): array
+    private function prepare(string $shopId, string $question, array $shown, string $mode, ?string $viewing = null): array
     {
         $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
         $found = array_values(array_filter(
@@ -483,8 +485,12 @@ final class AnswerSiteQuestion
             $forModel = array_map(fn (array $entry): array => AnswerContext::fields($type, $entry, $productsByRef[$entry['ref']], $question), $forModel);
         }
 
+        // The product whose page the question was asked from, by its ref.
+        $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
+
         $input = (string) json_encode([
             'question' => $question,
+        ] + (is_string($viewingRef) ? ['viewing' => $viewingRef] : []) + [
             'products' => $forModel,
             'analysis' => $analysis,
             'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
@@ -502,7 +508,7 @@ final class AnswerSiteQuestion
      * @param  bool  $keep  false for a follow-up: the answer is about this conversation's products, never saved for the next shopper
      * @return array<string, mixed>
      */
-    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true): array
+    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true, ?string $viewing = null): array
     {
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
@@ -513,7 +519,7 @@ final class AnswerSiteQuestion
             shopId: $shopId,
             trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,
             input: ['question' => $question, 'products' => count($shown)] + ($remember ? [] : ['evaluation' => $mode]),
-            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, &$result, &$trace): void {
+            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, $viewing, &$result, &$trace): void {
                 $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
                 $writer = ['provider' => $writer->provider, 'name' => $writer->provider->value, 'model' => $writer->model];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
@@ -592,7 +598,7 @@ final class AnswerSiteQuestion
                     }
                 }
 
-                $prepared = $this->prepare($shopId, $question, $shown, $mode);
+                $prepared = $this->prepare($shopId, $question, $shown, $mode, $viewing);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
                     'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];

@@ -373,6 +373,7 @@ final class SiteQuestionTest extends TestCase
         // A Shopify product has no short description: its description is what the writer reads.
         $input = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['products']));
         $this->assertSame('מברגה נטענת.', $input['products'][0]['about'] ?? null, 'the description reaches the writer');
+        $this->assertSame('p1', $input['viewing'] ?? null, 'and it is told this is the product on the page');
         $this->assertSame(1, $this->inShop(fn () => AssistantAnswer::query()->count()), 'and nothing about this product is kept for the next one');
     }
 
