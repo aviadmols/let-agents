@@ -91,5 +91,10 @@ return [
     'facet_type' => 'סוג מוצר',
     'filters' => 'סינון מהיר',
     'clear_filters' => 'ניקוי',
+    'filter_price' => 'מחיר',
+    'filter_size' => 'גודל',
+    'filter_more' => 'זמינות',
+    'columns_one' => 'תמונה אחת בשורה',
+    'columns_two' => 'שתי תמונות בשורה',
     'sorted_by' => 'מסודר: :label',
 ];

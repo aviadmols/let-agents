@@ -91,5 +91,10 @@ return [
     'facet_type' => 'Product type',
     'filters' => 'Quick filters',
     'clear_filters' => 'Clear',
+    'filter_price' => 'Price',
+    'filter_size' => 'Size',
+    'filter_more' => 'Availability',
+    'columns_one' => 'One picture a row',
+    'columns_two' => 'Two pictures a row',
     'sorted_by' => 'Sorted: :label',
 ];

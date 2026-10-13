@@ -1248,6 +1248,8 @@
       'box-shadow:0 30px 80px -24px rgba(0,0,0,.35),0 2px 10px rgba(0,0,0,.06);overflow:hidden;display:flex;flex-direction:column}',
       '.d-cols{display:grid;grid-template-columns:minmax(200px,280px) minmax(0,1fr);overflow:auto;min-height:0;flex:1 1 auto}',
       '.d.one .d-cols{grid-template-columns:minmax(0,1fr)}',
+      // "one" is also the single result's section (.one, a grid): the suggestions stay a column that scrolls inside.
+      '.d.one{display:flex;gap:0}',
       '.d-side{background:var(--rs-soft);padding:18px 20px;display:grid;gap:2px;align-content:start;border-inline-end:1px solid var(--rs-line)}',
       '.d-h{margin:0 0 4px;font-size:13px;font-weight:500;opacity:.62}',
       '.d-cat,.d-art{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 8px;margin:0 -8px;border-radius:8px;color:inherit;text-decoration:none;cursor:pointer}',
@@ -1370,6 +1372,10 @@
       '.la-bar-x:hover{background:var(--rs-soft,rgba(0,0,0,.05))}',
       '.la-bar-x svg{width:20px;height:20px}',
       '.la-filters-title{font-size:12px;opacity:.7;margin-inline-end:2px}',
+      // One group per kind of filter, its name before its chips, a thin line between groups.
+      '.la-fgroup{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;padding-inline-end:10px;margin-inline-end:4px;border-inline-end:1px solid var(--rs-line,#e5e7eb)}',
+      '.la-fgroup:last-of-type{border-inline-end:0}',
+      '.la-fgroup-l{font-size:11.5px;opacity:.6;font-weight:600}',
       '.la-filters .d-chip{padding:4px 12px;font-size:13px}',
       '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
       '.la-focus-row{display:flex;flex-wrap:wrap;gap:8px}',
@@ -2074,18 +2080,18 @@
       }
       var chips = [];
       var count = function (test) { return left.filter(test).length; };
-      var sortChip = function (id, value) {
+      var sortChip = function (id, value, group) {
         var text = actionLabel(id);
         if (text) {
-          chips.push({ on: c.sort === value, text: text, go: function () { c.sort = c.sort === value ? null : value; } });
+          chips.push({ on: c.sort === value, text: text, group: group, go: function () { c.sort = c.sort === value ? null : value; } });
         }
       };
       // In the order a shopper narrows down: price, then what the product is made of and set with,
       // attribute by attribute as the shop's vocabulary lists them (metal, karat, stone…), then its
       // type, then size, sale and stock.
       if (count(function (r) { return typeof r.pr === 'number'; }) >= 2) {
-        sortChip('cheapest', 'price:asc');
-        sortChip('dearest', 'price:desc');
+        sortChip('cheapest', 'price:asc', 'price');
+        sortChip('dearest', 'price:desc', 'price');
       }
       var counts = {};
       left.forEach(function (record) {
@@ -2108,7 +2114,7 @@
           var facet = (state.facets || [])[Math.floor(code / 1000)];
           var value = facet && facet.v[code % 1000];
           if (value) {
-            chips.push({ on: !!c.f[code], text: value.l, go: function () {
+            chips.push({ on: !!c.f[code], text: value.l, group: 'f' + Math.floor(code / 1000), title: facet.l, go: function () {
               if (c.f[code]) {
                 delete c.f[code];
               } else {
@@ -2118,14 +2124,14 @@
           }
         });
       if (state.size && count(function (r) { return typeof r.z === 'number'; }) >= 2) {
-        sortChip('biggest', 'size:desc');
-        sortChip('smallest', 'size:asc');
+        sortChip('biggest', 'size:desc', 'size');
+        sortChip('smallest', 'size:asc', 'size');
       }
       [['on_sale', 'sale', function (r) { return r.sl === 1; }], ['in_stock', 'stock', function (r) { return r.s === 1; }]].forEach(function (flag) {
         var some = count(flag[2]);
         var text = actionLabel(flag[0]);
         if (text && (c[flag[1]] || (some > 0 && some < n))) {
-          chips.push({ on: c[flag[1]], text: text, go: function () { c[flag[1]] = !c[flag[1]]; } });
+          chips.push({ on: c[flag[1]], text: text, group: 'more', go: function () { c[flag[1]] = !c[flag[1]]; } });
         }
       });
       if (!chips.length) {
@@ -2134,8 +2140,17 @@
       var row = el('div', 'la-filters');
       row.appendChild(el('span', 'la-filters-title', label('filters')));
       var any = false;
+      var titles = { price: label('filter_price'), size: (state.size && state.size.l) || label('filter_size'), more: label('filter_more') };
+      var box = null;
+      var boxOf = null;
       chips.forEach(function (chip) {
         any = any || chip.on;
+        if (chip.group !== boxOf) {
+          boxOf = chip.group;
+          box = el('span', 'la-fgroup');
+          box.appendChild(el('span', 'la-fgroup-l', chip.title || titles[chip.group] || ''));
+          row.appendChild(box);
+        }
         var button = el('button', 'd-chip', chip.text);
         button.type = 'button';
         button.setAttribute('aria-pressed', chip.on ? 'true' : 'false');
@@ -2146,7 +2161,7 @@
           chip.go();
           changed();
         });
-        row.appendChild(button);
+        box.appendChild(button);
       });
       if (any) {
         var clear = el('button', 'd-chip', label('clear_filters'));
@@ -3253,6 +3268,21 @@
       return shop;
     }
 
+    var COLUMNS_KEY = 'let_agents_drawer_columns:' + ctx.site;
+    var COLUMNS_ONE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/></svg>';
+    var COLUMNS_TWO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg>';
+
+    /** How many pictures a row in the drawer: what this shopper chose, else the shop's setting. */
+    function drawerColumns() {
+      try {
+        var kept = win.localStorage.getItem(COLUMNS_KEY);
+        if (kept === '1' || kept === '2') {
+          return Number(kept);
+        }
+      } catch (e) { /* none kept */ }
+      return state.config && state.config.drawerColumns === 1 ? 1 : 2;
+    }
+
     /** "Regular search | Smart search"; text() is what the shopper has typed at the moment of the click. */
     function modeSwitch(text) {
       var bar = el('div', 'la-mode');
@@ -3490,7 +3520,7 @@
           closePanel();
         }
       });
-      var sheet = el('aside', 'sheet drawer' + (state.config.drawerColumns === 1 ? ' one' : ''));
+      var sheet = el('aside', 'sheet drawer' + (drawerColumns() === 1 ? ' one' : ''));
       sheet.setAttribute('role', 'dialog');
       sheet.setAttribute('aria-modal', 'true');
       sheet.setAttribute('aria-label', label('drawer_title'));
@@ -3502,8 +3532,27 @@
       var again = el('button', 'x', '\u21BB');
       again.type = 'button';
       again.setAttribute('aria-label', label('new_search'));
+      // One picture a row or two: the shopper's choice, kept in this browser; the shop's setting until then.
+      var cols = el('button', 'x cols');
+      cols.type = 'button';
+      var paintCols = function () {
+        var one = sheet.classList.contains('one');
+        cols.innerHTML = one ? COLUMNS_TWO : COLUMNS_ONE;
+        cols.setAttribute('aria-label', label(one ? 'columns_two' : 'columns_one'));
+        cols.title = cols.getAttribute('aria-label');
+      };
+      cols.addEventListener('click', function () {
+        var one = !sheet.classList.contains('one');
+        sheet.classList.toggle('one', one);
+        try {
+          win.localStorage.setItem(COLUMNS_KEY, one ? '1' : '2');
+        } catch (e) { /* this page only */ }
+        paintCols();
+      });
+      paintCols();
       top.appendChild(x);
       top.appendChild(el('h2', null, label('drawer_title')));
+      top.appendChild(cols);
       top.appendChild(again);
       sheet.appendChild(top);
       if (choosesMode()) {
@@ -4215,7 +4264,9 @@
           }
         }, 1000);
         if (picker.files && picker.files[0]) {
-          // Where the shop shows results in the side drawer, a photo's results go there too.
+          // A photo goes on in the smart search, in the side drawer, where the shopper can ask about it;
+          // where the shop shows results in the drawer anyway, they go there too.
+          toSmart();
           if (inSheet || drawerMode()) {
             searchPhotoSheet(picker.files[0]);
           } else {
@@ -4280,6 +4331,7 @@
       zone.addEventListener('drop', function (event) {
         var dropped = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
         if (dropped) {
+          toSmart();
           if (drawerMode()) {
             searchPhotoSheet(dropped);
           } else {
@@ -4926,6 +4978,43 @@
         closeDropdown();
       }
     }, true);
+    // A theme's search field inside a dialog that closes on a press or a click outside it (focus-trap
+    // and the like listen on the document, before our chips can stop anything): our suggestions sit
+    // outside that dialog, so a press on them stops at the window, keeping the field's focus as
+    // keepFocus does, and a click goes on again inside our own tree only, where the document does
+    // not see it. The theme's search stays open while the shopper picks a filter.
+    var replaying = false;
+    var inDialog = function () {
+      return !!(current && current.closest && current.closest('dialog, [role="dialog"], [aria-modal="true"]'));
+    };
+    ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach(function (type) {
+      win.addEventListener(type, function (event) {
+        if (replaying || !dropdown || !inDialog()) {
+          return;
+        }
+        var path = event.composedPath ? event.composedPath() : [];
+        if (path.indexOf(dropdown.host) === -1) {
+          return;
+        }
+        event.stopPropagation();
+        var target = path[0];
+        if (type === 'mousedown' && !(target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'))) {
+          event.preventDefault();
+        }
+        if (type === 'click' && target && target.dispatchEvent) {
+          event.preventDefault();
+          replaying = true;
+          try {
+            target.dispatchEvent(new win.MouseEvent('click', {
+              bubbles: true, cancelable: true, composed: false, button: event.button,
+              ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey
+            }));
+          } finally {
+            replaying = false;
+          }
+        }
+      }, true);
+    });
   }
 
   return {

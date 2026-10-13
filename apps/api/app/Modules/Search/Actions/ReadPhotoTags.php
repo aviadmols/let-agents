@@ -42,7 +42,7 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 9;
+    public const PROMPT_VERSION = 10;
 
     public const SECOND_VERSION = 1;
 
@@ -313,7 +313,8 @@ final class ReadPhotoTags
                     'object' => $object,
                     'also' => self::words($data['also'] ?? [], 3, [$object]),
                     'around' => self::words($data['around'] ?? [], 4, [$object]),
-                    'details' => self::words([...(array) ($data['details'] ?? []), ...(array) ($data['maybe'] ?? [])], 9, [$object]),
+                    // The one detail that tells it apart most (v10: "key") leads the details, and weighs the most.
+                    'details' => self::words([$data['key'] ?? null, ...(array) ($data['details'] ?? []), ...(array) ($data['maybe'] ?? [])], 9, [$object]),
                     'lacks' => self::words($data['lacks'] ?? [], 4, []),
                     'box' => self::box($data['box'] ?? null),
                     'others' => self::others($data['others'] ?? [], $object),
@@ -507,7 +508,7 @@ final class ReadPhotoTags
                 continue;
             }
 
-            $out[] = ['object' => $name, 'details' => self::words([...(array) ($other['details'] ?? []), ...(array) ($other['maybe'] ?? [])], 9, [$name]), 'lacks' => self::words($other['lacks'] ?? [], 4, []), 'box' => $box];
+            $out[] = ['object' => $name, 'details' => self::words([$other['key'] ?? null, ...(array) ($other['details'] ?? []), ...(array) ($other['maybe'] ?? [])], 9, [$name]), 'lacks' => self::words($other['lacks'] ?? [], 4, []), 'box' => $box];
         }
 
         return array_slice($out, 0, 3);

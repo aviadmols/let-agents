@@ -43,4 +43,22 @@ final class PhotoPlacerTest extends TestCase
         $this->assertSame(['מברגת', 'מברג', 'מברגה'], PhotoPlacer::forms('מברגות'), 'a plural in ות may be of a masculine or a feminine noun');
         $this->assertSame([], PhotoPlacer::words(' '));
     }
+
+    public function test_what_it_is_made_of_never_chooses_the_category(): void
+    {
+        $index = ['records' => [
+            'k:1' => ['id' => 'k:1', 't' => 'category', 'title' => 'טבעות', 'n' => 400],
+            'k:2' => ['id' => 'k:2', 't' => 'category', 'title' => 'טבעות זהב צהוב', 'n' => 60],
+        ], 'facets' => [
+            ['k' => 'type', 'l' => 'סוג מוצר', 'v' => [['k' => 'ring', 'l' => 'טבעת']]],
+            ['k' => 'metal', 'l' => 'מתכת', 'v' => [['k' => 'yellow_gold', 'l' => 'זהב צהוב'], ['k' => 'white_gold', 'l' => 'זהב לבן']]],
+        ]];
+
+        // "זהב" says what it is made of: a signet ring with gold letters is a ring, not only among yellow-gold rings.
+        $this->assertSame('טבעות', (new PhotoPlacer($index))->place('טבעת חותם עם לוח שחור ואותיות זהב')['main']['title']);
+        // Without the shop's vocabulary, the words choose as before.
+        $this->assertSame('טבעות זהב צהוב', (new PhotoPlacer(['records' => $index['records']]))->place('טבעת חותם עם לוח שחור ואותיות זהב')['main']['title']);
+        // A plural in יות stands for its short singular too: אותיות, אות.
+        $this->assertContains('את', PhotoPlacer::forms('אותיות'));
+    }
 }

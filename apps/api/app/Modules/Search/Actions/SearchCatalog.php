@@ -67,6 +67,9 @@ final class SearchCatalog
     /** Products the object's words name, put first in a photo's results. */
     private const OBJECT_NAMED = 24;
 
+    /** How much more the detail that tells the object apart most counts than any other detail. */
+    private const KEY_DETAIL_WEIGHT = 2.0;
+
     /** Products of the asked-about kind put first for a question. */
     private const SUBJECT_PRODUCTS = 12;
 
@@ -521,7 +524,8 @@ final class SearchCatalog
     {
         $members = [];
         // What the reader's own words for the object name: of the kind photographed, whatever category it chose.
-        $objectNamed = array_flip(self::objectNamed($index, $object));
+        [$named, $specific] = self::objectNamed($index, $object);
+        $objectNamed = array_flip($named);
         foreach (array_keys($objectNamed) as $id) {
             $members[$id] ??= [];
         }
@@ -583,6 +587,9 @@ final class SearchCatalog
         // chosen by a shared word: "סטים" (power-tool kits) for "סט ביטים". Then the bit sets come
         // first. When it holds some ("טבעת" among the rings), the picture orders them as before.
         $missed = $objectNamed !== [] && array_filter(array_keys($objectNamed), fn ($id): bool => array_intersect($members[$id] ?? [], $main) !== []) === [];
+        // "טבעת חותם": the words name a kind narrower than the category (rings), so the signet rings
+        // come before the other rings, and their pictures order them.
+        $missed = $missed || $specific;
         $byObject = fn (array $c): int => $missed && isset($objectNamed[$c['external_id']]) ? 1 : 0;
         usort($candidates, fn (array $a, array $b): int => $byObject($b) <=> $byObject($a) ?: $isMain($b) <=> $isMain($a) ?: $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
         $brandOf = fn (array $c): string => mb_strtolower(trim((string) $rows->get($c['external_id'])?->brand)) ?: 'id:'.$c['external_id'];
@@ -613,7 +620,7 @@ final class SearchCatalog
      * reader chose. One short word alone ("סט") names nothing; at most OBJECT_NAMED products.
      *
      * @param  array{engine: array<string, mixed>, records: array<string, array<string, mixed>>}  $index
-     * @return list<string> external ids
+     * @return array{0: list<string>, 1: bool} external ids, and whether the words name a kind narrower than the noun
      */
     private static function objectNamed(array $index, ?string $object): array
     {
@@ -634,11 +641,14 @@ final class SearchCatalog
             }
 
             if ($ids !== []) {
-                return array_slice($ids, 0, self::OBJECT_NAMED);
+                // Two words of three letters or more ("טבעת חותם", not "טבעת עם"): a kind of its own.
+                $specific = count(array_filter(array_slice($words, 0, $n), fn (string $w): bool => mb_strlen(HebrewSearch::normalize($w)) >= 3)) >= 2;
+
+                return [array_slice($ids, 0, self::OBJECT_NAMED), $specific];
             }
         }
 
-        return [];
+        return [[], false];
     }
 
     /**
@@ -655,10 +665,13 @@ final class SearchCatalog
     private function namedLike(array $index, array $ids, array $description): array
     {
         $wanted = [];
+        $boost = [];
 
         foreach ($description as $at => $phrase) {
             foreach (array_slice(PhotoPlacer::words((string) $phrase), $at === 0 ? 1 : 0) as $forms) {
                 $wanted[$forms[0]] = $forms;
+                // The detail that tells the object apart most ("אותיות על לוח שחור") counts twice.
+                $boost[$forms[0]] = max($boost[$forms[0]] ?? 1, $at === 1 ? self::KEY_DETAIL_WEIGHT : 1);
             }
         }
 
@@ -670,7 +683,7 @@ final class SearchCatalog
 
         foreach ($ids as $id) {
             $record = $index['records']['p:'.$id] ?? [];
-            $own = PhotoPlacer::words(trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '')));
+            $own = self::withoutPrefix(PhotoPlacer::words(trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? ''))));
 
             foreach ($wanted as $key => $forms) {
                 foreach ($own as $word) {
@@ -685,7 +698,7 @@ final class SearchCatalog
         $weights = [];
 
         foreach ($wanted as $key => $forms) {
-            $weights[$key] = 1 - count($held[$key] ?? []) / count($ids);
+            $weights[$key] = (1 - count($held[$key] ?? []) / count($ids)) * $boost[$key];
         }
 
         $total = array_sum($weights);
@@ -706,6 +719,27 @@ final class SearchCatalog
         }
 
         return $out;
+    }
+
+    /**
+     * A title's words, each also without the one letter Hebrew puts before a word (ה, ו, ב, ל, מ, ש, כ):
+     * "עם האות M" holds "אות". Only words long enough to stay a word without it.
+     *
+     * @param  list<list<string>>  $words
+     * @return list<list<string>>
+     */
+    private static function withoutPrefix(array $words): array
+    {
+        foreach ($words as $i => $forms) {
+            foreach ($forms as $form) {
+                if (mb_strlen($form) >= 3 && preg_match('/^[הובלמשכ]/u', $form) === 1) {
+                    $words[$i][] = mb_substr($form, 1);
+                }
+            }
+            $words[$i] = array_values(array_unique($words[$i]));
+        }
+
+        return $words;
     }
 
     /**

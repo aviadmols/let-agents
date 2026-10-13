@@ -14,6 +14,11 @@ use App\Modules\Catalog\Models\CatalogProduct;
  * like the plural of (ברזים: ברז; מברגות: מברג and מברגה), with ו and י dropped after the
  * first letter. So ברז places in ברזים and ברזי מטבח, never in ברזל. The first word of what was
  * seen is its head noun, as Hebrew puts it, and must be there; the other words count for more.
+ *
+ * Except the words that only say what it is made of or set with: a value of the shop's vocabulary
+ * ("זהב", "צהוב", "יהלום"). They tell one ring from another, never which kind of thing it is, so
+ * they never choose the category: "טבעת חותם עם אותיות זהב" places in rings, not in yellow-gold
+ * rings, where a signet ring with onyx may not be. The pictures and the details order by them.
  */
 final class PhotoPlacer
 {
@@ -32,6 +37,9 @@ final class PhotoPlacer
     /** @var array<string, list<string>> product external id => its categories' external ids */
     private array $categories = [];
 
+    /** @var array<string, true>|null the first form of every word of the vocabulary's values, the type's aside */
+    private ?array $traits = null;
+
     /** @param array{engine: array<string, mixed>, records: array<string, array<string, mixed>>} $index */
     public function __construct(private readonly array $index) {}
 
@@ -49,7 +57,8 @@ final class PhotoPlacer
             $length = mb_strlen($word);
 
             if ($length >= 5 && str_ends_with($word, 'יות')) {
-                $forms[] = mb_substr($word, 0, -3).'ית';
+                // אותיות: אותית as the pattern goes, and אות, the word itself.
+                array_push($forms, mb_substr($word, 0, -3).'ית', mb_substr($word, 0, -3));
             } elseif ($length >= 4 && str_ends_with($word, 'ות')) {
                 $base = mb_substr($word, 0, -2);
                 array_push($forms, $base, $base.'ה');
@@ -266,6 +275,7 @@ final class PhotoPlacer
      */
     private function category(array $words): ?array
     {
+        $words = $this->kindOnly($words);
         $best = null;
         $bestKey = null;
 
@@ -294,6 +304,31 @@ final class PhotoPlacer
         }
 
         return $best;
+    }
+
+    /**
+     * The head noun, and the words after it that are not values of the shop's vocabulary.
+     *
+     * @param  list<list<string>>  $words
+     * @return list<list<string>>
+     */
+    private function kindOnly(array $words): array
+    {
+        if ($this->traits === null) {
+            $this->traits = [];
+            foreach ((array) ($this->index['facets'] ?? []) as $facet) {
+                if (($facet['k'] ?? null) === 'type') {
+                    continue;
+                }
+                foreach ((array) ($facet['v'] ?? []) as $value) {
+                    foreach (self::words((string) ($value['l'] ?? '')) as $forms) {
+                        $this->traits[$forms[0]] = true;
+                    }
+                }
+            }
+        }
+
+        return [$words[0], ...array_values(array_filter(array_slice($words, 1), fn (array $forms): bool => ! isset($this->traits[$forms[0]])))];
     }
 
     /**
