@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Modules\Admin\Contracts\OverviewBlock;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -36,6 +37,24 @@ final class ShopOverview extends Page
     public function getTitle(): string
     {
         return $this->shop()->name;
+    }
+
+    /**
+     * What modules put at the top of the overview (OverviewBlock): the store's scan, first of all.
+     *
+     * @return list<class-string>
+     */
+    protected function getHeaderWidgets(): array
+    {
+        return array_values(array_filter(
+            Filament::getCurrentPanel()?->getWidgets() ?? [],
+            fn (string $widget): bool => is_subclass_of($widget, OverviewBlock::class),
+        ));
+    }
+
+    public function getHeaderWidgetsColumns(): int|array
+    {
+        return 1;
     }
 
     public function content(Schema $schema): Schema
