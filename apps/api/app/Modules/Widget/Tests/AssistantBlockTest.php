@@ -88,8 +88,9 @@ final class AssistantBlockTest extends TestCase
         Settings::set('widget.layout', 'assistant', $this->shop->id);
         app(TenantContext::class)->run($this->shop->id, function (): void {
             // A Shopify store with tags only: "כל המוצרים" on every product says nothing of kind.
-            foreach (['11' => ['כל המוצרים', 'חיתולי במבוק', 'אייקוני - כדורים פורחים'], '12' => ['כל המוצרים', 'חיתולי במבוק'], '13' => ['כל המוצרים', 'שמיכות', 'אייקוני - כדורים פורחים'],
-                '14' => ['כל המוצרים', 'טיפוח לתינוק'], '15' => ['כל המוצרים', 'שמיכות']] as $id => $tags) {
+            // "sale 20%" is a campaign both are in, not a kind they share.
+            foreach (['11' => ['כל המוצרים', 'חיתולי במבוק', 'אייקוני - כדורים פורחים', 'sale 20%'], '12' => ['כל המוצרים', 'חיתולי במבוק'], '13' => ['כל המוצרים', 'שמיכות', 'אייקוני - כדורים פורחים'],
+                '14' => ['כל המוצרים', 'טיפוח לתינוק', 'sale 20%'], '15' => ['כל המוצרים', 'שמיכות']] as $id => $tags) {
                 CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "מוצר {$id}",
                     'url' => "https://store.test/p/{$id}", 'price' => 50, 'in_stock' => true, 'purchasable' => true, 'hash' => "t{$id}", 'payload' => ['tags' => $tags]]);
             }

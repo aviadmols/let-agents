@@ -16,6 +16,12 @@ final class CatalogProductKinds implements ProductKinds
     /** A tag on more than this share of the products says nothing about kind ("כל המוצרים", the brand). */
     private const TAG_MAX_SHARE = 0.4;
 
+    /** A series may run through much of a small store ("אייקוני - כדורים פורחים" on half of it), never all of it. */
+    private const SERIES_MAX_SHARE = 0.75;
+
+    /** A campaign, not a kind: a sale, a season, a date ("sale 20%", "july20", "חזרה לגן", "Top 10"). */
+    private const CAMPAIGN = '/\d|%|\b(sale|off|new|top|last|chance|outlet|clearance|black friday)\b|מבצע|הנחה|סייל|חדש|חזרה ל/iu';
+
     /** Words a store uses for a print, a collection or a series. */
     private const SERIES_WORDS = '/הדפס|דוגמ|קולקצי|סדרת|אייקוני|print|pattern|collection|series/iu';
 
@@ -36,7 +42,7 @@ final class CatalogProductKinds implements ProductKinds
 
         return array_values(array_map(fn (string $t): string => 'tag:'.$t, array_filter(
             $own['tags'],
-            fn (string $t): bool => ($counts['tag'][$t] ?? 0) <= $limit && $t !== $own['title'],
+            fn (string $t): bool => ($counts['tag'][$t] ?? 0) <= $limit && $t !== $own['title'] && preg_match(self::CAMPAIGN, $t) !== 1,
         )));
     }
 
@@ -76,7 +82,7 @@ final class CatalogProductKinds implements ProductKinds
     {
         $counts = $this->counts((string) $product->shop_id);
         $own = self::own($product);
-        $limit = max(2, (int) floor($counts['products'] * self::TAG_MAX_SHARE));
+        $limit = max(2, min($counts['products'] - 1, (int) floor($counts['products'] * self::SERIES_MAX_SHARE)));
         $best = null;
 
         foreach ($product->payload['tags'] ?? [] as $tag) {
@@ -84,7 +90,7 @@ final class CatalogProductKinds implements ProductKinds
             $key = mb_strtolower($tag);
             $count = $counts['tag'][$key] ?? 0;
             // A name of its own ("אייקוני - כדורים פורחים"), not the bare word ("קולקציות").
-            if ($count >= 2 && $count <= $limit && $key !== $own['title'] && str_contains($tag, ' ') && preg_match(self::SERIES_WORDS, $tag) === 1
+            if ($count >= 2 && $count <= $limit && $key !== $own['title'] && str_contains($tag, ' ') && preg_match(self::SERIES_WORDS, $tag) === 1 && preg_match(self::CAMPAIGN, $tag) !== 1
                 && ($best === null || $count > $best['count'] + 1)) {
                 $best = ['tag' => $tag, 'count' => $count - 1];
             }
