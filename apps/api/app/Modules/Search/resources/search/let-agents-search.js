@@ -2080,29 +2080,30 @@
           chips.push({ on: c.sort === value, text: text, go: function () { c.sort = c.sort === value ? null : value; } });
         }
       };
+      // In the order a shopper narrows down: price, then what the product is made of and set with,
+      // attribute by attribute as the shop's vocabulary lists them (metal, karat, stone…), then its
+      // type, then size, sale and stock.
       if (count(function (r) { return typeof r.pr === 'number'; }) >= 2) {
         sortChip('cheapest', 'price:asc');
         sortChip('dearest', 'price:desc');
       }
-      if (state.size && count(function (r) { return typeof r.z === 'number'; }) >= 2) {
-        sortChip('biggest', 'size:desc');
-        sortChip('smallest', 'size:asc');
-      }
-      [['on_sale', 'sale', function (r) { return r.sl === 1; }], ['in_stock', 'stock', function (r) { return r.s === 1; }]].forEach(function (flag) {
-        var some = count(flag[2]);
-        var text = actionLabel(flag[0]);
-        if (text && (c[flag[1]] || (some > 0 && some < n))) {
-          chips.push({ on: c[flag[1]], text: text, go: function () { c[flag[1]] = !c[flag[1]]; } });
-        }
-      });
       var counts = {};
       left.forEach(function (record) {
         (record.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; });
       });
+      // The type goes after the attributes: "טבעת" is rarely what a search for rings narrows by.
+      var typeAt = (state.facets || []).map(function (facet) { return facet.k; }).indexOf('type');
+      var group = function (code) {
+        var at = Math.floor(code / 1000);
+        return at === typeAt ? 999 : at;
+      };
       Object.keys(counts).map(Number)
         .filter(function (code) { return c.f[code] || counts[code] < n; })
+        // The most telling twelve, what was chosen always among them…
         .sort(function (a, b) { return (c.f[b] ? 1 : 0) - (c.f[a] ? 1 : 0) || counts[b] - counts[a] || a - b; })
         .slice(0, 12)
+        // …shown attribute by attribute, each one's values in the vocabulary's order (9K, 10K, 14K).
+        .sort(function (a, b) { return group(a) - group(b) || a - b; })
         .forEach(function (code) {
           var facet = (state.facets || [])[Math.floor(code / 1000)];
           var value = facet && facet.v[code % 1000];
@@ -2116,6 +2117,17 @@
             } });
           }
         });
+      if (state.size && count(function (r) { return typeof r.z === 'number'; }) >= 2) {
+        sortChip('biggest', 'size:desc');
+        sortChip('smallest', 'size:asc');
+      }
+      [['on_sale', 'sale', function (r) { return r.sl === 1; }], ['in_stock', 'stock', function (r) { return r.s === 1; }]].forEach(function (flag) {
+        var some = count(flag[2]);
+        var text = actionLabel(flag[0]);
+        if (text && (c[flag[1]] || (some > 0 && some < n))) {
+          chips.push({ on: c[flag[1]], text: text, go: function () { c[flag[1]] = !c[flag[1]]; } });
+        }
+      });
       if (!chips.length) {
         return null;
       }
@@ -3178,6 +3190,21 @@
       return resultsMode() === 'drawer';
     }
 
+    /**
+     * From the regular search to the smart one, for what goes on as a conversation: similar items to
+     * scroll through, a question to keep asking. Only where the shop offers both; the shopper's own
+     * choice is kept, and closing the drawer brings the regular search back.
+     */
+    function toSmart() {
+      if (!choosesMode() || drawerMode()) {
+        return;
+      }
+      closeDropdown();
+      closeBar();
+      forceRegular = false;
+      forceSmart = true;
+    }
+
     // ---------------------------------------------------------------- regular or smart search
 
     /** The shopper's own choice, kept in this browser: "regular" (the site's box) or "smart" (the drawer). */
@@ -3643,6 +3670,7 @@
      */
     function showSimilar(item, raw) {
       var asked = label('similar_to', { title: item.title });
+      toSmart();
 
       if (drawerMode()) {
         var turn = openDrawer(asked);
@@ -4619,7 +4647,14 @@
         var picked = active >= 0 ? shown[active] : null;
         if ((picked && picked.ask) || (!picked && state.config && state.config.ask && isQuestion(input.value))) {
           event.preventDefault();
-          askInline(input);
+          if (choosesMode() && !drawerMode()) {
+            // A question in the regular search is answered in the smart one, where the next can follow.
+            var question = input.value.trim();
+            toSmart();
+            askText(question);
+          } else {
+            askInline(input);
+          }
         } else if (picked && picked.all) {
           event.preventDefault();
           submit(input);
