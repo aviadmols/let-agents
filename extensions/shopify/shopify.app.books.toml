@@ -1,0 +1,47 @@
+# The custom-distribution app for the books-and-clothing store, until the public app is approved (runbook, section 6).
+# Pushed with `npx shopify app deploy --config books --allow-updates`.
+# The app itself (install, billing, webhooks) is served by apps/api, module Shopify.
+
+client_id = "af547c49b209a5431457a0d7e3476f63"
+name = "Let's search – books"
+application_url = "https://agents.lets.co.il/shopify/app"
+# The shop's panel opens inside the Shopify admin, in its frame (App Bridge, session token exchange).
+embedded = true
+
+[build]
+# The URLs above are production's; `shopify app dev` must not rewrite them.
+automatically_update_urls_on_dev = false
+
+[access_scopes]
+# Catalog and content for the index, draft orders and orders for the assistant's carts and reports.
+# The web pixel (write_pixels, read_customer_events) reports purchases that came through the search.
+scopes = "read_products,read_content,write_content,read_online_store_pages,read_legal_policies,write_draft_orders,write_pixels,read_customer_events"
+
+[auth]
+redirect_urls = [ "https://agents.lets.co.il/shopify/callback" ]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
+
+  # Required of every app: requests to see or erase a shopper's data, and the store's data after uninstall.
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "https://agents.lets.co.il/api/v1/shopify/webhooks"
+
+# The wishlist of a signed-in customer: the store calls /apps/letagents/wishlist on its own address,
+# and Shopify forwards it here signed, with the customer it vouches for (logged_in_customer_id).
+[app_proxy]
+url = "https://agents.lets.co.il/api/v1/shortlist/proxy"
+subpath = "letagents"
+prefix = "apps"
+
+[pos]
+embedded = false
