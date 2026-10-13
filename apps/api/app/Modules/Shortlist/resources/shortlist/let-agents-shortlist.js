@@ -605,6 +605,21 @@
     repaint();
   }
 
+  /** From the block under a product: these products in the comparison, and the comparison open. */
+  function compareThese(products) {
+    (products || []).forEach(function (p) {
+      var id = p && p.id ? String(p.id) : '';
+      if (id && !isCompared(id) && state.compare.length < MAX) {
+        state.compare.push({ id: id, title: p.title || '', image: p.image || null, url: p.url || null });
+      }
+    });
+    save();
+    repaint();
+    if (state.compare.length >= 2) {
+      openComparison();
+    }
+  }
+
   function renderTray() {
     if (!cfg.compare) {
       return;
@@ -1234,7 +1249,7 @@
     }
   }
 
-  win.LetAgentsShortlist = { decorate: decorate, compare: cfg.compare, wishlist: cfg.wishlist, openWishlist: openDrawer };
+  win.LetAgentsShortlist = { decorate: decorate, compare: cfg.compare, wishlist: cfg.wishlist, openWishlist: openDrawer, compareThese: compareThese };
 
   if (doc.readyState === 'loading') {
     doc.addEventListener('DOMContentLoaded', start);

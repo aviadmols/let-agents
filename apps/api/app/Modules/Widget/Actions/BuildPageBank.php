@@ -11,6 +11,7 @@ use App\Modules\Analytics\Models\AnalyticsPrior;
 use App\Modules\Analytics\Models\AnalyticsScore;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -1617,8 +1618,8 @@ final class BuildPageBank
      * choices, its yes-or-no attributes), each with the search for others like it ("תליון זהב
      * צהוב"); and next steps that lead somewhere, never a question nobody can answer: what
      * shoppers already asked here and got answered; similar items; a comparison with the product
-     * viewed before (filled in the browser); more of its type ("עוד 5 חיתולי טטרה"); another value
-     * of its choices the store also sells ("יש דגם דומה בזהב לבן?") or a cheaper one; and returns
+     * viewed before of the same kind (filled in the browser); its print or series; more of its type
+     * ("עוד 5 חיתולי טטרה"); another value of its choices the store also sells ("יש דגם דומה בזהב לבן?"); and returns
      * or delivery only where the store's own pages say something about them. No model.
      *
      * @param  list<string>  $asked
@@ -1677,20 +1678,28 @@ final class BuildPageBank
         // Returns and delivery are asked only where the store says something about them.
         $policies = $this->policiesKnown();
 
+        // Similar items and the comparison only among products of its own kind (never a cream with a
+        // bandana); its print or series ("אייקוני - כדורים פורחים") where others carry it too.
+        $kinds = app(ProductKinds::class);
+        $marks = $kinds->marks($product);
+        $hasLike = $kinds->hasLike($product);
+        // The store says nothing of its kind: the type its scan approved does.
+        if ($marks === [] && $type !== null) {
+            $marks = ['fact:'.$type->value_text];
+            $hasLike = $moreOfType !== [];
+        }
+        $series = $kinds->series($product);
+
         // A question about this product goes with it; one about others like it is searched for;
         // similar items and the comparison are actions the browser takes.
         $questions = [];
         foreach ([
             ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], array_slice($asked, 0, 2)),
-            ['text' => (string) __('widget::bank.assistant.similar_items', [], $this->locale), 'about' => 'similar_items'],
-            ['text' => (string) __('widget::bank.assistant.compare', [], $this->locale), 'about' => 'compare', 'named' => (string) __('widget::bank.assistant.compare_named', [], $this->locale), 'question' => (string) __('widget::bank.assistant.compare_question', [], $this->locale)],
+            ...($hasLike ? [['text' => (string) __('widget::bank.assistant.similar_items', [], $this->locale), 'about' => 'similar_items']] : []),
+            ...($series !== null ? [['text' => (string) __('widget::bank.assistant.same_series', ['series' => $series['tag']], $this->locale), 'about' => 'similar', 'query' => $series['tag']]] : []),
+            ...($marks !== [] ? [['text' => (string) __('widget::bank.assistant.compare', [], $this->locale), 'about' => 'compare', 'named' => (string) __('widget::bank.assistant.compare_named', [], $this->locale), 'question' => (string) __('widget::bank.assistant.compare_question', [], $this->locale)]] : []),
             ...$moreOfType,
             ...array_slice($others, 0, 1),
-            // Cheaper than this one: searched as "טבעת עד 649", the price range the search reads in code.
-            ...($product->price !== null && (float) $product->price > 1
-                ? [['text' => (string) __('widget::bank.assistant.cheaper', ['type' => $kind], $this->locale), 'about' => 'similar',
-                    'query' => (string) __('widget::bank.assistant.cheaper_query', ['type' => $kind, 'price' => (string) ((int) ceil((float) $product->price) - 1)], $this->locale)]]
-                : []),
             ...($policies['returns'] ? [['text' => (string) __('widget::bank.assistant.returns', [], $this->locale), 'about' => 'product']] : []),
             ...($policies['delivery'] ? [['text' => (string) __('widget::bank.assistant.delivery', [], $this->locale), 'about' => 'product']] : []),
         ] as $question) {
@@ -1701,7 +1710,8 @@ final class BuildPageBank
         return [
             'title' => (string) __('widget::bank.assistant.title', ['shop' => (string) Shop::query()->whereKey($shopId)->value('name')], $this->locale),
             'placeholder' => (string) __('widget::bank.assistant.placeholder', [], $this->locale),
-            'product' => ['id' => $externalId, 'title' => (string) $product->title],
+            // Its kind: the browser offers to compare it only with a product viewed before of the same kind.
+            'product' => ['id' => $externalId, 'title' => (string) $product->title, 'kinds' => $marks],
             'tags' => array_slice(array_values($tags), 0, self::ASSISTANT_TAGS),
             'questions' => array_slice($questions, 0, self::ASSISTANT_QUESTIONS),
         ];

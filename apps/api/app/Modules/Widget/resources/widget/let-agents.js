@@ -592,13 +592,20 @@
     return src.indexOf('//') === 0 ? 'https:' + src : src;
   }
 
-  /** The product viewed before this one, of any kind, within 30 days: the block offers to compare with it. */
-  function viewedBefore() {
+  /**
+   * The product viewed before this one, within 30 days, of the same kind (kinds: the store's type,
+   * category or tags it shares): the block offers to compare with it. Never a cream with a bandana.
+   */
+  function viewedBefore(kinds) {
+    if (!kinds || !kinds.length) {
+      return null;
+    }
     var limit = Date.now() - 30 * 86400000;
     var list = seenProducts();
     for (var i = 0; i < list.length; i++) {
       var item = list[i];
-      if (item && item.id && item.id !== PAGE_ID && item.title && item.at > limit) {
+      var shared = (item && item.kinds || []).some(function (kind) { return kinds.indexOf(kind) !== -1; });
+      if (item && item.id && item.id !== PAGE_ID && item.title && item.at > limit && shared) {
         return item;
       }
     }
@@ -2261,7 +2268,7 @@
         return;
       }
       // The comparison names the product viewed before, and is left out when there is none.
-      var before = about === 'compare' ? viewedBefore() : null;
+      var before = about === 'compare' ? viewedBefore(block.product.kinds) : null;
       if (about === 'compare') {
         if (!before) {
           return;
@@ -2281,6 +2288,17 @@
         if (about === 'similar_items' && search && typeof search.similar === 'function') {
           track('click', AS_SECTION, 'panel');
           search.similar(thisProduct());
+          return;
+        }
+        // The store's compare module, with both products side by side, where the shop has it.
+        var shortlist = window.LetAgentsShortlist;
+        if (about === 'compare' && shortlist && shortlist.compare && typeof shortlist.compareThese === 'function') {
+          track('click', AS_SECTION, 'panel');
+          var current = thisProduct();
+          shortlist.compareThese([
+            { id: before.id, title: before.title, image: before.image || null, url: before.url || null },
+            { id: current.external_id, title: current.title, image: current.image || null, url: current.url }
+          ]);
           return;
         }
         if (about === 'compare' && search && typeof search.ask === 'function') {
@@ -3812,6 +3830,9 @@
       title: data ? decodeEntities(data.name) : (heading ? heading.textContent.trim().slice(0, 120) : ''),
       url: data ? data.permalink : location.href.split('?')[0],
       rows: bank.compare ? bank.compare.rows : null,
+      // Its kind and picture: compared only with one of the same kind, and shown in the comparison.
+      kinds: bank.assistant && bank.assistant.product ? bank.assistant.product.kinds || [] : [],
+      image: pageImage() || null,
       at: Date.now()
     });
   }

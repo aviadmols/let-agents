@@ -5,6 +5,7 @@ namespace App\Modules\Search\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
@@ -277,7 +278,7 @@ final class SearchCatalog
     {
         return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit): array {
             $index = LoadedIndex::for($shopId);
-            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'payload']);
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'title', 'payload']);
 
             if ($index === null || $product === null || $limit < 1) {
                 return [];
@@ -290,7 +291,8 @@ final class SearchCatalog
                 $ids = array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id');
             }
 
-            $ids = self::sameKind($product, array_map('strval', $ids));
+            // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
+            $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids));
 
             $records = [];
 
@@ -306,40 +308,6 @@ final class SearchCatalog
 
             return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
         });
-    }
-
-    /**
-     * The ones of the product's own kind: its product type where it has one, else a category it is
-     * listed under. A baby cream's nearest pictures may be blankets on the same white background;
-     * "similar" shows none rather than those. A product of no known kind keeps them all.
-     *
-     * @param  list<string>  $ids
-     * @return list<string>
-     */
-    private static function sameKind(CatalogProduct $product, array $ids): array
-    {
-        $kind = fn (CatalogProduct $p): array => [
-            'type' => mb_strtolower(trim((string) ($p->payload['product_type'] ?? ''))),
-            'categories' => array_values(array_filter(array_map(fn (array $path): string => mb_strtolower(trim((string) end($path))), $p->categoryPaths()))),
-        ];
-        $own = $kind($product);
-
-        if ($ids === [] || ($own['type'] === '' && $own['categories'] === [])) {
-            return $ids;
-        }
-
-        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $ids)->get(['external_id', 'payload'])
-            ->keyBy(fn (CatalogProduct $p): string => (string) $p->external_id);
-
-        return array_values(array_filter($ids, function (string $id) use ($others, $own, $kind): bool {
-            $other = $others->get($id);
-            if ($other === null) {
-                return false;
-            }
-            $theirs = $kind($other);
-
-            return $own['type'] !== '' ? $theirs['type'] === $own['type'] : array_intersect($own['categories'], $theirs['categories']) !== [];
-        }));
     }
 
     /**

@@ -61,16 +61,16 @@ final class AssistantBlockTest extends TestCase
         $block = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
 
         $this->assertSame('שאלו את Rocks and Gold AI', $block['title']);
-        $this->assertSame(['id' => '1', 'title' => 'תליון 1'], $block['product']);
+        $this->assertSame(['id' => '1', 'title' => 'תליון 1', 'kinds' => ['fact:pendant']], $block['product'], 'its kind, for a comparison only with another pendant');
         $this->assertSame([['label' => 'תליון', 'query' => 'תליון'], ['label' => 'זהב צהוב', 'query' => 'תליון זהב צהוב'], ['label' => '14K', 'query' => 'תליון 14K']], $block['tags']);
         // Next steps that lead somewhere: similar items, a comparison (named in the browser), more of its type,
-        // another value of its choices, a cheaper one; returns and delivery only where the store says something.
+        // another value of its choices; returns and delivery only where the store says something.
         $this->assertSame(['text' => 'לראות פריטים דומים', 'about' => 'similar_items'], $block['questions'][0]);
         $this->assertSame('compare', $block['questions'][1]['about']);
         $this->assertSame('להשוות עם :title', $block['questions'][1]['named']);
         $this->assertSame(['text' => 'עוד 2 תליון', 'about' => 'similar', 'query' => 'תליון'], $block['questions'][2], 'the other products of its type');
         $this->assertSame(['text' => 'יש תליון דומה בזהב לבן?', 'about' => 'similar', 'query' => 'תליון זהב לבן'], $block['questions'][3], 'a value of its choice the store also sells, as a search');
-        $this->assertSame(['text' => 'יש תליון דומה במחיר נמוך יותר?', 'about' => 'similar', 'query' => 'תליון עד 899'], $block['questions'][4], 'cheaper than this one, as a price range');
+        $this->assertCount(4, $block['questions'], 'nothing more to offer');
         $this->assertNotContains('אפשר להחזיר או להחליף?', array_column($block['questions'], 'text'), 'the store says nothing about returns: not asked');
 
         // A refund policy of its own: now the question has an answer.
@@ -81,5 +81,29 @@ final class AssistantBlockTest extends TestCase
 
         Settings::set('widget.layout', 'circles', $this->shop->id);
         $this->assertNull(app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant']);
+    }
+
+    public function test_similar_items_and_the_comparison_only_among_its_own_kind_and_its_series_where_others_share_it(): void
+    {
+        Settings::set('widget.layout', 'assistant', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            // A Shopify store with tags only: "כל המוצרים" on every product says nothing of kind.
+            foreach (['11' => ['כל המוצרים', 'חיתולי במבוק', 'אייקוני - כדורים פורחים'], '12' => ['כל המוצרים', 'חיתולי במבוק'], '13' => ['כל המוצרים', 'שמיכות', 'אייקוני - כדורים פורחים'],
+                '14' => ['כל המוצרים', 'טיפוח לתינוק'], '15' => ['כל המוצרים', 'שמיכות']] as $id => $tags) {
+                CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "מוצר {$id}",
+                    'url' => "https://store.test/p/{$id}", 'price' => 50, 'in_stock' => true, 'purchasable' => true, 'hash' => "t{$id}", 'payload' => ['tags' => $tags]]);
+            }
+        });
+
+        $swaddle = app(BuildPageBank::class)->handle($this->shop->id, 'product', '11', 'he')['assistant'];
+        $about = array_column($swaddle['questions'], 'about');
+        $this->assertContains('similar_items', $about, 'other swaddles');
+        $this->assertContains('compare', $about);
+        $this->assertContains(['text' => 'עוד מוצרים מ"אייקוני - כדורים פורחים"', 'about' => 'similar', 'query' => 'אייקוני - כדורים פורחים'], $swaddle['questions'], 'its print, which a blanket shares');
+        $this->assertNotContains('כל המוצרים', array_map(fn (string $k): string => substr($k, 4), $swaddle['product']['kinds']));
+
+        $cream = app(BuildPageBank::class)->handle($this->shop->id, 'product', '14', 'he')['assistant'];
+        $this->assertNotContains('similar_items', array_column($cream['questions'], 'about'), 'no other cream: no similar items');
+        $this->assertSame([], array_intersect($cream['product']['kinds'], $swaddle['product']['kinds']), 'never compared with a swaddle');
     }
 }

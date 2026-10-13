@@ -127,6 +127,19 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame([], $this->similar('301')->json('products'), 'nothing of its kind: none, never related ones');
     }
 
+    public function test_without_types_the_tags_only_some_products_carry_say_its_kind(): void
+    {
+        // A Shopify store with tags only: every product is in "כל המוצרים", which says nothing.
+        $tags = fn (string $id, array $tags) => app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', $id)->update(['payload' => ['tags' => $tags]]));
+        $tags('301', ['כל המוצרים', 'חיתולי במבוק']);
+        $tags('302', ['כל המוצרים', 'טיפוח לתינוק']);
+        $tags('303', ['כל המוצרים', 'חיתולי במבוק']);
+        LoadedIndex::forget();
+
+        $this->assertSame(['303'], array_column($this->similar('301')->json('products'), 'external_id'));
+        $this->assertSame([], $this->similar('302')->json('products'), 'a baby cream has no swaddles for similar items');
+    }
+
     public function test_without_scanned_pictures_they_come_by_meaning(): void
     {
         $this->pictures = false;

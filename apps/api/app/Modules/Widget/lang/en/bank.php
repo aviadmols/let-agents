@@ -287,7 +287,6 @@ return [
         'returns' => 'Can I return or exchange it?',
         'delivery' => 'How soon does it arrive?',
         'model' => 'model',
-        'cheaper' => 'Is there a similar :type for less?',
-        'cheaper_query' => ':type under :price',
+        'same_series' => 'More from ":series"',
     ],
 ];

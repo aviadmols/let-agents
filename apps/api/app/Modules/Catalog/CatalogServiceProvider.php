@@ -5,7 +5,9 @@ namespace App\Modules\Catalog;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
+use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Listeners\MoveCatalogLinks;
+use App\Modules\Catalog\Support\CatalogProductKinds;
 use App\Modules\Catalog\Support\CatalogScanDetails;
 use App\Modules\Connections\Events\StoreAddressMoved;
 use Illuminate\Console\Scheduling\Schedule;
@@ -17,6 +19,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
     {
         // What this module learned, under its step of the store's scan.
         $this->app->tag([CatalogScanDetails::class], ScanDetails::TAG);
+        $this->app->singleton(ProductKinds::class, CatalogProductKinds::class);
     }
 
     protected function bootModule(): void

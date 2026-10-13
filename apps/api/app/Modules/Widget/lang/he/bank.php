@@ -287,7 +287,6 @@ return [
         'returns' => 'אפשר להחזיר או להחליף?',
         'delivery' => 'תוך כמה זמן זה מגיע?',
         'model' => 'דגם',
-        'cheaper' => 'יש :type דומה במחיר נמוך יותר?',
-        'cheaper_query' => ':type עד :price',
+        'same_series' => 'עוד מוצרים מ":series"',
     ],
 ];
