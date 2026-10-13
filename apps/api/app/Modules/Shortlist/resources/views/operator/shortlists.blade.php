@@ -72,6 +72,9 @@
                         <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_max.label') }}</b><small>{{ __('shortlist::settings.wishlist_max.description') }}</small></div>
                         <input type="number" min="10" max="200" wire:model="data.wishlist_max" class="lsl-field num">
                     </div>
+                    <div class="lsl-row">
+                        <div class="lsl-rt"><b>{{ $t('wish_link') }}</b><small>{{ $t('wish_link_help') }}</small><code class="lsl-field code" style="display:inline-block;width:auto">#wishlist</code></div>
+                    </div>
                 @endif
 
                 @if (($data['compare'] ?? false) || ($data['wishlist'] ?? false))

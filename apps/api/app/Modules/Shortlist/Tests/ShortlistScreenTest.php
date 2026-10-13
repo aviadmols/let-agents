@@ -61,7 +61,9 @@ final class ShortlistScreenTest extends TestCase
             ->assertSet('data.compare', false)
             ->assertSet('data.wishlist', false)
             ->set('data.compare', true)
+            ->assertDontSee('#wishlist')
             ->set('data.wishlist', true)
+            ->assertSee('#wishlist')
             ->set('data.card_selector', '.product-card')
             ->call('save');
 

@@ -10,7 +10,8 @@
  * Compare: up to five products in a tray at the bottom; "Compare" opens a table built on our side
  * from the store's approved facts. Wishlist: kept in this browser and on our side, so it waits on the
  * next visit; signed in to the store, it is the account's (Shopify vouches for the customer through
- * the app proxy, the WordPress plugin signs the user). A list is shared by link or WhatsApp.
+ * the app proxy, the WordPress plugin signs the user). A list is shared by link or WhatsApp. A link
+ * of the theme's own to "#wishlist" (a menu item, a header icon) opens the list, even empty.
  *
  * Nothing here calls a model; every request is a cached table or a few rows.
  */
@@ -32,6 +33,7 @@
   var KEY = 'la_shortlist_' + SITE;
   var PROXY = '/apps/letagents/wishlist';
   var SHARE_PARAM = 'la_list';
+  var WISH_HASH = '#wishlist';
 
   if (!API || !SITE) {
     return;
@@ -845,6 +847,18 @@
     }
     if (cfg.wishlist && code && /^[A-Za-z0-9]{8,16}$/.test(code)) {
       openShared(code);
+    } else if (cfg.wishlist && win.location.hash === WISH_HASH) {
+      openDrawer();
+    }
+    if (cfg.wishlist) {
+      // The shop's own way in: any link to "#wishlist", in the menu or the header, now or added later.
+      doc.addEventListener('click', function (event) {
+        var link = event.target && event.target.closest ? event.target.closest('a[href$="' + WISH_HASH + '"], [data-let-agents-wishlist]') : null;
+        if (link) {
+          event.preventDefault();
+          openDrawer();
+        }
+      }, true);
     }
     // Once a session: what the account or another device changed; a guest with nothing saved asks nothing.
     var synced = false;
@@ -859,7 +873,7 @@
     }
   }
 
-  win.LetAgentsShortlist = { decorate: decorate, compare: cfg.compare, wishlist: cfg.wishlist };
+  win.LetAgentsShortlist = { decorate: decorate, compare: cfg.compare, wishlist: cfg.wishlist, openWishlist: openDrawer };
 
   if (doc.readyState === 'loading') {
     doc.addEventListener('DOMContentLoaded', start);
