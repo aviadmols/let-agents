@@ -61,8 +61,19 @@ final class AnswerSiteQuestion
 
     public const ACTION = 'assistant.answer_site';
 
-    /** 4: the safety rules, the checker's safe and injection, and the topic check (scope_site). */
-    public const PROMPT_VERSION = 4;
+    /**
+     * 4: the safety rules, the checker's safe and injection, and the topic check (scope_site).
+     * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
+     * 5 is the facts-only writer the bench tries, never released here).
+     */
+    public const PROMPT_VERSION = 6;
+
+    /** Who wrote a knowledge entry, as the writer is told. */
+    private const WRITTEN_BY = [
+        BuildShopKnowledge::OWN => 'store_team',
+        BuildShopKnowledge::TEAM => 'team_answers',
+        BuildShopKnowledge::REPEATED => 'every_product_page',
+    ];
 
     private const SCOPE_OUTPUT_TOKENS = 400;
 
@@ -282,7 +293,12 @@ final class AnswerSiteQuestion
         $words = $this->words($question);
         $first = [];
 
-        foreach (CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->orderBy('external_id')->get(['id', 'external_id', 'title', 'body']) as $entry) {
+        // The team's own words first, then its answers, then what every product page repeats.
+        $order = array_flip(array_keys(self::WRITTEN_BY));
+        $entries = CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->orderBy('external_id')->get(['id', 'external_id', 'title', 'body'])
+            ->sortBy(fn (CatalogContent $entry): int => $order[(string) $entry->external_id] ?? count($order));
+
+        foreach ($entries as $entry) {
             $text = trim((string) $entry->body);
 
             if ($entry->external_id === BuildShopKnowledge::TEAM) {
@@ -299,7 +315,7 @@ final class AnswerSiteQuestion
             }
 
             if ($text !== '') {
-                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge'];
+                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => self::WRITTEN_BY[(string) $entry->external_id] ?? null];
             }
         }
 
@@ -453,7 +469,7 @@ final class AnswerSiteQuestion
             'question' => $question,
             'products' => $forModel,
             'analysis' => $analysis,
-            'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']], array_keys($byRef), $byRef),
+            'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
         ], JSON_UNESCAPED_UNICODE);
 
         return ['type' => $type, 'empty' => $counts['found'] === 0 && $counts['shown'] === 0] + $counts
@@ -1330,10 +1346,20 @@ final class AnswerSiteQuestion
         return false;
     }
 
-    /** A released prompt of this version, as the writer and the checker read it. */
+    /**
+     * A released prompt of this version, as the writer and the checker read it: a prompt this
+     * version did not change is read from the last version that wrote it.
+     */
     public static function prompt(string $name): string
     {
-        return (string) file_get_contents(__DIR__.'/../Prompts/'.$name.'.v'.self::PROMPT_VERSION.'.md');
+        for ($version = self::PROMPT_VERSION; $version > 0; $version--) {
+            // 5 is the bench's facts-only writer, never this answerer's.
+            if ($version !== 5 && is_file($file = __DIR__.'/../Prompts/'.$name.'.v'.$version.'.md')) {
+                return (string) file_get_contents($file);
+            }
+        }
+
+        return '';
     }
 
     /** @return array{outcome: string, answer: string, from: string} */

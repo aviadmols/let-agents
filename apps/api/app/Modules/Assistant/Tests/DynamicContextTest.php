@@ -220,6 +220,18 @@ final class DynamicContextTest extends TestCase
         $this->assertSame(['מדריך טבעות'], array_column($selection['passages'], 'title'));
     }
 
+    public function test_what_the_team_wrote_about_the_question_stays_for_a_product_question(): void
+    {
+        // As Gueta Avigdor's team wrote about its cutting calculator, asked as a question about a size.
+        $this->passages[] = ['source' => 'content', 'source_id' => 'k2', 'external_id' => null, 'title' => 'מידע על החנות מצוות החנות', 'text' => 'באתר יש כלי AI שעוזר לחשב את החתוכים של החלקים הרצויים בפלטות ובעצים. תוכלו למצוא אותו מתחת לכפתור להוספה לסל, בשם "מחשבון חיתוך".', 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => 'store_team'];
+        $this->assertSame('size', AnswerContext::type('אפשר לחתוך פלטות לפי מידה?'));
+
+        $why = array_column($this->select('אפשר לחתוך פלטות לפי מידה?', 'size')['debug']['passages'], 'reason', 'title');
+
+        $this->assertSame('team_wrote_about_it', $why['מידע על החנות מצוות החנות']);
+        $this->assertSame('store_text_not_needed_for_product_question', $why['משלוחים והחזרות'], 'what every page repeats, about something else');
+    }
+
     public function test_full_context_is_given_exactly_as_before_and_dynamic_gives_less(): void
     {
         $full = $this->ask('באיזו מידה יש את טבעת הגרנט?', AnswerContext::FULL);

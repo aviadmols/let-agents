@@ -94,12 +94,24 @@ final class ShopKnowledgeTest extends TestCase
             ->invoke(app(AnswerSiteQuestion::class), 'איך עושים איסוף מהחנות?', $this->shop->id, [['source' => 'content', 'source_id' => 'x', 'title' => 'דף', 'text' => 'ט', 'similarity' => 0.5]]));
 
         $this->assertCount(4, $passages);
+        $this->assertSame(['store_team', 'team_answers', 'every_product_page'], array_column(array_slice($passages, 0, 3), 'from'), 'the team\'s own words first, and the writer is told who wrote each');
         $this->assertSame('דף', $passages[3]['title'], 'the pages the meaning search found come after');
+        $this->assertArrayNotHasKey('from', $passages[3]);
         $this->assertStringContainsString('איסוף עצמי', implode(' ', array_column($passages, 'text')));
 
         // Not in another shop, and never a search result of its own.
         $other = Shop::factory()->create();
         $this->assertSame([], app(TenantContext::class)->run($other->id, fn (): array => app(BuildShopKnowledge::class)->entries()));
+    }
+
+    public function test_the_writer_is_told_the_team_word_comes_first_and_the_checker_reads_its_last_version(): void
+    {
+        $prompts = __DIR__.'/../Prompts/';
+
+        $this->assertSame(file_get_contents($prompts.'answer_site.v6.md'), AnswerSiteQuestion::prompt('answer_site'));
+        $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
+        $this->assertSame(file_get_contents($prompts.'verify_site.v4.md'), AnswerSiteQuestion::prompt('verify_site'), 'unchanged in 6, read from 4');
+        $this->assertSame(file_get_contents($prompts.'scope_site.v4.md'), AnswerSiteQuestion::prompt('scope_site'));
     }
 
     public function test_the_merchant_sees_and_edits_what_the_assistant_knows(): void
