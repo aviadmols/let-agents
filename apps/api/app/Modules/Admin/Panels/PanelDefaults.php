@@ -40,13 +40,13 @@ final class PanelDefaults
         $panel
             ->login()
             ->brandName((string) config('app.name'))
-            ->font('Rubik', url: PanelTheme::FONT_URL, provider: GoogleFontProvider::class)
+            ->font('Heebo', url: PanelTheme::FONT_URL, provider: GoogleFontProvider::class)
             ->maxContentWidth(Width::Full)
             ->colors([
-                'primary' => Color::hex('#7e22ce'),
+                'primary' => Color::hex('#3B5BDB'),
                 'success' => Color::hex('#16A34A'),
                 'danger' => Color::hex('#DC2626'),
-                'warning' => Color::hex('#D97706'),
+                'warning' => Color::hex('#C77700'),
                 'info' => Color::hex('#2563EB'),
                 'gray' => Color::Neutral,
             ])

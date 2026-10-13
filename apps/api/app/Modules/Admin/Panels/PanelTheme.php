@@ -13,8 +13,8 @@ use Illuminate\Support\HtmlString;
  */
 final class PanelTheme
 {
-    /** Outfit carries Latin and digits, Rubik the Hebrew (Outfit has no Hebrew glyphs). */
-    public const FONT_URL = 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Rubik:wght@400;500;600;700&display=swap';
+    /** Heebo carries Hebrew and Latin in one family, as on app.lets.co.il. */
+    public const FONT_URL = 'https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;900&display=swap';
 
     private static ?string $css = null;
 

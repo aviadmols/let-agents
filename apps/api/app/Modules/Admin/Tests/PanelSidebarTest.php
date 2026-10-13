@@ -62,8 +62,8 @@ final class PanelSidebarTest extends TestCase
             $this->get($url)
                 ->assertOk()
                 ->assertSee('data-lets-theme', false)
-                ->assertSee('family=Outfit', false)
-                ->assertSee('--la-lime', false);
+                ->assertSee('family=Heebo', false)
+                ->assertSee('--la-accent: #3b5bdb', false);
         }
     }
 

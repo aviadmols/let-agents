@@ -129,8 +129,8 @@ final class ReportChart extends ChartWidget
         return RawJs::make(<<<JS
             (() => {
                 const fallback = {
-                    light: ['#7e22ce', '#eb6834', '#1baf7a', '#2a78d6'],
-                    dark: ['#a855f7', '#d95926', '#199e70', '#3987e5'],
+                    light: ['#3b5bdb', '#0fa3a3', '#c77700', '#ee82ee'],
+                    dark: ['#6d8af0', '#0fa3a3', '#c77700', '#ee82ee'],
                 }
                 const color = (context) => {
                     const root = document.documentElement
