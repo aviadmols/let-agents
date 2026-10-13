@@ -57,4 +57,20 @@ return [
         'label' => 'Length of the reply',
         'description' => 'Tokens at most.',
     ],
+    'heart_plain' => [
+        'label' => 'A plain heart on the products',
+        'description' => 'The heart on product cards with no white circle and no shadow, the heart alone.',
+    ],
+    'phone_codes_per_hour' => [
+        'label' => 'Codes per number an hour',
+        'description' => 'How many SMS codes one number may ask for in an hour.',
+    ],
+    'phone_codes_per_ip_hour' => [
+        'label' => 'Codes per address an hour',
+        'description' => 'How many codes one network address may ask for in an hour, all numbers together.',
+    ],
+    'phone_codes_per_day' => [
+        'label' => 'Codes per shop a day',
+        'description' => 'The shop\'s cap on SMS messages a day. 0 sends none.',
+    ],
 ];

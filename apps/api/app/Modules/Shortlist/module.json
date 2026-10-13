@@ -9,7 +9,8 @@
         "Admin",
         "Shopify",
         "Runs",
-        "Ai"
+        "Ai",
+        "Sms"
     ],
     "provider": "ShortlistServiceProvider",
     "features": [
@@ -19,6 +20,10 @@
         },
         {
             "name": "wishlist",
+            "default": false
+        },
+        {
+            "name": "wishlist_phone",
             "default": false
         }
     ],
@@ -73,6 +78,12 @@
             "name": "wishlist_whatsapp",
             "type": "bool",
             "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "heart_plain",
+            "type": "bool",
+            "default": false,
             "scope": "shop"
         },
         {
@@ -137,6 +148,33 @@
             "max": 2000,
             "scope": "global",
             "unit": "tokens"
+        },
+        {
+            "name": "phone_codes_per_hour",
+            "type": "int",
+            "default": 3,
+            "min": 1,
+            "max": 10,
+            "scope": "global",
+            "unit": "items"
+        },
+        {
+            "name": "phone_codes_per_ip_hour",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 50,
+            "scope": "global",
+            "unit": "items"
+        },
+        {
+            "name": "phone_codes_per_day",
+            "type": "int",
+            "default": 300,
+            "min": 0,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "items"
         }
     ],
     "agents": [

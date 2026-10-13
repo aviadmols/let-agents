@@ -42,7 +42,7 @@
 
   // ---- What this browser keeps -------------------------------------------------------------
 
-  /** {compare: [{id, title, image, url}], wish: [id], pending: [id] added but not yet confirmed, token, share, account} */
+  /** {compare: [{id, title, image, url}], wish: [id], pending: [id] added but not yet confirmed, token, share, account, phone, phoneShown} */
   var state = read();
   var cards = {};
   var buttons = [];
@@ -61,7 +61,10 @@
       pending: Array.isArray(data.pending) ? data.pending.map(String) : [],
       token: typeof data.token === 'string' && /^[A-Za-z0-9_-]{24,64}$/.test(data.token) ? data.token : token(),
       share: typeof data.share === 'string' ? data.share : null,
-      account: !!data.account
+      account: !!data.account,
+      // Signed in by phone: the token the server gave, and the number as it may be shown (masked).
+      phone: typeof data.phone === 'string' && /^[A-Za-z0-9]{40}$/.test(data.phone) ? data.phone : null,
+      phoneShown: typeof data.phoneShown === 'string' ? data.phoneShown : null
     };
   }
 
@@ -133,7 +136,8 @@
   function roundButton(kind, info) {
     var button = doc.createElement('button');
     button.type = 'button';
-    button.setAttribute('style', ROUND);
+    // The shop may want the heart alone on its cards, with no circle and no shadow.
+    button.setAttribute('style', kind === 'wish' && cfg.heartPlain ? ROUND.replace(/background:[^;]+;/, 'background:transparent;').replace(/box-shadow:[^;]+;/, 'box-shadow:none;') : ROUND);
     button.innerHTML = kind === 'wish' ? HEART : SCALES;
     button.setAttribute('data-la-shortlist', kind);
     // The search box keeps its focus, so the suggestions around the card stay open.
@@ -518,6 +522,14 @@
     '.foot{border-top:1px solid #e5e7eb;padding:12px 18px;display:grid;gap:8px}',
     '.note{color:#6b7280;font-size:12.5px}',
     '.share{display:flex;gap:8px;flex-wrap:wrap}',
+    '.phone{display:grid;gap:6px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px}',
+    '.phone-row{display:flex;gap:8px}',
+    '.phone-row input{flex:1;min-width:0;border:1px solid #d1d5db;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px}',
+    '.phone-code{display:grid;gap:6px}',
+    '.phone-consent{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#374151}',
+    '.phone-err{color:#b91c1c;font-size:12.5px}',
+    '.phone-err:empty{display:none}',
+    '.link{border:0;background:none;padding:0;color:#111827;text-decoration:underline;font:inherit;cursor:pointer}',
     '.wa{background:#25d366}',
     '.pop{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:2147483003;background:#111827;color:#fff;border-radius:999px;padding:9px 16px;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,.2)}',
     '.msg{padding:24px 18px;color:#6b7280}',
@@ -715,6 +727,9 @@
     // Adds the server has not confirmed yet go with every request: one that failed is not lost.
     var add = (body.add || []).concat(state.pending.filter(function (id) { return (body.add || []).indexOf(id) === -1 && (body.remove || []).indexOf(id) === -1; }));
     var payload = { token: state.token, add: add, remove: body.remove || [] };
+    if (state.phone) {
+      payload.phone = state.phone;
+    }
     var direct = function () {
       if (ctx.customer) {
         payload.customer = ctx.customer;
@@ -738,6 +753,11 @@
   }
 
   function take(data) {
+    // A phone sign-in the server no longer knows (signed out elsewhere) is forgotten here too.
+    if (state.phone && !data.phone && !data.account) {
+      state.phone = null;
+    }
+    state.phoneShown = data.phone || (state.phone ? state.phoneShown : null);
     state.wish = (data.items || []).map(String);
     state.pending = [];
     state.share = data.share || state.share;
@@ -900,11 +920,133 @@
       foot.appendChild(row);
     }
     if (!shared) {
-      foot.appendChild(el('div', 'note', label(state.account ? 'wish_account' : 'wish_guest')));
+      if (state.phoneShown && state.phone) {
+        var kept = el('div', 'note');
+        kept.appendChild(el('span', null, label('phone_kept', { phone: state.phoneShown }) + ' · '));
+        var out = el('button', 'link', label('phone_out'));
+        out.type = 'button';
+        out.addEventListener('click', phoneOut);
+        kept.appendChild(out);
+        foot.appendChild(kept);
+      } else if (cfg.phoneLogin && !state.account && !ctx.customer && !ctx.loggedIn) {
+        foot.appendChild(phoneBox());
+      } else {
+        foot.appendChild(el('div', 'note', label(state.account ? 'wish_account' : 'wish_guest')));
+      }
     }
     drawer.appendChild(foot);
     wrap().appendChild(veil);
     wrap().appendChild(drawer);
+  }
+
+  /**
+   * Keeping the list by phone: the number, a four-digit code by SMS, the code back (with an
+   * optional yes to hearing from the store), and the list is the number's on any device.
+   */
+  function phoneBox() {
+    var box = el('div', 'phone');
+    box.appendChild(el('b', null, label('phone_title')));
+    box.appendChild(el('div', 'note', label('phone_help')));
+    var row = el('div', 'phone-row');
+    var number = el('input');
+    number.type = 'tel';
+    number.inputMode = 'tel';
+    number.autocomplete = 'tel';
+    number.placeholder = label('phone_placeholder');
+    number.setAttribute('aria-label', label('phone_placeholder'));
+    number.dir = 'ltr';
+    var send = el('button', 'btn', label('phone_send'));
+    send.type = 'button';
+    row.appendChild(number);
+    row.appendChild(send);
+    box.appendChild(row);
+    var said = el('div', 'phone-err');
+    var second = el('div', 'phone-code');
+    second.hidden = true;
+    box.appendChild(second);
+    box.appendChild(said);
+
+    var ask = function () {
+      said.textContent = '';
+      send.disabled = true;
+      send.textContent = label('phone_sending');
+      phonePost('code', { phone: number.value }).then(function (data) {
+        send.disabled = false;
+        send.textContent = label('phone_resend');
+        if (!data.sent) {
+          said.textContent = label('phone_' + (data.error || 'unavailable'));
+          return;
+        }
+        second.hidden = false;
+        var code = second.querySelector('input[inputmode="numeric"]');
+        if (code) {
+          code.focus();
+        }
+      });
+    };
+    send.addEventListener('click', ask);
+    number.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); ask(); } });
+
+    var codeRow = el('div', 'phone-row');
+    var code = el('input');
+    code.type = 'text';
+    code.inputMode = 'numeric';
+    code.autocomplete = 'one-time-code';
+    code.maxLength = 4;
+    code.placeholder = label('phone_code');
+    code.setAttribute('aria-label', label('phone_code'));
+    code.dir = 'ltr';
+    var confirm = el('button', 'btn', label('phone_verify'));
+    confirm.type = 'button';
+    codeRow.appendChild(code);
+    codeRow.appendChild(confirm);
+    second.appendChild(codeRow);
+    var consent = el('label', 'phone-consent');
+    var agree = el('input');
+    agree.type = 'checkbox';
+    consent.appendChild(agree);
+    consent.appendChild(el('span', null, label('phone_consent')));
+    second.appendChild(consent);
+
+    var check = function () {
+      said.textContent = '';
+      confirm.disabled = true;
+      phonePost('verify', { phone: number.value, code: code.value, token: state.token, consent: agree.checked }).then(function (data) {
+        confirm.disabled = false;
+        if (!data.ok) {
+          said.textContent = label('phone_' + (data.error || 'bad_code'));
+          return;
+        }
+        state.phone = data.session;
+        state.phoneShown = data.phone;
+        state.pending = [];
+        save();
+        sync().then(function (synced) { renderDrawer((synced && synced.products) || []); });
+      });
+    };
+    confirm.addEventListener('click', check);
+    code.addEventListener('input', function () { if (/^\d{4}$/.test(code.value)) { check(); } });
+    return box;
+  }
+
+  function phonePost(step, body) {
+    return fetch(API + '/shortlist/' + encodeURIComponent(SITE) + '/phone/' + step, {
+      method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); }).catch(function () { return { sent: false, ok: false, error: 'unavailable' }; });
+  }
+
+  /** Signed out on this browser: the list stays the number's; this browser starts its own again. */
+  function phoneOut() {
+    var session = state.phone;
+    state.phone = null;
+    state.phoneShown = null;
+    state.wish = [];
+    state.pending = [];
+    state.share = null;
+    save();
+    repaint();
+    phonePost('out', { phone: session });
+    renderDrawer([]);
   }
 
   /** "ב-Rocks and Gold" but "בחנות": a Hebrew prefix letter joins a Hebrew word only. */
@@ -992,7 +1134,7 @@
     } catch (e) {
       synced = false;
     }
-    if (cfg.wishlist && !synced && (state.wish.length || ctx.customer || ctx.loggedIn)) {
+    if (cfg.wishlist && !synced && (state.wish.length || state.phone || ctx.customer || ctx.loggedIn)) {
       sync();
     }
   }

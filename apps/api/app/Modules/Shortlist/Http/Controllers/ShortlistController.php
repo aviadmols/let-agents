@@ -10,8 +10,10 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shortlist\Actions\BuildComparison;
 use App\Modules\Shortlist\Actions\KeepWishlist;
+use App\Modules\Shortlist\Actions\PhoneSignIn;
 use App\Modules\Shortlist\Actions\ProductCards;
 use App\Modules\Shortlist\Models\ShortlistCount;
+use App\Modules\Sms\Contracts\SendsSms;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,6 +56,9 @@ final class ShortlistController
                 'wishlistFloating' => (bool) Settings::get('shortlist.wishlist_floating', $shopId),
                 'wishlistHeader' => $wishlist && (bool) Settings::get('shortlist.wishlist_header', $shopId),
                 'wishlistWhatsapp' => (bool) Settings::get('shortlist.wishlist_whatsapp', $shopId),
+                // Keeping the list by phone, with a code by SMS: only where the shop turned it on and the platform can text.
+                'phoneLogin' => $wishlist && Features::enabled('shortlist.wishlist_phone', $shopId) && app(SendsSms::class)->ready(),
+                'heartPlain' => (bool) Settings::get('shortlist.heart_plain', $shopId),
                 // For the share message: "My wishlist at Rocks and Gold".
                 'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
                 'labels' => trans('shortlist::storefront', [], $locale),
@@ -124,6 +129,10 @@ final class ShortlistController
         }
 
         $customer = is_string($request->input('customer')) ? $connection->customerFromProof((string) $request->input('customer')) : null;
+        // Not signed in to the store: signed in by phone, when this browser was.
+        if ($customer === null && is_string($request->input('phone')) && Features::enabled('shortlist.wishlist_phone', $connection->shop_id)) {
+            $customer = $tenant->run($connection->shop_id, fn (): ?string => app(PhoneSignIn::class)->resolve($connection->shop_id, (string) $request->input('phone')));
+        }
 
         return self::keep($request, $tenant, $keep, $cards, $connection->shop_id, $customer);
     }
@@ -177,11 +186,65 @@ final class ShortlistController
 
         $list = $tenant->run($shopId, function () use ($keep, $cards, $shopId, $token, $customer, $add, $remove): array {
             $list = $keep->handle($shopId, $token, $customer, $add, $remove);
+            // A list kept by phone says which, masked, for "kept for 050-•••-4567".
+            $phone = $customer === null ? null : PhoneSignIn::maskedFor($customer);
 
-            return $list + ['products' => $cards->handle($list['items'])];
+            return $list + ['products' => $cards->handle($list['items'])] + ($phone === null ? [] : ['phone' => $phone]);
         });
 
         return response()->json($list, 200, ['Cache-Control' => 'no-store'], self::JSON);
+    }
+
+    /** A four-digit code by SMS, to keep the wishlist by phone. */
+    public function phoneCode(Request $request, TenantContext $tenant, PhoneSignIn $signIn, string $site): JsonResponse
+    {
+        $connection = self::phoneSite($request, $site);
+        if ($connection instanceof JsonResponse) {
+            return $connection;
+        }
+
+        $result = $tenant->run($connection->shop_id, fn (): array => $signIn->sendCode($connection->shop_id, (string) $request->input('phone', ''), (string) $request->ip()));
+
+        return response()->json($result, $result['sent'] ? 200 : ($result['error'] === 'too_many' ? 429 : 422), ['Cache-Control' => 'no-store'], self::JSON);
+    }
+
+    /** The code back: the list is the number's, and the browser gets its sign-in token. */
+    public function phoneVerify(Request $request, TenantContext $tenant, PhoneSignIn $signIn, string $site): JsonResponse
+    {
+        $connection = self::phoneSite($request, $site);
+        if ($connection instanceof JsonResponse) {
+            return $connection;
+        }
+
+        $token = is_string($request->input('token')) ? (string) $request->input('token') : null;
+        $result = $tenant->run($connection->shop_id, fn (): array => $signIn->verify($connection->shop_id, (string) $request->input('phone', ''), (string) $request->input('code', ''), $token, $request->boolean('consent')));
+
+        return response()->json($result, $result['ok'] ? 200 : 422, ['Cache-Control' => 'no-store'], self::JSON);
+    }
+
+    public function phoneOut(Request $request, TenantContext $tenant, PhoneSignIn $signIn, string $site): JsonResponse
+    {
+        $connection = self::phoneSite($request, $site);
+        if ($connection instanceof JsonResponse) {
+            return $connection;
+        }
+
+        if (is_string($request->input('phone'))) {
+            $tenant->run($connection->shop_id, fn () => $signIn->signOut($connection->shop_id, (string) $request->input('phone')));
+        }
+
+        return response()->json(['ok' => true], 200, ['Cache-Control' => 'no-store'], self::JSON);
+    }
+
+    private static function phoneSite(Request $request, string $site): StoreConnection|JsonResponse
+    {
+        $connection = self::site($request, $site);
+
+        if (! $connection instanceof JsonResponse && (! Features::enabled('shortlist.wishlist', $connection->shop_id) || ! Features::enabled('shortlist.wishlist_phone', $connection->shop_id))) {
+            return response()->json(['error' => 'phone_off'], 404);
+        }
+
+        return $connection;
     }
 
     /** The shop behind a public site key; a browser on another site is refused. */

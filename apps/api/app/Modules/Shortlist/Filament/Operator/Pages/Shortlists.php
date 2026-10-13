@@ -10,12 +10,15 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Shortlist\Actions\FindThemeCards;
 use App\Modules\Shortlist\Models\ShortlistCount;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
+use App\Modules\Sms\Contracts\Phone;
+use App\Modules\Sms\Contracts\SendsSms;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 /**
@@ -34,6 +37,9 @@ class Shortlists extends Page
 
     /** Lists read for the products saved most; a store with more reads its latest. */
     private const LISTS_READ = 5000;
+
+    /** Lists shown on the screen; the export has all. */
+    private const LISTS_SHOWN = 100;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHeart;
 
@@ -104,6 +110,8 @@ class Shortlists extends Page
             'wishlist_floating' => (bool) Settings::get('shortlist.wishlist_floating', $shop),
             'wishlist_header' => (bool) Settings::get('shortlist.wishlist_header', $shop),
             'wishlist_whatsapp' => (bool) Settings::get('shortlist.wishlist_whatsapp', $shop),
+            'wishlist_phone' => Features::enabled('shortlist.wishlist_phone', $shop),
+            'heart_plain' => (bool) Settings::get('shortlist.heart_plain', $shop),
             'wishlist_place' => (string) Settings::get('shortlist.wishlist_place', $shop),
         ];
     }
@@ -126,6 +134,8 @@ class Shortlists extends Page
             Settings::set('shortlist.wishlist_floating', (bool) ($d['wishlist_floating'] ?? true), $shop);
             Settings::set('shortlist.wishlist_header', (bool) ($d['wishlist_header'] ?? false), $shop);
             Settings::set('shortlist.wishlist_whatsapp', (bool) ($d['wishlist_whatsapp'] ?? true), $shop);
+            Features::override('shortlist.wishlist_phone', (bool) ($d['wishlist_phone'] ?? false), $shop);
+            Settings::set('shortlist.heart_plain', (bool) ($d['heart_plain'] ?? false), $shop);
 
             // Empty: no buttons there (no category cards; not on the product page; no heart in the header).
             foreach (['card_selector', 'product_selector', 'wishlist_place'] as $key) {
@@ -164,6 +174,69 @@ class Shortlists extends Page
 
         $this->data['card_selector'] = (string) $found['selector'];
         Notification::make()->success()->title(__('shortlist::ui.cards_found', ['cards' => (string) $found['cards']]))->body(__('shortlist::ui.cards_found_body', ['page' => rawurldecode((string) $found['page'])]))->send();
+    }
+
+    /** Whether the platform can send SMS: without it, keeping the list by phone shows nowhere. */
+    public function smsReady(): bool
+    {
+        return app(SendsSms::class)->ready();
+    }
+
+    /**
+     * Every wishlist of the shop, the latest changed first: who keeps it (a store account, a phone,
+     * a browser), the number in full only when the shopper agreed to hear from the store, and the
+     * products in it.
+     *
+     * @return list<array{who: string, phone: string|null, consent: bool, count: int, products: list<string>, updated: string}>
+     */
+    public function lists(?int $limit = self::LISTS_SHOWN): array
+    {
+        $shop = $this->shop;
+
+        if ($shop === null) {
+            return [];
+        }
+
+        return app(TenantContext::class)->run($shop, function () use ($limit): array {
+            $lists = ShortlistWishlist::query()->latest('updated_at')->orderBy('id')->when($limit !== null, fn ($q) => $q->limit($limit))->get()
+                ->filter(fn (ShortlistWishlist $list): bool => (array) $list->items !== []);
+            $titles = CatalogProduct::query()->whereIn('external_id', $lists->pluck('items')->flatten()->unique()->map(fn ($id): string => (string) $id)->values())->pluck('title', 'external_id');
+
+            return $lists->map(function (ShortlistWishlist $list) use ($titles): array {
+                $ref = (string) $list->customer_ref;
+                $phone = str_starts_with($ref, 'phone:') && is_string($list->phone) ? $list->phone : null;
+
+                return [
+                    'who' => match (true) {
+                        $phone !== null => 'phone',
+                        $ref !== '' => 'account',
+                        default => 'browser',
+                    },
+                    'phone' => $phone === null ? null : ($list->marketing_consent ? $phone : Phone::masked($phone)),
+                    'consent' => (bool) $list->marketing_consent,
+                    'count' => count((array) $list->items),
+                    'products' => array_values(array_filter(array_map(fn ($id): ?string => $titles[(string) $id] ?? null, (array) $list->items))),
+                    'updated' => (string) $list->updated_at?->timezone('Asia/Jerusalem')->format('d/m/Y H:i'),
+                ];
+            })->values()->all();
+        });
+    }
+
+    /** Every list as a spreadsheet, for the store manager: the number only where the shopper agreed. */
+    public function export(): StreamedResponse
+    {
+        $rows = $this->lists(null);
+
+        return response()->streamDownload(function () use ($rows): void {
+            $out = fopen('php://output', 'w');
+            // Excel reads the Hebrew right with the byte-order mark.
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, [__('shortlist::ui.col_updated'), __('shortlist::ui.col_who'), __('shortlist::ui.col_phone'), __('shortlist::ui.col_consent'), __('shortlist::ui.col_count'), __('shortlist::ui.col_products')]);
+            foreach ($rows as $row) {
+                fputcsv($out, [$row['updated'], __('shortlist::ui.who_'.$row['who']), $row['consent'] ? $row['phone'] : '', $row['consent'] ? __('shortlist::ui.yes') : '', $row['count'], implode(' | ', $row['products'])]);
+            }
+            fclose($out);
+        }, 'wishlists-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**

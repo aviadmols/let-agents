@@ -1,0 +1,11 @@
+{
+    "name": "Sms",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Admin"
+    ],
+    "provider": "SmsServiceProvider",
+    "features": [],
+    "settings": []
+}

@@ -84,6 +84,17 @@
                         <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_header"><span></span></label>
                     </div>
                     <div class="lsl-row">
+                        <div class="lsl-rt"><b>{{ __('shortlist::features.wishlist_phone.label') }}</b><small>{{ __('shortlist::features.wishlist_phone.description') }}</small></div>
+                        <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_phone"><span></span></label>
+                    </div>
+                    @if (($data['wishlist_phone'] ?? false) && ! $this->smsReady())
+                        <p class="lsl-help" style="color:#b45309">{{ $t('sms_missing') }}</p>
+                    @endif
+                    <div class="lsl-row">
+                        <div class="lsl-rt"><b>{{ __('shortlist::settings.heart_plain.label') }}</b><small>{{ __('shortlist::settings.heart_plain.description') }}</small></div>
+                        <label class="lsl-sw"><input type="checkbox" wire:model="data.heart_plain"><span></span></label>
+                    </div>
+                    <div class="lsl-row">
                         <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_whatsapp.label') }}</b><small>{{ __('shortlist::settings.wishlist_whatsapp.description') }}</small></div>
                         <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_whatsapp"><span></span></label>
                     </div>
@@ -133,6 +144,26 @@
                     <div class="lsl-stat" data-stat="saved"><b>{{ number_format($n['saved']) }}</b><span>{{ $t('stat_saved') }}</span></div>
                     <div class="lsl-stat" data-stat="compares"><b>{{ number_format($n['compares']) }}</b><span>{{ $t('stat_compares') }}</span></div>
                 </div>
+            </div>
+
+            @php($lists = $this->lists())
+            <div class="lsl-card" data-lists>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                    <h2>{{ $t('lists_title') }}</h2>
+                    @if ($lists !== [])
+                        <button type="button" class="lsl-save" style="background:transparent;color:inherit;border:1px solid var(--lsl-line)" wire:click="export">{{ $t('export') }}</button>
+                    @endif
+                </div>
+                <p class="lsl-help">{{ $t('lists_help') }}</p>
+                @forelse ($lists as $list)
+                    <div class="lsl-row" style="display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:start">
+                        <div><b style="font-size:13.5px">{{ $t('who_'.$list['who']) }}</b>@if ($list['phone'])<br><span dir="ltr" style="font-size:13px">{{ $list['phone'] }}</span>@endif @if ($list['consent'])<br><small style="color:#15803d">{{ $t('consented') }}</small>@endif</div>
+                        <div style="font-size:13px">{{ implode(' · ', array_slice($list['products'], 0, 4)) }}@if (count($list['products']) > 4) {{ $t('and_more', ['n' => count($list['products']) - 4]) }}@endif</div>
+                        <small style="white-space:nowrap" dir="ltr">{{ $list['updated'] }}</small>
+                    </div>
+                @empty
+                    <p class="lsl-help">{{ $t('none_yet') }}</p>
+                @endforelse
             </div>
 
             <div class="lsl-cols">

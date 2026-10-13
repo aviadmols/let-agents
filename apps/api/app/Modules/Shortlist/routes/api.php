@@ -16,4 +16,7 @@ Route::middleware('throttle:shortlist')->group(function (): void {
     Route::get('shortlist/{site}/paths', [ShortlistController::class, 'paths'])->name('api.shortlist.paths');
     Route::post('shortlist/{site}/wishlist', [ShortlistController::class, 'wishlist'])->name('api.shortlist.wishlist');
     Route::get('shortlist/{site}/shared/{code}', [ShortlistController::class, 'shared'])->name('api.shortlist.shared');
+    Route::post('shortlist/{site}/phone/code', [ShortlistController::class, 'phoneCode'])->name('api.shortlist.phone.code');
+    Route::post('shortlist/{site}/phone/verify', [ShortlistController::class, 'phoneVerify'])->name('api.shortlist.phone.verify');
+    Route::post('shortlist/{site}/phone/out', [ShortlistController::class, 'phoneOut'])->name('api.shortlist.phone.out');
 });
