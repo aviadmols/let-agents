@@ -92,7 +92,10 @@
                         <div class="lsl-rt">
                             <b>{{ __('shortlist::settings.card_selector.label') }}</b>
                             <small>{{ __('shortlist::settings.card_selector.description') }}</small>
-                            <input type="text" wire:model="data.card_selector" class="lsl-field code" placeholder=".product-card, li.product">
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="text" wire:model="data.card_selector" class="lsl-field code" placeholder=".product-card, li.product" style="flex:1">
+                                <button type="button" class="lsl-save" style="background:transparent;color:inherit;border:1px solid var(--lsl-line);white-space:nowrap" wire:click="findCards" wire:loading.attr="disabled" wire:target="findCards">{{ $t('find_cards') }}</button>
+                            </div>
                         </div>
                     </div>
                     <div class="lsl-row">

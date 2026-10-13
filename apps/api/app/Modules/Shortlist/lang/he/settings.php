@@ -25,4 +25,24 @@ return [
         'label' => 'בקשות לדקה מגולש אחד',
         'description' => 'הגבלה על לחיצות לב והשוואה מאותה כתובת, לכל אתר.',
     ],
+    'card_finder_provider' => [
+        'label' => 'ספק המודל שמוצא כרטיסי מוצר',
+        'description' => 'נשאל רק כשהקוד לא מצא את הכרטיסים בעצמו.',
+    ],
+    'card_finder_model' => [
+        'label' => 'המודל שמוצא כרטיסי מוצר',
+        'description' => 'למשל gpt-5.4-mini.',
+    ],
+    'card_finder_input_usd_per_million' => [
+        'label' => 'מחיר קלט, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'card_finder_output_usd_per_million' => [
+        'label' => 'מחיר פלט, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'card_finder_max_output_tokens' => [
+        'label' => 'אורך התשובה',
+        'description' => 'עד כמה טוקנים.',
+    ],
 ];

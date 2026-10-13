@@ -20,5 +20,11 @@ return [
     'wish_link' => 'A permanent way in',
     'wish_link_help' => 'The floating heart shows once a shopper saved a product. For a way in at any time, add a link to this address to the site menu or header (for example "Wishlist"). Clicking it opens the list.',
     'wish_heart_help' => 'Or place the heart yourselves: paste this tag in the site\'s theme, and on WordPress the shortcode works too. The heart shows how many products are saved and opens the list.',
+    'find_cards' => 'Find it for me',
+    'cards_found' => 'Found :cards product cards',
+    'cards_found_body' => 'On :page. The selector is in the field: check it and press save.',
+    'cards_not_found' => 'We did not find the product cards',
+    'cards_not_found_body' => 'You can write the selector yourselves, or ask our team for help.',
+    'cards_no_page' => 'We found no category page of the store. It will be there after the next sync.',
     'none_yet' => 'No data yet.',
 ];

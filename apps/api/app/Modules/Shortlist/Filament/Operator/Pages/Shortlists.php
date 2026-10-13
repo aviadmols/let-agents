@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Settings\InvalidSettingValue;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Shortlist\Actions\FindThemeCards;
 use App\Modules\Shortlist\Models\ShortlistCount;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
 use App\Modules\Tenancy\Models\Shop;
@@ -132,6 +133,26 @@ class Shortlists extends Page
 
         Notification::make()->success()->title(__('shortlist::ui.saved'))->body(__('shortlist::ui.saved_body'))->send();
         $this->load();
+    }
+
+    /** The theme's product cards, found on the store's own category page and put in the field, not saved. */
+    public function findCards(): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        $found = app(FindThemeCards::class)->handle($this->shop);
+
+        if (! $found['found']) {
+            $no = ($found['reason'] ?? '') === 'no_page';
+            Notification::make()->warning()->title(__($no ? 'shortlist::ui.cards_no_page' : 'shortlist::ui.cards_not_found'))->body($no ? null : __('shortlist::ui.cards_not_found_body'))->send();
+
+            return;
+        }
+
+        $this->data['card_selector'] = (string) $found['selector'];
+        Notification::make()->success()->title(__('shortlist::ui.cards_found', ['cards' => (string) $found['cards']]))->body(__('shortlist::ui.cards_found_body', ['page' => rawurldecode((string) $found['page'])]))->send();
     }
 
     /**
