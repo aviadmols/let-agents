@@ -50,6 +50,7 @@ return [
     'send' => 'Send',
     'similar' => 'Similar items',
     'similar_to' => 'Similar to: :title',
+    'similar_for' => 'Items similar to',
     'back_to' => 'Back to the results',
     'show_more' => 'Show more',
     'no_similar' => 'We found no similar items.',

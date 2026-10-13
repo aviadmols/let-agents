@@ -1689,6 +1689,14 @@
       '.who i svg{width:16px;height:16px}',
       '.who.ai i{background:var(--rs-accent);color:var(--rs-accent-fg)}',
       '.said{font-size:15px;line-height:1.5;padding-inline-start:36px;overflow-wrap:anywhere}',
+      '.asked{position:relative;display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;align-items:start;margin-inline-start:36px;padding:10px;padding-inline-end:52px;border:1px solid var(--rs-line);border-radius:var(--rs-radius);background:var(--rs-bg);color:var(--rs-fg)}',
+      '.asked-pic{display:block;width:76px;height:76px;border-radius:8px;overflow:hidden;background:var(--rs-soft)}',
+      '.asked-pic img{display:block;width:100%;height:100%;object-fit:cover}',
+      '.asked-info{display:grid;gap:3px;min-width:0}',
+      '.asked-for{font-size:12px}',
+      '.asked-title{color:inherit;text-decoration:none;font-size:14px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+      '.asked-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}',
+      '.asked-btns .la-btn{padding:6px 10px;font-size:12px}',
       '.turn-body{background:var(--rs-bg);border-radius:16px;padding:6px 4px;min-width:0}',
       '.turn-body .la-wait{margin:6px 8px;background:var(--rs-soft)}',
       // The shop hides prices; the second picture shows while the pointer is on the product.
@@ -3658,6 +3666,71 @@
       return body;
     }
 
+    /**
+     * The product a "similar to" turn is about, in place of the words: its picture beside its name,
+     * the price under it, the cart and its page, and the heart and compare box where the shop has them.
+     */
+    function askedProduct(body, item, raw) {
+      var turn = body && body.parentNode;
+      var said = turn && turn.querySelector('.said');
+      if (!said || !item || !item.external_id) {
+        return;
+      }
+      var node = el('div', 'asked');
+      node.setAttribute('data-product', item.external_id);
+      node.setAttribute('aria-label', label('similar_to', { title: item.title || '' }));
+      rememberUrl(item.external_id, item.url);
+      var href = safeUrl(item.url);
+      var pic = el('a', 'asked-pic');
+      if (href) {
+        pic.href = href;
+      }
+      if (safeUrl(item.image)) {
+        var img = el('img');
+        img.src = item.image;
+        img.alt = '';
+        pic.appendChild(img);
+      }
+      bindClick(pic, raw, item);
+      node.appendChild(pic);
+      var info = el('div', 'asked-info');
+      info.appendChild(el('span', 'asked-for', label('similar_for')));
+      var title = el('a', 'asked-title', item.title || '');
+      if (href) {
+        title.href = href;
+      }
+      bindClick(title, raw, item);
+      info.appendChild(title);
+      info.appendChild(el('div', 'price'));
+      var buttons = el('div', 'asked-btns');
+      if (showsCart() && item.buy && CAN_BUY) {
+        var action = el('button', 'la-btn', label('add'));
+        action.type = 'button';
+        action.setAttribute('data-action', '1');
+        action.addEventListener('click', function () {
+          countClick(raw, { id: item.id, title: item.title });
+          addToCart(item.external_id, action, function () { countAdd(raw, { id: item.id, title: item.title }); });
+        });
+        buttons.appendChild(action);
+      }
+      if (href) {
+        var view = el('a', 'la-btn la-ghost', label('view'));
+        view.href = href;
+        bindClick(view, raw, item);
+        buttons.appendChild(view);
+      }
+      info.appendChild(buttons);
+      node.appendChild(info);
+      said.parentNode.replaceChild(node, said);
+      shortlisted(node, item);
+      liveProducts([item.external_id]).then(function () { updateCards(turn); });
+    }
+
+    /** What a "similar to" turn keeps of its product, to draw the card again. */
+    function askedFields(item) {
+      return { id: item.id, external_id: item.external_id, title: item.title, image: item.image, url: item.url, buy: item.buy };
+    }
+
     /** The earlier turns of this visit, drawn again from what they showed. */
     function replayTurns(scroll) {
       chatTurns().forEach(function (turn) {
@@ -3681,6 +3754,9 @@
             renderResults(below, turn.r, turn.q || '', true);
           }
         } else if ((turn.k === 'p' || turn.k === 'm') && turn.r) {
+          if (turn.k === 'm' && turn.i) {
+            askedProduct(body, turn.i, '');
+          }
           // A photo's matches, or the products like one ("similar to…"): products only.
           renderResults(body, { groups: { product: turn.r } }, '', true);
         }
@@ -4223,10 +4299,11 @@
 
       if (drawerMode()) {
         var turn = openDrawer(asked);
+        askedProduct(turn, item, raw);
         countClick(raw, { id: item.id, title: item.title });
         var status = waiting(label('drawer_thinking'));
         turn.appendChild(status);
-        var kept = keepTurn({ t: Date.now(), k: 'm', q: asked });
+        var kept = keepTurn({ t: Date.now(), k: 'm', q: asked, i: askedFields(item) });
         showTurn(turn);
 
         similarProducts(item).then(function (products) {

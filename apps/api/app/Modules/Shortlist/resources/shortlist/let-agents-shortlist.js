@@ -509,7 +509,7 @@
     '.none{color:#9ca3af}',
     '.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer}',
     '.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(520px,100vw);background:#fff;z-index:2147483002;display:flex;flex-direction:column;box-shadow:0 0 30px rgba(0,0,0,.25)}',
-    '.drawer{color:#000}',
+    '.drawer{color:var(--la-ink,#000)}',
     '.list{flex:1;overflow:auto;padding:28px 24px 12px;display:grid;grid-template-columns:1fr 1fr;gap:36px 20px;align-content:start}',
     '.list .msg{grid-column:1/-1}',
     '.item{display:flex;flex-direction:column;gap:12px;min-width:0}',
@@ -517,31 +517,33 @@
     '.item img{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;cursor:pointer}',
     '.item .gone{position:absolute;inset-inline-start:0;bottom:0;padding:5px 9px;background:#000;color:#fff;font-size:10px;font-weight:400;letter-spacing:1px}',
     '.item .meta{display:flex;flex-direction:column;gap:2px;min-width:0}',
-    '.item a{color:#1a1a1a;text-decoration:none;font-size:13px;font-weight:300;line-height:1.4;letter-spacing:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
-    '.item .price{color:#1a1a1a;font-size:15px;font-weight:300;line-height:1.3}',
-    '.item .buy{display:block;width:100%;padding:8px 12px;border:1px solid #1a1a1a;border-radius:0;background:transparent;color:#1a1a1a;font:inherit;font-size:12px;font-weight:300;letter-spacing:1px;line-height:1.2;cursor:pointer;transition:all .5s ease}',
-    '.item .buy:hover,.item .buy.done{background:#000;color:#fff}',
+    '.item a{color:inherit;text-decoration:none;font-size:13px;font-weight:400;line-height:1.4;letter-spacing:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+    '.item .price{color:inherit;font-size:15px;font-weight:400;line-height:1.3}',
+    '.item .buy{display:block;width:100%;padding:8px 12px;border:1px solid currentColor;border-radius:0;background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:400;letter-spacing:1px;line-height:1.2;cursor:pointer;transition:all .5s ease}',
+    '.item .buy:hover,.item .buy.done{background:var(--la-ink,#000);border-color:var(--la-ink,#000);color:#fff}',
     '.item .buy[disabled]{opacity:.5;cursor:default}',
     '.item .sub{display:flex;justify-content:space-between;align-items:center;gap:12px}',
-    '.item .sub button{border:0;background:none;padding:0;font:inherit;font-size:11px;font-weight:300;letter-spacing:.5px;cursor:pointer}',
-    '.item .alike{color:#1a1a1a;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}',
-    '.item .rm{color:#9a9a9a}',
-    '.item .rm:hover{color:#000}',
+    '.item .sub button{border:0;background:none;padding:0;font:inherit;font-size:11px;font-weight:400;letter-spacing:.5px;cursor:pointer}',
+    '.item .alike{color:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}',
+    '.item .rm{color:inherit}',
+    '.item .rm:hover{text-decoration:underline;text-underline-offset:3px}',
     '.item .sub button:only-child{margin-inline-start:auto}',
     '@media (max-width:360px){.list{grid-template-columns:1fr}}',
     '.foot{border-top:1px solid #efefef;padding:16px 24px 22px;display:grid;gap:14px}',
-    '.note{color:#8a8a8a;font-size:11.5px;font-weight:300}',
+    '.note{color:#6b7280;font-size:12.5px}',
+    '.drawer .note{color:inherit;font-size:11.5px;font-weight:400}',
+    '.drawer .msg,.drawer .link,.drawer .phone-consent{color:inherit}',
     '.share{display:grid;grid-template-columns:1fr 1fr;gap:12px}',
     '.share:has(> :only-child){grid-template-columns:1fr}',
-    '.drawer .btn{border:1px solid #1a1a1a;border-radius:0;padding:9px 12px;background:transparent;color:#1a1a1a;font:inherit;font-size:12px;font-weight:300;letter-spacing:1px;line-height:1.2;transition:all .5s ease}',
-    '.drawer .btn:hover{background:#000;color:#fff}',
-    '.drawer .btn.wa{background:transparent;color:#000}',
-    '.drawer .btn.wa:hover{background:#000;color:#fff}',
+    '.drawer .btn{border:1px solid currentColor;border-radius:0;padding:9px 12px;background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:400;letter-spacing:1px;line-height:1.2;transition:all .5s ease}',
+    '.drawer .btn:hover{background:var(--la-ink,#000);border-color:var(--la-ink,#000);color:#fff}',
+    '.drawer .btn.wa{background:transparent;color:inherit}',
+    '.drawer .btn.wa:hover{background:var(--la-ink,#000);border-color:var(--la-ink,#000);color:#fff}',
     '.phone{display:grid;gap:10px}',
     '.phone > b{font-size:12px;font-weight:400;letter-spacing:1px}',
     '.phone > .note{margin-top:-6px}',
     '.phone-row{display:flex;gap:20px;align-items:flex-end}',
-    '.phone-row input{flex:1;min-width:0;border:0;border-bottom:1px solid #bcbcbc;border-radius:0;padding:10px 0;background:transparent;color:#000;font:inherit;font-size:16px;transition:all .5s ease}',
+    '.phone-row input{flex:1;min-width:0;border:0;border-bottom:1px solid #bcbcbc;border-radius:0;padding:10px 0;background:transparent;color:inherit;font:inherit;font-size:16px;transition:all .5s ease}',
     '.phone-row input:focus{outline:0;box-shadow:none;border-bottom:2px solid #000}',
     '.phone-row .btn{flex:none;padding:9px 16px}',
     '.phone-code{display:grid;gap:10px}',
@@ -863,6 +865,24 @@
     renderWishButton();
   }
 
+  /**
+   * The site's own text color, for the drawer's words and lines. Black where the page's text is too
+   * light to read on the drawer's white (a dark theme) or cannot be read at all.
+   */
+  function siteInk() {
+    try {
+      var color = win.getComputedStyle(doc.body).color;
+      var rgb = String(color || '').match(/\d+(\.\d+)?/g);
+      if (!rgb || rgb.length < 3 || (rgb.length > 3 && Number(rgb[3]) < 1)) {
+        return '#000';
+      }
+      var light = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+      return light > 0.6 ? '#000' : 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+    } catch (e) {
+      return '#000';
+    }
+  }
+
   /** The drawer: this shopper's list, or (shared) someone else's with "save to my list". */
   function renderDrawer(products, shared) {
     own('veil');
@@ -870,6 +890,7 @@
     var veil = el('div', 'veil');
     veil.addEventListener('click', closeDrawer);
     var drawer = el('div', 'drawer');
+    drawer.style.setProperty('--la-ink', siteInk());
     drawer.setAttribute('role', 'dialog');
     drawer.setAttribute('aria-modal', 'true');
     var head = el('div', 'head');

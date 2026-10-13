@@ -50,6 +50,7 @@ return [
     'send' => 'שליחה',
     'similar' => 'פריטים דומים',
     'similar_to' => 'דומים ל: :title',
+    'similar_for' => 'פריטים דומים ל־',
     'back_to' => 'חזרה לתוצאות',
     'show_more' => 'הצג עוד',
     'no_similar' => 'לא מצאנו פריטים דומים.',
