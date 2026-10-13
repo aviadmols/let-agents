@@ -10,10 +10,10 @@
 4. מהתיקייה `extensions/shopify`:
    ```sh
    shopify app config link      # בוחרים את האפליקציה שנוצרה
-   shopify app deploy           # כתובות, הרשאות, webhooks והרחבת התבנית
+   shopify app deploy           # כתובות, הרשאות, webhooks, App Proxy והרחבת התבנית
    ```
 5. Distribution: לבדיקות בוחרים Custom distribution לחנות אחת. בשביל כל החנויות בוחרים Public (App Store). כך או כך, החיוב עובר דרך ה־Billing API של האפליקציה, ולא דרך Managed pricing.
-6. בפרטי האפליקציה ב־Partners, תחת API access, מבקשים Protected customer data access. זה נדרש בגלל ה־webhooks של פרטיות ובגלל המייל שנשמר בסלים נטושים.
+6. בפרטי האפליקציה ב־Partners, תחת API access, מבקשים Protected customer data access. זה נדרש בגלל ה־webhooks של פרטיות ובגלל רשימת המשאלות שנשמרת בחשבון של לקוח מחובר (מזהה הלקוח מה־App Proxy).
 
 ## 2. משתנים ב־Railway (api, worker, scheduler)
 
@@ -34,6 +34,7 @@
 | `/shopify/callback` | חזרה מאישור ההתקנה |
 | `/shopify/billing/return` | חזרה מאישור המנוי |
 | `/api/v1/shopify/webhooks` | הסרת האפליקציה, שינוי מנוי ושלושת ה־webhooks של פרטיות |
+| `/api/v1/shortlist/proxy` | App Proxy: החנות קוראת ל־`/apps/letagents/wishlist` בכתובת שלה, ושופיפיי מעביר לכאן בחתימה, עם הלקוח המחובר (`logged_in_customer_id`) |
 
 ## 3. התקנה ובדיקה על חנות פיתוח
 
@@ -58,7 +59,7 @@
 
 - **הסוחר מבטל את המנוי** (webhook `app_subscriptions/update`): החנות מושהית. כשהסוחר פותח שוב את האפליקציה, הוא מתבקש לאשר מחדש.
 - **הסוחר מסיר את האפליקציה** (`app/uninstalled`): הגישה נמחקת והחנות מושהית. אחרי 48 שעות מגיע `shop/redact`, והחנות וכל הנתונים שלה נמחקים.
-- **בקשת פרטיות של קונה** (`customers/redact`): הסלים הנטושים עם המייל שלו נמחקים. זה המקום היחיד שבו נשמר מייל של קונה.
+- **בקשת פרטיות של קונה** (`customers/redact`): רשימת המשאלות שנשמרה בחשבון שלו נמחקת. מייל של קונה לא נשמר אצלנו בכלל.
 - **הטוקן:** טוקן אופליין שפג תוקפו מתחדש אוטומטית עם ה־refresh token. אם גם הוא פג, הסנכרון נכשל עם "צריך להתקין שוב".
 
 ## 5. מחיר וניסיון

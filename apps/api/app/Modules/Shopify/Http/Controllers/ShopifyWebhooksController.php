@@ -48,6 +48,7 @@ final class ShopifyWebhooksController
                 (string) $install->shop_id,
                 $topic === 'customers/redact' ? 'redact' : 'report',
                 mb_strtolower((string) ($payload['customer']['email'] ?? '')),
+                (string) ($payload['customer']['id'] ?? ''),
             )),
             // 48 hours after the app was removed: the shop and all it holds go.
             'shop/redact' => Shop::query()->whereKey($install->shop_id)->delete(),

@@ -21,13 +21,9 @@ Let Agents gets read-only access through a token created by a store manager:
 * Published guides and articles from the post types you choose, with the products they mention.
 * Site information: WordPress, WooCommerce, theme and active plugin versions.
 
-Customer details are never shared: orders reach Let Agents only as totals, product IDs and quantities, at checkout and once from the last 24 months. The one exception is an email a shopper gives Let Agents themselves, below. Custom fields that look like costs, supplier details or internal notes are never shared either.
+Customer details are never shared: orders reach Let Agents only as totals, product IDs and quantities, at checkout and once from the last 24 months. Custom fields that look like costs, supplier details or internal notes are never shared either.
 
-The plugin reads the store, and writes only one thing: a pending payment order a shopper asks for by leaving their email before checkout, when the shop turns that on. Nothing else in the store is ever changed, and the token gives Let Agents no write access.
-
-= The email before checkout =
-
-When the shop turns it on in Let Agents, the store asks the shopper for their email before checkout. When they leave it and agree, the plugin saves the cart as an order waiting for payment, with that email, so the shop can follow up. Leaving the email again updates the same order. If the shopper then checks out, the classic checkout finishes that same order; the block checkout makes its own, and the one left waiting goes to the trash. The shopper gets no email from the store, stock is not touched and nothing is charged.
+The plugin only reads the store: nothing in the store is ever changed, and the token gives Let Agents no write access.
 
 = The widget on the store =
 
@@ -59,6 +55,7 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 == Changelog ==
 
 = 0.7.2 =
+* The email before checkout and the abandoned carts are removed: the plugin no longer asks for an email, saves no pending payment orders and has no write route. It only reads the store again. Orders it saved before stay in the store as they are.
 * The wishlist of a signed-in shopper: when the shop turns the wishlist on in Let Agents, the page tells Let Agents which store account is signed in, signed with the store's key, so the list is kept in that account and waits on any device. Only the user ID is sent, never a name or an email.
 
 = 0.7.1 =

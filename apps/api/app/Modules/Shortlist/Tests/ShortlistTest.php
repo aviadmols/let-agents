@@ -12,6 +12,7 @@ use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shortlist\Actions\ProductCards;
 use App\Modules\Shortlist\Http\Controllers\ShortlistController;
@@ -169,6 +170,12 @@ final class ShortlistTest extends TestCase
         // Claiming a customer in the address without Shopify's signature opens nothing.
         $forged = '/api/v1/shortlist/proxy/wishlist?'.http_build_query(['shop' => 'rocks.myshopify.com', 'logged_in_customer_id' => '7001', 'timestamp' => (string) time(), 'signature' => str_repeat('a', 64)]);
         $this->postJson($forged, ['token' => self::BROWSER])->assertUnauthorized();
+
+        // The customer asks the store to forget them: their account's list goes, no one else's.
+        event(new ShopperDataRequested($this->shop->id, 'report', 'a@b.test', '7001'));
+        $this->assertSame(1, ShortlistWishlist::query()->withoutGlobalScopes()->count(), 'a request to report erases nothing');
+        event(new ShopperDataRequested($this->shop->id, 'redact', 'a@b.test', '7001'));
+        $this->assertSame(0, ShortlistWishlist::query()->withoutGlobalScopes()->where('customer_ref', 'shopify:7001')->count());
     }
 
     public function test_the_themes_cards_are_named_by_their_links(): void

@@ -7,6 +7,7 @@ defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 delete_option( 'let_agents_access_token' );
 delete_option( 'let_agents_settings' );
+delete_option( 'let_agents_cart_capture_removed' );
 
 global $wpdb;
 
