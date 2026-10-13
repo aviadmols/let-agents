@@ -17,7 +17,9 @@ use Illuminate\Http\Response;
  *   {"type":"search","q":"מקיטא","results":11}           the shopper paused over suggestions
  *   {"type":"click","q":"מקיטא","id":"p:1203","title":"…"}  a result was opened
  *   {"type":"add_to_cart","q":"מקיטא","id":"p:1203","title":"…","path":"/"}  added to the cart from
- *                                                           the results or the assistant's picks
+ *                                                           the results or the assistant's picks;
+ *                                                           "via":"page" from the page of a product
+ *                                                           opened from the search, within a week
  *
  * With them, "vid": the anonymous id the storefront scripts keep, only so an order by the same
  * visitor is attributed to the search; stored as a hash salted per shop. Nothing else about the

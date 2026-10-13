@@ -77,7 +77,8 @@ final class CountSearch
     }
 
     /**
-     * A product added to the cart from the search: its results, or the assistant's picks. Counted
+     * A product added to the cart from the search: its results, the assistant's picks, or the
+     * product's own page after it was opened from them (within a week). Counted
      * on the query and the product, and, when the visitor is known, kept with the shop's events so
      * an order by the same visitor is attributed to the search (Analytics\Actions\RecordOrder).
      */
@@ -113,6 +114,7 @@ final class CountSearch
             'shop_id' => $shopId,
             'event_id' => (string) Str::ulid(),
             'type' => 'add_to_cart',
+            // Also from the product's own page, after it was opened from the search: the search's add all the same.
             'page_type' => 'search',
             'page_path' => mb_substr($path !== '' && str_starts_with($path, '/') ? $path : '/', 0, 512),
             'item_external_id' => $m[1],

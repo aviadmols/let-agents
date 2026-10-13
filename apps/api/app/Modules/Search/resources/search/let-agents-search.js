@@ -844,6 +844,100 @@
       }
       events.push({ type: 'click', q: normalized, id: item.id, title: item.title });
       send(events);
+      rememberFound(normalized, item);
+    }
+
+    var FOUND_KEY = 'let_agents_found';
+    var FOUND_DAYS = 7;
+
+    /** The products opened from the search lately, by the store's id: the words, the record, when. */
+    function foundProducts() {
+      try {
+        var kept = JSON.parse(win.localStorage.getItem(FOUND_KEY) || '{}');
+        var cutoff = Date.now() - FOUND_DAYS * 864e5;
+        var out = {};
+        Object.keys(kept || {}).forEach(function (id) {
+          if (kept[id] && kept[id].t > cutoff && kept[id].q) {
+            out[id] = kept[id];
+          }
+        });
+        return out;
+      } catch (e) {
+        return {};
+      }
+    }
+
+    /**
+     * A product opened from the search, kept in this browser for a week: added to the cart later from
+     * its own page, it still came through the search (watchFoundProduct).
+     */
+    function rememberFound(query, item) {
+      var id = String(item && item.id || '');
+      if (id.indexOf('p:') !== 0) {
+        return;
+      }
+      try {
+        var kept = foundProducts();
+        kept[id.slice(2)] = { q: query, id: id, title: String(item.title || '').slice(0, 200), t: Date.now() };
+        var ids = Object.keys(kept).sort(function (a, b) { return kept[b].t - kept[a].t; }).slice(0, 40);
+        var trimmed = {};
+        ids.forEach(function (key) { trimmed[key] = kept[key]; });
+        win.localStorage.setItem(FOUND_KEY, JSON.stringify(trimmed));
+      } catch (e) { /* storage blocked: not kept */ }
+    }
+
+    /**
+     * On the page of a product found by the search: the store's own add to cart counts as the search's,
+     * once, with the words it was found by. A form that leaves the page is counted as it is sent; one the
+     * theme sends itself is counted when the store's cart answers yes.
+     */
+    function watchFoundProduct() {
+      var meta = win.ShopifyAnalytics && win.ShopifyAnalytics.meta && win.ShopifyAnalytics.meta.product;
+      var post = String(doc.body && doc.body.className || '').match(/(?:^|\s)postid-([0-9]+)(?:\s|$)/);
+      var pageId = meta && meta.id ? String(meta.id) : (post && /(?:^|\s)single-product(?:\s|$)/.test(doc.body.className) ? post[1] : null);
+      var found = pageId ? foundProducts()[pageId] : null;
+      if (!found) {
+        return;
+      }
+      var counted = false;
+      var count = function () {
+        if (!counted) {
+          counted = true;
+          send([{ type: 'add_to_cart', q: found.q, id: found.id, title: found.title, path: win.location.pathname, via: 'page' }], true);
+        }
+      };
+      var isAdd = function (url) {
+        return /\/cart\/add(\.js)?(\?|$)|wc-ajax=add_to_cart|[?&]add-to-cart=/.test(String(url || ''));
+      };
+      // A form that really leaves the page: the theme did not take it over (checked after every handler).
+      win.addEventListener('submit', function (event) {
+        var form = event.target;
+        var action = form && form.getAttribute ? String(form.getAttribute('action') || '') : '';
+        if (!event.defaultPrevented && form && (/\/cart\/add/.test(action) || (form.classList && form.classList.contains('cart')))) {
+          count();
+        }
+      });
+      // A theme that adds by itself: the cart's yes, by fetch or by XMLHttpRequest.
+      if (win.fetch) {
+        var fetchBefore = win.fetch;
+        win.fetch = function (input, init) {
+          var url = typeof input === 'string' ? input : (input && input.url);
+          var answer = fetchBefore.apply(this, arguments);
+          if (isAdd(url)) {
+            answer.then(function (response) { if (response && response.ok) { count(); } }, function () {});
+          }
+          return answer;
+        };
+      }
+      if (win.XMLHttpRequest) {
+        var openBefore = win.XMLHttpRequest.prototype.open;
+        win.XMLHttpRequest.prototype.open = function (method, url) {
+          if (isAdd(url)) {
+            this.addEventListener('load', function () { if (this.status >= 200 && this.status < 300) { count(); } });
+          }
+          return openBefore.apply(this, arguments);
+        };
+      }
     }
 
     /** A product the store's cart took from the search: its results or the assistant's picks. */
@@ -4918,6 +5012,8 @@
         });
       }
     };
+    // An add to the cart on the page of a product found by the search counts as the search's.
+    watchFoundProduct();
     // Compare and wishlist: the shop's settings once the page is idle (a small cached answer), and
     // their script only in a shop that turned either on.
     var shortlistStart = function () {
