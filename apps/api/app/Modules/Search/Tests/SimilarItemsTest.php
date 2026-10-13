@@ -112,6 +112,21 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['picture' => 1, 'text' => 0], $this->asked);
     }
 
+    public function test_similar_items_are_of_its_own_kind_or_none(): void
+    {
+        $type = fn (string $id, string $kind) => app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', $id)->update(['payload' => ['product_type' => $kind]]));
+        $type('301', 'Sneakers');
+        $type('302', 'Socks');
+        $type('303', 'sneakers ');
+        LoadedIndex::forget();
+
+        $this->assertSame(['303'], array_column($this->similar('301')->json('products'), 'external_id'), 'socks look alike on a white background, and are not similar');
+
+        $type('303', 'Laces');
+        LoadedIndex::forget();
+        $this->assertSame([], $this->similar('301')->json('products'), 'nothing of its kind: none, never related ones');
+    }
+
     public function test_without_scanned_pictures_they_come_by_meaning(): void
     {
         $this->pictures = false;
