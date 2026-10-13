@@ -40,6 +40,8 @@ final class PanelDefaults
         $panel
             ->login()
             ->brandName((string) config('app.name'))
+            ->brandLogo(fn (): HtmlString => new HtmlString(view('admin::panel.brand')->render()))
+            ->brandLogoHeight('24px')
             ->font('Heebo', url: PanelTheme::FONT_URL, provider: GoogleFontProvider::class)
             ->maxContentWidth(Width::Full)
             ->colors([
@@ -54,6 +56,7 @@ final class PanelDefaults
                 'locale' => self::localeSwitchAction(),
             ])
             ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): HtmlString => PanelTheme::styles())
+            ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn (): HtmlString => self::topbarEnd())
             ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): HtmlString => self::loginLocaleLinks())
             ->middleware([
                 EncryptCookies::class,
@@ -120,6 +123,18 @@ final class PanelDefaults
         $others = array_values(array_diff(Locales::supported(), [app()->getLocale()]));
 
         return $others[0] ?? Locales::fallback();
+    }
+
+    /** The language switch and the signed-in person's name, beside their menu in the top bar. */
+    private static function topbarEnd(): HtmlString
+    {
+        $user = auth()->user();
+
+        return new HtmlString(view('admin::panel.topbar-end', [
+            'locales' => Locales::supported(),
+            'current' => app()->getLocale(),
+            'name' => $user === null ? '' : (string) $user->name,
+        ])->render());
     }
 
     private static function loginLocaleLinks(): HtmlString

@@ -29,8 +29,9 @@ final class PanelNavigation
         $groups = [];
 
         foreach ($keys as $key) {
+            // Plain headings, as on app.lets.co.il: nothing folds away.
             $groups[$key] = NavigationGroup::make(fn (): string => __("admin::panels.nav.{$key}"))
-                ->collapsible();
+                ->collapsible(false);
         }
 
         return $groups;

@@ -2,6 +2,11 @@
 
 return [
     'locale' => [
+        'label' => 'Language',
+        'short' => [
+            'he' => 'עב',
+            'en' => 'EN',
+        ],
         'switch_to' => 'Switch to :language',
         'names' => [
             'he' => 'עברית',

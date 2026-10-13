@@ -1288,3 +1288,101 @@ html.dark {
         transition: none;
     }
 }
+
+/* ------------------------------------------------------------------ the frame, as in the sketch */
+
+/* The LETS mark (admin::panel.brand). */
+.la-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 23px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--la-ink);
+}
+
+.la-brand svg {
+    width: 19px;
+    height: 20px;
+    flex: none;
+}
+
+/* The brand sits over the sidebar's column, as the sidebar's own head. */
+@media (min-width: 1024px) {
+    .fi-topbar-start {
+        min-width: calc(var(--sidebar-width, 248px) - 32px);
+    }
+}
+
+/* The language switch and the person's name, before the user menu (admin::panel.topbar-end). */
+.la-topbar-end {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-inline-end: 8px;
+}
+
+.la-seg-sm > * {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
+.la-seg > span[aria-current] {
+    background: var(--la-paper);
+    color: var(--la-ink);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
+}
+
+.la-topbar-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--la-ink);
+}
+
+@media (max-width: 640px) {
+    .la-topbar-name {
+        display: none;
+    }
+}
+
+.fi-user-menu-trigger .fi-avatar,
+.fi-tenant-menu-trigger .fi-avatar {
+    background: var(--la-soft);
+}
+
+/* The shop, as a card at the head of the sidebar. */
+.fi-tenant-menu-trigger {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--la-line);
+    border-radius: var(--la-r);
+    background: var(--la-paper);
+    box-shadow: var(--la-shadow);
+}
+
+.fi-tenant-menu-trigger:hover {
+    background: var(--la-sunk);
+}
+
+.fi-sidebar-header {
+    padding-block: 12px;
+}
+
+/* Icons for the screens at the top only; inside a group the words are enough. */
+.fi-sidebar-group:not([data-group-label='']) .fi-sidebar-item-btn > .fi-icon {
+    display: none;
+}
+
+.fi-sidebar-group-btn .fi-icon-btn,
+.fi-sidebar-group-collapse-btn {
+    display: none;
+}
+
+/* The page head: the title and its line under it, a little tighter. */
+.fi-header {
+    gap: 4px;
+}
