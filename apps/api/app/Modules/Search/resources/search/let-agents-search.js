@@ -1338,6 +1338,9 @@
       '.askbox button{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:50%;background:var(--rs-fg);color:var(--rs-bg);display:grid;place-items:center}',
       '.askbox button svg{width:18px;height:18px}',
       '.card .la-sim{margin-top:2px}',
+      '.la-sim{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;border-width:1.5px;background:var(--rs-soft,#f4f4f5)}',
+      '.la-sim:hover{background:var(--rs-bg,#fff)}',
+      '.la-sim svg{width:16px;height:16px;flex:none}',
       '.more{display:block;margin:16px auto 0;font:inherit;font-size:13px;padding:8px 40px;border:1px solid var(--rs-fg);border-radius:var(--rs-radius);background:transparent;color:var(--rs-fg);cursor:pointer}',
       '.card[hidden]{display:none}',
       '.backlink{font:inherit;font-size:13px;border:0;background:transparent;color:var(--rs-accent-text);cursor:pointer;padding:0}',
@@ -1368,8 +1371,9 @@
       '.d-match{position:absolute;bottom:6px;inset-inline-start:6px;background:var(--rs-bg);color:var(--rs-fg);font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.15)}',
       '.d-info{display:block;min-width:0}',
       '.d-row{position:relative;min-width:0}',
-      '.d-sim{position:absolute;inset-inline-end:2px;bottom:0;font:inherit;font-size:12px;line-height:1;padding:5px 10px;border:0;border-radius:999px;background:var(--rs-soft);color:inherit;cursor:pointer;opacity:.85}',
-      '.d-sim:hover{opacity:1}',
+      '.d-sim{position:absolute;inset-inline-end:2px;bottom:0;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;line-height:1;padding:6px 11px;border:1.5px solid var(--rs-fg);border-radius:999px;background:var(--rs-bg);color:var(--rs-fg);cursor:pointer}',
+      '.d-sim:hover{background:var(--rs-fg);color:var(--rs-bg)}',
+      '.d-sim svg{width:14px;height:14px;flex:none}',
       '.d-name{font-size:14.5px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:inherit;text-decoration:none}',
       '.d-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-weight:700;margin-top:4px;font-size:14px;min-height:1.2em}',
       '.d-price s{opacity:.5;font-weight:400}',
@@ -1565,6 +1569,8 @@
 
     var NARROW = 720; // at most this wide, the suggestions cover the page
     var SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c.5 4.6 2.9 7 7.5 7.5-4.6.5-7 2.9-7.5 7.5-.5-4.6-2.9-7-7.5-7.5 4.6-.5 7-2.9 7.5-7.5Z"/><path d="M19 15.5c.2 1.9 1.1 2.8 3 3-1.9.2-2.8 1.1-3 3-.2-1.9-1.1-2.8-3-3 1.9-.2 2.8-1.1 3-3Z"/></svg>';
+    // A lens with a spark: the smart search, and "similar items" (the shop's own icon).
+    var SMART = '<svg viewBox="0 0 29 30" fill="currentColor" aria-hidden="true"><path d="M15.68,6.95l-.22-1.1.22,1.1ZM20.67,1.97l-1.1-.23,1.1.23ZM15.68,7.05l-.22,1.1.22-1.1ZM20.67,12.03l-1.1.23,1.1-.23ZM20.76,12.03l1.1.23-1.1-.23ZM25.75,7.05l.23,1.1-.23-1.1ZM25.75,6.95l.23-1.1-.23,1.1ZM20.76,1.97l1.1-.23-1.1.23ZM15.91,8.06c2.95-.61,5.26-2.91,5.86-5.87l-2.2-.45c-.42,2.07-2.04,3.69-4.11,4.11l.45,2.21ZM15.91,5.94c1.15.24,1.15,1.88,0,2.12l-.45-2.21c-1.25.26-1.25,2.04,0,2.3l.45-2.21ZM21.77,11.81c-.6-2.95-2.91-5.26-5.86-5.87l-.45,2.21c2.07.42,3.69,2.04,4.11,4.11l2.2-.45ZM19.66,11.81c.24-1.15,1.88-1.15,2.11,0l-2.2.45c.25,1.25,2.04,1.25,2.29,0l-2.2-.45ZM25.52,5.94c-2.95.61-5.26,2.91-5.86,5.87l2.2.45c.43-2.07,2.04-3.69,4.11-4.11l-.45-2.21ZM25.52,8.06c-1.15-.24-1.15-1.88,0-2.12l.45,2.21c1.25-.26,1.25-2.04,0-2.3l-.45,2.21ZM19.66,2.19c.6,2.95,2.91,5.26,5.86,5.87l.45-2.21c-2.07-.42-3.69-2.04-4.11-4.11l-2.2.45ZM21.86,1.74c-.25-1.25-2.04-1.25-2.29,0l2.2.45c-.23,1.15-1.88,1.15-2.11,0l2.2-.45ZM13.25,3.98c.41,0,.78-.23.98-.58.2-.36.18-.79-.03-1.14-.21-.34-.6-.55-1.01-.52l.07,2.25ZM26.68,14.47c-.02-.62-.54-1.11-1.16-1.09-.62.02-1.11.54-1.09,1.16l2.25-.06ZM26.56,29.43c.44.44,1.15.44,1.59,0,.44-.44.44-1.15,0-1.59l-1.59,1.59ZM21.25,22.54c-4.25,4.25-11.13,4.25-15.38,0l-1.59,1.59c5.13,5.12,13.43,5.12,18.56,0l-1.59-1.59ZM5.87,22.54c-4.25-4.25-4.25-11.13,0-15.38l-1.59-1.59C-.84,10.69-.84,19,4.28,24.13l1.59-1.59ZM5.87,7.16c1.96-1.97,4.6-3.11,7.38-3.18l-.07-2.25c-3.35.09-6.53,1.47-8.9,3.84l1.59,1.59ZM24.43,14.53c.09,3-1.06,5.89-3.18,8.01l1.59,1.59c2.55-2.55,3.95-6.05,3.84-9.66l-2.25.06ZM21.25,24.13l5.31,5.31,1.59-1.59-5.3-5.3-1.59,1.59Z"/></svg>';
     var BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></svg>';
     var CLEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
     var WHATSAPP = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.8-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
@@ -2498,8 +2504,10 @@
       // "Similar items" beside every product, from the suggestions too.
       var row = el('div', 'd-row');
       row.appendChild(link);
-      var sim = el('button', 'd-sim', label('similar'));
+      var sim = el('button', 'd-sim');
       sim.type = 'button';
+      sim.innerHTML = SMART;
+      sim.appendChild(el('span', null, label('similar')));
       sim.setAttribute('aria-label', label('similar_to', { title: record.title }));
       sim.addEventListener('click', function (event) {
         event.preventDefault();
@@ -3396,7 +3404,7 @@
         button.setAttribute('aria-checked', on ? 'true' : 'false');
         if (pair[0] === 'smart') {
           var mark = el('i');
-          mark.innerHTML = SPARK;
+          mark.innerHTML = SMART;
           button.insertBefore(mark, button.firstChild);
         }
         button.addEventListener('click', function (event) {
@@ -4156,8 +4164,10 @@
         node.appendChild(action);
       }
       if (state.config && state.config.similar) {
-        var sim = el('button', 'la-btn la-ghost la-sim', label('similar'));
+        var sim = el('button', 'la-btn la-ghost la-sim');
         sim.type = 'button';
+        sim.innerHTML = SMART;
+        sim.appendChild(el('span', null, label('similar')));
         sim.addEventListener('click', function () { showSimilar(item, raw); });
         node.appendChild(sim);
       }
