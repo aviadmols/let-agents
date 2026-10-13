@@ -161,7 +161,7 @@ final class MatchProductsTest extends TestCase
     {
         $this->app->instance(SpendGuard::class, new class implements SpendGuard
         {
-            public function assertCanSpend(float $estimatedUsd): void {}
+            public function assertCanSpend(float $estimatedUsd, bool $forShopper = false): void {}
 
             public function spentThisMonth(): float
             {
@@ -171,6 +171,16 @@ final class MatchProductsTest extends TestCase
             public function cap(): float
             {
                 return 6.0;
+            }
+
+            public function spentThisMonthFor(string $shopId): float
+            {
+                return 0.0;
+            }
+
+            public function capFor(string $shopId): float
+            {
+                return 30.0;
             }
         });
 

@@ -381,7 +381,7 @@ final class ReadPhotoTags
             work: function (RunContext $run) use ($role, $mime, $bytes, $system, $user, $effort, $read): void {
                 try {
                     // Hebrew runs at about two characters a token; estimating high is the safe side.
-                    $this->spend->assertCanSpend(((mb_strlen($system) + mb_strlen($user)) / 2 + self::PHOTO_TOKENS) * $role['in'] / 1_000_000 + $role['max'] * $role['out'] / 1_000_000);
+                    $this->spend->assertCanSpend(forShopper: true, estimatedUsd: ((mb_strlen($system) + mb_strlen($user)) / 2 + self::PHOTO_TOKENS) * $role['in'] / 1_000_000 + $role['max'] * $role['out'] / 1_000_000);
                     $reply = $this->vision->jsonWithImage($role['provider'], $role['model'], $system, $user, $mime, $bytes, $role['max'], $effort);
                 } catch (SpendCapReached) {
                     $run->fail('search::runs.photo_tags_spend_cap');

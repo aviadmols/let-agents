@@ -2,12 +2,16 @@
     "name": "Ai",
     "enabled": true,
     "requires": [
+        "Tenancy",
         "Runs",
         "Admin"
     ],
     "provider": "AiServiceProvider",
     "features": [],
     "settings": [
-        { "name": "monthly_spend_cap_usd", "type": "float", "default": 6, "min": 0, "max": 10000, "scope": "global", "unit": "usd" }
+        { "name": "monthly_spend_cap_usd", "type": "float", "default": 6, "min": 0, "max": 10000, "scope": "global", "unit": "usd" },
+        { "name": "shop_monthly_cap_usd", "type": "float", "default": 30, "min": 0, "max": 10000, "scope": "shop", "unit": "usd" },
+        { "name": "shop_cap_stops_shoppers", "type": "bool", "default": false, "scope": "shop" },
+        { "name": "shop_cap_warn_percent", "type": "int", "default": 80, "min": 50, "max": 99, "scope": "global", "unit": "percent" }
     ]
 }

@@ -91,7 +91,7 @@ final class NightlyModelReadingTest extends TestCase
 
         $this->app->instance(SpendGuard::class, new class implements SpendGuard
         {
-            public function assertCanSpend(float $usd): void
+            public function assertCanSpend(float $usd, bool $forShopper = false): void
             {
                 throw new SpendCapReached(6.0, 0.01, 6.0);
             }
@@ -104,6 +104,16 @@ final class NightlyModelReadingTest extends TestCase
             public function cap(): float
             {
                 return 6.0;
+            }
+
+            public function spentThisMonthFor(string $shopId): float
+            {
+                return 0.0;
+            }
+
+            public function capFor(string $shopId): float
+            {
+                return 30.0;
             }
         });
 

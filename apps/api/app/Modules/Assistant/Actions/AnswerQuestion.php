@@ -168,7 +168,7 @@ final class AnswerQuestion
                 $replies = [];
 
                 try {
-                    $this->spend->assertCanSpend((
+                    $this->spend->assertCanSpend(forShopper: true, estimatedUsd: (
                         $estimatedInput * $this->price('answer_input') + $maxOutput * $this->price('answer_output')
                         + ($estimatedInput + 1200) * $this->price('scope_input') + 2 * self::CHECK_OUTPUT_TOKENS * $this->price('scope_output')
                     ) / 1_000_000);

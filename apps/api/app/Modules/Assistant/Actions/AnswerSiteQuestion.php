@@ -532,7 +532,7 @@ final class AnswerSiteQuestion
                     $scoper = ['provider' => $scoper->provider, 'name' => $scoper->provider->value, 'model' => $scoper->model];
 
                     try {
-                        $this->spend->assertCanSpend((800 * $this->price('scope_input') + self::SCOPE_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
+                        $this->spend->assertCanSpend(forShopper: true, estimatedUsd: (800 * $this->price('scope_input') + self::SCOPE_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
                         $scope = $this->call($run, $scoper, 'scope_site', (string) json_encode([
                             'store' => $this->storeBrief($shopId),
                             'question' => $question,
@@ -611,7 +611,7 @@ final class AnswerSiteQuestion
 
                 try {
                     $estimated = (int) ceil(mb_strlen($input) / 2) + 600;
-                    $this->spend->assertCanSpend((
+                    $this->spend->assertCanSpend(forShopper: true, estimatedUsd: (
                         $estimated * $this->price('answer_input') + $maxOutput * $this->price('answer_output')
                         + ($estimated + 400) * $this->price('site_check_input') + $checkOutput * $this->price('site_check_output')
                     ) / 1_000_000);

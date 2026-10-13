@@ -70,7 +70,7 @@ final class QueryVectors
         $dimensions = (int) Settings::get($images ? 'retrieval.image_dimensions' : 'retrieval.embedding_dimensions') ?: null;
 
         try {
-            $this->spend->assertCanSpend(mb_strlen($text) * $price / 1_000_000);
+            $this->spend->assertCanSpend(forShopper: true, estimatedUsd: mb_strlen($text) * $price / 1_000_000);
             $embeddings = $images
                 ? $this->imageEmbedder->embedTextsForImages($choice->provider, $choice->model, [$text], $dimensions)
                 : $this->embedder->embed($choice->provider, $choice->model, [$text], $dimensions);
@@ -126,7 +126,7 @@ final class QueryVectors
         $price = (float) Settings::get('retrieval.image_usd_per_image');
 
         try {
-            $this->spend->assertCanSpend($price);
+            $this->spend->assertCanSpend(forShopper: true, estimatedUsd: $price);
             $embeddings = $this->imageEmbedder->embedImages($choice->provider, $choice->model, [['mime' => $mime, 'data' => $bytes]], (int) Settings::get('retrieval.image_dimensions') ?: null);
         } catch (SpendCapReached|ModelCallFailed) {
             return null;

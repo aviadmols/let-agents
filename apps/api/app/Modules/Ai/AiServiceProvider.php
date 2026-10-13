@@ -17,6 +17,9 @@ use App\Modules\Ai\Support\MonthlySpendGuard;
 use App\Modules\Ai\Support\ProviderChatModel;
 use App\Modules\Ai\Support\ProviderEmbedder;
 use App\Modules\Ai\Support\SdkModelLister;
+use App\Modules\Ai\Support\UsageStrip;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 
 final class AiServiceProvider extends ModuleServiceProvider
 {
@@ -43,5 +46,11 @@ final class AiServiceProvider extends ModuleServiceProvider
         $this->app->bind(VisionModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers')));
         $this->app->bind(Embedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
         $this->app->bind(ImageEmbedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
+    }
+
+    protected function bootModule(): void
+    {
+        // The month's allowance above every admin screen: a share for a shop, dollars for the operator.
+        FilamentView::registerRenderHook(PanelsRenderHook::CONTENT_START, fn (): string => app(UsageStrip::class)->render()->toHtml());
     }
 }

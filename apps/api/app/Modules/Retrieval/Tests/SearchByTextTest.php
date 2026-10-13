@@ -71,7 +71,7 @@ final class SearchByTextTest extends TestCase
     {
         $this->app->instance(SpendGuard::class, new class implements SpendGuard
         {
-            public function assertCanSpend(float $estimatedUsd): void
+            public function assertCanSpend(float $estimatedUsd, bool $forShopper = false): void
             {
                 throw new SpendCapReached(6.0, $estimatedUsd, 6.0);
             }
@@ -84,6 +84,16 @@ final class SearchByTextTest extends TestCase
             public function cap(): float
             {
                 return 6.0;
+            }
+
+            public function spentThisMonthFor(string $shopId): float
+            {
+                return 0.0;
+            }
+
+            public function capFor(string $shopId): float
+            {
+                return 30.0;
             }
         });
         $calls = $this->embedder->calls;

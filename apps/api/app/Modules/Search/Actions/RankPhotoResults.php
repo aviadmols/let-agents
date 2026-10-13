@@ -127,7 +127,7 @@ final class RankPhotoResults
             trigger: RunTrigger::Webhook,
             work: function (RunContext $run) use (&$answer, $provider, $model, $system, $user, $sheet, $in, $out, $max): void {
                 try {
-                    $this->spend->assertCanSpend((self::SHEET_TOKENS + mb_strlen($system) / 2) * $in / 1_000_000 + $max * $out / 1_000_000);
+                    $this->spend->assertCanSpend(forShopper: true, estimatedUsd: (self::SHEET_TOKENS + mb_strlen($system) / 2) * $in / 1_000_000 + $max * $out / 1_000_000);
                     $reply = $this->vision->jsonWithImage($provider, $model, $system, $user, 'image/jpeg', $sheet['jpeg'], $max, 'low');
                 } catch (SpendCapReached) {
                     $run->fail('search::runs.photo_rank_spend_cap');
