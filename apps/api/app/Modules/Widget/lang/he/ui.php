@@ -49,6 +49,7 @@ return [
         'pinned_by_team' => 'הוצמד ראשון על ידי הצוות',
         'why_position' => 'סופרלטיב שחושב בקוד מעובדות מאושרות (:metric)',
         'why_highlight' => 'נכתב על ידי :model מהציטוט ״:quote״, אושר על ידי :review',
+        'why_highlight_shop' => 'מתוך הציטוט ״:quote״',
         'common_highlight' => 'ציטוט שחוזר אצל :count מוצרים, לכן אחרון',
         'why_specs' => 'עובדות מאושרות',
         'why_uses' => 'עבודות שבודק אישר',

@@ -49,6 +49,7 @@ return [
         'pinned_by_team' => 'pinned first by the team',
         'why_position' => 'a superlative computed in code from approved facts (:metric)',
         'why_highlight' => 'written by :model from the quote ":quote", approved by :review',
+        'why_highlight_shop' => 'From the quote ":quote"',
         'common_highlight' => 'a quote repeated on :count products, so last',
         'why_specs' => 'approved facts',
         'why_uses' => 'jobs a checker approved',

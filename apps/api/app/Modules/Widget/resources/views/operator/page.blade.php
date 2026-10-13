@@ -200,7 +200,7 @@
                         @foreach ($section['items'] ?? [] as $item)
                             @php($h = $why['highlights'][$item['key']] ?? [])
                             <li><strong>{{ $item['key'] }}</strong> {{ $item['text'] }}
-                                <span style="{{ $small }}">— {{ __('widget::ui.page.why_highlight', ['quote' => mb_substr((string) ($h['quote'] ?? ''), 0, 90), 'model' => $h['model'] ?? '', 'review' => $h['review'] ?? '']) }}@if (! empty($item['common'])) · {{ __('widget::ui.page.common_highlight', ['count' => $h['products_with_this_quote'] ?? 0]) }}@endif</span>
+                                <span style="{{ $small }}">— {{ filament()->getCurrentPanel()?->getId() === 'operator' ? __('widget::ui.page.why_highlight', ['quote' => mb_substr((string) ($h['quote'] ?? ''), 0, 90), 'model' => $h['model'] ?? '', 'review' => $h['review'] ?? '']) : __('widget::ui.page.why_highlight_shop', ['quote' => mb_substr((string) ($h['quote'] ?? ''), 0, 90)]) }}@if (! empty($item['common'])) · {{ __('widget::ui.page.common_highlight', ['count' => $h['products_with_this_quote'] ?? 0]) }}@endif</span>
                             </li>
                         @endforeach
                     </ul>

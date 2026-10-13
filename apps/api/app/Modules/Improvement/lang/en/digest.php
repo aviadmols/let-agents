@@ -7,9 +7,9 @@ return [
     'evidence' => 'Reviewed: :empty searches that found nothing, :unclicked searches nobody clicked, :questions questions the site did not answer.',
     'quiet' => 'Nothing new today.',
     'proposals' => 'Suggestions: :proposed, of which :accepted passed the check and :applied already joined search.',
-    'budget' => 'Budget: :spent $ of :cap $ this month.',
+    'usage' => 'System use this month: :percent% of the monthly allowance.',
     'stopped' => [
-        'spend_cap' => 'The review stopped: the monthly budget ran out.',
+        'spend_cap' => 'The review stopped: the monthly allowance is used up.',
         'no_key' => 'The review stopped: a provider key is missing.',
         'other' => 'The review did not finish today. Details are in the activity log.',
     ],

@@ -200,6 +200,14 @@ final class DailyReviewTest extends TestCase
         $digest = $this->inShop(fn (): string => Digest::write($this->shop->id, $review, []));
 
         $this->assertStringContainsString('מוצרים חדשים שנכנסו למערכת ביממה האחרונה: 2 (מהם 1 כבר נקראו ותוארו). סך הכול בקטלוג: 3.', $digest);
+
+        // It goes to the shop's manager: a share of the shop's allowance, never dollars.
+        $this->assertStringContainsString('ניצול המערכת החודש: 0% מהמכסה החודשית.', $digest);
+        $this->assertStringNotContainsString('$', $digest);
+        $this->assertSame('אתמול: 3 חיפושים.
+כותרת', Digest::forMerchant('אתמול: 3 חיפושים.
+תקציב: 40.64 $ מתוך 60.00 $ החודש.
+כותרת'), 'a report saved before loses its dollar line');
     }
 
     private function inShop(callable $callback): mixed

@@ -75,11 +75,25 @@ final class Digest
         }
 
         try {
+            // It goes to the shop's manager: the share of the shop's allowance, never an amount.
             $spend = app(SpendGuard::class);
-            $lines[] = __('improvement::digest.budget', ['spent' => number_format($spend->spentThisMonth(), 2), 'cap' => number_format($spend->cap(), 2)]);
+            $cap = $spend->capFor($shopId);
+            $percent = $cap > 0 ? (int) floor(100 * $spend->spentThisMonthFor($shopId) / $cap) : 0;
+            $lines[] = __('improvement::digest.usage', ['percent' => (string) min($percent, 100)]);
         } catch (Throwable) {
-            // The report goes out without the budget line rather than not at all.
+            // The report goes out without the usage line rather than not at all.
         }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * A report as the shop's manager reads it: a report saved before amounts left it loses its
+     * budget line ("Budget: 40.64 $ of 60.00 $"), so no dollar figure reaches them.
+     */
+    public static function forMerchant(string $digest): string
+    {
+        $lines = array_filter(explode("\n", $digest), fn (string $line): bool => preg_match('/^\s*(תקציב|Budget):.*\$/u', $line) !== 1);
 
         return implode("\n", $lines);
     }
