@@ -42,7 +42,15 @@ return [
     'col_phone' => 'טלפון',
     'col_consent' => 'הסכים לעדכונים',
     'col_count' => 'מוצרים',
+    'col_device' => 'מכשיר',
     'col_products' => 'המוצרים',
     'yes' => 'כן',
     'none_yet' => 'עוד אין נתונים.',
+    'visit' => [
+        'phone' => 'טלפון',
+        'tablet' => 'טאבלט',
+        'computer' => 'מחשב',
+        'last' => 'בפעם האחרונה: IP :ip · :device · :browser',
+        'from' => 'הגיעו מ־:from',
+    ],
 ];

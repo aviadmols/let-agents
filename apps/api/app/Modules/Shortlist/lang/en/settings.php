@@ -73,4 +73,8 @@ return [
         'label' => 'Codes per shop a day',
         'description' => 'The shop\'s cap on SMS messages a day. 0 sends none.',
     ],
+    'visit_keep_days' => [
+        'label' => 'Days an IP and a session are kept',
+        'description' => 'Then the IP address and the session of wishlists are deleted. The lists stay.',
+    ],
 ];

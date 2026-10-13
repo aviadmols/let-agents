@@ -294,4 +294,8 @@ return [
         'label' => 'Weight of the product\'s name in photo search',
         'description' => 'How much a product whose name holds the words seen in the photo ("band", "plain", "solitaire") rises in the order. 0 = pictures only.',
     ],
+    'visit_keep_days' => [
+        'label' => 'Days an IP and a session are kept',
+        'description' => 'Then the IP address and the session of searches and photo searches are deleted. The searches stay.',
+    ],
 ];

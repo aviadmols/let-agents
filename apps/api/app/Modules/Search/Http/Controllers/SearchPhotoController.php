@@ -4,6 +4,7 @@ namespace App\Modules\Search\Http\Controllers;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\Visit;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Http\StorefrontSite;
 use finfo;
@@ -63,7 +64,8 @@ final class SearchPhotoController
 
         // Which of the separate things in the photo the shopper chose; 0 is the one the reader saw first.
         $item = max(0, min(3, (int) $request->input('item', 0)));
-        $result = $search->photo($shopId, $mime, $bytes, $item);
+        $visit = Visit::from($request, ['sid' => $request->input('sid'), 'page' => $request->input('page'), 'ref' => $request->input('ref')]);
+        $result = $search->photo($shopId, $mime, $bytes, $item, visit: $visit);
 
         return response()->json($result, 200, ['Cache-Control' => 'no-store'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

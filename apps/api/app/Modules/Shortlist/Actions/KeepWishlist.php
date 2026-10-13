@@ -3,6 +3,7 @@
 namespace App\Modules\Shortlist\Actions;
 
 use App\Core\Facades\Settings;
+use App\Core\Http\Visit;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
 use Illuminate\Support\Str;
 
@@ -21,9 +22,10 @@ final class KeepWishlist
     /**
      * @param  list<string>  $add
      * @param  list<string>  $remove
+     * @param  array<string, string|null>  $visit  the visit that changes it (App\Core\Http\Visit), kept on the list
      * @return array{items: list<string>, share: string|null, account: bool}
      */
-    public function handle(string $shopId, ?string $token, ?string $customer, array $add = [], array $remove = []): array
+    public function handle(string $shopId, ?string $token, ?string $customer, array $add = [], array $remove = [], array $visit = []): array
     {
         $max = (int) Settings::get('shortlist.wishlist_max', $shopId);
         $hash = $token !== null && preg_match('/^[A-Za-z0-9_-]{24,64}$/', $token) === 1 ? hash('sha256', $token) : null;
@@ -53,6 +55,11 @@ final class KeepWishlist
 
         $items = array_values(array_diff((array) $list->items, $remove));
         $list->items = self::merge($add, $items, $max);
+
+        // The last visit that changed it, for the store manager; a mere look changes nothing.
+        if ($visit !== [] && ($add !== [] || $remove !== [] || ! $list->exists)) {
+            $list->fill(array_intersect_key($visit, array_flip(Visit::COLUMNS)));
+        }
 
         if (! $list->exists || $list->isDirty()) {
             $list->save();

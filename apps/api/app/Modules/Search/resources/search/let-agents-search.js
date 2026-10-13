@@ -790,8 +790,35 @@
      * @param {boolean} [withVisitor] adds to the cart only: the anonymous id, so an order by the same
      *   visitor is counted as the search's. A plain search never makes one.
      */
+    /**
+     * The visit, as the store manager reads it beside a search: this tab's session (kept for the
+     * tab), the page, and where the shopper came from at the start of the session. Shared with the
+     * wishlist script through the same keys.
+     */
+    function visit() {
+      var sid = null;
+      var ref = '';
+      try {
+        sid = win.sessionStorage.getItem('let_agents_sid');
+        if (!sid) {
+          sid = 's' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+          win.sessionStorage.setItem('let_agents_sid', sid);
+          var from = doc.referrer || '';
+          var external = from && from.indexOf(win.location.protocol + '//' + win.location.host) !== 0;
+          win.sessionStorage.setItem('let_agents_ref', external ? from : '');
+        }
+        ref = win.sessionStorage.getItem('let_agents_ref') || '';
+      } catch (e) { /* storage blocked: no session */ }
+      return { sid: sid, page: win.location.pathname, ref: ref };
+    }
+
+    function visitQuery() {
+      var v = visit();
+      return (v.sid ? '&sid=' + encodeURIComponent(v.sid) : '') + '&page=' + encodeURIComponent(v.page) + (v.ref ? '&ref=' + encodeURIComponent(v.ref) : '');
+    }
+
     function send(events, withVisitor) {
-      var payload = { events: events };
+      var payload = { events: events, ctx: visit() };
       if (withVisitor) {
         payload.vid = visitor();
       }
@@ -2856,7 +2883,7 @@
         d.scroll.scrollTop = 0;
       }
       var normalized = normalize(raw);
-      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
+      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '') + visitQuery();
       markCounted(normalized);
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
         .then(function (response) { return response.ok ? response.json() : null; })
@@ -2970,7 +2997,7 @@
       });
 
       var normalized = normalize(raw);
-      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '');
+      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '') + visitQuery();
       markCounted(normalized);
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
         .then(function (response) { return response.ok ? response.json() : null; })
@@ -3825,7 +3852,7 @@
       var kept = keepTurn({ t: Date.now(), k: 's', q: raw });
 
       var normalized = normalize(raw);
-      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '') + (spelling ? '&spelling=1' : '');
+      var url = API + '/search/' + encodeURIComponent(ctx.site) + '?q=' + encodeURIComponent(raw) + (isCounted(normalized) ? '&counted=1' : '') + (spelling ? '&spelling=1' : '') + visitQuery();
       markCounted(normalized);
 
       win.fetch(url, { mode: 'cors', credentials: 'omit' })
@@ -4580,6 +4607,14 @@
         form.append('photo', blob, 'photo.jpg');
         if (item) {
           form.append('item', String(item));
+        }
+        var seen = visit();
+        if (seen.sid) {
+          form.append('sid', seen.sid);
+        }
+        form.append('page', seen.page);
+        if (seen.ref) {
+          form.append('ref', seen.ref);
         }
         return win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/photo', { method: 'POST', body: form, mode: 'cors', credentials: 'omit' })
           .then(function (response) {

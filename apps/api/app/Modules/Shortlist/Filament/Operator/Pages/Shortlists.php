@@ -187,7 +187,7 @@ class Shortlists extends Page
      * a browser), the number in full only when the shopper agreed to hear from the store, and the
      * products in it.
      *
-     * @return list<array{who: string, phone: string|null, consent: bool, count: int, products: list<string>, updated: string}>
+     * @return list<array{who: string, phone: string|null, consent: bool, count: int, products: list<string>, updated: string, ip: string|null, device: string|null, browser: string|null, os: string|null, referrer: string|null, session: string|null}>
      */
     public function lists(?int $limit = self::LISTS_SHOWN): array
     {
@@ -217,6 +217,13 @@ class Shortlists extends Page
                     'count' => count((array) $list->items),
                     'products' => array_values(array_filter(array_map(fn ($id): ?string => $titles[(string) $id] ?? null, (array) $list->items))),
                     'updated' => (string) $list->updated_at?->timezone('Asia/Jerusalem')->format('d/m/Y H:i'),
+                    // The last visit that changed it, kept shortlist.visit_keep_days.
+                    'ip' => $list->ip,
+                    'device' => $list->device,
+                    'browser' => $list->browser,
+                    'os' => $list->os,
+                    'referrer' => $list->referrer,
+                    'session' => $list->session_id,
                 ];
             })->values()->all();
         });
@@ -231,9 +238,9 @@ class Shortlists extends Page
             $out = fopen('php://output', 'w');
             // Excel reads the Hebrew right with the byte-order mark.
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, [__('shortlist::ui.col_updated'), __('shortlist::ui.col_who'), __('shortlist::ui.col_phone'), __('shortlist::ui.col_consent'), __('shortlist::ui.col_count'), __('shortlist::ui.col_products')]);
+            fputcsv($out, [__('shortlist::ui.col_updated'), __('shortlist::ui.col_who'), __('shortlist::ui.col_phone'), __('shortlist::ui.col_consent'), __('shortlist::ui.col_count'), __('shortlist::ui.col_products'), 'IP', __('shortlist::ui.col_device')]);
             foreach ($rows as $row) {
-                fputcsv($out, [$row['updated'], __('shortlist::ui.who_'.$row['who']), $row['consent'] ? $row['phone'] : '', $row['consent'] ? __('shortlist::ui.yes') : '', $row['count'], implode(' | ', $row['products'])]);
+                fputcsv($out, [$row['updated'], __('shortlist::ui.who_'.$row['who']), $row['consent'] ? $row['phone'] : '', $row['consent'] ? __('shortlist::ui.yes') : '', $row['count'], implode(' | ', $row['products']), (string) $row['ip'], trim($row['device'].' '.$row['browser'].' '.$row['os'])]);
             }
             fclose($out);
         }, 'wishlists-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

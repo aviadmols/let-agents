@@ -8,6 +8,7 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Catalog\Events\CatalogUpdated;
+use App\Modules\Search\Console\ForgetVisitsCommand;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
@@ -52,6 +53,14 @@ final class SearchServiceProvider extends ModuleServiceProvider
                 ->onOneServer()
                 ->runInBackground();
 
+            // The address and the session of a search, kept search.visit_keep_days.
+            $schedule->command('search:forget-visits')
+                ->dailyAt('03:20')
+                ->timezone('Asia/Jerusalem')
+                ->name('search:forget-visits')
+                ->withoutOverlapping()
+                ->onOneServer();
+
             // A picture scan cut off by a deploy or a crash goes on, however many pictures are left.
             $schedule->command('search:resume-pictures')
                 ->everyTenMinutes()
@@ -89,6 +98,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
     {
         return [
             ResumePictureScansCommand::class,
+            ForgetVisitsCommand::class,
             SearchCommand::class,
         ];
     }

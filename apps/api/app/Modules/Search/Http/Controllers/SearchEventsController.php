@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Http\Controllers;
 
+use App\Core\Http\Visit;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Search\Actions\CountSearch;
@@ -40,16 +41,17 @@ final class SearchEventsController
         $body = json_decode((string) $request->getContent(), true);
         $events = is_array($body['events'] ?? null) ? array_slice($body['events'], 0, self::MAX_EVENTS) : [];
         $visitor = is_string($body['vid'] ?? null) ? $body['vid'] : null;
+        $visit = Visit::from($request, is_array($body['ctx'] ?? null) ? $body['ctx'] : []);
 
-        $tenant->run($connection->shop_id, function () use ($events, $count, $connection, $visitor): void {
+        $tenant->run($connection->shop_id, function () use ($events, $count, $connection, $visitor, $visit): void {
             foreach ($events as $event) {
                 if (! is_array($event) || ! is_string($event['q'] ?? null)) {
                     continue;
                 }
 
                 match ($event['type'] ?? null) {
-                    'search' => $count->search($connection->shop_id, $event['q'], (int) ($event['results'] ?? 0)),
-                    'click' => $count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? '')),
+                    'search' => $count->search($connection->shop_id, $event['q'], (int) ($event['results'] ?? 0), $visit),
+                    'click' => $count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visit),
                     'add_to_cart' => $count->added($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visitor, (string) ($event['path'] ?? '/')),
                     'ask_whatsapp' => self::onAsk($event, fn (AssistantSearchAsk $ask) => $ask->forceFill(['whatsapp_clicked' => true])->save()),
                     'ask_pick' => self::onAsk($event, function (AssistantSearchAsk $ask) use ($event): void {

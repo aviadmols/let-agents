@@ -74,6 +74,13 @@
                                     <div style="width:96px;height:96px;border-radius:8px;background:#f4f4f5"></div>
                                 @endif
                                 <div style="{{ $small }};margin-top:4px">{{ $ask->created_at->diffForHumans() }}</div>
+                                @if ($ask->ip || $ask->device)
+                                    <div style="{{ $small }};margin-top:2px;line-height:1.4" dir="auto">
+                                        @if ($ask->ip)<a href="{{ $this->logUrl($ask->ip) }}" dir="ltr" style="text-decoration:underline">{{ $ask->ip }}</a><br>@endif
+                                        {{ $ask->device ? __('search::ui.visit.'.$ask->device) : '' }} {{ $ask->browser }} {{ $ask->os }}
+                                        @if ($ask->referrer)<br>{{ __('search::ui.visit.from', ['from' => $ask->referrer]) }}@endif
+                                    </div>
+                                @endif
                             </div>
                             <div style="display:grid;gap:6px;min-width:0">
                                 <div>

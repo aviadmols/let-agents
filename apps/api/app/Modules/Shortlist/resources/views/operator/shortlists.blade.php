@@ -157,7 +157,8 @@
                 <p class="lsl-help">{{ $t('lists_help') }}</p>
                 @forelse ($lists as $list)
                     <div class="lsl-row" style="display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:start">
-                        <div><b style="font-size:13.5px">{{ $t('who_'.$list['who']) }}</b>@if ($list['phone'])<br><span dir="ltr" style="font-size:13px">{{ $list['phone'] }}</span>@endif @if ($list['consent'])<br><small style="color:#15803d">{{ $t('consented') }}</small>@endif</div>
+                        <div><b style="font-size:13.5px">{{ $t('who_'.$list['who']) }}</b>@if ($list['phone'])<br><span dir="ltr" style="font-size:13px">{{ $list['phone'] }}</span>@endif @if ($list['consent'])<br><small style="color:#15803d">{{ $t('consented') }}</small>@endif
+                            @if ($list['ip'] || $list['device'])<br><small style="opacity:.75" dir="auto">IP <span dir="ltr">{{ $list['ip'] ?? '—' }}</span> · {{ $list['device'] ? $t('visit.'.$list['device']) : '' }} {{ $list['browser'] }} {{ $list['os'] }}@if ($list['referrer']) · {{ $t('visit.from', ['from' => $list['referrer']]) }}@endif</small>@endif</div>
                         <div style="font-size:13px">{{ implode(' · ', array_slice($list['products'], 0, 4)) }}@if (count($list['products']) > 4) {{ $t('and_more', ['n' => count($list['products']) - 4]) }}@endif</div>
                         <small style="white-space:nowrap" dir="ltr">{{ $list['updated'] }}</small>
                     </div>

@@ -4,6 +4,7 @@ namespace App\Modules\Shortlist\Http\Controllers;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\Visit;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
@@ -184,8 +185,9 @@ final class ShortlistController
         $add = ProductCards::ids($request->input('add', []), $max);
         $remove = ProductCards::ids($request->input('remove', []), $max);
 
-        $list = $tenant->run($shopId, function () use ($keep, $cards, $shopId, $token, $customer, $add, $remove): array {
-            $list = $keep->handle($shopId, $token, $customer, $add, $remove);
+        $visit = Visit::from($request, is_array($request->input('ctx')) ? $request->input('ctx') : []);
+        $list = $tenant->run($shopId, function () use ($keep, $cards, $shopId, $token, $customer, $add, $remove, $visit): array {
+            $list = $keep->handle($shopId, $token, $customer, $add, $remove, $visit);
             // A list kept by phone says which, masked, for "kept for 050-•••-4567".
             $phone = $customer === null ? null : PhoneSignIn::maskedFor($customer);
 

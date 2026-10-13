@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Actions;
 
 use App\Core\Facades\Features;
+use App\Core\Http\Visit;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Support\PhotoLook;
 use Throwable;
@@ -28,8 +29,9 @@ final class KeepPhotoSearch
 
     /**
      * @param  list<array<string, mixed>>  $products  what the shopper got, first first
+     * @param  array<string, string|null>  $visit  who searched (App\Core\Http\Visit)
      */
-    public function handle(string $shopId, string $bytes, PhotoLook $look, array $products, int $total, bool $cut = false): void
+    public function handle(string $shopId, string $bytes, PhotoLook $look, array $products, int $total, bool $cut = false, array $visit = []): void
     {
         if (! Features::enabled('search.photo_log', $shopId)) {
             return;
@@ -64,7 +66,7 @@ final class KeepPhotoSearch
                     'same' => (bool) ($p['same'] ?? false),
                 ], array_slice($products, 0, self::RESULTS)),
                 'total' => $total,
-            ]);
+            ] + array_intersect_key($visit, array_flip(Visit::COLUMNS)));
         } catch (Throwable $e) {
             report($e);
         }

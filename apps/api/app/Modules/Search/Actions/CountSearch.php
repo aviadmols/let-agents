@@ -2,8 +2,10 @@
 
 namespace App\Modules\Search\Actions;
 
+use App\Core\Http\Visit;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Search\Models\SearchClick;
+use App\Modules\Search\Models\SearchLog;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\HebrewSearch;
 use Illuminate\Support\Str;
@@ -34,7 +36,8 @@ final class CountSearch
         );
     }
 
-    public function search(string $shopId, string $raw, int $results): void
+    /** @param  array<string, string|null>  $visit  who searched (App\Core\Http\Visit); a row of its own when given */
+    public function search(string $shopId, string $raw, int $results, array $visit = []): void
     {
         $query = $this->query($raw);
 
@@ -48,9 +51,14 @@ final class CountSearch
             ['searches' => 1, 'empty' => $results === 0 ? 1 : 0],
             ['last_results' => max(0, $results), 'updated_at' => now()],
         );
+
+        if ($visit !== []) {
+            SearchLog::query()->create(['shop_id' => $shopId, 'query' => $query, 'results' => max(0, $results), 'created_at' => now()] + array_intersect_key($visit, array_flip(Visit::COLUMNS)));
+        }
     }
 
-    public function click(string $shopId, string $raw, string $item, string $title): void
+    /** @param  array<string, string|null>  $visit */
+    public function click(string $shopId, string $raw, string $item, string $title, array $visit = []): void
     {
         $query = $this->query($raw);
 
@@ -61,6 +69,12 @@ final class CountSearch
         $day = now()->toDateString();
         $this->ensure($shopId, $query);
         SearchTerm::query()->whereDate('day', $day)->where('query', $query)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
+
+        // The search it came from, in the same session, within the hour: what it led to.
+        if (($visit['session_id'] ?? null) !== null) {
+            SearchLog::query()->where('session_id', $visit['session_id'])->where('query', $query)->whereNull('clicked')
+                ->where('created_at', '>=', now()->subHour())->latest('id')->limit(1)->update(['clicked' => $item]);
+        }
 
         SearchClick::query()->insertOrIgnore([
             'id' => (string) Str::ulid(),

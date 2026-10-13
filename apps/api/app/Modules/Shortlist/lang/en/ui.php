@@ -42,7 +42,15 @@ return [
     'col_phone' => 'Phone',
     'col_consent' => 'Agreed to updates',
     'col_count' => 'Products',
+    'col_device' => 'Device',
     'col_products' => 'The products',
     'yes' => 'Yes',
     'none_yet' => 'No data yet.',
+    'visit' => [
+        'phone' => 'Phone',
+        'tablet' => 'Tablet',
+        'computer' => 'Computer',
+        'last' => 'Last time: IP :ip · :device · :browser',
+        'from' => 'Came from :from',
+    ],
 ];

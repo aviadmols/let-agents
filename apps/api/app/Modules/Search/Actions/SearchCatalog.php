@@ -92,9 +92,9 @@ final class SearchCatalog
     /**
      * @param  bool  $meaning  false while a shopper is still typing: spelling only, code only, no vector
      */
-    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true): array
+    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true, array $visit = []): array
     {
-        return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup, $meaning): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup, $meaning, $visit): array {
             // "עד 2500 ש״ח": the amount is not searched for; products outside the range are kept away.
             [$priced, $minPrice, $maxPrice] = HebrewSearch::priceRange(mb_substr($raw, 0, 120));
             // "בלי יהלומים": that word is not searched for, and what holds it is kept away.
@@ -208,7 +208,7 @@ final class SearchCatalog
             $total = array_sum($counts);
 
             if ($count) {
-                $this->counter->search($shopId, $query, $total);
+                $this->counter->search($shopId, $query, $total, $visit);
             }
 
             foreach ($groups as $type => $records) {
@@ -312,12 +312,12 @@ final class SearchCatalog
      *
      * @return array{total: int, groups: array{product: list<array<string, mixed>>}, searched: bool}
      */
-    public function photo(string $shopId, string $mime, string $bytes, int $item = 0, ?bool $rank = null, bool $record = true): array
+    public function photo(string $shopId, string $mime, string $bytes, int $item = 0, ?bool $rank = null, bool $record = true, array $visit = []): array
     {
         // Whether a model orders the first products again: the shop's choice, unless the team's check asks.
         $rank ??= Features::enabled('search.photo_rank', $shopId);
 
-        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes, $item, $rank, $record): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $mime, $bytes, $item, $rank, $record, $visit): array {
             $index = LoadedIndex::for($shopId);
             $floor = (float) Settings::get('search.photo_min_similarity');
             $perGroup = (int) Settings::get('search.results_per_group', $shopId);
@@ -350,7 +350,7 @@ final class SearchCatalog
             // looks like it, however close a white-background picture of a screw may score.
             if ($tags === []) {
                 $record && $this->counter->photo($shopId, 0);
-                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0);
+                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0, visit: $visit);
 
                 return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true] + $seen;
             }
@@ -359,7 +359,7 @@ final class SearchCatalog
             // and light would be shown as if they were what the shopper photographed.
             if ($look->failed) {
                 $record && $this->counter->photo($shopId, 0);
-                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0);
+                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0, visit: $visit);
 
                 return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'unclear' => true, 'searched' => true];
             }
@@ -377,7 +377,7 @@ final class SearchCatalog
                 $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details])), $look->lacks, $look->object));
                 $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products, self::described($look)) : $products;
                 $record && $this->counter->photo($shopId, count($products));
-                $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
+                $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut, $visit);
 
                 return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true] + $seen;
             }
@@ -393,7 +393,7 @@ final class SearchCatalog
             $products = array_slice($this->samePictureFirst($index, $hits, $products), 0, $perGroup);
             $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products) : $products;
             $record && $this->counter->photo($shopId, count($products));
-            $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut);
+            $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut, $visit);
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null] + $seen;
         });

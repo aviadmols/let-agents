@@ -726,7 +726,7 @@
   function send(body) {
     // Adds the server has not confirmed yet go with every request: one that failed is not lost.
     var add = (body.add || []).concat(state.pending.filter(function (id) { return (body.add || []).indexOf(id) === -1 && (body.remove || []).indexOf(id) === -1; }));
-    var payload = { token: state.token, add: add, remove: body.remove || [] };
+    var payload = { token: state.token, add: add, remove: body.remove || [], ctx: visit() };
     if (state.phone) {
       payload.phone = state.phone;
     }
@@ -766,6 +766,23 @@
     save();
     repaint();
     return data;
+  }
+
+  /** The visit, as the search script keeps it for this tab (its session, the page, where the shopper came from). */
+  function visit() {
+    var sid = null;
+    var ref = '';
+    try {
+      sid = win.sessionStorage.getItem('let_agents_sid');
+      if (!sid) {
+        sid = 's' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+        win.sessionStorage.setItem('let_agents_sid', sid);
+        var from = doc.referrer || '';
+        win.sessionStorage.setItem('let_agents_ref', from && from.indexOf(win.location.protocol + '//' + win.location.host) !== 0 ? from : '');
+      }
+      ref = win.sessionStorage.getItem('let_agents_ref') || '';
+    } catch (e) { /* storage blocked */ }
+    return { sid: sid, page: win.location.pathname, ref: ref };
   }
 
   function sync() {

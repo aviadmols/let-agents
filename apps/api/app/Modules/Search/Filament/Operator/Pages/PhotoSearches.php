@@ -5,6 +5,7 @@ namespace App\Modules\Search\Filament\Operator\Pages;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Search\Filament\Merchant\Pages\SearchLogPage as MerchantSearchLogPage;
 use App\Modules\Search\Jobs\CheckPhotoSearchesJob;
 use App\Modules\Search\Jobs\RelearnPhotoJob;
 use App\Modules\Search\Models\SearchPhotoAsk;
@@ -61,6 +62,14 @@ class PhotoSearches extends Page
     public function operatorView(): bool
     {
         return Filament::getCurrentPanel()?->getId() === User::OPERATOR_PANEL;
+    }
+
+    /** The search log of one address, in this panel: what that visitor searched. */
+    public function logUrl(string $ip): string
+    {
+        return $this->operatorView()
+            ? SearchLogPage::getUrl(['ip' => $ip, 'shop' => $this->shop])
+            : MerchantSearchLogPage::getUrl(['ip' => $ip]);
     }
 
     public function getTitle(): string
