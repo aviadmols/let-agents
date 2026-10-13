@@ -166,10 +166,18 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
         $shop = $this->shop($install);
         $variables = ['first' => self::PRODUCTS_PER_PAGE, 'collections' => self::COLLECTIONS_PER_PRODUCT, 'variants' => self::VARIANTS_PER_PRODUCT];
 
+        // A store behind a password (a development store, a store before launch): Shopify gives no
+        // product an Online Store address, though the query already asked for published ones only.
+        // Decided on the first page: none of its active products has an address.
+        $locked = null;
+
         foreach ($this->pages($install, self::PRODUCTS, 'products', $variables) as $nodes) {
+            $active = array_values(array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) === 'ACTIVE'));
+            $locked ??= $active !== [] && array_filter($active, fn (array $node): bool => is_string($node['onlineStoreUrl'] ?? null)) === [];
             // Active but not on the Online Store (another sales channel only, or unlisted):
-            // a visitor cannot reach it, so it is not part of the catalog.
-            $nodes = array_values(array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) === 'ACTIVE' && is_string($node['onlineStoreUrl'] ?? null)));
+            // a visitor cannot reach it, so it is not part of the catalog. Behind a password every
+            // published product counts, its link made from its handle.
+            $nodes = $locked ? $active : array_values(array_filter($active, fn (array $node): bool => is_string($node['onlineStoreUrl'] ?? null)));
             $details = $this->details($install, array_column($nodes, 'id'));
             $records = [];
 

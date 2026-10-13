@@ -32,6 +32,8 @@ final class ShopifyStoreFeedTest extends TestCase
     /** The details query answers with an error, as for a store whose app may not read a field. */
     private bool $failDetails = false;
 
+    private bool $locked = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -134,6 +136,18 @@ final class ShopifyStoreFeedTest extends TestCase
             && $request->hasHeader('X-Shopify-Access-Token', 'shpat_test'));
     }
 
+    public function test_a_store_behind_a_password_has_its_published_products_read_with_links_from_their_handles(): void
+    {
+        // A development store, or a store before launch: no product has an Online Store address.
+        $this->locked = true;
+
+        $run = app(SyncCatalog::class)->handle($this->shop->id);
+
+        $this->assertSame(RunStatus::Succeeded, $run->status, (string) $run->error);
+        $this->assertSame(4, $run->output['products']['created'], 'every published product, none left out for a missing address');
+        $this->inShop(fn () => $this->assertSame('https://kli.co.il/products/circular-saw', CatalogProduct::query()->where('external_id', '8001')->sole()->url));
+    }
+
     public function test_custom_fields_options_barcodes_and_weights_are_read_like_the_plugin_sends_them(): void
     {
         $run = app(SyncCatalog::class)->handle($this->shop->id);
@@ -223,6 +237,21 @@ final class ShopifyStoreFeedTest extends TestCase
         return app(TenantContext::class)->run($this->shop->id, $callback);
     }
 
+    /**
+     * Behind a password Shopify gives no product an Online Store address.
+     *
+     * @param  array<string, mixed>  $connection
+     * @return array<string, mixed>
+     */
+    private function lockedStore(array $connection): array
+    {
+        if ($this->locked) {
+            $connection['nodes'] = array_map(fn (array $node): array => ['onlineStoreUrl' => null] + $node, $connection['nodes']);
+        }
+
+        return $connection;
+    }
+
     private function respond(Request $request): mixed
     {
         $query = (string) $request['query'];
@@ -242,9 +271,9 @@ final class ShopifyStoreFeedTest extends TestCase
                 ['id' => 'gid://shopify/Collection/4001', 'title' => 'מסורים', 'handle' => 'saws', 'description' => '', 'updatedAt' => '2026-09-01T08:00:00Z', 'image' => ['url' => 'https://cdn.shopify.com/saws.jpg'], 'productsCount' => ['count' => 12]],
                 ['id' => 'gid://shopify/Collection/4002', 'title' => 'כלי עבודה חשמליים', 'handle' => 'power-tools', 'description' => '', 'updatedAt' => '2026-09-01T08:00:00Z', 'image' => null, 'productsCount' => ['count' => 40]],
             ])],
-            'Products' => ['products' => $after === null
+            'Products' => ['products' => $this->lockedStore($after === null
                 ? $this->connection([$this->saw(), $this->sawBlade(), $this->posOnly()], 'cursor-1')
-                : $this->connection([$this->drill()])],
+                : $this->connection([$this->drill()]))],
             'Pages' => ['pages' => $this->connection([
                 ['id' => 'gid://shopify/Page/5002', 'title' => 'ביטול עסקה', 'handle' => 'cancel', 'body' => '', 'bodySummary' => '', 'isPublished' => true, 'createdAt' => '2026-01-01T00:00:00Z', 'updatedAt' => '2026-02-01T00:00:00Z'],
                 ['id' => 'gid://shopify/Page/5001', 'title' => 'אחריות', 'handle' => 'warranty', 'body' => '<p>אחריות לשנתיים.</p><p>על כל&nbsp;כלי.</p>', 'bodySummary' => 'אחריות לשנתיים.', 'isPublished' => true, 'createdAt' => '2026-01-01T00:00:00Z', 'updatedAt' => '2026-02-01T00:00:00Z'],
