@@ -578,8 +578,10 @@ final class AnswerSiteQuestion
                         return;
                     }
 
-                    if (! $scoped['about_store']) {
-                        if ($remember && $keep) {
+                    // Asked about given products (from a product's page, or the turn before): they are the
+                    // store's, whatever the words alone seem to be about ("מה מיוחד במוצר הזה?").
+                    if (! $scoped['about_store'] && $keep) {
+                        if ($remember) {
                             $this->save($question, AssistantAnswer::OUT_OF_SCOPE, null, [], [], $scoper['model'], $replies, $run, $flags);
                         }
                         $result = $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'not_about_store'];

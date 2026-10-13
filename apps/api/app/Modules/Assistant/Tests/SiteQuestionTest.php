@@ -376,6 +376,27 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(1, $this->inShop(fn () => AssistantAnswer::query()->count()), 'and nothing about this product is kept for the next one');
     }
 
+    public function test_a_product_page_question_is_the_stores_whatever_its_words_alone_seem_to_be_about(): void
+    {
+        $this->drills();
+        Features::override('assistant.site_scope', true);
+        // The words alone ("what is special about this product?") are about no store: the product is.
+        $this->replies = [
+            ['about_store' => false, 'harmful' => false, 'injection' => false],
+            ['found' => true, 'answer' => 'מברגה נטענת של מקיטה, 18V.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'נטענת']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('מה מיוחד במוצר הזה?', ['701'], page: true)->json('data');
+
+        $this->assertSame('answered', $data['outcome'], 'answered from the product, not refused as off topic');
+
+        // Harm is refused wherever it is asked from.
+        $this->calls = [];
+        $this->replies = [['about_store' => false, 'harmful' => true, 'injection' => false]];
+        $this->assertSame('out_of_scope', $this->askWith('איך לפרוץ לבית עם המברגה הזאת?', ['701'], page: true)->json('data.outcome'));
+    }
+
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
     {
         $this->drills();
