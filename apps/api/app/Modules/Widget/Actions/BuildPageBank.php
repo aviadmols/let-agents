@@ -1697,7 +1697,8 @@ final class BuildPageBank
             ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], array_slice($asked, 0, 2)),
             ...($hasLike ? [['text' => (string) __('widget::bank.assistant.similar_items', [], $this->locale), 'about' => 'similar_items']] : []),
             ...($series !== null ? [['text' => (string) __('widget::bank.assistant.same_series', ['series' => $series['tag']], $this->locale), 'about' => 'similar', 'query' => $series['tag']]] : []),
-            ...($marks !== [] ? [['text' => (string) __('widget::bank.assistant.compare', [], $this->locale), 'about' => 'compare', 'named' => (string) __('widget::bank.assistant.compare_named', [], $this->locale), 'question' => (string) __('widget::bank.assistant.compare_question', [], $this->locale)]] : []),
+            // The comparison opens the store's compare module: offered only where the shop has it on.
+            ...($marks !== [] && Features::enabled('shortlist.compare', $shopId) ? [['text' => (string) __('widget::bank.assistant.compare', [], $this->locale), 'about' => 'compare', 'named' => (string) __('widget::bank.assistant.compare_named', [], $this->locale), 'question' => (string) __('widget::bank.assistant.compare_question', [], $this->locale)]] : []),
             ...$moreOfType,
             ...array_slice($others, 0, 1),
             ...($policies['returns'] ? [['text' => (string) __('widget::bank.assistant.returns', [], $this->locale), 'about' => 'product']] : []),

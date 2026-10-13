@@ -720,6 +720,9 @@
     var TYPE_MS = 60;
 
     var state = { loading: null, data: null, index: null, codes: {}, records: {}, labels: {}, config: null };
+    // The drawer's own box, and the details the chat is waiting for in it (a name and a way back), if any.
+    var drawerField = null;
+    var leadAsked = null;
     var live = {};
     var inflight = {}; // Shopify: product id -> the request already on its way, so typing asks once
     var urls = {}; // Shopify: product id -> its link, where the handle comes from
@@ -3562,18 +3565,23 @@
     }
 
     /**
-     * A short conversation in the reply: the shopper writes anything, and the chat asks again for
-     * what is still missing until it has a name and a phone or email; then the shop's team has it
-     * as a callback about this question.
+     * Asks for a name and a way back. In the drawer the shopper answers in the chat's own box: each
+     * message is a turn of theirs, and the chat answers in the next turn with what is still missing,
+     * until it has a name and a phone or email; then the shop's team has it as a callback about this
+     * question. Elsewhere (the results sheet has no chat box) a small box in the reply does the same.
      */
     function leaveDetails(raw, askId, hasNumber) {
       var wrap = el('div', 'd-lead');
       var talk = el('div', 'd-lead-talk');
       wrap.appendChild(talk);
-      var say = function (text, mine) {
-        talk.appendChild(el('div', mine ? 'd-lead-me' : 'd-lead-us', text));
-      };
-      say(label(hasNumber ? 'lead_ask_closed' : 'lead_ask'));
+      talk.appendChild(el('div', 'd-lead-us', label(hasNumber ? 'lead_ask_closed' : 'lead_ask')));
+      wrap.appendChild(el('div', 'd-lead-note', label('lead_note')));
+      var lead = { raw: raw, askId: askId, name: '', contact: '', sending: false };
+      if (drawerMode() && drawerField && drawerField.isConnected) {
+        leadAsked = lead;
+        drawerField.placeholder = label('lead_placeholder');
+        return wrap;
+      }
       var form = el('form', 'd-lead-form');
       var input = el('input');
       input.type = 'text';
@@ -3584,59 +3592,84 @@
       go.type = 'submit';
       form.appendChild(input);
       form.appendChild(go);
-      wrap.appendChild(form);
-      wrap.appendChild(el('div', 'd-lead-note', label('lead_note')));
-      var got = { name: '', contact: '' };
+      wrap.insertBefore(form, wrap.lastChild);
       form.addEventListener('submit', function (event) {
         event.preventDefault();
         var text = String(input.value || '').trim();
-        if (!text || go.disabled) {
+        if (!text || lead.sending) {
           return;
         }
         input.value = '';
-        say(text, true);
-        var read = readDetails(text);
-        got.contact = read.contact || got.contact;
-        got.name = read.name || got.name;
-        if (!got.name && !got.contact) {
-          say(label('lead_again'));
-          return;
-        }
-        if (!got.name) {
-          say(label('lead_need_name'));
-          return;
-        }
-        if (!got.contact) {
-          say(label('lead_need_contact', { name: got.name }));
-          return;
-        }
-        go.disabled = true;
-        win.fetch(API + '/widget/' + encodeURIComponent(ctx.site) + '/signup', {
-          method: 'POST', mode: 'cors', credentials: 'omit', headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ vid: visitor(), contact: got.contact, name: got.name, consent: true, locale: LOCALE, question: raw, type: 'search', id: askId || 'search' })
-        })
-          .then(function (response) { return response.json().catch(function () { return null; }); })
-          .then(function (json) {
-            go.disabled = false;
-            var status = json && json.data ? json.data.status : null;
-            if (status === 'invalid_contact') {
-              got.contact = '';
-              say(label('lead_bad_contact'));
-            } else if (status === 'saved' || status === 'code_sent') {
-              say(label('lead_saved', { name: got.name }));
-              if (form.parentNode) {
-                form.parentNode.removeChild(form);
-              }
-            } else {
-              say(label('lead_error'));
-            }
-          })
-          .catch(function () {
-            go.disabled = false;
-            say(label('lead_error'));
-          });
+        talk.appendChild(el('div', 'd-lead-me', text));
+        leadReply(lead, text, function (line) { talk.appendChild(el('div', 'd-lead-us', line)); }, function () {
+          if (form.parentNode) {
+            form.parentNode.removeChild(form);
+          }
+        });
       });
       return wrap;
+    }
+
+    /** The shopper's message in the chat's box while the chat waits for their details: a turn of its own. */
+    function leadTurn(text) {
+      var lead = leadAsked;
+      var body = openDrawer(text);
+      var box = el('div', 'd-contact');
+      body.appendChild(box);
+      leadReply(lead, text, function (line) { box.appendChild(el('div', 'd-a', line)); }, endLead);
+    }
+
+    /** The chat stops waiting for details: its box asks for questions again. */
+    function endLead() {
+      leadAsked = null;
+      if (drawerField) {
+        drawerField.placeholder = label('ask_placeholder');
+      }
+    }
+
+    /**
+     * What the chat says to one message: it asks again for what is still missing, and with a name
+     * and a phone or email sends them as the shop's callback about the question.
+     */
+    function leadReply(lead, text, say, done) {
+      var read = readDetails(text);
+      lead.contact = read.contact || lead.contact;
+      lead.name = read.name || lead.name;
+      if (!lead.name && !lead.contact) {
+        say(label('lead_again'));
+        return;
+      }
+      if (!lead.name) {
+        say(label('lead_need_name'));
+        return;
+      }
+      if (!lead.contact) {
+        say(label('lead_need_contact', { name: lead.name }));
+        return;
+      }
+      lead.sending = true;
+      win.fetch(API + '/widget/' + encodeURIComponent(ctx.site) + '/signup', {
+        method: 'POST', mode: 'cors', credentials: 'omit', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ vid: visitor(), contact: lead.contact, name: lead.name, consent: true, locale: LOCALE, question: lead.raw, type: 'search', id: lead.askId || 'search' })
+      })
+        .then(function (response) { return response.json().catch(function () { return null; }); })
+        .then(function (json) {
+          lead.sending = false;
+          var status = json && json.data ? json.data.status : null;
+          if (status === 'invalid_contact') {
+            lead.contact = '';
+            say(label('lead_bad_contact'));
+          } else if (status === 'saved' || status === 'code_sent') {
+            say(label('lead_saved', { name: lead.name }));
+            done();
+          } else {
+            say(label('lead_error'));
+          }
+        })
+        .catch(function () {
+          lead.sending = false;
+          say(label('lead_error'));
+        });
     }
 
     // ---------------------------------------------------------------- full results
@@ -3693,6 +3726,8 @@
 
     /** @param {boolean} [away] true when the shopper is going elsewhere: the site's field is not focused. */
     function closePanel(away) {
+      // Closed while details were asked for: the next time the drawer opens, it asks for questions.
+      leadAsked = null;
       forceRegular = false;
       forceSmart = false;
       if (panel) {
@@ -4359,10 +4394,19 @@
       foot.addEventListener('submit', function (event) {
         event.preventDefault();
         var text = field.value.trim();
-        if (!text) {
+        if (!text || (leadAsked && leadAsked.sending)) {
           return;
         }
         field.value = '';
+        // Waiting for a name and a way back: this is one, unless it is a new question with neither.
+        if (leadAsked) {
+          var details = readDetails(text);
+          if (details.contact || details.name || !isQuestion(text)) {
+            leadTurn(text);
+            return;
+          }
+          endLead();
+        }
         // "הכי זול" after a search is a question about it, even without the words of a question.
         if (state.config.ask && (isQuestion(text) || (FOLLOW_UP.test(text) && previousProducts().length))) {
           askText(text);
@@ -4372,12 +4416,14 @@
       });
       // A fresh conversation: the turns of this visit are forgotten.
       again.addEventListener('click', function () {
+        endLead();
         scroll.textContent = '';
         saveTurns([]);
         field.value = '';
         field.focus();
       });
       sheet.appendChild(foot);
+      drawerField = field;
 
       overlay.appendChild(sheet);
       rootNode.appendChild(overlay);

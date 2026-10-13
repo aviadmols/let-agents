@@ -52,6 +52,7 @@ final class AssistantBlockTest extends TestCase
         });
         Features::override('widget.on_products', true, $this->shop->id);
         Features::override('assistant.on_products', true, $this->shop->id);
+        Features::override('shortlist.compare', true, $this->shop->id);
     }
 
     public function test_the_block_carries_the_products_tags_and_questions_in_its_layout_only(): void

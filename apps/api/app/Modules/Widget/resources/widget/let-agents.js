@@ -2290,21 +2290,24 @@
           search.similar(thisProduct());
           return;
         }
-        // The store's compare module, with both products side by side, where the shop has it.
-        var shortlist = window.LetAgentsShortlist;
-        if (about === 'compare' && shortlist && shortlist.compare && typeof shortlist.compareThese === 'function') {
+        // The store's compare module, with both products side by side; its script loads when the page
+        // is idle, so a click that comes first waits for it a moment.
+        if (about === 'compare') {
           track('click', AS_SECTION, 'panel');
           var current = thisProduct();
-          shortlist.compareThese([
+          var both = [
             { id: before.id, title: before.title, image: before.image || null, url: before.url || null },
             { id: current.external_id, title: current.title, image: current.image || null, url: current.url }
-          ]);
-          return;
-        }
-        if (about === 'compare' && search && typeof search.ask === 'function') {
-          track('click', AS_SECTION, 'panel');
-          var asked = String(question.question || '').replace(':this', block.product.title).replace(':that', before.title);
-          search.ask(asked || text, [String(block.product.id), String(before.id)], thisProduct());
+          ];
+          var tries = 0;
+          (function open() {
+            var shortlist = window.LetAgentsShortlist;
+            if (shortlist && typeof shortlist.compareThese === 'function') {
+              shortlist.compareThese(both);
+            } else if (++tries < 20) {
+              setTimeout(open, 150);
+            }
+          })();
           return;
         }
         // Without the search script: similar items are searched for by name, the comparison asked here.
