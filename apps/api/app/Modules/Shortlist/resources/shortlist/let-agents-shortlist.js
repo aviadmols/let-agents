@@ -517,7 +517,12 @@
     '.item a{color:#111827;text-decoration:none;font-weight:600}',
     '.item .meta{flex:1;min-width:0}',
     '.item .price{color:#374151;font-size:13px;margin-top:2px}',
-    '.item button{position:absolute;top:8px;inset-inline-end:8px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(0,0,0,.18);color:#374151;cursor:pointer;font-size:18px;line-height:1;padding:0}',
+    '.acts{display:flex;flex-wrap:wrap;gap:6px}',
+    '.acts button{position:static;width:auto;height:auto;border-radius:999px;padding:7px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:none;line-height:1.2}',
+    '.acts .buy{border:0;background:#111827;color:#fff}',
+    '.acts .alike{border:1px solid #d1d5db;background:#fff;color:#111827}',
+    '.acts button[disabled]{opacity:.5;cursor:default}',
+    '.item > button{position:absolute;top:8px;inset-inline-end:8px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 5px rgba(0,0,0,.18);color:#374151;cursor:pointer;font-size:18px;line-height:1;padding:0}',
     '@media (max-width:360px){.list{grid-template-columns:1fr}}',
     '.foot{border-top:1px solid #e5e7eb;padding:12px 18px;display:grid;gap:8px}',
     '.note{color:#6b7280;font-size:12.5px}',
@@ -886,6 +891,32 @@
       }
       item.appendChild(img);
       item.appendChild(meta);
+      // To the cart (sizes and colours chosen in a small window) and similar items, through the search.
+      var search = win.LetAgentsSearch;
+      if (search && (search.addToCart || search.similar)) {
+        var acts = el('div', 'acts');
+        if (search.addToCart && p.in_stock !== false) {
+          var buy = el('button', 'buy', label('add_to_cart'));
+          buy.type = 'button';
+          buy.addEventListener('click', function () {
+            search.addToCart(String(p.id), buy, function () {
+              buy.textContent = label('in_cart');
+              flash(label('in_cart'));
+            });
+          });
+          acts.appendChild(buy);
+        }
+        if (search.similar && (!search.canSimilar || search.canSimilar())) {
+          var alike = el('button', 'alike', label('similar'));
+          alike.type = 'button';
+          alike.addEventListener('click', function () {
+            closeDrawer();
+            search.similar({ id: String(p.id), title: p.title, image: p.image, url: p.url });
+          });
+          acts.appendChild(alike);
+        }
+        item.appendChild(acts);
+      }
       if (!shared) {
         var rm = el('button', null, '×');
         rm.type = 'button';

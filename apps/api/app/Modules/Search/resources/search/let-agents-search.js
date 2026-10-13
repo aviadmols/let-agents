@@ -1117,8 +1117,18 @@
       liveProducts([externalId]).then(function () {
         var product = live[externalId];
         var page = safeUrl(urls[externalId]) || safeUrl((state.records['p:' + externalId] || {}).url);
-        if (product && product.variants > 1 && page) {
-          win.location.href = page;
+        // Sizes or colours: the shopper chooses here, the exact variant goes in.
+        if (product && product.variants > 1) {
+          button.disabled = false;
+          chooseVariant(externalId).then(function (done) {
+            if (done) {
+              button.textContent = label('added');
+              if (onAdded) {
+                onAdded();
+              }
+              doc.body.dispatchEvent(new CustomEvent('let-agents:added_to_cart', { detail: { id: externalId } }));
+            }
+          });
           return;
         }
         if (!product || !product.variant || !product.is_in_stock) {
@@ -1227,6 +1237,301 @@
       }, 400);
     }
 
+    // ---------------------------------------------------------------- choosing a variant
+
+    /**
+     * A product with sizes or colours: the store's own variants, read from the store (Shopify's
+     * product JSON, WooCommerce's Store API), in a small window over the page. The shopper chooses
+     * each option, a choice no variant has (or none in stock) cannot be made, and the exact variant
+     * goes to the cart. Resolves true when it went in, false when the shopper closed the window.
+     */
+    function chooseVariant(externalId) {
+      var page = safeUrl(urls[externalId]) || safeUrl((state.records['p:' + externalId] || {}).url);
+      var read = SHOPIFY ? shopifyVariants(externalId) : wooVariants(externalId);
+      return read.then(function (product) {
+        if (!product || !product.options.length || !product.variants.length) {
+          if (page) {
+            win.location.href = page;
+          }
+          return false;
+        }
+        return variantWindow(product);
+      }).catch(function () {
+        if (page) {
+          win.location.href = page;
+        }
+        return false;
+      });
+    }
+
+    /** { title, image, options: [{ name, values }], variants: [{ id, values: [..], available, price }] } */
+    function shopifyVariants(externalId) {
+      var handle = handleFromUrl(urls[externalId] || (state.records['p:' + externalId] || {}).url);
+      if (!handle) {
+        return Promise.resolve(null);
+      }
+      return win.fetch(ROOT + 'products/' + encodeURIComponent(handle) + '.js', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (json) {
+          if (!json || !json.variants) {
+            return null;
+          }
+          var names = (json.options || []).map(function (option) { return typeof option === 'string' ? option : option.name; });
+          return {
+            title: json.title,
+            image: json.featured_image ? String(json.featured_image).replace(/^\/\//, 'https://') : null,
+            options: names.map(function (name, at) {
+              var values = [];
+              json.variants.forEach(function (v) {
+                var value = v['option' + (at + 1)];
+                if (value != null && values.indexOf(value) === -1) {
+                  values.push(value);
+                }
+              });
+              return { name: name, values: values };
+            }).filter(function (option) { return option.values.length > 1 || names.length === 1; }),
+            variants: json.variants.map(function (v) {
+              return { id: v.id, values: names.map(function (name, at) { return v['option' + (at + 1)]; }), available: v.available !== false, price: v.price };
+            }),
+            shopify: true,
+            names: names
+          };
+        });
+    }
+
+    function wooVariants(externalId) {
+      if (!STORE_API) {
+        return Promise.resolve(null);
+      }
+      return win.fetch(STORE_API + 'products/' + encodeURIComponent(externalId), { credentials: 'same-origin' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (json) {
+          if (!json || json.type !== 'variable' || !json.variations || !json.variations.length) {
+            return null;
+          }
+          var attributes = (json.attributes || []).filter(function (a) { return a.has_variations; });
+          var names = attributes.map(function (a) { return a.name; });
+          return {
+            title: json.name,
+            image: json.images && json.images[0] ? json.images[0].src : null,
+            options: attributes.map(function (a) {
+              return { name: a.name, taxonomy: a.taxonomy || null, values: (a.terms || []).map(function (t) { return t.name; }), slugs: (a.terms || []).map(function (t) { return t.slug; }) };
+            }),
+            variants: json.variations.map(function (v) {
+              var values = names.map(function (name, at) {
+                var own = (v.attributes || []).filter(function (x) { return x.name === name; })[0];
+                if (!own || own.value === '' || own.value == null) {
+                  return null; // "any" value of this attribute
+                }
+                var slugAt = attributes[at].terms.map(function (t) { return t.slug; }).indexOf(own.value);
+                return slugAt === -1 ? own.value : attributes[at].terms[slugAt].name;
+              });
+              return { id: v.id, values: values, available: true, attributes: v.attributes || [] };
+            }),
+            shopify: false,
+            names: names
+          };
+        });
+    }
+
+    var pickerHost = null;
+
+    function variantWindow(product) {
+      return new Promise(function (resolve) {
+        if (pickerHost && pickerHost.parentNode) {
+          pickerHost.parentNode.removeChild(pickerHost);
+        }
+        pickerHost = doc.createElement('div');
+        pickerHost.setAttribute('data-let-agents-variants', '');
+        var root = pickerHost.attachShadow({ mode: 'open' });
+        var style = doc.createElement('style');
+        style.textContent = [
+          ':host{all:initial}',
+          '.veil{position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:2147483646}',
+          '.win{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 40px);overflow:auto;background:#fff;color:#111827;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.3);z-index:2147483647;padding:18px;font:15px/1.45 system-ui,-apple-system,Segoe UI,Arial,sans-serif;direction:' + (LOCALE === 'he' ? 'rtl' : 'ltr') + '}',
+          '.top{display:flex;gap:12px;align-items:center;margin-bottom:12px}',
+          '.top img{width:64px;height:64px;object-fit:cover;border-radius:10px;background:#f3f4f6;flex:none}',
+          '.top b{flex:1;font-size:15px}',
+          '.x{border:0;background:#f3f4f6;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:18px;flex:none}',
+          '.opt{margin:10px 0}',
+          '.opt span{display:block;font-size:13px;color:#4b5563;margin-bottom:6px}',
+          '.vals{display:flex;flex-wrap:wrap;gap:6px}',
+          '.vals button{border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:7px 13px;font:inherit;font-size:14px;cursor:pointer;color:#111827}',
+          '.vals button[aria-pressed="true"]{background:#111827;color:#fff;border-color:#111827}',
+          '.vals button[disabled]{opacity:.35;cursor:default;text-decoration:line-through}',
+          '.add{margin-top:14px;width:100%;border:0;border-radius:999px;padding:12px;background:' + (state.config.buttonColor || '#111827') + ';color:#fff;font:inherit;font-weight:600;cursor:pointer}',
+          '.add[disabled]{opacity:.45;cursor:default}',
+          '.say{font-size:13px;color:#b91c1c;margin-top:8px;min-height:1em}'
+        ].join('');
+        root.appendChild(style);
+        var veil = el('div', 'veil');
+        var box = el('div', 'win');
+        box.setAttribute('role', 'dialog');
+        box.setAttribute('aria-modal', 'true');
+        box.setAttribute('aria-label', label('choose_title'));
+        var top = el('div', 'top');
+        if (safeUrl(product.image)) {
+          var img = el('img');
+          img.src = product.image;
+          img.alt = '';
+          top.appendChild(img);
+        }
+        top.appendChild(el('b', null, product.title));
+        var x = el('button', 'x', '×');
+        x.type = 'button';
+        x.setAttribute('aria-label', label('close'));
+        top.appendChild(x);
+        box.appendChild(top);
+
+        var chosen = product.options.map(function () { return null; });
+        // An option with one value is chosen already.
+        product.options.forEach(function (option, at) {
+          if (option.values.length === 1) {
+            chosen[at] = option.values[0];
+          }
+        });
+        var at = function (option) { return product.names.indexOf(option.name); };
+        var fits = function (variant, except) {
+          return product.options.every(function (option, o) {
+            if (o === except || chosen[o] === null) {
+              return true;
+            }
+            var value = variant.values[at(option)];
+            return value === null || value === chosen[o];
+          });
+        };
+        var picked = function () {
+          if (chosen.some(function (c) { return c === null; })) {
+            return null;
+          }
+          return product.variants.filter(function (v) { return v.available && fits(v, -1); })[0] || null;
+        };
+        var add = el('button', 'add', label('add'));
+        add.type = 'button';
+        var say = el('div', 'say');
+        var buttons = [];
+        var paint = function () {
+          buttons.forEach(function (b) {
+            b.node.setAttribute('aria-pressed', chosen[b.o] === b.value ? 'true' : 'false');
+            var keep = chosen[b.o];
+            chosen[b.o] = b.value;
+            var some = product.variants.some(function (v) { return v.available && fits(v, -1); });
+            chosen[b.o] = keep;
+            b.node.disabled = !some;
+          });
+          add.disabled = !picked();
+        };
+        product.options.forEach(function (option, o) {
+          var row = el('div', 'opt');
+          row.appendChild(el('span', null, option.name));
+          var vals = el('div', 'vals');
+          option.values.forEach(function (value) {
+            var b = el('button', null, value);
+            b.type = 'button';
+            b.addEventListener('click', function () {
+              chosen[o] = chosen[o] === value ? null : value;
+              say.textContent = '';
+              paint();
+            });
+            buttons.push({ node: b, o: o, value: value });
+            vals.appendChild(b);
+          });
+          row.appendChild(vals);
+          box.appendChild(row);
+        });
+        box.appendChild(add);
+        box.appendChild(say);
+
+        var close = function (done) {
+          if (pickerHost && pickerHost.parentNode) {
+            pickerHost.parentNode.removeChild(pickerHost);
+          }
+          doc.removeEventListener('keydown', onKey, true);
+          resolve(done);
+        };
+        var onKey = function (event) {
+          if (event.key === 'Escape') {
+            close(false);
+          }
+        };
+        doc.addEventListener('keydown', onKey, true);
+        veil.addEventListener('click', function () { close(false); });
+        x.addEventListener('click', function () { close(false); });
+        add.addEventListener('click', function () {
+          var variant = picked();
+          if (!variant) {
+            return;
+          }
+          add.disabled = true;
+          addVariant(product, variant).then(function (ok) {
+            if (ok) {
+              close(true);
+            } else {
+              add.disabled = false;
+              say.textContent = label('choose_failed');
+            }
+          });
+        });
+        root.appendChild(veil);
+        root.appendChild(box);
+        doc.body.appendChild(pickerHost);
+        paint();
+      });
+    }
+
+    /** The chosen variant into the store's cart; resolves whether it took it. */
+    function addVariant(product, variant) {
+      if (product.shopify) {
+        return win.fetch(ROOT + 'cart/add.js', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ items: [{ id: Number(variant.id), quantity: 1 }], sections: 'cart-icon-bubble,cart-drawer', sections_url: win.location.pathname })
+        }).then(function (response) {
+          if (!response.ok) {
+            return false;
+          }
+          return response.json().catch(function () { return null; }).then(function (json) {
+            var dawn = doc.querySelector('cart-drawer');
+            if (dawn && typeof dawn.renderContents === 'function' && json && json.sections && json.sections['cart-drawer']) {
+              closeDropdown();
+              closePanel();
+              dawn.classList.remove('is-empty');
+              dawn.renderContents(json);
+            } else {
+              refreshShopifyCart(json && json.sections);
+            }
+            return true;
+          });
+        }).catch(function () { return false; });
+      }
+      var headers = { 'Content-Type': 'application/json' };
+      if (nonce) {
+        headers.Nonce = nonce;
+      }
+      // Each attribute the variation leaves open ("any") is the one the shopper chose.
+      var attributes = product.options.map(function (option, o) {
+        var own = (variant.attributes || []).filter(function (a) { return a.name === option.name; })[0];
+        var slugAt = option.values.indexOf(variant.values[product.names.indexOf(option.name)]);
+        return { attribute: option.taxonomy || option.name, value: own && own.value ? own.value : (option.slugs && slugAt !== -1 ? option.slugs[slugAt] : '') };
+      });
+      return win.fetch(STORE_API + 'cart/add-item', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headers,
+        body: JSON.stringify({ id: Number(variant.id), quantity: 1, variation: attributes })
+      }).then(function (response) {
+        var fresh = response.headers.get('Nonce');
+        if (fresh) {
+          nonce = fresh;
+        }
+        if (response.ok && win.jQuery) {
+          win.jQuery(doc.body).trigger('wc_fragment_refresh');
+        }
+        return response.ok;
+      }).catch(function () { return false; });
+    }
+
     /**
      * The store's cart did not take it (a variant to choose, a quantity rule, out of stock): the
      * shopper goes on to the product's page, where the store adds it its own way. A note only when
@@ -1251,6 +1556,21 @@
         return;
       }
       button.disabled = true;
+      var record = state.records['p:' + externalId];
+      // A product the store sells by variation (the index marks a simple one buyable): chosen here.
+      if (record && record.buy === 0) {
+        button.disabled = false;
+        chooseVariant(externalId).then(function (done) {
+          if (done) {
+            button.textContent = label('added');
+            if (onAdded) {
+              onAdded();
+            }
+            doc.body.dispatchEvent(new CustomEvent('let-agents:added_to_cart', { detail: { id: externalId } }));
+          }
+        });
+        return;
+      }
       var headers = { 'Content-Type': 'application/json' };
       if (nonce) {
         headers.Nonce = nonce;
@@ -5137,6 +5457,27 @@
     // For the block under a product's add-to-cart (the page widget): a question about the product,
     // or a search for others like it, in the drawer, as from the search box.
     win.LetAgentsSearch = {
+      // From the wishlist: the store's cart (sizes chosen here), and similar items in the smart search.
+      addToCart: function (externalId, button, onAdded) {
+        load().then(function (data) {
+          if (data) {
+            addToCart(String(externalId), button, onAdded);
+          }
+        });
+      },
+      // Only where the shop's vectors can answer (the search's own "similar items" setting).
+      canSimilar: function () {
+        // Not loaded yet: offered; the search says "no similar items" if the shop has none.
+        return state.config ? !!state.config.similar : true;
+      },
+      similar: function (item) {
+        load().then(function (data) {
+          if (data) {
+            forceSmart = true;
+            showSimilar({ id: 'p:' + item.id, external_id: String(item.id), title: item.title || '', image: item.image || null, url: item.url || null }, item.title || '');
+          }
+        });
+      },
       ask: function (question, productIds) {
         load().then(function (data) {
           if (data) {

@@ -97,4 +97,6 @@ return [
     'columns_one' => 'תמונה אחת בשורה',
     'columns_two' => 'שתי תמונות בשורה',
     'sorted_by' => 'מסודר: :label',
+    'choose_title' => 'בחירת מידה וצבע',
+    'choose_failed' => 'לא הצלחנו להוסיף את זה לסל. נסו אפשרות אחרת.',
 ];

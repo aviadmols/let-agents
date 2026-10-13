@@ -97,4 +97,6 @@ return [
     'columns_one' => 'One picture a row',
     'columns_two' => 'Two pictures a row',
     'sorted_by' => 'Sorted: :label',
+    'choose_title' => 'Choose size and colour',
+    'choose_failed' => 'We could not add this to the cart. Try another option.',
 ];

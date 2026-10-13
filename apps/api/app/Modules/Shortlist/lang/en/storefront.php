@@ -52,4 +52,7 @@ return [
     'phone_unavailable' => 'We could not send a code now. Try again later.',
     'phone_bad_code' => 'That code is not right',
     'phone_expired' => 'The code expired. Ask for a new one.',
+    'add_to_cart' => 'Add to cart',
+    'in_cart' => 'Added to cart',
+    'similar' => 'Similar items',
 ];
