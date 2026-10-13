@@ -61,8 +61,6 @@ final class LoadedIndex
             'actions' => is_array($data['actions'] ?? null) ? $data['actions'] : [],
             // What the shop's vocabulary says products are (metal, karat, stone…), for the photo placer.
             'facets' => is_array($data['facets'] ?? null) ? $data['facets'] : [],
-            // What each kind of product is called and headed by, for the tiers (HebrewSearch::tiers).
-            'kinds' => is_array($data['kinds'] ?? null) ? $data['kinds'] : [],
         ];
     }
 

@@ -244,12 +244,6 @@
             "scope": "global"
         },
         {
-            "name": "in_stock_only",
-            "type": "bool",
-            "default": true,
-            "scope": "shop"
-        },
-        {
             "name": "photo_in_stock_only",
             "type": "bool",
             "default": true,

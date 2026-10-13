@@ -39,8 +39,6 @@ final class QueryActionsTest extends TestCase
         parent::setUp();
         LoadedIndex::forget();
         $this->shop = Shop::factory()->create(['content_locale' => 'he']);
-        // These tests read the order of what is found; hiding what is out of stock is tested on its own.
-        Settings::set('search.in_stock_only', false, $this->shop->id);
 
         $this->inShop(function (): void {
             $vocabulary = EnrichmentVocabulary::query()->create(['shop_id' => $this->shop->id, 'key' => 'jewelry', 'version' => 1, 'root_category_external_id' => '*', 'active' => true, 'definition_hash' => 'h',

@@ -97,6 +97,4 @@ return [
     'columns_one' => 'One picture a row',
     'columns_two' => 'Two pictures a row',
     'sorted_by' => 'Sorted: :label',
-    'related_products' => 'Related products',
-    'out_of_stock_too' => 'Out of stock too',
 ];

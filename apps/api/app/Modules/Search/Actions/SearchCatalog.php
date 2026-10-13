@@ -194,34 +194,6 @@ final class SearchCatalog
             // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
             $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
 
-            // Only what is in stock, when the shop asks for it and something found is: the rest waits
-            // behind a button (`out_of_stock`). A product found exactly is shown whatever its stock.
-            $outOfStock = [];
-            if ($single === null && (bool) Settings::get('search.in_stock_only', $shopId)) {
-                $inStock = array_values(array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) === 1));
-                if ($inStock !== [] && count($inStock) < count($groups['product'])) {
-                    $outOfStock = array_values(array_map(fn (array $r): string => (string) $r['id'], array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) !== 1)));
-                    $groups['product'] = $inStock;
-                }
-            }
-
-            // "פלטת עץ": the boards, then a caster "עם פלטה" only as related, and not at all when the
-            // boards fill the first screen (HebrewSearch::tiers). Code only; the order inside each
-            // tier is the order above.
-            $related = null;
-            if ($single === null && $groups['product'] !== []) {
-                $full = [];
-                foreach ($spelling as $hit) {
-                    if ($hit['full']) {
-                        $full[$hit['id']] = true;
-                    }
-                }
-                $tiered = HebrewSearch::tiers($groups['product'], $full, $query, $index['kinds'] ?? [], $perGroup);
-                $byId = array_column($groups['product'], null, 'id');
-                $groups['product'] = array_map(fn (string $id): array => $byId[$id], $tiered['ids']);
-                $related = $tiered['related'];
-            }
-
             // The one product first, wherever the merge put it, and also when only its code found it.
             if ($single !== null) {
                 $groups['product'] = [
@@ -245,19 +217,10 @@ final class SearchCatalog
                     : [];
             }
 
-            // The related products are marked, for the heading above the first of them.
-            if ($related !== null) {
-                foreach ($groups['product'] as $at => $product) {
-                    if ($at >= $related) {
-                        $groups['product'][$at]['related'] = true;
-                    }
-                }
-            }
-
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'related' => $related, 'out_of_stock' => array_slice($outOfStock, 0, self::ALL_IDS), 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 

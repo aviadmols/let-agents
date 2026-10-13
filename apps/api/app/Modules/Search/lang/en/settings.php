@@ -74,10 +74,6 @@ return [
         'label' => 'Largest distance from the best photo match',
         'description' => 'Only what is close to the first result is shown (0.06 = up to 6 points below it). Picture similarity scores sit close together, so a fixed floor alone lets far products in.',
     ],
-    'in_stock_only' => [
-        'label' => 'In the search, only what is in stock',
-        'description' => 'Products out of stock are hidden, and an "Out of stock too" button shows them. A product the search found exactly, or a search that found nothing in stock, shows as before.',
-    ],
     'photo_in_stock_only' => [
         'label' => 'In photo search, only what is in stock',
         'description' => 'Products that ran out are not shown, unless nothing alike is in stock.',

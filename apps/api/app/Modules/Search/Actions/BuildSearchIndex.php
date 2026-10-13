@@ -90,13 +90,8 @@ final class BuildSearchIndex
         $facets = $this->facets($shopId);
         $faceted = 0;
 
-        // What each product is, for the tiers of a search (HebrewSearch::tiers): its kind, and each
-        // kind's name and the words that head it.
-        $kinds = [];
-
-        foreach (CatalogProduct::query()->active()->with('categories:id,name,external_id,depth')->orderBy('id')->lazy(200) as $product) {
+        foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
-            $kind = self::kindOf($product, $read['t'] ?? null, $facets['types'], $kinds);
             $faceted += isset($read['f']) ? 1 : 0;
             $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
@@ -113,7 +108,6 @@ final class BuildSearchIndex
                 'f' => $read['f'] ?? null,
                 'z' => $read['z'] ?? null,
                 'd' => self::added($product),
-                'k' => $kind,
             ]);
             $counts['product']++;
         }
@@ -150,7 +144,7 @@ final class BuildSearchIndex
             $counts['answer']++;
         }
 
-        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'kinds' => $kinds, 'size' => $facets['size'], 'actions' => self::actions($this->locale($shopId), $facets['size'] !== null)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'], 'actions' => self::actions($this->locale($shopId), $facets['size'] !== null)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
         SearchIndex::query()->updateOrCreate(['shop_id' => $shopId], [
@@ -175,7 +169,7 @@ final class BuildSearchIndex
      * with its size: the approved number of the attribute the shop measures size by
      * (search.size_attribute), when it has one.
      *
-     * @return array{facets: list<array{k: string, l: string, v: list<array{k: string, l: string}>}>, size: array{k: string, l: string}|null, products: array<string, array{f?: list<int>, z?: float, t?: string}>, types: array<string, string>}
+     * @return array{facets: list<array{k: string, l: string, v: list<array{k: string, l: string}>}>, size: array{k: string, l: string}|null, products: array<string, array{f?: list<int>, z?: float}>}
      */
     private function facets(string $shopId): array
     {
@@ -232,9 +226,6 @@ final class BuildSearchIndex
                         return;
                     }
                     $key = $fact->kind === FactKind::Type ? 'type' : $fact->key;
-                    if ($fact->kind === FactKind::Type) {
-                        $products[$fact->product_id]['t'] ??= (string) $fact->value_text;
-                    }
                     $value = $fact->kind === FactKind::Flag ? 'true' : (string) $fact->value_text;
                     if (isset($where[$key]['values'][$value])) {
                         $products[$fact->product_id]['f'][] = $where[$key]['at'] * 1000 + $where[$key]['values'][$value];
@@ -249,80 +240,7 @@ final class BuildSearchIndex
             unset($read);
         }
 
-        $types = [];
-        if (isset($where['type'])) {
-            foreach ($where['type']['values'] as $value => $at) {
-                $types[(string) $value] = (string) $facets[$where['type']['at']]['v'][$at]['l'];
-            }
-        }
-
-        return ['facets' => $facets, 'size' => $size, 'products' => $products, 'types' => $types];
-    }
-
-    /**
-     * What a product is, for the tiers of a search: its approved type; else the deepest of its
-     * categories; else, only then, the first word of its title that is not a brand, "סט", "מארז"
-     * or a model number. Each kind goes into $kinds once, with its name and its heads.
-     *
-     * @param  array<string, string>  $types  type key => its name
-     * @param  array<string, array{l: string, h: list<string>}>  $kinds
-     */
-    public static function kindOf(CatalogProduct $product, ?string $type, array $types, array &$kinds): ?string
-    {
-        if ($type !== null && $type !== '') {
-            $kinds['t:'.$type] ??= ['l' => $types[$type] ?? $type, 'h' => self::heads($types[$type] ?? $type)];
-
-            return 't:'.$type;
-        }
-
-        $category = $product->categories->sortByDesc('depth')->first();
-        if ($category !== null && trim((string) $category->name) !== '') {
-            $kinds['c:'.$category->external_id] ??= ['l' => (string) $category->name, 'h' => self::heads((string) $category->name)];
-
-            return 'c:'.$category->external_id;
-        }
-
-        $brand = explode(' ', HebrewSearch::normalize((string) $product->brand));
-        foreach (explode(' ', HebrewSearch::normalize($product->title)) as $word) {
-            if (mb_strlen($word) < 2 || in_array($word, HebrewSearch::TIER_SKIP, true) || in_array($word, $brand, true)
-                || preg_match('/\d/u', $word) === 1 || preg_match('/^[a-z]+$/u', $word) === 1) {
-                continue;
-            }
-
-            $kinds['w:'.$word] ??= ['l' => $word, 'h' => [$word]];
-
-            return 'w:'.$word;
-        }
-
-        return null;
-    }
-
-    /**
-     * The words a kind's name is headed by: "זווית וסרגל חיזוק" by זווית and סרגל, "פלטה / לביד /
-     * OSB" by פלטה, לביד and osb; never a word it only qualifies ("צבע לעץ" is not wood).
-     *
-     * @return list<string>
-     */
-    public static function heads(string $name): array
-    {
-        $heads = [];
-
-        foreach (preg_split('#[/,()]|\s+(?:או|or)\s+#u', $name) ?: [] as $segment) {
-            $words = array_values(array_filter(explode(' ', HebrewSearch::normalize($segment))));
-
-            if ($words === []) {
-                continue;
-            }
-
-            $heads[] = $words[0];
-            foreach (array_slice($words, 1) as $word) {
-                if (mb_strlen($word) > 3 && str_starts_with($word, 'ו')) {
-                    $heads[] = mb_substr($word, 1);
-                }
-            }
-        }
-
-        return array_values(array_unique($heads));
+        return ['facets' => $facets, 'size' => $size, 'products' => $products];
     }
 
     /**
