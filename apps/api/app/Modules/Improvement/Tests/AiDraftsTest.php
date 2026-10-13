@@ -16,11 +16,13 @@ use App\Modules\Improvement\Actions\DraftAnswer;
 use App\Modules\Improvement\Actions\DraftPost;
 use App\Modules\Improvement\Filament\Operator\Pages\SiteSuggestions;
 use App\Modules\Improvement\Jobs\DraftAnswerJob;
+use App\Modules\Improvement\Jobs\DraftPostJob;
 use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Runs\Models\Run;
+use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -200,6 +202,42 @@ final class AiDraftsTest extends TestCase
         Queue::fake();
         Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])->call('draftAnswer', $proposal->id)->assertSee('מודל כותב את התשובה');
         Queue::assertPushed(DraftAnswerJob::class, 1);
+    }
+
+    public function test_a_question_shoppers_ask_becomes_a_post_linking_the_products_the_search_finds_for_it(): void
+    {
+        $question = $this->proposal(ImprovementProposal::FAQ, 'איזה שמן הכי טוב לדק במרפסת?', ['question' => 'איזה שמן הכי טוב לדק במרפסת?', 'answer' => ''], [['question' => 'איזה שמן הכי טוב לדק במרפסת?', 'asked' => 3]]);
+        // The store's own search, as a shopper asking it would see: the oil, then the decking.
+        $this->app->instance(ProductsForQuery::class, new class implements ProductsForQuery
+        {
+            public function find(string $shopId, string $query, int $limit): array
+            {
+                return $query === 'איזה שמן הכי טוב לדק במרפסת?' ? ['2', '1'] : [];
+            }
+        });
+
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        Queue::fake();
+        Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])
+            ->assertSee('לכתוב פוסט עם AI')
+            ->call('postFromQuestion', $question->id)
+            ->call('postFromQuestion', $question->id);
+
+        $post = $this->inShop(fn () => ImprovementProposal::query()->where('kind', ImprovementProposal::CONTENT_GAP)->sole());
+        $this->assertSame(['איזה שמן הכי טוב לדק במרפסת?', $question->id, ImprovementProposal::PENDING], [$post->detail['topic'], $post->detail['question_id'], $post->status], 'one post suggestion, however often pressed');
+        $this->assertSame($post->id, $question->fresh()->detail['post_proposal_id']);
+        $this->assertSame(ImprovementProposal::PENDING, $question->fresh()->status, 'the question stays, to be answered too');
+        Queue::assertPushed(DraftPostJob::class, fn (DraftPostJob $job): bool => $job->proposalId === $post->id);
+
+        $this->replies = [
+            ['title' => 'שמן לדק: מה כדאי', 'body' => 'שמן לעץ חיצוני שומר על הדק.', 'products' => ['2', '1']],
+            ['ok' => true, 'problems' => []],
+        ];
+        $written = app(DraftPost::class)->handle($post);
+
+        $this->assertSame(['2', '1'], array_slice(array_column($this->calls[0]['input']['products'], 'id'), 0, 2), 'what the search finds for the question first, though no title holds its words');
+        $this->assertSame(['2', '1'], $written->products);
     }
 
     /**

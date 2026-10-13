@@ -20,6 +20,7 @@ use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Tenancy\Models\Shop;
 
 /**
@@ -68,6 +69,7 @@ final class DraftPost
         private readonly ChatModel $chat,
         private readonly SpendGuard $spend,
         private readonly TenantContext $tenant,
+        private readonly ProductsForQuery $search,
     ) {}
 
     /** The draft, or null when no model could write one; the run says why. */
@@ -168,19 +170,23 @@ final class DraftPost
                 fn (array $e): string => trim((string) ($e['query'] ?? $e['question'] ?? '')).' ×'.(int) ($e['searches'] ?? $e['asked'] ?? 0),
                 $proposal->evidence,
             ), fn (string $s): bool => ! str_starts_with($s, ' ×'))),
-            'products' => $this->candidates($topic),
+            'products' => $this->candidates($topic, $proposal->shop_id),
             'categories' => CatalogCategory::query()->where('product_count', '>', 0)->orderByDesc('product_count')->limit(40)->pluck('name')->map(fn ($n): string => (string) $n)->all(),
         ];
     }
 
     /**
-     * The store's products the topic's words name, in their titles or their categories, the ones
-     * naming more of the words first.
+     * The products the store's own search finds for the topic ("איזה עץ הכי כדאי לפרגולה" finds
+     * the pergola wood, as a shopper would), then those the topic's words name in their titles or
+     * their categories, the ones naming more of the words first.
      *
      * @return list<array{id: string, title: string, category: string, about: string}>
      */
-    private function candidates(string $topic): array
+    private function candidates(string $topic, string $shopId): array
     {
+        $searched = $this->search->find($shopId, $topic, self::CANDIDATES);
+        $byExternal = CatalogProduct::query()->whereIn('external_id', $searched)->pluck('id', 'external_id');
+        $first = array_values(array_filter(array_map(fn (string $id): ?string => isset($byExternal[$id]) ? (string) $byExternal[$id] : null, $searched)));
         $words = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($topic)) ?: [], fn (string $w): bool => mb_strlen($w) >= 3));
         $scores = [];
 
@@ -195,7 +201,8 @@ final class DraftPost
         }
 
         arsort($scores);
-        $products = CatalogProduct::query()->with('categories')->whereIn('id', array_slice(array_keys($scores), 0, self::CANDIDATES))->get();
+        $ids = array_slice(array_values(array_unique([...$first, ...array_map('strval', array_keys($scores))])), 0, self::CANDIDATES);
+        $products = CatalogProduct::query()->with('categories')->whereIn('id', $ids)->get();
 
         $facts = EnrichmentFact::query()->with('vocabulary')->whereIn('product_id', $products->pluck('id'))->where('status', FactStatus::Approved)
             ->whereIn('kind', [FactKind::Type, FactKind::Brand, FactKind::Choice, FactKind::Spec, FactKind::Flag])->orderBy('id')->get()->groupBy('product_id');
@@ -207,7 +214,7 @@ final class DraftPost
             'facts' => $facts->get($p->id, collect())->take(self::MAX_FACTS)->map(fn (EnrichmentFact $f): string => trim($f->keyLabel()).': '.trim($f->valueLabel()))->values()->all(),
             'about' => mb_substr(trim((string) preg_replace('/\s+/u', ' ', strip_tags($p->description()))), 0, 200),
         ], array_values(array_filter(
-            array_map(fn (string $id) => $products->firstWhere('id', $id), array_slice(array_keys($scores), 0, self::CANDIDATES)),
+            array_map(fn (string $id) => $products->first(fn (CatalogProduct $p): bool => (string) $p->id === $id), $ids),
         ))));
     }
 

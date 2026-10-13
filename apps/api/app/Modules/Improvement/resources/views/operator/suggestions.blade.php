@@ -144,6 +144,9 @@
                                     @if ($p->kind === 'faq' && ! $this->drafting($p->id))
                                         <button type="button" wire:click="draftAnswer('{{ $p->id }}')" style="{{ $btn }}">{{ __(isset($p->detail['ai']) ? 'improvement::ui.answer.rewrite' : 'improvement::ui.answer.write') }}</button>
                                     @endif
+                                    @if ($p->kind === 'faq' && ! isset($p->detail['post_proposal_id']) && $quota['left'] > 0)
+                                        <button type="button" wire:click="postFromQuestion('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.from_question') }}</button>
+                                    @endif
                                     @if ($p->kind === 'content_gap' && ! $this->drafting($p->id) && $quota['left'] > 0)
                                         <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.rewrite') }}</button>
                                     @endif

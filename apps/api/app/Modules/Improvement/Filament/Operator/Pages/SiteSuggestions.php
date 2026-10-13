@@ -167,6 +167,57 @@ class SiteSuggestions extends Page
         Notification::make()->success()->title(__('improvement::ui.post.writing'))->send();
     }
 
+    /**
+     * A post that answers a question shoppers keep asking, with links to the store's products: a
+     * new suggestion for a post, made from the question and written in the background. The question
+     * stays, to be answered on the site too.
+     */
+    public function postFromQuestion(string $id): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        if ($this->postsLeft()['left'] <= 0) {
+            Notification::make()->warning()->title(__('improvement::ui.post.cap_reached'))->send();
+
+            return;
+        }
+
+        $post = app(TenantContext::class)->run($this->shop, function () use ($id): ?ImprovementProposal {
+            $question = ImprovementProposal::query()->whereKey($id)->where('kind', ImprovementProposal::FAQ)->first();
+
+            if ($question === null || isset($question->detail['post_proposal_id'])) {
+                return null;
+            }
+
+            $text = trim((string) ($question->detail['question'] ?? $question->title));
+            $post = ImprovementProposal::query()->create([
+                'shop_id' => $question->shop_id,
+                'review_id' => $question->review_id,
+                'kind' => ImprovementProposal::CONTENT_GAP,
+                'title' => mb_substr($text, 0, 300),
+                'detail' => ['topic' => $text, 'why' => (string) __('improvement::ui.post.question_why'), 'question_id' => $question->id],
+                'evidence' => $question->evidence,
+                'fingerprint' => hash('sha256', ImprovementProposal::CONTENT_GAP.'|question:'.$question->id),
+                'status' => ImprovementProposal::PENDING,
+                'proposed_by' => 'team',
+            ]);
+            $question->detail = array_replace($question->detail, ['post_proposal_id' => $post->id]);
+            $question->save();
+
+            return $post;
+        });
+
+        if ($post === null) {
+            return;
+        }
+
+        Cache::put(DraftPostJob::WRITING.$post->id, now()->timestamp, now()->addSeconds(DraftPostJob::WRITING_SECONDS));
+        DraftPostJob::dispatch($this->shop, $post->id);
+        Notification::make()->success()->title(__('improvement::ui.post.from_question_writing'))->send();
+    }
+
     public function approve(string $id): void
     {
         $this->decide($id, true);

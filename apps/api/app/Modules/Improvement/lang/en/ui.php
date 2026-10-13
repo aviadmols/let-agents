@@ -52,6 +52,9 @@ return [
         'sources' => 'Written from:',
     ],
     'post' => [
+        'from_question' => 'Write a post with AI',
+        'from_question_writing' => 'The post is being written, with links to the products. It shows here as a new suggestion in about a minute.',
+        'question_why' => 'A question shoppers ask on the site: a post that answers it and links to the products that fit it.',
         'write' => 'Write a post with AI',
         'rewrite' => 'Write again',
         'writing' => 'The post is being written in the background',
