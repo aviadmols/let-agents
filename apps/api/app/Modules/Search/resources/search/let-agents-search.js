@@ -606,6 +606,112 @@
     return sides.length > 1 ? sides : [raw];
   }
 
+  // ---------------------------------------------------------------- tiers (same as HebrewSearch.php)
+
+  /** Words of a query that name no kind of product: "סט ביטים" is about bits. */
+  var TIER_SKIP = ['סט', 'מארז', 'ערכה', 'ערכת', 'זוג', 'חבילה', 'חבילת', 'מבצע', 'set', 'kit', 'pack'];
+
+  /** A normalized word as kinds are compared: "פלטת", "פלטות" as "פלטה"; "גלגלים" as "גלגל". */
+  function kindKey(word) {
+    var length = word.length;
+    if (length >= 4 && /ות$/.test(word)) {
+      return word.slice(0, -2) + 'ה';
+    }
+    if (length >= 4 && /ימ$/.test(word)) {
+      return word.slice(0, -2);
+    }
+    if (length > 3 && /ת$/.test(word)) {
+      return word.slice(0, -1) + 'ה';
+    }
+    if (length > 3 && /י$/.test(word)) {
+      return word.slice(0, -1);
+    }
+    return word;
+  }
+
+  /** The kinds a query asks for among those found: named by its first word that names any. */
+  function queryKinds(query, present, kinds) {
+    return asked(query, present, kinds).kinds;
+  }
+
+  /** The first word of a title that can say what the product is, as kindKey compares it; null when none. */
+  function titleKey(title) {
+    var words = normalize(title).split(' ');
+    for (var w = 0; w < words.length; w++) {
+      var word = words[w];
+      if (word.length >= 2 && TIER_SKIP.indexOf(word) === -1 && !/\d/.test(word) && !/^[a-z]+$/.test(word)) {
+        return kindKey(word);
+      }
+    }
+    return null;
+  }
+
+  /** The kinds asked for, and the word that named them. */
+  function asked(query, present, kinds) {
+    var words = normalize(query).split(' ');
+    for (var w = 0; w < words.length; w++) {
+      var word = words[w];
+      if (word.length < 2 || TIER_SKIP.indexOf(word) !== -1 || /\d/.test(word)) {
+        continue;
+      }
+      var key = kindKey(word);
+      var found = {};
+      var any = false;
+      present.forEach(function (kind) {
+        var heads = (kinds && kinds[kind] && kinds[kind].h) || [];
+        for (var h = 0; h < heads.length; h++) {
+          if (kindKey(String(heads[h])) === key) {
+            found[kind] = true;
+            any = true;
+            break;
+          }
+        }
+      });
+      if (any) {
+        return { kinds: found, key: key };
+      }
+    }
+    return { kinds: {}, key: null };
+  }
+
+  /**
+   * The products found in tiers: of the kind asked for and holding every word, of that kind, then
+   * the rest; the rest left out when the first two fill the first screen, otherwise from `related`
+   * on. Nothing changes when the query names no kind found. As on the server (HebrewSearch::tiers).
+   */
+  function tiers(records, full, query, kinds, firstScreen) {
+    var ids = records.map(function (r) { return String(r.id); });
+    var present = [];
+    records.forEach(function (r) {
+      if (r.k !== undefined && r.k !== null && present.indexOf(String(r.k)) === -1) {
+        present.push(String(r.k));
+      }
+    });
+    var named = asked(query, present, kinds);
+    var askedKinds = named.kinds;
+    if (!Object.keys(askedKinds).length) {
+      return { ids: ids, related: null };
+    }
+    var whole = [];
+    var some = [];
+    var rest = [];
+    records.forEach(function (r) {
+      var id = String(r.id);
+      // Of the kind asked for, or calling itself by the word that asked.
+      var byName = r.title !== undefined && r.title !== null && titleKey(String(r.title)) === named.key;
+      if ((r.k !== undefined && r.k !== null && askedKinds[String(r.k)]) || byName) {
+        (full[id] ? whole : some).push(id);
+      } else {
+        rest.push(id);
+      }
+    });
+    var main = whole.concat(some);
+    if (!rest.length || main.length >= firstScreen) {
+      return { ids: main, related: null };
+    }
+    return { ids: main.concat(rest), related: main.length };
+  }
+
   // ---------------------------------------------------------------- Shopify helpers (pure, tested in node)
 
   /**
@@ -974,6 +1080,7 @@
           state.index = build(source);
           state.codes = codes(data.items);
           state.facets = data.facets || [];
+          state.kinds = data.kinds || {};
           state.size = data.size || null;
           state.actions = data.actions || [];
           attachAll();
@@ -1903,9 +2010,23 @@
       }
 
       var picked = chosenFor(raw);
+      // Only what is in stock when the shop asks and something found is; the rest behind a chip.
+      var shelved = shelve(pool, picked);
+      pool = shelved.pool;
+      // "פלטת עץ": the boards, then a caster "עם פלטה" only as related (tiers, as on the server).
+      var full = {};
+      hits.forEach(function (hit) { if (hit.full) { full[hit.id] = true; } });
+      var tiered = tiers(pool, full, raw, state.kinds || {}, max);
+      var byPool = {};
+      pool.forEach(function (record) { byPool[record.id] = record; });
+      var ordered = tiered.ids.map(function (id) { return byPool[id]; });
+      pool = tiered.related === null ? ordered : ordered.slice(0, tiered.related);
+      var relatedRecords = tiered.related === null ? [] : ordered.slice(tiered.related);
       var view = viewOf(pool, picked);
       total = view.length;
       products = view.slice(0, max);
+      // Related only to fill the first screen, and only while nothing is chosen.
+      var related = chosenAny(picked) ? [] : relatedRecords.slice(0, Math.max(0, max - products.length));
 
       // A product code, or the only product that holds every word: that product alone and clearly,
       // the rest only when the shopper asks for similar items. As on the server (HebrewSearch::single).
@@ -1958,7 +2079,7 @@
 
       if (one) {
         main.appendChild(oneSuggestion(one, raw, oneHit.by, others));
-      } else if (!products.length && !categories.length && !articles.length && !answers.length && !question) {
+      } else if (!products.length && !related.length && !categories.length && !articles.length && !answers.length && !question) {
         var empty = el('div', 'd-empty');
         empty.appendChild(el('span', null, label('no_results', { query: raw.trim() })));
         empty.appendChild(el('span', 'muted', label('try_other')));
@@ -1972,6 +2093,7 @@
       }
 
       // Quick filters for what was found: a choice shows the products again, as chosen.
+      picked.outCount = shelved.out.length;
       var bar = one ? null : filterBar(pool, picked, function () { suggest(input); });
       if (bar) {
         main.appendChild(bar);
@@ -1987,6 +2109,15 @@
         }
         main.appendChild(grid);
         fillPrices(grid, products);
+      }
+      if (!one && related.length) {
+        main.appendChild(el('h4', 'd-h', label('related_products')));
+        var also = el('div', d.mobile ? 'm-list' : 'd-prods');
+        for (var rp = 0; rp < related.length; rp++) {
+          also.appendChild(productRow(related[rp], raw));
+        }
+        main.appendChild(also);
+        fillPrices(also, related);
       }
 
       // A site of articles and pages, or a search that found no product: the articles and pages
@@ -2163,14 +2294,34 @@
     // ---------------------------------------------------------------- filters beside the results
 
     /** What the shopper chose beside the results of this query; a new query starts with nothing chosen. */
-    var chosen = { key: null, sort: null, sale: false, stock: false, f: {} };
+    var chosen = { key: null, sort: null, sale: false, stock: false, out: false, f: {} };
 
     function chosenFor(raw) {
       var key = normalize(raw);
       if (chosen.key !== key) {
-        chosen = { key: key, sort: null, sale: false, stock: false, f: {} };
+        chosen = { key: key, sort: null, sale: false, stock: false, out: false, f: {} };
       }
       return chosen;
+    }
+
+    function chosenAny(c) {
+      return !!(c.sort || c.sale || c.stock || c.out || Object.keys(c.f).length);
+    }
+
+    /**
+     * Only what is in stock, when the shop asks for it (inStockOnly) and something found is; the
+     * rest is kept for the "out of stock too" chip. As on the server.
+     */
+    function shelve(pool, c) {
+      if (!state.config.inStockOnly) {
+        return { pool: pool, out: [] };
+      }
+      var inStock = pool.filter(function (r) { return r.s === 1; });
+      if (!inStock.length || inStock.length === pool.length) {
+        return { pool: pool, out: [] };
+      }
+      var out = pool.filter(function (r) { return r.s !== 1; });
+      return { pool: c.out ? inStock.concat(out) : inStock, out: out };
     }
 
     /**
@@ -2207,8 +2358,8 @@
       // What is left after what was chosen: only the tags that still find something, and split it.
       var left = viewOf(pool, c);
       var n = left.length;
-      var chosenAny = c.sort || c.sale || c.stock || Object.keys(c.f).length;
-      if (n < 2 && !chosenAny) {
+      var anyChosen = chosenAny(c);
+      if (n < 2 && !anyChosen && !c.outCount) {
         return null;
       }
       var chips = [];
@@ -2231,10 +2382,23 @@
         (record.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; });
       });
       // The type goes after the attributes: "טבעת" is rarely what a search for rings narrows by.
+      // The others in the order the first results speak of them: for pine wood, treated or not and
+      // its colour before what one product of twelve has.
       var typeAt = (state.facets || []).map(function (facet) { return facet.k; }).indexOf('type');
+      var first = {};
+      left.slice(0, 12).forEach(function (record) {
+        var seen = {};
+        (record.f || []).forEach(function (code) {
+          var at = Math.floor(code / 1000);
+          if (!seen[at]) {
+            seen[at] = true;
+            first[at] = (first[at] || 0) + 1;
+          }
+        });
+      });
       var group = function (code) {
         var at = Math.floor(code / 1000);
-        return at === typeAt ? 999 : at;
+        return at === typeAt ? 100000 : (13 - (first[at] || 0)) * 1000 + at;
       };
       Object.keys(counts).map(Number)
         .filter(function (code) { return c.f[code] || counts[code] < n; })
@@ -2267,6 +2431,10 @@
           chips.push({ on: c[flag[1]], text: text, group: 'more', go: function () { c[flag[1]] = !c[flag[1]]; } });
         }
       });
+      // What the shop hides as out of stock, on request.
+      if (c.out || c.outCount) {
+        chips.push({ on: !!c.out, text: label('out_of_stock_too'), group: 'more', go: function () { c.out = !c.out; } });
+      }
       if (!chips.length) {
         return null;
       }
@@ -2306,6 +2474,7 @@
           c.sort = null;
           c.sale = false;
           c.stock = false;
+          c.out = false;
           c.f = {};
           changed();
         });
@@ -4013,9 +4182,24 @@
             pool.push(record);
           }
         });
+        // The server's tiers: from `related` on, the related products, apart and after.
+        var relatedAt = result && typeof result.related === 'number' ? result.related : null;
+        var relatedPool = relatedAt === null ? [] : pool.slice(relatedAt);
+        pool = relatedAt === null ? pool : pool.slice(0, relatedAt);
+        // What the server kept out as out of stock, for the chip.
+        var outPool = [];
+        ((result && result.out_of_stock) || []).forEach(function (id) {
+          var record = state.records[id];
+          if (record && record.t === 'product' && !byRecord[id]) {
+            byRecord[id] = presented(record);
+            outPool.push(record);
+          }
+        });
         var page = drawerMode() ? 6 : 24;
         var showing = page;
         var picked = chosenFor(raw);
+        picked.outCount = outPool.length;
+        var shown = function () { return picked.out ? pool.concat(outPool) : pool; };
         var barAt = el('div');
         section.appendChild(barAt);
         var grid = el('div', 'grid');
@@ -4030,12 +4214,24 @@
             moreAt.removeChild(moreAt.firstChild);
           }
           var ids = [];
-          var view = viewOf(pool, picked);
+          var view = viewOf(shown(), picked);
           view.slice(0, showing).forEach(function (record) {
             var item = byRecord[record.id];
             grid.appendChild(card(item, raw));
             ids.push(item.external_id);
           });
+          // The related products after all of these, under their own heading, while nothing is chosen.
+          if (view.length <= showing && relatedPool.length && !chosenAny(picked)) {
+            moreAt.appendChild(el('h3', 'la-related-h', label('related_products')));
+            var also = el('div', 'grid');
+            relatedPool.slice(0, page).forEach(function (record) {
+              var item = byRecord[record.id];
+              also.appendChild(card(item, raw));
+              ids.push(item.external_id);
+            });
+            moreAt.appendChild(also);
+            liveProducts(ids).then(function () { updateCards(also); });
+          }
           // A page at a time; the rest on request.
           if (view.length > showing) {
             var more = el('button', 'more', label('show_more'));
@@ -4053,7 +4249,7 @@
           while (barAt.firstChild) {
             barAt.removeChild(barAt.firstChild);
           }
-          var bar = one ? null : filterBar(pool, picked, refresh);
+          var bar = one ? null : filterBar(shown(), picked, refresh);
           if (bar) {
             barAt.appendChild(bar);
           }
@@ -5236,6 +5432,10 @@
     readActions: readActions,
     either: either,
     applyActions: applyActions,
+    kindKey: kindKey,
+    queryKinds: queryKinds,
+    titleKey: titleKey,
+    tiers: tiers,
     handleFromUrl: handleFromUrl,
     formatMoney: formatMoney,
     fromShopifyProduct: fromShopifyProduct,

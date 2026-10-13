@@ -55,6 +55,8 @@ final class SearchIndexController
             'dropdown' => (string) Settings::get('search.dropdown_layout', $shopId),
             'suggestions' => (int) Settings::get('search.suggestions', $shopId),
             'perGroup' => (int) Settings::get('search.results_per_group', $shopId),
+            // What is out of stock waits behind a button, unless nothing found is in stock.
+            'inStockOnly' => (bool) Settings::get('search.in_stock_only', $shopId),
             // The camera shows only where the shop's pictures already have vectors.
             'photos' => Features::enabled('search.photos', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
             'photoMaxKb' => (int) Settings::get('search.photo_max_kb'),
@@ -95,6 +97,7 @@ final class SearchIndexController
             'items' => $data['items'] ?? [],
             // The filters beside the results and the phrases that are actions (BuildSearchIndex).
             'facets' => $data['facets'] ?? [],
+            'kinds' => (object) ($data['kinds'] ?? []),
             'size' => $data['size'] ?? null,
             'actions' => $data['actions'] ?? [],
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

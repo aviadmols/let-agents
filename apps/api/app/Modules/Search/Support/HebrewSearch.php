@@ -274,6 +274,141 @@ final class HebrewSearch
         return count($sides) > 1 ? $sides : [$query];
     }
 
+    /** Words of a query that name no kind of product: "סט ביטים" is about bits, "מארז ברגים" about screws. */
+    public const TIER_SKIP = ['סט', 'מארז', 'ערכה', 'ערכת', 'זוג', 'חבילה', 'חבילת', 'מבצע', 'set', 'kit', 'pack'];
+
+    /**
+     * A normalized word as kinds are compared: "פלטת" and "פלטות" as "פלטה", "גלגלים" as "גלגל",
+     * "סרגלי" as "סרגל", "עצים" as "עץ". "מברג" stays apart from "מברגה". The same in the browser.
+     */
+    public static function kindKey(string $word): string
+    {
+        $length = mb_strlen($word);
+
+        return match (true) {
+            $length >= 4 && str_ends_with($word, 'ות') => mb_substr($word, 0, -2).'ה',
+            $length >= 4 && str_ends_with($word, 'ימ') => mb_substr($word, 0, -2),
+            $length > 3 && str_ends_with($word, 'ת') => mb_substr($word, 0, -1).'ה',
+            $length > 3 && str_ends_with($word, 'י') => mb_substr($word, 0, -1),
+            default => $word,
+        };
+    }
+
+    /**
+     * The kinds a query asks for, among the kinds of the products found: those named by the first
+     * word of the query that names any (a brand, "סט" or a model number before it name none).
+     *
+     * @param  list<string>  $present  kinds of the products found
+     * @param  array<string, array{l?: string, h?: list<string>}>  $kinds  each kind's name and the words that head it
+     * @return array<string, true>
+     */
+    public static function queryKinds(string $query, array $present, array $kinds): array
+    {
+        return self::asked($query, $present, $kinds)['kinds'];
+    }
+
+    /**
+     * The first word of a title that can say what the product is: not "סט", a number or a Latin
+     * brand or model, as kindKey compares it. Null when there is none.
+     */
+    public static function titleKey(string $title): ?string
+    {
+        foreach (explode(' ', self::normalize($title)) as $word) {
+            if (mb_strlen($word) >= 2 && ! in_array($word, self::TIER_SKIP, true) && preg_match('/\d/u', $word) !== 1 && preg_match('/^[a-z]+$/u', $word) !== 1) {
+                return self::kindKey($word);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $present
+     * @param  array<string, array{l?: string, h?: list<string>}>  $kinds
+     * @return array{kinds: array<string, true>, key: string|null} the kinds asked for, and the word that named them
+     */
+    private static function asked(string $query, array $present, array $kinds): array
+    {
+        foreach (explode(' ', self::normalize($query)) as $word) {
+            if (mb_strlen($word) < 2 || in_array($word, self::TIER_SKIP, true) || preg_match('/\d/u', $word) === 1) {
+                continue;
+            }
+
+            $key = self::kindKey($word);
+            $found = [];
+
+            foreach ($present as $kind) {
+                foreach ((array) ($kinds[$kind]['h'] ?? []) as $head) {
+                    if (self::kindKey((string) $head) === $key) {
+                        $found[$kind] = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($found !== []) {
+                return ['kinds' => $found, 'key' => $key];
+            }
+        }
+
+        return ['kinds' => [], 'key' => null];
+    }
+
+    /**
+     * The products found, in tiers: of the kind the query asks for and holding every word, of that
+     * kind without them, then the rest. "פלטת עץ" shows the boards, then a caster "עם פלטה" only as
+     * related. The rest is left out when the first two fill the first screen, and otherwise follows
+     * from `related` on. Nothing changes when the query names no kind found. The same in the browser.
+     *
+     * @param  list<array<string, mixed>>  $records  products, in order, each with its id and kind (k)
+     * @param  array<string, bool>  $full  ids of the products holding every word
+     * @param  array<string, array{l?: string, h?: list<string>}>  $kinds
+     * @return array{ids: list<string>, related: int|null}
+     */
+    public static function tiers(array $records, array $full, string $query, array $kinds, int $firstScreen): array
+    {
+        $ids = array_map(fn (array $r): string => (string) $r['id'], $records);
+        $present = [];
+        foreach ($records as $record) {
+            if (isset($record['k'])) {
+                $present[(string) $record['k']] = true;
+            }
+        }
+
+        ['kinds' => $asked, 'key' => $key] = self::asked($query, array_keys($present), $kinds);
+
+        if ($asked === []) {
+            return ['ids' => $ids, 'related' => null];
+        }
+
+        [$whole, $some, $rest] = [[], [], []];
+        foreach ($records as $record) {
+            $id = (string) $record['id'];
+
+            // Of the kind asked for, or calling itself by the word that asked ("עץ אורן דו שכבתי" is a
+            // beam by its type, and pine wood by its own name).
+            $named = isset($record['title']) && self::titleKey((string) $record['title']) === $key;
+
+            if ((isset($record['k']) && isset($asked[(string) $record['k']])) || $named) {
+                if (! empty($full[$id])) {
+                    $whole[] = $id;
+                } else {
+                    $some[] = $id;
+                }
+            } else {
+                $rest[] = $id;
+            }
+        }
+
+        $main = [...$whole, ...$some];
+
+        if ($rest === [] || count($main) >= $firstScreen) {
+            return ['ids' => $main, 'related' => null];
+        }
+
+        return ['ids' => [...$main, ...$rest], 'related' => count($main)];
+    }
+
     private static function replaceFirst(string $text, string $find, string $with): string
     {
         $at = strpos($text, $find);

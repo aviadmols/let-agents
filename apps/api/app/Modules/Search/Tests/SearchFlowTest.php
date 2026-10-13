@@ -55,6 +55,8 @@ final class SearchFlowTest extends TestCase
         LoadedIndex::forget();
 
         $this->shop = Shop::factory()->create();
+        // These tests read the order of what is found; hiding what is out of stock is tested on its own.
+        Settings::set('search.in_stock_only', false, $this->shop->id);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => 'https://www.store.test', 'access_token' => self::TOKEN,
         ]));

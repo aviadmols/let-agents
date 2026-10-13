@@ -97,4 +97,6 @@ return [
     'columns_one' => 'תמונה אחת בשורה',
     'columns_two' => 'שתי תמונות בשורה',
     'sorted_by' => 'מסודר: :label',
+    'related_products' => 'מוצרים נלווים',
+    'out_of_stock_too' => 'גם מה שאזל מהמלאי',
 ];
