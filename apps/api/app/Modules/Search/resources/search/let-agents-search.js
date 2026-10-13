@@ -2364,6 +2364,10 @@
       if (match) {
         pic.appendChild(el('span', 'd-match', label('photo_match', { match: match })));
       }
+      // The large cards have room for the heart and the compare box; a small thumbnail has not.
+      if (state.config && state.config.dropdown === 'grid' && !narrow()) {
+        shortlisted(pic, { external_id: String(record.id).slice(2), title: record.title, image: record.img, url: record.url });
+      }
       link.appendChild(pic);
       var info = el('span', 'd-info');
       info.appendChild(el('span', 'd-name', record.title));

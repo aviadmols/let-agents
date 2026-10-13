@@ -133,6 +133,8 @@
     button.setAttribute('style', ROUND);
     button.innerHTML = kind === 'wish' ? HEART : SCALES;
     button.setAttribute('data-la-shortlist', kind);
+    // The search box keeps its focus, so the suggestions around the card stay open.
+    button.addEventListener('mousedown', function (event) { event.preventDefault(); });
     button.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -345,7 +347,13 @@
       }
       anchor.parentNode.insertBefore(row, anchor.nextSibling);
     };
-    pageProductId(null) ? place(null) : withPaths(place);
+    // Shopify and WooCommerce say on the page which product it is; their other pages need no lookup.
+    var platformPage = !!(win.ShopifyAnalytics && win.ShopifyAnalytics.meta) || /(?:^|\s)woocommerce(?:-page)?(?:\s|$)/.test(doc.body.className);
+    if (pageProductId(null)) {
+      place(null);
+    } else if (!platformPage) {
+      withPaths(place);
+    }
   }
 
   // ---- Our own surface: tray, table, drawer --------------------------------------------------
