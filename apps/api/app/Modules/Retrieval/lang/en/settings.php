@@ -111,6 +111,10 @@ return [
         'label' => 'Largest picture',
         'description' => 'A bigger picture is skipped and marked.',
     ],
+    'image_fetch_width' => [
+        'label' => 'Width of a picture read from Shopify',
+        'description' => 'Pictures on Shopify are read resized to this width (pixels), so none is too big and the scan is faster. 0: the original picture.',
+    ],
     'min_look_alike' => [
         'label' => 'Minimum visual likeness',
         'description' => 'Below this a product is not offered as looking alike.',

@@ -14,6 +14,7 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\ModelChoice;
+use App\Modules\Retrieval\Support\PictureAddress;
 use App\Modules\Retrieval\Support\VectorSearch;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -209,7 +210,7 @@ Describe this product photo.';
     private function fetch(RetrievalImage $image): ?array
     {
         try {
-            $response = Http::timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get($image->image_url);
+            $response = Http::timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get(PictureAddress::fetchable($image->image_url));
         } catch (ConnectionException) {
             return null;
         }

@@ -13,6 +13,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Models\RetrievalGalleryImage;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\ModelChoice;
+use App\Modules\Retrieval\Support\PictureAddress;
 use App\Modules\Retrieval\Support\PictureTrim;
 use App\Modules\Retrieval\Support\VectorSearch;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -388,7 +389,7 @@ final class BuildImageIndex
         $maxBytes = (int) Settings::get('retrieval.image_max_kb') * 1024;
 
         try {
-            $response = Http::timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get($row->image_url);
+            $response = Http::timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get(PictureAddress::fetchable($row->image_url));
         } catch (ConnectionException) {
             return $this->failed($row, 'unreachable');
         }
