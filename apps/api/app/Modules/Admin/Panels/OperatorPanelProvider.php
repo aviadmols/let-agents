@@ -7,6 +7,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\CurrentShop;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Icons\Heroicon;
@@ -92,8 +93,9 @@ final class OperatorPanelProvider extends PanelProvider
     private static function viewAsUrl(): ?string
     {
         $id = CurrentShop::effective();
-        $slug = $id === null ? null : Shop::query()->whereKey($id)->value('slug');
+        $shop = $id === null ? null : Shop::query()->find($id);
 
-        return $slug === null ? null : url('/'.User::MERCHANT_PANEL.'/'.$slug);
+        // The panel's own address for the shop: its subdomain where shops have one ({slug}.shop_domain).
+        return $shop === null ? null : Filament::getPanel(User::MERCHANT_PANEL)->getUrl($shop);
     }
 }
