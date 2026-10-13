@@ -1469,6 +1469,8 @@
       '.d.big .d-prod{grid-template-columns:1fr;align-items:start;gap:10px}',
       '.d.big .d-pic{width:100%;height:auto;aspect-ratio:1/1}',
       '.d.big .d-row{display:grid;gap:6px}',
+      // On the large cards "similar items" goes under the price, never over it.
+      '.d.big .d-sim{position:static;justify-self:start;margin-top:2px}',
       '.la-bar{display:flex;align-items:center;gap:8px;padding:12px max(16px,calc(50vw - 520px));background:var(--rs-bg,#fff);box-shadow:0 2px 14px rgba(0,0,0,.12)}',
       '.la-bar .m-box input{font-size:17px}',
       '.la-bar-x{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:999px;color:var(--rs-fg)}',
