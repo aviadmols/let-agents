@@ -11,4 +11,5 @@ return [
     'import_relation_rules' => 'שמירת כללי התאמה',
     'discover_schema' => 'ספירת מדגם מוצרים',
     'propose_schema' => 'כתיבת אוצר מילים ובדיקתו',
+    'reread_products' => 'קריאה חוזרת של מוצרים שחסר להם פרט',
 ];

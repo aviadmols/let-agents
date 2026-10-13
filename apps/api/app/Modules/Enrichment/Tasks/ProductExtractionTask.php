@@ -76,7 +76,11 @@ final class ProductExtractionTask implements AgentTask
 
         $batch->forceFill(['scope' => ($batch->scope ?? []) + ['boilerplate' => $boilerplate]])->save();
 
-        foreach (VocabularyBranch::products($vocabulary)->lazyById(200) as $product) {
+        // Some products only, read again whatever was read before: what the gaps screen sends.
+        $only = array_values(array_map('strval', (array) ($batch->scope['products'] ?? [])));
+        $products = VocabularyBranch::products($vocabulary)->when($only !== [], fn ($q) => $q->whereIn('id', $only));
+
+        foreach ($products->lazyById(200) as $product) {
             $digest = ProductDigest::build($product, $vocabulary, $maxChars, $batch->prompt_hash, $boilerplate, $this->known($product->id, $vocabulary));
 
             if (! $includeDone && $this->alreadyRead($product->id, $digest->inputHash)) {

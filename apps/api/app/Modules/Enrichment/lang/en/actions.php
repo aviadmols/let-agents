@@ -11,4 +11,5 @@ return [
     'import_relation_rules' => 'Matching rules saved',
     'discover_schema' => 'Counting a sample of products',
     'propose_schema' => 'Writing and reviewing a vocabulary',
+    'reread_products' => 'Reading again products missing a detail',
 ];
