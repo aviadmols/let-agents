@@ -22,7 +22,9 @@ use App\Modules\Enrichment\Actions\RunNightlyReading;
 use App\Modules\Enrichment\Enums\TaskType;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Enrichment\Scanning\WordAudit;
 use App\Modules\Enrichment\Support\TaskFile;
+use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Console\Command;
@@ -41,7 +43,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, vocabulary, schema, code, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, vocabulary, schema, code, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results}
         {--template= : vocabulary template name}
@@ -67,6 +69,8 @@ final class EnrichmentCommand extends Command
             'nightly' => $this->shopStep(fn (Shop $shop): Run => app(RunNightlyReading::class)->handle($shop->id), 'enrichment.nightly'),
             'rankings' => $this->rankings(),
             'code' => $this->shopStep(fn (Shop $shop): Run => app(ReadProductsInCode::class)->handle($shop->id)),
+            // Read only: where the vocabulary's words would mislead code (WordAudit).
+            'words' => $this->words(),
             // The shop's own vocabulary: counted in code, then written and reviewed, for the operator to approve.
             'schema' => $this->shopStep(function (Shop $shop): Run {
                 ['run' => $run, 'proposal' => $proposal] = app(DiscoverSchema::class)->handle($shop->id);
@@ -230,6 +234,28 @@ final class EnrichmentCommand extends Command
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function words(): int
+    {
+        $shop = $this->shop();
+
+        if (! $shop) {
+            return $this->failWith('Shop not found.');
+        }
+
+        return app(TenantContext::class)->run($shop->id, function (): int {
+            foreach (EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get() as $vocabulary) {
+                $audit = WordAudit::of($vocabulary->definition(), VocabularyBranch::products($vocabulary->definition())->with('categories')->lazy(200));
+                $this->info("{$vocabulary->key} v{$vocabulary->version}");
+                $this->line('Found only inside longer words (code passes over these):');
+                $this->table(['attribute', 'value', 'word', 'products', 'example'], array_map(fn (array $r): array => [$r['attribute'], $r['value'], $r['word'], $r['products'], $r['example']], $audit['inside']));
+                $this->line('Names that group several values (code decides nothing from them):');
+                $this->table(['attribute', 'name', 'values', 'products'], array_map(fn (array $r): array => [$r['attribute'], $r['name'], implode(', ', $r['values']), $r['products']], $audit['groups']));
+            }
+
+            return self::SUCCESS;
+        });
     }
 
     private function shop(): ?Shop

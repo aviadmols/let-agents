@@ -2,10 +2,12 @@
 
 namespace App\Modules\Enrichment\Tests;
 
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\ImportVocabulary;
 use App\Modules\Enrichment\Scanning\BrandResolver;
 use App\Modules\Enrichment\Scanning\CodeReading;
 use App\Modules\Enrichment\Scanning\PatternMatch;
+use App\Modules\Enrichment\Scanning\WordAudit;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,5 +76,14 @@ final class WholeWordReadingTest extends TestCase
         $this->assertNotContains('sapphire', $stones($spiral), 'ספירלה is a spiral');
         $this->assertEqualsCanonicalizing(['diamond', 'ruby'], $stones($ruby), 'the collection names three stones; the title names the ruby and the diamonds, no sapphire, no emerald');
         $this->assertContains('sapphire', $stones($listed), 'a store attribute listing its stones describes this one');
+
+        // The operator's check finds both, across the catalog, before code is misled.
+        $audit = $this->inShop(fn () => WordAudit::of($jewelry, CatalogProduct::query()->with('categories')->get()));
+        $spiralRow = collect($audit['inside'])->firstWhere('word', 'ספירלה');
+        $this->assertSame(['stone', 'sapphire', 1], [$spiralRow['attribute'], $spiralRow['value'], $spiralRow['products']]);
+        $group = collect($audit['groups'])->firstWhere('name', 'ספיר, רובי, אמרלד');
+        // The ruby ring is filed in it (the third product's own payload carries no categories).
+        $this->assertSame(['stone', 1], [$group['attribute'], $group['products']]);
+        $this->assertEqualsCanonicalizing(['sapphire', 'ruby', 'emerald'], $group['values']);
     }
 }
