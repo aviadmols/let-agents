@@ -2144,6 +2144,9 @@
   function renderAssistant(block, labels, live) {
     var host = el('div', 'let-agents-widget');
     host.setAttribute('data-let-agents', PAGE_TYPE);
+    // Its content is in the shadow root, so to the theme it is an empty div, and themes like Dawn hide
+    // every empty div (div:empty { display: none }). Said on the element itself, that rule loses.
+    host.style.display = 'block';
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var style = el('style');
     style.textContent = CSS + ASSISTANT_CSS;
@@ -2321,6 +2324,8 @@
 
     var host = el('div', 'let-agents-widget');
     host.setAttribute('data-let-agents', PAGE_TYPE);
+    // Not taken for an empty div by the theme (div:empty { display: none }).
+    host.style.display = 'block';
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
 
     var style = el('style');

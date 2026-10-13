@@ -1343,6 +1343,8 @@
         }
         pickerHost = doc.createElement('div');
         pickerHost.setAttribute('data-let-agents-variants', '');
+        // Not taken for an empty div by the theme (div:empty { display: none }).
+        pickerHost.style.display = 'block';
         var root = pickerHost.attachShadow({ mode: 'open' });
         var style = doc.createElement('style');
         style.textContent = [
@@ -1939,6 +1941,9 @@
     function shadowHost(id) {
       var host = doc.createElement('div');
       host.id = id;
+      // Its content is in the shadow root, so to the theme it is an empty div, and themes like Dawn hide
+      // every empty div (div:empty { display: none }). Said on the element itself, that rule loses.
+      host.style.display = 'block';
       theme(host);
       var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
       var style = doc.createElement('style');
