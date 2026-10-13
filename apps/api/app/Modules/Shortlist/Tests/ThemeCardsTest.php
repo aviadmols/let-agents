@@ -13,7 +13,7 @@ use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Shortlist\Actions\FindThemeCards;
-use App\Modules\Shortlist\Filament\Merchant\Pages\Shortlists;
+use App\Modules\Shortlist\Filament\Merchant\Pages\Wishlist;
 use App\Modules\Shortlist\Support\ThemeCards;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -86,7 +86,7 @@ final class ThemeCardsTest extends TestCase
         // Code finds them: no model.
         $this->page = $this->wooPage();
         Http::fake(fn () => Http::response($this->page, $this->status));
-        Livewire::test(Shortlists::class)->call('findCards')->assertSet('data.card_selector', '.product-card');
+        Livewire::test(Wishlist::class)->call('findCards')->assertSet('data.card_selector', '.product-card');
         $this->assertSame(0, $this->asked);
         Http::assertSent(fn ($request): bool => $request->url() === 'https://shop.test/products/boards/');
 

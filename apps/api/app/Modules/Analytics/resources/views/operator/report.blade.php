@@ -2,6 +2,14 @@
     @php($report = $this->report())
     @php($pct = fn ($v) => $v === null ? '–' : number_format($v * 100, 1).'%')
 
+    @if ($this->tabs() !== [])
+        <nav class="la-tabs" style="padding: 0; margin-block-end: 16px" aria-label="{{ __('analytics::analytics.title') }}">
+            @foreach ($this->tabs() as $tab)
+                <a href="{{ $tab['url'] }}" @if ($tab['current']) aria-current="page" @endif>{{ $tab['label'] }}</a>
+            @endforeach
+        </nav>
+    @endif
+
     <div class="la-toolbar">
         @if ($this->picksShop())
             <select wire:model.live="shop" class="la-select" aria-label="{{ __('analytics::analytics.shop') }}" style="min-width:220px">

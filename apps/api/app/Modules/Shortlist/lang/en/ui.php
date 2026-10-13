@@ -2,6 +2,10 @@
 
 return [
     'title' => 'Compare and wishlist',
+    'wishlist_title' => 'Wishlist',
+    'wishlist_subheading' => 'The heart on every product: where it shows, who saved what, and which products are loved most.',
+    'compare_title' => 'Compare products',
+    'compare_subheading' => 'The compare box on every product: whether it is on, where it shows, and what is compared most.',
     'subheading' => 'A compare button and a heart on every product: whether they are on, where they show, and what shoppers do with them.',
     'settings' => 'What is on',
     'settings_help' => 'Both stay off until they are switched on here. A change reaches shoppers within a few minutes.',

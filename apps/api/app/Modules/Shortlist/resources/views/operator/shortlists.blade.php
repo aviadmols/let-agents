@@ -3,11 +3,10 @@
     @php($n = $this->numbers())
 
     <style>
-        .lsl{--lsl-line:#e5e7eb;--lsl-soft:#f3f4f6;--lsl-card:#fff;--lsl-muted:#6b7280;--lsl-on:#0f766e}
-        .dark .lsl{--lsl-line:#3f3f46;--lsl-soft:#27272a;--lsl-card:#18181b;--lsl-muted:#a1a1aa;--lsl-on:#14b8a6}
-        .lsl{display:grid;gap:18px}
-        .lsl-card{background:var(--lsl-card);border:1px solid var(--lsl-line);border-radius:14px;padding:20px 22px}
-        .lsl-card h2{font-size:17px;font-weight:700;margin:0 0 4px}
+        .lsl{--lsl-line:var(--la-line,#e6e6e1);--lsl-soft:var(--la-sunk,#fafaf8);--lsl-card:var(--la-paper,#fff);--lsl-muted:var(--la-muted,#6b7280);--lsl-on:var(--la-accent,#3b5bdb)}
+                .lsl{display:grid;gap:18px}
+        .lsl-card{background:var(--lsl-card);border:1px solid var(--lsl-line);border-radius:12px;box-shadow:var(--la-shadow);padding:20px 22px}
+        .lsl-card h2{font-size:15px;font-weight:600;margin:0 0 4px}
         .lsl-help{color:var(--lsl-muted);font-size:13.5px;margin:0}
         .lsl-row{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--lsl-line)}
         .lsl-row:first-of-type{border-top:0}
@@ -20,12 +19,12 @@
         .lsl-sw span:after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:inset-inline-start .2s}
         .lsl-sw input:checked+span{background:var(--lsl-on)}
         .lsl-sw input:checked+span:after{inset-inline-start:23px}
-        .lsl-field{width:100%;box-sizing:border-box;border:1px solid var(--lsl-line);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;background:var(--lsl-card);color:inherit;margin-top:8px}
+        .lsl-field{width:100%;box-sizing:border-box;border:1px solid var(--lsl-line);border-radius:8px;padding:9px 12px;font:inherit;font-size:14px;background:var(--lsl-card);color:inherit;margin-top:8px}
         .lsl-field.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;direction:ltr;text-align:left}
         .lsl-field.num{width:110px}
         .lsl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
-        .lsl-stat{border:1px solid var(--lsl-line);border-radius:12px;padding:12px 14px}
-        .lsl-stat b{display:block;font-size:24px;font-weight:700}
+        .lsl-stat{border:1px solid var(--lsl-line);border-radius:12px;padding:16px 18px;background:var(--lsl-card)}
+        .lsl-stat b{display:block;font-size:28px;font-weight:600;line-height:1.1}
         .lsl-stat span{color:var(--lsl-muted);font-size:13px}
         .lsl-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
         .lsl-item{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--lsl-line)}
@@ -33,7 +32,7 @@
         .lsl-item img,.lsl-item .ph{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--lsl-soft);flex:none}
         .lsl-item a{flex:1;min-width:0;color:inherit;text-decoration:none;font-size:14px}
         .lsl-item em{font-style:normal;font-weight:700}
-        .lsl-save{border:0;border-radius:999px;padding:9px 20px;font:inherit;font-weight:600;cursor:pointer;background:#111827;color:#fff}
+        .lsl-save{border:0;border-radius:8px;padding:0 16px;height:36px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;background:var(--lsl-on);color:#fff}
     </style>
 
     <div class="lsl">
@@ -52,6 +51,7 @@
                 <h2>{{ $t('settings') }}</h2>
                 <p class="lsl-help">{{ $t('settings_help') }}</p>
 
+                @if ($this->shows('compare'))
                 <div class="lsl-row" style="margin-top:8px">
                     <div class="lsl-rt"><b>{{ __('shortlist::features.compare.label') }}</b><small>{{ __('shortlist::features.compare.description') }}</small></div>
                     <label class="lsl-sw"><input type="checkbox" wire:model.live="data.compare" data-switch="compare"><span></span></label>
@@ -62,7 +62,9 @@
                         <input type="number" min="2" max="5" wire:model="data.compare_max" class="lsl-field num">
                     </div>
                 @endif
+                @endif
 
+                @if ($this->shows('wishlist'))
                 <div class="lsl-row">
                     <div class="lsl-rt"><b>{{ __('shortlist::features.wishlist.label') }}</b><small>{{ __('shortlist::features.wishlist.description') }}</small></div>
                     <label class="lsl-sw"><input type="checkbox" wire:model.live="data.wishlist" data-switch="wishlist"><span></span></label>
@@ -109,6 +111,7 @@
                         </div>
                     </div>
                 @endif
+                @endif
 
                 @if (($data['compare'] ?? false) || ($data['wishlist'] ?? false))
                     <div class="lsl-row">
@@ -139,13 +142,18 @@
             <div class="lsl-card">
                 <h2>{{ $t('numbers', ['days' => \App\Modules\Shortlist\Filament\Operator\Pages\Shortlists::DAYS]) }}</h2>
                 <div class="lsl-stats">
+                    @if ($this->shows('wishlist'))
                     <div class="lsl-stat" data-stat="lists"><b>{{ number_format($n['lists']) }}</b><span>{{ $t('stat_lists') }}</span></div>
                     <div class="lsl-stat" data-stat="accounts"><b>{{ number_format($n['accounts']) }}</b><span>{{ $t('stat_accounts') }}</span></div>
                     <div class="lsl-stat" data-stat="saved"><b>{{ number_format($n['saved']) }}</b><span>{{ $t('stat_saved') }}</span></div>
+                    @endif
+                    @if ($this->shows('compare'))
                     <div class="lsl-stat" data-stat="compares"><b>{{ number_format($n['compares']) }}</b><span>{{ $t('stat_compares') }}</span></div>
+                    @endif
                 </div>
             </div>
 
+            @if ($this->shows('wishlist'))
             @php($lists = $this->lists())
             <div class="lsl-card" data-lists>
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -166,9 +174,10 @@
                     <p class="lsl-help">{{ $t('none_yet') }}</p>
                 @endforelse
             </div>
+            @endif
 
             <div class="lsl-cols">
-                @foreach (['wished' => 'top_wished', 'compared' => 'top_compared'] as $key => $heading)
+                @foreach (array_filter(['wished' => 'top_wished', 'compared' => 'top_compared'], fn ($heading, $key) => $this->shows($key === 'wished' ? 'wishlist' : 'compare'), ARRAY_FILTER_USE_BOTH) as $key => $heading)
                     <div class="lsl-card" data-top="{{ $key }}">
                         <h2>{{ $t($heading) }}</h2>
                         @forelse ($n[$key] as $product)

@@ -2,6 +2,11 @@
 
 return [
     'title' => 'Analytics',
+    'tabs' => [
+        'overview' => 'Overview',
+        'search' => 'Site search',
+        'search_log' => 'Search log',
+    ],
     'last_days' => 'Last :days days',
     'no_shop' => 'No shop yet.',
     'empty' => 'No data yet.',

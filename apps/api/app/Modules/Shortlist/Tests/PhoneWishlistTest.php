@@ -9,7 +9,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
-use App\Modules\Shortlist\Filament\Merchant\Pages\Shortlists;
+use App\Modules\Shortlist\Filament\Merchant\Pages\Wishlist;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
 use App\Modules\Sms\Contracts\Phone;
 use App\Modules\Sms\Contracts\SendsSms;
@@ -108,7 +108,7 @@ final class PhoneWishlistTest extends TestCase
         $this->actingAs($manager);
         Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
         Filament::setTenant($this->shop);
-        $page = Livewire::test(Shortlists::class)->assertSee('0501234567')->assertSee('טבעת יהלום');
+        $page = Livewire::test(Wishlist::class)->assertSee('0501234567')->assertSee('טבעת יהלום');
         $phoneRow = collect($page->instance()->lists())->firstWhere('who', 'phone');
         $this->assertSame(['0501234567', true, 3], [$phoneRow['phone'], $phoneRow['consent'], $phoneRow['count']]);
         $page->call('export')->assertFileDownloaded('wishlists-'.now()->format('Y-m-d').'.csv');
@@ -135,7 +135,7 @@ final class PhoneWishlistTest extends TestCase
         $this->actingAs($manager);
         Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
         Filament::setTenant($this->shop);
-        Livewire::test(Shortlists::class)->assertDontSee('0529876543');
+        Livewire::test(Wishlist::class)->assertDontSee('0529876543');
     }
 
     public function test_the_operator_sets_up_the_019_account_and_sends_a_test(): void

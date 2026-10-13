@@ -36,7 +36,7 @@ final class PanelSidebarTest extends TestCase
         }
     }
 
-    public function test_the_merchant_sidebar_has_its_groups_in_order_and_no_loose_items(): void
+    public function test_the_merchant_sidebar_opens_with_home_and_analytics_then_its_groups_in_order(): void
     {
         $shop = Shop::factory()->create();
         $merchant = User::factory()->create();
@@ -50,7 +50,7 @@ final class PanelSidebarTest extends TestCase
                 ->getContent();
 
             $this->assertSame(
-                array_map(fn (string $key): string => __("admin::panels.nav.{$key}", [], $locale), PanelNavigation::MERCHANT),
+                ['', ...array_map(fn (string $key): string => __("admin::panels.nav.{$key}", [], $locale), PanelNavigation::MERCHANT)],
                 $this->groupLabels($html),
             );
         }

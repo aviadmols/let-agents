@@ -28,9 +28,10 @@ trait LocksShopToPanelTenant
         return Filament::getTenant() !== null;
     }
 
+    /** In the menu once the shop is known, unless the screen took itself off the menu. */
     public static function shouldRegisterNavigation(...$arguments): bool
     {
-        return Filament::getTenant() !== null;
+        return static::$shouldRegisterNavigation && Filament::getTenant() !== null;
     }
 
     /**

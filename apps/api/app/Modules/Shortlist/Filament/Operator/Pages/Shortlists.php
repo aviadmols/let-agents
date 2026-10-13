@@ -72,6 +72,20 @@ class Shortlists extends Page
         return __('shortlist::ui.subheading');
     }
 
+    /**
+     * Which part of the screen shows: both in the operator panel; in the shop's panel the wishlist
+     * and the compare box are two screens of their own.
+     */
+    public function part(): ?string
+    {
+        return null;
+    }
+
+    public function shows(string $part): bool
+    {
+        return $this->part() === null || $this->part() === $part;
+    }
+
     /** False in the merchant panel, where the shop is the one in the address. */
     public function picksShop(): bool
     {

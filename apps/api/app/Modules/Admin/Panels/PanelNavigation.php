@@ -17,8 +17,8 @@ final class PanelNavigation
     /** Operator panel, top to bottom. */
     public const OPERATOR = ['overview', 'shops', 'content', 'discovery', 'shoppers', 'analytics', 'system'];
 
-    /** Merchant panel, top to bottom: what a shop owner looks at first comes first. */
-    public const MERCHANT = ['overview', 'analytics', 'search', 'on_page', 'shoppers', 'settings'];
+    /** Merchant panel, under the loose screens at the top (home, analytics): what a shop owner does, in order. */
+    public const MERCHANT = ['search', 'shoppers', 'on_page', 'settings'];
 
     /**
      * @param  list<string>  $keys

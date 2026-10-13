@@ -61,6 +61,12 @@ class ShopAnalytics extends Page
         return true;
     }
 
+    /** @return list<array{label: string, url: string, current: bool}> none here; the merchant screen links its other analytics */
+    public function tabs(): array
+    {
+        return [];
+    }
+
     /** Model costs are the operator's business. The merchant screen turns this off. */
     public function showsCosts(): bool
     {

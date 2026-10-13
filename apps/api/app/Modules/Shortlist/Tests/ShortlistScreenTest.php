@@ -10,7 +10,8 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
-use App\Modules\Shortlist\Filament\Merchant\Pages\Shortlists;
+use App\Modules\Shortlist\Filament\Merchant\Pages\Compare;
+use App\Modules\Shortlist\Filament\Merchant\Pages\Wishlist;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -57,11 +58,17 @@ final class ShortlistScreenTest extends TestCase
 
     public function test_the_store_manager_switches_them_on_and_sees_what_shoppers_did(): void
     {
-        $screen = Livewire::test(Shortlists::class)
+        // Two screens of their own: compare first, then the wishlist.
+        Livewire::test(Compare::class)
             ->assertSet('data.compare', false)
-            ->assertSet('data.wishlist', false)
+            ->assertDontSee('data-switch="wishlist"', false)
             ->set('data.compare', true)
             ->assertDontSee('#wishlist')
+            ->call('save');
+
+        $screen = Livewire::test(Wishlist::class)
+            ->assertSet('data.wishlist', false)
+            ->assertDontSee('data-switch="compare"', false)
             ->set('data.wishlist', true)
             ->assertSee('#wishlist')
             ->set('data.card_selector', '.product-card')
@@ -88,11 +95,12 @@ final class ShortlistScreenTest extends TestCase
         $this->getJson("/api/v1/shortlist/{$site}/compare?ids=3,2")->assertOk();
         app(TenantContext::class)->run($this->theirs->id, fn () => ShortlistWishlist::query()->create(['shop_id' => $this->theirs->id, 'token_hash' => 'x', 'share_code' => 'theirs000001', 'items' => ['3', '3']]));
 
-        $numbers = Livewire::test(Shortlists::class)->instance()->numbers();
+        $numbers = Livewire::test(Wishlist::class)->instance()->numbers();
 
         $this->assertSame([2, 0, 3, 2], [$numbers['lists'], $numbers['accounts'], $numbers['saved'], $numbers['compares']]);
         $this->assertSame([['טבעת יהלום', 2], ['עגילי זהב', 1]], array_map(fn (array $p): array => [$p['title'], $p['n']], $numbers['wished']));
         $this->assertSame(['תליון לב', 2], [$numbers['compared'][0]['title'], $numbers['compared'][0]['n']]);
-        Livewire::test(Shortlists::class)->assertSee('המוצרים שנשמרו הכי הרבה')->assertSee('טבעת יהלום');
+        Livewire::test(Wishlist::class)->assertSee('המוצרים שנשמרו הכי הרבה')->assertSee('טבעת יהלום')->assertDontSee('המוצרים שהושוו הכי הרבה');
+        Livewire::test(Compare::class)->assertSee('המוצרים שהושוו הכי הרבה')->assertSee('תליון לב')->assertDontSee('המוצרים שנשמרו הכי הרבה');
     }
 }

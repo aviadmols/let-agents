@@ -22,7 +22,7 @@ final class ShopOverview extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
-    protected static string|UnitEnum|null $navigationGroup = 'overview';
+    protected static string|UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 10;
 

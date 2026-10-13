@@ -15,6 +15,9 @@ final class SearchLogPage extends OperatorSearchLogPage
 
     protected static ?int $navigationSort = 21;
 
+    /** Off the menu: reached from where it belongs (the analytics tabs, or the operator). */
+    protected static bool $shouldRegisterNavigation = false;
+
     public function picksShop(): bool
     {
         return false;
