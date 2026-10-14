@@ -102,4 +102,20 @@ final class ShopifySearchScriptTest extends TestCase
         $this->assertFalse($live['on_sale']);
         $this->assertNull(self::node('e.fromShopifyProduct({variants:[]})'));
     }
+
+    public function test_the_sizes_in_stock_are_read_so_similar_items_in_a_gone_size_keep_only_those_that_have_it(): void
+    {
+        $product = ['options' => [['name' => 'צבע'], ['name' => 'מידה']], 'variants' => [
+            ['id' => 1, 'available' => true, 'price' => 500, 'option1' => 'שחור', 'option2' => '41'],
+            ['id' => 2, 'available' => false, 'price' => 500, 'option1' => 'שחור', 'option2' => '42'],
+            ['id' => 3, 'available' => true, 'price' => 500, 'option1' => 'חום', 'option2' => ' 41 '],
+            ['id' => 4, 'available' => true, 'price' => 500, 'option1' => 'חום', 'option2' => 'M'],
+        ]];
+
+        $this->assertSame(['41', 'm'], self::node('e.fromShopifyProduct('.json_encode($product, JSON_UNESCAPED_UNICODE).').sizes'), 'in stock in any colour, each once, compared loosely');
+
+        // Shopify's .js gives option names as strings in older themes' data.
+        $product['options'] = ['Color', 'Size'];
+        $this->assertSame(['41', 'm'], self::node('e.fromShopifyProduct('.json_encode($product, JSON_UNESCAPED_UNICODE).').sizes'));
+    }
 }

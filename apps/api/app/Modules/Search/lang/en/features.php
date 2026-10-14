@@ -61,4 +61,8 @@ return [
         'label' => 'Second ordering of photo search results',
         'description' => 'A model sees the shopper\'s photo beside the leading products\' pictures and orders them again: the truly closest first. One call per photo search, so it costs. Turn on only once the check shows it helps.',
     ],
+    'size_alternatives' => [
+        'label' => 'Size gone: similar items in that size',
+        'description' => 'On a product page where a size is out of stock: the sizes that are gone are marked, and a tap opens similar items that have that size in stock. Stock is read from the store itself, live, with no model.',
+    ],
 ];

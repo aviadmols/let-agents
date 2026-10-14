@@ -687,13 +687,42 @@
     var price = Number(chosen.price);
     var compare = chosen.compare_at_price == null ? null : Number(chosen.compare_at_price);
     var sale = compare !== null && compare > price;
-    return {
+    // The sizes some variant has in stock, so "similar items in size 41" keeps only those that have it.
+    var sizeAt = sizeOptionIndex(product.options);
+    var sizes = [];
+    for (var s = 0; sizeAt >= 0 && s < variants.length; s++) {
+      var value = variants[s].available ? sizeValue(variants[s]['option' + (sizeAt + 1)]) : '';
+      if (value && sizes.indexOf(value) === -1) {
+        sizes.push(value);
+      }
+    }
+    var summary = {
       is_in_stock: !!chosen.available,
       on_sale: sale,
       prices: { price: price, regular_price: sale ? compare : price, currency_minor_unit: 2 },
       variant: chosen.id,
       variants: variants.length
     };
+    if (sizeAt >= 0) {
+      summary.sizes = sizes;
+    }
+    return summary;
+  }
+
+  /** Which of a product's options is its size, by name (Shopify gives names, or objects with one). -1 when none. */
+  function sizeOptionIndex(options) {
+    for (var i = 0; options && i < options.length; i++) {
+      var name = typeof options[i] === 'string' ? options[i] : (options[i] && options[i].name) || '';
+      if (/מידה|מידות|גודל|size/i.test(name)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /** A size as compared: "41", " 41 " and "41" are one size; "M" and "m" too. */
+  function sizeValue(value) {
+    return value == null ? '' : String(value).replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
   /**
@@ -5957,6 +5986,344 @@
         closeBar();
       }
     });
+    // ---------------------------------------------------------------- a size that is gone
+
+    /**
+     * On a product page with a size out of stock (search.size_alternatives): the sizes that are gone
+     * get a spark and a line above them, and a tap on one opens the drawer with similar items that
+     * have that size in stock. Which sizes are gone, and which similar items have the size, is read
+     * from the store itself, live: Shopify's product JSON, WooCommerce's variations. Our server is
+     * asked twice at most, both cached and without a model: whether the shop wants it (only when a
+     * size is gone), and the similar items (only on a tap).
+     */
+    function sizeHelp() {
+      var productId = productOnPage(win, ctx);
+      if (!productId) {
+        return;
+      }
+      var form = doc.querySelector('form[action*="/cart/add"]') || doc.querySelector('form.variations_form') || doc.querySelector('form.cart');
+      if (!form) {
+        return;
+      }
+      var scope = form.closest('product-info, .product, [id*="MainProduct"], main, section') || doc.body;
+      var words = null; // the shop's words, once it said yes
+      var lastOpen = 0;
+
+      /** The product's sizes and which variants are in stock, in one shape for both platforms. */
+      function readProduct() {
+        if (SHOPIFY) {
+          var handle = /\/products\/([^\/?#]+)/.exec(win.location.pathname);
+          if (!handle) {
+            return Promise.resolve(null);
+          }
+          return win.fetch(ROOT + 'products/' + handle[1] + '.js', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (json) {
+              var at = json ? sizeOptionIndex(json.options) : -1;
+              if (at < 0) {
+                return null;
+              }
+              return {
+                at: 'option' + (at + 1),
+                keys: ['option1', 'option2', 'option3'],
+                variants: (json.variants || []).map(function (v) { return { id: String(v.id), values: { option1: v.option1, option2: v.option2, option3: v.option3 }, available: !!v.available }; })
+              };
+            })
+            .catch(function () { return null; });
+        }
+        var raw = form.getAttribute('data-product_variations');
+        var list = null;
+        try { list = raw ? JSON.parse(raw) : null; } catch (e) { list = null; }
+        if (!list || !list.length) {
+          return Promise.resolve(null);
+        }
+        var keys = Object.keys(list[0].attributes || {});
+        var at = null;
+        for (var k = 0; k < keys.length && !at; k++) {
+          var select = form.querySelector('[name="' + keys[k] + '"]');
+          var named = (select && select.getAttribute('data-attribute_name')) || keys[k];
+          var caption = select && select.closest('tr') && select.closest('tr').querySelector('label');
+          if (/מידה|מידות|גודל|size/i.test(named + ' ' + (caption ? caption.textContent : ''))) {
+            at = keys[k];
+          }
+        }
+        return Promise.resolve(at ? {
+          at: at,
+          keys: keys,
+          variants: list.map(function (v) { return { id: String(v.variation_id), values: v.attributes || {}, available: !!(v.is_in_stock && v.variation_is_active !== false && v.is_purchasable !== false) }; })
+        } : null);
+      }
+
+      /** The other choices made now (the colour), so a size gone in black but there in tan is not gone. */
+      function chosen(product) {
+        var others = {};
+        if (SHOPIFY) {
+          var idField = form.querySelector('[name="id"]');
+          var current = null;
+          for (var i = 0; idField && i < product.variants.length; i++) {
+            if (product.variants[i].id === String(idField.value)) {
+              current = product.variants[i];
+            }
+          }
+          if (!current) {
+            return null;
+          }
+          product.keys.forEach(function (key) { if (key !== product.at && current.values[key] != null) { others[key] = current.values[key]; } });
+          return others;
+        }
+        product.keys.forEach(function (key) {
+          var field = form.querySelector('[name="' + key + '"]');
+          if (key !== product.at && field && field.value) {
+            others[key] = field.value;
+          }
+        });
+        return others;
+      }
+
+      /** The sizes that exist with the other choices made, and none of them is in stock. */
+      function goneSizes(product) {
+        var others = chosen(product);
+        var matches = function (variant) {
+          for (var key in others) {
+            // WooCommerce: an empty value in a variation means "any".
+            if (Object.prototype.hasOwnProperty.call(others, key) && variant.values[key] !== '' && String(variant.values[key]) !== String(others[key])) {
+              return false;
+            }
+          }
+          return true;
+        };
+        var seen = {};
+        var gone = [];
+        product.variants.forEach(function (variant) {
+          var size = variant.values[product.at];
+          if (size == null || size === '' || !matches(variant)) {
+            return;
+          }
+          var key = sizeValue(size);
+          if (!seen[key]) {
+            seen[key] = { value: String(size), available: false };
+          }
+          seen[key].available = seen[key].available || variant.available;
+        });
+        for (var key in seen) {
+          if (Object.prototype.hasOwnProperty.call(seen, key) && !seen[key].available) {
+            gone.push(seen[key].value);
+          }
+        }
+        return gone;
+      }
+
+      /** What the shopper reads for a size: the select's text where WooCommerce keeps a slug. */
+      function sizeLabel(product, value) {
+        var select = !SHOPIFY && form.querySelector('select[name="' + product.at + '"]');
+        var option = select && select.querySelector('option[value="' + cssEscape(value) + '"]');
+        return option ? option.textContent.trim() : value;
+      }
+
+      function cssEscape(value) {
+        return win.CSS && win.CSS.escape ? win.CSS.escape(value) : String(value).replace(/["\\]/g, '\\$&');
+      }
+
+      /** The theme's own buttons for a size: a radio with its label, or an element carrying the value. */
+      function swatches(value) {
+        var found = [];
+        var v = cssEscape(value);
+        var nodes = scope.querySelectorAll('input[type="radio"][value="' + v + '"], [data-value="' + v + '"], [data-option-value="' + v + '"], button[value="' + v + '"]');
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (node.tagName === 'INPUT') {
+            var tag = (node.id && scope.querySelector('label[for="' + cssEscape(node.id) + '"]')) || node.closest('label');
+            if (tag && found.indexOf(tag) === -1) {
+              found.push(tag);
+            }
+            node.setAttribute('data-la-size-gone', value);
+            continue;
+          }
+          if (found.indexOf(node) === -1 && !node.closest('[data-la-size-help]')) {
+            found.push(node);
+          }
+        }
+        return found;
+      }
+
+      function clear() {
+        var marked = doc.querySelectorAll('[data-la-size-gone]');
+        for (var i = 0; i < marked.length; i++) {
+          marked[i].removeAttribute('data-la-size-gone');
+        }
+        var added = doc.querySelectorAll('[data-la-size-badge], [data-la-size-help]');
+        for (var j = 0; j < added.length; j++) {
+          added[j].parentNode.removeChild(added[j]);
+        }
+      }
+
+      var SPARK = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M19 3v3M17.5 4.5h3"/></svg>';
+
+      /** The line above the sizes; where the theme's sizes were not found, the gone sizes to tap in it. */
+      function banner(product, gone, before, withChips) {
+        var host = doc.createElement('div');
+        host.setAttribute('data-la-size-help', '');
+        host.style.margin = '0 0 10px';
+        var root = host.attachShadow({ mode: 'open' });
+        var style = doc.createElement('style');
+        style.textContent = ':host{all:initial;display:block;font-family:inherit}' +
+          '.b{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px;border-radius:10px;background:#f3f4f6;color:#1e3a8a;font:600 14px/1.4 inherit}' +
+          '.b svg{flex:none;width:22px;height:22px}.chips{display:flex;flex-wrap:wrap;gap:6px;width:100%}' +
+          'button{all:unset;box-sizing:border-box;min-width:40px;padding:6px 12px;border:1px solid #c7cbd4;border-radius:8px;background:#fff;color:#111827;text-align:center;cursor:pointer;font:500 14px/1.2 inherit}button:focus-visible{outline:2px solid #6366f1}';
+        root.appendChild(style);
+        var box = doc.createElement('div');
+        box.className = 'b';
+        box.innerHTML = SPARK;
+        box.appendChild(el('span', null, label(withChips ? 'size_gone_pick' : 'size_gone_banner')));
+        if (withChips) {
+          var chips = el('div', 'chips');
+          gone.forEach(function (value) {
+            var chip = el('button', null, sizeLabel(product, value));
+            chip.type = 'button';
+            chip.addEventListener('click', function () { open(value, sizeLabel(product, value)); });
+            chips.appendChild(chip);
+          });
+          box.appendChild(chips);
+        }
+        root.appendChild(box);
+        host.style.fontFamily = win.getComputedStyle(doc.body).fontFamily;
+        before.parentNode.insertBefore(host, before);
+      }
+
+      function mark(product) {
+        clear();
+        var gone = goneSizes(product);
+        if (!gone.length) {
+          return;
+        }
+        var first = null;
+        gone.forEach(function (value) {
+          swatches(value).forEach(function (node) {
+            node.setAttribute('data-la-size-gone', value);
+            node.setAttribute('title', label('size_gone_badge'));
+            if (win.getComputedStyle(node).position === 'static') {
+              node.style.position = 'relative';
+            }
+            var badge = el('span');
+            badge.setAttribute('data-la-size-badge', '');
+            badge.setAttribute('aria-hidden', 'true');
+            badge.setAttribute('style', 'position:absolute;top:2px;inset-inline-start:2px;width:16px;height:16px;color:#6b7fd7;pointer-events:none;line-height:0');
+            badge.innerHTML = SPARK;
+            node.appendChild(badge);
+            first = first || node;
+          });
+        });
+        if (first) {
+          var group = first.closest('fieldset, variant-radios, variant-selects, .variant-picker, .product-form__input, .swatch, .variations') || first.parentNode;
+          banner(product, gone, group, false);
+        } else {
+          // A select, or a theme we do not know: the sizes to tap are in the line itself.
+          banner(product, gone, form, true);
+        }
+      }
+
+      /** The drawer: similar items, kept only where the store has the size in stock now. */
+      function open(value, shown) {
+        if (Date.now() - lastOpen < 600) {
+          return;
+        }
+        lastOpen = Date.now();
+        load().then(function (data) {
+          if (!data) {
+            return;
+          }
+          var title = label('size_similar_title', { size: shown });
+          forceRegular = false;
+          forceSmart = true;
+          var turn = openDrawer(title);
+          var status = waiting(label('drawer_thinking'));
+          turn.appendChild(status);
+          showTurn(turn);
+          var wanted = sizeValue(value);
+          var wantedShown = sizeValue(shown);
+          win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/similar?id=' + encodeURIComponent(productId) + '&limit=24', { mode: 'cors', credentials: 'omit' })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (json) {
+              var products = ((json && json.products) || []).filter(function (p) { return String(p.external_id) !== String(productId); });
+              products.forEach(function (p) { rememberUrl(p.external_id, p.url); });
+              return liveProducts(products.map(function (p) { return String(p.external_id); })).then(function () { return products; });
+            })
+            .then(function (products) {
+              if (status.parentNode) {
+                status.parentNode.removeChild(status);
+              }
+              var inSize = products.filter(function (p) {
+                var item = live[String(p.external_id)];
+                if (!item || item.is_in_stock === false) {
+                  return false;
+                }
+                if (SHOPIFY) {
+                  return !!item.sizes && (item.sizes.indexOf(wanted) !== -1 || item.sizes.indexOf(wantedShown) !== -1);
+                }
+                // WooCommerce's Store API: the size among the product's attribute terms.
+                return (item.attributes || []).some(function (attribute) {
+                  return (attribute.terms || []).some(function (term) {
+                    return sizeValue(term.slug) === wanted || sizeValue(term.name) === wantedShown;
+                  });
+                });
+              });
+              var section = el('div', 'section');
+              if (inSize.length) {
+                section.appendChild(productGrid(inSize, ''));
+              } else {
+                section.appendChild(el('p', null, label('size_similar_none', { size: shown })));
+                if (products.length) {
+                  section.appendChild(el('h3', null, label('size_similar_more')));
+                  section.appendChild(productGrid(products.slice(0, 8), ''));
+                }
+              }
+              turn.appendChild(section);
+              showTurn(turn);
+            })
+            .catch(function () {
+              if (status.parentNode) {
+                status.parentNode.removeChild(status);
+              }
+              turn.appendChild(el('div', 'section', label('size_similar_none', { size: shown })));
+            });
+        });
+      }
+
+      // A tap on a marked size: the theme still selects it (it shows its own "sold out"); the drawer opens.
+      doc.addEventListener('click', function (event) {
+        var target = event.target && event.target.closest ? event.target.closest('[data-la-size-gone]') : null;
+        if (target && words) {
+          var value = target.getAttribute('data-la-size-gone');
+          open(value, target.textContent.trim() || value);
+        }
+      }, true);
+
+      readProduct().then(function (product) {
+        if (!product || !goneSizes(product).length) {
+          return;
+        }
+        // Only now, with a size gone: does the shop want this, and in which words.
+        win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/sizes?locale=' + LOCALE, { mode: 'cors', credentials: 'omit' })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (json) {
+            if (!json || !json.enabled) {
+              return;
+            }
+            words = json.labels || {};
+            for (var key in words) {
+              if (Object.prototype.hasOwnProperty.call(words, key) && !state.labels[key]) {
+                state.labels[key] = words[key];
+              }
+            }
+            mark(product);
+            // Another colour chosen: the sizes gone change with it. Themes redraw the picker, so a beat later.
+            form.addEventListener('change', function () { setTimeout(function () { mark(product); }, 350); });
+          })
+          .catch(function () { /* the page stays as the theme drew it */ });
+      });
+    }
+    sizeHelp();
+
     // The bar of our own closes with a click outside it and outside the suggestions.
     doc.addEventListener('pointerdown', function (event) {
       if (bar && event.target !== bar.host && !(dropdown && event.target === dropdown.host)) {

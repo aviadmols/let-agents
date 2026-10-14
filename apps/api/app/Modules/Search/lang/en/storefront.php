@@ -112,4 +112,10 @@ return [
     'sorted_by' => 'Sorted: :label',
     'choose_title' => 'Choose size and colour',
     'choose_failed' => 'We could not add this to the cart. Try another option.',
+    'size_gone_banner' => 'Size out of stock? Tap the size to see similar items in it',
+    'size_gone_pick' => 'Size out of stock? Pick a size to see similar items in it:',
+    'size_gone_badge' => 'Gone. Tap for similar items in this size',
+    'size_similar_title' => 'Similar items in size :size',
+    'size_similar_none' => 'No similar items in size :size right now.',
+    'size_similar_more' => 'Similar items (any size)',
 ];

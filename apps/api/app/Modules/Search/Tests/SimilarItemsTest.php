@@ -165,6 +165,26 @@ final class SimilarItemsTest extends TestCase
         $this->similar('bad id!')->assertNotFound();
     }
 
+    public function test_a_size_that_is_gone_is_helped_only_where_the_shop_turned_it_on(): void
+    {
+        $sizes = fn () => $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/sizes?locale=he')->assertOk();
+
+        $this->assertSame(['enabled' => false, 'labels' => []], $sizes()->json(), 'off until the shop turns it on: the store page stays as it is');
+
+        Features::override('search.size_alternatives', true, $this->shop->id);
+        $on = $sizes()->json();
+        $this->assertTrue($on['enabled']);
+        $this->assertSame('המידה לא במלאי? לחצו על המידה להצגת פריטים דומים במידה המבוקשת', $on['labels']['size_gone_banner']);
+        $this->assertSame('פריטים דומים במידה :size', $on['labels']['size_similar_title'], 'the size is filled in the browser');
+
+        // The page keeps only the similar items that have the size, so it may ask for more of them, within a bound.
+        $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/similar?id=301&limit=500')->assertOk();
+        $this->assertSame(['303', '302'], array_column($this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/similar?id=301&limit=24')->json('products'), 'external_id'));
+
+        Features::override('search.similar', false, $this->shop->id);
+        $this->assertFalse($sizes()->json('enabled'), 'no similar items, no help');
+    }
+
     private function similar(string $id): TestResponse
     {
         return $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/similar?id='.rawurlencode($id));

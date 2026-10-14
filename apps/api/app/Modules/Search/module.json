@@ -52,6 +52,10 @@
             "default": true
         },
         {
+            "name": "size_alternatives",
+            "default": false
+        },
+        {
             "name": "mode_choice",
             "default": false
         },
