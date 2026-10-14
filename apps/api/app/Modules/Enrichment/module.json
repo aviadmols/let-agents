@@ -47,6 +47,10 @@
         {
             "name": "batch_reading",
             "default": true
+        },
+        {
+            "name": "auto_review",
+            "default": true
         }
     ],
     "settings": [
@@ -176,6 +180,52 @@
             "max": 400,
             "scope": "global",
             "unit": "usd"
+        },
+        {
+            "name": "reviewer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "reviewer_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "reviewer_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "reviewer_output_usd_per_million",
+            "type": "float",
+            "default": 5.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "nightly_review_requests",
+            "type": "int",
+            "default": 200,
+            "min": 0,
+            "max": 2000,
+            "scope": "shop",
+            "unit": "requests"
         },
         {
             "name": "compare_provider",
@@ -552,9 +602,20 @@
                     ],
                     "prompts": [
                         "product_extraction",
-                        "fact_review",
                         "content_mapping",
                         "product_highlights"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "reviewer_provider",
+                    "model": "reviewer_model",
+                    "prices": [
+                        "reviewer_input_usd_per_million",
+                        "reviewer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "fact_review"
                     ]
                 }
             ],

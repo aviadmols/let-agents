@@ -13,6 +13,7 @@ return [
     'propose_schema' => 'Writing and reviewing a vocabulary',
     'reread_products' => 'Reading again products missing a detail',
     'nightly_model' => 'Products read by a model',
+    'nightly_review' => 'Waiting details reviewed',
     'compare_readers' => 'Two reading models compared',
     'collect_batches' => 'Collecting batch answers from the provider',
 ];

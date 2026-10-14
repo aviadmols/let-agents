@@ -61,6 +61,26 @@ return [
         'label' => 'Output price of the reader, per million tokens',
         'description' => 'From the price list of the provider.',
     ],
+    'reviewer_provider' => [
+        'label' => 'Provider of the model that checks what the reader was unsure of',
+        'description' => 'Another family than the reader. anthropic by default.',
+    ],
+    'reviewer_model' => [
+        'label' => 'Model that checks what the reader was unsure of',
+        'description' => 'Says of each waiting detail: right, wrong, or unsure. Unsure goes to a person.',
+    ],
+    'reviewer_input_usd_per_million' => [
+        'label' => 'Input price of the reviewer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'reviewer_output_usd_per_million' => [
+        'label' => 'Output price of the reviewer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'nightly_review_requests' => [
+        'label' => 'Products the reviewer checks a night',
+        'description' => 'Products with details waiting for review. 0 turns the review off.',
+    ],
     'compare_provider' => [
         'label' => 'Provider of the model compared with the reader',
         'description' => 'In the model comparison on the gaps screen: the second model, against the night\'s reader.',

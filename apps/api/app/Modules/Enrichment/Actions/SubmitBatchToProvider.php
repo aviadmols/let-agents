@@ -13,6 +13,7 @@ use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
+use App\Modules\Enrichment\Support\ReadingPrices;
 use App\Modules\Enrichment\Tasks\TaskRegistry;
 use App\Modules\Runs\Contracts\RunContext;
 
@@ -58,7 +59,7 @@ final class SubmitBatchToProvider
 
             $user = (string) json_encode($item->request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $requests[] = new BatchRequest($item->custom_id, (string) $batch->system_prompt, $user, $maxOutput);
-            $estimate += ((mb_strlen((string) $batch->system_prompt) + mb_strlen($user)) / 3 * $this->price('input') + $maxOutput * $this->price('output')) / 1_000_000;
+            $estimate += ((mb_strlen((string) $batch->system_prompt) + mb_strlen($user)) / 3 * ReadingPrices::input($batch->task) + $maxOutput * ReadingPrices::output($batch->task)) / 1_000_000;
         }
 
         if ($requests === []) {
@@ -86,10 +87,5 @@ final class SubmitBatchToProvider
         $run->output(['provider_batch' => $id]);
 
         return ['submitted' => count($requests), 'stale' => $stale, 'stopped' => null];
-    }
-
-    private function price(string $name): float
-    {
-        return (float) Settings::get("enrichment.reader_{$name}_usd_per_million");
     }
 }

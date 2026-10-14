@@ -2,7 +2,6 @@
 
 namespace App\Modules\Enrichment\Actions;
 
-use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\BatchState;
@@ -12,6 +11,7 @@ use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
+use App\Modules\Enrichment\Support\ReadingPrices;
 use App\Modules\Enrichment\Tasks\TaskRegistry;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -109,8 +109,8 @@ final class CollectProviderBatches
         $model = (string) $batch->model;
         $items = EnrichmentBatchItem::query()->where('batch_id', $batch->id)->where('status', ItemStatus::Pending)->get()->keyBy('custom_id');
         $sent = $items->map(fn (EnrichmentBatchItem $item): string => (string) json_encode($item->request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))->all();
-        $in = $this->price('input');
-        $out = $this->price('output');
+        $in = ReadingPrices::input($batch->task);
+        $out = ReadingPrices::output($batch->task);
 
         foreach ($this->batches->results($provider, $model, (string) $batch->provider_batch_id, (string) $batch->system_prompt, $sent) as $result) {
             $item = $items->get($result->customId);
@@ -153,10 +153,5 @@ final class CollectProviderBatches
             'rejected_count' => (clone $answered)->where('status', ItemStatus::Rejected)->count(),
             'completed_at' => $pending === 0 ? now() : null,
         ])->save();
-    }
-
-    private function price(string $name): float
-    {
-        return (float) Settings::get("enrichment.reader_{$name}_usd_per_million");
     }
 }

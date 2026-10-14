@@ -29,6 +29,10 @@ return [
         'label' => 'Nightly reading',
         'description' => 'Every night, after the sync, code reads what changed in the shop again: products, promises, articles, superlatives and relations. No model, no cost.',
     ],
+    'auto_review' => [
+        'label' => 'Nightly review of waiting details',
+        'description' => 'Every night a model of another family checks the details the reader was unsure of: right is approved, wrong rejected, unsure goes to a person.',
+    ],
     'batch_reading' => [
         'label' => 'Read products in batches, at half price',
         'description' => 'Questions for the model go to the provider in one batch and are answered during the day, at half the price of asking one by one. The answers are collected every ten minutes and checked in code as always. Off: each question is asked on its own, at once.',

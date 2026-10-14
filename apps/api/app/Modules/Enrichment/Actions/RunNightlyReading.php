@@ -39,8 +39,10 @@ final class RunNightlyReading
         'articles' => MatchProductsToArticles::class,
         'rankings' => ComputeRankings::class,
         'relations' => ComputeProductRelations::class,
-        // Last, and the only one that costs anything: what code could not work out on its own.
+        // Last, and the only ones that cost anything: what code could not work out on its own.
         'model' => RunNightlyModelReading::class,
+        // What the reading left waiting, checked by the other family.
+        'review' => RunNightlyReview::class,
     ];
 
     public function __construct(private readonly RecordsRuns $runs) {}

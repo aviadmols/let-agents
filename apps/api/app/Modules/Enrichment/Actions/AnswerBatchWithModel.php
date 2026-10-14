@@ -12,6 +12,7 @@ use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
+use App\Modules\Enrichment\Support\ReadingPrices;
 use App\Modules\Enrichment\Tasks\TaskRegistry;
 use App\Modules\Runs\Contracts\RunContext;
 
@@ -64,7 +65,7 @@ final class AnswerBatchWithModel
             $user = (string) json_encode($item->request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
             try {
-                $this->spend->assertCanSpend($this->estimate($batch->system_prompt, $user, $maxOutput));
+                $this->spend->assertCanSpend($this->estimate($batch, $user, $maxOutput));
 
                 $reply = $this->models->json(
                     $provider,
@@ -85,8 +86,8 @@ final class AnswerBatchWithModel
             }
 
             $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd(
-                $this->price('input'),
-                $this->price('output'),
+                ReadingPrices::input($batch->task),
+                ReadingPrices::output($batch->task),
             ));
             $counts['asked']++;
 
@@ -117,16 +118,11 @@ final class AnswerBatchWithModel
     }
 
     /** Roughly what one question will cost, before asking whether there is room for it. */
-    private function estimate(string $system, string $user, int $maxOutput): float
+    private function estimate(EnrichmentBatch $batch, string $user, int $maxOutput): float
     {
-        $input = (mb_strlen($system) + mb_strlen($user)) / 3;
+        $input = (mb_strlen((string) $batch->system_prompt) + mb_strlen($user)) / 3;
 
-        return $input * $this->price('input') / 1_000_000
-            + $maxOutput * $this->price('output') / 1_000_000;
-    }
-
-    private function price(string $name): float
-    {
-        return (float) Settings::get("enrichment.reader_{$name}_usd_per_million");
+        return $input * ReadingPrices::input($batch->task) / 1_000_000
+            + $maxOutput * ReadingPrices::output($batch->task) / 1_000_000;
     }
 }
