@@ -56,6 +56,18 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - Hebrew text: never `trim($s, '•…')` with multibyte characters (PHP trims bytes and cuts letters);
   use a `/u` regex. Hebrew final letters (ן ם ך ף ץ) differ from their regular forms in patterns.
 
+## Planned (docs only so far): strict first scan, Try-On, Site rename
+
+- ADR 0011 / `docs/strict-scan.md`: one vocabulary per branch leaf with a buyer's checklist, a score
+  (code metrics + pilot extraction + cross-family review) and a gate before the full scan; merchant
+  screen for missing info; "ask the web" needs two independent verbatim sources and a person's approval.
+  `enrichment.schema_auto_advance` stays off until the score is calibrated.
+- ADR 0012 / `docs/try-on.md`: module `TryOn`, flag `tryon.enabled` off by default (per-shop override
+  through `Features`), Replicate behind a new `Ai\Contracts\ImageDriver`, own spend cap, every step logged
+  with its prompt. Model calls only on the two POST routes (photo, job). Process, prompts and costs are
+  operator-only; the merchant sees counts.
+- ADR 0013: the tenant becomes `Site` (`site_id`). Until that commit lands, code still says `Shop`.
+
 ## Index and matching (apps/api, ADR 0007)
 
 - `Retrieval` builds a per-shop index by meaning (`retrieval_chunks`, pgvector on Postgres, JSON

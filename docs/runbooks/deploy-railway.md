@@ -104,6 +104,10 @@ BOOTSTRAP_OPERATOR_LOCALE=he
 
 פריסה שנכשלת לא מחליפה את הגרסה הרצה: Railway ממשיך להגיש את הפריסה הקודמת עד שבדיקת `/up` עוברת.
 
+## Bucket לתמונות (Try-On, ADR 0012)
+
+מתכנן, עדיין לא נוצר. Railway Bucket (S3-compatible) בפרויקט, מחובר ל‑api ול‑worker דרך משתני הסביבה של ה‑bucket (`AWS_*`, `AWS_USE_PATH_STYLE_ENDPOINT=true` ו‑`FILESYSTEM_DISK=s3` לפי מה ש‑Railway מציג; הדיסק `s3` כבר מוגדר ב‑`config/filesystems.php`). הקבצים פרטיים; הגשה לדפדפן ולמודל רק בכתובות חתומות קצרות. מחיקה אוטומטית אחרי 90 יום ב‑scheduler. לאמת את שם השירות והמשתנים בממשק כשיוצרים אותו.
+
 ## Cloudflare
 
 - DNS של הדומיין הציבורי בפרוקסי מול הדומיין של Railway.
