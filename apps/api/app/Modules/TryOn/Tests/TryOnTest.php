@@ -21,6 +21,7 @@ use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Tenancy\Models\Shop;
+use App\Modules\TryOn\Actions\GatePhoto;
 use App\Modules\TryOn\Filament\Operator\Pages\TryOnLog;
 use App\Modules\TryOn\Models\TryOnJob;
 use App\Modules\TryOn\Models\TryOnPhoto;
@@ -312,7 +313,8 @@ final class TryOnTest extends TestCase
         $this->getJson("/api/v1/try-on/{$this->site}/config?product=new-777{$page}", $origin)->assertNotFound();
 
         Http::fake(['www.store.test/*' => Http::response(self::picture(700, 700), 200, ['Content-Type' => 'image/jpeg'])]);
-        $this->gate[] = $this->hand(['subject' => 'neck', 'hands_visible' => 0, 'fingers_visible' => []]);
+        // A head-and-neck selfie: its main subject is the face, and the neck shows. That serves a necklace.
+        $this->gate[] = $this->hand(['subject' => 'face', 'parts_visible' => ['face', 'neck'], 'hands_visible' => 0, 'fingers_visible' => []]);
         $photo = $this->call('POST', "/api/v1/try-on/{$this->site}/photos", ['vid' => self::VID, 'consent' => '1', 'preview' => $key, 'photo' => UploadedFile::fake()->createWithContent('me.jpg', self::picture(900, 900))],
             server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json('data.photo');
         $this->checks[] = $this->verdict();
@@ -333,6 +335,18 @@ final class TryOnTest extends TestCase
         $this->assertSame('furniture', TryOnClasses::guess('ספה תלת מושבית אפורה'));
         $this->assertSame('dress', TryOnClasses::guess('Linen summer dress'));
         $this->assertNull(TryOnClasses::guess('מקדחה רוטטת 18V'));
+    }
+
+    public function test_a_photo_serves_every_item_whose_part_it_shows_not_only_its_main_subject(): void
+    {
+        $face = ['subject' => 'face', 'parts_visible' => ['face', 'neck']];
+        $this->assertTrue(TryOnClasses::fits('necklace', $face), 'the neck shows in a head-and-neck selfie');
+        $this->assertTrue(TryOnClasses::fits('earrings', $face));
+        $this->assertFalse(TryOnClasses::fits('necklace', ['subject' => 'face', 'parts_visible' => ['face']]), 'a neck covered or out of the photo');
+        $this->assertFalse(TryOnClasses::fits('ring', $face));
+
+        [$reason, $usable] = app(GatePhoto::class)->decide($this->hand(['subject' => 'other', 'parts_visible' => [], 'hands_visible' => 0, 'fingers_visible' => []]));
+        $this->assertSame(['no_subject', []], [$reason, $usable], 'a mug serves nothing');
     }
 
     public function test_pictures_are_deleted_after_the_shops_days_and_the_log_stays(): void

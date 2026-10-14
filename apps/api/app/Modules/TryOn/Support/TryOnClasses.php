@@ -89,9 +89,25 @@ final class TryOnClasses
         return self::GROUPS[$class] ?? null;
     }
 
+    /** The parts of a person the photo check reports as visible. */
+    public const PARTS = ['hand', 'wrist', 'neck', 'ear', 'face', 'body_upper', 'body_full', 'foot'];
+
     public static function accepts(string $class, string $subject): bool
     {
         return in_array($subject, self::SUBJECTS[$class] ?? [], true);
+    }
+
+    /**
+     * Whether a checked photo serves this class: its main subject, or any part it shows clearly, is
+     * one the class needs. A head-and-neck photo (main subject: face) serves a necklace.
+     *
+     * @param  array<string, mixed>  $gate
+     */
+    public static function fits(string $class, array $gate): bool
+    {
+        $shown = array_merge([(string) ($gate['subject'] ?? '')], array_map('strval', (array) ($gate['parts_visible'] ?? [])));
+
+        return array_intersect($shown, self::SUBJECTS[$class] ?? []) !== [];
     }
 
     /**

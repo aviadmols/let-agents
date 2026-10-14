@@ -62,7 +62,7 @@ final class StartTryOn
             return ['problem' => 'not_tryable'] + $none;
         }
 
-        if (! TryOnClasses::accepts($class, (string) ($photo->gate['subject'] ?? ''))) {
+        if (! TryOnClasses::fits($class, (array) $photo->gate)) {
             return ['problem' => 'wrong_subject'] + $none;
         }
 

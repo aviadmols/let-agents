@@ -30,7 +30,8 @@ final class GatePhoto
 {
     private const PROMPT = 'tryon_gate';
 
-    private const PROMPT_VERSION = 1;
+    // v2: every part of the person that is visible, not only the main one (a head-and-neck photo serves a necklace).
+    private const PROMPT_VERSION = 2;
 
     private const OUTPUT_TOKENS = 600;
 
@@ -54,8 +55,10 @@ final class GatePhoto
         $hash = hash('sha256', $bytes);
         $known = TryOnPhoto::query()->where('visitor_hash', $visitorHash)->where('photo_hash', $hash)->latest()->first();
 
-        // Looked at before: the same answer, unless it was the model or the budget that failed then.
-        if ($known !== null && ! in_array($known->reject_code, ['model_failed', 'busy'], true)) {
+        // Looked at before: the same answer, unless it was the model or the budget that failed then, or
+        // the look was by an older version of the prompt (what it reports changed).
+        $current = $known !== null && ($known->gate === null || (int) ($known->gate['prompt_version'] ?? 1) === self::PROMPT_VERSION);
+        if ($known !== null && $current && ! in_array($known->reject_code, ['model_failed', 'busy'], true)) {
             return $this->outcome($known);
         }
 
@@ -89,7 +92,7 @@ final class GatePhoto
         }
 
         $cost = $reply->costUsd($this->price('input'), $this->price('output'));
-        $gate = $this->facts($reply->data);
+        $gate = $this->facts($reply->data) + ['prompt_version' => self::PROMPT_VERSION];
         [$reason, $usable] = $this->decide($gate);
 
         $photo->update(['gate' => $gate, 'usable' => $usable, 'status' => $reason === null ? TryOnPhoto::OK : TryOnPhoto::REJECTED, 'reject_code' => $reason, 'cost_usd' => round($cost, 6)]);
@@ -114,7 +117,6 @@ final class GatePhoto
             $gate['minor_present'] => 'minor',
             $gate['people_count'] >= 2 => 'several_people',
             $gate['subject'] === 'room' && $gate['people_count'] > 0 => 'people_in_room',
-            $gate['subject'] === 'other' || $gate['subject'] === 'foot' => 'no_subject',
             default => null,
         };
 
@@ -122,7 +124,8 @@ final class GatePhoto
             return [$reason, []];
         }
 
-        $usable = array_keys(array_filter(TryOnClasses::SUBJECTS, fn (array $subjects): bool => in_array($gate['subject'], $subjects, true)));
+        // What the photo can serve, by its main subject or any part it shows; nothing (a foot, a mug): no subject.
+        $usable = array_values(array_filter(array_keys(TryOnClasses::SUBJECTS), fn (string $class): bool => TryOnClasses::fits($class, $gate)));
 
         return [$usable === [] ? 'no_subject' : null, $usable];
     }
@@ -139,6 +142,7 @@ final class GatePhoto
 
         return [
             'subject' => in_array($data['subject'] ?? null, $subjects, true) ? $data['subject'] : 'other',
+            'parts_visible' => array_values(array_intersect(TryOnClasses::PARTS, array_map('strval', (array) ($data['parts_visible'] ?? [])))),
             'people_count' => max(0, (int) ($data['people_count'] ?? 0)),
             'minor_present' => ($data['minor_present'] ?? true) !== false,
             'quality' => in_array($data['quality'] ?? null, ['ok', 'blurry', 'dark', 'cropped', 'occluded'], true) ? $data['quality'] : 'blurry',
