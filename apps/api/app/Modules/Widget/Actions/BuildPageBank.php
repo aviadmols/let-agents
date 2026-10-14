@@ -4,6 +4,7 @@ namespace App\Modules\Widget\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Features\UnknownFeature;
 use App\Core\Modules\ModuleRepository;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsPopularity;
@@ -198,6 +199,7 @@ final class BuildPageBank
         $this->traced('curated', $bank['sections']);
         $bank['bank_version'] = max(1, $version);
         $bank['teaser'] = $bank['sections'] === [] ? null : $this->teaser($bank['sections'][0]);
+        $bank['tryon'] = $type === 'product' ? $this->tryOn($shopId, $externalId) : null;
         $bank['compare'] = $compare;
         // The question box (Assistant module), when the shop has it on for this kind of page, and
         // how many questions were already asked here: the assistant's line says so. On a guide the
@@ -1374,6 +1376,29 @@ final class BuildPageBank
             return ! in_array($candidate, self::SWITCHABLE, true)
                 || Features::enabled('widget.show_'.$candidate, $shopId);
         }));
+    }
+
+    /**
+     * Whether the product can be tried on (docs/try-on.md): the shop turned Try-On on and the catalog
+     * scan marked the product with a try-on class. The widget then loads the Try-On window, and only
+     * then. Read by key and by fact: the Widget does not depend on the TryOn module.
+     *
+     * @return array{class: string}|null
+     */
+    private function tryOn(string $shopId, string $externalId): ?array
+    {
+        try {
+            if (! Features::enabled('try_on.enabled', $shopId)) {
+                return null;
+            }
+        } catch (UnknownFeature) {
+            return null;
+        }
+
+        $class = $this->tenant->run($shopId, fn () => EnrichmentFact::query()->where('kind', FactKind::TryOn)->where('key', 'class')->where('status', FactStatus::Approved)
+            ->whereHas('product', fn ($q) => $q->where('external_id', $externalId)->whereNull('removed_at'))->latest('id')->value('value_text'));
+
+        return is_string($class) && $class !== 'none' ? ['class' => $class] : null;
     }
 
     /**

@@ -44,7 +44,9 @@ final class TryOnController
             return $connection;
         }
 
-        return app(TenantContext::class)->run($connection->shop_id, function () use ($request): JsonResponse {
+        $locale = in_array($request->query('locale'), ['he', 'en'], true) ? (string) $request->query('locale') : 'he';
+
+        return app(TenantContext::class)->run($connection->shop_id, function () use ($request, $locale, $connection): JsonResponse {
             $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $request->query('product'))->first();
             $class = $product === null ? null : StartTryOn::classOf($product->id);
 
@@ -53,6 +55,8 @@ final class TryOnController
                 'class' => $class,
                 'group' => $class === null ? null : TryOnClasses::group($class),
                 'needs' => $class === null ? [] : TryOnClasses::SUBJECTS[$class],
+                'note' => __('try_on::try_on.ai_note', [], $locale),
+                'labels' => __('try_on::try_on.ui', ['days' => (string) Settings::get('try_on.retention_days', $connection->shop_id)], $locale),
             ]], 200, ['Cache-Control' => 'public, max-age=300']);
         });
     }
@@ -145,6 +149,16 @@ final class TryOnController
         return $job === null
             ? response()->json(['error' => 'unknown_try'], 404)
             : response()->json(['data' => $this->state($job)], 200, ['Cache-Control' => 'no-store']);
+    }
+
+    /** The storefront's Try-On window, served like the other storefront scripts. */
+    public function script(Request $request): Response
+    {
+        $script = (string) file_get_contents(dirname(__DIR__, 2).'/resources/tryon/let-agents-tryon.js');
+        $etag = '"'.substr(hash('sha256', $script), 0, 20).'"';
+        $headers = ['Content-Type' => 'application/javascript; charset=utf-8', 'Cache-Control' => 'public, max-age=300', 'ETag' => $etag, 'X-Content-Type-Options' => 'nosniff'];
+
+        return $request->header('If-None-Match') === $etag ? response('', 304, $headers) : response($script, 200, $headers);
     }
 
     /** A kept picture, through an address the server signed and that expires. */

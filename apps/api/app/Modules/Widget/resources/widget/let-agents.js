@@ -3694,6 +3694,19 @@
     return line;
   }
 
+  /** The Try-On window's script, once, with what it needs to know of this page. */
+  function loadTryOn() {
+    if (window.LetAgentsTryOnContext || document.querySelector('script[data-let-agents-tryon]')) {
+      return;
+    }
+    window.LetAgentsTryOnContext = { api: API, site: ctx.site, product: String(PAGE_ID), locale: String(ctx.locale || 'he').slice(0, 2) };
+    var script = document.createElement('script');
+    script.src = API + '/try-on/let-agents-tryon.js';
+    script.async = true;
+    script.setAttribute('data-let-agents-tryon', '');
+    document.head.appendChild(script);
+  }
+
   // ---------------------------------------------------------------- start
 
   function start() {
@@ -3738,6 +3751,12 @@
         if (!showWidget) {
           rememberCurrent(null);
           return;
+        }
+
+        // Try-On, only where the shop turned it on and the product can be tried: its own script,
+        // which puts its button in this widget's row (docs/try-on.md).
+        if (PAGE_TYPE === 'product' && data.tryon && data.tryon['class']) {
+          loadTryOn();
         }
 
         return Promise.all([fetchViewed(), fetchSearched()]).then(function (both) {

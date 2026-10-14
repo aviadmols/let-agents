@@ -233,6 +233,27 @@ final class TryOnTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/nano-banana|claude|gpt|\$0\./iu', strip_tags($html));
     }
 
+    public function test_the_widget_loads_try_on_only_where_it_is_on_and_the_window_gets_its_words_from_the_server(): void
+    {
+        $page = fn (string $id) => $this->getJson("/api/v1/widget/{$this->site}/page?type=product&id={$id}&locale=he", ['Origin' => 'https://www.store.test'])->assertOk()->json();
+
+        $this->assertSame(['class' => 'ring'], $page('ring-1')['tryon']);
+        $this->assertNull($page('drill-1')['tryon'], 'a product the scan did not mark');
+
+        $config = $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1&locale=he", ['Origin' => 'https://www.store.test'])->json('data');
+        $this->assertSame('העלו תמונה של היד', $config['labels']['upload_title']['jewelry']);
+        $this->assertStringContainsString('90 יום', $config['labels']['consent']);
+        $this->assertSame('התמונה נוצרה באמצעות AI ויכולה להיות לא מדויקת.', $config['note']);
+
+        $script = $this->get('/api/v1/try-on/let-agents-tryon.js')->assertOk();
+        $this->assertStringContainsString('application/javascript', (string) $script->headers->get('Content-Type'));
+        $this->assertStringContainsString('LetAgentsTryOn', $script->getContent());
+
+        Features::override('try_on.enabled', false, $this->shop->id);
+        cache()->flush();
+        $this->assertNull($page('ring-1')['tryon'], 'off: the widget never loads it');
+    }
+
     public function test_pictures_are_deleted_after_the_shops_days_and_the_log_stays(): void
     {
         $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
