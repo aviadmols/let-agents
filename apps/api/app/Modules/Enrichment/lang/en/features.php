@@ -9,6 +9,10 @@ return [
         'label' => 'Read attributes from the store\'s text in code',
         'description' => 'Code reads the vocabulary\'s choices, numbers and flags from the store\'s fields (type, tags, attributes), the title and the start of the description, in that order, and keeps where each fact was read and how sure its source is.',
     ],
+    'schema_auto_advance' => [
+        'label' => 'Go on to the full scan when the structure scores well',
+        'description' => 'When every branch\'s vocabulary scores at least the pass score and nothing hard failed, it is approved and the scan goes on without waiting. Off: the score is shown and a person approves. Turn it on after comparing the score with your own judgment on a store or two.',
+    ],
     'auto_approve' => [
         'label' => 'Approve checked facts automatically',
         'description' => 'When code and a model agree, or a reviewer model confirms, the fact is approved. When off, every fact waits for a person.',

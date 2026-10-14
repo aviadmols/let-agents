@@ -9,7 +9,8 @@
 
     <x-filament::section>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-            <x-filament::button wire:click="discover" icon="heroicon-o-sparkles">{{ $t('discover') }}</x-filament::button>
+            <x-filament::button wire:click="buildStructure" icon="heroicon-o-squares-2x2">{{ $t('build_structure') }}</x-filament::button>
+            <x-filament::button wire:click="discover" color="gray" icon="heroicon-o-sparkles">{{ $t('discover') }}</x-filament::button>
             <x-filament::button wire:click="readCatalog" color="gray" icon="heroicon-o-arrow-path">{{ $t('read_catalog') }}</x-filament::button>
             <span style="{{ $muted }}">{{ $t('how') }}</span>
         </div>
@@ -25,7 +26,7 @@
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
                 @foreach ($proposals as $item)
                     <x-filament::button size="sm" color="gray" wire:click="open('{{ $item->id }}')">
-                        {{ $item->created_at?->format('d/m H:i') }} · {{ $t('statuses.'.$item->status) }} · {{ $t('sampled', ['n' => $item->sampled]) }}
+                        {{ $item->created_at?->format('d/m H:i') }}@if ($item->branch) · {{ $item->branch['name'] }}@endif · {{ $t('statuses.'.$item->status) }}@if ($item->score !== null) · {{ $item->score }}@endif · {{ $t('sampled', ['n' => $item->sampled]) }}
                     </x-filament::button>
                 @endforeach
             </div>
@@ -42,8 +43,34 @@
                 <x-filament::badge :color="$colors[$p->status] ?? 'gray'">{{ $t('statuses.'.$p->status) }}</x-filament::badge>
                 {{ $p->created_at?->format('d/m/Y H:i') }} · {{ $t('sampled', ['n' => $p->sampled]) }}
                 @if ($p->template) · {{ $t('from_template', ['template' => $p->template]) }} @endif
+                @if ($p->branch) · {{ $t('branch_of', ['name' => $p->branch['name'], 'path' => $p->branch['path'], 'products' => $p->branch['products']]) }} @endif
             </x-slot>
             @if ($p->summary)<p>{{ $p->summary }}</p>@endif
+            @php($sc = $this->scoreOf($p))
+            @if ($sc)
+                <div style="{{ $card }};margin-top:10px" data-schema-score>
+                    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:baseline">
+                        <span style="font-size:34px;font-weight:700;line-height:1">{{ $sc['score'] }}</span><span style="{{ $muted }}">/ 100 · {{ $t('pass_score', ['pass' => $sc['pass']]) }}</span>
+                        <x-filament::badge :color="$sc['gate'] === 'passed' ? 'success' : ($sc['gate'] === 'hard_failure' ? 'danger' : 'warning')">{{ $t('gate.'.$sc['gate']) }}</x-filament::badge>
+                        @if ($sc['cost'] !== null)<span style="{{ $muted }}">{{ $t('cost', ['usd' => number_format($sc['cost'], 4)]) }}</span>@endif
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:13px">
+                        @foreach ($sc['parts'] as $part)
+                            <span>{{ $t('score_parts.'.$part['key']) }} <strong>{{ $part['value'] }}</strong> <span style="{{ $muted }}">/ {{ $part['weight'] }}</span></span>
+                        @endforeach
+                    </div>
+                    @foreach ($sc['hard'] as $failure)
+                        <div style="margin-top:6px"><x-filament::badge color="danger">{{ $t('hard.'.$failure) }}</x-filament::badge></div>
+                    @endforeach
+                    @if (! empty($sc['pilot']['asked']))
+                        <div style="margin-top:8px;font-size:13px"><strong>{{ $t('pilot_found', ['products' => $sc['pilot']['products'], 'on' => $t('measured_on.'.($sc['pilot']['measured_on'] ?? 'asked'))]) }}</strong>
+                            @foreach ($sc['pilot']['asked'] as $key)
+                                <span style="white-space:nowrap;margin-inline-end:12px"><code dir="ltr">{{ $key }}</code> {{ $sc['pilot']['found'][$key] ?? 0 }}/{{ $sc['pilot']['products'] }}</span>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
             @if ($p->status === 'proposed')
                 <div style="display:flex;gap:8px;margin-top:10px">
                     <x-filament::button color="success" wire:click="decide('{{ $p->id }}', true)" wire:confirm="{{ $t('approve_confirm') }}">{{ $t('approve') }}</x-filament::button>
@@ -77,8 +104,8 @@
                         <tbody>
                         @foreach ($this->rows($p) as $row)
                             <tr style="{{ str_starts_with($row['decision'], 'removed') ? 'opacity:.6' : '' }}">
-                                <td style="{{ $cell }}">{{ $row['label'] }} <code dir="ltr" style="{{ $muted }}">{{ $row['key'] }}</code></td>
-                                <td style="{{ $cell }}" dir="ltr">{{ $row['part'] === 'type' ? $t('product_type') : $row['kind'] }}</td>
+                                <td style="{{ $cell }}">{{ $row['label'] }} <code dir="ltr" style="{{ $muted }}">{{ $row['key'] }}</code>@if ($row['part'] === 'attribute' && $row['why'] !== '' && ! str_starts_with($row['decision'], 'removed'))<div style="{{ $muted }}">{{ $row['why'] }}</div>@endif</td>
+                                <td style="{{ $cell }}" dir="ltr">{{ $row['part'] === 'type' ? $t('product_type') : $row['kind'] }}@if ($row['part'] === 'type' && $row['kind'] !== '') <span style="{{ $muted }}">{{ $row['kind'] }}</span>@endif @if (! empty($row['importance']))<x-filament::badge size="sm" :color="$row['importance'] === 'required' ? 'danger' : 'warning'">{{ $t('importance.'.$row['importance']) }}</x-filament::badge>@endif</td>
                                 <td style="{{ $cell }};font-size:12px">
                                     @foreach ($row['values'] as $value)<span style="white-space:nowrap">{{ $value['label'] }} <span style="{{ $muted }}">{{ $pct($value['share']) }}</span></span>@if (! $loop->last) · @endif @endforeach
                                 </td>

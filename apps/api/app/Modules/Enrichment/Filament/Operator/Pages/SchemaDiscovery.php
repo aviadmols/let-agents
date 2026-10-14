@@ -2,15 +2,19 @@
 
 namespace App\Modules\Enrichment\Filament\Operator\Pages;
 
+use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\DecideSchemaProposal;
+use App\Modules\Enrichment\Actions\ScoreSchemaProposal;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -63,7 +67,7 @@ final class SchemaDiscovery extends Page
     public function proposals(): Collection
     {
         return EnrichmentSchemaProposal::query()->latest()->limit(20)
-            ->get(['id', 'status', 'sampled', 'template', 'summary', 'created_at', 'decided_at', 'vocabulary_id']);
+            ->get(['id', 'status', 'sampled', 'template', 'summary', 'created_at', 'decided_at', 'vocabulary_id', 'branch', 'score']);
     }
 
     /** The one open below the list: the chosen one, or the latest. */
@@ -100,7 +104,7 @@ final class SchemaDiscovery extends Page
 
         foreach ((array) ($proposal->proposed['product_types'] ?? []) as $type) {
             $key = (string) $type['key'];
-            $rows[] = ['part' => 'type', 'key' => $key, 'label' => (string) ($type['label']['he'] ?? $key), 'kind' => '', 'values' => [],
+            $rows[] = ['part' => 'type', 'key' => $key, 'label' => (string) ($type['label']['he'] ?? $key), 'kind' => isset($type['tryon']) ? 'try-on · '.$type['tryon'] : '', 'values' => [],
                 'sample' => (float) ($coverage['product_types'][$key] ?? 0), 'catalog' => $read['types'][$key]['share'] ?? null,
                 'source' => self::sources($read['types'][$key]['sources'] ?? []), 'decision' => $decision, 'why' => '', 'author' => $author($key)];
         }
@@ -112,7 +116,7 @@ final class SchemaDiscovery extends Page
                 'kind' => $kind === 'number' ? 'number · '.($attribute['dimension'] ?? '') : $kind, 'values' => $values,
                 'sample' => (float) ($coverage['attributes'][$key]['share'] ?? 0), 'catalog' => $read['attributes'][$key]['share'] ?? null,
                 'source' => self::sources($read['attributes'][$key]['sources'] ?? []) ?: (string) ($proposal->review['writer']['sources'][$key] ?? ''),
-                'decision' => $decision, 'why' => '', 'author' => $author($key)];
+                'decision' => $decision, 'why' => (string) ($attribute['why']['he'] ?? ''), 'importance' => (string) ($attribute['importance'] ?? ''), 'author' => $author($key)];
         }
         foreach ((array) ($proposal->review['dropped'] ?? []) as $drop) {
             $rows[] = ['part' => $drop['kind'] === 'product_type' ? 'type' : 'attribute', 'key' => (string) $drop['key'], 'label' => '', 'kind' => (string) $drop['kind'],
@@ -215,6 +219,46 @@ final class SchemaDiscovery extends Page
     public function open(string $id): void
     {
         $this->proposal = $id;
+    }
+
+    /**
+     * What the proposal's score is made of and why the gate did or did not let it on: the score,
+     * its parts with their weights, the hard failures, the buyer-critical attributes the pilot
+     * looked for and how many of the pilot's products each was found on, and what the model calls
+     * cost (the writer's and the reviewer's together).
+     *
+     * @return array{score: int, parts: list<array{key: string, value: float, weight: int}>, hard: list<string>, pilot: array<string, mixed>, gate: string, pass: int, cost: float|null}|null
+     */
+    public function scoreOf(EnrichmentSchemaProposal $proposal): ?array
+    {
+        if ($proposal->score === null) {
+            return null;
+        }
+
+        $pass = (int) Settings::get('enrichment.schema_pass_score', $proposal->shop_id);
+        $gate = match (true) {
+            ! empty($proposal->hard_failures) => 'hard_failure',
+            $proposal->score < $pass => 'below_pass',
+            ! Features::enabled('enrichment.schema_auto_advance', $proposal->shop_id) => 'auto_off',
+            default => 'passed',
+        };
+        $parts = [];
+        foreach (ScoreSchemaProposal::WEIGHTS as $key => $weight) {
+            $parts[] = ['key' => $key, 'value' => (float) ($proposal->score_parts[$key] ?? 0), 'weight' => $weight];
+        }
+        $runs = array_filter([$proposal->review['run'] ?? null, $proposal->run_id]);
+        $cost = $runs === [] ? null : (float) Run::query()->whereIn('id', $runs)->sum('cost_usd');
+
+        return ['score' => (int) $proposal->score, 'parts' => $parts, 'hard' => (array) ($proposal->hard_failures ?? []), 'pilot' => (array) ($proposal->score_parts['pilot'] ?? []), 'gate' => $gate, 'pass' => $pass, 'cost' => $cost];
+    }
+
+    /** Divides the catalog into branches, writes and scores a vocabulary for each, in the background. */
+    public function buildStructure(): void
+    {
+        $shop = $this->shop();
+        Artisan::queue('enrichment', ['step' => 'structure', 'target' => $shop->slug])->onQueue('long');
+
+        Notification::make()->success()->title(__('enrichment::ui.schema.structure_started', ['shop' => $shop->name]))->send();
     }
 
     /** Counts a new sample, and writes and reviews a vocabulary from it, in the background. */

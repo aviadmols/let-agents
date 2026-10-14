@@ -94,6 +94,16 @@ the products that person looked at. Turn it on only with consent wording the sho
 their browsing follows them to their other browsers. Sending a code needs a channel that works:
 set `MAIL_MAILER` and the rest of the mail environment for email; phones wait for an SMS provider.
 
+## The first scan's structure (ADR 0011)
+
+A new shop's scan reads what the store says about itself first (`knowledge`, `posts`), then divides the
+catalog (`structure`), then reads the products with what that produced. `structure` is
+`php artisan enrichment structure <shop> [--force]`: the catalog is divided into branches in code, each
+branch gets a vocabulary written by one family and reviewed by the other (it reads the titles of the
+store's guides), code scores it on a pilot, and the gate lets it on or leaves it for a person on
+"Vocabulary discovery" (score, parts, hard failures, cost). Nothing is read with a vocabulary until it is
+approved; with `enrichment.schema_auto_advance` off (the default) every branch waits for a person.
+
 ## The log
 
 Scan and check log shows one product's whole story: the code reading, every fact with origin,

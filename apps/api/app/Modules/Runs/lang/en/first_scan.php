@@ -18,6 +18,7 @@ return [
     'too_soon' => 'A scan is running or started less than :hours hours ago.',
     'steps' => [
         'catalog' => 'Reading every product from the store',
+        'structure' => 'Dividing the catalog and deciding what to know about each part',
         'products' => 'Understanding the product details',
         'pages' => 'Scanning pages and pictures',
         'search' => 'Building the search',

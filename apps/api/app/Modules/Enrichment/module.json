@@ -35,6 +35,10 @@
         {
             "name": "auto_publish_rules",
             "default": true
+        },
+        {
+            "name": "schema_auto_advance",
+            "default": false
         }
     ],
     "settings": [
@@ -247,6 +251,42 @@
             "max": 3,
             "scope": "global",
             "unit": "rounds"
+        },
+        {
+            "name": "branch_min_products",
+            "type": "int",
+            "default": 15,
+            "min": 5,
+            "max": 200,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "branch_split_percent",
+            "type": "int",
+            "default": 35,
+            "min": 10,
+            "max": 90,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "max_branches",
+            "type": "int",
+            "default": 12,
+            "min": 1,
+            "max": 40,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "schema_pass_score",
+            "type": "int",
+            "default": 80,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
         },
         {
             "name": "schema_sample",

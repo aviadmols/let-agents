@@ -43,7 +43,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, vocabulary, schema, code, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, vocabulary, schema, structure, code, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results}
         {--template= : vocabulary template name}
@@ -55,6 +55,7 @@ final class EnrichmentCommand extends Command
         {--limit= : maximum requests}
         {--out= : where to write the task file}
         {--model= : the model that produced the results}
+        {--force : structure: also when a vocabulary already covers the whole catalog}
         {--include-done : ask again about products already read with the same input}
         {--scheduled : every shop that has articles, when its flag is on (audit only)}';
 
@@ -78,6 +79,8 @@ final class EnrichmentCommand extends Command
 
                 return $proposal === null ? $run : app(ProposeSchema::class)->handle($proposal);
             }),
+            // The first scan's structure: branches, a vocabulary for each, a score, and the gate.
+            'structure' => $this->shopStep(fn (Shop $shop): Run => app(BuildStructure::class)->handle($shop->id, (bool) $this->option('force'))),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),
             'content' => $this->shopStep(fn (Shop $shop): Run => app(ReadContentInCode::class)->handle($shop->id)),
             'promises' => $this->shopStep(fn (Shop $shop): Run => app(ReadPromisesInCode::class)->handle($shop->id)),

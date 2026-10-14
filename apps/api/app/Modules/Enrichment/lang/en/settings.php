@@ -93,6 +93,22 @@ return [
         'label' => 'Output price of the checker, per million tokens',
         'description' => 'From the price list of the provider.',
     ],
+    'branch_min_products' => [
+        'label' => 'Fewest products for a branch of its own',
+        'description' => 'A category with fewer products is not given a vocabulary of its own.',
+    ],
+    'branch_split_percent' => [
+        'label' => 'Share of the catalog that splits a category into its subcategories',
+        'description' => 'A category holding more than this share of all products, with at least two big subcategories, is split into them.',
+    ],
+    'max_branches' => [
+        'label' => 'Most branches in one scan',
+        'description' => 'The biggest branches first. The rest of the catalog is read with the closest branch, or not at all.',
+    ],
+    'schema_pass_score' => [
+        'label' => 'Score a vocabulary needs to pass',
+        'description' => '0 to 100, from what code measures on a pilot and from the reviewing model. Below it the vocabulary waits for a person.',
+    ],
     'schema_sample' => [
         'label' => 'Products sampled to discover the vocabulary',
         'description' => 'From every kind the store sells, in turn. Code counts them; a model reads only the counts.',

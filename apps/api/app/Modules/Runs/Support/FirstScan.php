@@ -34,11 +34,14 @@ final class FirstScan
     /** step => the command and its arguments; {shop} is the shop's slug. */
     public const STEPS = [
         'catalog' => ['catalog:sync', ['shop' => '{shop}']],
+        // What the store says about itself and in its posts is read before its catalog is divided and
+        // read: the guides show what its buyers ask, and the page index built after it holds them.
+        'knowledge' => ['assistant:knowledge', ['shop' => '{shop}']],
+        'posts' => ['assistant:read-posts', ['shop' => '{shop}']],
+        'structure' => ['enrichment', ['step' => 'structure', 'target' => '{shop}']],
         'products' => ['enrichment', ['step' => 'nightly', 'target' => '{shop}']],
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
-        'knowledge' => ['assistant:knowledge', ['shop' => '{shop}']],
-        'posts' => ['assistant:read-posts', ['shop' => '{shop}']],
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
     ];
 

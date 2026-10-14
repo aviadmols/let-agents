@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\SchemaStats;
+use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -33,24 +34,25 @@ final class DiscoverSchema
     ) {}
 
     /** @return array{run: Run, proposal: ?EnrichmentSchemaProposal} the proposal is null when nothing new was found */
-    public function handle(string $shopId, ?int $sample = null): array
+    public function handle(string $shopId, ?int $sample = null, ?array $branch = null): array
     {
         $proposal = null;
         $run = $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
-            work: function (RunContext $run) use ($shopId, $sample, &$proposal): void {
-                $proposal = $this->tenant->run($shopId, fn () => $this->discover($run, $shopId, $sample));
+            work: function (RunContext $run) use ($shopId, $sample, $branch, &$proposal): void {
+                $proposal = $this->tenant->run($shopId, fn () => $this->discover($run, $shopId, $sample, $branch));
             },
         );
 
         return ['run' => $run, 'proposal' => $proposal];
     }
 
-    private function discover(RunContext $run, string $shopId, ?int $size): ?EnrichmentSchemaProposal
+    /** @param array{key: string, name: string, path: string, root: string, products: int, split_from: string|null}|null $branch one branch of the catalog (BranchPlan), or null for all of it */
+    private function discover(RunContext $run, string $shopId, ?int $size, ?array $branch): ?EnrichmentSchemaProposal
     {
-        $sample = $this->sample($size ?? (int) Settings::get('enrichment.schema_sample', $shopId));
+        $sample = $this->sample($size ?? (int) Settings::get('enrichment.schema_sample', $shopId), $branch);
 
         if ($sample === []) {
             $run->output(['sampled' => 0])->summary('enrichment::runs.schema_nothing');
@@ -68,8 +70,8 @@ final class DiscoverSchema
 
         // The sample's ids stay with the counts, so the proposal's patterns are measured on the same products.
         $stats = SchemaStats::collect(CatalogProduct::query()->whereIn('id', $sample)->orderBy('external_id')->get(), $templates, PictureText::for($sample)) + ['sample' => $sample];
-        $fingerprint = hash('sha256', self::VERSION.'|'.json_encode($stats, JSON_UNESCAPED_UNICODE));
-        $last = EnrichmentSchemaProposal::query()->latest()->first();
+        $fingerprint = hash('sha256', self::VERSION.'|'.($branch['root'] ?? '*').'|'.json_encode($stats, JSON_UNESCAPED_UNICODE));
+        $last = EnrichmentSchemaProposal::query()->when($branch === null, fn ($q) => $q->whereNull('branch_key'), fn ($q) => $q->where('branch_key', $branch['key']))->latest()->first();
         $template = array_key_first($stats['templates'] ?? []);
         $fit = $template === null ? 0 : $stats['templates'][$template];
 
@@ -86,6 +88,8 @@ final class DiscoverSchema
             // A ready vocabulary is a starting point only when its types fit a good share of the titles.
             'template' => $fit >= ProposeSchema::TEMPLATE_FIT ? $template : null,
             'stats' => $stats,
+            'branch' => $branch,
+            'branch_key' => $branch['key'] ?? null,
             'fingerprint' => $fingerprint,
             'run_id' => $run->runId,
         ]);
@@ -108,11 +112,14 @@ final class DiscoverSchema
      *
      * @return list<string>
      */
-    private function sample(int $size): array
+    private function sample(int $size, ?array $branch = null): array
     {
         $groups = [];
+        $products = $branch === null
+            ? CatalogProduct::query()->active()
+            : VocabularyBranch::products(VocabularyDefinition::fromTrusted(['root_category_external_id' => $branch['root'], 'product_types' => [], 'excluded_category_external_ids' => []]));
 
-        CatalogProduct::query()->active()->select(['id', 'external_id', 'payload'])->orderBy('id')
+        $products->select(['id', 'external_id', 'payload'])->orderBy('id')
             ->chunk(500, function ($products) use (&$groups): void {
                 foreach ($products as $product) {
                     $kind = trim((string) ($product->payload['product_type'] ?? ''));

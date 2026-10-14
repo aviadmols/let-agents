@@ -23,6 +23,11 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $review
  * @property list<string>|null $problems
  * @property string|null $summary
+ * @property array{key: string, name: string, path: string, root: string, products: int, split_from: string|null}|null $branch
+ * @property string|null $branch_key
+ * @property int|null $score
+ * @property array<string, mixed>|null $score_parts
+ * @property list<string>|null $hard_failures
  * @property string $fingerprint
  * @property string|null $run_id
  * @property string|null $vocabulary_id
@@ -59,6 +64,10 @@ class EnrichmentSchemaProposal extends Model
             'coverage' => 'array',
             'review' => 'array',
             'problems' => 'array',
+            'branch' => 'array',
+            'score' => 'integer',
+            'score_parts' => 'array',
+            'hard_failures' => 'array',
             'sampled' => 'integer',
             'decided_at' => 'datetime',
         ];

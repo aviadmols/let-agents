@@ -12,9 +12,11 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
+use App\Modules\Enrichment\Scanning\KnowledgeEvidence;
 use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\SchemaStats;
 use App\Modules\Enrichment\Scanning\TextNormalizer;
+use App\Modules\Enrichment\Scanning\TryOnEligibility;
 use App\Modules\Enrichment\Scanning\Units;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -36,7 +38,7 @@ final class ProposeSchema
     public const TEMPLATE_FIT = 0.3;
 
     /** The released version each prompt is sent at; a released one is never edited. */
-    private const PROMPTS = ['schema_writer' => 2, 'schema_review' => 2, 'schema_revise' => 2];
+    private const PROMPTS = ['schema_writer' => 3, 'schema_review' => 3, 'schema_revise' => 3];
 
     private const WRITER_OUTPUT_TOKENS = 12000;
 
@@ -77,9 +79,13 @@ final class ProposeSchema
         $stats = $proposal->stats;
         $template = $proposal->template === null ? null : ImportVocabulary::template($proposal->template);
         $texts = $this->texts((array) ($stats['sample'] ?? []));
+        $knowledge = KnowledgeEvidence::of($proposal->branch);
         $input = [
             'store' => (string) Shop::query()->whereKey($proposal->shop_id)->value('name'),
             'stats' => array_diff_key($stats, ['sample' => true]),
+            'branch' => $proposal->branch === null ? null : array_intersect_key($proposal->branch, array_flip(['name', 'path', 'products'])),
+            // What the store's own guides say buyers should know: titles, read with the counts and never instead.
+            'knowledge' => $knowledge,
             'template' => $template,
             'dimensions' => array_keys(Units::CANONICAL),
         ];
@@ -103,10 +109,11 @@ final class ProposeSchema
             for ($round = 0; ; $round++) {
                 // Code first: what no pattern reads on the sample (a number with no capture, a choice
                 // that matches nothing) is a fact nothing supports, and would be answered with confidence.
-                [$vocabulary, $byCode] = self::drop($vocabulary, self::unread(self::coverage($vocabulary, $texts)));
+                [$vocabulary, $byCode] = self::drop($vocabulary, self::unread(self::coverage($vocabulary, $texts), $vocabulary));
                 $coverage = self::coverage($vocabulary, $texts);
                 $review = $this->call($run, $reviewer, 'reviewer', 'schema_review', [
                     'stats' => array_diff_key($stats, ['sample' => true, 'examples' => true]),
+                    'knowledge' => $knowledge,
                     'vocabulary' => array_intersect_key($vocabulary, array_flip(['product_types', 'attributes'])),
                     'coverage' => $coverage,
                 ], self::REVIEW_OUTPUT_TOKENS);
@@ -127,6 +134,7 @@ final class ProposeSchema
                 // missing, its notes), and the other family reviews the fix again.
                 $asked = [
                     'stats' => array_diff_key($stats, ['sample' => true]),
+                    'knowledge' => $knowledge,
                     'vocabulary' => $vocabulary,
                     'coverage' => self::coverage($vocabulary, $texts),
                     'review' => ['removed' => $byReviewer, 'missing' => (array) ($review['missing'] ?? []), 'notes' => (array) ($review['notes'] ?? [])],
@@ -170,6 +178,7 @@ final class ProposeSchema
             'proposed' => $vocabulary,
             'coverage' => self::coverage($vocabulary, $texts),
             'review' => [
+                'run' => $run->runId,
                 'verdict' => ($review['verdict'] ?? null) === 'good' ? 'good' : 'needs_work',
                 'dropped' => $dropped,
                 'missing' => array_slice(array_values(array_filter((array) ($review['missing'] ?? []), 'is_array')), 0, 15),
@@ -199,8 +208,14 @@ final class ProposeSchema
     private function repair(array $vocabulary, EnrichmentSchemaProposal $proposal): array
     {
         $vocabulary['schema_version'] = VocabularyDefinition::SCHEMA_VERSION;
-        $vocabulary['root_category_external_id'] = VocabularyDefinition::WHOLE_CATALOG;
-        $vocabulary['key'] = preg_match('/^[a-z][a-z0-9_]{1,40}$/', (string) ($vocabulary['key'] ?? '')) === 1 ? $vocabulary['key'] : ($proposal->template ?? 'store');
+        $branch = $proposal->branch;
+        $vocabulary['root_category_external_id'] = $branch['root'] ?? VocabularyDefinition::WHOLE_CATALOG;
+        $vocabulary['key'] = $branch !== null
+            ? $branch['key']
+            : (preg_match('/^[a-z][a-z0-9_]{1,40}$/', (string) ($vocabulary['key'] ?? '')) === 1 ? $vocabulary['key'] : ($proposal->template ?? 'store'));
+        if ($branch !== null && (! is_string($vocabulary['name']['he'] ?? null) || ! is_string($vocabulary['name']['en'] ?? null))) {
+            $vocabulary['name'] = ['he' => $branch['name'], 'en' => $branch['name']];
+        }
         $vocabulary['product_types'] = array_values(array_filter((array) ($vocabulary['product_types'] ?? []), 'is_array'));
         $vocabulary['attributes'] = array_values(array_filter((array) ($vocabulary['attributes'] ?? []), 'is_array'));
         // A number written as text ("group": "1") is the number it says.
@@ -221,6 +236,30 @@ final class ProposeSchema
         unset($entry);
         unset($vocabulary['uses'], $vocabulary['comparison'], $vocabulary['components'], $vocabulary['excluded_category_external_ids']);
         $problems = [];
+
+        // A try-on class, an importance or a reason that is not one of the allowed is left off, not the
+        // product type or the attribute it sits on: they are still right without it.
+        if (isset($vocabulary['tryon']) && $vocabulary['tryon'] !== false) {
+            unset($vocabulary['tryon']);
+            $problems[] = 'tryon: only false belongs on the vocabulary';
+        }
+        foreach ($vocabulary['product_types'] as &$entry) {
+            if (isset($entry['tryon']) && ! array_key_exists((string) $entry['tryon'], TryOnEligibility::CLASSES)) {
+                $problems[] = 'product type '.($entry['key'] ?? '?').': tryon '.json_encode($entry['tryon']).' is not clothes, jewelry or furniture';
+                unset($entry['tryon']);
+            }
+        }
+        unset($entry);
+        foreach ($vocabulary['attributes'] as &$entry) {
+            if (isset($entry['importance']) && ! in_array($entry['importance'], VocabularyDefinition::IMPORTANCE, true)) {
+                $problems[] = 'attribute '.($entry['key'] ?? '?').': importance '.json_encode($entry['importance']).' left off';
+                unset($entry['importance']);
+            }
+            if (isset($entry['why']) && (! is_string($entry['why']['he'] ?? null) || ! is_string($entry['why']['en'] ?? null))) {
+                unset($entry['why']);
+            }
+        }
+        unset($entry);
 
         // Each entry tried alone with a known-good frame: what breaks it is left out, and said.
         $frame = fn (array $types, array $attributes): array => ['product_types' => $types, 'attributes' => $attributes, 'image' => []] + $vocabulary;
@@ -300,15 +339,28 @@ final class ProposeSchema
     /**
      * What the sample shows no pattern reads: each attribute, choice value and product type at 0.
      *
+     * An attribute the vocabulary marks `required` or `recommended` is kept at 0: nobody writes it,
+     * and that is the gap to ask the store about, not a reason to stop asking (docs/strict-scan.md).
+     *
      * @param  array{product_types: array<string, float>, attributes: array<string, array<string, mixed>>}  $coverage
+     * @param  array<string, mixed>  $vocabulary  the vocabulary the coverage was measured on, when importance should be honoured
      * @return list<array{kind: string, key: string, why: string}>
      */
-    public static function unread(array $coverage): array
+    public static function unread(array $coverage, array $vocabulary = []): array
     {
         $why = (string) __('enrichment::ui.schema.unread');
+        $asked = [];
+        foreach ((array) ($vocabulary['attributes'] ?? []) as $entry) {
+            if (is_array($entry) && in_array($entry['importance'] ?? null, [VocabularyDefinition::REQUIRED, VocabularyDefinition::RECOMMENDED], true)) {
+                $asked[(string) ($entry['key'] ?? '')] = true;
+            }
+        }
         $out = [];
         foreach ($coverage['attributes'] as $key => $attribute) {
             if ((float) $attribute['share'] === 0.0) {
+                if (isset($asked[(string) $key])) {
+                    continue;
+                }
                 $out[] = ['kind' => 'attribute', 'key' => (string) $key, 'why' => $why];
 
                 continue;
@@ -345,7 +397,22 @@ final class ProposeSchema
             $why = mb_substr((string) ($drop['why'] ?? ''), 0, 200);
             $before = json_encode($vocabulary);
 
-            if (($drop['kind'] ?? null) === 'product_type') {
+            if (($drop['kind'] ?? null) === 'importance' && str_ends_with($key, '.importance')) {
+                // Only the importance goes; the attribute stays.
+                foreach ($vocabulary['attributes'] as &$entry) {
+                    if ($entry['key'] === substr($key, 0, -11)) {
+                        unset($entry['importance']);
+                    }
+                }
+                unset($entry);
+            } elseif (($drop['kind'] ?? null) === 'tryon' && str_ends_with($key, '.tryon')) {
+                foreach ($vocabulary['product_types'] as &$entry) {
+                    if ($entry['key'] === substr($key, 0, -6)) {
+                        unset($entry['tryon']);
+                    }
+                }
+                unset($entry);
+            } elseif (($drop['kind'] ?? null) === 'product_type') {
                 // The last type stays: a vocabulary needs one, and the operator sees the review.
                 if (count($vocabulary['product_types']) > 1) {
                     $vocabulary['product_types'] = array_values(array_filter($vocabulary['product_types'], fn (array $t): bool => $t['key'] !== $key));

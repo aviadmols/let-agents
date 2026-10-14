@@ -72,6 +72,11 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   (a vocabulary that says nothing about try-on). Vocabulary attributes carry `importance` (default `optional`) and `why`;
   `RequiredGaps` lists what a branch asks for. Yes/no attributes are not counted (code stores only the yes): write an
   "included / body only" choice instead.
+- First scan order: catalog, knowledge, posts, **structure**, products, pages, search, tags. `structure` (`BuildStructure`)
+  divides the catalog (`BranchPlan`, code), writes a vocabulary per branch (`ProposeSchema`, prompts v3, reads guide titles
+  from `KnowledgeEvidence`), scores it (`ScoreSchemaProposal`: pilot in code, never a model) and gates it
+  (`AdvanceSchemaProposal`, flag `enrichment.schema_auto_advance` off by default). A `required`/`recommended` attribute
+  is kept even when no product says it: that is the gap to ask the store about.
 - `php` CLI defaults to 128 MB here and `composer check` runs out of memory in the full suite; run
   `php -d memory_limit=2G vendor/bin/phpunit` when it does.
 
