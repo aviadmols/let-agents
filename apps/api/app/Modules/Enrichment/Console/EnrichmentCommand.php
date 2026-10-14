@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\AuditContentReading;
 use App\Modules\Enrichment\Actions\BuildStructure;
+use App\Modules\Enrichment\Actions\CollectProviderBatches;
 use App\Modules\Enrichment\Actions\ComputeProductRelations;
 use App\Modules\Enrichment\Actions\ComputeRankings;
 use App\Modules\Enrichment\Actions\CreateTaskFile;
@@ -27,6 +28,7 @@ use App\Modules\Enrichment\Scanning\WordAudit;
 use App\Modules\Enrichment\Support\TaskFile;
 use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Runs\Models\Run;
+use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Console\Command;
 
@@ -44,7 +46,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, vocabulary, schema, structure, code, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, collect, vocabulary, schema, structure, code, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results}
         {--template= : vocabulary template name}
@@ -58,6 +60,7 @@ final class EnrichmentCommand extends Command
         {--model= : the model that produced the results}
         {--force : structure: also when a vocabulary already covers the whole catalog}
         {--include-done : ask again about products already read with the same input}
+        {--all-products : nightly: every product a model has not read, not only a night of them (the first scan)}
         {--scheduled : every shop that has articles, when its flag is on (audit only)}';
 
     protected $description = 'Run enrichment steps from the command line.';
@@ -68,7 +71,9 @@ final class EnrichmentCommand extends Command
             'vocabulary' => $this->vocabulary(),
             'tasks' => $this->tasks(),
             'results' => $this->results(),
-            'nightly' => $this->shopStep(fn (Shop $shop): Run => app(RunNightlyReading::class)->handle($shop->id), 'enrichment.nightly'),
+            'nightly' => $this->shopStep(fn (Shop $shop): Run => app(RunNightlyReading::class)->handle($shop->id, (bool) $this->option('all-products')), 'enrichment.nightly'),
+            // The answers of batches a provider has: read every so often, for every shop whose reading goes in batches.
+            'collect' => $this->collect(),
             'rankings' => $this->rankings(),
             'code' => $this->shopStep(fn (Shop $shop): Run => app(ReadProductsInCode::class)->handle($shop->id)),
             // Read only: where the vocabulary's words would mislead code (WordAudit).
@@ -89,6 +94,27 @@ final class EnrichmentCommand extends Command
             'rules' => $this->rules(),
             default => $this->failWith('Unknown step.'),
         });
+    }
+
+    private function collect(): int
+    {
+        $shops = $this->option('scheduled')
+            ? Shop::query()->where('status', ShopStatus::Active)->orderBy('slug')->get()->filter(fn (Shop $shop): bool => Features::enabled('enrichment.batch_reading', $shop->id))
+            : collect([$this->shop()])->filter();
+
+        if ($shops->isEmpty()) {
+            return $this->option('scheduled') ? self::SUCCESS : $this->failWith('Shop not found.');
+        }
+
+        foreach ($shops as $shop) {
+            $run = app(CollectProviderBatches::class)->handle($shop->id);
+
+            if ($run !== null) {
+                $this->line($shop->slug.': '.$run->summary());
+            }
+        }
+
+        return self::SUCCESS;
     }
 
     private function vocabulary(): int

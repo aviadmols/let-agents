@@ -12,4 +12,6 @@ return [
     'discover_schema' => 'Counting a sample of products',
     'propose_schema' => 'Writing and reviewing a vocabulary',
     'reread_products' => 'Reading again products missing a detail',
+    'nightly_model' => 'Products read by a model',
+    'collect_batches' => 'Collecting batch answers from the provider',
 ];

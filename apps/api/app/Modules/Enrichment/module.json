@@ -43,6 +43,10 @@
         {
             "name": "web_lookup",
             "default": true
+        },
+        {
+            "name": "batch_reading",
+            "default": true
         }
     ],
     "settings": [

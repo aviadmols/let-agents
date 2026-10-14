@@ -25,6 +25,8 @@ return [
     'nightly_model' => 'A model read :asked products: :applied accepted, :rejected rejected.',
     'nightly_model_off' => 'Model reading is off for this shop.',
     'nightly_model_nothing' => 'No new products for a model to read.',
+    'nightly_model_submitted' => ':submitted products handed to the model in :batches batches. The answers are collected during the day.',
+    'batches_collected' => ':collected batches collected: :applied answers accepted, :rejected rejected. :running still with the provider, :lost lost and handed over again tonight.',
     'relations_computed' => ':relations relations: :complements complements for :products products, :families other sizes, :alternatives alternatives.',
     'relation_rules_saved' => 'Matching rules saved, version :version: :rules rules.',
     'relation_rules_invalid' => 'The matching rules were not saved: :count problems.',

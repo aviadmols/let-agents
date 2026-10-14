@@ -2,9 +2,11 @@
 
 namespace App\Modules\Enrichment\Actions;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
+use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
 use App\Modules\Enrichment\Enums\TaskType;
@@ -28,6 +30,11 @@ use App\Modules\Runs\Models\Run;
  * A night reads a bounded number on purpose. It keeps the spend predictable, it spreads a large
  * catalogue over a week or two instead of one expensive evening, and it means a prompt that turns
  * out to be wrong costs one night rather than the whole catalogue.
+ *
+ * Where the provider has a batch API (enrichment.batch_reading), the questions are handed over in
+ * one go at half the price and the answers are collected during the day; the night then only
+ * submits. The first scan asks for every unread product at once ($allProducts): batch after batch
+ * until nothing is left, which is the one time a whole catalogue is read in an evening.
  */
 final class RunNightlyModelReading
 {
@@ -35,23 +42,29 @@ final class RunNightlyModelReading
 
     public const ACTION = 'enrichment.nightly_model';
 
+    /** Batches handed over in one "all products" reading, at most: a guard, not a cap. */
+    private const MAX_ROUNDS = 100;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
         private readonly CreateTaskFile $batches,
         private readonly AnswerBatchWithModel $answers,
+        private readonly SubmitBatchToProvider $submit,
+        private readonly BatchChatModel $provider,
     ) {}
 
-    public function handle(string $shopId): Run
+    public function handle(string $shopId, bool $allProducts = false): Run
     {
         return $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
-            work: function (RunContext $run) use ($shopId): void {
+            input: ['all_products' => $allProducts],
+            work: function (RunContext $run) use ($shopId, $allProducts): void {
                 $limit = (int) Settings::get('enrichment.nightly_model_requests', $shopId);
 
-                if ($limit === 0) {
+                if ($limit === 0 && ! $allProducts) {
                     $run->output(['asked' => 0])->summary('enrichment::runs.nightly_model_off');
 
                     return;
@@ -59,49 +72,84 @@ final class RunNightlyModelReading
 
                 $model = (string) Settings::get('enrichment.reader_model');
                 $provider = AgentModel::provider('enrichment.reader_provider');
+                $viaBatch = Features::enabled('enrichment.batch_reading', $shopId) && $this->provider->supports($provider);
+                // The whole catalogue goes over in batches as large as a task file may be.
+                $limit = $allProducts ? (int) Settings::get('enrichment.max_requests_per_task_file', $shopId) : $limit;
 
                 // A shop's catalogue is divided between several vocabularies, and a product can
                 // only be read against the one its branch belongs to. Taking the first would mean
                 // reading one branch until it was finished and never touching the others, so each
                 // is tried in turn until one still has something unread.
+                $vocabularies = $this->tenant->run($shopId, fn () => EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get());
+
                 // A batch somebody exported and never brought answers back for leaves its
                 // products marked as already asked, so nothing would ever pick them up again.
-                // Those are answered first: they are the oldest questions waiting.
-                // Any kind of question, not only reading a product: facts waiting to be checked
-                // and articles waiting to be matched were left behind the same way.
+                // Those are answered first: they are the oldest questions waiting. One already
+                // in a provider's hands is the collector's, not tonight's.
                 $batch = $this->tenant->run($shopId, fn () => EnrichmentBatch::query()
                     ->where('status', BatchStatus::AwaitingResults)
+                    ->whereNull('provider_batch_id')
                     ->whereHas('items', fn ($q) => $q->where('status', ItemStatus::Pending))
                     ->oldest('created_at')
                     ->first());
 
-                $vocabularies = $batch !== null ? collect() : $this->tenant->run($shopId, fn () => EnrichmentVocabulary::query()
-                    ->where('active', true)->orderBy('key')->get());
+                $totals = ['asked' => 0, 'applied' => 0, 'rejected' => 0, 'stale' => 0, 'submitted' => 0, 'batches' => 0, 'stopped' => null, 'via' => $viaBatch ? 'batch' : 'direct', 'model' => $model];
 
-                foreach ($vocabularies as $vocabulary) {
-                    $batch = $this->batches->handle($shopId, TaskType::ProductExtraction, $vocabulary->id, limit: $limit)['batch'] ?? null;
+                for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
+                    if ($batch === null) {
+                        foreach ($vocabularies as $vocabulary) {
+                            $batch = $this->batches->handle($shopId, TaskType::ProductExtraction, $vocabulary->id, limit: $limit)['batch'] ?? null;
 
-                    if ($batch !== null) {
+                            if ($batch !== null) {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Nothing to read is the ordinary case for a shop that has caught up.
+                    if ($batch === null) {
                         break;
                     }
+
+                    $totals['batches']++;
+                    $totals['batch'] ??= $batch->id;
+
+                    if ($viaBatch) {
+                        $sent = $this->tenant->run($shopId, fn (): array => $this->submit->handle($run, $batch, $model, $provider));
+                        $totals['submitted'] += $sent['submitted'];
+                        $totals['stale'] += $sent['stale'];
+                        $stopped = $sent['stopped'];
+                    } else {
+                        $counts = $this->tenant->run($shopId, fn (): array => $this->answers->handle($run, $batch, $model, $limit, $provider));
+                        foreach (['asked', 'applied', 'rejected', 'stale'] as $key) {
+                            $totals[$key] += $counts[$key];
+                        }
+                        $stopped = $counts['stopped'];
+                    }
+
+                    if ($stopped !== null) {
+                        $totals['stopped'] = $stopped;
+
+                        break;
+                    }
+
+                    if (! $allProducts) {
+                        break;
+                    }
+
+                    // The next round builds the next batch: what was just handed over counts as asked.
+                    $batch = null;
                 }
 
-                // Nothing to read is the ordinary case for a shop that has caught up.
-                if ($batch === null) {
-                    $run->output(['asked' => 0, 'vocabularies' => $vocabularies->count()])
-                        ->summary('enrichment::runs.nightly_model_nothing');
+                $run->output($totals + ['vocabularies' => $vocabularies->count()]);
 
-                    return;
+                if ($totals['batches'] === 0) {
+                    $run->summary('enrichment::runs.nightly_model_nothing');
+                } elseif ($viaBatch) {
+                    $run->summary('enrichment::runs.nightly_model_submitted', ['submitted' => number_format($totals['submitted']), 'batches' => (string) $totals['batches']]);
+                } else {
+                    $run->summary('enrichment::runs.nightly_model', ['asked' => number_format($totals['asked']), 'applied' => number_format($totals['applied']), 'rejected' => number_format($totals['rejected'])]);
                 }
-
-                $counts = $this->tenant->run($shopId, fn (): array => $this->answers->handle($run, $batch, $model, $limit, $provider));
-
-                $run->output($counts + ['batch' => $batch->id, 'task' => $batch->task->value, 'model' => $model])
-                    ->summary('enrichment::runs.nightly_model', [
-                        'asked' => number_format($counts['asked']),
-                        'applied' => number_format($counts['applied']),
-                        'rejected' => number_format($counts['rejected']),
-                    ]);
             },
         );
     }

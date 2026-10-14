@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
@@ -39,6 +40,8 @@ final class NightlyModelReadingTest extends TestCase
         parent::setUp();
 
         $this->buildShop();
+        // These test asking one question at a time; the batch path has its own test.
+        Features::override('enrichment.batch_reading', false, $this->shop->id);
         $this->root = $this->category('1751', 'כלי עבודה חשמליים');
         $this->powerToolsVocabulary();
 

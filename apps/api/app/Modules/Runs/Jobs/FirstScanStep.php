@@ -23,7 +23,7 @@ final class FirstScanStep implements ShouldQueue
     /** A step that failed is not repeated: the night runs it again anyway. */
     public int $tries = 1;
 
-    /** @param array<string, string> $parameters */
+    /** @param array<string, string|bool> $parameters */
     public function __construct(
         public readonly string $shopId,
         public readonly string $step,

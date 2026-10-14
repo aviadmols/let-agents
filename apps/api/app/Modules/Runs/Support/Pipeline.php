@@ -45,6 +45,8 @@ final class Pipeline
             'enrichment.import_vocabulary' => ['model' => null],
             'enrichment.create_task_file' => ['model' => null],
             'enrichment.import_results' => ['model' => self::FROM_SETTING, 'outside' => true],
+            'enrichment.nightly_model' => ['model' => 'enrichment.reader_model'],
+            'enrichment.collect_batches' => ['model' => 'enrichment.reader_model'],
         ],
         'compute' => [
             'enrichment.import_relation_rules' => ['model' => null],

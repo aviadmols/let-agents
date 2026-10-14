@@ -31,7 +31,7 @@ final class FirstScan
 
     public const FAILED = 'failed';
 
-    /** step => the command and its arguments; {shop} is the shop's slug. */
+    /** step => the command and its arguments; {shop} is the shop's slug, true a flag. */
     public const STEPS = [
         'catalog' => ['catalog:sync', ['shop' => '{shop}']],
         // What the store says about itself and in its posts is read before its catalog is divided and
@@ -39,7 +39,8 @@ final class FirstScan
         'knowledge' => ['assistant:knowledge', ['shop' => '{shop}']],
         'posts' => ['assistant:read-posts', ['shop' => '{shop}']],
         'structure' => ['enrichment', ['step' => 'structure', 'target' => '{shop}']],
-        'products' => ['enrichment', ['step' => 'nightly', 'target' => '{shop}']],
+        // Every product a model has not read, in batches, not only a night's share.
+        'products' => ['enrichment', ['step' => 'nightly', 'target' => '{shop}', '--all-products' => true]],
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
@@ -93,7 +94,7 @@ final class FirstScan
 
         $jobs = [];
         foreach ($steps as $step => [$command, $parameters]) {
-            $jobs[] = new FirstScanStep($shop->id, $step, $command, array_map(fn (string $value): string => str_replace('{shop}', (string) $shop->slug, $value), $parameters));
+            $jobs[] = new FirstScanStep($shop->id, $step, $command, array_map(fn (string|bool $value): string|bool => is_string($value) ? str_replace('{shop}', (string) $shop->slug, $value) : $value, $parameters));
         }
 
         Bus::chain($jobs)->onQueue('long')->dispatch();

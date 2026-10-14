@@ -34,6 +34,14 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
                 ->onOneServer()
                 ->runInBackground();
 
+            // Answers of batches handed to a provider: read as they end, through the day.
+            $schedule->command('enrichment collect --scheduled')
+                ->everyTenMinutes()
+                ->name('enrichment:collect-batches')
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->runInBackground();
+
             $schedule->command('enrichment audit --scheduled')
                 ->weeklyOn(0, '04:40')
                 ->timezone('Asia/Jerusalem')

@@ -25,6 +25,8 @@ return [
     'nightly_model' => 'מודל קרא :asked מוצרים: :applied התקבלו, :rejected נדחו.',
     'nightly_model_off' => 'קריאה במודל כבויה לחנות הזאת.',
     'nightly_model_nothing' => 'אין מוצרים חדשים שמודל צריך לקרוא.',
+    'nightly_model_submitted' => 'נשלחו :submitted מוצרים לקריאה במודל, ב־:batches קבוצות. התשובות נאספות במהלך היום.',
+    'batches_collected' => 'נאספו :collected קבוצות: :applied תשובות התקבלו, :rejected נדחו. :running עדיין אצל הספק, :lost אבדו ויישלחו שוב בלילה.',
     'relations_computed' => ':relations קשרים: :complements מוצרים משלימים ל־:products מוצרים, :families מידות נוספות, :alternatives חלופות.',
     'relation_rules_saved' => 'נשמרו כללי ההתאמה, גרסה :version: :rules כללים.',
     'relation_rules_invalid' => 'כללי ההתאמה לא נשמרו: :count בעיות.',

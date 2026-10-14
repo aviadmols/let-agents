@@ -45,13 +45,15 @@ final class RunNightlyReading
 
     public function __construct(private readonly RecordsRuns $runs) {}
 
-    public function handle(string $shopId): Run
+    /** @param bool $allProducts the first scan: every product a model has not read, not only the night's share */
+    public function handle(string $shopId, bool $allProducts = false): Run
     {
         return $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
-            work: function (RunContext $run) use ($shopId): void {
+            input: ['all_products' => $allProducts],
+            work: function (RunContext $run) use ($shopId, $allProducts): void {
                 $done = [];
                 $failed = [];
 
@@ -61,7 +63,7 @@ final class RunNightlyReading
                         continue;
                     }
                     try {
-                        $step = app($action)->handle($shopId);
+                        $step = $name === 'model' ? app($action)->handle($shopId, $allProducts) : app($action)->handle($shopId);
                         $done[$name] = $step->status->value;
                     } catch (Throwable $e) {
                         // One reader failing is not a reason to leave the rest of the night

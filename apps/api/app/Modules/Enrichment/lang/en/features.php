@@ -29,6 +29,10 @@ return [
         'label' => 'Nightly reading',
         'description' => 'Every night, after the sync, code reads what changed in the shop again: products, promises, articles, superlatives and relations. No model, no cost.',
     ],
+    'batch_reading' => [
+        'label' => 'Read products in batches, at half price',
+        'description' => 'Questions for the model go to the provider in one batch and are answered during the day, at half the price of asking one by one. The answers are collected every ten minutes and checked in code as always. Off: each question is asked on its own, at once.',
+    ],
     'auto_publish_rules' => [
         'label' => 'Publish reading improvements automatically',
         'description' => 'A proposal two models agreed on, with a measured improvement, publishes itself — at most one version a week. An older version can always be put back on the Scan improvements screen.',

@@ -12,4 +12,6 @@ return [
     'discover_schema' => 'ספירת מדגם מוצרים',
     'propose_schema' => 'כתיבת אוצר מילים ובדיקתו',
     'reread_products' => 'קריאה חוזרת של מוצרים שחסר להם פרט',
+    'nightly_model' => 'קריאת מוצרים במודל',
+    'collect_batches' => 'איסוף תשובות של קבוצות מהספק',
 ];
