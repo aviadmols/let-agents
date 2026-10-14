@@ -38,7 +38,7 @@ final class CaptionImages implements CaptionsPictures
 
     public const ACTION = 'retrieval.caption_images';
 
-    public const PROMPT_VERSION = 2;
+    public const PROMPT_VERSION = 3;
 
     private const BATCH = 16;
 

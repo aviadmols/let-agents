@@ -122,6 +122,25 @@ final class JewelryVocabularyTest extends TestCase
         $this->assertTrue($this->jewelry->readFromImage('stone_color'));
     }
 
+    public function test_a_picture_tells_only_how_a_product_looks(): void
+    {
+        $looks = fn (VocabularyDefinition $v): array => array_values(array_filter(array_column($v->attributes(), 'key'), fn (string $key): bool => $v->readFromImage($key)));
+
+        $this->assertSame(['metal', 'stone', 'stone_color', 'stone_shape', 'setting_style', 'style', 'motif', 'earring_style', 'chain_style'], $looks($this->jewelry),
+            'the look of a jewel; never its karat, weight, length, who it is for, or whether a chain comes with it');
+
+        [$tools] = VocabularyDefinition::parse((array) ImportVocabulary::template('power-tools'));
+        $this->assertSame([], $looks($tools), 'nothing about a drill from its picture: not its battery, its kit, its power or its motor');
+
+        // A vocabulary written for a clothes branch says nothing about pictures: the key decides, and a vocabulary can say otherwise.
+        $clothes = VocabularyDefinition::fromTrusted(['key' => 'tops', 'attributes' => [
+            ['key' => 'color', 'type' => 'enum'], ['key' => 'pattern', 'type' => 'enum'], ['key' => 'sleeve_length', 'type' => 'enum'], ['key' => 'fabric', 'type' => 'enum'],
+            ['key' => 'size', 'type' => 'enum'], ['key' => 'washable', 'type' => 'boolean'], ['key' => 'cotton_percent', 'type' => 'number'],
+            ['key' => 'occasion', 'type' => 'enum', 'visible' => true], ['key' => 'main_color', 'type' => 'enum', 'visible' => false],
+        ]]);
+        $this->assertSame(['color', 'pattern', 'sleeve_length', 'fabric', 'occasion'], $looks($clothes));
+    }
+
     public function test_the_parts_of_a_jewel_name_where_a_stone_sits(): void
     {
         $center = collect($this->jewelry->components())->firstWhere('key', 'center');

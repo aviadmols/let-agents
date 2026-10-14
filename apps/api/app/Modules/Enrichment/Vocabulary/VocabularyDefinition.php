@@ -249,10 +249,42 @@ final class VocabularyDefinition
         return (float) ($thresholds[$key] ?? $thresholds['default'] ?? self::DEFAULT_IMAGE_FILTER_CONFIDENCE);
     }
 
-    /** Whether a picture may say this at all: a karat, a weight or a size is never read from one. */
+    /**
+     * Words in an attribute's key that say it is about how the product looks: what a picture can
+     * show (colour, shape, pattern, material, stone, setting, the cut of a garment).
+     */
+    public const LOOKS = '/(?:^|_)(?:colou?rs?|shapes?|patterns?|prints?|materials?|fabrics?|finish|texture|metals?|stones?|styles?|motifs?|setting|cut|neckline|sleeves?|collar|fit|silhouette|closure|heel|toe|design|look)(?:$|_)/';
+
+    /**
+     * Whether a picture may say this at all. Only how the product looks: a choice of colour,
+     * shape, pattern, material, stone or cut. Never a number (a karat, a weight, a size, a
+     * capacity) and never a yes/no (a battery included, a charger in the box): a picture shows the
+     * piece, not what comes with it. The vocabulary names what a picture may tell under
+     * `image.filter_confidence` or with `visible` on the attribute; otherwise its key must say
+     * it is about looks. `image.never` always wins.
+     */
     public function readFromImage(string $key): bool
     {
-        return ! in_array($key, (array) ($this->data['image']['never'] ?? []), true);
+        if (in_array($key, (array) ($this->data['image']['never'] ?? []), true)) {
+            return false;
+        }
+
+        if ($key === self::PRODUCT_TYPE) {
+            return true;
+        }
+
+        $attribute = $this->attribute($key);
+
+        if ($attribute === null || in_array($attribute['type'] ?? 'number', ['number', 'boolean'], true)) {
+            return false;
+        }
+
+        if (array_key_exists('visible', $attribute)) {
+            return $attribute['visible'] === true;
+        }
+
+        return array_key_exists($key, (array) ($this->data['image']['filter_confidence'] ?? []))
+            || preg_match(self::LOOKS, $key) === 1;
     }
 
     /** @return list<string> */

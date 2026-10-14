@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Actions\BuildImageIndex;
 use App\Modules\Retrieval\Actions\BuildIndex;
+use App\Modules\Retrieval\Actions\CaptionImages;
 use App\Modules\Retrieval\Actions\MatchProducts;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
@@ -18,13 +19,17 @@ use Illuminate\Console\Command;
  *
  *   retrieval index gueta-avigdor
  *   retrieval images gueta-avigdor   the pictures, when retrieval.image_index is on
+ *   retrieval pictures gueta-avigdor every picture and how it looks, part after part (the first scan)
  *   retrieval match gueta-avigdor
  *   retrieval nightly --all          what the schedule runs
  */
 final class RetrievalCommand extends Command
 {
+    /** How long the pictures step goes on; what is left, the night and the scan button finish. */
+    private const PICTURE_MINUTES = 50;
+
     protected $signature = 'retrieval
-        {step : index, images, match or nightly}
+        {step : index, images, pictures, match or nightly}
         {target? : shop slug or ID}
         {--all : every active shop}';
 
@@ -35,6 +40,7 @@ final class RetrievalCommand extends Command
         return $tenant->runUnscoped(fn (): int => match ($this->argument('step')) {
             'index' => $this->each(fn (Shop $shop): array => [app(BuildIndex::class)->handle($shop->id)]),
             'images' => $this->each(fn (Shop $shop): array => [app(BuildImageIndex::class)->handle($shop->id)]),
+            'pictures' => $this->each(fn (Shop $shop): array => $this->pictures($shop)),
             'match' => $this->each(fn (Shop $shop): array => [app(MatchProducts::class)->handle($shop->id)]),
             'nightly' => $this->each(fn (Shop $shop): array => array_values(array_filter([
                 Features::enabled('retrieval.index', $shop->id) ? app(BuildIndex::class)->handle($shop->id) : null,
@@ -43,6 +49,39 @@ final class RetrievalCommand extends Command
             ]))),
             default => $this->failWith('Unknown step.'),
         });
+    }
+
+    /**
+     * Every picture of the shop and what it shows, in one go: the picture scan part after part
+     * until none is left, then the descriptions the same way, within the step's time. Off where
+     * the shop has no picture index (it needs the picture model's key).
+     *
+     * @return list<Run>
+     */
+    private function pictures(Shop $shop): array
+    {
+        if (! Features::enabled('retrieval.image_index', $shop->id)) {
+            $this->line("{$shop->slug}: pictures off");
+
+            return [];
+        }
+
+        $until = now()->addMinutes(self::PICTURE_MINUTES);
+        $runs = [];
+
+        foreach ([fn (): Run => app(BuildImageIndex::class)->handle($shop->id), fn (): Run => app(CaptionImages::class)->handle($shop->id)] as $part) {
+            do {
+                $run = $part();
+                $runs[] = $run;
+            } while (in_array($run->output['stopped'] ?? null, ['more', 'time_budget'], true) && now()->lt($until));
+
+            // Descriptions only once every picture has its look.
+            if (($run->output['stopped'] ?? null) !== null) {
+                break;
+            }
+        }
+
+        return $runs;
     }
 
     /** @param callable(Shop): list<Run> $step */

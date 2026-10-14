@@ -104,7 +104,7 @@ final class FirstScanTest extends TestCase
             ->call('start');
 
         Bus::assertChained(array_fill(0, count(FirstScan::CHANGES), FirstScanStep::class));
-        $this->assertSame(FirstScan::CHANGES, FirstScan::steps($shop), 'the changes only: catalogue, products, pages, search');
+        $this->assertSame(FirstScan::CHANGES, FirstScan::steps($shop), 'the changes only: catalogue, pictures, products, pages, search');
 
         Livewire::actingAs($operator)->test(FirstScanCard::class)->call('startFull');
         $this->assertSame(array_keys(FirstScan::STEPS), FirstScan::steps($shop), 'the operator scans it all, even while the manager is locked');

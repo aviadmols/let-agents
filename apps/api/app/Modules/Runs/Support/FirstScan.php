@@ -38,6 +38,9 @@ final class FirstScan
         // read: the guides show what its buyers ask, and the page index built after it holds them.
         'knowledge' => ['assistant:knowledge', ['shop' => '{shop}']],
         'posts' => ['assistant:read-posts', ['shop' => '{shop}']],
+        // How every product looks, before the catalog is divided: the vocabulary writer counts what
+        // the pictures show, and the products step reads it as the last source of a product's looks.
+        'pictures' => ['retrieval', ['step' => 'pictures', 'target' => '{shop}']],
         'structure' => ['enrichment', ['step' => 'structure', 'target' => '{shop}']],
         // Every product a model has not read, in batches, not only a night's share.
         'products' => ['enrichment', ['step' => 'nightly', 'target' => '{shop}', '--all-products' => true]],
@@ -47,12 +50,13 @@ final class FirstScan
     ];
 
     /**
-     * The shop manager's scan after the first: what changed and what is new. Each of these steps
+     * The shop manager's scan after the first: what changed and what is new (a picture is looked
+     * at again only when its address changes). Each of these steps
      * already reads only what changed since it last ran (an unchanged product is not read again);
      * what the store says about itself, its posts and the page tags are left to the night. The
      * whole chain again is the operator's (start(full: true)).
      */
-    public const CHANGES = ['catalog', 'products', 'pages', 'search'];
+    public const CHANGES = ['catalog', 'pictures', 'products', 'pages', 'search'];
 
     /** A manager starts it again at most this often; the night runs it anyway. */
     public const AGAIN_AFTER_HOURS = 1;
