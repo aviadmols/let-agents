@@ -87,6 +87,12 @@ final class ShopOverview extends Page
         return (bool) session()->get($this->hiddenKey(), false);
     }
 
+    /** The manager did what a card asked: it leaves the home (and comes back from the notices' done tab). */
+    public function markDone(string $key): void
+    {
+        app(Home::class)->markDone($this->shop(), $key, auth()->id());
+    }
+
     /** @return list<ShopNotice> */
     public function today(): array
     {

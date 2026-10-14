@@ -11,6 +11,7 @@ use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -38,8 +39,45 @@ final class Home
         return $statuses;
     }
 
-    /** @return list<ShopNotice> the weightiest first, then the newest */
+    /** @return list<ShopNotice> the weightiest first, then the newest, without those marked done */
     public function notices(Shop $shop): array
+    {
+        $done = $this->doneKeys($shop);
+
+        return array_values(array_filter($this->raised($shop), fn (ShopNotice $n): bool => ! isset($done[$n->key])));
+    }
+
+    /** @return list<ShopNotice> what the modules still raise and the manager marked done */
+    public function done(Shop $shop): array
+    {
+        $done = $this->doneKeys($shop);
+
+        return array_values(array_filter($this->raised($shop), fn (ShopNotice $n): bool => isset($done[$n->key])));
+    }
+
+    /** The manager did it: the notice leaves the home and the list until brought back. */
+    public function markDone(Shop $shop, string $key, ?int $userId = null): void
+    {
+        if ($key === '' || mb_strlen($key) > 191) {
+            return;
+        }
+
+        DB::table('shop_notices_done')->insertOrIgnore(['shop_id' => $shop->id, 'key' => $key, 'user_id' => $userId, 'created_at' => now()]);
+    }
+
+    public function undo(Shop $shop, string $key): void
+    {
+        DB::table('shop_notices_done')->where('shop_id', $shop->id)->where('key', $key)->delete();
+    }
+
+    /** @return array<string, true> */
+    private function doneKeys(Shop $shop): array
+    {
+        return array_fill_keys(DB::table('shop_notices_done')->where('shop_id', $shop->id)->pluck('key')->all(), true);
+    }
+
+    /** @return list<ShopNotice> every notice the modules raise, the weightiest first, then the newest */
+    private function raised(Shop $shop): array
     {
         $rows = $this->remember($shop, 'notices', fn (HomeSource $source): array => array_map(
             fn (ShopNotice $n): array => ['at' => $n->at?->toIso8601String()] + get_object_vars($n),

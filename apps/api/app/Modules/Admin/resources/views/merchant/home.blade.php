@@ -24,11 +24,12 @@
                                 <span class="la-badge" data-tone="{{ $card->kind === 'todo' && $card->tone === 'info' ? 'info' : $badge[$card->kind][0] }}"><i></i>{{ __($card->kind === 'todo' && $card->tone === 'info' ? 'admin::home.kinds.approve' : $badge[$card->kind][1]) }}</span>
                                 <h3>{{ $card->title }}</h3>
                                 @if ($card->body)<p>{{ $card->body }}</p>@endif
-                                @if ($card->url)
-                                    <div class="la-actions">
+                                <div class="la-actions">
+                                    @if ($card->url)
                                         <a href="{{ $card->url }}" class="la-btn {{ $loop->first ? 'la-btn-primary' : '' }}">{{ $card->action ?? __('admin::home.open') }}</a>
-                                    </div>
-                                @endif
+                                    @endif
+                                    <button type="button" class="la-btn la-btn-quiet" wire:click="markDone(@js($card->key))" data-card-done>{{ __('admin::home.notices.mark_done') }}</button>
+                                </div>
                             </article>
                         @endforeach
                     </div>

@@ -2,9 +2,11 @@
 
 namespace App\Modules\Assistant\Filament\Operator\Pages;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
+use App\Modules\Assistant\Actions\DraftTeamAnswer;
 use App\Modules\Assistant\Actions\ReviewSearchAsks;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
@@ -46,6 +48,9 @@ class ShopQuestions extends Page
 
     /** @var array<string, string> answer drafts by question id */
     public array $drafts = [];
+
+    /** @var array<string, list<string>> what to check in an AI draft, by question id */
+    public array $draftChecks = [];
 
     public static function getNavigationLabel(): string
     {
@@ -170,12 +175,48 @@ class ShopQuestions extends Page
         });
     }
 
+    /** Whether this shop's team may ask a model for a draft. */
+    public function teamDrafts(): bool
+    {
+        return $this->shop !== null && Features::enabled('assistant.team_drafts', $this->shop);
+    }
+
+    /**
+     * A draft in the box, from the page, the store's text and whatever the team typed there. The team
+     * reads it, fixes it and publishes; nothing reaches shoppers from here.
+     */
+    public function draft(string $id): void
+    {
+        if (! $this->teamDrafts()) {
+            return;
+        }
+
+        $result = app(DraftTeamAnswer::class)->handle($this->shop, $id, (string) ($this->drafts[$id] ?? ''));
+
+        if (isset($result['refused'])) {
+            Notification::make()->warning()->title(__('assistant::ui.questions.draft_refused.'.$result['refused']))->send();
+
+            return;
+        }
+
+        $this->drafts[$id] = $result['answer'];
+        $this->draftChecks[$id] = $result['problems'];
+        Notification::make()->success()->title(__('assistant::ui.questions.draft_ready'))->send();
+    }
+
     /** The team's answer: shown to the next shopper, never replaced by a model. */
     public function answer(string $id): void
     {
         $text = trim((string) ($this->drafts[$id] ?? ''));
 
         if ($this->shop === null || mb_strlen($text) < 2) {
+            return;
+        }
+
+        // A draft still holding what nothing said is not an answer yet.
+        if (preg_match('/\[(?:לבדוק|check)\s*:/iu', $text) === 1) {
+            Notification::make()->warning()->title(__('assistant::ui.questions.fill_marked'))->send();
+
             return;
         }
 
@@ -188,7 +229,7 @@ class ShopQuestions extends Page
             'shared_at' => now(),
         ])->save());
 
-        unset($this->drafts[$id]);
+        unset($this->drafts[$id], $this->draftChecks[$id]);
         Notification::make()->success()->title(__('assistant::ui.questions.answered'))->send();
     }
 

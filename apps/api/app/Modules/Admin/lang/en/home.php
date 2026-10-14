@@ -77,6 +77,10 @@ return [
             'setup' => 'Not set up yet',
             'insight' => 'Insights',
             'report' => 'Reports',
+            'done' => 'Done',
         ],
+        'mark_done' => 'Mark as done',
+        'undo' => 'Back to the list',
+        'none_done' => 'Nothing marked as done yet.',
     ],
 ];

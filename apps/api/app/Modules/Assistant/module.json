@@ -40,6 +40,10 @@
         {
             "name": "site_scope",
             "default": true
+        },
+        {
+            "name": "team_drafts",
+            "default": true
         }
     ],
     "settings": [
@@ -584,6 +588,15 @@
             "max": 100,
             "scope": "shop",
             "unit": "posts"
+        },
+        {
+            "name": "team_drafts_per_day",
+            "type": "int",
+            "default": 40,
+            "min": 0,
+            "max": 500,
+            "scope": "shop",
+            "unit": "requests"
         }
     ],
     "agents": [
@@ -723,6 +736,40 @@
                 "command": "assistant:read-posts",
                 "shop_argument": "shop"
             }
+        },
+        {
+            "name": "team_helper",
+            "action": "draft_team_answer",
+            "when": "on_request",
+            "features": [
+                "team_drafts"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "answer_provider",
+                    "model": "answer_model",
+                    "prices": [
+                        "answer_input_usd_per_million",
+                        "answer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "team_answer"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "post_check_provider",
+                    "model": "post_check_model",
+                    "prices": [
+                        "post_check_input_usd_per_million",
+                        "post_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "team_answer_check"
+                    ]
+                }
+            ]
         }
     ]
 }

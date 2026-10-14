@@ -29,7 +29,7 @@ final class ShopNotices extends Page
 
     protected string $view = 'admin::merchant.notices';
 
-    /** all, or one of ShopNotice::KINDS */
+    /** all, one of ShopNotice::KINDS, or done */
     #[Url]
     public string $kind = 'all';
 
@@ -64,15 +64,36 @@ final class ShopNotices extends Page
 
     public function show(string $kind): void
     {
-        $this->kind = in_array($kind, ShopNotice::KINDS, true) ? $kind : 'all';
+        $this->kind = in_array($kind, [...ShopNotice::KINDS, 'done'], true) ? $kind : 'all';
+    }
+
+    public function markDone(string $key): void
+    {
+        app(Home::class)->markDone($this->shop(), $key, auth()->id());
+    }
+
+    public function undo(string $key): void
+    {
+        app(Home::class)->undo($this->shop(), $key);
+    }
+
+    /** @return list<ShopNotice> what the manager marked done and the modules still raise */
+    public function done(): array
+    {
+        return app(Home::class)->done($this->shop());
     }
 
     /** @return list<ShopNotice> */
     public function all(): array
     {
+        return app(Home::class)->notices($this->shop());
+    }
+
+    private function shop(): Shop
+    {
         /** @var Shop $shop */
         $shop = Filament::getTenant();
 
-        return app(Home::class)->notices($shop);
+        return $shop;
     }
 }

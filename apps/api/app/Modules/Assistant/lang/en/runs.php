@@ -17,4 +17,8 @@ return [
     'posts_off' => 'What the assistant knows about the store is off: no post was read.',
     'posts_same_family' => 'The post reader and its checker are of the same family (:family). The checker must be of another.',
     'posts_read' => 'Read :read new or changed posts of :posts. The assistant knows :facts things from the posts.',
+    'team_draft_no_provider' => 'No draft: the writer or the checker has no provider.',
+    'team_draft_same_family' => 'The writer and the checker are of the same family (:family). The checker must be of another.',
+    'team_draft_empty' => 'The model returned no draft.',
+    'team_drafted' => 'An answer draft was written for the team. :problems things to check.',
 ];

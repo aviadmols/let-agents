@@ -251,4 +251,8 @@ return [
         'label' => 'How many new or changed posts are read each night',
         'description' => 'The rest wait for the next night. A post that did not change is not read again.',
     ],
+    'team_drafts_per_day' => [
+        'label' => 'AI answer drafts a day',
+        'description' => 'How many drafts a store team may ask for a day. A draft already written for the same question and words comes back without a model.',
+    ],
 ];

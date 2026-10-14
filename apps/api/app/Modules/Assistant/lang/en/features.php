@@ -29,4 +29,8 @@ return [
         'label' => 'Check that a search box question is about the store',
         'description' => 'Before an answer is written, a small model decides whether the question is about the store, its products, services, policies or pages, and whether it asks for something harmful. A sensitive subject the store sells is still the store\'s. About $0.0002 a new question.',
     ],
+    'team_drafts' => [
+        'label' => 'AI help writing answers to shopper questions',
+        'description' => 'On the shopper questions screen: a button that drafts an answer from the product information and the store pages, or from a few words the team typed. Nothing is published without the team.',
+    ],
 ];
