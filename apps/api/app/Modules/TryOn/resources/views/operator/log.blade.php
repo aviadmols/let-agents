@@ -71,11 +71,21 @@
                 @forelse ($this->jobs(6) as $job)
                     <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(127,127,127,.15)" data-try-on-job="{{ $job->id }}">
                         <x-filament::badge size="sm" :color="$colors[$job->status] ?? 'gray'">{{ $t('statuses.'.$job->status) }}</x-filament::badge>
-                        <span style="flex:1;font-size:13px">{{ $job->productTitle() }} <span style="{{ $muted }}" dir="ltr">{{ $job->tryon_class }}@if ($job->failure) · {{ $job->failure }}@endif</span></span>
+                        <span style="flex:1;font-size:13px">{{ $job->productTitle() }} <span style="{{ $muted }}" dir="ltr">{{ $job->tryon_class }}</span>
+                            @if ($why = $this->failureWhy($job))<span style="display:block;font-size:12px;color:#b91c1c" data-try-on-why>{{ $why }}</span>@endif
+                        </span>
                         <x-filament::button size="xs" color="gray" wire:click="open('{{ $job->id }}')">{{ $t('open') }}</x-filament::button>
                     </div>
                 @empty
                     <p style="{{ $muted }}">{{ $t('none') }}</p>
+                @endforelse
+            </x-filament::section>
+
+            <x-filament::section :heading="$h('failed_tries')">
+                @forelse ($this->failures() as $code => $n)
+                    <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:13px"><span>{{ $page::failureName($code) }}</span><strong>{{ $n }}</strong></div>
+                @empty
+                    <p style="{{ $muted }}">{{ $h('no_failed_tries') }}</p>
                 @endforelse
             </x-filament::section>
 
@@ -115,7 +125,9 @@
                         <tr data-try-on-job="{{ $job->id }}">
                             <td style="{{ $cell }}" dir="ltr">{{ $job->created_at?->timezone('Asia/Jerusalem')->format('d/m H:i') }}</td>
                             <td style="{{ $cell }}">{{ $job->productTitle() }} <span style="{{ $muted }}" dir="ltr">{{ $job->tryon_class }}</span>@if ($job->product_id === null) <x-filament::badge size="sm" color="info">{{ $h('page_product') }}</x-filament::badge>@endif</td>
-                            <td style="{{ $cell }}"><x-filament::badge :color="$colors[$job->status] ?? 'gray'">{{ $t('statuses.'.$job->status) }}</x-filament::badge> @if ($job->failure)<span style="{{ $muted }}" dir="ltr">{{ $job->failure }}</span>@endif</td>
+                            <td style="{{ $cell }}"><x-filament::badge :color="$colors[$job->status] ?? 'gray'">{{ $t('statuses.'.$job->status) }}</x-filament::badge>
+                                @if ($why = $this->failureWhy($job))<div style="font-size:12px;color:#b91c1c;margin-top:3px" data-try-on-why>{{ $why }}</div>@endif
+                            </td>
                             <td style="{{ $cell }}">{{ $job->attempts }}</td>
                             <td style="{{ $cell }}" dir="ltr">${{ number_format((float) $job->cost_usd, 4) }}</td>
                             <td style="{{ $cell }}"><x-filament::button size="xs" color="gray" wire:click="open('{{ $job->id }}')">{{ $t('open') }}</x-filament::button></td>
@@ -219,7 +231,7 @@
                 <x-filament::section :heading="$h('settings.'.$scope)" :description="$h('settings.'.$scope.'_help')">
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
                         @foreach ($definitions[$scope] as $definition)
-                            @php($key = $definition->key())
+                            @php($key = $definition->name)
                             @php($unit = $page::unit($definition))
                             @php($inherited = $this->inherited($definition))
                             <label style="display:grid;gap:4px;align-content:start" data-setting="{{ $key }}">

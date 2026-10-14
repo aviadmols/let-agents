@@ -333,6 +333,35 @@ final class TryOnTest extends TestCase
         $this->assertSame(['necklace', 'שרשרת איטלקית חוליות אובליות 4.35 מ"מ'], [$job->tryon_class, $job->productTitle()]);
     }
 
+    public function test_the_operator_changes_the_picture_model_and_the_shop_cap_in_the_hub_and_they_stay(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        app(TenantContext::class)->set($this->shop->id);
+
+        Livewire::test(TryOnLog::class, ['tab' => 'settings'])
+            ->assertSeeHtml('data-setting="model_jewelry"')
+            ->set('values.model_jewelry', 'google/nano-banana-pro')
+            ->set('values.monthly_cap_usd', '35')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSet('values.model_jewelry', 'google/nano-banana-pro');
+
+        $this->assertSame('google/nano-banana-pro', Settings::get('try_on.model_jewelry'), 'a setting of the whole system');
+        $this->assertSame(35.0, (float) Settings::get('try_on.monthly_cap_usd', $this->shop->id), 'this shop only');
+        $this->assertSame(20.0, (float) Settings::get('try_on.monthly_cap_usd'), 'the default stays');
+
+        Livewire::test(TryOnLog::class, ['tab' => 'settings'])->set('values.monthly_cap_usd', 'many')->call('save')->assertHasErrors(['values.monthly_cap_usd']);
+
+        // A failed try says why, in words.
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $this->checks[] = $this->verdict(['product_similarity' => 1, 'artifacts' => ['another ring']]);
+        $this->checks[] = $this->verdict(['product_similarity' => 1, 'artifacts' => ['another ring']]);
+        $this->start($photo, 'ring-1')->assertStatus(202);
+        Livewire::test(TryOnLog::class, ['tab' => 'tries'])->assertSee('הבודק דחה את התמונה בכל הניסיונות: המוצר בתמונה לא נראה כמו המוצר (another ring)');
+    }
+
     public function test_a_products_name_says_its_class_for_the_teams_test(): void
     {
         $this->assertSame('necklace', TryOnClasses::guess('שרשרת עם תליון טבעת'), 'the first word that says a class');

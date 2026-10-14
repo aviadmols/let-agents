@@ -69,7 +69,12 @@ final class TryOnLog extends Page
     #[Url]
     public string $productClass = '';
 
-    /** @var array<string, string|bool|null> setting key => the value in the form ('' or null: inherit) */
+    /**
+     * Setting name (model_jewelry, not try_on.model_jewelry: Livewire reads a dot in a bound key as
+     * nesting, and the field would write where save() never reads) => the value in the form ('' or null: inherit).
+     *
+     * @var array<string, string|bool|null>
+     */
     public array $values = [];
 
     public static function getNavigationLabel(): string
@@ -219,6 +224,49 @@ final class TryOnLog extends Page
         return $this->inShop(fn () => TryOnJob::query()->with('product:id,title')->latest()->limit($limit)->get()) ?? collect();
     }
 
+    /**
+     * Why a try failed, in words: the reason it ended with, and for a refused picture what the checker
+     * saw (its decision and the faults it listed on the last attempt), for a model that did not answer
+     * which step and what it said.
+     */
+    public function failureWhy(TryOnJob $job): ?string
+    {
+        if ($job->status !== TryOnJob::FAILED || $job->failure === null) {
+            return null;
+        }
+
+        $last = $this->inShop(fn () => TryOnStep::query()->where('job_id', $job->id)->whereIn('status', ['refused', 'failed'])->latest('created_at')->latest('id')->first());
+        $detail = '';
+
+        if ($job->failure === 'check_failed' && $last !== null) {
+            $decision = (string) ($last->output['decision'] ?? '');
+            $faults = implode(', ', array_slice(array_map('strval', (array) ($last->output['artifacts'] ?? [])), 0, 3));
+            $detail = trim(self::words('checks.'.$decision, $decision).($faults !== '' ? ' ('.$faults.')' : ''));
+        } elseif ($job->failure === 'model_failed' && $last !== null) {
+            $detail = trim($last->step.': '.(string) $last->error);
+        }
+
+        return (string) __('try_on::hub.failures.'.$job->failure, ['detail' => $detail]) ?: $job->failure;
+    }
+
+    /** Why tries failed this month, the most common first. @return array<string, int> */
+    public function failures(): array
+    {
+        return $this->inShop(fn (): array => TryOnJob::query()->where('created_at', '>=', now()->startOfMonth())->where('status', TryOnJob::FAILED)
+            ->selectRaw('failure, count(*) as n')->groupBy('failure')->orderByDesc('n')->pluck('n', 'failure')
+            ->mapWithKeys(fn ($n, $code): array => [(string) $code => (int) $n])->all()) ?? [];
+    }
+
+    public static function failureName(string $code): string
+    {
+        return self::words('failure_names.'.$code, $code);
+    }
+
+    private static function words(string $key, string $fallback): string
+    {
+        return Lang::has('try_on::hub.'.$key) ? (string) __('try_on::hub.'.$key) : $fallback;
+    }
+
     public function open(string $id): void
     {
         $this->tab = 'tries';
@@ -348,7 +396,7 @@ final class TryOnLog extends Page
         $clean = [];
 
         foreach ([...$this->definitions()['shop'], ...$this->definitions()['global']] as $definition) {
-            $raw = $this->values[$definition->key()] ?? null;
+            $raw = $this->values[$definition->name] ?? null;
 
             if ($raw === null || $raw === '') {
                 $clean[$definition->key()] = null;
@@ -359,7 +407,7 @@ final class TryOnLog extends Page
             try {
                 $clean[$definition->key()] = $definition->normalize($raw);
             } catch (InvalidSettingValue $e) {
-                $errors['values.'.$definition->key()] = $e->translated();
+                $errors['values.'.$definition->name] = $e->translated();
             }
         }
 
@@ -410,7 +458,7 @@ final class TryOnLog extends Page
         foreach ([...$this->definitions()['shop'], ...$this->definitions()['global']] as $definition) {
             $scope = $definition->isShopOverridable() ? $this->shopId() : null;
             $override = app(SettingManager::class)->overrideFor($definition->key(), $scope);
-            $values[$definition->key()] = $override === null ? '' : (is_bool($override) ? $override : (string) $override);
+            $values[$definition->name] = $override === null ? '' : (is_bool($override) ? $override : (string) $override);
         }
 
         $this->values = $values;
