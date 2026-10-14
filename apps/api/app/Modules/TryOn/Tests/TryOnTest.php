@@ -254,6 +254,41 @@ final class TryOnTest extends TestCase
         $this->assertNull($page('ring-1')['tryon'], 'off: the widget never loads it');
     }
 
+    public function test_the_team_tries_it_on_its_own_store_with_the_preview_key_while_it_is_off_for_shoppers(): void
+    {
+        Features::override('try_on.enabled', false, $this->shop->id);
+        $key = app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $this->shop->id)->first())->previewKey();
+        $origin = ['Origin' => 'https://www.store.test'];
+        $page = fn (string $query) => $this->getJson("/api/v1/widget/{$this->site}/page?type=product&locale=he&{$query}", $origin)->assertOk()->json('tryon');
+
+        // A shopper: nothing, even asking for it.
+        $this->assertNull($page('id=ring-1&tryon=1'));
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1", $origin)->assertNotFound();
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1&preview=wrongkey0000000000000000000000ab", $origin)->assertNotFound();
+
+        // The team, with the key: the product's own class, or the one it names on a product the scan did not mark.
+        $this->assertSame(['class' => 'ring', 'test' => true], $page("id=ring-1&preview={$key}&tryon=1"));
+        $this->assertSame(['class' => 'top', 'test' => true], $page("id=drill-1&preview={$key}&tryon=top"));
+        $this->assertNull($page("id=drill-1&preview={$key}&tryon=1"), 'not marked and no class named: nothing to try');
+        $this->assertTrue($this->getJson("/api/v1/try-on/{$this->site}/config?product=drill-1&preview={$key}&class=ring", $origin)->assertOk()->json('data.tryable'));
+        $this->assertFalse($this->getJson("/api/v1/try-on/{$this->site}/config?product=drill-1&preview={$key}&class=rocket", $origin)->assertOk()->json('data.tryable'), 'only a real try-on class');
+
+        // The whole try runs for the team, and costs like any other.
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->call('POST', "/api/v1/try-on/{$this->site}/photos", ['vid' => self::VID, 'consent' => '1', 'preview' => $key, 'photo' => UploadedFile::fake()->createWithContent('me.jpg', self::picture(900, 900))],
+            server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json('data.photo');
+        $this->checks[] = $this->verdict();
+        $made = $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'drill-1', 'preview' => $key, 'class' => 'ring'], $origin)->assertStatus(202)->json('data');
+        $this->assertSame('ready', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$made['id']}?vid=".self::VID."&preview={$key}", $origin)->json('data.status'));
+        $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'drill-1', 'class' => 'ring'], $origin)->assertNotFound();
+
+        // The operator finds the link on the log.
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        app(TenantContext::class)->set($this->shop->id);
+        Livewire::test(TryOnLog::class)->assertSeeHtml('data-try-on-test')->assertSee("let_agents_preview={$key}&let_agents_tryon=1");
+    }
+
     public function test_pictures_are_deleted_after_the_shops_days_and_the_log_stays(): void
     {
         $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);

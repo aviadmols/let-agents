@@ -138,6 +138,27 @@
     previewKey = /^[a-f0-9]{32}$/.test(candidate || '') ? candidate : null;
   })();
 
+  // The store team's Try-On test: `let_agents_tryon=1` (the product's own class) or a class to try on
+  // any product page (`ring`, `top`, `furniture`), kept for a day; `0` ends it. Only with the preview
+  // key: the server checks it, and a shopper without it never sees Try-On while it is off.
+  var tryOnTest = null;
+  (function () {
+    var fromUrl = null;
+    try {
+      fromUrl = new URLSearchParams(location.search).get('let_agents_tryon');
+    } catch (e) { /* old browser */ }
+
+    if (fromUrl === '0') {
+      writeCookie('let_agents_tryon', '', 0);
+      return;
+    }
+    if (fromUrl && /^(1|[a-z_]{2,20})$/.test(fromUrl)) {
+      writeCookie('let_agents_tryon', fromUrl, 86400);
+    }
+    var candidate = fromUrl || readCookie('let_agents_tryon');
+    tryOnTest = previewKey && /^(1|[a-z_]{2,20})$/.test(candidate || '') ? candidate : null;
+  })();
+
   var isPreviewMode = ctx.mode === 'preview';
 
   // ---------------------------------------------------------------- events
@@ -3694,12 +3715,19 @@
     return line;
   }
 
-  /** The Try-On window's script, once, with what it needs to know of this page. */
-  function loadTryOn() {
+  /**
+   * The Try-On window's script, once, with what it needs to know of this page. In the team's test it
+   * also carries the preview key and the class named for the test, which the server checks.
+   */
+  function loadTryOn(tryon) {
     if (window.LetAgentsTryOnContext || document.querySelector('script[data-let-agents-tryon]')) {
       return;
     }
     window.LetAgentsTryOnContext = { api: API, site: ctx.site, product: String(PAGE_ID), locale: String(ctx.locale || 'he').slice(0, 2) };
+    if (tryon && tryon.test && previewKey) {
+      window.LetAgentsTryOnContext.preview = previewKey;
+      window.LetAgentsTryOnContext.testClass = tryon['class'];
+    }
     var script = document.createElement('script');
     script.src = API + '/try-on/let-agents-tryon.js';
     script.async = true;
@@ -3714,7 +3742,8 @@
 
     var query = '?type=' + PAGE_TYPE + '&id=' + encodeURIComponent(PAGE_ID) +
       '&locale=' + encodeURIComponent(String(ctx.locale || 'he').slice(0, 2)) +
-      (previewKey ? '&preview=' + previewKey : '');
+      (previewKey ? '&preview=' + previewKey : '') +
+      (tryOnTest ? '&tryon=' + encodeURIComponent(tryOnTest) : '');
 
     fetch(API + '/widget/' + ctx.site + '/page' + query, { credentials: 'omit' })
       .then(function (response) { return response.ok ? response.json() : null; })
@@ -3756,7 +3785,7 @@
         // Try-On, only where the shop turned it on and the product can be tried: its own script,
         // which puts its button in this widget's row (docs/try-on.md).
         if (PAGE_TYPE === 'product' && data.tryon && data.tryon['class']) {
-          loadTryOn();
+          loadTryOn(data.tryon);
         }
 
         return Promise.all([fetchViewed(), fetchSearched()]).then(function (both) {

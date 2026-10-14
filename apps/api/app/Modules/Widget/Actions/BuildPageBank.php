@@ -1383,12 +1383,16 @@ final class BuildPageBank
      * scan marked the product with a try-on class. The widget then loads the Try-On window, and only
      * then. Read by key and by fact: the Widget does not depend on the TryOn module.
      *
-     * @return array{class: string}|null
+     * The store team's test (`?let_agents_preview=<key>&let_agents_tryon=1`, PageBankController) asks
+     * with $test: the flag is not asked, and a product the scan did not mark takes the class the
+     * team named ($testClass), so it can be tried on any product page.
+     *
+     * @return array{class: string, test?: bool}|null
      */
-    private function tryOn(string $shopId, string $externalId): ?array
+    public function tryOn(string $shopId, string $externalId, bool $test = false, ?string $testClass = null): ?array
     {
         try {
-            if (! Features::enabled('try_on.enabled', $shopId)) {
+            if (! $test && ! Features::enabled('try_on.enabled', $shopId)) {
                 return null;
             }
         } catch (UnknownFeature) {
@@ -1398,7 +1402,11 @@ final class BuildPageBank
         $class = $this->tenant->run($shopId, fn () => EnrichmentFact::query()->where('kind', FactKind::TryOn)->where('key', 'class')->where('status', FactStatus::Approved)
             ->whereHas('product', fn ($q) => $q->where('external_id', $externalId)->whereNull('removed_at'))->latest('id')->value('value_text'));
 
-        return is_string($class) && $class !== 'none' ? ['class' => $class] : null;
+        if ((! is_string($class) || $class === 'none') && $test && $testClass !== null) {
+            $class = $testClass;
+        }
+
+        return is_string($class) && $class !== 'none' ? ['class' => $class] + ($test ? ['test' => true] : []) : null;
     }
 
     /**

@@ -25,6 +25,12 @@
   var LOCALE = String(ctx.locale || 'he').slice(0, 2);
   var KEY = 'let_agents_tryon_' + ctx.site + '_' + ctx.product;
   var POLL_MS = 2500;
+  // The store team's test (let_agents_tryon in the page's address, with the preview key): sent with
+  // every request; the server checks the key. Empty for shoppers.
+  var TEST = ctx.preview ? { preview: String(ctx.preview), 'class': String(ctx.testClass || '') } : null;
+  function testQuery() {
+    return TEST ? '&preview=' + encodeURIComponent(TEST.preview) + (TEST['class'] ? '&class=' + encodeURIComponent(TEST['class']) : '') : '';
+  }
 
   var CSS = [
     ':host{all:initial;font-family:inherit;color:#111827;font-size:15px;line-height:1.5;--accent:var(--let-agents-accent,#1f2933);--surface:var(--let-agents-surface,#fff);--line:rgba(17,24,39,.12);--muted:rgba(17,24,39,.62);--g1:var(--let-agents-glow-1,66,133,244);--g2:var(--let-agents-glow-2,168,85,247);--g3:var(--let-agents-glow-3,236,72,153);--hairline:linear-gradient(135deg,rgba(var(--g1),.55),rgba(var(--g2),.4) 50%,rgba(var(--g3),.35));--wash:radial-gradient(120% 90% at 100% 0%,rgba(var(--g1),.08),transparent 55%),radial-gradient(90% 70% at 0% 100%,rgba(var(--g3),.06),transparent 55%);--grad:linear-gradient(135deg,rgb(var(--g1)),rgb(var(--g2)) 60%,rgb(var(--g3)))}',
@@ -391,6 +397,7 @@
     body.append('vid', visitor());
     body.append('consent', S.consent ? '1' : '0');
     body.append('locale', LOCALE);
+    if (TEST) { body.append('preview', TEST.preview); }
     fetch(API + '/photos', { method: 'POST', body: body, credentials: 'omit' })
       .then(json)
       .then(function (r) {
@@ -415,7 +422,7 @@
     fetch(API + '/tries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ vid: visitor(), photo: S.photo, product: String(ctx.product), answers: S.answers, locale: LOCALE }),
+      body: JSON.stringify({ vid: visitor(), photo: S.photo, product: String(ctx.product), answers: S.answers, locale: LOCALE, preview: TEST ? TEST.preview : undefined, 'class': TEST ? TEST['class'] : undefined }),
       credentials: 'omit'
     })
       .then(json)
@@ -461,7 +468,7 @@
     S.view = 'working';
     render();
     S.poll = setTimeout(function () {
-      fetch(API + '/tries/' + encodeURIComponent(d.id) + '?vid=' + encodeURIComponent(visitor()), { credentials: 'omit' })
+      fetch(API + '/tries/' + encodeURIComponent(d.id) + '?vid=' + encodeURIComponent(visitor()) + testQuery(), { credentials: 'omit' })
         .then(json)
         .then(function (r) { if (r.status === 200 && r.body.data) { follow(r.body.data); } else { S.job = null; remember(null); render(); } })
         .catch(function () { S.poll = setTimeout(function () { follow(d); }, POLL_MS); });
@@ -482,7 +489,7 @@
 
   // ------------------------------------------------------------------ start
 
-  fetch(API + '/config?product=' + encodeURIComponent(ctx.product) + '&locale=' + LOCALE, { credentials: 'omit' })
+  fetch(API + '/config?product=' + encodeURIComponent(ctx.product) + '&locale=' + LOCALE + testQuery(), { credentials: 'omit' })
     .then(json)
     .then(function (r) {
       var d = r.body.data;

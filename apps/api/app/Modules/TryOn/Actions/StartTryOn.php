@@ -30,14 +30,17 @@ final class StartTryOn
 
     /**
      * @param  array<string, mixed>  $answers
+     * @param  bool  $test  the store team's test, with its preview key: the flag is not asked
+     * @param  string|null  $testClass  for the test, the class to use on a product the scan did not mark
      * @return array{job: TryOnJob|null, problem: string|null, questions: list<array<string, mixed>>}
      */
-    public function handle(string $visitorHash, string $photoId, string $productExternalId, array $answers = []): array
+    public function handle(string $visitorHash, string $photoId, string $productExternalId, array $answers = [], bool $test = false, ?string $testClass = null): array
     {
         $shopId = $this->tenant->require();
         $none = ['job' => null, 'problem' => null, 'questions' => []];
 
-        if (! Features::enabled('try_on.enabled', $shopId)) {
+        // The store team's test runs while it is off for shoppers (TryOnController checks the key).
+        if (! $test && ! Features::enabled('try_on.enabled', $shopId)) {
             return ['problem' => 'off'] + $none;
         }
 
@@ -48,7 +51,7 @@ final class StartTryOn
         }
 
         $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $productExternalId)->first();
-        $class = $product === null ? null : self::classOf($product->id);
+        $class = $product === null ? null : (self::classOf($product->id) ?? ($test ? $testClass : null));
 
         if ($product === null || $class === null) {
             return ['problem' => 'not_tryable'] + $none;

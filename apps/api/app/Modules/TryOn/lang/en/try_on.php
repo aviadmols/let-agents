@@ -50,6 +50,11 @@ return [
         'answers' => 'Answers',
         'photo_check' => 'Photo check',
         'statuses' => ['queued' => 'Waiting', 'working' => 'Working', 'ready' => 'Ready', 'failed' => 'Failed'],
+        'test_title' => 'Try it on your store before shoppers see it',
+        'test_help' => 'Try-On runs only in your browser, while it stays off for shoppers. Every limit and every cost still counts.',
+        'test_add' => 'Add these parameters to the address of any product page on your store:',
+        'test_class' => 'A product the scan did not mark: write the kind instead of 1, for example let_agents_tryon=ring, top or furniture.',
+        'test_off' => 'It stays on in your browser for a day. let_agents_tryon=0 turns it off.',
         'total' => ':count tries this month, :ready ready, cost :usd USD.',
     ],
     'merchant' => [

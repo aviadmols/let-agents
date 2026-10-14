@@ -6,6 +6,16 @@
     @php($month = $this->month())
     @php($jobs = $this->jobs() ?? collect())
 
+    @php($link = $this->testLink())
+    @if ($link)
+        <x-filament::section :heading="$t('test_title')" :description="$t('test_help')" collapsible data-try-on-test>
+            <p style="font-size:13px">{{ $t('test_add') }}</p>
+            <code dir="ltr" style="display:block;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.1);font-size:12.5px;word-break:break-all">?{{ $link['params'] }}</code>
+            <p style="{{ $muted }};margin-top:8px">{{ $t('test_class') }}</p>
+            <p style="{{ $muted }}">{{ $t('test_off') }}</p>
+        </x-filament::section>
+    @endif
+
     <x-filament::section>
         <p data-try-on-month>{{ $t('total', ['count' => $month['count'], 'ready' => $month['ready'], 'usd' => $month['usd']]) }}</p>
     </x-filament::section>

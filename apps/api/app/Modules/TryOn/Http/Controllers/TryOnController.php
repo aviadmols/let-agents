@@ -48,7 +48,7 @@ final class TryOnController
 
         return app(TenantContext::class)->run($connection->shop_id, function () use ($request, $locale, $connection): JsonResponse {
             $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $request->query('product'))->first();
-            $class = $product === null ? null : StartTryOn::classOf($product->id);
+            $class = $product === null ? null : (StartTryOn::classOf($product->id) ?? self::testClass($request, $connection));
 
             return response()->json(['data' => [
                 'tryable' => $class !== null,
@@ -118,7 +118,8 @@ final class TryOnController
 
         $locale = (string) $request->input('locale', 'he');
         $answers = is_array($request->input('answers')) ? $request->input('answers') : [];
-        $result = app(TenantContext::class)->run($connection->shop_id, fn (): array => $start->handle(self::visitor($connection->shop_id, $visitor), (string) $request->input('photo'), (string) $request->input('product'), $answers));
+        $result = app(TenantContext::class)->run($connection->shop_id, fn (): array => $start->handle(self::visitor($connection->shop_id, $visitor), (string) $request->input('photo'), (string) $request->input('product'), $answers,
+            test: self::test($request, $connection), testClass: self::testClass($request, $connection)));
 
         if ($result['questions'] !== []) {
             return response()->json(['data' => ['status' => 'needs_answer', 'questions' => array_map(fn (array $q): array => [
@@ -203,11 +204,30 @@ final class TryOnController
             return response()->json(['error' => 'other_origin'], 403);
         }
 
-        if (! Features::enabled('try_on.enabled', $connection->shop_id)) {
+        if (! Features::enabled('try_on.enabled', $connection->shop_id) && ! self::test($request, $connection)) {
             return response()->json(['error' => 'off'], 404);
         }
 
         return $connection;
+    }
+
+    /**
+     * The store team's test: the preview key (the one `let_agents_preview` carries) lets Try-On run on
+     * the team's own browser while it is off for shoppers. Every limit and every cost still counts.
+     */
+    private static function test(Request $request, StoreConnection $connection): bool
+    {
+        $key = $request->input('preview', $request->query('preview'));
+
+        return is_string($key) && $key !== '' && hash_equals($connection->previewKey(), $key);
+    }
+
+    /** The class the team named for its test, on a product the scan did not mark. */
+    private static function testClass(Request $request, StoreConnection $connection): ?string
+    {
+        $class = (string) $request->input('class', $request->query('class', ''));
+
+        return self::test($request, $connection) && TryOnClasses::group($class) !== null ? $class : null;
     }
 
     private static function visitor(string $shopId, string $visitor): string

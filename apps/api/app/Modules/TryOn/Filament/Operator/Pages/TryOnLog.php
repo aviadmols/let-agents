@@ -4,6 +4,7 @@ namespace App\Modules\TryOn\Filament\Operator\Pages;
 
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\TryOn\Models\TryOnJob;
 use App\Modules\TryOn\Models\TryOnPhoto;
 use App\Modules\TryOn\Models\TryOnStep;
@@ -68,6 +69,27 @@ final class TryOnLog extends Page
 
             return ['count' => (clone $jobs)->count(), 'ready' => (clone $jobs)->where('status', TryOnJob::READY)->count(), 'usd' => number_format((float) $jobs->sum('cost_usd') + $photos, 4)];
         }) ?? ['count' => 0, 'ready' => 0, 'usd' => '0'];
+    }
+
+    /**
+     * How the team tries Try-On on its own store before it is on for shoppers: the parameters to add
+     * to any product page's address, with this store's preview key.
+     *
+     * @return array{params: string, example: string|null}|null
+     */
+    public function testLink(): ?array
+    {
+        return $this->inShop(function (): ?array {
+            $connection = StoreConnection::query()->first();
+
+            if ($connection === null) {
+                return null;
+            }
+
+            $params = 'let_agents_preview='.$connection->previewKey().'&let_agents_tryon=1';
+
+            return ['params' => $params, 'example' => $connection->site_url ? rtrim((string) $connection->site_url, '/').'/?'.$params : null];
+        });
     }
 
     public function open(string $id): void
