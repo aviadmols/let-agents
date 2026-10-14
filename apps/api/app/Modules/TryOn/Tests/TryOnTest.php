@@ -66,6 +66,9 @@ final class TryOnTest extends TestCase
     /** @var list<string> the writer's inputs */
     public array $written = [];
 
+    /** The product's pictures all show it worn by a model. */
+    public bool $productWorn = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -86,6 +89,10 @@ final class TryOnTest extends TestCase
 
             public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
+                // The product picture: alone, unless a test says it is worn by a model.
+                if (str_contains($system, 'product page')) {
+                    return new ModelReply(['product_only' => ! $this->test->productWorn, 'product_clear' => true], 300, 20);
+                }
                 $data = str_contains($system, 'You check a picture') ? array_shift($this->test->checks) : array_shift($this->test->gate);
 
                 return new ModelReply($data ?? [], 1200, 150);
@@ -180,8 +187,9 @@ final class TryOnTest extends TestCase
         $this->assertSame(2, $job->attempts);
         $this->assertGreaterThan(0.07, (float) $job->cost_usd, 'two pictures, two prompts, two checks');
         $steps = $this->inShop(fn () => TryOnStep::query()->where('job_id', $job->id)->orderBy('created_at')->orderBy('id')->pluck('status', 'id')->all());
-        $this->assertCount(6, $steps);
-        $this->assertSame(['prompt', 'generate', 'check'], $this->inShop(fn () => TryOnStep::query()->where('job_id', $job->id)->where('attempt', 1)->orderBy('created_at')->orderBy('id')->pluck('step')->all()));
+        $this->assertCount(7, $steps, 'the product picture chosen once, then two rounds');
+        $this->assertSame(['product_pick', 'prompt', 'generate', 'check'], $this->inShop(fn () => TryOnStep::query()->where('job_id', $job->id)->where('attempt', 1)->orderBy('created_at')->orderBy('id')->pluck('step')->all()));
+        $this->assertArrayNotHasKey('picture', json_decode($this->written[0], true)['product'], 'the product alone: nothing to warn the writer of');
 
         // The same try again is the one already made.
         $this->assertSame($made['id'], $this->start($photo, 'ring-1', ['finger' => 'ring', 'hand' => 'left'])->json('data.id'));
@@ -365,6 +373,20 @@ final class TryOnTest extends TestCase
         $this->checks[] = $this->verdict(['product_similarity' => 1, 'artifacts' => ['another ring']]);
         $this->start($photo, 'ring-1')->assertStatus(202);
         Livewire::test(TryOnLog::class, ['tab' => 'tries'])->assertSee('הבודק דחה את התמונה בכל הניסיונות: המוצר בתמונה לא נראה כמו המוצר (another ring)');
+    }
+
+    public function test_a_product_shown_only_on_a_model_is_taken_alone_and_the_writer_is_told(): void
+    {
+        $this->productWorn = true;
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $this->checks[] = $this->verdict();
+        $id = $this->start($photo, 'ring-1')->assertStatus(202)->json('data.id');
+
+        $this->assertSame('ready', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$id}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->json('data.status'));
+        $this->assertStringContainsString('worn by a model', (string) json_decode($this->written[0], true)['product']['picture']);
+        $pick = $this->inShop(fn () => TryOnStep::query()->where('job_id', $id)->where('step', 'product_pick')->sole());
+        $this->assertTrue($pick->output['worn']);
     }
 
     public function test_a_photo_saved_by_another_container_is_found_without_a_bucket(): void

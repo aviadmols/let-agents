@@ -22,8 +22,6 @@ use App\Modules\TryOn\Models\TryOnStep;
 use App\Modules\TryOn\Support\Files;
 use App\Modules\TryOn\Support\Picture;
 use App\Modules\TryOn\Support\TryOnClasses;
-use Illuminate\Support\Facades\Http;
-use Throwable;
 
 /**
  * One try, in the background (docs/try-on.md §3, steps 3 to 5): the prompt (the team's template for
@@ -53,6 +51,7 @@ final class RunTryOn
         private readonly VisionModel $vision,
         private readonly ImageModel $images,
         private readonly SpendGuard $spend,
+        private readonly PickProductPicture $pick,
     ) {}
 
     public function handle(string $shopId, string $jobId): void
@@ -92,7 +91,14 @@ final class RunTryOn
         }
 
         $photo = Files::get($job->photo->path);
-        $productPicture = $this->productPicture((string) $job->productImage());
+        // A picture of the product alone: a store's main one is often worn by a model, and the image
+        // model then edits that hand instead of the shopper's photo.
+        $picked = $this->pick->handle($job, $run);
+        $productPicture = $picked['bytes'] ?? null;
+        $worn = (bool) ($picked['worn'] ?? false);
+        if ($picked !== null) {
+            $this->step($job, 'product_pick', 1, 'done', ['output' => ['picked' => $picked['url'], 'worn' => $worn, 'looked' => $picked['looked']], 'prompt' => PickProductPicture::prompt()]);
+        }
 
         if ($photo === null || $productPicture === null) {
             $this->finish($run, $job, $photo === null ? 'photo_gone' : 'no_product_picture');
@@ -128,7 +134,7 @@ final class RunTryOn
                 $this->spend->assertCanSpend($estimate, true);
 
                 // 1. The prompt.
-                $input = $this->writerInput($job, $fix);
+                $input = $this->writerInput($job, $fix, $worn);
                 $system = self::prompt('tryon_writer');
                 $reply = $this->chat->json($writer->provider, $writer->model, $system, (string) json_encode($input, JSON_UNESCAPED_UNICODE), self::WRITER_OUTPUT_TOKENS, 'low');
                 $prompt = trim((string) ($reply->data['prompt'] ?? '')) ?: $input['template'];
@@ -211,7 +217,7 @@ final class RunTryOn
     }
 
     /** @return array<string, mixed> */
-    private function writerInput(TryOnJob $job, string $fix): array
+    private function writerInput(TryOnJob $job, string $fix, bool $worn = false): array
     {
         $facts = $job->product_id === null ? collect() : EnrichmentFact::query()->with('vocabulary')->where('product_id', $job->product_id)->whereIn('kind', [FactKind::Choice, FactKind::Spec])
             ->where('status', FactStatus::Approved)->orderBy('key')->get();
@@ -224,26 +230,13 @@ final class RunTryOn
 
         return array_filter([
             'template' => trim(self::prompt('tryon_'.$job->group)),
-            'product' => ['title' => $job->productTitle(), 'class' => $job->tryon_class, 'details' => array_slice($details, 0, 12), 'dimensions' => array_slice($dimensions, 0, 6)],
+            'product' => ['title' => $job->productTitle(), 'class' => $job->tryon_class, 'details' => array_slice($details, 0, 12), 'dimensions' => array_slice($dimensions, 0, 6)]
+                // The only picture of it shows it worn by someone: the image model takes the piece only.
+                + ($worn ? ['picture' => 'The second image shows the product worn by a model. Take only the product from it; nothing of that person, hand or background.'] : []),
             'photo' => array_intersect_key((array) $job->photo->gate, array_flip(['subject', 'parts_visible', 'scale', 'free_spots', 'hands_visible'])),
             'answers' => $job->answers ?? [],
             'fix' => $fix,
         ], fn ($value): bool => $value !== '' && $value !== null);
-    }
-
-    private function productPicture(string $url): ?string
-    {
-        if (! preg_match('#^https?://#i', $url)) {
-            return null;
-        }
-
-        try {
-            $response = Http::timeout(20)->get($url);
-        } catch (Throwable) {
-            return null;
-        }
-
-        return $response->successful() && $response->body() !== '' ? $response->body() : null;
     }
 
     /** @param  array<string, mixed>  $values */
