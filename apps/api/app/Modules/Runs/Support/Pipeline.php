@@ -30,6 +30,7 @@ final class Pipeline
     public const STAGES = [
         'intake' => [
             'catalog.sync' => ['model' => null],
+            'catalog.sync_changes' => ['model' => null],
             'search.build_index' => ['model' => null],
             'enrichment.read_in_code' => ['model' => null],
             'enrichment.read_promises' => ['model' => null],

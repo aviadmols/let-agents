@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Search\Console\ForgetVisitsCommand;
 use App\Modules\Search\Console\ResumePictureScansCommand;
@@ -44,7 +45,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
         $this->app->bind(ProductsForQuery::class, SpellingProductsForQuery::class);
         $this->app->bind(PriceRange::class, HebrewPriceRange::class);
         $this->app->bind(ProductsNamed::class, SpellingProductsNamed::class);
-        Event::listen(CatalogUpdated::class, RebuildSearchIndex::class);
+        Event::listen([CatalogUpdated::class, CatalogProductsChanged::class], RebuildSearchIndex::class);
 
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search:'.$request->ip().'|'.$request->route('site')));

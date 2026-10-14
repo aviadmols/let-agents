@@ -3,10 +3,12 @@
 namespace App\Modules\Shopify\Feed;
 
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
+use App\Modules\Connections\Contracts\ReadsChangedProducts;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
+use Carbon\CarbonInterface;
 use Generator;
 use Illuminate\Support\Facades\Http;
 
@@ -19,7 +21,7 @@ use Illuminate\Support\Facades\Http;
  * is above 1,000 points, and a product with its variants and collections costs about 60, so a
  * product page holds 15 products, not 50.
  */
-final class ShopifyStoreFeed implements PlatformStoreFeed
+final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 {
     private const PRODUCTS_PER_PAGE = 15;
 
@@ -189,6 +191,51 @@ final class ShopifyStoreFeed implements PlatformStoreFeed
                 yield $records;
             }
         }
+    }
+
+    /**
+     * The products changed since a moment, any status, newest change last. One still on the Online
+     * Store is a record; one archived or set to draft is gone. One active without an Online Store
+     * address is left to the nightly read, which knows whether the whole store is behind a password.
+     */
+    public function changedProducts(StoreConnection $connection, CarbonInterface $since): ?Generator
+    {
+        return $this->changed($connection, $since);
+    }
+
+    /** @return Generator<int, array{records: list<array<string, mixed>>, gone: list<string>}> */
+    private function changed(StoreConnection $connection, CarbonInterface $since): Generator
+    {
+        $install = $this->install($connection);
+        $shop = $this->shop($install);
+        // Publishing a product to the store does not always move its update time: published and
+        // created since are asked too.
+        $at = "'".$since->copy()->utc()->format('Y-m-d\TH:i:s\Z')."'";
+        $variables = [
+            'first' => self::PRODUCTS_PER_PAGE, 'collections' => self::COLLECTIONS_PER_PRODUCT, 'variants' => self::VARIANTS_PER_PRODUCT,
+            'filter' => "updated_at:>{$at} OR published_at:>{$at} OR created_at:>{$at}",
+        ];
+
+        foreach ($this->pages($install, self::changedQuery(), 'products', $variables) as $nodes) {
+            $on = array_values(array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) === 'ACTIVE' && is_string($node['onlineStoreUrl'] ?? null)));
+            $gone = array_values(array_map(fn (array $node): string => self::id($node['id']), array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) !== 'ACTIVE')));
+            $details = $on === [] ? [] : $this->details($install, array_column($on, 'id'));
+
+            yield [
+                'records' => array_map(fn (array $node): array => $this->product($node, $shop, $details[$node['id']] ?? null), $on),
+                'gone' => $gone,
+            ];
+        }
+    }
+
+    /** The products query with the same fields, for what changed: any status, by update time. */
+    private static function changedQuery(): string
+    {
+        return str_replace(
+            ['query Products($first: Int!, $after: String,', 'sortKey: ID, query: "status:active AND published_status:published"'],
+            ['query ChangedProducts($first: Int!, $after: String, $filter: String!,', 'sortKey: UPDATED_AT, query: $filter'],
+            self::PRODUCTS,
+        );
     }
 
     /**

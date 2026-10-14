@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Listeners;
 
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
@@ -12,7 +13,7 @@ use App\Modules\Search\Actions\BuildSearchIndex;
  */
 final class RebuildSearchIndex
 {
-    public function handle(CatalogUpdated $event): void
+    public function handle(CatalogUpdated|CatalogProductsChanged $event): void
     {
         $shopId = $event->shopId;
 

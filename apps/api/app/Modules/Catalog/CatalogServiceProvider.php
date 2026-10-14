@@ -5,6 +5,7 @@ namespace App\Modules\Catalog;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
+use App\Modules\Catalog\Console\SyncChangedProductsCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Listeners\MoveCatalogLinks;
 use App\Modules\Catalog\Support\CatalogProductKinds;
@@ -33,6 +34,14 @@ final class CatalogServiceProvider extends ModuleServiceProvider
                 ->timezone('Asia/Jerusalem')
                 ->name('catalog:sync-daily')
                 ->onOneServer();
+
+            // And between nights, what each store changed (catalog.live_sync): a new product is
+            // searchable within minutes. A few cheap questions to the store; nothing when nothing changed.
+            $schedule->command('catalog:sync-changes')
+                ->everyTenMinutes()
+                ->name('catalog:sync-changes')
+                ->withoutOverlapping(30)
+                ->onOneServer();
         });
     }
 
@@ -40,6 +49,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
     {
         return [
             SyncCatalogCommand::class,
+            SyncChangedProductsCommand::class,
         ];
     }
 }

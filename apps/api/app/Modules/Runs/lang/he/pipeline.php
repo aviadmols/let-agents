@@ -28,6 +28,7 @@ return [
     ],
     'actions' => [
         'catalog_sync' => 'קריאת הקטלוג מהתוסף',
+        'catalog_sync_changes' => 'שינויים מהחנות, כל 10 דקות',
         'search_build_index' => 'עדכון החיפוש באתר',
         'enrichment_read_in_code' => 'קריאת המוצרים בקוד',
         'enrichment_read_promises' => 'מה החנות מבטיחה',

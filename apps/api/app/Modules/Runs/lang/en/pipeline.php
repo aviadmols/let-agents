@@ -28,6 +28,7 @@ return [
     ],
     'actions' => [
         'catalog_sync' => 'Reading the catalog from the plugin',
+        'catalog_sync_changes' => 'Store changes, every 10 minutes',
         'search_build_index' => 'Updating the site search',
         'retrieval_build_index' => 'Building the index by meaning',
         'retrieval_build_image_index' => 'Vectors for product pictures',

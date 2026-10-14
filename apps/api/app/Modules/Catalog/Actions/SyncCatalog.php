@@ -17,6 +17,7 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -129,30 +130,11 @@ final class SyncCatalog
                 $counts['capped'] = true;
             }
 
-            $existing = CatalogProduct::query()
-                ->whereIn('external_id', array_map(fn (array $r): string => (string) $r['external_id'], $page))
-                ->get()
-                ->keyBy('external_id');
-
-            DB::transaction(function () use ($page, $existing, $shopId, $categoryIds, &$counts, &$seen): void {
-                foreach ($page as $record) {
-                    $attributes = FeedRecord::product($record);
-                    $seen[$attributes['external_id']] = true;
-                    $counts['total']++;
-
-                    $current = $existing->get($attributes['external_id']);
-                    $outcome = $this->upsert(CatalogProduct::class, $current, $attributes + ['shop_id' => $shopId]);
-                    $counts[$outcome]++;
-
-                    if ($outcome !== 'unchanged') {
-                        /** @var CatalogProduct $product */
-                        $product = $current ?? CatalogProduct::query()->where('external_id', $attributes['external_id'])->firstOrFail();
-                        $product->categories()->sync(
-                            collect(FeedRecord::productCategoryIds($record))->map(fn (string $id) => $categoryIds->get($id))->filter()->values()->all(),
-                        );
-                    }
-                }
-            });
+            foreach ($this->saveProducts($shopId, $page, $categoryIds) as $externalId => $outcome) {
+                $seen[$externalId] = true;
+                $counts['total']++;
+                $counts[$outcome]++;
+            }
 
             if ($counts['capped']) {
                 break;
@@ -209,6 +191,43 @@ final class SyncCatalog
         }
 
         return $counts;
+    }
+
+    /**
+     * One page of product records saved: new ones created, changed ones updated with their
+     * categories, the same ones left alone. The quick read of changed products saves with it too
+     * (SyncChangedProducts), so both reads save a product the same way. Inside the shop's tenant.
+     *
+     * @param  list<array<string, mixed>>  $page
+     * @param  Collection<string, string>  $categoryIds  category external ID => its row ID
+     * @return array<string, 'created'|'updated'|'unchanged'> external ID => what happened
+     */
+    public function saveProducts(string $shopId, array $page, Collection $categoryIds): array
+    {
+        $existing = CatalogProduct::query()
+            ->whereIn('external_id', array_map(fn (array $r): string => (string) $r['external_id'], $page))
+            ->get()
+            ->keyBy('external_id');
+        $outcomes = [];
+
+        DB::transaction(function () use ($page, $existing, $shopId, $categoryIds, &$outcomes): void {
+            foreach ($page as $record) {
+                $attributes = FeedRecord::product($record);
+                $current = $existing->get($attributes['external_id']);
+                $outcome = $this->upsert(CatalogProduct::class, $current, $attributes + ['shop_id' => $shopId]);
+                $outcomes[(string) $attributes['external_id']] = $outcome;
+
+                if ($outcome !== 'unchanged') {
+                    /** @var CatalogProduct $product */
+                    $product = $current ?? CatalogProduct::query()->where('external_id', $attributes['external_id'])->firstOrFail();
+                    $product->categories()->sync(
+                        collect(FeedRecord::productCategoryIds($record))->map(fn (string $id) => $categoryIds->get($id))->filter()->values()->all(),
+                    );
+                }
+            }
+        });
+
+        return $outcomes;
     }
 
     /**

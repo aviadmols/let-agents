@@ -2,8 +2,11 @@
 
 namespace App\Modules\Shopify\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\SyncCatalog;
+use App\Modules\Catalog\Actions\SyncChangedProducts;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -14,6 +17,7 @@ use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -33,6 +37,9 @@ final class ShopifyStoreFeedTest extends TestCase
     private bool $failDetails = false;
 
     private bool $locked = false;
+
+    /** @var list<array<string, mixed>> what the store answers when asked what changed */
+    private array $changed = [];
 
     protected function setUp(): void
     {
@@ -134,6 +141,41 @@ final class ShopifyStoreFeedTest extends TestCase
 
         Http::assertSent(fn (Request $request): bool => $request->url() === 'https://kli-tools.myshopify.com/admin/api/2026-07/graphql.json'
             && $request->hasHeader('X-Shopify-Access-Token', 'shpat_test'));
+    }
+
+    public function test_a_product_added_or_taken_off_the_store_reaches_the_catalog_and_the_search_within_minutes(): void
+    {
+        app(SyncCatalog::class)->handle($this->shop->id);
+        Event::fake([CatalogProductsChanged::class]);
+
+        // Nothing changed: nothing is written, not even to the activity log.
+        $this->assertNull(app(SyncChangedProducts::class)->handle($this->shop->id));
+
+        $this->changed = [
+            $this->product('8009', 'תליון וינטג׳ משובץ רובי - מק"ט 53022', 'ruby-pendant', ['createdAt' => '2026-10-14T09:00:00Z', 'updatedAt' => '2026-10-14T09:09:53Z']),
+            ['status' => 'ARCHIVED'] + $this->saw(),
+            ['onlineStoreUrl' => null] + $this->product('8010', 'טיוטה בערוץ אחר', 'other-channel'),
+        ];
+        $run = app(SyncChangedProducts::class)->handle($this->shop->id);
+
+        $this->assertNotNull($run);
+        $this->assertSame(['created' => 1, 'updated' => 0, 'removed' => 1], array_intersect_key($run->output, array_flip(['created', 'updated', 'removed'])));
+        $this->inShop(function (): void {
+            $this->assertSame('ruby-pendant', CatalogProduct::query()->where('external_id', '8009')->sole()->payload['handle']);
+            $this->assertNotNull(CatalogProduct::query()->where('external_id', '8001')->sole()->removed_at, 'archived: off the catalog');
+            $this->assertFalse(CatalogProduct::query()->where('external_id', '8010')->exists(), 'not on the Online Store: the nightly read decides');
+        });
+        Event::assertDispatched(CatalogProductsChanged::class, fn (CatalogProductsChanged $e): bool => $e->shopId === $this->shop->id && in_array('8009', $e->externalIds, true));
+        Http::assertSent(fn (Request $request): bool => str_contains((string) data_get($request->data(), 'query'), 'query ChangedProducts')
+            && str_contains((string) data_get($request->data(), 'variables.filter'), 'published_at:>'));
+
+        // The same answer again is no change.
+        $this->assertNull(app(SyncChangedProducts::class)->handle($this->shop->id));
+
+        // A store that turned it off waits for the night.
+        Features::override('catalog.live_sync', false, $this->shop->id);
+        $this->changed = [$this->product('8011', 'עוד מוצר', 'another')];
+        $this->assertNull(app(SyncChangedProducts::class)->handle($this->shop->id));
     }
 
     public function test_a_store_behind_a_password_has_its_published_products_read_with_links_from_their_handles(): void
@@ -271,6 +313,7 @@ final class ShopifyStoreFeedTest extends TestCase
                 ['id' => 'gid://shopify/Collection/4001', 'title' => 'מסורים', 'handle' => 'saws', 'description' => '', 'updatedAt' => '2026-09-01T08:00:00Z', 'image' => ['url' => 'https://cdn.shopify.com/saws.jpg'], 'productsCount' => ['count' => 12]],
                 ['id' => 'gid://shopify/Collection/4002', 'title' => 'כלי עבודה חשמליים', 'handle' => 'power-tools', 'description' => '', 'updatedAt' => '2026-09-01T08:00:00Z', 'image' => null, 'productsCount' => ['count' => 40]],
             ])],
+            'ChangedProducts' => ['products' => $this->connection($this->changed)],
             'Products' => ['products' => $this->lockedStore($after === null
                 ? $this->connection([$this->saw(), $this->sawBlade(), $this->posOnly()], 'cursor-1')
                 : $this->connection([$this->drill()]))],

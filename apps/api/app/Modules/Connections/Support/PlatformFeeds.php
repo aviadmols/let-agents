@@ -3,14 +3,24 @@
 namespace App\Modules\Connections\Support;
 
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
+use App\Modules\Connections\Contracts\ReadsChangedProducts;
 use App\Modules\Connections\Contracts\StoreFeed;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
+use Carbon\CarbonInterface;
 use Generator;
 
 /** The store feed of a connection, read by the reader registered for its platform. */
-final class PlatformFeeds implements StoreFeed
+final class PlatformFeeds implements ReadsChangedProducts, StoreFeed
 {
+    /** Null where the platform's reader cannot ask its store what changed (the plugin, today). */
+    public function changedProducts(StoreConnection $connection, CarbonInterface $since): ?Generator
+    {
+        $feed = $this->for($connection);
+
+        return $feed instanceof ReadsChangedProducts ? $feed->changedProducts($connection, $since) : null;
+    }
+
     /** @param iterable<PlatformStoreFeed> $feeds */
     public function __construct(private readonly iterable $feeds) {}
 
