@@ -50,9 +50,9 @@ class ScanHistory extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 91;
+    protected static ?int $navigationSort = 70;
 
     protected static ?string $slug = 'retrieval/scans';
 

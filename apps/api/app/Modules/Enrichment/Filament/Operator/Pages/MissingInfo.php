@@ -37,9 +37,9 @@ class MissingInfo extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'enrichment/missing-info';
 

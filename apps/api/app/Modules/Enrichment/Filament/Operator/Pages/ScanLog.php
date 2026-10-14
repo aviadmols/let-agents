@@ -31,9 +31,9 @@ final class ScanLog extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentMagnifyingGlass;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 60;
 
     protected static ?string $slug = 'enrichment/scan-log';
 

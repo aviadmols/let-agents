@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Product detail gaps',
+    'title' => 'Details the reading missed',
     'tryon_heading' => 'Try-on',
     'tryon_help' => 'Clothes, jewelry and whole pieces of furniture can be tried on a shopper or placed in a room. Decided in code from each branch\'s vocabulary; a branch whose vocabulary says nothing is not marked either way.',
     'tryon_counts' => ':yes products can be tried on, :no cannot, :undecided are not decided yet.',

@@ -30,9 +30,9 @@ final class ProductGaps extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPuzzlePiece;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 95;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'enrichment/product-gaps';
 

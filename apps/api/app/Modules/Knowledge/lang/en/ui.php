@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'What is known about this shop',
+    'title' => 'Store knowledge status',
     'help' => 'Everything the system knows about this shop, where it came from, and what is still missing.',
     'pick_a_shop' => 'Choose a shop above to see what is known about it. Knowledge belongs to one shop and is never shown across all of them.',
     'known_share_of' => [

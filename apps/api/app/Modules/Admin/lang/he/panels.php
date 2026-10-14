@@ -31,7 +31,9 @@ return [
     'nav' => [
         'overview' => 'סקירה',
         'shops' => 'חנויות',
-        'content' => 'תוכן וידע',
+        'catalog' => 'קטלוג ותוכן',
+        'scan' => 'סריקה ומידע מוצרים',
+        'try_on' => 'מדידה על הלקוח (Try-On)',
         'discovery' => 'חיפוש וגילוי',
         'shoppers' => 'גולשים',
         'analytics' => 'אנליטיקס',

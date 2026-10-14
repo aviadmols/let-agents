@@ -29,9 +29,9 @@ final class ScanImprovements extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 80;
 
     protected static ?string $slug = 'enrichment/scan-improvements';
 

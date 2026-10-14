@@ -30,9 +30,9 @@ final class EnrichmentVocabularyResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 70;
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'enrichment/vocabularies';
 

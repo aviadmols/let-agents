@@ -33,9 +33,9 @@ final class EnrichmentBatchResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 80;
+    protected static ?int $navigationSort = 90;
 
     protected static ?string $slug = 'enrichment/tasks';
 

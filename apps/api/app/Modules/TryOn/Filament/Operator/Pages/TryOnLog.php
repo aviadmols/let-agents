@@ -28,9 +28,9 @@ final class TryOnLog extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'try_on';
 
-    protected static ?int $navigationSort = 96;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'try-on/log';
 

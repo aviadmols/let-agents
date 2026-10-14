@@ -2,7 +2,7 @@
 
 return [
     'scans' => [
-        'title' => 'Scan log',
+        'title' => 'Scan history',
         'subheading' => 'Every catalogue sync and picture scan of the shop, what each did, and every picture: scanned, waiting or unreadable and why.',
         'runs' => 'Scans',
         'runs_about' => 'The last 40, newest first. A running scan updates by itself.',

@@ -37,9 +37,9 @@ final class SchemaDiscovery extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 15;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'enrichment/schema';
 

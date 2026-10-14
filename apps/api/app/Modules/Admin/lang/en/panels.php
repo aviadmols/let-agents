@@ -31,7 +31,9 @@ return [
     'nav' => [
         'overview' => 'Overview',
         'shops' => 'Stores',
-        'content' => 'Content & knowledge',
+        'catalog' => 'Catalog & content',
+        'scan' => 'Scan & product data',
+        'try_on' => 'Try-On',
         'discovery' => 'Search & discovery',
         'shoppers' => 'Shoppers',
         'analytics' => 'Analytics',

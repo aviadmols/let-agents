@@ -33,9 +33,9 @@ final class EnrichmentFactResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCheckBadge;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'enrichment/facts';
 

@@ -15,7 +15,7 @@ use Filament\Navigation\NavigationGroup;
 final class PanelNavigation
 {
     /** Operator panel, top to bottom. */
-    public const OPERATOR = ['overview', 'shops', 'content', 'discovery', 'shoppers', 'analytics', 'system'];
+    public const OPERATOR = ['overview', 'shops', 'catalog', 'scan', 'discovery', 'shoppers', 'try_on', 'analytics', 'system'];
 
     /** Merchant panel, under the loose screens at the top (home, analytics): what a shop owner does, in order. */
     public const MERCHANT = ['search', 'shoppers', 'on_page', 'settings'];
@@ -24,14 +24,15 @@ final class PanelNavigation
      * @param  list<string>  $keys
      * @return array<string, NavigationGroup>
      */
-    public static function groups(array $keys): array
+    public static function groups(array $keys, bool $foldable = false): array
     {
         $groups = [];
 
         foreach ($keys as $key) {
-            // Plain headings, as on app.lets.co.il: nothing folds away.
+            // A shop manager's few groups are plain headings that stay open; the operator's many fold,
+            // and Filament remembers which the operator folded.
             $groups[$key] = NavigationGroup::make(fn (): string => __("admin::panels.nav.{$key}"))
-                ->collapsible(false);
+                ->collapsible($foldable);
         }
 
         return $groups;

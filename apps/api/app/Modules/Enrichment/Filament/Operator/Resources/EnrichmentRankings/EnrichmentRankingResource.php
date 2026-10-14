@@ -27,9 +27,9 @@ final class EnrichmentRankingResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTrophy;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'catalog';
 
-    protected static ?int $navigationSort = 40;
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'enrichment/rankings';
 

@@ -109,7 +109,7 @@ return [
         ],
     ],
     'knowledge' => [
-        'title' => 'About the store',
+        'title' => 'What the assistant knows about the store',
         'subheading' => 'What the assistant knows about the store before it reads any page: what every product page shows, the policies, what you wrote and the answers you gave. All of it goes into answers to questions in the search.',
         'no_shop' => 'No shop yet.',
         'pair' => 'Question: :question

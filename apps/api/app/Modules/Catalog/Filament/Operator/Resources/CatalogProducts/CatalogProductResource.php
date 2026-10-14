@@ -24,7 +24,7 @@ final class CatalogProductResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingBag;
 
-    protected static string|UnitEnum|null $navigationGroup = 'content';
+    protected static string|UnitEnum|null $navigationGroup = 'catalog';
 
     protected static ?int $navigationSort = 10;
 

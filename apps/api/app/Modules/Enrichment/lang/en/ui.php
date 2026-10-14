@@ -174,7 +174,7 @@ return [
         ],
     ],
     'scan_log' => [
-        'title' => 'Scan and check log',
+        'title' => 'Scan log by product',
         'subheading' => 'Everything that happened to one product: what code found, what a model was asked and answered, what was approved or rejected and why, what checkers said, and which relations were built.',
         'search' => 'Find a product by name or ID',
         'pick' => 'Pick a product to see its log.',
@@ -205,7 +205,7 @@ return [
         'hardware-store' => 'Hardware and tools store',
     ],
     'schema' => [
-        'title' => 'Store vocabulary',
+        'title' => 'Catalog structure & vocabulary',
         'subheading' => 'Code counts a sample of products, a model writes a vocabulary from the counts, a model of the other family reviews it, and you approve. Nothing is read with a proposal before approval.',
         'build_structure' => 'Divide the catalog and write a vocabulary for each part',
         'structure_started' => 'Dividing the catalog of :shop into branches. A vocabulary is written for each and scored; it appears here.',

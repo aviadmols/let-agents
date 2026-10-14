@@ -1372,14 +1372,16 @@ html.dark {
     padding-block: 12px;
 }
 
-/* Icons for the screens at the top only; inside a group the words are enough. */
-.fi-sidebar-group:not([data-group-label='']) .fi-sidebar-item-btn > .fi-icon {
+/* A shop manager's few groups stay open; the operator's many fold (PanelNavigation). */
+.fi-panel-merchant .fi-sidebar-group-btn .fi-icon-btn,
+.fi-panel-merchant .fi-sidebar-group-collapse-btn {
     display: none;
 }
 
-.fi-sidebar-group-btn .fi-icon-btn,
-.fi-sidebar-group-collapse-btn {
-    display: none;
+.fi-sidebar-item-btn > .fi-icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
 }
 
 /* The page head: the title and its line under it, a little tighter. */
