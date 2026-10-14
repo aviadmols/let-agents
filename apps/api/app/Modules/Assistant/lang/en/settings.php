@@ -243,6 +243,10 @@ return [
         'label' => 'Length of the post checker\'s reply',
         'description' => 'Tokens per post at most.',
     ],
+    'post_knowledge_pages' => [
+        'label' => 'How many information pages are read',
+        'description' => 'The store\'s policy pages (returns, delivery, warranty) first, then the other pages. 0 reads no pages.',
+    ],
     'post_knowledge_posts' => [
         'label' => 'How many posts are read',
         'description' => 'The latest updated. 0 reads no posts.',

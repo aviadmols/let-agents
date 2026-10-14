@@ -66,6 +66,29 @@ class CatalogContent extends Model
         return $this->belongsTo(Shop::class);
     }
 
+    /** Words in a page's title that say it is one of the store's policies. */
+    public const POLICY_WORDS = '/מדיניות|החזר|ביטול|משלוח|אחריות|תקנון|פרטיות|החלפ|policy|refund|return|shipping|terms|warranty|privacy/iu';
+
+    /** A page of the store's own rules: a platform policy, or a page whose title says so. */
+    public function isPolicy(): bool
+    {
+        return $this->type === self::PAGE
+            && (str_starts_with((string) $this->external_id, 'policy-') || preg_match(self::POLICY_WORDS, (string) $this->title) === 1);
+    }
+
+    /**
+     * Which is read first: the store's policies (returns, delivery, warranty), then its other
+     * pages, then its posts. 0 is first.
+     */
+    public function importance(): int
+    {
+        return match (true) {
+            $this->isPolicy() => 0,
+            $this->type === self::PAGE => 1,
+            default => 2,
+        };
+    }
+
     /** @param Builder<CatalogContent> $query */
     public function scopeActive(Builder $query): void
     {

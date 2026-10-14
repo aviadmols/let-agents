@@ -70,10 +70,12 @@ final class ReadPromisesInCode
                 ->update(['status' => FactStatus::Superseded, 'updated_at' => now()]);
 
             // What the shop promises, from its pages. The first page that says a thing owns it,
-            // so a promise repeated in the footer of every page is stored once.
+            // so a promise repeated in the footer of every page is stored once; the store's
+            // policies are read first, so its returns page owns what it says of returns.
             $said = [];
 
-            CatalogContent::query()->active()->where('type', 'page')->orderBy('external_id')
+            CatalogContent::query()->active()->where('type', 'page')->orderBy('external_id')->get()
+                ->sortBy(fn (CatalogContent $page): array => [$page->importance(), (string) $page->external_id])
                 ->each(function (CatalogContent $page) use ($shopId, $status, &$counts, &$said, &$samples): void {
                     $counts['pages']++;
                     $text = mb_substr(trim(($page->title ?? '')."\n".($page->body ?? $page->excerpt ?? '')), 0, self::MAX_PAGE_CHARS);

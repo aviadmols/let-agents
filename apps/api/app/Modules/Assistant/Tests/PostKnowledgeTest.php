@@ -76,7 +76,7 @@ final class PostKnowledgeTest extends TestCase
         $this->assertSame('succeeded', $run->status->value);
         // Two posts read, one checked: the guide on pine said nothing about the store.
         $this->assertSame([AiProviderName::OpenAi, AiProviderName::Anthropic, AiProviderName::OpenAi], array_column($this->calls, 'provider'), 'the other family checks');
-        $this->assertSame(file_get_contents(__DIR__.'/../Prompts/post_facts.v1.md'), $this->calls[0]['system']);
+        $this->assertSame(file_get_contents(__DIR__.'/../Prompts/post_facts.v2.md'), $this->calls[0]['system']);
         $this->assertCount(3, json_decode($this->calls[1]['user'], true)['facts'], 'code drops the sum before the checker sees it');
 
         $body = (string) $this->entry()->body;
@@ -118,6 +118,24 @@ final class PostKnowledgeTest extends TestCase
 
         $this->assertSame('failed', $run->status->value);
         $this->assertSame([], $this->calls);
+    }
+
+    public function test_the_stores_policies_are_read_first_then_its_pages_then_its_posts(): void
+    {
+        $this->article('מחשבון חיתוך', '<p>יש מחשבון חיתוך באתר.</p>');
+        $this->inShop(fn () => CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => '100', 'title' => 'אודות', 'body' => '<p>חנות משפחתית.</p>', 'hash' => 'a']));
+        $this->inShop(fn () => CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => 'policy-9', 'title' => 'מדיניות החזרות', 'body' => '<p>אפשר להחזיר תוך 14 יום.</p>', 'hash' => 'b']));
+        Settings::set('assistant.post_knowledge_per_run', 1, $this->shop->id);
+
+        app(ReadPostKnowledge::class)->handle($this->shop->id);
+
+        $first = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['policy', 'מדיניות החזרות'], [$first['kind'], $first['title']], 'one a night: the returns policy first');
+
+        $this->calls = [];
+        app(ReadPostKnowledge::class)->handle($this->shop->id);
+        $second = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['page', 'אודות'], [$second['kind'], $second['title']], 'then a page, before the post');
     }
 
     public function test_only_a_few_posts_a_night_and_the_rest_wait(): void

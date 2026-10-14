@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Tests;
 
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Enrichment\Actions\ReadPromisesInCode;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
@@ -40,6 +41,20 @@ final class PromisesTest extends TestCase
         foreach ($promises as $promise) {
             $this->assertStringContainsString($promise['detail'], $promise['quote'], 'the detail is a piece of its own sentence');
         }
+    }
+
+    public function test_the_stores_returns_policy_owns_what_it_says_of_returns_before_a_footer_page(): void
+    {
+        $this->buildShop();
+        $this->inShop(function (): void {
+            CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => '1', 'title' => 'צור קשר', 'body' => 'החזרות תוך 30 יום.', 'hash' => 'a']);
+            CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => 'policy-7', 'title' => 'מדיניות החזרות', 'body' => 'ניתן להחזיר מוצר תוך 14 יום ולקבל החזר מלא.', 'hash' => 'b']);
+        });
+
+        app(ReadPromisesInCode::class)->handle($this->shop->id);
+
+        $returns = $this->inShop(fn () => EnrichmentFact::query()->where('kind', FactKind::Promise)->where('key', 'returns')->whereNotNull('content_id')->sole());
+        $this->assertSame('14 יום', $returns->value_text, 'the policy page, not the contact page that sorts before it');
     }
 
     public function test_a_product_says_how_it_was_made_and_what_it_is_made_of(): void

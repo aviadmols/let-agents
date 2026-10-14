@@ -572,6 +572,15 @@
             "unit": "tokens"
         },
         {
+            "name": "post_knowledge_pages",
+            "type": "int",
+            "default": 30,
+            "min": 0,
+            "max": 200,
+            "scope": "shop",
+            "unit": "items"
+        },
+        {
             "name": "post_knowledge_posts",
             "type": "int",
             "default": 40,

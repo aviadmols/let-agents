@@ -220,14 +220,22 @@ final class BuildShopKnowledge
         return CatalogContent::query()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', $id)->first();
     }
 
-    /** Writes an entry only when it changed, so the time it changed means something; empty removes it. */
+    /**
+     * Writes an entry only when it changed, so the time it changed means something; empty removes
+     * it, and keeps its terms: what was read and said nothing is not read and paid for again.
+     */
     private function put(string $id, string $kind, string $body, array $terms): void
     {
         $row = $this->row($id);
         $body = mb_substr($body, 0, self::MAX_BODY);
 
         if ($body === '') {
-            $row?->forceFill(['removed_at' => now(), 'body' => '', 'terms' => $terms])->save();
+            if ($row !== null) {
+                $row->forceFill(['removed_at' => now(), 'body' => '', 'terms' => $terms])->save();
+            } elseif (($terms['read'] ?? []) !== []) {
+                // Pages read that said nothing yet: kept, removed, so they are not read again tomorrow.
+                CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => $id, 'title' => '', 'body' => '', 'terms' => $terms, 'hash' => hash('sha256', ''), 'removed_at' => now(), 'synced_at' => now()]);
+            }
 
             return;
         }

@@ -37,7 +37,8 @@ final class ReadPostKnowledge
 
     public const ACTION = 'assistant.read_posts';
 
-    public const PROMPT_VERSION = 1;
+    // v2: pages too, the store's policies first; a period ("14 days") is kept, a date is not.
+    public const PROMPT_VERSION = 2;
 
     private const MAX_TEXT = 8000;
 
@@ -85,10 +86,16 @@ final class ReadPostKnowledge
         }
 
         $before = (array) ($this->knowledge->entries()[BuildShopKnowledge::POSTS]->terms['read'] ?? []);
-        $posts = CatalogContent::query()->active()->where('type', CatalogContent::POST)
+        // The store's policies first, then its other pages, then its newest posts: a night that
+        // reads only a few reads what a shopper most needs to be told right.
+        $pages = CatalogContent::query()->active()->where('type', CatalogContent::PAGE)->orderBy('external_id')
+            ->limit((int) Settings::get('assistant.post_knowledge_pages', $shopId))
+            ->get(['id', 'type', 'external_id', 'title', 'body'])
+            ->sortBy(fn (CatalogContent $page): array => [$page->importance(), (string) $page->external_id]);
+        $posts = $pages->concat(CatalogContent::query()->active()->where('type', CatalogContent::POST)
             ->orderByDesc('updated_at')->orderBy('id')
             ->limit((int) Settings::get('assistant.post_knowledge_posts', $shopId))
-            ->get(['id', 'title', 'body']);
+            ->get(['id', 'type', 'external_id', 'title', 'body']))->values();
         $budget = (int) Settings::get('assistant.post_knowledge_per_run', $shopId);
         $shop = (string) (Shop::query()->whereKey($shopId)->value('name') ?? '');
         $read = [];
@@ -119,7 +126,7 @@ final class ReadPostKnowledge
             }
 
             try {
-                $facts = $this->facts($run, $writer, $checker, $shop, $title, $text);
+                $facts = $this->facts($run, $writer, $checker, $shop, $post->isPolicy() ? 'policy' : (string) $post->type, $title, $text);
             } catch (SpendCapReached $e) {
                 $run->fail('assistant::runs.spend_cap', [], $e->getMessage());
 
@@ -140,9 +147,9 @@ final class ReadPostKnowledge
     }
 
     /** @return list<string> what the post states about the store, as the checker kept it */
-    private function facts(RunContext $run, AgentModel $writer, AgentModel $checker, string $shop, string $title, string $text): array
+    private function facts(RunContext $run, AgentModel $writer, AgentModel $checker, string $shop, string $kind, string $title, string $text): array
     {
-        $written = $this->call($run, $writer, 'post_reader', 'post_facts', ['shop' => $shop, 'title' => $title, 'text' => $text]);
+        $written = $this->call($run, $writer, 'post_reader', 'post_facts', ['shop' => $shop, 'kind' => $kind, 'title' => $title, 'text' => $text]);
         $facts = [];
 
         foreach (array_slice((array) ($written['facts'] ?? []), 0, self::MAX_FACTS) as $fact) {
@@ -159,6 +166,7 @@ final class ReadPostKnowledge
         }
 
         $checked = $this->call($run, $checker, 'post_check', 'post_facts_check', [
+            'kind' => $kind,
             'title' => $title,
             'text' => $text,
             'facts' => array_map(fn (string $id, string $fact): array => ['id' => $id, 'text' => $fact], array_keys($facts), $facts),
