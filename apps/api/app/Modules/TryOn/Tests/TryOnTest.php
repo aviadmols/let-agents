@@ -26,6 +26,7 @@ use App\Modules\TryOn\Filament\Operator\Pages\TryOnLog;
 use App\Modules\TryOn\Models\TryOnJob;
 use App\Modules\TryOn\Models\TryOnPhoto;
 use App\Modules\TryOn\Models\TryOnStep;
+use App\Modules\TryOn\Support\Files;
 use App\Modules\TryOn\Support\Picture;
 use App\Modules\TryOn\Support\TryOnClasses;
 use Filament\Facades\Filament;
@@ -360,6 +361,22 @@ final class TryOnTest extends TestCase
         $this->checks[] = $this->verdict(['product_similarity' => 1, 'artifacts' => ['another ring']]);
         $this->start($photo, 'ring-1')->assertStatus(202);
         Livewire::test(TryOnLog::class, ['tab' => 'tries'])->assertSee('הבודק דחה את התמונה בכל הניסיונות: המוצר בתמונה לא נראה כמו המוצר (another ring)');
+    }
+
+    public function test_a_photo_saved_by_another_container_is_found_without_a_bucket(): void
+    {
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $path = $this->inShop(fn () => TryOnPhoto::query()->findOrFail($photo)->path);
+
+        // The container that took the photo is gone (a deploy): this one's disk does not have it.
+        Files::disk()->delete($path);
+        $this->assertFalse(Files::disk()->exists($path));
+
+        $this->checks[] = $this->verdict();
+        $id = $this->start($photo, 'ring-1')->assertStatus(202)->json('data.id');
+        $this->assertSame('ready', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$id}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->json('data.status'), 'read from the database, not photo_gone');
+        $this->assertTrue(Files::disk()->exists($path), 'and on this disk again');
     }
 
     public function test_a_try_never_has_more_than_two_pictures_and_never_waits_forever(): void

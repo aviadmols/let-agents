@@ -57,7 +57,9 @@ final class GatePhoto
 
         // Looked at before: the same answer, unless it was the model or the budget that failed then, or
         // the look was by an older version of the prompt (what it reports changed).
-        $current = $known !== null && ($known->gate === null || (int) ($known->gate['prompt_version'] ?? 1) === self::PROMPT_VERSION);
+        // A photo accepted before whose file is gone (kept on a container that no longer is) is saved again.
+        $current = $known !== null && ($known->gate === null || (int) ($known->gate['prompt_version'] ?? 1) === self::PROMPT_VERSION)
+            && ($known->status !== TryOnPhoto::OK || Files::exists($known->path));
         if ($known !== null && $current && ! in_array($known->reject_code, ['model_failed', 'busy'], true)) {
             return $this->outcome($known);
         }

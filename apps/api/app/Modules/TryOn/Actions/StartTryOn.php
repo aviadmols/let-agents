@@ -103,9 +103,8 @@ final class StartTryOn
             'status' => TryOnJob::QUEUED,
         ]);
 
-        // The worker sees the photo only on a shared disk (the bucket). On a container's own disk the web
-        // service that took the photo makes the picture itself, right after it answers the shopper.
-        Files::shared() ? RunTryOnJob::dispatch($shopId, $job->id) : RunTryOnJob::dispatchAfterResponse($shopId, $job->id);
+        // On the worker: it finds the photo on the bucket, or without one in the database (Files).
+        RunTryOnJob::dispatch($shopId, $job->id);
 
         return ['job' => $job->refresh()] + $none;
     }

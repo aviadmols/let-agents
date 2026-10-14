@@ -538,7 +538,8 @@
     }
     if (d.status === 'failed') {
       S.view = 'rejected';
-      S.message = L('failed');
+      // The team's test sees why, by its code (the hub explains each); a shopper sees the plain words.
+      S.message = L('failed') + (TEST && d.failure ? ' (' + d.failure + ')' : '');
       S.job = null;
       remember(null);
       render();
