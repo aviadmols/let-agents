@@ -32,7 +32,7 @@ final class RequiredGaps
      * @param  list<string>  $levels  the importance levels counted; `required` by default
      * @return list<array{vocabulary_id: string, type: string, type_label: string, attribute: string, attribute_label: string,
      *     importance: string, why: string|null, have: int, of: int,
-     *     missing: list<array{id: string, external_id: string, title: string, url: string|null, waiting: string|null}>}>
+     *     missing: list<array{id: string, external_id: string, title: string, url: string|null, waiting: string|null, waiting_keys: list<string>}>}>
      */
     public static function of(array $levels = [VocabularyDefinition::REQUIRED], string $locale = 'he'): array
     {
@@ -66,11 +66,15 @@ final class RequiredGaps
             // product => attribute => approved / waiting.
             $have = [];
             $waiting = [];
+            $waitingKeys = [];
             foreach ($values as $fact) {
                 if ($fact->status === FactStatus::Approved || $fact->status === FactStatus::NotApplicable) {
                     $have[$fact->product_id][$fact->key] = true;
                 } else {
                     $waiting[$fact->product_id][$fact->key] ??= $fact->valueLabel();
+                    if ($fact->kind === FactKind::Choice && $fact->value_text !== null) {
+                        $waitingKeys[$fact->product_id][$fact->key][] = (string) $fact->value_text;
+                    }
                 }
             }
 
@@ -86,7 +90,8 @@ final class RequiredGaps
                     foreach ($group as $product) {
                         if (! isset($have[$product->id][$key])) {
                             $missing[] = ['id' => (string) $product->id, 'external_id' => (string) $product->external_id, 'title' => (string) $product->title,
-                                'url' => $product->url, 'waiting' => $waiting[$product->id][$key] ?? null];
+                                'url' => $product->url, 'waiting' => $waiting[$product->id][$key] ?? null,
+                                'waiting_keys' => array_values(array_unique($waitingKeys[$product->id][$key] ?? []))];
                         }
                     }
 

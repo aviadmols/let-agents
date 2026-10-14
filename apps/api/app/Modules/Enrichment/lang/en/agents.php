@@ -10,6 +10,7 @@ return [
     'matcher' => 'Article product matcher',
     'code_reader' => 'Code reader',
     'relator' => 'Product relations calculator',
+    'picture_reader' => 'Suggests details of looks from the picture',
     'nightly_model' => 'Reads products and articles',
     'auditor' => 'Checks how articles are read',
     'schema_discovery' => 'Discovers the store\'s vocabulary',

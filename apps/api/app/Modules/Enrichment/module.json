@@ -51,6 +51,10 @@
         {
             "name": "auto_review",
             "default": true
+        },
+        {
+            "name": "picture_suggestions",
+            "default": true
         }
     ],
     "settings": [
@@ -226,6 +230,43 @@
             "max": 2000,
             "scope": "shop",
             "unit": "requests"
+        },
+        {
+            "name": "picture_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "picture_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "picture_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "picture_output_usd_per_million",
+            "type": "float",
+            "default": 5.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
         },
         {
             "name": "compare_provider",
@@ -731,6 +772,28 @@
                     ],
                     "prompts": [
                         "web_verifier"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "picture_reader",
+            "action": "suggest_from_picture",
+            "when": "on_request",
+            "features": [
+                "picture_suggestions"
+            ],
+            "roles": [
+                {
+                    "role": "reader",
+                    "provider": "picture_provider",
+                    "model": "picture_model",
+                    "prices": [
+                        "picture_input_usd_per_million",
+                        "picture_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "picture_value"
                     ]
                 }
             ]

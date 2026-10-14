@@ -81,6 +81,22 @@ return [
         'label' => 'Products the reviewer checks a night',
         'description' => 'Products with details waiting for review. 0 turns the review off.',
     ],
+    'picture_provider' => [
+        'label' => 'Provider of the model that suggests a detail from the picture',
+        'description' => 'On the missing details screen: suggests a value for a detail of looks (colour, stone, shape) from the product\'s picture. A person approves.',
+    ],
+    'picture_model' => [
+        'label' => 'Model that suggests a detail from the picture',
+        'description' => 'Picks only from the vocabulary\'s values, and says how sure it is.',
+    ],
+    'picture_input_usd_per_million' => [
+        'label' => 'Input price of the picture model, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'picture_output_usd_per_million' => [
+        'label' => 'Output price of the picture model, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
     'compare_provider' => [
         'label' => 'Provider of the model compared with the reader',
         'description' => 'In the model comparison on the gaps screen: the second model, against the night\'s reader.',

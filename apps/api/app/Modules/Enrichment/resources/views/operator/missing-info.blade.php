@@ -48,6 +48,7 @@
                     <x-filament::button size="sm" color="gray" wire:click="markNotApplicable">{{ $t('not_applicable_ticked') }}</x-filament::button>
                     <x-filament::button size="sm" color="gray" wire:click="$set('picked', @js(array_column($shown, 'id')))">{{ $t('tick_all') }}</x-filament::button>
                     @if ($this->webOn())<x-filament::button size="sm" color="gray" icon="heroicon-o-globe-alt" wire:click="lookUpPicked">{{ $t('web_check_ticked') }}</x-filament::button>@endif
+                    @if ($this->pictureOn($gap))<x-filament::button size="sm" color="gray" icon="heroicon-o-photo" wire:click="suggestFromPicture" data-picture-suggest>{{ $t('picture_suggest') }}</x-filament::button>@endif
                 </div>
 
                 <div style="display:grid;gap:2px">
@@ -61,7 +62,12 @@
                                 @else
                                     <span style="font-weight:600;font-size:14px">{{ $product['title'] }}</span>
                                 @endif
-                                @if ($product['waiting'])<div style="{{ $small }}">{{ $t('waiting', ['value' => $product['waiting']]) }}</div>@endif
+                                @if ($product['waiting'])
+                                    <div style="{{ $small }};display:flex;gap:6px;align-items:center">
+                                        <span>{{ $t('waiting', ['value' => $product['waiting']]) }}</span>
+                                        @if (($product['waiting_keys'] ?? []) !== [])<x-filament::button size="xs" color="success" wire:click="acceptWaiting(@js($product['id']))" data-accept-waiting>{{ $t('waiting_accept') }}</x-filament::button>@endif
+                                    </div>
+                                @endif
                             </div>
                             @if ($field['type'] === 'enum')
                                 <select wire:model="entries.{{ $product['id'] }}" style="{{ $inputStyle }}" @if ($field['multiple']) multiple @endif>

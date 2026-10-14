@@ -32,6 +32,8 @@ return [
     'review_nothing' => 'No details are waiting for review.',
     'review_submitted' => ':submitted products sent for review. The answers are collected during the day.',
     'reviewed' => 'The reviewer checked :asked products: :applied answers accepted.',
+    'picture_not_visible' => 'This detail cannot be seen in a picture.',
+    'picture_suggested' => ':suggested values suggested from pictures. In :unsure pictures it was not clear enough.',
     'compared' => ':products products compared: :a found :a_facts details, :b found :b_facts. :same the same, :different different.',
     'compare_same' => 'The two models are the same: nothing to compare.',
     'compare_nothing' => 'No products to read: the shop has no active vocabulary.',

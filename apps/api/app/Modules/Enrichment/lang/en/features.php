@@ -33,6 +33,10 @@ return [
         'label' => 'Nightly review of waiting details',
         'description' => 'Every night a model of another family checks the details the reader was unsure of: right is approved, wrong rejected, unsure goes to a person.',
     ],
+    'picture_suggestions' => [
+        'label' => 'Suggestions from the picture for missing details',
+        'description' => 'A button that suggests a value for a detail of looks (colour, stone, shape, pattern) from the product\'s picture. Only details a picture can show, and nothing is kept without approval.',
+    ],
     'batch_reading' => [
         'label' => 'Read products in batches, at half price',
         'description' => 'Questions for the model go to the provider in one batch and are answered during the day, at half the price of asking one by one. The answers are collected every ten minutes and checked in code as always. Off: each question is asked on its own, at once.',

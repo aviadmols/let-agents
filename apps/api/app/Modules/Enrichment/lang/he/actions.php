@@ -14,6 +14,7 @@ return [
     'reread_products' => 'קריאה חוזרת של מוצרים שחסר להם פרט',
     'nightly_model' => 'קריאת מוצרים במודל',
     'nightly_review' => 'בדיקה של פרטים שממתינים',
+    'suggest_from_picture' => 'הצעת פרט מהתמונה',
     'compare_readers' => 'השוואת שני מודלים שקוראים מוצרים',
     'collect_batches' => 'איסוף תשובות של קבוצות מהספק',
 ];

@@ -32,6 +32,8 @@ return [
     'review_nothing' => 'אין פרטים שממתינים לבדיקה.',
     'review_submitted' => 'נשלחו :submitted מוצרים לבדיקה. התשובות נאספות במהלך היום.',
     'reviewed' => 'הבודק בדק :asked מוצרים: :applied תשובות התקבלו.',
+    'picture_not_visible' => 'את הפרט הזה אי אפשר לראות בתמונה.',
+    'picture_suggested' => 'הוצעו :suggested ערכים מהתמונות. ב־:unsure תמונות לא היה ברור מספיק.',
     'compared' => 'הושוו :products מוצרים: :a מצא :a_facts פרטים, :b מצא :b_facts. :same זהים, :different שונים.',
     'compare_same' => 'שני המודלים בהשוואה זהים: אין מה להשוות.',
     'compare_nothing' => 'אין מוצרים לקרוא: לחנות אין אוצר מילים פעיל.',

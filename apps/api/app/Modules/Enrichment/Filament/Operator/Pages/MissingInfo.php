@@ -9,7 +9,9 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Enrichment\Actions\ApplyTeamValue;
 use App\Modules\Enrichment\Actions\LookUpOnTheWeb;
+use App\Modules\Enrichment\Actions\SuggestFromPicture;
 use App\Modules\Enrichment\Jobs\LookUpOnTheWebJob;
+use App\Modules\Enrichment\Jobs\SuggestFromPictureJob;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Models\EnrichmentWebLookup;
 use App\Modules\Enrichment\Scanning\RequiredGaps;
@@ -204,6 +206,61 @@ class MissingInfo extends Page
         $body = $first === null ? null : __('enrichment::missing.import_problem', ['line' => (string) $first['line'], 'problem' => __('enrichment::missing.problems.'.$first['problem'])]);
 
         Notification::make()->{$result['problems'] === [] ? 'success' : 'warning'}()->title($note)->body($body)->send();
+    }
+
+    /**
+     * Whether a group's detail can be suggested from the products' pictures: a choice about how
+     * the product looks, never a number or a yes/no.
+     *
+     * @param  array<string, mixed>  $gap
+     */
+    public function pictureOn(array $gap): bool
+    {
+        $shop = app(TenantContext::class)->id();
+
+        if ($shop === null || ! Features::enabled('enrichment.picture_suggestions', $shop)) {
+            return false;
+        }
+
+        $definition = EnrichmentVocabulary::query()->find($gap['vocabulary_id'])?->definition();
+
+        return $definition !== null && ($definition->attribute($gap['attribute'])['type'] ?? '') === 'enum' && $definition->readFromImage($gap['attribute']);
+    }
+
+    /** The ticked products, or every shown one without a suggestion, looked at in their pictures, in the background. */
+    public function suggestFromPicture(): void
+    {
+        $gap = $this->openGap();
+        $shop = app(TenantContext::class)->id();
+
+        if ($gap === null || $shop === null || ! $this->pictureOn($gap)) {
+            return;
+        }
+
+        $ids = $this->picked !== [] ? $this->picked : array_column(array_filter($gap['missing'], fn (array $p): bool => $p['waiting'] === null), 'id');
+        $ids = array_slice(array_values($ids), 0, SuggestFromPicture::MAX);
+
+        if ($ids === []) {
+            return;
+        }
+
+        SuggestFromPictureJob::dispatch($shop, (string) $gap['vocabulary_id'], (string) $gap['attribute'], $ids);
+        $this->picked = [];
+        Notification::make()->success()->title(__('enrichment::missing.picture_started', ['count' => (string) count($ids)]))->send();
+    }
+
+    /** A suggestion waiting for a person, approved as it is. */
+    public function acceptWaiting(string $productId): void
+    {
+        $gap = $this->openGap();
+        $product = $gap === null ? null : collect($gap['missing'])->firstWhere('id', $productId);
+
+        if ($product === null || ($product['waiting_keys'] ?? []) === []) {
+            return;
+        }
+
+        $value = $this->field($gap)['multiple'] ? $product['waiting_keys'] : $product['waiting_keys'][0];
+        $this->report($this->apply($gap, [$productId], $value));
     }
 
     /** Whether the shop lets its team check a missing detail on the web. */
