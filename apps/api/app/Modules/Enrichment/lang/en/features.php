@@ -11,7 +11,7 @@ return [
     ],
     'schema_auto_advance' => [
         'label' => 'Go on to the full scan when the structure scores well',
-        'description' => 'When every branch\'s vocabulary scores at least the pass score and nothing hard failed, it is approved and the scan goes on without waiting. Off: the score is shown and a person approves. Turn it on after comparing the score with your own judgment on a store or two.',
+        'description' => 'When every branch\'s vocabulary scores at least the pass score (80) and nothing hard failed, it is approved and the scan goes on without waiting. Off: the score is shown and a person approves. On by default.',
     ],
     'web_lookup' => [
         'label' => 'Let the team check a missing detail on the web',

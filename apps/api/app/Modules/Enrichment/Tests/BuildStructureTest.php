@@ -83,6 +83,7 @@ final class BuildStructureTest extends TestCase
 
     public function test_with_the_gate_off_every_branch_waits_for_a_person_with_its_score(): void
     {
+        Features::override('enrichment.schema_auto_advance', false, $this->shop->id);
         $this->replies = [...$this->branchReplies('pendant', 'תליון', '^\s*תליו(?:ן|נים)'), ...$this->branchReplies('ring', 'טבעת', '^\s*טבע(?:ת|ות)')];
 
         $run = app(BuildStructure::class)->handle($this->shop->id);
@@ -105,6 +106,15 @@ final class BuildStructureTest extends TestCase
 
         $this->assertSame(0, $this->calls, 'no model is asked when one vocabulary already reads it all');
         $this->assertSame('whole_catalog_vocabulary', $run->output['skipped']);
+    }
+
+    public function test_the_structure_command_the_first_scan_runs_reaches_the_action(): void
+    {
+        $this->replies = [...$this->branchReplies('pendant', 'תליון', '^\s*תליו(?:ן|נים)'), ...$this->branchReplies('ring', 'טבעת', '^\s*טבע(?:ת|ות)')];
+
+        $this->artisan('enrichment', ['step' => 'structure', 'target' => $this->shop->slug])->assertSuccessful();
+
+        $this->assertSame(4, $this->calls, 'the command ran the structure, a writer and a reviewer for each branch');
     }
 
     /** The branches are written biggest first, equal sizes by category id: pendants (p) before rings (r).

@@ -38,7 +38,7 @@
         },
         {
             "name": "schema_auto_advance",
-            "default": false
+            "default": true
         },
         {
             "name": "web_lookup",

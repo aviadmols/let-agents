@@ -112,7 +112,8 @@ final class SchemaScoreTest extends TestCase
         $this->assertSame(['outcome' => 'held', 'why' => 'below_pass'], $advance->handle($this->proposal), '70 of the 80 the shop asks');
 
         Settings::set('enrichment.schema_pass_score', 60, $this->shop->id);
-        $this->assertSame(['outcome' => 'held', 'why' => 'auto_off'], $advance->handle($this->proposal), 'passes, but the shop never turned the gate on');
+        Features::override('enrichment.schema_auto_advance', false, $this->shop->id);
+        $this->assertSame(['outcome' => 'held', 'why' => 'auto_off'], $advance->handle($this->proposal), 'passes, but the shop turned the gate off');
         $this->assertSame(EnrichmentSchemaProposal::PROPOSED, $this->proposal->refresh()->status);
 
         // A hard failure stops it whatever the score.
