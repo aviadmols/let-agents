@@ -26,6 +26,7 @@ use App\Modules\TryOn\Models\TryOnJob;
 use App\Modules\TryOn\Models\TryOnPhoto;
 use App\Modules\TryOn\Models\TryOnStep;
 use App\Modules\TryOn\Support\Picture;
+use App\Modules\TryOn\Support\TryOnClasses;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -276,7 +277,8 @@ final class TryOnTest extends TestCase
         // The team, with the key: the product's own class, or the one it names on a product the scan did not mark.
         $this->assertSame(['class' => 'ring', 'test' => true], $page("id=ring-1&preview={$key}&tryon=1"));
         $this->assertSame(['class' => 'top', 'test' => true], $page("id=drill-1&preview={$key}&tryon=top"));
-        $this->assertNull($page("id=drill-1&preview={$key}&tryon=1"), 'not marked and no class named: nothing to try');
+        $this->assertSame(['class' => 'auto', 'test' => true], $page("id=drill-1&preview={$key}&tryon=1"), 'not marked and no class named: the class its name says');
+        $this->assertFalse($this->getJson("/api/v1/try-on/{$this->site}/config?product=drill-1&preview={$key}&class=auto", $origin)->assertOk()->json('data.tryable'), 'a drill says no class');
         $this->assertTrue($this->getJson("/api/v1/try-on/{$this->site}/config?product=drill-1&preview={$key}&class=ring", $origin)->assertOk()->json('data.tryable'));
         $this->assertFalse($this->getJson("/api/v1/try-on/{$this->site}/config?product=drill-1&preview={$key}&class=rocket", $origin)->assertOk()->json('data.tryable'), 'only a real try-on class');
 
@@ -294,6 +296,43 @@ final class TryOnTest extends TestCase
         $this->actingAs(User::factory()->operator()->create());
         app(TenantContext::class)->set($this->shop->id);
         Livewire::test(TryOnLog::class)->assertSeeHtml('data-try-on-test')->assertSee("let_agents_preview={$key}&let_agents_tryon=1");
+    }
+
+    public function test_the_team_tries_a_product_the_catalog_has_not_read_by_its_page_name_and_picture(): void
+    {
+        Features::override('try_on.enabled', false, $this->shop->id);
+        $key = app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $this->shop->id)->first())->previewKey();
+        $origin = ['Origin' => 'https://www.store.test'];
+        $page = '&title='.rawurlencode('שרשרת איטלקית חוליות אובליות 4.35 מ"מ').'&image='.rawurlencode('https://www.store.test/cdn/shop/files/chain.jpg');
+        $config = fn (string $query) => $this->getJson("/api/v1/try-on/{$this->site}/config?product=new-777&preview={$key}{$query}", $origin)->assertOk()->json('data');
+
+        $this->assertSame([true, 'necklace'], [$config($page)['tryable'], $config($page)['class']], 'a chain: its name says necklace');
+        $this->assertFalse($config(str_replace('www.store.test', 'evil.test', $page))['tryable'], 'the server fetches the picture: only from the store or Shopify');
+        $this->assertFalse($config('')['tryable'], 'no name and picture: nothing to try');
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=new-777{$page}", $origin)->assertNotFound();
+
+        Http::fake(['www.store.test/*' => Http::response(self::picture(700, 700), 200, ['Content-Type' => 'image/jpeg'])]);
+        $this->gate[] = $this->hand(['subject' => 'neck', 'hands_visible' => 0, 'fingers_visible' => []]);
+        $photo = $this->call('POST', "/api/v1/try-on/{$this->site}/photos", ['vid' => self::VID, 'consent' => '1', 'preview' => $key, 'photo' => UploadedFile::fake()->createWithContent('me.jpg', self::picture(900, 900))],
+            server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json('data.photo');
+        $this->checks[] = $this->verdict();
+        $made = $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'new-777', 'preview' => $key, 'class' => '',
+            'title' => 'שרשרת איטלקית חוליות אובליות 4.35 מ"מ', 'image' => 'https://www.store.test/cdn/shop/files/chain.jpg'], $origin)->assertStatus(202)->json('data');
+
+        $this->assertSame('ready', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$made['id']}?vid=".self::VID."&preview={$key}", $origin)->json('data.status'));
+        $job = app(TenantContext::class)->run($this->shop->id, fn () => TryOnJob::query()->findOrFail($made['id']));
+        $this->assertNull($job->product_id);
+        $this->assertSame(['necklace', 'שרשרת איטלקית חוליות אובליות 4.35 מ"מ'], [$job->tryon_class, $job->productTitle()]);
+    }
+
+    public function test_a_products_name_says_its_class_for_the_teams_test(): void
+    {
+        $this->assertSame('necklace', TryOnClasses::guess('שרשרת עם תליון טבעת'), 'the first word that says a class');
+        $this->assertSame('ring', TryOnClasses::guess("טבעת וינטג' עדינה משובצת פרידוט"));
+        $this->assertSame('earrings', TryOnClasses::guess('עגילי חישוק זהב'));
+        $this->assertSame('furniture', TryOnClasses::guess('ספה תלת מושבית אפורה'));
+        $this->assertSame('dress', TryOnClasses::guess('Linen summer dress'));
+        $this->assertNull(TryOnClasses::guess('מקדחה רוטטת 18V'));
     }
 
     public function test_pictures_are_deleted_after_the_shops_days_and_the_log_stays(): void

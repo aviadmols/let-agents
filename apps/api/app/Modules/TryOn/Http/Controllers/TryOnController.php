@@ -48,9 +48,12 @@ final class TryOnController
 
         return app(TenantContext::class)->run($connection->shop_id, function () use ($request, $locale, $connection): JsonResponse {
             // Shoppers only where the shop turned Try-On on; the team's test anywhere (the key is checked).
-            $open = Features::enabled('try_on.enabled', $connection->shop_id) || self::test($request, $connection);
+            $test = self::test($request, $connection);
+            $open = Features::enabled('try_on.enabled', $connection->shop_id) || $test;
             $product = $open ? CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $request->query('product'))->first() : null;
-            $class = $product === null ? null : (StartTryOn::classOf($product->id) ?? self::testClass($request, $connection));
+            // The team's test also on a product the scan did not mark, or the catalog has not read yet (by the page's name).
+            $page = $test && $product === null ? self::pageProduct($request, $connection) : null;
+            $class = $product === null && $page === null ? null : StartTryOn::testedClass($product, $test, self::testClass($request, $connection), $page['title'] ?? null);
 
             return response()->json(['data' => [
                 'tryable' => $class !== null,
@@ -126,7 +129,8 @@ final class TryOnController
         $locale = (string) $request->input('locale', 'he');
         $answers = is_array($request->input('answers')) ? $request->input('answers') : [];
         $result = app(TenantContext::class)->run($connection->shop_id, fn (): array => $start->handle(self::visitor($connection->shop_id, $visitor), (string) $request->input('photo'), (string) $request->input('product'), $answers,
-            test: self::test($request, $connection), testClass: self::testClass($request, $connection)));
+            test: self::test($request, $connection), testClass: self::testClass($request, $connection),
+            page: self::test($request, $connection) ? self::pageProduct($request, $connection) : null));
 
         if ($result['questions'] !== []) {
             return response()->json(['data' => ['status' => 'needs_answer', 'questions' => array_map(fn (array $q): array => [
@@ -227,6 +231,32 @@ final class TryOnController
         $key = $request->input('preview', $request->query('preview'));
 
         return is_string($key) && $key !== '' && hash_equals($connection->previewKey(), $key);
+    }
+
+    /**
+     * In the team's test, the page's own product (its name and main picture) for a product the
+     * catalog has not read yet. The picture is fetched by the server, so it must be on the store's own
+     * address or Shopify's file server.
+     *
+     * @return array{title: string, image: string}|null
+     */
+    private static function pageProduct(Request $request, StoreConnection $connection): ?array
+    {
+        $title = trim(mb_substr((string) $request->input('title', $request->query('title', '')), 0, 200));
+        $image = trim((string) $request->input('image', $request->query('image', '')));
+        $image = str_starts_with($image, '//') ? 'https:'.$image : $image;
+        $host = strtolower((string) parse_url($image, PHP_URL_HOST));
+        $store = preg_replace('/^www\./', '', strtolower((string) parse_url((string) $connection->site_url, PHP_URL_HOST)));
+        $allowed = $host !== '' && (
+            ($store !== '' && ($host === $store || str_ends_with($host, '.'.$store)))
+            || $host === 'cdn.shopify.com' || str_ends_with($host, '.myshopify.com')
+        );
+
+        if ($title === '' || ! str_starts_with($image, 'https://') || ! $allowed) {
+            return null;
+        }
+
+        return ['title' => $title, 'image' => $image];
     }
 
     /** The class the team named for its test, on a product the scan did not mark. */

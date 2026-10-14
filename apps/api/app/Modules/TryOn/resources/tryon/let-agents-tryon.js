@@ -28,8 +28,20 @@
   // The store team's test (let_agents_tryon in the page's address, with the preview key): sent with
   // every request; the server checks the key. Empty for shoppers.
   var TEST = ctx.preview ? { preview: String(ctx.preview), 'class': String(ctx.testClass || '') } : null;
+  // In the test, the page's own name and picture, for a product the scan did not mark or the catalog
+  // has not read yet; the same values the search script sent, so the config comes from the cache.
+  function testPage() {
+    var h1 = doc.querySelector('h1');
+    return {
+      title: String(ctx.title || meta('og:title') || (h1 ? h1.textContent.replace(/\s+/g, ' ') : '') || '').trim().slice(0, 200),
+      image: String(ctx.image || meta('og:image:secure_url') || meta('og:image') || '').trim()
+    };
+  }
   function testQuery() {
-    return TEST ? '&preview=' + encodeURIComponent(TEST.preview) + (TEST['class'] ? '&class=' + encodeURIComponent(TEST['class']) : '') : '';
+    if (!TEST) { return ''; }
+    var page = testPage();
+    return '&preview=' + encodeURIComponent(TEST.preview) + (TEST['class'] ? '&class=' + encodeURIComponent(TEST['class']) : '') +
+      '&title=' + encodeURIComponent(page.title) + '&image=' + encodeURIComponent(page.image);
   }
 
   var CSS = [
@@ -111,7 +123,7 @@
   function json(response) { return response.json().then(function (body) { return { status: response.status, body: body || {} }; }); }
   function meta(name) {
     var n = doc.querySelector('meta[property="' + name + '"]') || doc.querySelector('meta[name="' + name + '"]');
-    return n ? n.getAttribute('content') : '';
+    return n ? String(n.getAttribute('content') || '').trim() : '';
   }
   function product() {
     var h1 = doc.querySelector('h1');
@@ -466,7 +478,7 @@
     fetch(API + '/tries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ vid: visitor(), photo: S.photo, product: String(ctx.product), answers: S.answers, locale: LOCALE, preview: TEST ? TEST.preview : undefined, 'class': TEST ? TEST['class'] : undefined }),
+      body: JSON.stringify({ vid: visitor(), photo: S.photo, product: String(ctx.product), answers: S.answers, locale: LOCALE, preview: TEST ? TEST.preview : undefined, 'class': TEST ? TEST['class'] : undefined, title: TEST ? testPage().title : undefined, image: TEST ? testPage().image : undefined }),
       credentials: 'omit'
     })
       .then(json)

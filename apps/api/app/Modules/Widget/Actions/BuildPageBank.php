@@ -1385,7 +1385,7 @@ final class BuildPageBank
      *
      * The store team's test (`?let_agents_preview=<key>&let_agents_tryon=1`, PageBankController) asks
      * with $test: the flag is not asked, and a product the scan did not mark takes the class the
-     * team named ($testClass), so it can be tried on any product page.
+     * team named ($testClass) or the one its name says (`auto`), so it can be tried on any product page.
      *
      * @return array{class: string, test?: bool}|null
      */
@@ -1402,8 +1402,10 @@ final class BuildPageBank
         $class = $this->tenant->run($shopId, fn () => EnrichmentFact::query()->where('kind', FactKind::TryOn)->where('key', 'class')->where('status', FactStatus::Approved)
             ->whereHas('product', fn ($q) => $q->where('external_id', $externalId)->whereNull('removed_at'))->latest('id')->value('value_text'));
 
-        if ((! is_string($class) || $class === 'none') && $test && $testClass !== null) {
-            $class = $testClass;
+        // In the test, a product the scan did not mark: the class the team named, or `auto`, which
+        // the Try-On server reads as "the class the product's name says".
+        if ((! is_string($class) || $class === 'none') && $test) {
+            $class = $testClass ?? 'auto';
         }
 
         return is_string($class) && $class !== 'none' ? ['class' => $class] + ($test ? ['test' => true] : []) : null;

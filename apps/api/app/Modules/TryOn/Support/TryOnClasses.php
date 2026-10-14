@@ -51,6 +51,39 @@ final class TryOnClasses
     /** The fingers a ring may go on, in the order a shopper reads them. */
     public const FINGERS = ['index', 'middle', 'ring', 'pinky', 'thumb'];
 
+    /**
+     * Words in a product's name that say its class, Hebrew and English. Only for the store team's
+     * test on a product the scan did not mark (let_agents_tryon=1): shoppers never get a guess.
+     */
+    private const NAMES = [
+        'earrings' => '/עגיל|earring|stud/iu',
+        'ring' => '/טבעת|טבעות|\bring\b|\brings\b/iu',
+        'bracelet' => '/צמיד|bracelet|bangle|anklet|רגלית/iu',
+        'necklace' => '/שרשר|תליון|קולייה|קולר|necklace|pendant|chain|choker/iu',
+        'watch' => '/שעון|\bwatch/iu',
+        'dress' => '/שמלה|שמלת|\bdress/iu',
+        'bottom' => '/מכנס|חצאית|ג׳ינס|ג\'ינס|טייץ|שורט|\bpants|trousers|skirt|jeans|shorts|leggings/iu',
+        'outerwear' => '/מעיל|ז׳קט|ז\'קט|קרדיגן|וסט|coat|jacket|cardigan|blazer/iu',
+        'top' => '/חולצ|טופ|סוודר|גופי|בלוז|טי.?שירט|shirt|\btop\b|sweater|hoodie|blouse/iu',
+        'furniture' => '/ספה|כורס|שולחן|כיסא|כסא|מיטה|ארון|שידה|מדף|ספרייה|מזנון|\bsofa|couch|armchair|table|chair|\bbed\b|wardrobe|dresser|shelf|cabinet/iu',
+    ];
+
+    /** The class a product's name says: the word that comes first in it ("שרשרת עם תליון טבעת" is a necklace). */
+    public static function guess(string $title): ?string
+    {
+        $best = null;
+        $at = PHP_INT_MAX;
+
+        foreach (self::NAMES as $class => $pattern) {
+            if (preg_match($pattern, $title, $match, PREG_OFFSET_CAPTURE) === 1 && $match[0][1] < $at) {
+                $best = $class;
+                $at = $match[0][1];
+            }
+        }
+
+        return $best;
+    }
+
     public static function group(string $class): ?string
     {
         return self::GROUPS[$class] ?? null;

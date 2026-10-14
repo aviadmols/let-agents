@@ -91,7 +91,7 @@ final class RunTryOn
         }
 
         $photo = Files::get($job->photo->path);
-        $productPicture = $this->productPicture((string) $job->product->image_url);
+        $productPicture = $this->productPicture((string) $job->productImage());
 
         if ($photo === null || $productPicture === null) {
             $this->finish($run, $job, $photo === null ? 'photo_gone' : 'no_product_picture');
@@ -164,7 +164,7 @@ final class RunTryOn
 
             if ($passed) {
                 $job->update(['status' => TryOnJob::READY, 'stage' => null, 'result_path' => $resultPath, 'cost_usd' => round($cost, 6), 'finished_at' => now()]);
-                $run->output(['job' => $job->id, 'attempts' => $attempt, 'cost' => round($cost, 6)])->summary('try_on::runs.ready', ['product' => mb_substr((string) $job->product->title, 0, 60), 'attempts' => (string) $attempt]);
+                $run->output(['job' => $job->id, 'attempts' => $attempt, 'cost' => round($cost, 6)])->summary('try_on::runs.ready', ['product' => mb_substr($job->productTitle(), 0, 60), 'attempts' => (string) $attempt]);
 
                 return;
             }
@@ -200,7 +200,7 @@ final class RunTryOn
     /** @return array<string, mixed> */
     private function writerInput(TryOnJob $job, string $fix): array
     {
-        $facts = EnrichmentFact::query()->with('vocabulary')->where('product_id', $job->product_id)->whereIn('kind', [FactKind::Choice, FactKind::Spec])
+        $facts = $job->product_id === null ? collect() : EnrichmentFact::query()->with('vocabulary')->where('product_id', $job->product_id)->whereIn('kind', [FactKind::Choice, FactKind::Spec])
             ->where('status', FactStatus::Approved)->orderBy('key')->get();
         $details = [];
         $dimensions = [];
@@ -211,7 +211,7 @@ final class RunTryOn
 
         return array_filter([
             'template' => trim(self::prompt('tryon_'.$job->group)),
-            'product' => ['title' => (string) $job->product->title, 'class' => $job->tryon_class, 'details' => array_slice($details, 0, 12), 'dimensions' => array_slice($dimensions, 0, 6)],
+            'product' => ['title' => $job->productTitle(), 'class' => $job->tryon_class, 'details' => array_slice($details, 0, 12), 'dimensions' => array_slice($dimensions, 0, 6)],
             'photo' => array_intersect_key((array) $job->photo->gate, array_flip(['subject', 'scale', 'free_spots', 'hands_visible'])),
             'answers' => $job->answers ?? [],
             'fix' => $fix,
@@ -243,7 +243,7 @@ final class RunTryOn
     private function finish(RunContext $run, TryOnJob $job, string $failure, float $cost = 0.0): void
     {
         $job->update(['status' => TryOnJob::FAILED, 'failure' => $failure, 'cost_usd' => round($cost, 6), 'finished_at' => now()]);
-        $run->output(['job' => $job->id, 'failure' => $failure, 'cost' => round($cost, 6)])->fail('try_on::runs.failed', ['product' => mb_substr((string) $job->product?->title, 0, 60), 'why' => $failure], $failure);
+        $run->output(['job' => $job->id, 'failure' => $failure, 'cost' => round($cost, 6)])->fail('try_on::runs.failed', ['product' => mb_substr($job->productTitle(), 0, 60), 'why' => $failure], $failure);
     }
 
     private function estimateWriter(AgentModel $writer): float

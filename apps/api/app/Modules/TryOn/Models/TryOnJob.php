@@ -16,7 +16,8 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $shop_id
  * @property string $photo_id
- * @property string $product_id
+ * @property string|null $product_id null only in the team's test of a product the catalog has not read
+ * @property array{external_id: string, title: string, image: string}|null $page_product
  * @property string $visitor_hash
  * @property string $tryon_class
  * @property string $group
@@ -50,7 +51,21 @@ class TryOnJob extends Model
 
     protected function casts(): array
     {
-        return ['answers' => 'array', 'attempts' => 'integer', 'finished_at' => 'datetime'];
+        return ['answers' => 'array', 'page_product' => 'array', 'attempts' => 'integer', 'finished_at' => 'datetime'];
+    }
+
+    /** The product's name: the catalog's, or the page's in the team's test of a product not read yet. */
+    public function productTitle(): string
+    {
+        return (string) ($this->product?->title ?? $this->page_product['title'] ?? '');
+    }
+
+    /** The product's picture, the same way. */
+    public function productImage(): ?string
+    {
+        $url = $this->product?->image_url ?? $this->page_product['image'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     /** @return BelongsTo<TryOnPhoto, $this> */

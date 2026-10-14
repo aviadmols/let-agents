@@ -32,9 +32,12 @@ final class StartTryOn
      * @param  array<string, mixed>  $answers
      * @param  bool  $test  the store team's test, with its preview key: the flag is not asked
      * @param  string|null  $testClass  for the test, the class to use on a product the scan did not mark
+     *                                  (none: the class its name says, TryOnClasses::guess)
+     * @param  array{title: string, image: string}|null  $page  for the test, the page's own product when the
+     *                                                          catalog has not read it yet (checked by the controller)
      * @return array{job: TryOnJob|null, problem: string|null, questions: list<array<string, mixed>>}
      */
-    public function handle(string $visitorHash, string $photoId, string $productExternalId, array $answers = [], bool $test = false, ?string $testClass = null): array
+    public function handle(string $visitorHash, string $photoId, string $productExternalId, array $answers = [], bool $test = false, ?string $testClass = null, ?array $page = null): array
     {
         $shopId = $this->tenant->require();
         $none = ['job' => null, 'problem' => null, 'questions' => []];
@@ -51,9 +54,11 @@ final class StartTryOn
         }
 
         $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $productExternalId)->first();
-        $class = $product === null ? null : (self::classOf($product->id) ?? ($test ? $testClass : null));
+        // Only the team's test reaches a product the catalog has not read, through the page's own name and picture.
+        $page = $product === null && $test && $page !== null ? ['external_id' => $productExternalId] + $page : null;
+        $class = self::testedClass($product, $test, $testClass, $page['title'] ?? null);
 
-        if ($product === null || $class === null) {
+        if (($product === null && $page === null) || $class === null) {
             return ['problem' => 'not_tryable'] + $none;
         }
 
@@ -69,7 +74,7 @@ final class StartTryOn
         }
 
         $group = (string) TryOnClasses::group($class);
-        $fingerprint = hash('sha256', implode('|', [$photo->photo_hash, $product->id, (string) $product->image_url, json_encode($answered), (string) Settings::get('try_on.model_'.$group), json_encode(self::PROMPT_VERSIONS)]));
+        $fingerprint = hash('sha256', implode('|', [$photo->photo_hash, $product?->id ?? 'page:'.$productExternalId, (string) ($product?->image_url ?? $page['image']), $class, json_encode($answered), (string) Settings::get('try_on.model_'.$group), json_encode(self::PROMPT_VERSIONS)]));
         $same = TryOnJob::query()->where('visitor_hash', $visitorHash)->where('fingerprint', $fingerprint)->whereIn('status', [TryOnJob::QUEUED, TryOnJob::WORKING, TryOnJob::READY])->latest()->first();
 
         if ($same !== null) {
@@ -87,7 +92,7 @@ final class StartTryOn
         }
 
         $job = TryOnJob::query()->create([
-            'shop_id' => $shopId, 'photo_id' => $photo->id, 'product_id' => $product->id, 'visitor_hash' => $visitorHash,
+            'shop_id' => $shopId, 'photo_id' => $photo->id, 'product_id' => $product?->id, 'page_product' => $page, 'visitor_hash' => $visitorHash,
             'tryon_class' => $class, 'group' => $group, 'answers' => $answered === [] ? null : $answered, 'fingerprint' => $fingerprint,
             'status' => TryOnJob::QUEUED,
         ]);
@@ -95,6 +100,25 @@ final class StartTryOn
         RunTryOnJob::dispatch($shopId, $job->id);
 
         return ['job' => $job->refresh()] + $none;
+    }
+
+    /**
+     * The class a try uses: the scan's for shoppers; in the team's test, the scan's, else the class the
+     * team named, else the class the product's name says. Null when none.
+     */
+    public static function testedClass(?CatalogProduct $product, bool $test, ?string $testClass, ?string $pageTitle = null): ?string
+    {
+        $marked = $product === null ? null : self::classOf($product->id);
+
+        if ($marked !== null || ! $test) {
+            return $marked;
+        }
+
+        if ($testClass !== null && TryOnClasses::group($testClass) !== null) {
+            return $testClass;
+        }
+
+        return TryOnClasses::guess((string) ($product?->title ?? $pageTitle ?? ''));
     }
 
     /** The product's try-on class, as the catalog scan marked it, or null when it is not one. */

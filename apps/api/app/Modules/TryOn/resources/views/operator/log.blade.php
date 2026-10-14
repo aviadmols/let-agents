@@ -33,7 +33,7 @@
                 @foreach ($jobs as $job)
                     <tr data-try-on-job="{{ $job->id }}">
                         <td style="{{ $cell }}">{{ $job->created_at?->format('d/m H:i') }}</td>
-                        <td style="{{ $cell }}">{{ $job->product?->title }} <span style="{{ $muted }}" dir="ltr">{{ $job->tryon_class }}</span></td>
+                        <td style="{{ $cell }}">{{ $job->productTitle() }} <span style="{{ $muted }}" dir="ltr">{{ $job->tryon_class }}</span></td>
                         <td style="{{ $cell }}"><x-filament::badge :color="$colors[$job->status] ?? 'gray'">{{ $t('statuses.'.$job->status) }}</x-filament::badge> @if ($job->failure)<span style="{{ $muted }}" dir="ltr">{{ $job->failure }}</span>@endif</td>
                         <td style="{{ $cell }}">{{ $job->attempts }}</td>
                         <td style="{{ $cell }}" dir="ltr">${{ number_format((float) $job->cost_usd, 4) }}</td>
@@ -47,10 +47,10 @@
 
     @php($c = $this->current())
     @if ($c)
-        <x-filament::section :heading="$c['job']->product?->title" data-try-on-detail>
+        <x-filament::section :heading="$c['job']->productTitle()" data-try-on-detail>
             <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px">
                 @if ($c['photo'])<img src="{{ $c['photo'] }}" alt="" style="height:180px;border-radius:8px">@endif
-                @if ($c['job']->product?->image_url)<img src="{{ $c['job']->product->image_url }}" alt="" style="height:180px;border-radius:8px">@endif
+                @if ($c['job']->productImage())<img src="{{ $c['job']->productImage() }}" alt="" style="height:180px;border-radius:8px">@endif
                 @if ($c['result'])<img src="{{ $c['result'] }}" alt="" style="height:180px;border-radius:8px" data-try-on-result>@endif
             </div>
             @if ($c['job']->answers)<p style="font-size:13px"><strong>{{ $t('answers') }}:</strong> <span dir="ltr">{{ json_encode($c['job']->answers, JSON_UNESCAPED_UNICODE) }}</span></p>@endif

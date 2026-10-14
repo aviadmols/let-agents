@@ -779,8 +779,18 @@
     var api = String(ctx.api).replace(/\/+$/, '');
     var locale = ctx.locale === 'en' ? 'en' : 'he';
     var testClass = test && test !== '1' ? test : '';
+    // In the test, the page's own name and picture: a product the scan did not mark is tried by the
+    // class its name says, and one the catalog has not read yet by these (the server checks the picture's address).
+    var meta = function (name) {
+      var node = doc.querySelector('meta[property="' + name + '"]') || doc.querySelector('meta[name="' + name + '"]');
+      return node ? String(node.getAttribute('content') || '').trim() : '';
+    };
+    var heading = doc.querySelector('h1');
+    var pageTitle = meta('og:title') || (heading ? heading.textContent.replace(/\s+/g, ' ').trim() : '');
+    var pageImage = meta('og:image:secure_url') || meta('og:image');
     // The same address the Try-On script asks, so its answer comes from the browser's cache.
-    var testQuery = test ? '&preview=' + encodeURIComponent(preview) + (testClass ? '&class=' + encodeURIComponent(testClass) : '') : '';
+    var testQuery = test ? '&preview=' + encodeURIComponent(preview) + (testClass ? '&class=' + encodeURIComponent(testClass) : '') +
+      '&title=' + encodeURIComponent(pageTitle.slice(0, 200)) + '&image=' + encodeURIComponent(pageImage) : '';
     win.fetch(api + '/try-on/' + encodeURIComponent(ctx.site) + '/config?product=' + encodeURIComponent(product) + '&locale=' + locale + testQuery, { credentials: 'omit' })
       .then(function (response) { return response.ok ? response.json() : null; })
       .then(function (body) {
@@ -789,6 +799,8 @@
         if (test) {
           win.LetAgentsTryOnContext.preview = preview;
           win.LetAgentsTryOnContext.testClass = testClass;
+          win.LetAgentsTryOnContext.title = pageTitle.slice(0, 200);
+          win.LetAgentsTryOnContext.image = pageImage;
         }
         var script = doc.createElement('script');
         script.src = api + '/try-on/let-agents-tryon.js';
