@@ -75,6 +75,7 @@ final class TryOnTest extends TestCase
         Storage::fake('local');
         $this->shop = Shop::factory()->create(['domain' => 'www.store.test']);
         Features::override('try_on.enabled', true, $this->shop->id);
+        Features::override('try_on.paused', false);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $this->shop->id, 'site_url' => 'https://www.store.test', 'access_token' => self::TOKEN]));
         $this->site = SiteKeys::site(self::TOKEN);
 
@@ -310,6 +311,15 @@ final class TryOnTest extends TestCase
         Settings::set('try_on.jobs_per_visitor_per_day', 1, $this->shop->id);
         $this->checks[] = $this->verdict();
         $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'ring-1', 'preview' => $key], $origin)->assertStatus(202);
+
+        // Paused for the whole system: not even the team's test, nor a shop that has it on.
+        Features::override('try_on.paused', true);
+        Features::override('try_on.enabled', true, $this->shop->id);
+        $this->assertNull($page("id=ring-1&preview={$key}&tryon=1"));
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1&preview={$key}", $origin)->assertNotFound();
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1", $origin)->assertNotFound();
+        $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'ring-1', 'preview' => $key], $origin)->assertNotFound();
+        Features::override('try_on.paused', false);
 
         // The operator finds the link on the log.
         Filament::setCurrentPanel(Filament::getPanel('operator'));

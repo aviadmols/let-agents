@@ -49,7 +49,7 @@ final class TryOnController
         return app(TenantContext::class)->run($connection->shop_id, function () use ($request, $locale, $connection): JsonResponse {
             // Shoppers only where the shop turned Try-On on; the team's test anywhere (the key is checked).
             $test = self::test($request, $connection);
-            $open = Features::enabled('try_on.enabled', $connection->shop_id) || $test;
+            $open = ! Features::enabled('try_on.paused') && (Features::enabled('try_on.enabled', $connection->shop_id) || $test);
             $product = $open ? CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $request->query('product'))->first() : null;
             // The team's test also on a product the scan did not mark, or the catalog has not read yet (by the page's name).
             $page = $test && $product === null ? self::pageProduct($request, $connection) : null;
@@ -220,7 +220,8 @@ final class TryOnController
             return response()->json(['error' => 'other_origin'], 403);
         }
 
-        if (! Features::enabled('try_on.enabled', $connection->shop_id) && ! self::test($request, $connection)) {
+        // Paused for the whole system: off everywhere, the team's test too.
+        if (Features::enabled('try_on.paused') || (! Features::enabled('try_on.enabled', $connection->shop_id) && ! self::test($request, $connection))) {
             return response()->json(['error' => 'off'], 404);
         }
 

@@ -49,7 +49,7 @@ final class StartTryOn
         $none = ['job' => null, 'problem' => null, 'questions' => []];
 
         // The store team's test runs while it is off for shoppers (TryOnController checks the key).
-        if (! $test && ! Features::enabled('try_on.enabled', $shopId)) {
+        if (Features::enabled('try_on.paused') || (! $test && ! Features::enabled('try_on.enabled', $shopId))) {
             return ['problem' => 'off'] + $none;
         }
 

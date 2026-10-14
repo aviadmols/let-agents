@@ -15,6 +15,10 @@
         {
             "name": "enabled",
             "default": false
+        },
+        {
+            "name": "paused",
+            "default": true
         }
     ],
     "settings": [

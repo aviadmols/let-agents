@@ -1392,7 +1392,7 @@ final class BuildPageBank
     public function tryOn(string $shopId, string $externalId, bool $test = false, ?string $testClass = null): ?array
     {
         try {
-            if (! $test && ! Features::enabled('try_on.enabled', $shopId)) {
+            if (Features::enabled('try_on.paused') || (! $test && ! Features::enabled('try_on.enabled', $shopId))) {
                 return null;
             }
         } catch (UnknownFeature) {
