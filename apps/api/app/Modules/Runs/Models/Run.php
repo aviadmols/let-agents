@@ -149,7 +149,7 @@ class Run extends Model
      * One model call in the spend ledger. Runs write theirs when they end; work that is too small
      * for a run of its own (a search query's embedding, a shopper's photo) writes here directly.
      */
-    public static function recordUsage(?string $shopId, string $agent, string $action, string $provider, string $model, int $inputTokens, int $outputTokens, float $costUsd, ?string $runId = null, int $cacheReadTokens = 0): void
+    public static function recordUsage(?string $shopId, string $agent, string $action, string $provider, string $model, int $inputTokens, int $outputTokens, float $costUsd, ?string $runId = null, int $cacheReadTokens = 0, bool $batch = false): void
     {
         DB::table('ai_usage')->insert([
             'run_id' => $runId,
@@ -161,6 +161,7 @@ class Run extends Model
             'input_tokens' => max(0, $inputTokens),
             'output_tokens' => max(0, $outputTokens),
             'cache_read_tokens' => max(0, $cacheReadTokens),
+            'batch' => $batch,
             'cost_usd' => $costUsd,
             'day' => now()->toDateString(),
             'created_at' => now(),

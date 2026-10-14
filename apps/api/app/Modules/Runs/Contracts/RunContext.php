@@ -23,7 +23,7 @@ final class RunContext
     /** @var array{provider: string, model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cost_usd: float|null}|null */
     private ?array $usage = null;
 
-    /** @var list<array{provider: string, model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cost_usd: float|null}> every model call, for the ledger */
+    /** @var list<array{provider: string, model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cost_usd: float|null, batch: bool}> every model call, for the ledger */
     private array $calls = [];
 
     public function __construct(public readonly string $runId) {}
@@ -61,11 +61,14 @@ final class RunContext
         return $this->summary($summaryKey, $params);
     }
 
-    /** Tokens and cost of a model call. Adds up when a run calls a model more than once. */
-    public function usage(string $provider, string $model, int $inputTokens = 0, int $outputTokens = 0, int $cacheReadTokens = 0, ?float $costUsd = null): self
+    /**
+     * Tokens and cost of a model call. Adds up when a run calls a model more than once. A call that
+     * went through the provider's batch API says so, with its cost already at the batch price.
+     */
+    public function usage(string $provider, string $model, int $inputTokens = 0, int $outputTokens = 0, int $cacheReadTokens = 0, ?float $costUsd = null, bool $batch = false): self
     {
         $previous = $this->usage;
-        $this->calls[] = ['provider' => $provider, 'model' => $model, 'input_tokens' => $inputTokens, 'output_tokens' => $outputTokens, 'cache_read_tokens' => $cacheReadTokens, 'cost_usd' => $costUsd];
+        $this->calls[] = ['provider' => $provider, 'model' => $model, 'input_tokens' => $inputTokens, 'output_tokens' => $outputTokens, 'cache_read_tokens' => $cacheReadTokens, 'cost_usd' => $costUsd, 'batch' => $batch];
 
         $this->usage = [
             'provider' => $provider,

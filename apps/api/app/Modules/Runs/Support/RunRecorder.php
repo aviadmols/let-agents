@@ -87,7 +87,7 @@ final class RunRecorder implements RecordsRuns
         // Each model call in the ledger, so spend reads by shop, agent and model.
         if ($reportData['calls'] !== []) {
             foreach ($reportData['calls'] as $call) {
-                Run::recordUsage($run->shop_id, $run->agent, $run->action, $call['provider'], $call['model'], $call['input_tokens'], $call['output_tokens'], (float) ($call['cost_usd'] ?? 0), $run->id, $call['cache_read_tokens']);
+                Run::recordUsage($run->shop_id, $run->agent, $run->action, $call['provider'], $call['model'], $call['input_tokens'], $call['output_tokens'], (float) ($call['cost_usd'] ?? 0), $run->id, $call['cache_read_tokens'], (bool) ($call['batch'] ?? false));
             }
         }
 

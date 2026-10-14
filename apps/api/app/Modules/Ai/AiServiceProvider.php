@@ -4,6 +4,7 @@ namespace App\Modules\Ai;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\ImageEmbedder;
@@ -13,12 +14,15 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Contracts\WebSearchModel;
 use App\Modules\Ai\Support\AllowanceHome;
+use App\Modules\Ai\Support\Drivers\AnthropicBatches;
 use App\Modules\Ai\Support\Drivers\AnthropicChat;
 use App\Modules\Ai\Support\Drivers\GeminiEmbeddings;
+use App\Modules\Ai\Support\Drivers\OpenAiBatches;
 use App\Modules\Ai\Support\Drivers\OpenAiChat;
 use App\Modules\Ai\Support\Drivers\OpenAiEmbeddings;
 use App\Modules\Ai\Support\Drivers\ReplicateImages;
 use App\Modules\Ai\Support\MonthlySpendGuard;
+use App\Modules\Ai\Support\ProviderBatchModel;
 use App\Modules\Ai\Support\ProviderChatModel;
 use App\Modules\Ai\Support\ProviderEmbedder;
 use App\Modules\Ai\Support\ProviderImageModel;
@@ -35,6 +39,9 @@ final class AiServiceProvider extends ModuleServiceProvider
      * here; the settings that name a provider and model then reach it without other changes.
      */
     public const CHAT_DRIVERS = [OpenAiChat::class, AnthropicChat::class];
+
+    /** Providers with a batch API: many questions at once, answered within a day at half price. */
+    public const BATCH_DRIVERS = [OpenAiBatches::class, AnthropicBatches::class];
 
     /** Providers that make pictures (Try-On). */
     public const IMAGE_DRIVERS = [ReplicateImages::class];
@@ -57,6 +64,8 @@ final class AiServiceProvider extends ModuleServiceProvider
         $this->app->bind(ChatModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
         $this->app->bind(VisionModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
         $this->app->bind(WebSearchModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
+        $this->app->tag(self::BATCH_DRIVERS, 'ai.batch_drivers');
+        $this->app->bind(BatchChatModel::class, fn ($app) => new ProviderBatchModel($app->tagged('ai.batch_drivers'), $app->make(CallJournal::class)));
         $this->app->tag(self::IMAGE_DRIVERS, 'ai.image_drivers');
         $this->app->bind(ImageModel::class, fn ($app) => new ProviderImageModel($app->tagged('ai.image_drivers'), $app->make(CallJournal::class)));
         $this->app->bind(Embedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
