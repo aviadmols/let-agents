@@ -10,28 +10,33 @@
     "product_types": [
         {
             "key": "ring",
+            "tryon": "ring",
             "label": { "he": "טבעת", "en": "Ring" },
             "patterns": ["^\\s*(?:זוג\\s)?טבע(?:ת|ות)", "(?<!תליון )(?<!תליון בצורת )טבעת (?:אירוסין|נישואין|יהלום|סוליטר|חותם)"]
         },
         {
             "key": "earrings",
+            "tryon": "earrings",
             "label": { "he": "עגילים", "en": "Earrings" },
             "patterns": ["^\\s*(?:זוג\\s)?עגיל(?:ים|י)?(?![\\p{L}])"]
         },
         {
             "key": "necklace",
+            "tryon": "necklace",
             "label": { "he": "שרשרת", "en": "Necklace" },
             "hint": "שרשרת שנמכרת כשרשרת, עם תליון או בלי. תליון שנמכר בלי שרשרת הוא תליון.",
             "patterns": ["^\\s*(?:שרשר(?:ת|אות)|קולייה|קולייר)(?! רגל)"]
         },
         {
             "key": "pendant",
+            "tryon": "necklace",
             "label": { "he": "תליון", "en": "Pendant" },
             "hint": "גם כשהוא מצולם על שרשרת, וגם כשהשרשרת כלולה במחיר.",
             "patterns": ["^\\s*תליו(?:ן|נים)", "תליון[^.,]{0,40}(?:ללא|בלי|לא כולל) שרשרת"]
         },
         {
             "key": "bracelet",
+            "tryon": "bracelet",
             "label": { "he": "צמיד", "en": "Bracelet" },
             "patterns": ["^\\s*צמיד(?:ים)?(?! רגל)"]
         },
@@ -62,6 +67,7 @@
         },
         {
             "key": "watch",
+            "tryon": "watch",
             "label": { "he": "שעון", "en": "Watch" },
             "patterns": ["^\\s*שעו(?:ן|ני)"]
         },
@@ -74,6 +80,8 @@
     "attributes": [
         {
             "key": "metal",
+            "importance": "required",
+            "why": { "he": "המתכת קובעת את המחיר, את המראה ואת הטיפול", "en": "The metal sets the price, the look and the care" },
             "type": "enum",
             "multiple": true,
             "label": { "he": "מתכת", "en": "Metal" },
@@ -91,6 +99,8 @@
         },
         {
             "key": "gold_karat",
+            "importance": "recommended",
+            "why": { "he": "טוהר הזהב קובע את הערך", "en": "The gold purity sets the value" },
             "type": "enum",
             "label": { "he": "קראטים בזהב", "en": "Gold karat" },
             "hint": "טוהר הזהב, לא משקל אבן",
@@ -106,6 +116,8 @@
         },
         {
             "key": "stone",
+            "importance": "recommended",
+            "why": { "he": "סוג האבן הוא מה שקונים", "en": "The stone is what the buyer chooses" },
             "type": "enum",
             "multiple": true,
             "label": { "he": "אבן", "en": "Stone" },
@@ -267,6 +279,8 @@
         },
         {
             "key": "carat_weight",
+            "importance": "recommended",
+            "why": { "he": "גודל האבן (בקראט) קובע את המחיר", "en": "The stone size, in carats, sets the price" },
             "label": { "he": "משקל האבן", "en": "Stone weight" },
             "hint": "משקל אבן בקראטים. '14 קארט' של זהב הוא טוהר, לא משקל.",
             "dimension": "carat",

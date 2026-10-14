@@ -44,6 +44,12 @@ enum FactKind: string
      */
     case Promise = 'promise';
 
+    /**
+     * Whether the product could be tried on a person or placed in a room: key `class`, value one of
+     * TryOnEligibility::CLASSES or `none`. Decided in code from the vocabulary (ADR 0012).
+     */
+    case TryOn = 'tryon';
+
     public function label(): string
     {
         return __("enrichment::enrichment.fact_kinds.{$this->value}");

@@ -26,6 +26,7 @@ return [
         'category' => 'Category',
         'highlight' => 'Highlight',
         'promise' => 'Store promise',
+        'tryon' => 'Try-on',
     ],
     'fact_statuses' => [
         'approved' => 'Approved',

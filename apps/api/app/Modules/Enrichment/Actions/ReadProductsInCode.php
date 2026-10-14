@@ -15,6 +15,7 @@ use App\Modules\Enrichment\Scanning\BrandResolver;
 use App\Modules\Enrichment\Scanning\CodeReading;
 use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\ProductFamily;
+use App\Modules\Enrichment\Scanning\TryOnEligibility;
 use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -94,7 +95,7 @@ final class ReadProductsInCode
         $pictures = $readText ? PictureText::for() : [];
         $now = now();
 
-        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0];
+        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'tryon_yes' => 0, 'tryon_no' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0];
         $brandSources = [];
         $families = [];
         $samples = [];
@@ -110,6 +111,9 @@ final class ReadProductsInCode
             $counts['title_specs'] += count($reading['specs'] ?? []);
             $counts['with_choices'] += isset($reading['choices']) ? 1 : 0;
             $counts['rentals'] += isset($reading['rental']) ? 1 : 0;
+            if (isset($reading['tryon'])) {
+                $counts[$reading['tryon']['class'] === TryOnEligibility::NONE ? 'tryon_no' : 'tryon_yes']++;
+            }
             $counts['text_choices'] += count($reading['text_choices'] ?? []);
             $counts['text_specs'] += count($reading['text_specs'] ?? []);
             $counts['flags'] += count($reading['flags'] ?? []);
@@ -174,6 +178,11 @@ final class ReadProductsInCode
                     $source = $reading['type']['source'];
                     $write(['kind' => FactKind::Type, 'key' => 'type', 'value_text' => $reading['type']['key'], 'quote' => $product->title, 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$source,
                         'confidence' => CodeReading::CONFIDENCE[$source] ?? null, 'evidence' => ['source' => $source]]);
+                }
+
+                if (isset($reading['tryon'])) {
+                    $write(['kind' => FactKind::TryOn, 'key' => 'class', 'value_text' => $reading['tryon']['class'], 'quote' => $product->title, 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$reading['tryon']['source'],
+                        'confidence' => CodeReading::CONFIDENCE['category'], 'evidence' => ['source' => $reading['tryon']['source']]]);
                 }
 
                 foreach ((array) ($reading['category_choices'] ?? []) as $key => $value) {

@@ -1,11 +1,23 @@
 # ADR 0013: הדייר נקרא `Site`, לא `Shop`
 
 תאריך: 14 באוקטובר 2026
-סטטוס: מוצע. ההחלטה על השם התקבלה; הביצוע ממתין לפריסה מתואמת.
+סטטוס: נדחה. השם נבחר, אבל הביצוע המכני נעצר אחרי שנמצאה התנגשות (ראו "מה נמצא"). עד שנסגרת ההתנגשות, הקוד נשאר `Shop`, וקוד חדש נכתב בשם הזה.
 
 ## הקשר
 
 הדייר (חנות Shopify או אתר WordPress/WooCommerce אחד) נקרא בקוד `Shop`: טבלת `shops`, עמודה `shop_id` בכל טבלה של חנות, `BelongsToTenant` עם `shop_id`, המפתח `X-Shop-Key`. הכתובות של הרכיב כבר משתמשות ב‑`{site}`. השם `Shop` מתנגש בקריאה עם `Shopify`, `Shopper` ו"חנות" כמוצר, ואתרי WordPress אינם חנויות אלא אתרים. ההחלטה: `Site`.
+
+## מה נמצא בבדיקה לפני הביצוע
+
+ב‑UPSELL המילה `site` כבר תפוסה, והיא **לא** הדייר:
+
+- `StoreConnection::forSite($siteKey)`, הנתיב `{site}` ב‑`routes/api.php` של Widget, Search, Analytics, Assistant, Shortlist, Shoppers ו‑Leads, `$site` בבקרים, `site_key` ב‑`StoreConnection`, `SiteKeys`, `StorefrontSite`. זה **המפתח הציבורי של החנות**, מחרוזת, לא מודל.
+- `AnswerSiteQuestion`, `assistant.site_*`: "שאלה על האתר כולו", מול שאלה על מוצר.
+- 15 קובצי בדיקה ו‑`ContextEvalCommand`, `ShopSearches` מחזיקים גם `$site` וגם `$shop` באותו תחום.
+
+החלפה עיוורת `Shop` ← `Site` מאחדת את שני המושגים לשם אחד, ויוצרת `forSite` כפול, `$site` שהוא לפעמים מפתח ולפעמים מודל, ותוצאה שנראית תקינה בבדיקות (שמוחלפות באותה החלפה) ושוברת את הרכיב. בנוסף, JS של הרכיב קורא מהשרת שדות בשם `shop` ו‑`shopName` ו‑`shopCurrency`, ו‑`SettingScope::Shop` ו‑`ValueSource::Shop` הם ערכי הצהרה במניפסטים.
+
+**לפני שמבצעים:** לשנות קודם את מושג המפתח הציבורי ל‑`site_key` / `siteKey` (`forSiteKey`, `$siteKey`, הנתיב נשאר `{site}` כי הוא משטח ציבורי), ורק אז להחליף `Shop` ל‑`Site`. שני commits נפרדים.
 
 ## החלטה
 

@@ -26,6 +26,7 @@ return [
         'category' => 'קטגוריה',
         'highlight' => 'נקודה חשובה',
         'promise' => 'הבטחה של החנות',
+        'tryon' => 'מדידה על הלקוח',
     ],
     'fact_statuses' => [
         'approved' => 'מאושר',

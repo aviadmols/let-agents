@@ -4,9 +4,15 @@ namespace App\Modules\Enrichment\Filament\Operator\Pages;
 
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\RereadProducts;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Jobs\RereadProductsJob;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Scanning\FactGaps;
+use App\Modules\Enrichment\Scanning\RequiredGaps;
+use App\Modules\Enrichment\Scanning\TryOnEligibility;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -53,6 +59,36 @@ final class ProductGaps extends Page
         $shop = app(TenantContext::class)->id();
 
         return $shop === null ? [] : app(TenantContext::class)->run($shop, fn (): array => FactGaps::of());
+    }
+
+    /** What each branch's vocabulary asks a shopper to know and the product does not say. @return list<array<string, mixed>> */
+    public function requiredGaps(): array
+    {
+        $shop = app(TenantContext::class)->id();
+
+        return $shop === null ? [] : app(TenantContext::class)->run($shop, fn (): array => RequiredGaps::of(locale: app()->getLocale() === 'en' ? 'en' : 'he'));
+    }
+
+    /**
+     * How many products are marked for try-on, marked not, and not looked at (no vocabulary says).
+     *
+     * @return array{yes: int, no: int, undecided: int}
+     */
+    public function tryOn(): array
+    {
+        $shop = app(TenantContext::class)->id();
+
+        if ($shop === null) {
+            return ['yes' => 0, 'no' => 0, 'undecided' => 0];
+        }
+
+        return app(TenantContext::class)->run($shop, function (): array {
+            $marks = EnrichmentFact::query()->where('kind', FactKind::TryOn)->where('status', FactStatus::Approved)->whereNotNull('product_id')->pluck('value_text', 'product_id');
+            $live = CatalogProduct::query()->whereNull('removed_at')->count();
+            $no = $marks->filter(fn (string $v): bool => $v === TryOnEligibility::NONE)->count();
+
+            return ['yes' => $marks->count() - $no, 'no' => $no, 'undecided' => max(0, $live - $marks->count())];
+        });
     }
 
     /** The products missing one detail of one kind, sent to be read again. */

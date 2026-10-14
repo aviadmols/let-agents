@@ -68,6 +68,13 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   operator-only; the merchant sees counts.
 - ADR 0013: the tenant becomes `Site` (`site_id`). Until that commit lands, code still says `Shop`.
 
+- Try-On marks are code-only facts (`FactKind::TryOn`, key `class`): `none` is written for known-not-eligible, nothing for undecided
+  (a vocabulary that says nothing about try-on). Vocabulary attributes carry `importance` (default `optional`) and `why`;
+  `RequiredGaps` lists what a branch asks for. Yes/no attributes are not counted (code stores only the yes): write an
+  "included / body only" choice instead.
+- `php` CLI defaults to 128 MB here and `composer check` runs out of memory in the full suite; run
+  `php -d memory_limit=2G vendor/bin/phpunit` when it does.
+
 ## Index and matching (apps/api, ADR 0007)
 
 - `Retrieval` builds a per-shop index by meaning (`retrieval_chunks`, pgvector on Postgres, JSON

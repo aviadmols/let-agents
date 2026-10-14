@@ -2,6 +2,35 @@
     @php($small = 'font-size:12.5px;opacity:.7')
     @php($gaps = $this->gaps())
 
+    @php($tryOn = $this->tryOn())
+    @php($required = $this->requiredGaps())
+
+    <x-filament::section :heading="__('enrichment::gaps.tryon_heading')" :description="__('enrichment::gaps.tryon_help')">
+        <p style="font-size:14px" data-tryon-summary>{{ __('enrichment::gaps.tryon_counts', ['yes' => number_format($tryOn['yes']), 'no' => number_format($tryOn['no']), 'undecided' => number_format($tryOn['undecided'])]) }}</p>
+    </x-filament::section>
+
+    @foreach ($required as $gap)
+        <x-filament::section wire:key="required-{{ $gap['type'] }}-{{ $gap['attribute'] }}"
+            :heading="__('enrichment::gaps.required_heading', ['type' => $gap['type_label'], 'attribute' => $gap['attribute_label'], 'importance' => __('enrichment::gaps.importance.'.$gap['importance'])])"
+            :description="__('enrichment::gaps.required_share', ['have' => $gap['have'], 'of' => $gap['of'], 'missing' => count($gap['missing'])]).($gap['why'] ? ' '.$gap['why'] : '')"
+            data-required-gap="{{ $gap['type'] }}.{{ $gap['attribute'] }}">
+            <div style="display:grid;gap:2px">
+                @foreach (array_slice($gap['missing'], 0, 50) as $product)
+                    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid rgba(127,127,127,.15)">
+                        @if ($product['url'])
+                            <a href="{{ $product['url'] }}" target="_blank" rel="noopener" style="font-weight:600;font-size:14px">{{ $product['title'] }}</a>
+                        @else
+                            <span style="font-weight:600;font-size:14px">{{ $product['title'] }}</span>
+                        @endif
+                        @if ($product['waiting'])
+                            <span style="font-size:12.5px;padding:2px 10px;border-radius:999px;background:rgba(245,158,11,.15)">{{ __('enrichment::gaps.waiting', ['value' => $product['waiting']]) }}</span>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </x-filament::section>
+    @endforeach
+
     @if ($gaps === [])
         <x-filament::section>
             <p style="{{ $small }}">{{ __('enrichment::gaps.none') }}</p>

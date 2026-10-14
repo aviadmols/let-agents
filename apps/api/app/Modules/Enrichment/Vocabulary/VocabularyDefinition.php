@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Vocabulary;
 
+use App\Modules\Enrichment\Scanning\TryOnEligibility;
 use App\Modules\Enrichment\Scanning\Units;
 
 /**
@@ -17,6 +18,15 @@ final class VocabularyDefinition
     public const SCHEMA_VERSION = 1;
 
     public const RANK_DIRECTIONS = ['min', 'max'];
+
+    /** How much a shopper needs an attribute known before buying. docs/strict-scan.md */
+    public const REQUIRED = 'required';
+
+    public const RECOMMENDED = 'recommended';
+
+    public const OPTIONAL = 'optional';
+
+    public const IMPORTANCE = [self::REQUIRED, self::RECOMMENDED, self::OPTIONAL];
 
     /** A root of "*" is the whole catalog: a store that sells one kind of thing has no one category above it. */
     public const WHOLE_CATALOG = '*';
@@ -174,6 +184,7 @@ final class VocabularyDefinition
         }
 
         $problems = [...$problems, ...self::checkImage((array) ($data['image'] ?? []), $attributeKeys)];
+        $problems = [...$problems, ...self::checkTryOn($data), ...self::checkImportance((array) ($data['attributes'] ?? []))];
 
         return $problems === [] ? [new self($data), []] : [null, $problems];
     }
@@ -404,6 +415,64 @@ final class VocabularyDefinition
         return in_array($key, array_column($this->tags(), 'key'), true);
     }
 
+    /**
+     * Whether the vocabulary says anything about try-on: `"tryon": false` on the whole branch, or a
+     * `tryon` class on at least one product type. When it does not, no product is marked either way.
+     */
+    public function declaresTryOn(): bool
+    {
+        if (($this->data['tryon'] ?? null) === false) {
+            return true;
+        }
+
+        foreach ($this->productTypes() as $type) {
+            if (isset($type['tryon'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** The try-on class a product type stands for (see TryOnEligibility::CLASSES), or null when it is not one. */
+    public function tryOnClass(string $typeKey): ?string
+    {
+        if (($this->data['tryon'] ?? null) === false) {
+            return null;
+        }
+
+        foreach ($this->productTypes() as $type) {
+            if ($type['key'] === $typeKey) {
+                return isset($type['tryon']) ? (string) $type['tryon'] : null;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<string> words of a part or an accessory that is not the piece itself (a leg for a table) */
+    public function tryOnExcludePatterns(): array
+    {
+        return array_values(array_map('strval', (array) ($this->data['tryon_exclude_patterns'] ?? [])));
+    }
+
+    /**
+     * How much a shopper needs an attribute known before buying: `required`, `recommended` or
+     * `optional`. A vocabulary that does not say is optional, so older vocabularies ask nothing new.
+     */
+    public function importance(string $attributeKey): string
+    {
+        $importance = (string) ($this->attribute($attributeKey)['importance'] ?? self::OPTIONAL);
+
+        return in_array($importance, self::IMPORTANCE, true) ? $importance : self::OPTIONAL;
+    }
+
+    /** @return list<array<string, mixed>> the attributes of one importance, in the vocabulary's own order */
+    public function attributesOf(string $importance): array
+    {
+        return array_values(array_filter($this->attributes(), fn (array $a): bool => $this->importance((string) $a['key']) === $importance));
+    }
+
     /** Whether an attribute applies to a product type; no list means every type. */
     public function appliesTo(string $attributeKey, ?string $productType): bool
     {
@@ -485,6 +554,58 @@ final class VocabularyDefinition
         }
 
         return [...$problems, ...self::checkPatterns("{$at}.patterns", $entry['patterns'] ?? null, $patternsRequired)];
+    }
+
+    /**
+     * Try-on: a class per product type from TryOnEligibility::CLASSES, `"tryon": false` for a branch
+     * with none, and patterns for the words of a part or an accessory.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private static function checkTryOn(array $data): array
+    {
+        $problems = [];
+
+        if (isset($data['tryon']) && $data['tryon'] !== false) {
+            $problems[] = 'tryon is false or absent on the vocabulary; a class goes on a product type';
+        }
+
+        foreach ((array) ($data['product_types'] ?? []) as $i => $type) {
+            if (is_array($type) && isset($type['tryon']) && ! array_key_exists((string) $type['tryon'], TryOnEligibility::CLASSES)) {
+                $problems[] = "product_types[{$i}].tryon must be one of: ".implode(', ', array_keys(TryOnEligibility::CLASSES));
+            }
+        }
+
+        return [...$problems, ...self::checkPatterns('tryon_exclude_patterns', $data['tryon_exclude_patterns'] ?? null, required: false)];
+    }
+
+    /**
+     * How much a shopper needs each attribute known: required, recommended or optional, and a short
+     * reason (`why`) in both languages for the person who reads the vocabulary.
+     *
+     * @param  list<mixed>  $attributes
+     * @return list<string>
+     */
+    private static function checkImportance(array $attributes): array
+    {
+        $problems = [];
+
+        foreach ($attributes as $i => $attribute) {
+            if (! is_array($attribute)) {
+                continue;
+            }
+
+            if (isset($attribute['importance']) && ! in_array($attribute['importance'], self::IMPORTANCE, true)) {
+                $problems[] = "attributes[{$i}].importance must be one of: ".implode(', ', self::IMPORTANCE);
+            }
+
+            if (isset($attribute['why']) && (! is_string($attribute['why']['he'] ?? null) || ! is_string($attribute['why']['en'] ?? null))) {
+                $problems[] = "attributes[{$i}].why needs he and en";
+            }
+        }
+
+        return $problems;
     }
 
     /**

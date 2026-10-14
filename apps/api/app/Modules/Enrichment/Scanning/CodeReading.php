@@ -83,6 +83,7 @@ final class CodeReading
             'brand' => $brands->resolve($product),
             'family' => ProductFamily::of($product),
             'type' => $type === null ? null : ['key' => $type, 'source' => $typeSource],
+            'tryon' => TryOnEligibility::decide($vocabulary, $type, $product->title),
             'category_choices' => $vocabulary?->choicesForCategories($categories) ?: null,
             'specs' => $specs,
             'text_choices' => $text === null ? null : (self::textChoices($vocabulary, $type, $text, $vocabulary->choicesForCategories($categories)) ?: null),
