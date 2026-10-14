@@ -362,6 +362,25 @@ final class TryOnTest extends TestCase
         Livewire::test(TryOnLog::class, ['tab' => 'tries'])->assertSee('הבודק דחה את התמונה בכל הניסיונות: המוצר בתמונה לא נראה כמו המוצר (another ring)');
     }
 
+    public function test_a_try_never_has_more_than_two_pictures_and_never_waits_forever(): void
+    {
+        // The setting asks for more: two at most, whatever it says.
+        Settings::set('try_on.retries', 1);
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $refused = $this->verdict(['product_similarity' => 1]);
+        $this->checks = [$refused, $refused, $refused, $refused];
+        $id = $this->start($photo, 'ring-1')->assertStatus(202)->json('data.id');
+        $this->assertSame(2, $this->pictures, 'two rounds, never a third');
+        $this->assertSame('failed', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$id}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->json('data.status'));
+
+        // A try stuck on its way ends after its minutes when the window asks, and asking again starts a new one.
+        $stuck = $this->inShop(fn () => TryOnJob::query()->findOrFail($id));
+        $stuck->forceFill(['status' => TryOnJob::WORKING, 'failure' => null, 'created_at' => now()->subMinutes(TryOnJob::MAX_MINUTES + 1)])->save();
+        $state = $this->getJson("/api/v1/try-on/{$this->site}/tries/{$id}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->json('data');
+        $this->assertSame(['failed', 'timed_out'], [$state['status'], $state['failure']]);
+    }
+
     public function test_a_products_name_says_its_class_for_the_teams_test(): void
     {
         $this->assertSame('necklace', TryOnClasses::guess('שרשרת עם תליון טבעת'), 'the first word that says a class');

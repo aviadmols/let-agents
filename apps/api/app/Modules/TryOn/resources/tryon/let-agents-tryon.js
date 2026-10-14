@@ -512,8 +512,21 @@
   }
 
   /** Where the try is, until it is ready or failed; the chip follows it while the window is closed. */
+  // The server ends a try after its minutes; the window stops waiting a little after that, whatever happens.
+  var WAIT_MS = 7 * 60 * 1000;
+
   function follow(d) {
     clearTimeout(S.poll);
+    if (S.job !== d.id) { S.since = Date.now(); }
+    if (S.since && Date.now() - S.since > WAIT_MS) {
+      S.view = 'rejected';
+      S.message = L('failed');
+      S.job = null;
+      S.since = null;
+      remember(null);
+      render();
+      return;
+    }
     S.job = d.id;
     S.stage = d.stage;
     remember({ job: d.id });
@@ -536,7 +549,7 @@
     S.poll = setTimeout(function () {
       fetch(API + '/tries/' + encodeURIComponent(d.id) + '?vid=' + encodeURIComponent(visitor()) + testQuery(), { credentials: 'omit' })
         .then(json)
-        .then(function (r) { if (r.status === 200 && r.body.data) { follow(r.body.data); } else { S.job = null; remember(null); render(); } })
+        .then(function (r) { if (r.status === 200 && r.body.data) { follow(r.body.data); } else { S.job = null; S.since = null; remember(null); render(); } })
         .catch(function () { S.poll = setTimeout(function () { follow(d); }, POLL_MS); });
     }, POLL_MS);
   }

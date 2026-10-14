@@ -33,6 +33,7 @@ return [
     'failed_tries' => 'Why tries failed this month',
     'no_failed_tries' => 'No try failed this month.',
     'failure_names' => [
+        'timed_out' => 'Did not finish in time',
         'check_failed' => 'The checker refused every attempt',
         'model_failed' => 'A model did not answer',
         'photo_gone' => 'The photo was not found when the picture was made',
@@ -42,6 +43,7 @@ return [
         'busy' => 'The month budget ran out',
     ],
     'failures' => [
+        'timed_out' => 'The try did not finish within :minutes minutes and was stopped. It can be tried again.',
         'check_failed' => 'The checker refused the picture on every attempt: :detail',
         'model_failed' => 'A model did not answer (:detail). Check the key and the model in the settings.',
         'photo_gone' => 'The shopper photo was not found when the try ran. This happened before the storage fix; new photos will not fail this way.',

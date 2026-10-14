@@ -221,7 +221,8 @@ final class TryOnLog extends Page
     /** @return Collection<int, TryOnJob> */
     public function jobs(int $limit = 50): Collection
     {
-        return $this->inShop(fn () => TryOnJob::query()->with('product:id,title')->latest()->limit($limit)->get()) ?? collect();
+        // A try past its minutes shows as ended, here too.
+        return $this->inShop(fn () => TryOnJob::query()->with('product:id,title')->latest()->limit($limit)->get()->each(fn (TryOnJob $job) => $job->endIfStuck())) ?? collect();
     }
 
     /**
@@ -246,7 +247,7 @@ final class TryOnLog extends Page
             $detail = trim($last->step.': '.(string) $last->error);
         }
 
-        return (string) __('try_on::hub.failures.'.$job->failure, ['detail' => $detail]) ?: $job->failure;
+        return (string) __('try_on::hub.failures.'.$job->failure, ['detail' => $detail, 'minutes' => (string) TryOnJob::MAX_MINUTES]) ?: $job->failure;
     }
 
     /** Why tries failed this month, the most common first. @return array<string, int> */

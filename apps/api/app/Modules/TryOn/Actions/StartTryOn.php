@@ -80,7 +80,9 @@ final class StartTryOn
         $fingerprint = hash('sha256', implode('|', [$photo->photo_hash, $product?->id ?? 'page:'.$productExternalId, (string) ($product?->image_url ?? $page['image']), $class, json_encode($answered), (string) Settings::get('try_on.model_'.$group), json_encode(self::PROMPT_VERSIONS)]));
         $same = TryOnJob::query()->where('visitor_hash', $visitorHash)->where('fingerprint', $fingerprint)->whereIn('status', [TryOnJob::QUEUED, TryOnJob::WORKING, TryOnJob::READY])->latest()->first();
 
-        if ($same !== null) {
+        // The same try again is the one already made or on its way; one stuck past its minutes is ended
+        // instead, and a new one starts, so asking again never waits on it forever.
+        if ($same !== null && ! $same->endIfStuck()) {
             return ['job' => $same] + $none;
         }
 

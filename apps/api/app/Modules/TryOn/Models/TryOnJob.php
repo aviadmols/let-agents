@@ -45,6 +45,24 @@ class TryOnJob extends Model
 
     public const FAILED = 'failed';
 
+    /** Never more than two pictures for one try: the first and one more after the checker's correction. */
+    public const MAX_ATTEMPTS = 2;
+
+    /** A try not done after this many minutes ends as failed (timed_out), so nothing waits on it forever. */
+    public const MAX_MINUTES = 6;
+
+    /** Still waited on (queued or working) but past its time: ended now as failed. True when it was. */
+    public function endIfStuck(): bool
+    {
+        if (! in_array($this->status, [self::QUEUED, self::WORKING], true) || $this->created_at === null || $this->created_at->gt(now()->subMinutes(self::MAX_MINUTES))) {
+            return false;
+        }
+
+        $this->update(['status' => self::FAILED, 'failure' => 'timed_out', 'stage' => null, 'finished_at' => now()]);
+
+        return true;
+    }
+
     protected $table = 'try_on_jobs';
 
     protected $guarded = ['id'];

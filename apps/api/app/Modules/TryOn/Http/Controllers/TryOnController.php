@@ -156,7 +156,12 @@ final class TryOnController
         }
 
         $visitor = (string) $request->query('vid');
-        $job = app(TenantContext::class)->run($connection->shop_id, fn () => TryOnJob::query()->whereKey($id)->where('visitor_hash', self::visitor($connection->shop_id, $visitor))->first());
+        $job = app(TenantContext::class)->run($connection->shop_id, function () use ($id, $connection, $visitor): ?TryOnJob {
+            $job = TryOnJob::query()->whereKey($id)->where('visitor_hash', self::visitor($connection->shop_id, $visitor))->first();
+            $job?->endIfStuck();
+
+            return $job;
+        });
 
         return $job === null
             ? response()->json(['error' => 'unknown_try'], 404)

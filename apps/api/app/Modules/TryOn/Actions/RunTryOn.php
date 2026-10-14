@@ -102,11 +102,16 @@ final class RunTryOn
         $inputs = [['mime' => 'image/jpeg', 'bytes' => Picture::forModel($photo)], ['mime' => 'image/jpeg', 'bytes' => Picture::forModel($productPicture)]];
         $productPath = Files::put($job->shop_id, 'product', $inputs[1]['bytes']);
         $cap = (float) Settings::get('try_on.job_cap_usd');
-        $tries = 1 + (int) Settings::get('try_on.retries');
+        // Two at most, whatever the setting says.
+        $tries = min(TryOnJob::MAX_ATTEMPTS, 1 + (int) Settings::get('try_on.retries'));
         $fix = '';
         $cost = 0.0;
 
         for ($attempt = 1; $attempt <= $tries; $attempt++) {
+            // Ended while it worked (past its minutes): nothing more is made or paid for.
+            if ($job->fresh()?->status === TryOnJob::FAILED) {
+                return;
+            }
             $job->update(['attempts' => $attempt, 'stage' => 'prompt']);
 
             try {
