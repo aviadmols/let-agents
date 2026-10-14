@@ -190,9 +190,9 @@
         {
             "name": "keep_days",
             "type": "int",
-            "default": 365,
+            "default": 3650,
             "min": 30,
-            "max": 1095,
+            "max": 3650,
             "scope": "global",
             "unit": "days"
         },

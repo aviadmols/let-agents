@@ -140,9 +140,11 @@ final class SearchCommand extends Command
         $before = now()->subDays((int) Settings::get('search.keep_days'))->toDateString();
         $terms = SearchTerm::query()->where('day', '<', $before)->delete();
         $clicks = SearchClick::query()->where('day', '<', $before)->delete();
-        // Searched photos go after their own days; the marked ones are the check set and stay.
-        $photos = SearchPhotoAsk::query()->whereNull('verdict')->where('created_at', '<', now()->subDays((int) Settings::get('search.photo_keep_days')))->delete();
-        $this->line("Pruned {$terms} query rows, {$clicks} click rows and {$photos} photos before {$before}.");
+        // A photo search stays, for learning what shoppers look for: only its full photo goes after its
+        // days (the small thumbnail, what was seen, the tags and the results stay). The marked ones keep
+        // the photo too, as the check set every change to photo search is measured against.
+        $photos = SearchPhotoAsk::query()->whereNull('verdict')->whereNotNull('photo')->where('created_at', '<', now()->subDays((int) Settings::get('search.photo_keep_days')))->update(['photo' => null]);
+        $this->line("Pruned {$terms} query rows and {$clicks} click rows before {$before}; let go of {$photos} full photos.");
 
         return self::SUCCESS;
     }

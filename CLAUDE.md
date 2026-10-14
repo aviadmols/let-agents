@@ -48,6 +48,11 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - Any call to a model with the keys saved in the panel asks `Ai\Contracts\SpendGuard::assertCanSpend()`
   first and records its cost with `RunContext::usage()`. The cap is `ai.monthly_spend_cap_usd`
   (default 6 USD a month, all shops). Answer files from agents outside the platform cost nothing.
+- Shopper behaviour is kept for learning: events (`analytics.retention_days`), searches and clicks
+  (`search.keep_days`) default to ten years, and a photo search keeps what it learned forever (only
+  its full photo goes after `search.photo_keep_days`). What identifies a person does not stay: IP and
+  session go after `*.visit_keep_days`, Try-On photos after `try_on.retention_days`, leads after a year.
+  Don't shorten a behaviour retention or delete behaviour rows without the owner's word.
 - Every call through `ChatModel`/`VisionModel`/`WebSearchModel`/`ImageModel` is written to `run_calls`
   (`Runs\Contracts\CallJournal`) with its prompt, what was sent and what came back, under the run open at
   the time (`RunStack`). Pictures appear by type and size only. Kept `runs.call_log_days` (30); the

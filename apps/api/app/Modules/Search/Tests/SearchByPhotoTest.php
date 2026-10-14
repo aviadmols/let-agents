@@ -674,18 +674,20 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(['ברזים', true], [$ask->fresh()->checked_main, $ask->fresh()->checked_right]);
         Livewire::test(PhotoSearches::class, ['shop' => $this->shop->id])->assertSee('1 מתוך 1');
 
-        // Unmarked photos go after their days; marked ones stay as the check set.
-        $this->inShop(function (): void {
-            SearchPhotoAsk::query()->create(['shop_id' => $this->shop->id, 'photo_hash' => 'old', 'tags' => [], 'results' => [], 'total' => 0, 'created_at' => now()->subDays(10)]);
-        });
+        // An unmarked search keeps what it learned after its days, without its full photo; a marked
+        // one keeps the photo too, as the check set.
+        $old = $this->inShop(fn () => SearchPhotoAsk::query()->create(['shop_id' => $this->shop->id, 'photo_hash' => 'old', 'photo' => 'data:image/jpeg;base64,AAAA', 'thumb' => 'data:image/jpeg;base64,BB', 'object' => 'ברז', 'tags' => ['ברז'], 'results' => [], 'total' => 0, 'created_at' => now()->subDays(10)]));
         Settings::set('search.photo_keep_days', 7);
         Artisan::call('search', ['step' => 'prune']);
-        $this->assertSame([$ask->id], $this->inShop(fn () => SearchPhotoAsk::query()->pluck('id')->all()));
+        $this->assertEqualsCanonicalizing([$ask->id, $old->id], $this->inShop(fn () => SearchPhotoAsk::query()->pluck('id')->all()), 'what shoppers looked for stays, for learning');
+        $kept = $this->inShop(fn () => $old->fresh());
+        $this->assertSame([null, 'data:image/jpeg;base64,BB', 'ברז', ['ברז']], [$kept->photo, $kept->thumb, $kept->object, $kept->tags]);
+        $this->assertNotNull($this->inShop(fn () => $ask->fresh()->photo), 'the check set keeps its photo');
 
         // With the log off, nothing is kept.
         Features::override('search.photo_log', false, $this->shop->id);
         $this->upload()->assertOk();
-        $this->assertSame(1, $this->inShop(fn () => SearchPhotoAsk::query()->count()));
+        $this->assertSame(2, $this->inShop(fn () => SearchPhotoAsk::query()->count()));
     }
 
     /**

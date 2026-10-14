@@ -11,7 +11,7 @@
         {
             "name": "retention_days",
             "type": "int",
-            "default": 90,
+            "default": 365,
             "min": 7,
             "max": 3650,
             "scope": "global",

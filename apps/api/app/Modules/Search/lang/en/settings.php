@@ -56,7 +56,7 @@ return [
     ],
     'keep_days' => [
         'label' => 'How long search statistics are kept',
-        'description' => 'Search and click counts older than this are deleted at night.',
+        'description' => 'What was searched and clicked is kept for learning and conclusions. Older is deleted at night. Default: ten years.',
     ],
     'photo_max_kb' => [
         'label' => 'Largest photo to search by',
@@ -232,7 +232,7 @@ return [
     ],
     'photo_keep_days' => [
         'label' => 'How long searched photos are kept',
-        'description' => 'A reduced copy of every photo uploaded to search is kept for review and then deleted. A photo marked right or wrong stays, as part of the check set.',
+        'description' => 'The photo itself is deleted after this. The search stays for learning: what the photo showed, the tags, the results and a thumbnail. A photo marked right or wrong stays whole, as part of the check set.',
     ],
     'photo_same_similarity' => [
         'label' => 'Likeness that counts as the same picture',

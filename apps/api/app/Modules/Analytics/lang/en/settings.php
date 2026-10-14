@@ -35,7 +35,7 @@ return [
     ],
     'retention_days' => [
         'label' => 'Keep events for',
-        'description' => 'Older events are deleted every night. Orders are kept.',
+        'description' => 'Shopper behaviour (views, clicks, adds to cart, orders) is kept for learning and conclusions. Older is deleted at night. Default: ten years.',
     ],
     'holdout_percent' => [
         'label' => 'Share of shoppers held out',
