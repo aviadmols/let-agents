@@ -48,6 +48,19 @@ final class TryOnClasses
         'furniture' => ['room'],
     ];
 
+    /**
+     * The usual real size of a piece, against the body it is worn on, for when the store states none.
+     * The product picture is cut to the product, so it no longer shows how small the piece is; an
+     * image model left to guess draws it as large as the picture it was given.
+     */
+    public const SIZES = [
+        'ring' => 'A band 2 to 4 mm wide; its top, stones included, no wider than the finger it is on.',
+        'necklace' => 'A thin chain, 1 to 2 mm; a pendant 15 to 25 mm tall, about the size of a fingertip: less than half the height of the person\'s ear and narrower than the bridge of their nose to the corner of their eye.',
+        'earrings' => 'A stud no larger than the earlobe; a drop earring shorter than the ear itself.',
+        'bracelet' => 'A band 3 to 8 mm wide that circles the wrist closely.',
+        'watch' => 'A case 34 to 44 mm across, about the width of the wrist, on a strap that circles it.',
+    ];
+
     /** The fingers a ring may go on, in the order a shopper reads them. */
     public const FINGERS = ['index', 'middle', 'ring', 'pinky', 'thumb'];
 

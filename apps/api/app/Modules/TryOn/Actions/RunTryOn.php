@@ -232,6 +232,8 @@ final class RunTryOn
         return array_filter([
             'template' => trim(self::prompt('tryon_'.$job->group)),
             'product' => ['title' => $job->productTitle(), 'class' => $job->tryon_class, 'details' => array_slice($details, 0, 12), 'dimensions' => array_slice($dimensions, 0, 6)]
+                // No measures from the store: the usual size of such a piece, against the body.
+                + ($dimensions === [] && isset(TryOnClasses::SIZES[$job->tryon_class]) ? ['usual_size' => TryOnClasses::SIZES[$job->tryon_class]] : [])
                 // The only picture of it shows it worn by someone: the image model takes the piece only.
                 + ($worn ? ['picture' => 'The second image shows the product worn by a model. Take only the product from it; nothing of that person, hand or background.'] : []),
             'photo' => array_intersect_key((array) $job->photo->gate, array_flip(['subject', 'parts_visible', 'scale', 'free_spots', 'hands_visible'])),

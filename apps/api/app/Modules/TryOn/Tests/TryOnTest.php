@@ -375,6 +375,19 @@ final class TryOnTest extends TestCase
         Livewire::test(TryOnLog::class, ['tab' => 'tries'])->assertSee('הבודק דחה את התמונה בכל הניסיונות: המוצר בתמונה לא נראה כמו המוצר (another ring)');
     }
 
+    public function test_without_measures_the_writer_gets_the_usual_size_and_an_oversized_piece_is_made_again(): void
+    {
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $this->checks[] = $this->verdict(['proportions_ok' => false, 'fix' => 'Make the ring a third of its size.']);
+        $this->checks[] = $this->verdict();
+        $id = $this->start($photo, 'ring-1')->assertStatus(202)->json('data.id');
+
+        $this->assertSame('ready', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$id}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->json('data.status'));
+        $this->assertStringContainsString('2 to 4 mm', (string) json_decode($this->written[0], true)['product']['usual_size']);
+        $this->assertSame('Make the ring a third of its size.', json_decode($this->written[1], true)['fix']);
+    }
+
     public function test_a_product_shown_only_on_a_model_is_taken_alone_and_the_writer_is_told(): void
     {
         $this->productWorn = true;

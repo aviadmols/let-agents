@@ -28,7 +28,9 @@ final class StartTryOn
     // checker v2: a fault only when a shopper would see it at a glance; when unsure, none.
     // writer v2: "Edit the first image", nothing added; checker v3: gentle on the product, strict that it is the shopper's own photo.
     // template v2 (jewelry): worn, not pasted on; checker v4: judges that too (realistic).
-    public const PROMPT_VERSIONS = ['writer' => 3, 'checker' => 4, 'template' => 2];
+    // writer v4, template v3, checker v5: the real size against the body (the product picture is a
+    // close-up), the light of the spot it sits in; the checker judges the size again (proportions_ok).
+    public const PROMPT_VERSIONS = ['writer' => 4, 'checker' => 5, 'template' => 3];
 
     public function __construct(private readonly TenantContext $tenant) {}
 
