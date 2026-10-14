@@ -108,7 +108,8 @@ final class RunTryOn
 
         // Jewelry is small: its stones need the sharper pictures.
         $side = $job->group === TryOnClasses::JEWELRY ? Picture::KEEP_SIDE : Picture::MODEL_SIDE;
-        $inputs = [['mime' => 'image/jpeg', 'bytes' => Picture::forModel($photo, $side)], ['mime' => 'image/jpeg', 'bytes' => Picture::forModel($productPicture, $side)]];
+        // The product cut to itself: a ring shot small on a large background reaches the model with all its stones.
+        $inputs = [['mime' => 'image/jpeg', 'bytes' => Picture::forModel($photo, $side)], ['mime' => 'image/jpeg', 'bytes' => Picture::forModel(Picture::cropToProduct($productPicture), $side)]];
         $perImage = (float) Settings::get('try_on.generation_usd_'.$job->group);
         $productPath = Files::put($job->shop_id, 'product', $inputs[1]['bytes']);
         $cap = (float) Settings::get('try_on.job_cap_usd');

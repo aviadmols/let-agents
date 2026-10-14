@@ -69,6 +69,93 @@ final class Picture
     }
 
     /**
+     * A product picture cut to the product: a store shoots a ring small in the middle of a large plain
+     * background, and the image model then sees too few of its pixels to keep its stones. The
+     * background is the colour of the corners; the product is what differs from it; the cut keeps a
+     * margin around it and stays square-ish. A picture whose product already fills it, or whose
+     * background is not plain, is returned as it was. Code only.
+     */
+    public static function cropToProduct(string $bytes, float $margin = 0.18): string
+    {
+        $image = @imagecreatefromstring($bytes);
+
+        if (! $image instanceof GdImage) {
+            return $bytes;
+        }
+
+        if (! imageistruecolor($image)) {
+            imagepalettetotruecolor($image);
+        }
+
+        $w = imagesx($image);
+        $h = imagesy($image);
+        $corners = [[0, 0], [$w - 1, 0], [0, $h - 1], [$w - 1, $h - 1]];
+        $colours = array_map(fn (array $p): array => self::rgb($image, $p[0], $p[1]), $corners);
+        $background = [
+            (int) round(array_sum(array_column($colours, 0)) / 4),
+            (int) round(array_sum(array_column($colours, 1)) / 4),
+            (int) round(array_sum(array_column($colours, 2)) / 4),
+        ];
+
+        // Corners that disagree: not a plain background (a photo of the piece worn, a scene).
+        foreach ($colours as $c) {
+            if (self::distance($c, $background) > 40) {
+                return $bytes;
+            }
+        }
+
+        $step = max(1, (int) floor(min($w, $h) / 300));
+        [$left, $top, $right, $bottom] = [$w, $h, -1, -1];
+
+        for ($y = 0; $y < $h; $y += $step) {
+            for ($x = 0; $x < $w; $x += $step) {
+                if (self::distance(self::rgb($image, $x, $y), $background) > 48) {
+                    $left = min($left, $x);
+                    $right = max($right, $x);
+                    $top = min($top, $y);
+                    $bottom = max($bottom, $y);
+                }
+            }
+        }
+
+        if ($right < 0) {
+            return $bytes;
+        }
+
+        $boxW = $right - $left + 1;
+        $boxH = $bottom - $top + 1;
+
+        // Already fills most of the picture: nothing to gain.
+        if ($boxW * $boxH > 0.6 * $w * $h) {
+            return $bytes;
+        }
+
+        $side = (int) round(max($boxW, $boxH) * (1 + 2 * $margin));
+        $side = min(max($side, 64), $w, $h);
+        $cx = (int) round(($left + $right) / 2);
+        $cy = (int) round(($top + $bottom) / 2);
+        $x0 = max(0, min($w - $side, $cx - intdiv($side, 2)));
+        $y0 = max(0, min($h - $side, $cy - intdiv($side, 2)));
+        $cut = imagecrop($image, ['x' => $x0, 'y' => $y0, 'width' => $side, 'height' => $side]);
+
+        return $cut instanceof GdImage ? self::jpeg($cut, 92) : $bytes;
+    }
+
+    /** @return array{0: int, 1: int, 2: int} */
+    private static function rgb(GdImage $image, int $x, int $y): array
+    {
+        $c = imagecolorat($image, $x, $y);
+
+        return [($c >> 16) & 0xFF, ($c >> 8) & 0xFF, $c & 0xFF];
+    }
+
+    /** @param array{0: int, 1: int, 2: int} $a @param array{0: int, 1: int, 2: int} $b */
+    private static function distance(array $a, array $b): float
+    {
+        return sqrt(($a[0] - $b[0]) ** 2 + ($a[1] - $b[1]) ** 2 + ($a[2] - $b[2]) ** 2);
+    }
+
+    /**
      * Pictures side by side, each scaled to one height, for a checker that sees one picture at a time:
      * the product, the shopper's photo, the result, in that order.
      *
