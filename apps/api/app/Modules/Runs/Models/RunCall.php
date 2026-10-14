@@ -3,6 +3,7 @@
 namespace App\Modules\Runs\Models;
 
 use App\Core\Facades\Settings;
+use App\Modules\Runs\Support\LearningAgents;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -62,6 +63,11 @@ class RunCall extends Model
     /** @return Builder<RunCall> */
     public function prunable(): Builder
     {
-        return static::query()->where('created_at', '<', now()->subDays((int) Settings::get('runs.call_log_days')));
+        // The learning and checking agents' calls stay: they are what the system learned, and why
+        // (LearningAgents). A call outside any run has no action, and NOT IN never matches a null.
+        $kept = LearningAgents::actions();
+
+        return static::query()->where('created_at', '<', now()->subDays((int) Settings::get('runs.call_log_days')))
+            ->when($kept !== [], fn (Builder $q) => $q->where(fn (Builder $w) => $w->whereNull('action')->orWhereNotIn('action', $kept)));
     }
 }

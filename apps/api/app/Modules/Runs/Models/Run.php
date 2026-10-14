@@ -5,6 +5,7 @@ namespace App\Modules\Runs\Models;
 use App\Core\Facades\Settings;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Runs\Support\LearningAgents;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -103,7 +104,11 @@ class Run extends Model
     /** @return Builder<Run> */
     public function prunable(): Builder
     {
-        return static::query()->where('created_at', '<', now()->subDays((int) Settings::get('runs.retention_days')));
+        // The learning and checking agents' runs stay (LearningAgents): what they found is the record of what was learned.
+        $kept = LearningAgents::actions();
+
+        return static::query()->where('created_at', '<', now()->subDays((int) Settings::get('runs.retention_days')))
+            ->when($kept !== [], fn (Builder $q) => $q->whereNotIn('action', $kept));
     }
 
     public function summary(): ?string

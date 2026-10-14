@@ -53,6 +53,10 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   its full photo goes after `search.photo_keep_days`). What identifies a person does not stay: IP and
   session go after `*.visit_keep_days`, Try-On photos after `try_on.retention_days`, leads after a year.
   Don't shorten a behaviour retention or delete behaviour rows without the owner's word.
+- The learning and checking agents' work is kept forever: runs and model calls of every agent that
+  is not `"when": "live"` in its module.json (or has `"keep": true`) are never pruned
+  (`Runs\Support\LearningAgents`), and are read in one place: "מה הסוכנים למדו" (`LearningJournal`).
+  A new learning agent is kept by being declared there.
 - Every call through `ChatModel`/`VisionModel`/`WebSearchModel`/`ImageModel` is written to `run_calls`
   (`Runs\Contracts\CallJournal`) with its prompt, what was sent and what came back, under the run open at
   the time (`RunStack`). Pictures appear by type and size only. Kept `runs.call_log_days` (30); the
