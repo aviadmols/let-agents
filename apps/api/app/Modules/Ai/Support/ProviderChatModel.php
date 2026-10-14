@@ -8,6 +8,9 @@ use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\VisionDriver;
 use App\Modules\Ai\Contracts\VisionModel;
+use App\Modules\Ai\Contracts\WebAnswer;
+use App\Modules\Ai\Contracts\WebSearchDriver;
+use App\Modules\Ai\Contracts\WebSearchModel;
 use App\Modules\Ai\Enums\AiProviderName;
 
 /**
@@ -15,7 +18,7 @@ use App\Modules\Ai\Enums\AiProviderName;
  * drivers are the ones AiServiceProvider registers; a provider without one is refused as
  * unsupported, the same way as before there were drivers.
  */
-final class ProviderChatModel implements ChatModel, VisionModel
+final class ProviderChatModel implements ChatModel, VisionModel, WebSearchModel
 {
     /** @param iterable<ChatDriver> $drivers */
     public function __construct(private readonly iterable $drivers) {}
@@ -25,6 +28,17 @@ final class ProviderChatModel implements ChatModel, VisionModel
         foreach ($this->drivers as $driver) {
             if ($driver->provider() === $provider) {
                 return $driver->json(ProviderKey::for($provider), $model, $system, $user, $maxOutputTokens, $reasoningEffort);
+            }
+        }
+
+        throw new ModelCallFailed(ModelCallFailed::UNSUPPORTED);
+    }
+
+    public function research(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, int $maxSearches): WebAnswer
+    {
+        foreach ($this->drivers as $driver) {
+            if ($driver instanceof WebSearchDriver && $driver->provider() === $provider) {
+                return $driver->research(ProviderKey::for($provider), $model, $system, $user, $maxOutputTokens, $maxSearches);
             }
         }
 

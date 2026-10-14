@@ -29,6 +29,7 @@ return [
         'tryon' => 'Try-on',
     ],
     'fact_statuses' => [
+        'not_applicable' => 'Does not apply',
         'approved' => 'Approved',
         'awaiting_review' => 'Waiting for the checker',
         'awaiting_escalation' => 'Waiting for the stronger checker',

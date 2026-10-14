@@ -13,6 +13,10 @@ return [
         'label' => 'Go on to the full scan when the structure scores well',
         'description' => 'When every branch\'s vocabulary scores at least the pass score and nothing hard failed, it is approved and the scan goes on without waiting. Off: the score is shown and a person approves. Turn it on after comparing the score with your own judgment on a store or two.',
     ],
+    'web_lookup' => [
+        'label' => 'Let the team check a missing detail on the web',
+        'description' => 'A button on the missing details screen asks a model that searches the web. A value is offered only when two independent sites, or the manufacturer, say it in a sentence a page really holds, and it is saved only when a person approves it.',
+    ],
     'auto_approve' => [
         'label' => 'Approve checked facts automatically',
         'description' => 'When code and a model agree, or a reviewer model confirms, the fact is approved. When off, every fact waits for a person.',

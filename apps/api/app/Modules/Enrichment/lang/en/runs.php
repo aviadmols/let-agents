@@ -13,6 +13,7 @@ return [
     'vocabulary_invalid' => 'The vocabulary was not saved: :count problems.',
     'structure_built' => 'Divided the catalog into :branches branches: :approved went on, :held wait for a decision; :rest products belong to no branch.',
     'structure_whole' => 'A vocabulary already covers the whole catalog, so it was not divided into branches.',
+    'web_lookup' => 'Checked on the web: :product (:certainty).',
     'schema_scored' => 'Scored the vocabulary of :branch: :score of 100 (:hard hard failures).',
     'read_in_code' => 'Code read :products products (:changed changed): brand for :brands, :families size families, :types types from categories, :specs sizes from titles.',
     'read_promises' => 'Code read :pages pages: :shop_promises store promises and :product_promises points from product text.',

@@ -109,6 +109,54 @@ return [
         'label' => 'Score a vocabulary needs to pass',
         'description' => '0 to 100, from what code measures on a pilot and from the reviewing model. Below it the vocabulary waits for a person.',
     ],
+    'web_researcher_provider' => [
+        'label' => 'Provider that searches the web for a product detail',
+        'description' => 'A family other than the verifier\'s. It must be able to search the web (Anthropic).',
+    ],
+    'web_researcher_model' => [
+        'label' => 'Model that searches the web for a product detail',
+        'description' => 'Reads the pages it finds and answers with a value and the sentences it rests on.',
+    ],
+    'web_researcher_input_usd_per_million' => [
+        'label' => 'Input price of the web researcher, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'web_researcher_output_usd_per_million' => [
+        'label' => 'Output price of the web researcher, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'web_verifier_provider' => [
+        'label' => 'Provider that checks the web answer is about the same product',
+        'description' => 'A family other than the researcher\'s.',
+    ],
+    'web_verifier_model' => [
+        'label' => 'Model that checks the web answer is about the same product',
+        'description' => 'Reads only the quoted sentences and the product, never the whole page.',
+    ],
+    'web_verifier_input_usd_per_million' => [
+        'label' => 'Input price of the web verifier, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'web_verifier_output_usd_per_million' => [
+        'label' => 'Output price of the web verifier, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'web_search_usd_per_search' => [
+        'label' => 'Price of one web search',
+        'description' => 'The provider charges per search on top of the tokens.',
+    ],
+    'web_max_searches' => [
+        'label' => 'Most searches for one product',
+        'description' => 'One lookup asks for every missing detail of a product at once.',
+    ],
+    'web_checks_per_month' => [
+        'label' => 'Web checks per shop per month',
+        'description' => 'A product and its details are checked at most once in 90 days. 0 turns it off for the shop.',
+    ],
+    'web_manufacturer_domains' => [
+        'label' => 'Manufacturer websites that count as enough on their own',
+        'description' => 'Comma separated domains (makita.com, boschtools.com). Otherwise two independent sites must say the same.',
+    ],
     'schema_sample' => [
         'label' => 'Products sampled to discover the vocabulary',
         'description' => 'From every kind the store sells, in turn. Code counts them; a model reads only the counts.',

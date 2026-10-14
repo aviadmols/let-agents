@@ -61,13 +61,13 @@ final class RequiredGaps
             $products = CatalogProduct::query()->whereIn('id', $types->keys())->whereNull('removed_at')
                 ->get(['id', 'external_id', 'title', 'url'])->keyBy('id');
             $values = EnrichmentFact::query()->whereIn('product_id', $products->keys())->whereIn('kind', [FactKind::Choice, FactKind::Spec])
-                ->whereIn('status', [FactStatus::Approved, ...self::WAITING])->orderBy('id')->get(['product_id', 'key', 'status', 'value_text', 'value_number', 'unit', 'kind']);
+                ->whereIn('status', [FactStatus::Approved, FactStatus::NotApplicable, ...self::WAITING])->orderBy('id')->get(['product_id', 'key', 'status', 'value_text', 'value_number', 'unit', 'kind']);
 
             // product => attribute => approved / waiting.
             $have = [];
             $waiting = [];
             foreach ($values as $fact) {
-                if ($fact->status === FactStatus::Approved) {
+                if ($fact->status === FactStatus::Approved || $fact->status === FactStatus::NotApplicable) {
                     $have[$fact->product_id][$fact->key] = true;
                 } else {
                     $waiting[$fact->product_id][$fact->key] ??= $fact->valueLabel();

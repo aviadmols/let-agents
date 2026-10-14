@@ -11,6 +11,7 @@ namespace App\Modules\Enrichment\Enums;
  *   the stronger model is unsure too .................. needs_person
  *   any check says wrong .............................. rejected
  *   a newer reading of the product replaced it ........ superseded
+ *   the shop's team says it does not apply ............ not_applicable (not a fact about the product)
  */
 enum FactStatus: string
 {
@@ -20,6 +21,7 @@ enum FactStatus: string
     case NeedsPerson = 'needs_person';
     case Rejected = 'rejected';
     case Superseded = 'superseded';
+    case NotApplicable = 'not_applicable';
 
     public function label(): string
     {
@@ -33,7 +35,7 @@ enum FactStatus: string
             self::AwaitingReview, self::AwaitingEscalation => 'warning',
             self::NeedsPerson => 'info',
             self::Rejected => 'danger',
-            self::Superseded => 'gray',
+            self::Superseded, self::NotApplicable => 'gray',
         };
     }
 

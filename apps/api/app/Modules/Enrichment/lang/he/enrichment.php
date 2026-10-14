@@ -29,6 +29,7 @@ return [
         'tryon' => 'מדידה על הלקוח',
     ],
     'fact_statuses' => [
+        'not_applicable' => 'לא רלוונטי',
         'approved' => 'מאושר',
         'awaiting_review' => 'מחכה לבודק',
         'awaiting_escalation' => 'מחכה לבודק החזק',

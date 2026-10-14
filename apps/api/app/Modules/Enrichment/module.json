@@ -39,6 +39,10 @@
         {
             "name": "schema_auto_advance",
             "default": false
+        },
+        {
+            "name": "web_lookup",
+            "default": true
         }
     ],
     "settings": [
@@ -251,6 +255,115 @@
             "max": 3,
             "scope": "global",
             "unit": "rounds"
+        },
+        {
+            "name": "web_researcher_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "web_researcher_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "web_researcher_input_usd_per_million",
+            "type": "float",
+            "default": 2,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "web_researcher_output_usd_per_million",
+            "type": "float",
+            "default": 10,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "web_verifier_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "web_verifier_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "web_verifier_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "web_verifier_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "web_search_usd_per_search",
+            "type": "float",
+            "default": 0.01,
+            "min": 0,
+            "max": 1,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "web_max_searches",
+            "type": "int",
+            "default": 3,
+            "min": 1,
+            "max": 6,
+            "scope": "global",
+            "unit": "products"
+        },
+        {
+            "name": "web_checks_per_month",
+            "type": "int",
+            "default": 150,
+            "min": 0,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "web_manufacturer_domains",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 500,
+            "scope": "shop"
         },
         {
             "name": "branch_min_products",
@@ -476,6 +589,40 @@
                 "step": "schema",
                 "shop_argument": "target"
             }
+        },
+        {
+            "name": "web_lookup",
+            "action": "web_lookup",
+            "when": "on_request",
+            "features": [
+                "web_lookup"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "web_researcher_provider",
+                    "model": "web_researcher_model",
+                    "prices": [
+                        "web_researcher_input_usd_per_million",
+                        "web_researcher_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "web_researcher"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "web_verifier_provider",
+                    "model": "web_verifier_model",
+                    "prices": [
+                        "web_verifier_input_usd_per_million",
+                        "web_verifier_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "web_verifier"
+                    ]
+                }
+            ]
         }
     ]
 }

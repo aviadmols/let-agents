@@ -158,7 +158,14 @@ final class ReadProductsInCode
                     ->update(['status' => FactStatus::Superseded, 'updated_at' => $now]);
 
                 $status = $autoApprove ? FactStatus::Approved : FactStatus::NeedsPerson;
-                $write = function (array $values) use ($shopId, $product, $hash, $status, &$counts): void {
+                // What the shop's team said of a detail stands: code does not write that detail again.
+                $team = EnrichmentFact::query()->where('product_id', $product->id)->where('origin', FactOrigin::Person)
+                    ->whereIn('status', [FactStatus::Approved, FactStatus::NotApplicable])->pluck('key')->all();
+                $write = function (array $values) use ($shopId, $product, $hash, $status, $team, &$counts): void {
+                    if (in_array($values['kind'], [FactKind::Choice, FactKind::Spec, FactKind::Flag], true) && in_array($values['key'], $team, true)) {
+                        return;
+                    }
+
                     EnrichmentFact::query()->create($values + [
                         'shop_id' => $shopId,
                         'product_id' => $product->id,

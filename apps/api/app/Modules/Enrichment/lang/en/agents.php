@@ -13,4 +13,5 @@ return [
     'nightly_model' => 'Reads products and articles',
     'auditor' => 'Checks how articles are read',
     'schema_discovery' => 'Discovers the store\'s vocabulary',
+    'web_lookup' => 'Checks a missing product detail on the web',
 ];

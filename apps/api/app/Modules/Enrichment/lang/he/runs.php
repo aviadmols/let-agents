@@ -13,6 +13,7 @@ return [
     'vocabulary_invalid' => 'אוצר המילים לא נשמר: :count בעיות.',
     'structure_built' => 'הקטלוג חולק ל־:branches ענפים: :approved המשיכו הלאה, :held מחכים להחלטה; :rest מוצרים לא שייכים לאף ענף.',
     'structure_whole' => 'אוצר מילים כבר מכסה את כל הקטלוג, ולכן הוא לא חולק לענפים.',
+    'web_lookup' => 'נבדק ברשת: :product (:certainty).',
     'schema_scored' => 'ניקוד אוצר המילים של :branch: :score מתוך 100 (:hard כשלים קשים).',
     'read_in_code' => 'הקוד קרא :products מוצרים (:changed השתנו): מותג ל־:brands, :families משפחות מידות, :types סוגים לפי קטגוריה, :specs מידות מהכותרת.',
     'read_promises' => 'הקוד קרא :pages עמודים: :shop_promises הבטחות של החנות ו־:product_promises נקודות מתוך טקסט המוצרים.',

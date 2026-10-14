@@ -31,6 +31,17 @@ final class FactWriter
             ->update(['status' => FactStatus::Superseded, 'updated_at' => now()]);
     }
 
+    /** Whether a person of the shop gave a value (or "does not apply") for this detail of this subject. */
+    public static function teamSaid(string $column, string $subjectId, string $key): bool
+    {
+        return EnrichmentFact::query()
+            ->where($column, $subjectId)
+            ->where('key', $key)
+            ->where('origin', FactOrigin::Person)
+            ->whereIn('status', [FactStatus::Approved, FactStatus::NotApplicable])
+            ->exists();
+    }
+
     /**
      * @param  array<string, mixed>  $values  kind, key, value_number, value_text, unit, quote, origin, status, status_reason
      */
@@ -40,6 +51,14 @@ final class FactWriter
 
         if ($status === FactStatus::Approved && ! Features::enabled('enrichment.auto_approve', $batch->shop_id)) {
             $status = FactStatus::NeedsPerson;
+        }
+
+        $reason = $values['status_reason'] ?? null;
+
+        // What the shop's team said of this detail stands: a later reading is kept for the log, not used.
+        if (in_array($values['kind'], [FactKind::Choice, FactKind::Spec, FactKind::Flag], true)
+            && self::teamSaid($column, $item->subject_id, (string) $values['key'])) {
+            [$status, $reason] = [FactStatus::Superseded, 'team_value'];
         }
 
         return EnrichmentFact::query()->create([
@@ -54,7 +73,7 @@ final class FactWriter
             'quote' => isset($values['quote']) ? mb_substr((string) $values['quote'], 0, 500) : null,
             'origin' => $values['origin'] ?? FactOrigin::CodeAndModel,
             'status' => $status,
-            'status_reason' => $values['status_reason'] ?? null,
+            'status_reason' => $reason,
             'batch_id' => $batch->id,
             'input_hash' => $item->input_hash,
             'model' => mb_substr($model, 0, 120),
