@@ -23,6 +23,7 @@
         { "name": "jobs_per_visitor_per_day", "type": "int", "default": 5, "min": 1, "max": 50, "scope": "shop", "unit": "requests" },
         { "name": "retries", "type": "int", "default": 1, "min": 0, "max": 1, "scope": "global", "unit": "requests" },
         { "name": "retention_days", "type": "int", "default": 90, "min": 1, "max": 365, "scope": "shop", "unit": "days" },
+        { "name": "refuse_minors", "type": "bool", "default": false, "scope": "shop" },
         { "name": "similar_count", "type": "int", "default": 8, "min": 0, "max": 16, "scope": "shop", "unit": "products" },
         { "name": "pass_similarity", "type": "int", "default": 3, "min": 1, "max": 5, "scope": "global" },
         { "name": "photo_max_kb", "type": "int", "default": 12000, "min": 500, "max": 20000, "scope": "global", "unit": "kilobytes" },

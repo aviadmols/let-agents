@@ -115,4 +115,8 @@ return [
             'end' => 'Inside, at the end',
         ],
     ],
+    'refuse_minors' => [
+        'label' => 'Refuse photos of children',
+        'description' => 'Off: a photo showing a child is taken like any other (a children\'s clothing store, for one). On: it is refused.',
+    ],
 ];

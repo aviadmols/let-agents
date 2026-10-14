@@ -127,8 +127,12 @@ final class TryOnTest extends TestCase
         $this->assertSame('several_people', $two['reject_code']);
         $this->assertSame('יש בתמונה יותר מאדם אחד. העלו תמונה שלכם בלבד.', $two['message']);
 
+        // A child's photo is taken (a children's clothing store), unless the shop refuses them.
         $this->gate[] = $this->hand(['minor_present' => true]);
-        $this->assertSame('minor', $this->upload(self::picture(900, 900, 2))['reject_code']);
+        $this->assertNull($this->upload(self::picture(900, 900, 2))['reject_code']);
+        Settings::set('try_on.refuse_minors', true, $this->shop->id);
+        $this->gate[] = $this->hand(['minor_present' => true]);
+        $this->assertSame('minor', $this->upload(self::picture(900, 900, 4))['reject_code']);
 
         $this->gate[] = $this->hand();
         $ok = $this->upload(self::picture(900, 900, 3));

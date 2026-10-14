@@ -31,7 +31,8 @@ final class GatePhoto
     private const PROMPT = 'tryon_gate';
 
     // v2: every part of the person that is visible, not only the main one (a head-and-neck photo serves a necklace).
-    private const PROMPT_VERSION = 2;
+    // v3: a child only when a face or body clearly shows one; a hand alone shows no age (it refused hands at random).
+    private const PROMPT_VERSION = 3;
 
     private const OUTPUT_TOKENS = 600;
 
@@ -116,7 +117,8 @@ final class GatePhoto
         $reason = match (true) {
             $gate['unsafe'] => 'unsafe',
             $gate['quality'] !== 'ok' => 'unclear',
-            $gate['minor_present'] => 'minor',
+            // Children's photos are allowed unless the shop refuses them (try_on.refuse_minors, off by default).
+            $gate['minor_present'] && (bool) Settings::get('try_on.refuse_minors', $this->tenant->require()) => 'minor',
             $gate['people_count'] >= 2 => 'several_people',
             $gate['subject'] === 'room' && $gate['people_count'] > 0 => 'people_in_room',
             default => null,
@@ -146,7 +148,7 @@ final class GatePhoto
             'subject' => in_array($data['subject'] ?? null, $subjects, true) ? $data['subject'] : 'other',
             'parts_visible' => array_values(array_intersect(TryOnClasses::PARTS, array_map('strval', (array) ($data['parts_visible'] ?? [])))),
             'people_count' => max(0, (int) ($data['people_count'] ?? 0)),
-            'minor_present' => ($data['minor_present'] ?? true) !== false,
+            'minor_present' => ($data['minor_present'] ?? false) === true,
             'quality' => in_array($data['quality'] ?? null, ['ok', 'blurry', 'dark', 'cropped', 'occluded'], true) ? $data['quality'] : 'blurry',
             'unsafe' => ($data['unsafe'] ?? false) === true,
             'hands_visible' => max(0, (int) ($data['hands_visible'] ?? 0)),
