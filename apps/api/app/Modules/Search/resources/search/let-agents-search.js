@@ -3369,9 +3369,11 @@
             if (data && data.context === 'previous') {
               return;
             }
-            // No answer and nothing picked ("can I return a ring by your courier?"): what its words
-            // happen to find is not related, and only the reply and the shop's WhatsApp stay.
-            if (data && data.outcome !== 'answered' && !(data.picks && data.picks.length)) {
+            // Nothing picked: the reply is about the store or the product itself ("can I return it?",
+            // "how long does the battery last?"), answered or not. What its words happen to find is
+            // not related, and only the reply (and the shop's WhatsApp) stays. Products follow a reply
+            // only when it picked some; with no reply at all, the results are what is left to show.
+            if (data && !(data.picks && data.picks.length)) {
               return;
             }
             renderResults(below, result, raw, true);
