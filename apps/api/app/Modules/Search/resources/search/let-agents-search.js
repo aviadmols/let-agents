@@ -696,6 +696,80 @@
     };
   }
 
+  /**
+   * Which product this page is, from the platform's own page data: the context when it says, Shopify's
+   * analytics meta, or WooCommerce's body classes. Null anywhere else.
+   */
+  function productOnPage(win, ctx) {
+    var page = ctx.page;
+    if (page && page.type === 'product' && page.id) { return String(page.id); }
+    var meta = win.ShopifyAnalytics && win.ShopifyAnalytics.meta;
+    if (meta && meta.page && meta.page.pageType === 'product' && meta.product && meta.product.id) { return String(meta.product.id); }
+    var body = win.document.body;
+    var post = body && /(?:^|\s)single-product(?:\s|$)/.test(body.className) ? /(?:^|\s)postid-(\d+)(?:\s|$)/.exec(body.className) : null;
+    return post ? post[1] : null;
+  }
+
+  /**
+   * Try-On on a product page without the Let Agents widget (where the widget is, it loads Try-On
+   * itself). One cached request, no model: whether this product can be tried here; only then the
+   * Try-On script, which puts its button where the store's setting points. The team's test
+   * (let_agents_preview + let_agents_tryon in the address) works here as in the widget.
+   */
+  function tryOnOnProductPage(win, ctx) {
+    var doc = win.document;
+    if (win.LetAgentsContext || win.LetAgentsTryOnContext || doc.querySelector('[data-let-agents-widget]') || typeof win.fetch !== 'function') {
+      return;
+    }
+    var product = productOnPage(win, ctx);
+    if (!product) { return; }
+
+    function cookie(name) {
+      var found = new RegExp('(?:^|; )' + name + '=([^;]*)').exec(doc.cookie || '');
+      return found ? decodeURIComponent(found[1]) : null;
+    }
+    function keep(name, value, seconds) {
+      doc.cookie = name + '=' + encodeURIComponent(value) + '; path=/; max-age=' + seconds + '; SameSite=Lax' + (win.location.protocol === 'https:' ? '; Secure' : '');
+    }
+    var params = null;
+    try { params = new URLSearchParams(win.location.search); } catch (e) { /* old browser */ }
+    var previewParam = params && params.get('let_agents_preview');
+    if (previewParam && /^[a-f0-9]{32}$/.test(previewParam)) { keep('let_agents_preview', previewParam, 30 * 86400); }
+    var preview = previewParam || cookie('let_agents_preview');
+    preview = /^[a-f0-9]{32}$/.test(preview || '') ? preview : null;
+    var testParam = params && params.get('let_agents_tryon');
+    var test = null;
+    if (testParam === '0') {
+      keep('let_agents_tryon', '', 0);
+    } else {
+      if (testParam && /^(1|[a-z_]{2,20})$/.test(testParam)) { keep('let_agents_tryon', testParam, 86400); }
+      test = testParam || cookie('let_agents_tryon');
+      test = preview && /^(1|[a-z_]{2,20})$/.test(test || '') ? test : null;
+    }
+
+    var api = String(ctx.api).replace(/\/+$/, '');
+    var locale = ctx.locale === 'en' ? 'en' : 'he';
+    var testClass = test && test !== '1' ? test : '';
+    // The same address the Try-On script asks, so its answer comes from the browser's cache.
+    var testQuery = test ? '&preview=' + encodeURIComponent(preview) + (testClass ? '&class=' + encodeURIComponent(testClass) : '') : '';
+    win.fetch(api + '/try-on/' + encodeURIComponent(ctx.site) + '/config?product=' + encodeURIComponent(product) + '&locale=' + locale + testQuery, { credentials: 'omit' })
+      .then(function (response) { return response.ok ? response.json() : null; })
+      .then(function (body) {
+        if (!body || !body.data || !body.data.tryable || win.LetAgentsTryOnContext) { return; }
+        win.LetAgentsTryOnContext = { api: api, site: ctx.site, product: product, locale: locale, standalone: true };
+        if (test) {
+          win.LetAgentsTryOnContext.preview = preview;
+          win.LetAgentsTryOnContext.testClass = testClass;
+        }
+        var script = doc.createElement('script');
+        script.src = api + '/try-on/let-agents-tryon.js';
+        script.async = true;
+        script.setAttribute('data-let-agents-tryon', '');
+        doc.head.appendChild(script);
+      })
+      .catch(function () { /* Try-On is extra; the page stays as it is */ });
+  }
+
   function boot(win) {
     var doc = win.document;
     var ctx = win.LetAgentsSearchContext;
@@ -703,6 +777,7 @@
       return;
     }
     win.__letAgentsSearch = true;
+    tryOnOnProductPage(win, ctx);
 
     var API = String(ctx.api).replace(/\/+$/, '');
     var STORE_API = ctx.storeApi ? String(ctx.storeApi).replace(/\/?$/, '/') : null;

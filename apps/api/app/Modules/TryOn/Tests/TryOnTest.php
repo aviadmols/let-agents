@@ -3,6 +3,7 @@
 namespace App\Modules\TryOn\Tests;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
@@ -244,6 +245,12 @@ final class TryOnTest extends TestCase
         $this->assertSame('העלו תמונה של היד', $config['labels']['upload_title']['jewelry']);
         $this->assertStringContainsString('90 יום', $config['labels']['consent']);
         $this->assertSame('התמונה נוצרה באמצעות AI ויכולה להיות לא מדויקת.', $config['note']);
+        $this->assertSame(['selector' => '', 'position' => 'after'], $config['anchor'], 'no place chosen: next to the add-to-cart form');
+
+        // The shop chooses where the button goes on a page without the widget block.
+        Settings::set('try_on.anchor_selector', '.product-form__buttons', $this->shop->id);
+        Settings::set('try_on.anchor_position', 'before', $this->shop->id);
+        $this->assertSame(['selector' => '.product-form__buttons', 'position' => 'before'], $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1&locale=he", ['Origin' => 'https://www.store.test'])->json('data.anchor'));
 
         $script = $this->get('/api/v1/try-on/let-agents-tryon.js')->assertOk();
         $this->assertStringContainsString('application/javascript', (string) $script->headers->get('Content-Type'));

@@ -42,6 +42,8 @@
         { "name": "checker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
         { "name": "checker_model", "type": "string", "default": "claude-haiku-4-5", "min": 1, "max": 120, "scope": "global" },
         { "name": "checker_input_usd_per_million", "type": "float", "default": 1.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
-        { "name": "checker_output_usd_per_million", "type": "float", "default": 5.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" }
+        { "name": "checker_output_usd_per_million", "type": "float", "default": 5.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "anchor_selector", "type": "string", "default": "", "max": 300, "scope": "shop" },
+        { "name": "anchor_position", "type": "enum", "options": ["after", "before", "start", "end"], "default": "after", "scope": "shop" }
     ]
 }

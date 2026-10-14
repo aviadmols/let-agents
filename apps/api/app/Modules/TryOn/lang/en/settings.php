@@ -101,4 +101,18 @@ return [
         'label' => 'Output price of the picture checker, per million tokens',
         'description' => 'From the price list of the provider.',
     ],
+    'anchor_selector' => [
+        'label' => 'Where the try-on button appears on the product page',
+        'description' => 'A CSS selector of an element on the product page, for example .product-form or #product-actions. Empty: next to the add-to-cart form. A store with the Let Agents block on its product page gets the button inside the block, unless a selector is set here.',
+    ],
+    'anchor_position' => [
+        'label' => 'Relative to the element',
+        'description' => 'Where the button goes relative to the selected element.',
+        'options' => [
+            'after' => 'After it',
+            'before' => 'Before it',
+            'start' => 'Inside, at the start',
+            'end' => 'Inside, at the end',
+        ],
+    ],
 ];

@@ -24,7 +24,7 @@ use Throwable;
  * after the shopper's own action; the rest reads what is kept. The site key and the page's origin
  * are checked as for every storefront call; the shopper is a hash salted per shop.
  *
- *   GET  /api/v1/try-on/{site}/config?product=     whether the product can be tried, and on what
+ *   GET  /api/v1/try-on/{site}/config?product=     whether the product can be tried, on what, and where its button goes
  *   POST /api/v1/try-on/{site}/photos              photo (file), vid, consent
  *   POST /api/v1/try-on/{site}/tries               vid, photo, product, answers{}
  *   GET  /api/v1/try-on/{site}/tries/{id}?vid=     where the try is, and its picture when ready
@@ -47,7 +47,9 @@ final class TryOnController
         $locale = in_array($request->query('locale'), ['he', 'en'], true) ? (string) $request->query('locale') : 'he';
 
         return app(TenantContext::class)->run($connection->shop_id, function () use ($request, $locale, $connection): JsonResponse {
-            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $request->query('product'))->first();
+            // Shoppers only where the shop turned Try-On on; the team's test anywhere (the key is checked).
+            $open = Features::enabled('try_on.enabled', $connection->shop_id) || self::test($request, $connection);
+            $product = $open ? CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $request->query('product'))->first() : null;
             $class = $product === null ? null : (StartTryOn::classOf($product->id) ?? self::testClass($request, $connection));
 
             return response()->json(['data' => [
@@ -55,6 +57,11 @@ final class TryOnController
                 'class' => $class,
                 'group' => $class === null ? null : TryOnClasses::group($class),
                 'needs' => $class === null ? [] : TryOnClasses::SUBJECTS[$class],
+                // Where the button goes on the store's page when there is no widget row: the shop's CSS selector.
+                'anchor' => [
+                    'selector' => trim((string) Settings::get('try_on.anchor_selector', $connection->shop_id)),
+                    'position' => (string) Settings::get('try_on.anchor_position', $connection->shop_id),
+                ],
                 'note' => __('try_on::try_on.ai_note', [], $locale),
                 'labels' => __('try_on::try_on.ui', ['days' => (string) Settings::get('try_on.retention_days', $connection->shop_id)], $locale),
             ]], 200, ['Cache-Control' => 'public, max-age=300']);

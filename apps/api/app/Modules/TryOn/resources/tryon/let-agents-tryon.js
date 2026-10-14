@@ -124,10 +124,54 @@
 
   // ------------------------------------------------------------------ entry: a pill in the widget's row
 
+  // Where the button goes when there is no widget row: the store's own setting (try_on.anchor_selector),
+  // else next to the add-to-cart form, which every theme has.
+  var FALLBACK_ANCHORS = ['form[action*="/cart/add"]', 'form.cart', '.product-form'];
+  var POSITIONS = { before: 'beforebegin', after: 'afterend', start: 'afterbegin', end: 'beforeend' };
+
+  function anchorElement() {
+    var wanted = S.cfg && S.cfg.anchor && S.cfg.anchor.selector ? [S.cfg.anchor.selector] : FALLBACK_ANCHORS;
+    for (var i = 0; i < wanted.length; i++) {
+      try {
+        var found = doc.querySelector(wanted[i]);
+        if (found) { return found; }
+      } catch (e) { /* a selector the browser does not accept */ }
+    }
+    return null;
+  }
+
+  /** The button on the store's page itself, in a shadow root of its own so the theme cannot touch it. */
+  function placeOnPage() {
+    if (doc.querySelector('[data-la-tryon-anchor]')) { return true; }
+    var anchor = anchorElement();
+    if (!anchor) { return false; }
+    var wrap = doc.createElement('div');
+    wrap.setAttribute('data-la-tryon-anchor', '');
+    wrap.style.margin = '10px 0';
+    var shadow = wrap.attachShadow({ mode: 'open' });
+    var style = doc.createElement('style');
+    style.textContent = ':host{all:initial;display:block;font-family:inherit}button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;padding:0 18px;border:1px solid transparent;border-radius:999px;cursor:pointer;font:600 15px/1.2 inherit;color:#111827;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,rgba(66,133,244,.7),rgba(168,85,247,.6) 50%,rgba(236,72,153,.55)) border-box;box-shadow:0 6px 18px rgba(168,85,247,.14)}button:hover{box-shadow:0 8px 24px rgba(168,85,247,.24)}button:focus-visible{outline:2px solid rgba(168,85,247,.5);outline-offset:2px}';
+    shadow.appendChild(style);
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-la-tryon', '');
+    b.innerHTML = ICON.spark;
+    b.appendChild(el('span', null, S.cfg.group === 'furniture' ? L('button_furniture') : L('button')));
+    b.addEventListener('click', function () { open(); });
+    shadow.appendChild(b);
+    wrap.style.fontFamily = win.getComputedStyle(doc.body).fontFamily;
+    anchor.insertAdjacentElement(POSITIONS[(S.cfg.anchor && S.cfg.anchor.position) || 'after'] || 'afterend', wrap);
+    return true;
+  }
+
   function placePill() {
+    if (!S.cfg) { return false; }
+    if (doc.querySelector('[data-la-tryon-anchor]')) { return true; }
+    // Loaded without a widget (the search script on a product page), or the shop chose a place: on the page.
+    if (ctx.standalone || (S.cfg.anchor && S.cfg.anchor.selector)) { return placeOnPage(); }
     var widget = doc.querySelector('.let-agents-widget');
     var wroot = widget && widget.shadowRoot;
-    if (!wroot || !S.cfg) { return false; }
+    if (!wroot) { return false; }
     if (wroot.querySelector('[data-la-tryon]')) { return true; }
     var row = wroot.querySelector('.as-tags') || wroot.querySelector('.chips') || wroot.querySelector('.quick') || wroot.querySelector('.more');
     if (!row) { return false; }
@@ -496,7 +540,12 @@
       if (!d || !d.tryable) { return; }
       S.cfg = d;
       var tries = 0;
-      (function wait() { if (!placePill() && ++tries < 50) { setTimeout(wait, 200); } })();
+      // The widget's row comes when the widget has drawn; without a row after a while, the page itself.
+      (function wait() {
+        if (placePill()) { return; }
+        if (++tries === 25) { placeOnPage(); return; }
+        setTimeout(wait, 200);
+      })();
       // A layout that redraws (the chat opening, a panel) keeps the pill.
       setInterval(function () { placePill(); }, 1500);
       // A try started before, on this product's page: its chip again.
