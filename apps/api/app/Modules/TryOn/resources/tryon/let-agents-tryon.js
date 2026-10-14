@@ -267,8 +267,9 @@
       icon.appendChild(i);
       pane.appendChild(icon);
     }
-    pane.appendChild(el('h3', null, (L('upload_title') || {})[S.cfg.group] || ''));
-    pane.appendChild(el('p', 'hint', (L('upload_hint') || {})[S.cfg.group] || ''));
+    // What the photo must show: by the item where it differs from its group (a necklace: the neck, not the hand).
+    pane.appendChild(el('h3', null, (L('upload_title_class') || {})[S.cfg['class']] || (L('upload_title') || {})[S.cfg.group] || ''));
+    pane.appendChild(el('p', 'hint', (L('upload_hint_class') || {})[S.cfg['class']] || (L('upload_hint') || {})[S.cfg.group] || ''));
     var buttons = el('div', 'buttons');
     var file = el('input');
     file.type = 'file';
