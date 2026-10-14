@@ -26,7 +26,8 @@ use App\Modules\TryOn\Support\TryOnClasses;
 final class StartTryOn
 {
     // checker v2: a fault only when a shopper would see it at a glance; when unsure, none.
-    public const PROMPT_VERSIONS = ['writer' => 1, 'checker' => 2, 'template' => 1];
+    // writer v2: "Edit the first image", nothing added; checker v3: gentle on the product, strict that it is the shopper's own photo.
+    public const PROMPT_VERSIONS = ['writer' => 2, 'checker' => 3, 'template' => 1];
 
     public function __construct(private readonly TenantContext $tenant) {}
 

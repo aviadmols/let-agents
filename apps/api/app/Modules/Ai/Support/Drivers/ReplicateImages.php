@@ -27,13 +27,18 @@ final class ReplicateImages implements ImageDriver
 
     private const GIVE_UP_SECONDS = 240;
 
-    /** model => the input field for the pictures, and whether it takes a list or a single picture. */
+    /**
+     * model => the input field for the pictures, whether it takes a list or a single picture, and
+     * what else it is always sent. `aspect_ratio: match_input_image` keeps the first picture's shape
+     * and framing: without it a model may draw a new picture of its own shape instead of editing
+     * the one it was given (a landscape hand came back as a portrait with a face that was not there).
+     */
     public const INPUTS = [
-        'google/nano-banana' => ['field' => 'image_input', 'list' => true],
-        'google/nano-banana-pro' => ['field' => 'image_input', 'list' => true],
-        'bytedance/seedream-4' => ['field' => 'image_input', 'list' => true],
-        'black-forest-labs/flux-kontext-pro' => ['field' => 'input_image', 'list' => false],
-        'black-forest-labs/flux-kontext-max' => ['field' => 'input_image', 'list' => false],
+        'google/nano-banana' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image']],
+        'google/nano-banana-pro' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image']],
+        'bytedance/seedream-4' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image']],
+        'black-forest-labs/flux-kontext-pro' => ['field' => 'input_image', 'list' => false, 'with' => ['aspect_ratio' => 'match_input_image']],
+        'black-forest-labs/flux-kontext-max' => ['field' => 'input_image', 'list' => false, 'with' => ['aspect_ratio' => 'match_input_image']],
     ];
 
     public function provider(): AiProviderName
@@ -52,6 +57,7 @@ final class ReplicateImages implements ImageDriver
         $input = ['prompt' => $prompt, 'output_format' => 'jpg'];
         if ($uris !== []) {
             $input[$shape['field']] = $shape['list'] ? $uris : $uris[0];
+            $input += $shape['with'] ?? [];
         }
 
         $started = microtime(true);

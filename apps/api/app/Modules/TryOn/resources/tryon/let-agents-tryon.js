@@ -49,7 +49,7 @@
     '*{box-sizing:border-box}[hidden]{display:none!important}button{font:inherit;color:inherit}',
     '@keyframes to-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}@keyframes to-spin{to{transform:rotate(360deg)}}@keyframes to-alive{0%,100%{box-shadow:0 0 0 0 rgba(var(--g2),.45)}50%{box-shadow:0 0 0 6px rgba(var(--g2),0)}}',
     '@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}',
-    '.veil{position:fixed;inset:0;z-index:2147483300;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;padding:16px}',
+    '.veil{position:fixed;inset:0;z-index:2147483647;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;padding:16px}',
     '.box{position:relative;width:100%;max-width:480px;height:min(94vh,860px);display:flex;flex-direction:column;padding:22px 20px 16px;border:1px solid transparent;border-radius:28px;background:var(--wash) padding-box,linear-gradient(var(--surface),var(--surface)) padding-box,var(--hairline) border-box;box-shadow:0 30px 70px rgba(17,24,39,.22);animation:to-in .28s cubic-bezier(.2,.8,.2,1)}',
     '.top{margin:0 0 14px;padding-inline-end:40px}.who{display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af}.title{margin:2px 0 0;font-size:16px;font-weight:600;line-height:1.35}.price{color:rgb(var(--g2));font-weight:700;white-space:nowrap}',
     '.x{all:unset;position:absolute;top:16px;inset-inline-end:16px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--muted)}.x:hover,.x:focus-visible{background:rgba(17,24,39,.06);color:#111827}.x svg{width:22px;height:22px}',
@@ -74,7 +74,7 @@
     '.zoom{all:unset;position:absolute;top:12px;inset-inline-end:12px;z-index:2;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,.92);box-shadow:0 4px 14px rgba(0,0,0,.12)}.zoom svg{width:18px;height:18px}',
     '.ai{position:absolute;bottom:12px;inset-inline-start:12px;z-index:2;display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);padding:6px 10px 6px 12px;border-radius:999px;background:rgba(255,255,255,.88);font-size:12px;line-height:1.35;color:#374151}.ai b{flex:none;padding:1px 7px;border-radius:999px;background:var(--grad);color:#fff;font-size:10.5px}',
     '.actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}.foot{margin-top:10px;text-align:center;font-size:11.5px;color:#a1a1aa}',
-    '.chip{all:unset;box-sizing:border-box;position:fixed;bottom:20px;inset-inline-start:20px;z-index:2147483200;display:flex;align-items:center;gap:10px;max-width:min(320px,calc(100vw - 40px));padding:8px 14px 8px 8px;border:1px solid transparent;border-radius:999px;cursor:pointer;background:linear-gradient(#fff,#fff) padding-box,var(--hairline) border-box;box-shadow:0 12px 34px rgba(var(--g2),.18);animation:to-in .3s ease}',
+    '.chip{all:unset;box-sizing:border-box;position:fixed;bottom:20px;inset-inline-start:20px;z-index:2147483646;display:flex;align-items:center;gap:10px;max-width:min(320px,calc(100vw - 40px));padding:8px 14px 8px 8px;border:1px solid transparent;border-radius:999px;cursor:pointer;background:linear-gradient(#fff,#fff) padding-box,var(--hairline) border-box;box-shadow:0 12px 34px rgba(var(--g2),.18);animation:to-in .3s ease}',
     '.chip .ico{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--g2),.1);overflow:hidden}.chip .ico img{width:100%;height:100%;object-fit:cover}.chip.is-ready .ico{box-shadow:0 0 0 2px rgb(var(--g2))}.chip .t{display:grid;line-height:1.3}.chip .t b{font-size:13.5px}.chip .t span{font-size:11.5px;color:var(--muted)}',
     '@media (max-width:560px){.veil{padding:0;align-items:flex-end}.box{max-width:none;height:96vh;border-radius:24px 24px 0 0;padding:18px 14px 12px}.chip{bottom:84px}}'
   ].join('');
@@ -211,7 +211,8 @@
   // ------------------------------------------------------------------ the window
 
   function ensureHost() {
-    if (root) { return; }
+    // Last on the page: at the same top layer as a store's banner (a cookie consent), the later one is on top.
+    if (root) { if (host.nextSibling) { doc.body.appendChild(host); } return; }
     host = doc.createElement('div');
     host.setAttribute('data-la-tryon-host', '');
     host.style.fontFamily = win.getComputedStyle(doc.body).fontFamily;

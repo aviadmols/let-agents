@@ -185,6 +185,9 @@ final class RunTryOn
     public function passes(array $data): array
     {
         $why = match (true) {
+            // A new picture instead of the shopper's own, or the product not there: always refused.
+            ($data['same_photo'] ?? true) !== true => 'not_the_same_photo',
+            ($data['product_visible'] ?? true) !== true => 'product_not_visible',
             (int) ($data['product_similarity'] ?? 0) < (int) Settings::get('try_on.pass_similarity') => 'not_the_product',
             ($data['identity_kept'] ?? false) !== true => 'not_the_same_person',
             ($data['anatomy_ok'] ?? false) !== true => 'anatomy',
@@ -212,7 +215,7 @@ final class RunTryOn
         return array_filter([
             'template' => trim(self::prompt('tryon_'.$job->group)),
             'product' => ['title' => $job->productTitle(), 'class' => $job->tryon_class, 'details' => array_slice($details, 0, 12), 'dimensions' => array_slice($dimensions, 0, 6)],
-            'photo' => array_intersect_key((array) $job->photo->gate, array_flip(['subject', 'scale', 'free_spots', 'hands_visible'])),
+            'photo' => array_intersect_key((array) $job->photo->gate, array_flip(['subject', 'parts_visible', 'scale', 'free_spots', 'hands_visible'])),
             'answers' => $job->answers ?? [],
             'fix' => $fix,
         ], fn ($value): bool => $value !== '' && $value !== null);

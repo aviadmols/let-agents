@@ -29,7 +29,9 @@ final class ReplicateImagesTest extends TestCase
         Http::assertSent(fn (Request $r): bool => str_contains($r->url(), '/predictions')
             && $r->hasHeader('Authorization', 'Bearer r8_key') && $r->hasHeader('Prefer', 'wait=60')
             && $r['input']['image_input'] === ['data:image/jpeg;base64,'.base64_encode('a'), 'data:image/jpeg;base64,'.base64_encode('b')]
-            && $r['input']['prompt'] === 'Put the ring on.');
+            && $r['input']['prompt'] === 'Put the ring on.'
+            // The shopper's photo is edited, not redrawn in another shape.
+            && $r['input']['aspect_ratio'] === 'match_input_image');
     }
 
     public function test_a_slow_prediction_is_asked_again_and_a_single_picture_model_gets_one(): void
