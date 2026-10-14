@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Http;
  * Admin GraphQL API: collections as categories, products published to the Online Store, and
  * published pages and blog articles as content. Nothing downstream knows which platform it was.
  *
- * Pages are read by cursor in Shopify's ID order. Shopify refuses a query whose estimated cost
+ * Pages are read by cursor in Shopify's ID order, newest first: a read cut short still has the new
+ * products, which matter most. Shopify refuses a query whose estimated cost
  * is above 1,000 points, and a product with its variants and collections costs about 60, so a
  * product page holds 15 products, not 50.
  */
@@ -69,7 +70,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
     // again on every product, because that is what Shopify itself documents as "on the store".
     private const PRODUCTS = <<<'GRAPHQL'
         query Products($first: Int!, $after: String, $collections: Int!, $variants: Int!) {
-          products(first: $first, after: $after, sortKey: ID, query: "status:active AND published_status:published") {
+          products(first: $first, after: $after, sortKey: ID, reverse: true, query: "status:active AND published_status:published") {
             nodes {
               id title handle status onlineStoreUrl descriptionHtml vendor productType tags
               createdAt updatedAt hasOnlyDefaultVariant tracksInventory totalInventory
@@ -232,7 +233,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
     private static function changedQuery(): string
     {
         return str_replace(
-            ['query Products($first: Int!, $after: String,', 'sortKey: ID, query: "status:active AND published_status:published"'],
+            ['query Products($first: Int!, $after: String,', 'sortKey: ID, reverse: true, query: "status:active AND published_status:published"'],
             ['query ChangedProducts($first: Int!, $after: String, $filter: String!,', 'sortKey: UPDATED_AT, query: $filter'],
             self::PRODUCTS,
         );

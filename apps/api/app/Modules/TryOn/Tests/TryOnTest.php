@@ -154,7 +154,8 @@ final class TryOnTest extends TestCase
 
         $this->assertSame('needs_answer', $this->start($photo, 'ring-1', ['finger' => 'elbow', 'hand' => 'left'])->json('data.status'), 'an answer that is not an option is asked again');
 
-        $this->checks[] = $this->verdict(['product_similarity' => 3, 'fix' => 'The stone is smaller than in the store picture; keep its size.']);
+        // A different-looking ring (2) is refused; the same kind with small differences (3) would pass.
+        $this->checks[] = $this->verdict(['product_similarity' => 2, 'fix' => 'The stone is smaller than in the store picture; keep its size.']);
         $this->checks[] = $this->verdict();
         $made = $this->start($photo, 'ring-1', ['finger' => 'ring', 'hand' => 'left'])->assertStatus(202)->json('data');
 
@@ -291,6 +292,11 @@ final class TryOnTest extends TestCase
         $made = $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'drill-1', 'preview' => $key, 'class' => 'ring'], $origin)->assertStatus(202)->json('data');
         $this->assertSame('ready', $this->getJson("/api/v1/try-on/{$this->site}/tries/{$made['id']}?vid=".self::VID."&preview={$key}", $origin)->json('data.status'));
         $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'drill-1', 'class' => 'ring'], $origin)->assertNotFound();
+
+        // The team's test has no daily count: a second try the same day, over a limit of one.
+        Settings::set('try_on.jobs_per_visitor_per_day', 1, $this->shop->id);
+        $this->checks[] = $this->verdict();
+        $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => 'ring-1', 'preview' => $key], $origin)->assertStatus(202);
 
         // The operator finds the link on the log.
         Filament::setCurrentPanel(Filament::getPanel('operator'));

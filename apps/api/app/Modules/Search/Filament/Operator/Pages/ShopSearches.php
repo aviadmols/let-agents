@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
+use App\Modules\Catalog\Events\CatalogSyncRequested;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Retrieval\Models\RetrievalImage;
@@ -28,7 +29,6 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
@@ -383,15 +383,18 @@ class ShopSearches extends Page
             : Notification::make()->danger()->title(__('search::ui.index.failed'))->send();
     }
 
-    /** Builds the index now, so new products and synonyms are searchable without waiting for the night. */
-    /** The shop's catalog read again from the store now (products, pages, policies), on the queue; the search follows. */
+    /**
+     * The shop's catalog read again from the store now (products, pages, policies), by the Catalog
+     * module's own sync job, with the minutes a large store needs; the search follows when it ends.
+     * (A queued console command had the worker's default minute and stopped before the newest products.)
+     */
     public function syncNow(): void
     {
         if ($this->shop === null) {
             return;
         }
 
-        Artisan::queue('catalog:sync', ['shop' => (string) $this->shop])->onQueue('long');
+        event(new CatalogSyncRequested((string) $this->shop));
         Notification::make()->success()->title(__('search::ui.index.sync_started'))->body(__('search::ui.index.sync_started_body'))->send();
     }
 

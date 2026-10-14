@@ -25,7 +25,8 @@ use App\Modules\TryOn\Support\TryOnClasses;
  */
 final class StartTryOn
 {
-    public const PROMPT_VERSIONS = ['writer' => 1, 'checker' => 1, 'template' => 1];
+    // checker v2: a fault only when a shopper would see it at a glance; when unsure, none.
+    public const PROMPT_VERSIONS = ['writer' => 1, 'checker' => 2, 'template' => 1];
 
     public function __construct(private readonly TenantContext $tenant) {}
 
@@ -82,7 +83,8 @@ final class StartTryOn
             return ['job' => $same] + $none;
         }
 
-        if (TryOnJob::query()->where('visitor_hash', $visitorHash)->where('created_at', '>=', now()->startOfDay())->count() >= (int) Settings::get('try_on.jobs_per_visitor_per_day', $shopId)) {
+        // The team's test is not a shopper's day: no daily count. The shop's month still is (below).
+        if (! $test && TryOnJob::query()->where('visitor_hash', $visitorHash)->where('created_at', '>=', now()->startOfDay())->count() >= (int) Settings::get('try_on.jobs_per_visitor_per_day', $shopId)) {
             return ['problem' => 'daily_limit'] + $none;
         }
 

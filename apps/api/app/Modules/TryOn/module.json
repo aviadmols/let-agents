@@ -24,7 +24,7 @@
         { "name": "retries", "type": "int", "default": 1, "min": 0, "max": 2, "scope": "global", "unit": "requests" },
         { "name": "retention_days", "type": "int", "default": 90, "min": 1, "max": 365, "scope": "shop", "unit": "days" },
         { "name": "similar_count", "type": "int", "default": 8, "min": 0, "max": 16, "scope": "shop", "unit": "products" },
-        { "name": "pass_similarity", "type": "int", "default": 4, "min": 1, "max": 5, "scope": "global" },
+        { "name": "pass_similarity", "type": "int", "default": 3, "min": 1, "max": 5, "scope": "global" },
         { "name": "photo_max_kb", "type": "int", "default": 12000, "min": 500, "max": 20000, "scope": "global", "unit": "kilobytes" },
         { "name": "generator_provider", "type": "enum", "options": ["replicate"], "default": "replicate", "scope": "global" },
         { "name": "model_apparel", "type": "string", "default": "google/nano-banana", "min": 3, "max": 120, "scope": "global" },

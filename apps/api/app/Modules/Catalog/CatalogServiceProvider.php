@@ -7,10 +7,13 @@ use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
+use App\Modules\Catalog\Events\CatalogSyncRequested;
+use App\Modules\Catalog\Jobs\SyncCatalogJob;
 use App\Modules\Catalog\Listeners\MoveCatalogLinks;
 use App\Modules\Catalog\Support\CatalogProductKinds;
 use App\Modules\Catalog\Support\CatalogScanDetails;
 use App\Modules\Connections\Events\StoreAddressMoved;
+use App\Modules\Runs\Enums\RunTrigger;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 
@@ -26,6 +29,8 @@ final class CatalogServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         Event::listen(StoreAddressMoved::class, MoveCatalogLinks::class);
+        // A read asked for from another screen: the sync job, with the 20 minutes a large store needs.
+        Event::listen(CatalogSyncRequested::class, fn (CatalogSyncRequested $event) => SyncCatalogJob::dispatch($event->shopId, RunTrigger::Manual));
 
         // Every connected shop with catalog.daily_sync on is read again at night, Israel time.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
