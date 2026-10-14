@@ -12,6 +12,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\TryOn\Jobs\RunTryOnJob;
 use App\Modules\TryOn\Models\TryOnJob;
 use App\Modules\TryOn\Models\TryOnPhoto;
+use App\Modules\TryOn\Support\Files;
 use App\Modules\TryOn\Support\TryOnClasses;
 
 /**
@@ -97,7 +98,9 @@ final class StartTryOn
             'status' => TryOnJob::QUEUED,
         ]);
 
-        RunTryOnJob::dispatch($shopId, $job->id);
+        // The worker sees the photo only on a shared disk (the bucket). On a container's own disk the web
+        // service that took the photo makes the picture itself, right after it answers the shopper.
+        Files::shared() ? RunTryOnJob::dispatch($shopId, $job->id) : RunTryOnJob::dispatchAfterResponse($shopId, $job->id);
 
         return ['job' => $job->refresh()] + $none;
     }

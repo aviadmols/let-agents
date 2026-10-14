@@ -17,7 +17,21 @@ final class Files
 {
     public static function disk(): Filesystem
     {
-        return Storage::disk((string) (config('upsell.tryon_disk') ?: 'local'));
+        return Storage::disk(self::name());
+    }
+
+    /**
+     * Whether every service sees the same pictures: a bucket, not one container's own disk. On a local
+     * disk the web service that took the photo must also make the picture (StartTryOn).
+     */
+    public static function shared(): bool
+    {
+        return config('filesystems.disks.'.self::name().'.driver') !== 'local';
+    }
+
+    private static function name(): string
+    {
+        return (string) (config('upsell.tryon_disk') ?: 'local');
     }
 
     /** Saves a picture and returns its path. */
