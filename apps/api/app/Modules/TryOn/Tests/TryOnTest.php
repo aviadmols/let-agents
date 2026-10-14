@@ -1,0 +1,325 @@
+<?php
+
+namespace App\Modules\TryOn\Tests;
+
+use App\Core\Facades\Features;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Enums\ShopRole;
+use App\Modules\Admin\Models\User;
+use App\Modules\Ai\Contracts\ChatModel;
+use App\Modules\Ai\Contracts\ImageModel;
+use App\Modules\Ai\Contracts\ImageReply;
+use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\VisionModel;
+use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactOrigin;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Tenancy\Models\Shop;
+use App\Modules\TryOn\Filament\Operator\Pages\TryOnLog;
+use App\Modules\TryOn\Models\TryOnJob;
+use App\Modules\TryOn\Models\TryOnPhoto;
+use App\Modules\TryOn\Models\TryOnStep;
+use App\Modules\TryOn\Support\Picture;
+use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+/**
+ * A product on the shopper's own photo: the photo is checked in code and by a look of a vision model
+ * (two people, a child, a blurred photo: refused), what it leaves open is asked first (which finger),
+ * the picture is made and checked by another family, tried again with the correction, and every step
+ * is kept for the operator with its prompt, pictures and cost.
+ */
+final class TryOnTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const TOKEN = 'lat_tryon_test_token_0123456789abcdef';
+
+    private const VID = 'anon-0123456789abcdefghij';
+
+    private Shop $shop;
+
+    private string $site;
+
+    /** @var list<array<string, mixed>> what the vision model says of the next photos */
+    public array $gate = [];
+
+    /** @var list<array<string, mixed>> what the checker says of the next pictures */
+    public array $checks = [];
+
+    public int $pictures = 0;
+
+    /** @var list<string> the writer's inputs */
+    public array $written = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+        $this->shop = Shop::factory()->create(['domain' => 'www.store.test']);
+        Features::override('try_on.enabled', true, $this->shop->id);
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $this->shop->id, 'site_url' => 'https://www.store.test', 'access_token' => self::TOKEN]));
+        $this->site = SiteKeys::site(self::TOKEN);
+
+        $this->product('ring-1', 'טבעת זהב עם יהלום', 'ring');
+        $this->product('drill-1', 'מברגת אימפקט', null);
+        Http::fake(['img.test/*' => Http::response(self::picture(700, 700), 200, ['Content-Type' => 'image/jpeg'])]);
+
+        $test = $this;
+        $this->app->instance(VisionModel::class, new class($test) implements VisionModel
+        {
+            public function __construct(private readonly TryOnTest $test) {}
+
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $data = str_contains($system, 'You check a picture') ? array_shift($this->test->checks) : array_shift($this->test->gate);
+
+                return new ModelReply($data ?? [], 1200, 150);
+            }
+        });
+        $this->app->instance(ChatModel::class, new class($test) implements ChatModel
+        {
+            public function __construct(private readonly TryOnTest $test) {}
+
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->test->written[] = $user;
+
+                return new ModelReply(['prompt' => 'Put the ring on the named finger. Keep everything else.'], 900, 80);
+            }
+        });
+        $this->app->instance(ImageModel::class, new class($test) implements ImageModel
+        {
+            public function __construct(private readonly TryOnTest $test) {}
+
+            public function generate(AiProviderName $provider, string $model, string $prompt, array $images): ImageReply
+            {
+                $this->test->pictures++;
+
+                return new ImageReply(TryOnTest::picture(1024, 1024), 'image/jpeg', 6.5, 'pred_'.$this->test->pictures);
+            }
+        });
+    }
+
+    public function test_a_photo_is_checked_in_code_then_by_a_look_and_two_people_or_a_child_are_refused(): void
+    {
+        $this->assertSame('consent_required', $this->upload(self::picture(900, 900), consent: false)['reject_code']);
+        $this->assertSame('too_small', $this->upload(self::picture(300, 300))['reject_code'], 'refused in code: no model looked');
+        $this->assertSame('blurry', $this->upload(self::flat(900, 900))['reject_code']);
+        $this->assertSame([], $this->gate, 'nothing was asked of a model');
+
+        $this->gate[] = $this->hand(['people_count' => 2]);
+        $two = $this->upload(self::picture(900, 900, 1));
+        $this->assertSame('several_people', $two['reject_code']);
+        $this->assertSame('יש בתמונה יותר מאדם אחד. העלו תמונה שלכם בלבד.', $two['message']);
+
+        $this->gate[] = $this->hand(['minor_present' => true]);
+        $this->assertSame('minor', $this->upload(self::picture(900, 900, 2))['reject_code']);
+
+        $this->gate[] = $this->hand();
+        $ok = $this->upload(self::picture(900, 900, 3));
+        $this->assertSame('ok', $ok['status']);
+        $this->assertContains('ring', $ok['usable']);
+
+        // The same photo again is not looked at again.
+        $this->assertSame($ok['photo'], $this->upload(self::picture(900, 900, 3))['photo']);
+        $this->assertSame(1, $this->inShop(fn () => TryOnStep::query()->where('step', 'vision_gate')->where('photo_id', $ok['photo'])->count()));
+    }
+
+    public function test_which_finger_is_asked_first_then_the_picture_is_made_checked_and_kept_with_every_step(): void
+    {
+        $this->gate[] = $this->hand(['hands_visible' => 2]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+
+        $asked = $this->start($photo, 'ring-1')->assertOk()->json('data');
+        $this->assertSame('needs_answer', $asked['status']);
+        $this->assertSame(['finger', 'hand'], array_column($asked['questions'], 'key'));
+        $this->assertSame('על איזו אצבע לשים את הטבעת?', $asked['questions'][0]['question']);
+        $this->assertSame(['index', 'middle', 'ring', 'pinky', 'thumb'], array_column($asked['questions'][0]['options'], 'key'), 'every finger the photo shows, the thumb last');
+        $this->assertSame('קמיצה', $asked['questions'][0]['options'][2]['label']);
+        $this->assertSame(0, $this->pictures, 'nothing is made before it is answered');
+
+        $this->assertSame('needs_answer', $this->start($photo, 'ring-1', ['finger' => 'elbow', 'hand' => 'left'])->json('data.status'), 'an answer that is not an option is asked again');
+
+        $this->checks[] = $this->verdict(['product_similarity' => 3, 'fix' => 'The stone is smaller than in the store picture; keep its size.']);
+        $this->checks[] = $this->verdict();
+        $made = $this->start($photo, 'ring-1', ['finger' => 'ring', 'hand' => 'left'])->assertStatus(202)->json('data');
+
+        // The queue runs at once in tests: refused once, made again with the correction, then shown.
+        $state = $this->getJson("/api/v1/try-on/{$this->site}/tries/{$made['id']}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->assertOk()->json('data');
+        $this->assertSame('ready', $state['status']);
+        $this->assertSame('התמונה נוצרה באמצעות AI ויכולה להיות לא מדויקת.', $state['note']);
+        $this->assertSame(2, $this->pictures);
+        $this->assertStringContainsString('The stone is smaller', $this->written[1], 'the second prompt carries the checker\'s correction');
+        $this->assertStringContainsString('"finger":"ring"', $this->written[0], 'and the shopper\'s answers');
+
+        $file = $this->get($state['image'])->assertOk();
+        $this->assertSame('image/jpeg', $file->headers->get('Content-Type'));
+        $this->get(preg_replace('/signature=[^&]+/', 'signature=bad', $state['image']))->assertForbidden();
+
+        $job = $this->inShop(fn () => TryOnJob::query()->find($made['id']));
+        $this->assertSame(2, $job->attempts);
+        $this->assertGreaterThan(0.07, (float) $job->cost_usd, 'two pictures, two prompts, two checks');
+        $steps = $this->inShop(fn () => TryOnStep::query()->where('job_id', $job->id)->orderBy('created_at')->orderBy('id')->pluck('status', 'id')->all());
+        $this->assertCount(6, $steps);
+        $this->assertSame(['prompt', 'generate', 'check'], $this->inShop(fn () => TryOnStep::query()->where('job_id', $job->id)->where('attempt', 1)->orderBy('created_at')->orderBy('id')->pluck('step')->all()));
+
+        // The same try again is the one already made.
+        $this->assertSame($made['id'], $this->start($photo, 'ring-1', ['finger' => 'ring', 'hand' => 'left'])->json('data.id'));
+        $this->assertSame(2, $this->pictures);
+    }
+
+    public function test_what_cannot_be_tried_is_refused_before_anything_is_spent_and_an_off_shop_has_no_try_on(): void
+    {
+        $this->gate[] = $this->hand();
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+
+        $this->assertSame('not_tryable', $this->start($photo, 'drill-1', [])->json('data.problem'));
+
+        $this->product('sofa-1', 'ספה פינתית', 'furniture');
+        $this->assertSame('wrong_subject', $this->start($photo, 'sofa-1', [])->json('data.problem'), 'a hand is no room');
+        $this->assertSame(0, $this->pictures);
+
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1", ['Origin' => 'https://www.store.test'])->assertOk()->assertJsonPath('data.group', 'jewelry');
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1", ['Origin' => 'https://evil.test'])->assertForbidden();
+
+        Features::override('try_on.enabled', false, $this->shop->id);
+        $this->getJson("/api/v1/try-on/{$this->site}/config?product=ring-1", ['Origin' => 'https://www.store.test'])->assertNotFound();
+    }
+
+    public function test_a_picture_the_checker_never_passes_is_not_shown(): void
+    {
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $this->checks[] = $this->verdict(['anatomy_ok' => false, 'fix' => 'Six fingers.']);
+        $this->checks[] = $this->verdict(['anatomy_ok' => false, 'fix' => 'Six fingers again.']);
+
+        $id = $this->start($photo, 'ring-1')->assertStatus(202)->json('data.id');
+        $state = $this->getJson("/api/v1/try-on/{$this->site}/tries/{$id}?vid=".self::VID, ['Origin' => 'https://www.store.test'])->json('data');
+
+        $this->assertSame('failed', $state['status']);
+        $this->assertSame('check_failed', $state['failure']);
+        $this->assertNull($state['image']);
+    }
+
+    public function test_the_operator_sees_every_step_and_the_shop_manager_only_counts(): void
+    {
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $this->checks[] = $this->verdict();
+        $id = $this->start($photo, 'ring-1')->json('data.id');
+
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        app(TenantContext::class)->set($this->shop->id);
+        Livewire::test(TryOnLog::class)->assertSeeHtml('data-try-on-job="'.$id.'"')->call('open', $id)
+            ->assertSeeHtml('data-try-on-step="vision_gate"')->assertSeeHtml('data-try-on-step="generate"')->assertSeeHtml('data-try-on-result')
+            ->assertSee('Put the ring on the named finger')->assertSee('google/nano-banana');
+
+        $manager = User::factory()->create();
+        $manager->attachShop($this->shop, ShopRole::Owner);
+        $html = $this->actingAs($manager)->withHeader('Accept-Language', 'he')->get("/merchant/{$this->shop->slug}/try-on")->assertOk()->getContent();
+        $this->assertStringContainsString('החודש: 1 מדידות, 1 תמונות הוצגו.', $html);
+        $this->assertDoesNotMatchRegularExpression('/nano-banana|claude|gpt|\$0\./iu', strip_tags($html));
+    }
+
+    public function test_pictures_are_deleted_after_the_shops_days_and_the_log_stays(): void
+    {
+        $this->gate[] = $this->hand(['fingers_visible' => ['ring']]);
+        $photo = $this->upload(self::picture(900, 900))['photo'];
+        $this->checks[] = $this->verdict();
+        $id = $this->start($photo, 'ring-1')->json('data.id');
+        $job = $this->inShop(fn () => TryOnJob::query()->find($id));
+        $this->assertTrue(Storage::disk('local')->exists($job->result_path));
+
+        $this->inShop(fn () => TryOnPhoto::query()->whereKey($photo)->update(['expires_at' => now()->subDay()]));
+        $this->artisan('try-on:prune')->assertSuccessful();
+
+        $this->assertFalse(Storage::disk('local')->exists($job->result_path));
+        $this->assertNull($this->inShop(fn () => TryOnJob::query()->find($id))->result_path);
+        $this->assertGreaterThan(0, $this->inShop(fn () => TryOnStep::query()->where('job_id', $id)->count()), 'what happened and what it cost stay');
+    }
+
+    // ------------------------------------------------------------------
+
+    /** @return array<string, mixed> */
+    private function upload(string $bytes, bool $consent = true): array
+    {
+        return $this->call('POST', "/api/v1/try-on/{$this->site}/photos", ['vid' => self::VID, 'consent' => $consent ? '1' : '0', 'photo' => UploadedFile::fake()->createWithContent('me.jpg', $bytes)],
+            server: ['HTTP_ORIGIN' => 'https://www.store.test', 'HTTP_ACCEPT' => 'application/json'])->assertOk()->json('data');
+    }
+
+    /** @param array<string, string> $answers */
+    private function start(string $photo, string $product, array $answers = [])
+    {
+        return $this->postJson("/api/v1/try-on/{$this->site}/tries", ['vid' => self::VID, 'photo' => $photo, 'product' => $product, 'answers' => $answers], ['Origin' => 'https://www.store.test']);
+    }
+
+    /** @return array<string, mixed> */
+    private function hand(array $over = []): array
+    {
+        return $over + ['subject' => 'hand', 'people_count' => 1, 'minor_present' => false, 'quality' => 'ok', 'unsafe' => false, 'hands_visible' => 1,
+            'fingers_visible' => ['thumb', 'index', 'middle', 'ring', 'pinky'], 'ears_visible' => 0, 'free_spots' => [], 'scale' => ''];
+    }
+
+    /** @return array<string, mixed> */
+    private function verdict(array $over = []): array
+    {
+        return $over + ['product_similarity' => 5, 'identity_kept' => true, 'anatomy_ok' => true, 'proportions_ok' => true, 'placement_ok' => true, 'extra_people' => false, 'artifacts' => [], 'fix' => ''];
+    }
+
+    private function product(string $external, string $title, ?string $class): void
+    {
+        $this->inShop(function () use ($external, $title, $class): void {
+            $product = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $external, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'price' => '499.00', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => md5($title), 'image_url' => "https://img.test/{$external}.jpg",
+                'payload' => ['title' => $title, 'description' => '', 'categories' => [], 'attributes' => [], 'meta' => []]]);
+            if ($class !== null) {
+                EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'kind' => FactKind::TryOn, 'key' => 'class', 'value_text' => $class,
+                    'origin' => FactOrigin::Code, 'status' => FactStatus::Approved, 'input_hash' => 'h-'.$external]);
+            }
+        });
+    }
+
+    private function inShop(callable $callback): mixed
+    {
+        return app(TenantContext::class)->run($this->shop->id, $callback);
+    }
+
+    /** A sharp, light test picture; $seed makes a different one. */
+    public static function picture(int $width, int $height, int $seed = 0): string
+    {
+        mt_srand(42 + $seed);
+        $image = imagecreatetruecolor($width, $height);
+        imagefill($image, 0, 0, imagecolorallocate($image, 210, 200, 190));
+        for ($i = 0; $i < 400; $i++) {
+            $color = imagecolorallocate($image, mt_rand(0, 255), mt_rand(0, 255), mt_rand(0, 255));
+            imagefilledrectangle($image, $x = mt_rand(0, $width), $y = mt_rand(0, $height), $x + mt_rand(4, 40), $y + mt_rand(4, 40), $color);
+        }
+        ob_start();
+        imagejpeg($image, null, 90);
+
+        return (string) ob_get_clean();
+    }
+
+    /** One flat colour: nothing in it is sharp. */
+    private static function flat(int $width, int $height): string
+    {
+        $image = imagecreatetruecolor($width, $height);
+        imagefill($image, 0, 0, imagecolorallocate($image, 200, 200, 200));
+        ob_start();
+        imagejpeg($image, null, 90);
+
+        return (string) ob_get_clean();
+    }
+}

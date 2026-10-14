@@ -1,0 +1,47 @@
+{
+    "name": "TryOn",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Runs",
+        "Ai",
+        "Connections",
+        "Catalog",
+        "Enrichment",
+        "Admin"
+    ],
+    "provider": "TryOnServiceProvider",
+    "features": [
+        {
+            "name": "enabled",
+            "default": false
+        }
+    ],
+    "settings": [
+        { "name": "monthly_cap_usd", "type": "float", "default": 20, "min": 0, "max": 5000, "scope": "shop", "unit": "usd" },
+        { "name": "job_cap_usd", "type": "float", "default": 0.25, "min": 0.01, "max": 5, "scope": "global", "unit": "usd" },
+        { "name": "jobs_per_visitor_per_day", "type": "int", "default": 5, "min": 1, "max": 50, "scope": "shop", "unit": "requests" },
+        { "name": "retries", "type": "int", "default": 1, "min": 0, "max": 2, "scope": "global", "unit": "requests" },
+        { "name": "retention_days", "type": "int", "default": 90, "min": 1, "max": 365, "scope": "shop", "unit": "days" },
+        { "name": "similar_count", "type": "int", "default": 8, "min": 0, "max": 16, "scope": "shop", "unit": "products" },
+        { "name": "pass_similarity", "type": "int", "default": 4, "min": 1, "max": 5, "scope": "global" },
+        { "name": "photo_max_kb", "type": "int", "default": 12000, "min": 500, "max": 20000, "scope": "global", "unit": "kilobytes" },
+        { "name": "generator_provider", "type": "enum", "options": ["replicate"], "default": "replicate", "scope": "global" },
+        { "name": "model_apparel", "type": "string", "default": "google/nano-banana", "min": 3, "max": 120, "scope": "global" },
+        { "name": "model_jewelry", "type": "string", "default": "google/nano-banana", "min": 3, "max": 120, "scope": "global" },
+        { "name": "model_furniture", "type": "string", "default": "google/nano-banana", "min": 3, "max": 120, "scope": "global" },
+        { "name": "generation_usd_per_image", "type": "float", "default": 0.039, "min": 0, "max": 2, "scope": "global", "unit": "usd" },
+        { "name": "gate_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
+        { "name": "gate_model", "type": "string", "default": "gpt-5.4-nano", "min": 1, "max": 120, "scope": "global" },
+        { "name": "gate_input_usd_per_million", "type": "float", "default": 0.1, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "gate_output_usd_per_million", "type": "float", "default": 0.4, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "writer_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
+        { "name": "writer_model", "type": "string", "default": "gpt-5.4-mini", "min": 1, "max": 120, "scope": "global" },
+        { "name": "writer_input_usd_per_million", "type": "float", "default": 1.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "writer_output_usd_per_million", "type": "float", "default": 8.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "checker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
+        { "name": "checker_model", "type": "string", "default": "claude-haiku-4-5", "min": 1, "max": 120, "scope": "global" },
+        { "name": "checker_input_usd_per_million", "type": "float", "default": 1.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "checker_output_usd_per_million", "type": "float", "default": 5.0, "min": 0, "max": 400, "scope": "global", "unit": "usd" }
+    ]
+}

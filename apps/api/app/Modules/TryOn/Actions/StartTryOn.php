@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Modules\TryOn\Actions;
+
+use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\TryOn\Jobs\RunTryOnJob;
+use App\Modules\TryOn\Models\TryOnJob;
+use App\Modules\TryOn\Models\TryOnPhoto;
+use App\Modules\TryOn\Support\TryOnClasses;
+
+/**
+ * A shopper asks to see a product on their photo. Code checks everything it can before anything is
+ * spent: the shop turned Try-On on, the product is one that can be tried (the catalog scan marked it),
+ * the photo was accepted and shows what this product needs, the shopper's daily tries and the shop's
+ * month are not used up. Whatever the photo leaves open (which finger, which hand, where in the room)
+ * is asked first: without the answers, nothing is made. The same try again is the one already made.
+ * Inside the shop's tenant.
+ */
+final class StartTryOn
+{
+    public const PROMPT_VERSIONS = ['writer' => 1, 'checker' => 1, 'template' => 1];
+
+    public function __construct(private readonly TenantContext $tenant) {}
+
+    /**
+     * @param  array<string, mixed>  $answers
+     * @return array{job: TryOnJob|null, problem: string|null, questions: list<array<string, mixed>>}
+     */
+    public function handle(string $visitorHash, string $photoId, string $productExternalId, array $answers = []): array
+    {
+        $shopId = $this->tenant->require();
+        $none = ['job' => null, 'problem' => null, 'questions' => []];
+
+        if (! Features::enabled('try_on.enabled', $shopId)) {
+            return ['problem' => 'off'] + $none;
+        }
+
+        $photo = TryOnPhoto::query()->whereKey($photoId)->where('visitor_hash', $visitorHash)->first();
+
+        if ($photo === null || $photo->status !== TryOnPhoto::OK || $photo->path === null) {
+            return ['problem' => 'unknown_photo'] + $none;
+        }
+
+        $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $productExternalId)->first();
+        $class = $product === null ? null : self::classOf($product->id);
+
+        if ($product === null || $class === null) {
+            return ['problem' => 'not_tryable'] + $none;
+        }
+
+        if (! TryOnClasses::accepts($class, (string) ($photo->gate['subject'] ?? ''))) {
+            return ['problem' => 'wrong_subject'] + $none;
+        }
+
+        $questions = TryOnClasses::questions($class, (array) $photo->gate);
+        $answered = TryOnClasses::answered($questions, $answers);
+
+        if ($answered === null) {
+            return ['questions' => $questions] + $none;
+        }
+
+        $group = (string) TryOnClasses::group($class);
+        $fingerprint = hash('sha256', implode('|', [$photo->photo_hash, $product->id, (string) $product->image_url, json_encode($answered), (string) Settings::get('try_on.model_'.$group), json_encode(self::PROMPT_VERSIONS)]));
+        $same = TryOnJob::query()->where('visitor_hash', $visitorHash)->where('fingerprint', $fingerprint)->whereIn('status', [TryOnJob::QUEUED, TryOnJob::WORKING, TryOnJob::READY])->latest()->first();
+
+        if ($same !== null) {
+            return ['job' => $same] + $none;
+        }
+
+        if (TryOnJob::query()->where('visitor_hash', $visitorHash)->where('created_at', '>=', now()->startOfDay())->count() >= (int) Settings::get('try_on.jobs_per_visitor_per_day', $shopId)) {
+            return ['problem' => 'daily_limit'] + $none;
+        }
+
+        $spent = (float) TryOnJob::query()->where('created_at', '>=', now()->startOfMonth())->sum('cost_usd') + (float) TryOnPhoto::query()->where('created_at', '>=', now()->startOfMonth())->sum('cost_usd');
+
+        if ($spent >= (float) Settings::get('try_on.monthly_cap_usd', $shopId)) {
+            return ['problem' => 'busy'] + $none;
+        }
+
+        $job = TryOnJob::query()->create([
+            'shop_id' => $shopId, 'photo_id' => $photo->id, 'product_id' => $product->id, 'visitor_hash' => $visitorHash,
+            'tryon_class' => $class, 'group' => $group, 'answers' => $answered === [] ? null : $answered, 'fingerprint' => $fingerprint,
+            'status' => TryOnJob::QUEUED,
+        ]);
+
+        RunTryOnJob::dispatch($shopId, $job->id);
+
+        return ['job' => $job->refresh()] + $none;
+    }
+
+    /** The product's try-on class, as the catalog scan marked it, or null when it is not one. */
+    public static function classOf(string $productId): ?string
+    {
+        $class = EnrichmentFact::query()->where('product_id', $productId)->where('kind', FactKind::TryOn)->where('key', 'class')
+            ->where('status', FactStatus::Approved)->latest('id')->value('value_text');
+
+        return is_string($class) && TryOnClasses::group($class) !== null ? $class : null;
+    }
+}

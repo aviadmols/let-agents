@@ -9,6 +9,7 @@ use Anthropic\Models\ModelInfo;
 use Anthropic\RequestOptions;
 use App\Modules\Ai\Contracts\ListsProviderModels;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Ai\Support\Drivers\ReplicateImages;
 use GuzzleHttp\Client;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -31,6 +32,7 @@ final class SdkModelLister implements ListsProviderModels
             AiProviderName::Anthropic => $this->anthropic($apiKey),
             AiProviderName::OpenAi => $this->openAi($apiKey),
             AiProviderName::Gemini => $this->gemini($apiKey),
+            AiProviderName::Replicate => $this->replicate($apiKey),
         };
     }
 
@@ -100,6 +102,27 @@ final class SdkModelLister implements ListsProviderModels
      *
      * @return list<array{id: string, name: string, created_at: ?string}>
      */
+    /**
+     * Replicate: the key is checked against the account, and the picture models the platform knows
+     * how to call are listed (ReplicateImages::INPUTS). Its whole catalogue is tens of thousands.
+     *
+     * @return list<array{id: string, name: string, created_at: ?string}>
+     */
+    private function replicate(string $apiKey): array
+    {
+        try {
+            $response = Http::timeout((int) self::TIMEOUT_SECONDS)->withToken($apiKey)->get('https://api.replicate.com/v1/account');
+        } catch (ConnectionException $e) {
+            throw new ProviderCheckFailed(ProviderCheckFailed::UNREACHABLE, null, $e);
+        }
+
+        if (! $response->successful()) {
+            throw ProviderCheckFailed::fromStatus($response->status());
+        }
+
+        return array_map(fn (string $id): array => ['id' => $id, 'name' => $id, 'created_at' => null], array_keys(ReplicateImages::INPUTS));
+    }
+
     private function gemini(string $apiKey): array
     {
         try {

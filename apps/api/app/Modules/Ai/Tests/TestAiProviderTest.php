@@ -145,9 +145,9 @@ final class TestAiProviderTest extends TestCase
 
         $this->assertSame(ProviderStatus::Connected, AiProvider::for(AiProviderName::Anthropic)->status);
 
-        // Anthropic is taken now, so only OpenAI is offered.
+        // Anthropic is taken now, so only the others are offered (Replicate makes the Try-On pictures).
         Livewire::test(CreateAiProvider::class)
-            ->assertFormFieldExists('provider', fn ($field): bool => array_keys($field->getOptions()) === ['openai', 'gemini']);
+            ->assertFormFieldExists('provider', fn ($field): bool => array_keys($field->getOptions()) === ['openai', 'gemini', 'replicate']);
 
         foreach (['he', 'en'] as $locale) {
             $this->withHeader('Accept-Language', $locale)->get('/operator/ai-providers')

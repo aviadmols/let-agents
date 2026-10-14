@@ -36,4 +36,10 @@ return [
      * and SESSION_DOMAIN=.agents.lets.co.il so one login serves every shop's address.
      */
     'shop_domain' => env('SHOP_DOMAIN'),
+
+    /*
+    | Where Try-On keeps shoppers' photos and the pictures made of them (docs/try-on.md): the
+    | Railway bucket (s3) in production, the local disk elsewhere. Never a public disk.
+    */
+    'tryon_disk' => env('TRYON_DISK', 'local'),
 ];
