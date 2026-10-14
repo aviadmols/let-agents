@@ -112,6 +112,7 @@ final class PipelineFlow extends Page
             ->get()
             ->map(fn (Run $run): array => [
                 'id' => $run->id,
+                'action' => (string) $run->action,
                 'label' => self::name((string) $run->action),
                 'shop' => $run->shop?->name,
                 'model' => $run->model,
@@ -217,7 +218,7 @@ final class PipelineFlow extends Page
      * identifier. So the dots come out before the name is looked up, and an action nobody has
      * named yet shows as itself rather than as a missing key.
      */
-    private static function name(string $action): string
+    public static function name(string $action): string
     {
         $key = 'runs::pipeline.actions.'.str_replace('.', '_', $action);
         $name = __($key);

@@ -48,6 +48,10 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - Any call to a model with the keys saved in the panel asks `Ai\Contracts\SpendGuard::assertCanSpend()`
   first and records its cost with `RunContext::usage()`. The cap is `ai.monthly_spend_cap_usd`
   (default 6 USD a month, all shops). Answer files from agents outside the platform cost nothing.
+- Every call through `ChatModel`/`VisionModel`/`WebSearchModel`/`ImageModel` is written to `run_calls`
+  (`Runs\Contracts\CallJournal`) with its prompt, what was sent and what came back, under the run open at
+  the time (`RunStack`). Pictures appear by type and size only. Kept `runs.call_log_days` (30); the
+  operator opens it from the pipeline (`ProcessLog`). A driver called directly bypasses it: don't.
 - `ReadProductsInCode` runs before any model: brand (`BrandResolver`), size families, a type the
   category stands for, title sizes. Its facts have origin `code`; model readings never supersede
   them and receive them as `known`. `ComputeProductRelations` builds complements, families and

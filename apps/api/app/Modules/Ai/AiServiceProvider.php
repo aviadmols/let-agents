@@ -24,6 +24,7 @@ use App\Modules\Ai\Support\ProviderEmbedder;
 use App\Modules\Ai\Support\ProviderImageModel;
 use App\Modules\Ai\Support\SdkModelLister;
 use App\Modules\Ai\Support\UsageStrip;
+use App\Modules\Runs\Contracts\CallJournal;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 
@@ -53,11 +54,11 @@ final class AiServiceProvider extends ModuleServiceProvider
         $this->app->tag(self::CHAT_DRIVERS, 'ai.chat_drivers');
         $this->app->tag(self::EMBEDDING_DRIVERS, 'ai.embedding_drivers');
         $this->app->tag(self::IMAGE_EMBEDDING_DRIVERS, 'ai.image_embedding_drivers');
-        $this->app->bind(ChatModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers')));
-        $this->app->bind(VisionModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers')));
-        $this->app->bind(WebSearchModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers')));
+        $this->app->bind(ChatModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
+        $this->app->bind(VisionModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
+        $this->app->bind(WebSearchModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
         $this->app->tag(self::IMAGE_DRIVERS, 'ai.image_drivers');
-        $this->app->bind(ImageModel::class, fn ($app) => new ProviderImageModel($app->tagged('ai.image_drivers')));
+        $this->app->bind(ImageModel::class, fn ($app) => new ProviderImageModel($app->tagged('ai.image_drivers'), $app->make(CallJournal::class)));
         $this->app->bind(Embedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
         $this->app->bind(ImageEmbedder::class, fn ($app) => new ProviderEmbedder($app->tagged('ai.embedding_drivers'), $app->tagged('ai.image_embedding_drivers')));
     }

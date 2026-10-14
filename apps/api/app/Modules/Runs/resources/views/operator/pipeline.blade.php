@@ -35,7 +35,8 @@
                             @if ($i > 0)
                                 <div style="align-self:center;color:#d4d4d8;font-size:17px">‹</div>
                             @endif
-                            <div @style([
+                            <a href="{{ \App\Modules\Runs\Filament\Operator\Pages\ProcessLog::getUrl(['step' => $step['action']]) }}" data-pipeline-step="{{ $step['action'] }}" @style([
+                                'display:block;color:inherit;text-decoration:none;cursor:pointer',
                                 'flex:1 1 200px;min-width:0;padding:9px 11px;border-radius:12px;border:1px solid #ececee;background:#fff',
                                 'opacity:.65' => $step['runs'] === 0,
                                 'border-color:#fca5a5' => $step['failed'] > 0,
@@ -78,7 +79,7 @@
                                 @if ($step['failed'] > 0)
                                     <div style="margin-top:3px;font-size:11px;color:#dc2626">{{ __('runs::pipeline.failed', ['n' => $step['failed']]) }}</div>
                                 @endif
-                            </div>
+                            </a>
                         @endforeach
                     </div>
                 </x-filament::section>
@@ -88,7 +89,7 @@
         <x-filament::section :heading="__('runs::pipeline.recent')">
             <div style="display:flex;flex-direction:column;gap:6px">
                 @forelse ($this->recent() as $run)
-                    <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;border:1px solid #ececee">
+                    <a href="{{ \App\Modules\Runs\Filament\Operator\Pages\ProcessLog::getUrl(['step' => $run['action'], 'run' => $run['id']]) }}" data-pipeline-run="{{ $run['id'] }}" style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;border:1px solid #ececee;color:inherit;text-decoration:none">
                         <span @style([
                             'flex:none;width:7px;height:7px;border-radius:50%',
                             'background:#16a34a' => $run['status'] === 'succeeded',
@@ -106,7 +107,7 @@
                         @if ($run['cost'] > 0)
                             <span style="font-size:11px;color:#a21caf;font-weight:600">${{ number_format($run['cost'], 4) }}</span>
                         @endif
-                    </div>
+                    </a>
                 @empty
                     <p style="font-size:12.5px;color:#6b7280">{{ __('runs::pipeline.nothing_yet') }}</p>
                 @endforelse

@@ -1,0 +1,32 @@
+<?php
+
+return [
+    'nav' => 'Prompts & replies',
+    'help' => 'Every model call: the prompt, what was sent and what came back. Kept :days days, then deleted automatically.',
+    'back' => 'Back to the pipeline',
+    'runs' => 'Latest runs of this step',
+    'no_runs' => 'This step has not run yet.',
+    'calls_count' => ':n model calls',
+    'run_heading' => 'The run of :when',
+    'run_input' => 'What the run was given',
+    'run_output' => 'What the run wrote',
+    'run_calls' => 'Model calls in this run',
+    'latest_calls' => 'Latest model calls',
+    'no_calls_run' => 'This run made no model call: it is all code, or its log was already deleted.',
+    'no_calls' => 'No calls in the log yet.',
+    'outside_run' => 'Outside a run',
+    'tokens' => ':in in / :out out',
+    'ms' => ':n ms',
+    'prompt' => 'The prompt (system instructions)',
+    'sent' => 'What was sent',
+    'received' => 'What came back',
+    'error' => 'Error',
+    'more' => 'Showing the first :n calls.',
+    'open' => 'Prompts & replies',
+    'kinds' => [
+        'chat' => 'Chat',
+        'vision' => 'Image reading',
+        'web' => 'Web search',
+        'image' => 'Image generation',
+    ],
+];

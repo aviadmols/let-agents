@@ -14,6 +14,8 @@ use Throwable;
 
 final class RunRecorder implements RecordsRuns
 {
+    public function __construct(private readonly RunStack $stack) {}
+
     private const MAX_ERROR_CHARS = 2000;
 
     public function track(
@@ -44,6 +46,9 @@ final class RunRecorder implements RecordsRuns
         $status = RunStatus::Succeeded;
         $exception = null;
 
+        // Model calls made inside the work are logged under this run.
+        $this->stack->push($run->id, $shopId, $agent, $action);
+
         try {
             $work($context);
 
@@ -54,6 +59,8 @@ final class RunRecorder implements RecordsRuns
             $status = RunStatus::Failed;
             $exception = $e;
             report($e);
+        } finally {
+            $this->stack->pop();
         }
 
         $reportData = $context->report();

@@ -2,7 +2,6 @@
 
 namespace App\Modules\Runs\Filament\Operator\Pages;
 
-use App\Modules\Runs\Filament\Operator\Resources\Runs\RunResource;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -18,7 +17,7 @@ use UnitEnum;
 /**
  * Every model call, one line each, the latest first, for the operator only: when, for which shop,
  * which agent and what for, the provider and model, the tokens and what the call cost. Read from
- * the ledger, where every call is a row; each line opens the run it belongs to.
+ * the ledger, where every call is a row; each line opens its run with the prompts and replies.
  */
 final class ModelCalls extends Page
 {
@@ -125,7 +124,7 @@ final class ModelCalls extends Page
             $call->shop = $call->shop_id === null ? __('runs::spend.platform') : ($names[$call->shop_id] ?? __('runs::spend.deleted'));
             $call->agent_label = Run::labelFor('agents', (string) $call->agent);
             $call->action_label = Run::labelFor('actions', (string) $call->action);
-            $call->url = $call->run_id === null ? null : RunResource::getUrl('view', ['record' => $call->run_id]);
+            $call->url = $call->run_id === null ? null : ProcessLog::getUrl(['step' => (string) $call->action, 'run' => $call->run_id]);
 
             return $call;
         });
