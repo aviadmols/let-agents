@@ -178,6 +178,52 @@
             "unit": "usd"
         },
         {
+            "name": "compare_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "compare_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "compare_input_usd_per_million",
+            "type": "float",
+            "default": 1.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "compare_output_usd_per_million",
+            "type": "float",
+            "default": 8.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "compare_products",
+            "type": "int",
+            "default": 50,
+            "min": 5,
+            "max": 200,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
             "name": "audit_writer_provider",
             "type": "enum",
             "options": [

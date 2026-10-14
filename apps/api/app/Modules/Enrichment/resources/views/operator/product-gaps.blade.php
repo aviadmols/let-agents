@@ -4,6 +4,61 @@
 
     @php($tryOn = $this->tryOn())
     @php($required = $this->requiredGaps())
+    @php($comparison = $this->lastComparison())
+
+    <x-filament::section :heading="__('enrichment::gaps.compare_heading')" :description="__('enrichment::gaps.compare_help')" data-compare-readers>
+        <x-slot name="afterHeader">
+            <x-filament::button size="sm" color="gray" wire:click="compareReaders" wire:confirm="{{ __('enrichment::gaps.compare_confirm') }}">{{ __('enrichment::gaps.compare') }}</x-filament::button>
+        </x-slot>
+        @if ($comparison === null)
+            <p style="{{ $small }}">{{ __('enrichment::gaps.compare_none') }}</p>
+        @else
+            <p style="font-size:14px">{{ $comparison['summary'] }}</p>
+            <p style="{{ $small }}">{{ $comparison['at']?->timezone('Asia/Jerusalem')->format('d.m.Y H:i') }}</p>
+            @if (isset($comparison['report']['readers']))
+                <div style="overflow-x:auto;margin-top:10px">
+                    <table style="width:100%;font-size:13px;border-collapse:collapse">
+                        <thead>
+                            <tr style="text-align:start">
+                                <th style="text-align:start;padding:6px"></th>
+                                @foreach ($comparison['report']['readers'] as $reader)
+                                    <th style="text-align:start;padding:6px">{{ $reader['model'] }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (['answered', 'applied', 'rejected', 'facts', 'approved', 'review', 'products_with_facts', 'cost_usd', 'cost_per_product_usd', 'catalog_estimate_usd'] as $row)
+                                <tr style="border-top:1px solid rgba(127,127,127,.15)">
+                                    <td style="padding:6px">{{ __('enrichment::gaps.compare_rows.'.$row) }}</td>
+                                    @foreach ($comparison['report']['readers'] as $reader)
+                                        <td style="padding:6px">{{ str_ends_with($row, '_usd') ? '$'.rtrim(rtrim(number_format((float) ($reader[$row] ?? 0), 5), '0'), '.') : number_format((int) ($reader[$row] ?? 0)) }}</td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                            <tr style="border-top:1px solid rgba(127,127,127,.15)">
+                                <td style="padding:6px">{{ __('enrichment::gaps.compare_rows.by_key') }}</td>
+                                @foreach ($comparison['report']['readers'] as $reader)
+                                    <td style="padding:6px;{{ $small }}">{{ collect($reader['by_key'] ?? [])->map(fn ($n, $k) => $k.' '.$n)->implode(', ') }}</td>
+                                @endforeach
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                @php($agreement = $comparison['report']['agreement'] ?? [])
+                <p style="font-size:13.5px;margin-top:10px">{{ __('enrichment::gaps.compare_agreement', ['same' => $agreement['same'] ?? 0, 'different' => $agreement['different'] ?? 0, 'only_a' => $agreement['only_a'] ?? 0, 'only_b' => $agreement['only_b'] ?? 0]) }}</p>
+                @if (($comparison['report']['differences'] ?? []) !== [])
+                    <div style="display:grid;gap:2px;margin-top:6px" data-compare-differences>
+                        @foreach ($comparison['report']['differences'] as $difference)
+                            <div style="font-size:13px;padding:6px 0;border-top:1px solid rgba(127,127,127,.15)">
+                                <span style="font-weight:600">{{ $difference['product'] }}</span> · {{ $difference['key'] }}:
+                                <span>{{ $difference['a'] }}</span> / <span>{{ $difference['b'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            @endif
+        @endif
+    </x-filament::section>
 
     <x-filament::section :heading="__('enrichment::gaps.tryon_heading')" :description="__('enrichment::gaps.tryon_help')">
         <p style="font-size:14px" data-tryon-summary>{{ __('enrichment::gaps.tryon_counts', ['yes' => number_format($tryOn['yes']), 'no' => number_format($tryOn['no']), 'undecided' => number_format($tryOn['undecided'])]) }}</p>

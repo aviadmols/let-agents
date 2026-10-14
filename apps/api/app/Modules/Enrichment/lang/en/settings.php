@@ -61,6 +61,26 @@ return [
         'label' => 'Output price of the reader, per million tokens',
         'description' => 'From the price list of the provider.',
     ],
+    'compare_provider' => [
+        'label' => 'Provider of the model compared with the reader',
+        'description' => 'In the model comparison on the gaps screen: the second model, against the night\'s reader.',
+    ],
+    'compare_model' => [
+        'label' => 'Model compared with the reader',
+        'description' => 'Reads the same products with the same prompt. Nothing it says is kept.',
+    ],
+    'compare_input_usd_per_million' => [
+        'label' => 'Input price of the compared model, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'compare_output_usd_per_million' => [
+        'label' => 'Output price of the compared model, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'compare_products' => [
+        'label' => 'Products in a model comparison',
+        'description' => 'The same products every time, shared between the vocabularies.',
+    ],
     'audit_writer_provider' => [
         'label' => 'Provider of the model that proposes reading rules',
         'description' => 'openai by default.',

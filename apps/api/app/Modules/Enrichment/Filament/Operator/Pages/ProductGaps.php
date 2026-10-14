@@ -5,14 +5,17 @@ namespace App\Modules\Enrichment\Filament\Operator\Pages;
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Actions\CompareReaders;
 use App\Modules\Enrichment\Actions\RereadProducts;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Jobs\CompareReadersJob;
 use App\Modules\Enrichment\Jobs\RereadProductsJob;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Scanning\FactGaps;
 use App\Modules\Enrichment\Scanning\RequiredGaps;
 use App\Modules\Enrichment\Scanning\TryOnEligibility;
+use App\Modules\Runs\Models\Run;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -89,6 +92,28 @@ final class ProductGaps extends Page
 
             return ['yes' => $marks->count() - $no, 'no' => $no, 'undecided' => max(0, $live - $marks->count())];
         });
+    }
+
+    /** The two reading models on the same products, in the background. */
+    public function compareReaders(): void
+    {
+        $shop = app(TenantContext::class)->id();
+
+        if ($shop === null) {
+            return;
+        }
+
+        CompareReadersJob::dispatch($shop);
+        Notification::make()->success()->title(__('enrichment::gaps.compare_sent'))->send();
+    }
+
+    /** The last comparison of the two reading models, for this shop. @return array<string, mixed>|null */
+    public function lastComparison(): ?array
+    {
+        $shop = app(TenantContext::class)->id();
+        $run = $shop === null ? null : Run::query()->where('shop_id', $shop)->where('action', CompareReaders::ACTION)->latest('started_at')->first();
+
+        return $run === null ? null : ['at' => $run->started_at, 'status' => $run->status->value, 'summary' => (string) $run->summary(), 'report' => (array) $run->output];
     }
 
     /** The products missing one detail of one kind, sent to be read again. */

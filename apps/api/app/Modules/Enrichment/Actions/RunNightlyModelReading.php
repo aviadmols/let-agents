@@ -89,6 +89,7 @@ final class RunNightlyModelReading
                 $batch = $this->tenant->run($shopId, fn () => EnrichmentBatch::query()
                     ->where('status', BatchStatus::AwaitingResults)
                     ->whereNull('provider_batch_id')
+                    ->where('runner', '!=', CompareReaders::RUNNER)
                     ->whereHas('items', fn ($q) => $q->where('status', ItemStatus::Pending))
                     ->oldest('created_at')
                     ->first());
