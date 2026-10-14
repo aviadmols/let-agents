@@ -49,9 +49,17 @@ return [
         'label' => 'Picture model for furniture',
         'description' => 'A Replicate model, such as google/nano-banana.',
     ],
-    'generation_usd_per_image' => [
-        'label' => 'Price of one picture',
-        'description' => 'From the provider\'s price list for the chosen model. Verify it.',
+    'generation_usd_apparel' => [
+        'label' => 'Price of one clothing picture',
+        'description' => 'By Replicate\'s price list for the clothing model.',
+    ],
+    'generation_usd_jewelry' => [
+        'label' => 'Price of one jewelry picture',
+        'description' => 'By Replicate\'s price list for the jewelry model (nano-banana-pro about 0.15 USD).',
+    ],
+    'generation_usd_furniture' => [
+        'label' => 'Price of one furniture picture',
+        'description' => 'By Replicate\'s price list for the furniture model.',
     ],
     'gate_provider' => [
         'label' => 'Provider of the photo check',

@@ -49,9 +49,17 @@ return [
         'label' => 'מודל התמונות לרהיטים',
         'description' => 'מודל של Replicate, למשל google/nano-banana.',
     ],
-    'generation_usd_per_image' => [
-        'label' => 'מחיר של תמונה אחת',
-        'description' => 'לפי המחירון של הספק למודל שנבחר. לאמת.',
+    'generation_usd_apparel' => [
+        'label' => 'מחיר תמונה אחת לביגוד',
+        'description' => 'לפי המחירון של Replicate למודל הביגוד.',
+    ],
+    'generation_usd_jewelry' => [
+        'label' => 'מחיר תמונה אחת לתכשיטים',
+        'description' => 'לפי המחירון של Replicate למודל התכשיטים (nano-banana-pro כ־0.15 דולר).',
+    ],
+    'generation_usd_furniture' => [
+        'label' => 'מחיר תמונה אחת לרהיטים',
+        'description' => 'לפי המחירון של Replicate למודל הרהיטים.',
     ],
     'gate_provider' => [
         'label' => 'הספק של בדיקת התמונה',

@@ -21,6 +21,7 @@ use App\Modules\TryOn\Models\TryOnJob;
 use App\Modules\TryOn\Models\TryOnStep;
 use App\Modules\TryOn\Support\Files;
 use App\Modules\TryOn\Support\Picture;
+use App\Modules\TryOn\Support\TryOnClasses;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -99,7 +100,10 @@ final class RunTryOn
             return;
         }
 
-        $inputs = [['mime' => 'image/jpeg', 'bytes' => Picture::forModel($photo)], ['mime' => 'image/jpeg', 'bytes' => Picture::forModel($productPicture)]];
+        // Jewelry is small: its stones need the sharper pictures.
+        $side = $job->group === TryOnClasses::JEWELRY ? Picture::KEEP_SIDE : Picture::MODEL_SIDE;
+        $inputs = [['mime' => 'image/jpeg', 'bytes' => Picture::forModel($photo, $side)], ['mime' => 'image/jpeg', 'bytes' => Picture::forModel($productPicture, $side)]];
+        $perImage = (float) Settings::get('try_on.generation_usd_'.$job->group);
         $productPath = Files::put($job->shop_id, 'product', $inputs[1]['bytes']);
         $cap = (float) Settings::get('try_on.job_cap_usd');
         // Two at most, whatever the setting says.
@@ -115,7 +119,7 @@ final class RunTryOn
             $job->update(['attempts' => $attempt, 'stage' => 'prompt']);
 
             try {
-                $estimate = $this->estimateWriter($writer) + (float) Settings::get('try_on.generation_usd_per_image') + $this->estimateChecker();
+                $estimate = $this->estimateWriter($writer) + $perImage + $this->estimateChecker();
                 if ($cost + $estimate > $cap) {
                     $this->finish($run, $job, 'job_cap', $cost);
 
@@ -137,7 +141,7 @@ final class RunTryOn
                 // 2. The picture.
                 $job->update(['stage' => 'generate']);
                 $made = $this->images->generate($generator, $model, $prompt, $inputs);
-                $spent = (float) Settings::get('try_on.generation_usd_per_image');
+                $spent = $perImage;
                 $cost += $spent;
                 $run->usage($generator->value, $model, 0, 0, 0, $spent);
                 $resultPath = Files::put($job->shop_id, 'result', Picture::forModel($made->bytes, Picture::KEEP_SIDE));
@@ -196,7 +200,8 @@ final class RunTryOn
             (int) ($data['product_similarity'] ?? 0) < (int) Settings::get('try_on.pass_similarity') => 'not_the_product',
             ($data['identity_kept'] ?? false) !== true => 'not_the_same_person',
             ($data['anatomy_ok'] ?? false) !== true => 'anatomy',
-            ($data['proportions_ok'] ?? false) !== true => 'proportions',
+            ($data['realistic'] ?? true) !== true => 'not_realistic',
+            ($data['proportions_ok'] ?? true) !== true => 'proportions',
             ($data['placement_ok'] ?? true) !== true => 'placement',
             ($data['extra_people'] ?? false) === true => 'extra_people',
             default => '',

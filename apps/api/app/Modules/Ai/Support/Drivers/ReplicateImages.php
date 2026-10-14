@@ -35,7 +35,7 @@ final class ReplicateImages implements ImageDriver
      */
     public const INPUTS = [
         'google/nano-banana' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image']],
-        'google/nano-banana-pro' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image']],
+        'google/nano-banana-pro' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image', 'resolution' => '2K']],
         'bytedance/seedream-4' => ['field' => 'image_input', 'list' => true, 'with' => ['aspect_ratio' => 'match_input_image']],
         'black-forest-labs/flux-kontext-pro' => ['field' => 'input_image', 'list' => false, 'with' => ['aspect_ratio' => 'match_input_image']],
         'black-forest-labs/flux-kontext-max' => ['field' => 'input_image', 'list' => false, 'with' => ['aspect_ratio' => 'match_input_image']],

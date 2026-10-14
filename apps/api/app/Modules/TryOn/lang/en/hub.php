@@ -53,6 +53,7 @@ return [
         'busy' => 'The shop month budget for Try-On ran out.',
     ],
     'checks' => [
+        'not_realistic' => 'the product looks pasted on, not worn',
         'not_the_same_photo' => 'not the shopper\'s photo: another picture was made',
         'product_not_visible' => 'the product cannot be seen',
         'not_the_product' => 'the product does not look like the product',

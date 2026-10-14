@@ -27,7 +27,8 @@ final class StartTryOn
 {
     // checker v2: a fault only when a shopper would see it at a glance; when unsure, none.
     // writer v2: "Edit the first image", nothing added; checker v3: gentle on the product, strict that it is the shopper's own photo.
-    public const PROMPT_VERSIONS = ['writer' => 2, 'checker' => 3, 'template' => 1];
+    // template v2 (jewelry): worn, not pasted on; checker v4: judges that too (realistic).
+    public const PROMPT_VERSIONS = ['writer' => 2, 'checker' => 4, 'template' => 2];
 
     public function __construct(private readonly TenantContext $tenant) {}
 
