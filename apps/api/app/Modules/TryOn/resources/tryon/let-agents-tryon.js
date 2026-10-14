@@ -142,11 +142,19 @@
   var POSITIONS = { before: 'beforebegin', after: 'afterend', start: 'afterbegin', end: 'beforeend' };
 
   function anchorElement() {
-    var wanted = S.cfg && S.cfg.anchor && S.cfg.anchor.selector ? [S.cfg.anchor.selector] : FALLBACK_ANCHORS;
+    var chosen = S.cfg && S.cfg.anchor && S.cfg.anchor.selector;
+    var wanted = chosen ? [chosen] : FALLBACK_ANCHORS;
     for (var i = 0; i < wanted.length; i++) {
       try {
-        var found = doc.querySelector(wanted[i]);
-        if (found) { return found; }
+        var all = doc.querySelectorAll(wanted[i]);
+        // Without the shop's own place: the form that adds to the cart, not the theme's other forms
+        // on the same address (Shopify's installments line, a quick-buy in a recommendation).
+        for (var j = 0; j < all.length; j++) {
+          if (chosen || (!all[j].closest('payment-terms, shopify-payment-terms, [class*="payment-terms"], [class*="recommend"], [class*="upsell"]') &&
+              all[j].querySelector('[name="add"], button[type="submit"], [type="submit"]'))) {
+            return all[j];
+          }
+        }
       } catch (e) { /* a selector the browser does not accept */ }
     }
     return null;
