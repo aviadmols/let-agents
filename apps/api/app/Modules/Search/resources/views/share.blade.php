@@ -64,7 +64,7 @@
         @php($time = \Illuminate\Support\Carbon::parse($s['as_of'])->timezone('Asia/Jerusalem')->format('d.m.Y H:i'))
         <h1>{{ $s['query'] !== '' ? $t('title', ['store' => $s['store']['name'], 'query' => $s['query']]) : $t('title_no_query', ['store' => $s['store']['name']]) }}</h1>
         <p class="muted">{{ $t('intro', ['time' => $time]) }}</p>
-        <p class="ai">{{ $t('for_ai', ['json' => $json]) }}</p>
+        <p class="ai">{{ $t('for_ai', ['json' => $json]) }}@if ($connector) {{ $t('connector', ['url' => $connector]) }}@endif</p>
 
         @php($read = $s['read'] ?? [])
         @if (($read['min_price'] ?? null) !== null || ($read['max_price'] ?? null) !== null || ($read['filters'] ?? []) !== [])

@@ -37,6 +37,10 @@ return [
         'label' => 'Ask my own AI about this search',
         'description' => 'In the search results: a button that hands the search, the products with their details and the store\'s policies to the shopper\'s own ChatGPT, Claude or Perplexity, in a short link. The shopper takes advice there, and the purchase stays on the store. No model, no cost, and nothing about the shopper.',
     ],
+    'agent_connector' => [
+        'label' => 'The store as a connector for the shopper\'s AI (MCP)',
+        'description' => 'An address anyone adds to their Claude or ChatGPT as a connector: the AI searches the store, reads product details and policies, and makes a link to the store\'s own cart. Buying and paying stay on the store. No model of ours, no cost.',
+    ],
     'similar' => [
         'label' => 'Similar items in the results',
         'description' => 'A button on every product in the results. By picture where the pictures are scanned, and by the meaning of the product name and description otherwise. From vectors that already exist, with no model and no cost.',

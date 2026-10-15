@@ -56,6 +56,10 @@
             "default": true
         },
         {
+            "name": "agent_connector",
+            "default": true
+        },
+        {
             "name": "size_alternatives",
             "default": false
         },

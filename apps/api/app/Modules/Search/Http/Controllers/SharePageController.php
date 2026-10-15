@@ -2,7 +2,9 @@
 
 namespace App\Modules\Search\Http\Controllers;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Search\Models\SearchShare;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +39,10 @@ final class SharePageController
 
         $locale = in_array($snapshot['store']['locale'] ?? 'he', ['he', 'en'], true) ? $snapshot['store']['locale'] : 'he';
 
-        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'json' => route('search.share', ['token' => $share->token, 'format' => 'json'])], 200, $headers);
+        // The store's connector, when it offers one, for an AI that can connect for good.
+        $connection = $tenant->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $share->shop_id)->first());
+        $connector = $connection !== null && Features::enabled('search.agent_connector', $share->shop_id) ? route('api.search.mcp', ['site' => $connection->site_key]) : null;
+
+        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'json' => route('search.share', ['token' => $share->token, 'format' => 'json'])], 200, $headers);
     }
 }

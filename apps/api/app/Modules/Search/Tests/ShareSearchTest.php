@@ -18,6 +18,7 @@ use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
@@ -130,5 +131,52 @@ final class ShareSearchTest extends TestCase
         Features::override('search.ai_share', false, $this->shop->id);
         $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'], $body)->assertNotFound();
         $this->assertSame(0, app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->count()));
+    }
+
+    public function test_the_store_is_a_connector_a_shoppers_ai_searches_reads_and_makes_a_cart_link_with(): void
+    {
+        $rpc = fn (string $method, array $params = [], ?int $id = 1) => $this->call('POST', "/api/v1/mcp/{$this->site}", [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json, text/event-stream'],
+            json_encode(['jsonrpc' => '2.0', 'method' => $method, 'params' => $params] + ($id === null ? [] : ['id' => $id])));
+
+        $hello = $rpc('initialize', ['protocolVersion' => '2025-06-18', 'capabilities' => (object) [], 'clientInfo' => ['name' => 'claude', 'version' => '1']])->assertOk()->json('result');
+        $this->assertSame('2025-06-18', $hello['protocolVersion']);
+        $this->assertSame('טבעות ושות׳', $hello['serverInfo']['title']);
+        $this->assertStringContainsString('create_cart_link', $hello['instructions']);
+        $rpc('notifications/initialized', [], null)->assertStatus(202);
+
+        $this->assertSame(['search_products', 'get_product', 'store_policies', 'create_cart_link'], array_column($rpc('tools/list')->json('result.tools'), 'name'));
+
+        $found = $rpc('tools/call', ['name' => 'search_products', 'arguments' => ['query' => 'טבעת זהב לבן עד 3000 ש"ח']])->assertOk()->json('result');
+        $this->assertFalse($found['isError']);
+        $this->assertSame(['טבעת סוליטר'], array_column($found['structuredContent']['products'], 'title'), 'white gold, up to 3000: not the yellow one, not the 9000 one');
+        $this->assertSame([['name' => 'מתכת', 'value' => 'זהב לבן']], $found['structuredContent']['read']['filters']);
+        $this->assertEquals(['id' => '11', 'title' => 'מידה 6', 'price' => 2400, 'in_stock' => true], $found['structuredContent']['products'][0]['variants'][0]);
+        $this->assertJson($found['content'][0]['text']);
+
+        $this->assertSame('טבעת וינטג׳', $rpc('tools/call', ['name' => 'get_product', 'arguments' => ['id' => '2']])->json('result.structuredContent.title'));
+        $this->assertTrue($rpc('tools/call', ['name' => 'get_product', 'arguments' => ['id' => 'nope']])->json('result.isError'));
+        $this->assertSame('ניתן להחזיר תוך 14 יום.', $rpc('tools/call', ['name' => 'store_policies'])->json('result.structuredContent.policies.promises.0.detail'));
+
+        // A product with sizes needs one chosen; then a link to the store's own cart.
+        $cart = fn (array $items) => $rpc('tools/call', ['name' => 'create_cart_link', 'arguments' => ['items' => $items]])->json('result.structuredContent');
+        $choose = $cart([['product' => '1']]);
+        $this->assertNull($choose['url']);
+        $this->assertSame('choose_option', $choose['problems'][0]['problem']);
+        $this->assertSame(['11', '12'], array_column($choose['problems'][0]['options'], 'id'));
+        $this->assertSame('https://www.rings.test/?add-to-cart=1&variation_id=11&quantity=2', $cart([['product' => '1', 'variant' => '11', 'quantity' => 2]])['url'], 'WooCommerce: an add-to-cart link');
+
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->update(['platform' => 'shopify']));
+        $this->assertSame('https://www.rings.test/cart/11:2,21:1?attributes[la_source]=ai', $cart([['product' => '1', 'variant' => '11', 'quantity' => 2], ['product' => '2', 'variant' => '21']])['url'], 'Shopify: one cart for both, marked as from an AI');
+
+        // A product without options: its one variant, read live from its public page, when it can be bought.
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '4', 'type' => 'simple', 'status' => 'publish',
+            'title' => 'שרשרת', 'url' => 'https://www.rings.test/products/chain', 'price' => 500, 'in_stock' => true, 'purchasable' => true, 'hash' => 'h4', 'payload' => []]));
+        Http::fake(['www.rings.test/products/chain.js' => Http::response(['variants' => [['id' => 777, 'available' => false], ['id' => 778, 'available' => true]]])]);
+        $this->assertSame('https://www.rings.test/cart/778:1?attributes[la_source]=ai', $cart([['product' => '4']])['url']);
+
+        $this->assertSame(-32601, $rpc('resources/list')->json('error.code'));
+        $this->get("/api/v1/mcp/{$this->site}")->assertStatus(405);
+        Features::override('search.agent_connector', false, $this->shop->id);
+        $rpc('tools/list')->assertNotFound();
     }
 }

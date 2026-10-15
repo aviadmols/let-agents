@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Search\Http\Controllers\McpController;
 use App\Modules\Search\Http\Controllers\PluginSearchController;
 use App\Modules\Search\Http\Controllers\SearchController;
 use App\Modules\Search\Http\Controllers\SearchEventsController;
@@ -22,6 +23,8 @@ Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}', SearchController::class)->name('api.search.query');
     Route::post('search/{site}/events', SearchEventsController::class)->name('api.search.events');
     Route::post('search/{site}/share', ShareController::class)->name('api.search.share');
+    // The store as a connector for a shopper's own AI (Model Context Protocol over HTTP).
+    Route::match(['get', 'post', 'delete'], 'mcp/{site}', McpController::class)->name('api.search.mcp');
 });
 
 // A photo costs one picture embedding, so it has its own, tighter bucket.
