@@ -43,8 +43,12 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    /** 11: stones by colour, light and shape, never by name, as the store's pictures are described (caption v4). */
-    public const PROMPT_VERSION = 11;
+    /**
+     * 11: stones by colour, light and shape, never by name, as the store's pictures are described (caption v4).
+     * 12: in the same words as the pictures' v6: the metal's colour always, every colour on its own,
+     * and the same care for clothes, shoes, accessories and furniture; up to eight details.
+     */
+    public const PROMPT_VERSION = 12;
 
     public const SECOND_VERSION = 1;
 

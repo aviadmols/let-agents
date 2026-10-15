@@ -338,7 +338,10 @@ final class SearchCatalog
             // The separate things in the photo, for the shopper to choose which one they meant.
             $seen = $look->items === [] ? [] : ['items' => $look->items, 'item' => $look->item];
             $tags = $look->tags;
-            $seen += $look->object === null ? [] : ['seen' => $look->object];
+            // What the shopper is told was seen: the object, and the two details that tell it apart
+            // most ("זהב צהוב", "אבן לבנה חלבית"), so a gold ring is not just "a ring with a stone".
+            $told = array_slice(array_values(array_filter((array) $look->details, fn ($d): bool => is_string($d) && $d !== '' && ! str_contains((string) $look->object, $d))), 0, 2);
+            $seen += $look->object === null ? [] : ['seen' => mb_substr(implode(' · ', [$look->object, ...$told]), 0, 120)];
             $cut = false;
 
             // A ring on a hand, a lamp in a room: the object alone, cut from the photo, is compared with

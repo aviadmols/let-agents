@@ -378,7 +378,7 @@ final class SearchByPhotoTest extends TestCase
 
         $second = $send(1);
         $this->assertSame(1, $second['item']);
-        $this->assertSame('טבעת נישואין', $second['seen']);
+        $this->assertSame('טבעת נישואין · פס זהב דק', $second['seen'], 'what it is, and what tells it apart');
         $this->assertSame('טבעות נישואין', $second['tags'][0]['title'], 'the wedding band is placed among the bands');
         $this->assertSame(1, $vision->calls, 'the photo is read once; choosing the other thing asks nothing again');
 
