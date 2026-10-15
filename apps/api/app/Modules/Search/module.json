@@ -209,6 +209,15 @@
             "unit": "products"
         },
         {
+            "name": "app_requests_per_minute",
+            "type": "int",
+            "default": 1200,
+            "min": 60,
+            "max": 20000,
+            "scope": "global",
+            "unit": "requests"
+        },
+        {
             "name": "ai_catalog_products",
             "type": "int",
             "default": 2500,

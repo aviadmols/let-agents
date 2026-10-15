@@ -16,6 +16,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Http\Controllers\AppMcpController;
 use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Search\Support\LoadedIndex;
@@ -194,16 +195,15 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('for_ai', array_key_first($all));
         $this->assertSame(3, $all['everything']['count'], 'every product in stock');
         $rows = array_merge(...array_values($all['everything']['by_category']));
-        // One line a product, its id written out first, each option as the order link takes it.
-        $this->assertSame([
-            'id 2 | טבעת וינטג׳ | ₪1800 | options: 2/21 = מידה 6 ₪1800',
-            'id 1 | טבעת סוליטר | ₪2400 | options: 1/11 = מידה 6 ₪2400',
-            'id 3 | טבעת יוקרה | ₪9000 | options: 3/31 = מידה 6 ₪9000',
-        ], $rows, 'cheapest first, only the options in stock');
+        // One short line a product, its id written out first; an option is chosen on the order page.
+        $this->assertSame(['id 2 | טבעת וינטג׳ | ₪1800 | +options', 'id 1 | טבעת סוליטר | ₪2400 | +options', 'id 3 | טבעת יוקרה | ₪9000 | +options'], $rows, 'cheapest first');
         $this->assertSame('https://agents.example.test/c/'.$this->site.'/cart?items=2:1,1:2', $all['everything']['order_example']);
-        $this->assertStringContainsString("\n", $this->get("/c/{$this->site}?format=json")->getContent(), 'never the whole store on one line');
+        $raw = $this->get("/c/{$this->site}?format=json")->assertHeader('Content-Type', 'application/json; charset=utf-8')->getContent();
+        $this->assertStringContainsString("\n\"id 1 | טבעת סוליטר | ₪2400 | +options\",\n", $raw, 'a line a product, never the whole store on one line, and no indent');
         $this->assertArrayNotHasKey('products', $all, 'not the same products twice');
         $this->assertArrayNotHasKey('browse', $all, 'no links to open when everything is here');
+        $this->assertSame([], array_intersect(['total', 'page', 'pages', 'next_page'], array_keys($all)), 'nothing about pages: an AI took them for products it could not reach');
+        $this->assertSame('everything', array_key_last($all), 'the policies before, short; every product last');
         $this->assertStringContainsString('everything.by_category', implode(' ', $all['for_ai']));
         $this->assertSame('https://agents.example.test/c/'.$this->site, $all['store']['catalog']);
         $this->assertNotEmpty($all['policies']['promises']);
@@ -240,9 +240,6 @@ final class ShareSearchTest extends TestCase
 
         $json = $this->getJson("/c/{$this->site}?format=json&q=".rawurlencode('טבעת סוליטר'))->assertOk()->json();
         $this->assertSame('טבעת סוליטר בזהב לבן עם אבן עגולה שקופה (טבעת, סוליטר, זהב לבן)', $json['products'][0]['looks'], 'how it looks, read at night, no picture opened now');
-        Cache::flush();
-        $rows = array_merge(...array_values($this->getJson("/c/{$this->site}?format=json")->json('everything.by_category')));
-        $this->assertContains('id 1 | טבעת סוליטר | ₪2400 | looks: טבעת, סוליטר, זהב לבן | options: 1/11 = מידה 6 ₪2400', $rows, 'and a few words of it in the whole store');
 
         $like = $this->getJson("/c/{$this->site}/similar/1")->assertOk()->json();
         $this->assertSame('טבעת סוליטר', $like['like']);
@@ -360,5 +357,69 @@ final class ShareSearchTest extends TestCase
         $this->get("/api/v1/mcp/{$this->site}")->assertStatus(405);
         Features::override('search.agent_connector', false, $this->shop->id);
         $rpc('tools/list')->assertNotFound();
+    }
+
+    public function test_one_app_inside_a_shoppers_ai_serves_every_store_with_cards_and_one_link_to_checkout(): void
+    {
+        config(['upsell.shop_domain' => 'agents.example.test']);
+        $rpc = fn (string $method, array $params = [], ?int $id = 1) => $this->call('POST', '/api/v1/mcp', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json, text/event-stream'],
+            json_encode(['jsonrpc' => '2.0', 'method' => $method, 'params' => $params] + ($id === null ? [] : ['id' => $id])));
+        $tool = fn (string $name, array $arguments = []) => $rpc('tools/call', ['name' => $name, 'arguments' => $arguments])->assertOk()->json('result');
+
+        $hello = $rpc('initialize', ['protocolVersion' => '2025-06-18', 'capabilities' => (object) [], 'clientInfo' => ['name' => 'chatgpt', 'version' => '1']])->assertOk()->json('result');
+        $this->assertSame('Lets Search', $hello['serverInfo']['title']);
+        $this->assertArrayHasKey('resources', $hello['capabilities']);
+        // What matters most, inside the first 512 characters: the shopper's language, and the one link that buys.
+        $this->assertStringContainsString('language they started the conversation in', mb_substr($hello['instructions'], 0, 512));
+        $this->assertStringContainsString('ONE checkout link', mb_substr($hello['instructions'], 0, 512));
+        $rpc('notifications/initialized', [], null)->assertStatus(202);
+
+        // Every tool asks the store, says it reads only, and needs no login; the product tools show cards.
+        $tools = collect($rpc('tools/list')->json('result.tools'))->keyBy('name');
+        $this->assertSame(['find_store', 'search_products', 'get_product', 'store_policies', 'create_cart_link'], $tools->keys()->all());
+        $this->assertSame(['store'], $tools['search_products']['inputSchema']['required']);
+        $this->assertSame(['store', 'items'], $tools['create_cart_link']['inputSchema']['required']);
+        $tools->each(function (array $tool): void {
+            $this->assertSame(['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false], $tool['annotations'], $tool['name']);
+            $this->assertSame([['type' => 'noauth']], $tool['_meta']['securitySchemes'], $tool['name']);
+        });
+        $this->assertSame(AppMcpController::WIDGET, $tools['search_products']['_meta']['ui']['resourceUri']);
+        $this->assertSame(AppMcpController::WIDGET, $tools['create_cart_link']['_meta']['openai/outputTemplate']);
+
+        // The cards: one page, its script inline, the stores' pictures and addresses allowed.
+        $this->assertSame([AppMcpController::WIDGET], array_column($rpc('resources/list')->json('result.resources'), 'uri'));
+        $widget = $rpc('resources/read', ['uri' => AppMcpController::WIDGET])->json('result.contents.0');
+        $this->assertSame('text/html;profile=mcp-app', $widget['mimeType']);
+        $this->assertStringContainsString('openai:set_globals', $widget['text']);
+        $this->assertStringContainsString('ui/notifications/tool-result', $widget['text']);
+        $this->assertContains('https://cdn.rings.test', $widget['_meta']['ui']['csp']['resourceDomains']);
+        $this->assertContains('https://www.rings.test', $widget['_meta']['openai/widgetCSP']['redirect_domains']);
+        $this->assertSame(-32002, $rpc('resources/read', ['uri' => 'ui://other'])->json('error.code'));
+
+        // The store, by its name or its web address.
+        $this->assertSame([['store' => $this->site, 'name' => 'טבעות ושות׳', 'url' => 'https://www.rings.test']], $tool('find_store', ['query' => 'rings.test'])['structuredContent']['stores']);
+        $this->assertSame($this->site, $tool('find_store', ['query' => 'טבעות'])['structuredContent']['stores'][0]['store']);
+        $this->assertSame([], $tool('find_store', ['query' => 'another-shop.test'])['structuredContent']['stores']);
+
+        // Searched in the shopper's words, as cards in the store's language.
+        $found = $tool('search_products', ['store' => 'https://www.rings.test/', 'query' => 'טבעת זהב לבן עד 3000 ש"ח']);
+        $this->assertFalse($found['isError']);
+        $this->assertSame(['טבעת סוליטר'], array_column($found['structuredContent']['products'], 'title'));
+        $this->assertSame($this->site, $found['structuredContent']['store']['store']);
+        $this->assertSame('לתשלום', $found['_meta']['labels']['checkout']);
+        $this->assertSame('he', $found['_meta']['locale']);
+        $this->assertSame('טבעת וינטג׳', $tool('get_product', ['store' => $this->site, 'id' => '2'])['structuredContent']['products'][0]['title']);
+        $this->assertTrue($tool('get_product', ['store' => $this->site, 'id' => 'nope'])['isError']);
+        $this->assertSame('unknown_store', $tool('search_products', ['store' => 'nowhere.test', 'query' => 'טבעת'])['structuredContent']['error']);
+
+        // The order: one link to the store's checkout with both in the cart.
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->update(['platform' => 'shopify']));
+        $order = $tool('create_cart_link', ['store' => $this->site, 'items' => [['product' => '1', 'variant' => '11', 'quantity' => 2], ['product' => '2', 'variant' => '21']]]);
+        $this->assertSame('https://www.rings.test/cart/11:2,21:1?attributes[la_source]=ai', $order['structuredContent']['url']);
+
+        // A store not offered to a shopper's AI is not in the app.
+        Features::override('search.ai_share', false, $this->shop->id);
+        $this->assertSame([], $tool('find_store')['structuredContent']['stores']);
+        $this->get('/api/v1/mcp')->assertStatus(405);
     }
 }

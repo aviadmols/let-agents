@@ -44,10 +44,18 @@ final class StoreCatalogController
         $next = $found['page'] < $found['pages'] ? AgentCatalog::catalogUrl($store, ['q' => $asked['q'], 'cat' => $asked['cat'], 'compact' => $asked['compact'], 'page' => $found['page'] + 1]) : null;
         $shape = $asked['compact'] ? fn (array $answer): array => AgentCatalog::short($answer) : fn (array $answer): array => $answer;
 
-        // With the whole store inside, the first page's products in full would only repeat it.
-        $products = isset($data['everything']) ? [] : $found['products'];
+        // The whole store inside: nothing about pages (an AI took "pages: 40" for products it could
+        // not reach), and the first page's products in full would only repeat it. The policies
+        // first, short; then every product.
+        if (isset($data['everything'])) {
+            return AgentCatalog::forAi($store, [], (string) $found['as_of'], array_filter([
+                'policies' => array_filter($data['policies']) ?: null,
+                'browse' => $data['browse'],
+                'everything' => $data['everything'],
+            ], fn ($value): bool => $value !== null));
+        }
 
-        return $shape(AgentCatalog::forAi($store, $products, (string) $found['as_of'], array_filter([
+        return $shape(AgentCatalog::forAi($store, $found['products'], (string) $found['as_of'], array_filter([
             'browse' => $data['browse'],
             'query' => $found['query'] ?: null,
             'category' => $asked['cat'] ?: null,
@@ -58,7 +66,6 @@ final class StoreCatalogController
             'next_page' => $next,
             'policies' => array_filter($data['policies']) ?: null,
             'compact' => $asked['compact'] ?: null,
-            'everything' => $data['everything'] ?? null,
         ], fn ($value): bool => $value !== null)));
     }
 
@@ -99,8 +106,11 @@ final class StoreCatalogController
 
         // "json" as an AI may copy it, with a quote or a stop after it.
         if (str_starts_with((string) $request->query('format', ''), 'json')) {
-            // Line by line: an AI's browser cuts a long line, so the whole store is never one line.
-            return response()->json(self::forAi($store, $data, $asked), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+            // Line by line, since an AI's browser cuts a long line; with no indent, since it reads
+            // only so much of a page, and the whole store has to fit.
+            $json = (string) preg_replace('/^ +/m', '', (string) json_encode(self::forAi($store, $data, $asked), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+
+            return response($json, 200, $headers + ['Content-Type' => 'application/json; charset=utf-8']);
         }
 
         $locale = in_array($store['locale'], ['he', 'en'], true) ? $store['locale'] : 'he';

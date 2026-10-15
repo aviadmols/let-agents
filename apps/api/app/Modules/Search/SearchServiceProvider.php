@@ -54,6 +54,10 @@ final class SearchServiceProvider extends ModuleServiceProvider
         RateLimiter::for('search-share', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search-share:'.$request->ip()));
 
+        // The app inside a shopper's AI: its calls come from the AI's own servers, many shoppers each.
+        RateLimiter::for('search-app', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.app_requests_per_minute'))
+            ->by('search-app:'.$request->ip()));
+
         // Off while search.photo_limits is off: the spending cap still holds every model call.
         RateLimiter::for('search-photo', fn (Request $request): Limit => Features::enabled('search.photo_limits')
             ? Limit::perMinute((int) Settings::get('search.photo_requests_per_minute'))->by('search-photo:'.$request->ip().'|'.$request->route('site'))

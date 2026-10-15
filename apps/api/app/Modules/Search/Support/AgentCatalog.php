@@ -28,9 +28,6 @@ final class AgentCatalog
     /** What an AI is told is always in English; it answers the shopper in the shopper's language. */
     public const AI_LOCALE = 'en';
 
-    /** How many words of a product's looks go into the whole catalogue in short. */
-    private const LOOKS_WORDS = 6;
-
     /** A public link on the platform's own address (agents.lets.co.il), never the address a request happened to come on. */
     public static function publicUrl(string $path): string
     {
@@ -137,11 +134,11 @@ final class AgentCatalog
     /**
      * Every product in stock, inside the one JSON an AI was given: an AI's browser often will not
      * open the links written in a page it read, so what it needs to choose and to order is here, in
-     * short. By category, cheapest first; each product one line of text, its id written out first
-     * ("id 23315 | name | ₪6 | looks: … | options: 23315/111 = 5.40 m ₪71.69"): an AI's browser
+     * short. By category, cheapest first; each product one short line of text, its id written out
+     * first ("id 23315 | name | ₪6 | +options"): an AI's browser reads only so much of a page,
      * cuts long lines and loses bare numbers in arrays, never a line that names them. The order
      * link is made from the ids by the AI and pressed by the shopper, so the AI never has to open
-     * it. Inside the shop's tenant.
+     * it; an option is chosen there. Inside the shop's tenant.
      *
      * @param  array<string, mixed>  $store
      * @return array<string, mixed>
@@ -152,41 +149,24 @@ final class AgentCatalog
         $products = CatalogProduct::query()->whereNull('removed_at')->where('in_stock', true)
             ->orderBy('price')->orderBy('id')->limit(max(1, $limit))
             ->get(['id', 'external_id', 'title', 'price', 'currency', 'payload']);
-        $words = [];
         $money = fn (?float $amount, ?string $currency): string => $amount === null ? '?'
             : (($currency ?: 'ILS') === 'ILS' ? '₪' : $currency.' ').rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
         // Never the separator inside a line's own words.
         $clean = fn (string $text): string => trim((string) preg_replace('/\s+/u', ' ', str_replace('|', '/', $text)));
-
-        RetrievalImage::query()->whereIn('product_id', $products->pluck('id')->all())->whereNotNull('caption_words')->orderBy('id')
-            ->get(['product_id', 'caption_words'])
-            ->each(function (RetrievalImage $image) use (&$words): void {
-                $list = is_array($image->caption_words) ? $image->caption_words : (array) json_decode((string) $image->caption_words, true);
-                $words[(string) $image->product_id] ??= implode(', ', array_slice(array_map('strval', $list), 0, self::LOOKS_WORDS));
-            });
-
         $groups = [];
 
         foreach ($products as $product) {
             $path = $product->categoryPaths()[0] ?? [];
             $category = $path === [] ? $t('everything_other') : implode(' > ', $path);
-            $id = (string) $product->external_id;
-            $options = [];
+            $choices = array_filter((array) ($product->payload['variations'] ?? []), fn ($variant): bool => is_array($variant) && ($variant['stock']['in_stock'] ?? false));
 
-            foreach (array_slice((array) ($product->payload['variations'] ?? []), 0, self::MAX_VARIANTS) as $variant) {
-                if (is_array($variant) && trim((string) ($variant['title'] ?? '')) !== '' && ($variant['stock']['in_stock'] ?? false)) {
-                    // Written as the order link takes it: product id / option id.
-                    $options[] = $id.'/'.($variant['external_id'] ?? '').' = '.$clean((string) $variant['title']).' '
-                        .$money(is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null, $product->currency);
-                }
-            }
-
+            // As short as a line can be: an AI's browser reads only so much of a page. A product
+            // with options is ordered by its id alone; the order page asks the shopper to choose.
             $groups[$category][] = implode(' | ', array_filter([
-                'id '.$id,
+                'id '.$product->external_id,
                 $clean((string) $product->title),
                 $money($product->price === null ? null : (float) $product->price, $product->currency),
-                isset($words[(string) $product->id]) && $words[(string) $product->id] !== '' ? 'looks: '.$clean($words[(string) $product->id]) : null,
-                $options === [] ? null : 'options: '.implode('; ', $options),
+                $choices === [] ? null : '+'.$t('everything_options'),
             ]));
         }
 
@@ -196,7 +176,7 @@ final class AgentCatalog
 
         return array_filter([
             'how' => $t('everything_how'),
-            'order_link' => $catalog.'/cart?items={id}:{quantity},{id}/{option_id}:{quantity}',
+            'order_link' => $catalog.'/cart?items={id}:{quantity},{id}:{quantity}',
             'order_example' => $products->count() >= 2 ? $catalog.'/cart?items='.$products[0]->external_id.':1,'.$products[1]->external_id.':2' : null,
             'count' => $products->count(),
             'by_category' => $groups,

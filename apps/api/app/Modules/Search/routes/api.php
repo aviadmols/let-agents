@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Search\Http\Controllers\AppMcpController;
 use App\Modules\Search\Http\Controllers\McpController;
 use App\Modules\Search\Http\Controllers\PluginSearchController;
 use App\Modules\Search\Http\Controllers\SearchController;
@@ -26,6 +27,12 @@ Route::middleware('throttle:search')->group(function (): void {
     // The store as a connector for a shopper's own AI (Model Context Protocol over HTTP).
     Route::match(['get', 'post', 'delete'], 'mcp/{site}', McpController::class)->name('api.search.mcp');
 });
+
+// Lets Search as one app inside a shopper's AI (a ChatGPT plugin, a Claude connector), every store
+// of it at one address. Its calls come from the AI's own servers, many shoppers to an address.
+Route::match(['get', 'post', 'delete'], 'mcp', AppMcpController::class)
+    ->middleware('throttle:search-app')
+    ->name('api.search.app');
 
 // A photo costs one picture embedding, so it has its own, tighter bucket.
 Route::post('search/{site}/photo', SearchPhotoController::class)

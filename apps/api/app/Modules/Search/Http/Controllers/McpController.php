@@ -126,7 +126,7 @@ final class McpController
     public static function tools(string $locale): array
     {
         $t = fn (string $key): string => (string) __('search::agent.tools.'.$key, [], $locale);
-        $read = ['readOnlyHint' => true, 'openWorldHint' => false];
+        $read = ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false];
 
         return [
             ['name' => 'search_products', 'title' => $t('search_title'), 'description' => $t('search'), 'annotations' => $read, 'inputSchema' => [
