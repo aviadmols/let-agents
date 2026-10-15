@@ -194,10 +194,14 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('for_ai', array_key_first($all));
         $this->assertSame(3, $all['everything']['count'], 'every product in stock');
         $rows = array_merge(...array_values($all['everything']['by_category']));
-        $this->assertSame(['2', '1', '3'], array_column($rows, 0), 'cheapest first');
-        $this->assertSame(['טבעת וינטג׳', 1800, ''], [$rows[0][1], $rows[0][2], $rows[0][3]]);
-        $this->assertSame([['21', 'מידה 6', 1800]], $rows[0][4], 'only the options in stock, by the id the cart takes');
+        // One line a product, its id written out first, each option as the order link takes it.
+        $this->assertSame([
+            'id 2 | טבעת וינטג׳ | ₪1800 | options: 2/21 = מידה 6 ₪1800',
+            'id 1 | טבעת סוליטר | ₪2400 | options: 1/11 = מידה 6 ₪2400',
+            'id 3 | טבעת יוקרה | ₪9000 | options: 3/31 = מידה 6 ₪9000',
+        ], $rows, 'cheapest first, only the options in stock');
         $this->assertSame('https://agents.example.test/c/'.$this->site.'/cart?items=2:1,1:2', $all['everything']['order_example']);
+        $this->assertStringContainsString("\n", $this->get("/c/{$this->site}?format=json")->getContent(), 'never the whole store on one line');
         $this->assertArrayNotHasKey('products', $all, 'not the same products twice');
         $this->assertArrayNotHasKey('browse', $all, 'no links to open when everything is here');
         $this->assertStringContainsString('everything.by_category', implode(' ', $all['for_ai']));
@@ -238,7 +242,7 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('טבעת סוליטר בזהב לבן עם אבן עגולה שקופה (טבעת, סוליטר, זהב לבן)', $json['products'][0]['looks'], 'how it looks, read at night, no picture opened now');
         Cache::flush();
         $rows = array_merge(...array_values($this->getJson("/c/{$this->site}?format=json")->json('everything.by_category')));
-        $this->assertSame('טבעת, סוליטר, זהב לבן', collect($rows)->firstWhere(0, '1')[3], 'and a few words of it in the whole store');
+        $this->assertContains('id 1 | טבעת סוליטר | ₪2400 | looks: טבעת, סוליטר, זהב לבן | options: 1/11 = מידה 6 ₪2400', $rows, 'and a few words of it in the whole store');
 
         $like = $this->getJson("/c/{$this->site}/similar/1")->assertOk()->json();
         $this->assertSame('טבעת סוליטר', $like['like']);
@@ -298,6 +302,11 @@ final class ShareSearchTest extends TestCase
         $check = $this->getJson("/c/{$this->site}/cart?items=1&format=json")->assertOk()->json();
         $this->assertFalse($check['ready']);
         $this->assertSame('choose_option', $check['problems'][0]['problem']);
+
+        // An AI that lost the ids names the products: the store's own, by their names; a name like none is said to be missing.
+        $named = $this->getJson("/c/{$this->site}/cart?items=".rawurlencode('טבעת+יוקרה:2,"טבעת  סוליטר",טבעת וינטג:1,מגהץ אדים').'&format=json')->assertOk()->json();
+        $this->assertSame(['3', '1', '2', 'מגהץ אדים'], array_column($named['problems'], 'product'), 'each found by its name, the fourth by none');
+        $this->assertSame(['choose_option', 'choose_option', 'choose_option', 'unknown_product'], array_column($named['problems'], 'problem'));
 
         // Shopify: every item in one cart, straight to checkout.
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->update(['platform' => 'shopify']));

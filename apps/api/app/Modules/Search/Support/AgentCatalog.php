@@ -137,10 +137,11 @@ final class AgentCatalog
     /**
      * Every product in stock, inside the one JSON an AI was given: an AI's browser often will not
      * open the links written in a page it read, so what it needs to choose and to order is here, in
-     * short. By category, cheapest first; each row: id, name, price, a few words of how it looks,
-     * and its options in stock (the id the cart takes, name, price). The order link is made from
-     * the ids by the AI and pressed by the shopper, so the AI never has to open it. Inside the
-     * shop's tenant.
+     * short. By category, cheapest first; each product one line of text, its id written out first
+     * ("id 23315 | name | ₪6 | looks: … | options: 23315/111 = 5.40 m ₪71.69"): an AI's browser
+     * cuts long lines and loses bare numbers in arrays, never a line that names them. The order
+     * link is made from the ids by the AI and pressed by the shopper, so the AI never has to open
+     * it. Inside the shop's tenant.
      *
      * @param  array<string, mixed>  $store
      * @return array<string, mixed>
@@ -150,8 +151,12 @@ final class AgentCatalog
         $t = fn (string $key, array $params = []): string => (string) __('search::share.'.$key, $params, self::AI_LOCALE);
         $products = CatalogProduct::query()->whereNull('removed_at')->where('in_stock', true)
             ->orderBy('price')->orderBy('id')->limit(max(1, $limit))
-            ->get(['id', 'external_id', 'title', 'price', 'payload']);
+            ->get(['id', 'external_id', 'title', 'price', 'currency', 'payload']);
         $words = [];
+        $money = fn (?float $amount, ?string $currency): string => $amount === null ? '?'
+            : (($currency ?: 'ILS') === 'ILS' ? '₪' : $currency.' ').rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
+        // Never the separator inside a line's own words.
+        $clean = fn (string $text): string => trim((string) preg_replace('/\s+/u', ' ', str_replace('|', '/', $text)));
 
         RetrievalImage::query()->whereIn('product_id', $products->pluck('id')->all())->whereNotNull('caption_words')->orderBy('id')
             ->get(['product_id', 'caption_words'])
@@ -165,16 +170,24 @@ final class AgentCatalog
         foreach ($products as $product) {
             $path = $product->categoryPaths()[0] ?? [];
             $category = $path === [] ? $t('everything_other') : implode(' > ', $path);
+            $id = (string) $product->external_id;
             $options = [];
 
             foreach (array_slice((array) ($product->payload['variations'] ?? []), 0, self::MAX_VARIANTS) as $variant) {
                 if (is_array($variant) && trim((string) ($variant['title'] ?? '')) !== '' && ($variant['stock']['in_stock'] ?? false)) {
-                    $options[] = [(string) ($variant['external_id'] ?? ''), (string) $variant['title'], is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null];
+                    // Written as the order link takes it: product id / option id.
+                    $options[] = $id.'/'.($variant['external_id'] ?? '').' = '.$clean((string) $variant['title']).' '
+                        .$money(is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null, $product->currency);
                 }
             }
 
-            $row = [(string) $product->external_id, (string) $product->title, $product->price === null ? null : (float) $product->price, $words[(string) $product->id] ?? ''];
-            $groups[$category][] = $options === [] ? $row : [...$row, $options];
+            $groups[$category][] = implode(' | ', array_filter([
+                'id '.$id,
+                $clean((string) $product->title),
+                $money($product->price === null ? null : (float) $product->price, $product->currency),
+                isset($words[(string) $product->id]) && $words[(string) $product->id] !== '' ? 'looks: '.$clean($words[(string) $product->id]) : null,
+                $options === [] ? null : 'options: '.implode('; ', $options),
+            ]));
         }
 
         // Categories in a fixed order, so the same store gives the same JSON.
@@ -183,9 +196,7 @@ final class AgentCatalog
 
         return array_filter([
             'how' => $t('everything_how'),
-            'row' => ['id', 'title', 'price', 'looks', 'options'],
-            'option' => ['cart_id', 'title', 'price'],
-            'order_link' => $catalog.'/cart?items={id}:{quantity},{id}/{cart_id}:{quantity}',
+            'order_link' => $catalog.'/cart?items={id}:{quantity},{id}/{option_id}:{quantity}',
             'order_example' => $products->count() >= 2 ? $catalog.'/cart?items='.$products[0]->external_id.':1,'.$products[1]->external_id.':2' : null,
             'count' => $products->count(),
             'by_category' => $groups,

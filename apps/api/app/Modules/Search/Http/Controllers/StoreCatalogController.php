@@ -99,8 +99,8 @@ final class StoreCatalogController
 
         // "json" as an AI may copy it, with a quote or a stop after it.
         if (str_starts_with((string) $request->query('format', ''), 'json')) {
-            // The front page holds the whole store: one product a line, not one value a line.
-            return response()->json(self::forAi($store, $data, $asked), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | ($front ? 0 : JSON_PRETTY_PRINT));
+            // Line by line: an AI's browser cuts a long line, so the whole store is never one line.
+            return response()->json(self::forAi($store, $data, $asked), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         }
 
         $locale = in_array($store['locale'], ['he', 'en'], true) ? $store['locale'] : 'he';
