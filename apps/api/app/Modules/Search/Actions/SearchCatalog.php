@@ -104,6 +104,8 @@ final class SearchCatalog
             // "הכי זול", "במבצע", "גדול מ-2": actions, not words. The same phrases in every shop, less
             // those its index leaves out (no size: "גדול" stays a word).
             [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);
+            // "שטיח כחול 80 על 150": a colour or a size the shop filters by is a filter, not a word (the page shows it as one).
+            $query = $index === null ? $query : HebrewSearch::withoutFacetWords($index, $query);
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
 
             if ($index === null || $query === '') {

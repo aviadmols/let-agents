@@ -135,6 +135,52 @@ final class QueryActionsTest extends TestCase
         $this->assertSame(['טבעת', 'עגילים'], $browser['או טבעת או עגילים במלאי']['either']);
     }
 
+    public function test_words_that_name_a_filter_value_are_read_as_that_filter_in_the_browser_as_on_the_server(): void
+    {
+        $facets = [
+            ['k' => 'type', 'l' => 'סוג', 'v' => [['k' => 'rug', 'l' => 'שטיח']]],
+            ['k' => 'size', 'l' => 'מידה', 'v' => [['k' => 'a', 'l' => '80×150'], ['k' => 'b', 'l' => '120×170'], ['k' => 's', 'l' => 'S']]],
+            ['k' => 'color', 'l' => 'צבע', 'v' => [['k' => 'blue', 'l' => 'כחול'], ['k' => 'cream', 'l' => 'קרם']]],
+            ['k' => 'metal', 'l' => 'מתכת', 'v' => [['k' => 'g', 'l' => 'זהב'], ['k' => 'yg', 'l' => 'זהב צהוב']]],
+        ];
+        $queries = ['שטיח עד 1000 שח 80 על 150', 'שטיח כחולה 80X150', 'שטיח בכחול', 'טבעת זהב צהוב', 'שטיח', 'שטיח S', 'שטיח 120×170 קרם'];
+        $server = [];
+        foreach ($queries as $query) {
+            $named = HebrewSearch::facets($query, $facets);
+            $server[$query] = ['named' => array_map(fn (array $n): array => [$n['code'], $n['said']], $named), 'left' => $named === [] ? null : HebrewSearch::withoutSaid($query, $named[0]['said'])];
+        }
+
+        $this->assertSame([[1000, '80x150']], $server['שטיח עד 1000 שח 80 על 150']['named'], 'a size however it is written');
+        $this->assertSame('שטיח עד 1000 שח', $server['שטיח עד 1000 שח 80 על 150']['left'], 'the × takes out exactly those words');
+        $this->assertSame([[1000, '80x150'], [2000, 'כחולה']], $server['שטיח כחולה 80X150']['named'], 'a colour in the feminine');
+        $this->assertSame('שטיח', $server['שטיח בכחול']['left'], 'with a letter in front');
+        $this->assertSame([[3001, 'זהב צהוב']], $server['טבעת זהב צהוב']['named'], 'the longest name, not also "זהב"');
+        $this->assertSame([], $server['שטיח']['named'], 'never the type');
+        $this->assertSame([], $server['שטיח S']['named'], 'too short to be meant');
+
+        $node = (new ExecutableFinder)->find('node');
+        if ($node === null) {
+            $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
+        }
+        $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const f='.json_encode($facets, JSON_UNESCAPED_UNICODE).';const out={};'
+            .'for(const q of '.json_encode($queries, JSON_UNESCAPED_UNICODE).'){const n=e.queryFacets(q,f);out[q]={named:n.map(x=>[x.code,x.said]),left:n.length?e.withoutSaid(q,n[0].said):null};}'
+            .'process.stdout.write(JSON.stringify(out));';
+        $process = new Process([$node, '-e', $harness]);
+        $process->mustRun();
+
+        $this->assertEquals($server, json_decode($process->getOutput(), true), 'the browser reads the words as the server does');
+    }
+
+    public function test_the_server_searches_a_filter_word_as_a_filter_only_when_what_it_finds_has_it(): void
+    {
+        $this->build();
+        $index = $this->inShop(fn () => LoadedIndex::for($this->shop->id));
+
+        $this->assertSame('טבעת יהלום', HebrewSearch::withoutFacetWords($index, 'טבעת יהלום זהב לבן'), 'rings marked white gold exist: the metal is a filter, not a word');
+        $this->assertSame('עגילי זהב צהוב', HebrewSearch::withoutFacetWords($index, 'עגילי זהב צהוב'), 'no earrings are marked yellow gold: the words stay words');
+        $this->assertSame('טבעת יהלום', HebrewSearch::withoutFacetWords($index, 'טבעת יהלום'));
+    }
+
     /** @return array<string, mixed> the index as built and stored */
     private function build(): array
     {

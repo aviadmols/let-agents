@@ -596,6 +596,64 @@
     });
   }
 
+  /** "80 על 150", "80X150", "80×150": one size, written one way. */
+  function facetText(text) {
+    return normalize(String(text).replace(/(\d)\s*(?:[x×X*✕]|על|on)\s*(\d)/g, '$1x$2'));
+  }
+
+  /**
+   * The shop's filter values the words name ("כחול", "כחולה", "בכחול", "80x150", "זהב צהוב"):
+   * those filters are chosen for this query, as if pressed, and shown at the top with their ×.
+   * In code, from last night's index; the longest name wins ("זהב צהוב" before "זהב"). Not the
+   * product's type: "שטיח" is what the words search for, not a filter on it.
+   */
+  function queryFacets(raw, facets) {
+    var text = ' ' + facetText(raw) + ' ';
+    var found = [];
+    (facets || []).forEach(function (facet, at) {
+      if (facet.k === 'type') {
+        return;
+      }
+      (facet.v || []).forEach(function (value, i) {
+        var name = facetText(value.l);
+        // Too short to be meant ("S", "M"), unless it is a size with numbers.
+        if (name.length < 3 && !/\d/.test(name)) {
+          return;
+        }
+        var hebrew = /[\u0590-\u05FF]$/.test(name);
+        var pattern = new RegExp('\\s[ובהלמ]?(' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + (hebrew ? '(?:ה|ימ|ות)?' : '') + ')(?=\\s)');
+        var m = text.match(pattern);
+        if (m) {
+          found.push({ code: at * 1000 + i, said: m[1], label: value.l, title: facet.l });
+        }
+      });
+    });
+    found.sort(function (a, b) { return b.said.length - a.said.length || a.code - b.code; });
+    var taken = [];
+    return found.filter(function (named) {
+      if (taken.some(function (word) { return word.indexOf(named.said) !== -1; })) {
+        return false;
+      }
+      taken.push(named.said);
+      return true;
+    });
+  }
+
+  /** The words as typed, less the ones that read as $said ("80 על 150" for "80x150"); null when not found. */
+  function withoutSaid(raw, said) {
+    var tokens = String(raw).split(/\s+/);
+    for (var size = 1; size <= 4; size++) {
+      for (var i = 0; i + size <= tokens.length; i++) {
+        var piece = facetText(tokens.slice(i, i + size).join(' '));
+        if (piece === said || piece.replace(/^[ובהלמ]/, '') === said) {
+          return tokens.slice(0, i).concat(tokens.slice(i + size)).join(' ').replace(/\s+/g, ' ').trim();
+        }
+      }
+    }
+    return null;
+  }
+
+
   /**
    * "טבעת או עגילים", "או טבעת או עגילים": each side searched on its own, its results added to the
    * other's. One element when the query names no "או". As on the server (HebrewSearch::either).
@@ -1992,6 +2050,10 @@
       '.la-fgroup:last-of-type{border-inline-end:0}',
       '.la-fgroup-l{font-size:11.5px;opacity:.6;font-weight:600}',
       '.la-filters .d-chip{padding:4px 12px;font-size:13px}',
+      // What the words were read as ("עד ₪1,000", "80×150", "כחול"): chosen, each with its ×.
+      '.la-read{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 0 10px}',
+      '.la-read .d-chip{display:inline-flex;align-items:center;gap:8px;font-weight:600;padding:6px 14px}',
+      '.la-read .d-chip span{font-size:15px;line-height:1;opacity:.85}',
       '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
       '.la-focus-row{display:flex;flex-wrap:wrap;gap:8px}',
       'a.d-chip{color:inherit;text-decoration:none}',
@@ -2400,6 +2462,7 @@
       }
 
       var picked = chosenFor(raw);
+      settle(pool, picked);
       var view = viewOf(pool, picked);
       total = view.length;
       products = view.slice(0, max);
@@ -2466,6 +2529,16 @@
       if (d.mobile && categories.length) {
         chips = el('div', 'm-cats');
         main.appendChild(chips);
+      }
+
+      // What the words were read as: a price, a colour, a size, each with its ×.
+      var read = one ? null : readRow(raw, picked, function (left) {
+        input.value = left;
+        current = input;
+        suggest(input);
+      }, function () { suggest(input); });
+      if (read) {
+        main.appendChild(read);
       }
 
       // Quick filters for what was found: a choice shows the products again, as chosen.
@@ -2584,6 +2657,7 @@
       var text = ' ' + String(raw).replace(/[.,!?;:]+(?=\s|$)/g, ' ') + ' ';
       var min = null;
       var max = null;
+      var said = [];
       PRICE_PATTERNS.forEach(function (pattern) {
         var m = text.match(pattern[1]);
         if (!m) {
@@ -2603,16 +2677,18 @@
         } else {
           min = priceAmount(m, 1);
         }
+        said.push(m[0].trim());
         text = text.replace(m[0], ' ');
       });
       if (min === null && max === null) {
         var bare = text.match(PRICE_BARE);
         if (bare) {
           max = priceAmount(bare, 1);
+          said.push(bare[0].trim());
           text = text.replace(bare[0], ' ');
         }
       }
-      return { query: text.replace(/\s+/g, ' ').trim(), min: min, max: max };
+      return { query: text.replace(/\s+/g, ' ').trim(), min: min, max: max, said: said };
     }
 
     function inPriceRange(price, min, max) {
@@ -2665,9 +2741,87 @@
     function chosenFor(raw) {
       var key = normalize(raw);
       if (chosen.key !== key) {
-        chosen = { key: key, sort: null, sale: false, stock: false, f: {} };
+        chosen = { key: key, sort: null, sale: false, stock: false, f: {}, read: queryFacets(raw, state.facets), settled: false };
+        chosen.read.forEach(function (named) { chosen.f[named.code] = true; });
       }
       return chosen;
+    }
+
+    /**
+     * Filters read from the words that would leave nothing are let go, once per query: a store
+     * whose blue rugs are not marked blue still shows the rugs the words find.
+     */
+    function settle(pool, c) {
+      if (c.settled) {
+        return;
+      }
+      c.settled = true;
+      if ((c.read || []).length && !viewOf(pool, c).length) {
+        c.read.forEach(function (named) { delete c.f[named.code]; });
+        c.read = [];
+      }
+    }
+
+    function shekels(amount) {
+      return '₪' + Number(amount).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    }
+
+    /**
+     * What the words were read as, above the results: the price range and the filters they name,
+     * each a chosen chip with its ×. The × takes the words out of the box and searches again
+     * (retype), or, when they cannot be found as typed, lets the filter go (changed). Null when the
+     * words named nothing.
+     */
+    function readRow(raw, c, retype, changed) {
+      var chips = [];
+      var price = priceRange(raw);
+      if (price.min !== null || price.max !== null) {
+        var text = price.min !== null && price.max !== null ? label('read_between', { min: shekels(price.min), max: shekels(price.max) })
+          : price.max !== null ? label('read_upto', { amount: shekels(price.max) }) : label('read_from', { amount: shekels(price.min) });
+        chips.push({ text: text, go: function () {
+          var left = String(raw);
+          price.said.forEach(function (said) { left = left.replace(said, ' '); });
+          retype(left.replace(/\s+/g, ' ').trim());
+        } });
+      }
+      (c.read || []).forEach(function (named) {
+        if (!c.f[named.code]) {
+          return;
+        }
+        chips.push({ text: named.label, title: named.title, go: function () {
+          var left = withoutSaid(raw, named.said);
+          if (left !== null && left !== '') {
+            retype(left);
+            return;
+          }
+          delete c.f[named.code];
+          changed();
+        } });
+      });
+      if (!chips.length) {
+        return null;
+      }
+      var row = el('div', 'la-read');
+      row.setAttribute('data-read-filters', '');
+      chips.forEach(function (chip) {
+        var button = el('button', 'd-chip');
+        button.type = 'button';
+        button.setAttribute('aria-pressed', 'true');
+        button.setAttribute('aria-label', label('read_remove', { name: chip.text }));
+        if (chip.title) {
+          button.title = chip.title;
+        }
+        button.appendChild(el('span', null, '\u00D7'));
+        button.appendChild(doc.createTextNode(chip.text));
+        button.addEventListener('mousedown', keepFocus);
+        holdClicks(button);
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          chip.go();
+        });
+        row.appendChild(button);
+      });
+      return row;
     }
 
     /**
@@ -2828,6 +2982,23 @@
       }
       // "הכי זול", "במבצע", "גדול מ-2": actions, not words, as on the server.
       var acted = readActions(raw, state.actions);
+      // "שטיח כחול 80 על 150": the words that name filter values are filters (chosen by chosenFor),
+      // searched without, when the products the other words find have those values; as on the server.
+      var named = acted.actions.ids.length ? [] : queryFacets(raw, state.facets);
+      if (named.length) {
+        var stripped = raw;
+        named.forEach(function (value) { stripped = withoutSaid(stripped, value.said) || stripped; });
+        if (stripped && normalize(stripped) !== normalize(raw)) {
+          var wide = lookup(stripped, question);
+          var held = wide.some(function (hit) {
+            var record = state.records[hit.id];
+            return record && record.t === 'product' && named.every(function (value) { return (record.f || []).indexOf(value.code) !== -1; });
+          });
+          if (held) {
+            return wide;
+          }
+        }
+      }
       if (acted.actions.ids.length) {
         return actOn(lookup(acted.query, question), acted.actions);
       }
@@ -4799,6 +4970,7 @@
         var page = drawerMode() ? 6 : 24;
         var showing = page;
         var picked = chosenFor(raw);
+        settle(pool, picked);
         var barAt = el('div');
         section.appendChild(barAt);
         var grid = el('div', 'grid');
@@ -4835,6 +5007,10 @@
           showing = page;
           while (barAt.firstChild) {
             barAt.removeChild(barAt.firstChild);
+          }
+          var read = one ? null : readRow(raw, picked, function (left) { openPanel(left); }, refresh);
+          if (read) {
+            barAt.appendChild(read);
           }
           var bar = one ? null : filterBar(pool, picked, refresh);
           if (bar) {
@@ -6404,6 +6580,8 @@
     focus: focus,
     closeAnswer: closeAnswer,
     readActions: readActions,
+    queryFacets: queryFacets,
+    withoutSaid: withoutSaid,
     either: either,
     applyActions: applyActions,
     handleFromUrl: handleFromUrl,

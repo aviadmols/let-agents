@@ -260,6 +260,112 @@ final class HebrewSearch
         return $records;
     }
 
+    /** "80 על 150", "80X150", "80×150": one size, written one way. The same in the browser (facetText). */
+    public static function facetText(string $text): string
+    {
+        return self::normalize((string) preg_replace('/(\d)\s*(?:[x×X*✕]|על|on)\s*(\d)/u', '$1x$2', $text));
+    }
+
+    /**
+     * The shop's filter values the words name ("כחול", "כחולה", "בכחול", "80x150", "זהב צהוב"),
+     * longest first, one value per phrase; never the product's type. The same in the browser
+     * (queryFacets).
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  the index's
+     * @return list<array{code: int, said: string, label: string, title: string}>
+     */
+    public static function facets(string $raw, array $facets): array
+    {
+        $text = ' '.self::facetText($raw).' ';
+        $found = [];
+
+        foreach ($facets as $at => $facet) {
+            if (($facet['k'] ?? '') === 'type') {
+                continue;
+            }
+
+            foreach ((array) ($facet['v'] ?? []) as $i => $value) {
+                $name = self::facetText((string) ($value['l'] ?? ''));
+
+                if (mb_strlen($name) < 3 && preg_match('/\d/', $name) !== 1) {
+                    continue;
+                }
+
+                $hebrew = preg_match('/[\x{0590}-\x{05FF}]$/u', $name) === 1;
+                if (preg_match('/\s[ובהלמ]?('.preg_quote($name, '/').($hebrew ? '(?:ה|ימ|ות)?' : '').')(?=\s)/u', $text, $m) === 1) {
+                    $found[] = ['code' => $at * 1000 + $i, 'said' => $m[1], 'label' => (string) $value['l'], 'title' => (string) ($facet['l'] ?? '')];
+                }
+            }
+        }
+
+        usort($found, fn (array $a, array $b): int => [mb_strlen($b['said']), $a['code']] <=> [mb_strlen($a['said']), $b['code']]);
+        $taken = [];
+
+        return array_values(array_filter($found, function (array $named) use (&$taken): bool {
+            foreach ($taken as $word) {
+                if (str_contains($word, $named['said'])) {
+                    return false;
+                }
+            }
+            $taken[] = $named['said'];
+
+            return true;
+        }));
+    }
+
+    /** The words as typed, less the ones that read as $said ("80 על 150" for "80x150"); null when not found. The same in the browser. */
+    public static function withoutSaid(string $raw, string $said): ?string
+    {
+        $tokens = preg_split('/\s+/u', $raw) ?: [];
+
+        for ($size = 1; $size <= 4; $size++) {
+            for ($i = 0; $i + $size <= count($tokens); $i++) {
+                $piece = self::facetText(implode(' ', array_slice($tokens, $i, $size)));
+                if ($piece === $said || (string) preg_replace('/^[ובהלמ]/u', '', $piece) === $said) {
+                    return trim((string) preg_replace('/\s+/u', ' ', implode(' ', [...array_slice($tokens, 0, $i), ...array_slice($tokens, $i + $size)])));
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * "שטיח כחול 80 על 150": the words that name filter values are searched as filters, not as
+     * words, when the products the other words find have those values; otherwise they stay words
+     * (a shop whose blue rugs are not marked blue still finds them by the word). The same in the
+     * browser (lookup).
+     *
+     * @param  array<string, mixed>  $index  as LoadedIndex keeps it
+     */
+    public static function withoutFacetWords(array $index, string $query): string
+    {
+        $named = self::facets($query, (array) ($index['facets'] ?? []));
+
+        if ($named === []) {
+            return $query;
+        }
+
+        $stripped = $query;
+        foreach ($named as $value) {
+            $stripped = self::withoutSaid($stripped, $value['said']) ?? $stripped;
+        }
+
+        if ($stripped === '' || $stripped === $query) {
+            return $query;
+        }
+
+        $codes = array_column($named, 'code');
+        foreach (self::search($index['engine'], $stripped) as $hit) {
+            $record = $index['records'][$hit['id']] ?? null;
+            if (($record['t'] ?? null) === 'product' && array_diff($codes, (array) ($record['f'] ?? [])) === []) {
+                return $stripped;
+            }
+        }
+
+        return $query;
+    }
+
     /**
      * "טבעת או עגילים", "או טבעת או עגילים": each side searched on its own, its results added to
      * the other's. One element when the query names no "או". The same in the browser (either).
