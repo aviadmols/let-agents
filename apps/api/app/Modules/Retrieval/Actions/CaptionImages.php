@@ -39,15 +39,19 @@ final class CaptionImages implements CaptionsPictures
 
     public const ACTION = 'retrieval.caption_images';
 
-    /** 4: stones by colour, light and shape, never by name: a photo cannot tell a ruby from a garnet. */
-    public const PROMPT_VERSION = 4;
+    /**
+     * 4: stones by colour, light and shape, never by name: a photo cannot tell a ruby from a garnet.
+     * 5: more of how it looks: the metal's colour in two words, every colour as a word of its own,
+     * the finish and the style; up to 18 words.
+     */
+    public const PROMPT_VERSION = 5;
 
     private const BATCH = 16;
 
     /** How long a describer holds the shop: a part of 200 pictures takes minutes, not this. */
     private const LOCK_SECONDS = 1500;
 
-    private const MAX_WORDS = 14;
+    private const MAX_WORDS = 18;
 
     /** A picture of about 1000px is about this many input tokens, for the spend estimate. */
     private const PHOTO_TOKENS = 1600;
