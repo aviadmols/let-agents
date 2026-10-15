@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Support;
 
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -22,7 +23,8 @@ use Throwable;
  */
 final class CartLink
 {
-    public const MAX_ITEMS = 10;
+    /** A project (a pergola: posts, beams, rafters, brackets, screws) is more than ten lines. */
+    public const MAX_ITEMS = 30;
 
     public const MAX_QUANTITY = 20;
 
@@ -30,8 +32,13 @@ final class CartLink
     private const PROBE_SECONDS = 86400;
 
     /**
-     * @param  list<array<string, mixed>>  $items  each {product, variant?, quantity?}
-     * @return array{url: string|null, links: list<array{product: string, url: string}>, problems: list<array{product: string, problem: string, options?: list<array{id: string, title: string, in_stock: bool}>}>}
+     * The items a store's cart cannot take from a link: a product whose page asks for a choice the
+     * feed does not carry (a length, CatalogProductChoice) is added on its own page, with the
+     * choice the AI made, if any, written out for the shopper. A link with such a product would
+     * fail: the store empties the cart and sends the shopper to its catalogue.
+     *
+     * @param  list<array<string, mixed>>  $items  each {product, variant?, quantity?, length?}
+     * @return array{url: string|null, links: list<array{product: string, url: string}>, problems: list<array{product: string, problem: string, options?: list<array{id: string, title: string, in_stock: bool}>}>, on_store: list<array<string, mixed>>, cart_url: string}
      */
     public static function build(StoreConnection $connection, array $items): array
     {
@@ -39,6 +46,7 @@ final class CartLink
         $lines = [];
         $links = [];
         $problems = [];
+        $onStore = [];
 
         foreach (array_slice($items, 0, self::MAX_ITEMS) as $item) {
             $productId = (string) ($item['product'] ?? '');
@@ -47,6 +55,14 @@ final class CartLink
 
             if ($product === null) {
                 $problems[] = ['product' => $productId, 'problem' => 'unknown_product'];
+
+                continue;
+            }
+
+            $choice = CatalogProductChoice::query()->where('product_id', $product->id)->first();
+
+            if ($choice !== null && $choice->required()) {
+                $onStore[] = self::onStore($product, $choice, $quantity, is_numeric($item['length'] ?? null) ? (float) $item['length'] : null);
 
                 continue;
             }
@@ -85,7 +101,46 @@ final class CartLink
             default => $store['url'].'/checkout-link/?products='.implode(',', $lines),
         };
 
-        return ['url' => $url, 'links' => $links, 'problems' => $problems];
+        return ['url' => $url, 'links' => $links, 'problems' => $problems, 'on_store' => $onStore, 'cart_url' => self::cartUrl($connection)];
+    }
+
+    /**
+     * A product added on its own page: where, how many, and the length the AI chose with its price,
+     * or the lengths to choose from.
+     *
+     * @return array<string, mixed>
+     */
+    private static function onStore(CatalogProduct $product, CatalogProductChoice $choice, int $quantity, ?float $length): array
+    {
+        $field = collect($choice->fields)->first(fn (array $f): bool => (bool) ($f['required'] ?? false)) ?? [];
+        $values = (array) ($field['values'] ?? []);
+        $picked = $length === null ? null : collect($values)->first(fn (array $v): bool => isset($v['meters']) && abs((float) $v['meters'] - $length) < 0.001);
+
+        return array_filter([
+            'product' => (string) $product->external_id,
+            'title' => (string) $product->title,
+            'url' => (string) $product->url,
+            'quantity' => $quantity,
+            'field' => (string) ($field['label'] ?? ''),
+            'chosen' => $picked['label'] ?? null,
+            'price' => $picked['price'] ?? null,
+            'choices' => $picked === null ? array_map(fn (array $v): array => array_filter(['label' => $v['label'] ?? '', 'price' => $v['price'] ?? null], fn ($x): bool => $x !== null), $values) : null,
+            'problem' => $length !== null && $picked === null ? 'unknown_length' : null,
+        ], fn ($v): bool => $v !== null && $v !== '');
+    }
+
+    /** The store's own cart page: where an empty checkout link sends the shopper, else /cart/. */
+    public static function cartUrl(StoreConnection $connection): string
+    {
+        $base = rtrim((string) $connection->site_url, '/');
+
+        if ($connection->platform === 'shopify') {
+            return $base.'/cart';
+        }
+
+        $to = self::probe($connection)['cart'];
+
+        return $to !== null ? $to : $base.'/cart/';
     }
 
     /**
@@ -132,19 +187,36 @@ final class CartLink
             return false;
         }
 
+        return self::probe($connection)['takes'];
+    }
+
+    /**
+     * An empty checkout link, asked once a day: a store that takes them sends it on to its cart
+     * (whose address is kept, without the error it adds); one that does not has no such page.
+     *
+     * @return array{takes: bool, cart: string|null}
+     */
+    private static function probe(StoreConnection $connection): array
+    {
         $base = rtrim((string) $connection->site_url, '/');
 
-        return (bool) Cache::remember('cart:checkout-link:'.hash('sha256', $base), self::PROBE_SECONDS, function () use ($base): bool {
+        if ($base === '') {
+            return ['takes' => false, 'cart' => null];
+        }
+
+        return (array) Cache::remember('cart:checkout-link:v2:'.hash('sha256', $base), self::PROBE_SECONDS, function () use ($base): array {
             try {
                 $response = Http::withoutRedirecting()->timeout(6)->connectTimeout(3)->get($base.'/checkout-link/');
             } catch (Throwable) {
-                return false;
+                return ['takes' => false, 'cart' => null];
             }
 
             $to = rtrim((string) $response->header('Location'), '/');
+            $takes = $response->redirect() && $to !== '' && $to !== $base && ! str_starts_with($to, $base.'/?');
+            $cart = $takes ? strtok($to, '?').'/' : null;
 
-            return $response->redirect() && $to !== '' && $to !== $base && ! str_starts_with($to, $base.'/?');
-        });
+            return ['takes' => $takes, 'cart' => $cart === null ? null : rtrim($cart, '/').'/'];
+        }) + ['takes' => false, 'cart' => null];
     }
 
     /** The one variant of a Shopify product without options, from its public product page, when it can be bought. */

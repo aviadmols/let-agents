@@ -151,6 +151,7 @@ final class McpController
                         'product' => ['type' => 'string', 'description' => $t('cart_product')],
                         'variant' => ['type' => 'string', 'description' => $t('cart_variant')],
                         'quantity' => ['type' => 'integer', 'minimum' => 1, 'maximum' => CartLink::MAX_QUANTITY, 'default' => 1],
+                        'length' => ['type' => 'number', 'minimum' => 0, 'description' => $t('cart_length')],
                     ],
                     'required' => ['product'],
                 ]]],

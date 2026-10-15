@@ -2,6 +2,7 @@
 
 return [
     'refreshed' => 'Prices and stock refreshed: :updated products changed, :removed taken off the store.',
+    'choices_read' => 'Product pages: :read read, :changed changed; :with products ask for a choice (a length, a size) before the cart.',
     'changes_synced' => 'Changes from the store: :created new products, :updated changed, :removed taken off the store.',
     'synced' => ':products products read: :created new, :updated changed, :removed no longer published. :categories categories, :content articles.',
     'synced_capped' => 'Stopped at the limit of :limit products: :products read, :created new, :updated changed. Nothing was marked removed. Raise the limit in Settings to read the rest.',

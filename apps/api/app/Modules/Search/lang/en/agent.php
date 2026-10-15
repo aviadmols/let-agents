@@ -16,6 +16,7 @@ return [
         'cart_title' => 'Make a cart link',
         'cart' => 'A link that puts products in the store\'s own cart; the shopper opens it and pays on the store. A product with options needs the option\'s id (from the product\'s variants); without one, the answer lists the options to choose from.',
         'cart_product' => 'The product id.',
+        'cart_length' => 'For a product sold by length: the length chosen, in metres, one of its lengths (get_product). The shopper adds it on its page, where it is written out.',
         'cart_variant' => 'The chosen option\'s id (a size, a colour), from the product\'s variants.',
     ],
     // Lets Search as one app inside a shopper's AI, every store of it at one address (AppMcpController).

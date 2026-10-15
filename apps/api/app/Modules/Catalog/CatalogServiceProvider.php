@@ -4,6 +4,7 @@ namespace App\Modules\Catalog;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Catalog\Console\ReadPageChoicesCommand;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
@@ -40,8 +41,6 @@ final class CatalogServiceProvider extends ModuleServiceProvider
                 ->name('catalog:sync-daily')
                 ->onOneServer();
 
-            // And between nights, what each store changed (catalog.live_sync): a new product is
-            // searchable within minutes. A few cheap questions to the store; nothing when nothing changed.
             // Prices and stock three times a day (catalog.refresh): the products alone.
             foreach (['08:30', '14:30', '20:30'] as $at) {
                 $schedule->command('catalog:sync --refresh')
@@ -52,6 +51,18 @@ final class CatalogServiceProvider extends ModuleServiceProvider
                     ->onOneServer();
             }
 
+            // The choices product pages ask for (catalog.page_choices): slowly, after the nightly
+            // read, in the background so the other schedules are not held up.
+            $schedule->command('catalog:read-choices')
+                ->dailyAt('04:05')
+                ->timezone('Asia/Jerusalem')
+                ->name('catalog:read-choices')
+                ->withoutOverlapping(180)
+                ->runInBackground()
+                ->onOneServer();
+
+            // And between nights, what each store changed (catalog.live_sync): a new product is
+            // searchable within minutes. A few cheap questions to the store; nothing when nothing changed.
             $schedule->command('catalog:sync-changes')
                 ->everyTenMinutes()
                 ->name('catalog:sync-changes')
@@ -65,6 +76,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
         return [
             SyncCatalogCommand::class,
             SyncChangedProductsCommand::class,
+            ReadPageChoicesCommand::class,
         ];
     }
 }

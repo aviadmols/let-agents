@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -425,5 +426,52 @@ final class ShareSearchTest extends TestCase
         Features::override('search.ai_share', false, $this->shop->id);
         $this->assertSame([], $tool('find_store')['structuredContent']['stores']);
         $this->get('/api/v1/mcp')->assertStatus(405);
+    }
+
+    public function test_a_product_sold_by_length_is_counted_by_its_lengths_and_added_on_its_own_page(): void
+    {
+        config(['upsell.shop_domain' => 'agents.example.test']);
+        // A store that takes checkout links; an empty one leads to its cart.
+        Http::fake(['www.rings.test/checkout-link/' => Http::response('', 302, ['Location' => 'https://www.rings.test/%D7%A2%D7%92%D7%9C%D7%94/?wc_error=empty'])]);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $beam = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '7', 'type' => 'simple', 'status' => 'publish', 'title' => 'קורת אורן 45X95',
+                'url' => 'https://www.rings.test/p/7', 'price' => 13.28, 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => 'h7', 'payload' => []]);
+            CatalogProductChoice::query()->create(['shop_id' => $this->shop->id, 'product_id' => $beam->id, 'checked_at' => now(), 'fields' => [[
+                'key' => 'addon-7-אורך-0', 'label' => 'אורך', 'kind' => 'length', 'required' => true, 'values' => [
+                    ['value' => '4-20-מטר-2', 'label' => '4.20 מטר', 'price' => 55.78, 'meters' => 4.2],
+                    ['value' => '3-00-מטר-1', 'label' => '3.00 מטר', 'price' => 39.84, 'meters' => 3.0],
+                ]]]]);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+        Cache::flush();
+
+        // The whole store: the lengths on the line, shortest first, each with its price.
+        $rows = array_merge(...array_values($this->getJson("/c/{$this->site}?format=json")->json('everything.by_category')));
+        $this->assertContains('id 7 | קורת אורן 45X95 | ₪13.28 | lengths: 3m ₪39.84; 4.2m ₪55.78', $rows);
+
+        // The product: its lengths, and no store link, which would empty the cart.
+        $beam = $this->getJson("/c/{$this->site}?format=json&q=".rawurlencode('קורת אורן'))->json('products.0');
+        $this->assertSame('אורך', $beam['choices'][0]['label']);
+        $this->assertEquals([4.2, 3.0], array_column($beam['choices'][0]['values'], 'meters'));
+        $this->assertStringContainsString('/c/'.$this->site.'/cart?items=7:1', $beam['buy_url'], 'through our order page');
+
+        // An order with a ring and four beams of 3 m: the ring by the link, the beams on their page.
+        $order = $this->getJson("/c/{$this->site}/cart?items=1/11:1,7@3:4&format=json")->assertOk()->json();
+        $this->assertSame('https://www.rings.test/checkout-link/?products=11:1', $order['url'], 'never the beam in a store link');
+        $this->assertSame([['product' => '7', 'title' => 'קורת אורן 45X95', 'url' => 'https://www.rings.test/p/7', 'quantity' => 4, 'field' => 'אורך', 'chosen' => '3.00 מטר', 'price' => 39.84]], $order['on_store']);
+        $this->assertSame('https://www.rings.test/%D7%A2%D7%92%D7%9C%D7%94/', $order['cart_url']);
+        $this->assertTrue($order['ready']);
+        $this->assertFalse($order['one_link']);
+
+        // The page walks the shopper through it, the link first: a checkout link replaces the cart.
+        $page = $this->get("/c/{$this->site}/cart?items=1/11:1,7@3:4")->assertOk();
+        $page->assertSee('data-cart-steps', false)->assertSee('לבחור: 3.00 מטר')->assertSee('₪39.84')
+            ->assertSeeInOrder(['checkout-link/?products=11:1', 'https://www.rings.test/p/7', 'https://www.rings.test/%D7%A2%D7%92%D7%9C%D7%94/'], false);
+
+        // A length the product is not sold in: every length to choose from, said plainly.
+        $wrong = $this->getJson("/c/{$this->site}/cart?items=7@2.5:2&format=json")->json('on_store.0');
+        $this->assertSame('unknown_length', $wrong['problem']);
+        $this->assertSame(['4.20 מטר', '3.00 מטר'], array_column($wrong['choices'], 'label'));
     }
 }

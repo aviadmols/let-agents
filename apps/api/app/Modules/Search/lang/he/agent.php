@@ -16,6 +16,7 @@ return [
         'cart_title' => 'קישור לעגלה',
         'cart' => 'קישור שמכניס מוצרים לעגלה של החנות עצמה; הקונה פותח אותו ומשלם בחנות. מוצר עם אפשרויות צריך את המזהה של האפשרות (מה-variants של המוצר); בלי, התשובה מפרטת מה אפשר לבחור.',
         'cart_product' => 'מזהה המוצר.',
+        'cart_length' => 'למוצר שנמכר לפי אורך: האורך שנבחר, במטרים, אחד מהאורכים שלו (get_product). הקונה מוסיף אותו בעמוד שלו, שם הוא כתוב.',
         'cart_variant' => 'המזהה של האפשרות שנבחרה (מידה, צבע), מה-variants של המוצר.',
     ],
     // Lets Search as one app inside a shopper's AI, every store of it at one address (AppMcpController).

@@ -13,4 +13,8 @@ return [
         'label' => 'Prices and stock refreshed 3 times a day',
         'description' => 'At 08:30, 14:30 and 20:30 reads the products again, and only them (price, stock, what left the store), without categories, pages or posts. Also catches stock that changed without the product being marked as updated, for example from an inventory system. The search is rebuilt only when something really changed.',
     ],
+    'page_choices' => [
+        'label' => 'Choices from product pages (length, size)',
+        'description' => 'Once a day, slowly, reads from each product page the fields the store asks for before the cart that the sync does not carry (a length with a price for each, from Product Add-Ons for example). A page that did not change is not processed again. WooCommerce only.',
+    ],
 ];

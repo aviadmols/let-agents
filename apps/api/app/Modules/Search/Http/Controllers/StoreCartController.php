@@ -40,23 +40,28 @@ final class StoreCartController
             // A product the AI named instead of giving its id: the store's product of that name.
             $items = self::named($items);
 
-            return $items === [] ? ['url' => null, 'links' => [], 'problems' => []] : CartLink::build($connection, $items);
+            return $items === [] ? ['url' => null, 'links' => [], 'problems' => [], 'on_store' => [], 'cart_url' => CartLink::cartUrl($connection)] : CartLink::build($connection, $items);
         });
         $store = AgentCatalog::store($connection);
         $headers = ['X-Robots-Tag' => 'noindex, nofollow', 'Cache-Control' => 'no-store'];
 
         if ($request->query('format') === 'json') {
-            return response()->json($cart + ['ready' => $cart['url'] !== null && $cart['problems'] === []], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+            return response()->json($cart + [
+                'ready' => ($cart['url'] !== null || $cart['on_store'] !== []) && $cart['problems'] === [],
+                // Every item goes in by the link alone; else some are added on their own page.
+                'one_link' => $cart['on_store'] === [],
+            ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         }
 
         // Everything chosen, and one link holds it all: to the checkout.
-        if ($cart['url'] !== null && $cart['problems'] === [] && ($store['platform'] === 'shopify' || ($store['checkout_link'] ?? false) || count($cart['links']) === 1)) {
+        if ($cart['url'] !== null && $cart['problems'] === [] && $cart['on_store'] === [] && ($store['platform'] === 'shopify' || ($store['checkout_link'] ?? false) || count($cart['links']) === 1)) {
             return redirect()->away($cart['url'], 302, $headers);
         }
 
         $locale = in_array($store['locale'], ['he', 'en'], true) ? $store['locale'] : 'he';
+        $line = fn (array $item): string => $item['product'].(($item['variant'] ?? '') !== '' ? '/'.$item['variant'] : '').(($item['length'] ?? null) !== null ? '@'.$item['length'] : '').':'.$item['quantity'];
         $chosen = fn (string $product, string $option): string => AgentCatalog::publicUrl('c/'.$site.'/cart?items='.rawurlencode(implode(',', array_map(
-            fn (array $item): string => $item['product'] === $product ? $product.'/'.$option.':'.$item['quantity'] : $item['product'].(($item['variant'] ?? '') !== '' ? '/'.$item['variant'] : '').':'.$item['quantity'],
+            fn (array $item): string => $item['product'] === $product ? $product.'/'.$option.':'.$item['quantity'] : $line($item),
             $items,
         ))));
 
@@ -64,19 +69,24 @@ final class StoreCartController
     }
 
     /**
-     * "31313:1,7677/42928:2": each product, its option when it has one, and how many. A part that
-     * is not an id is a product's name, as an AI that lost the ids may write it ("מטאטא דשא:2"),
-     * found by named().
+     * "31313:1,7677/42928:2,14283@5.4:4": each product, its option when it has one, the length in
+     * metres when it is sold by length, and how many. A part that is not an id is a product's name,
+     * as an AI that lost the ids may write it ("מטאטא דשא:2"), found by named().
      *
-     * @return list<array{product: string, variant: string, quantity: int, name?: string}>
+     * @return list<array{product: string, variant: string, quantity: int, length?: float, name?: string}>
      */
     public static function items(string $text): array
     {
         $items = [];
 
         foreach (array_slice(array_filter(array_map('trim', explode(',', $text))), 0, CartLink::MAX_ITEMS) as $part) {
-            if (preg_match('~^([A-Za-z0-9_.-]{1,64})(?:/([A-Za-z0-9_.-]{1,64}))?(?::(\d{1,3}))?$~', $part, $m) === 1) {
-                $items[] = ['product' => $m[1], 'variant' => $m[2] ?? '', 'quantity' => max(1, min(CartLink::MAX_QUANTITY, (int) ($m[3] ?? 1)))];
+            if (preg_match('~^([A-Za-z0-9_.-]{1,64})(?:/([A-Za-z0-9_.-]{1,64}))?(?:@(\d{1,3}(?:[.,]\d{1,3})?)\s*(?:m|מ|מטר)?)?(?::(\d{1,3}))?$~u', $part, $m) === 1) {
+                $items[] = array_filter([
+                    'product' => $m[1],
+                    'variant' => $m[2] ?? '',
+                    'quantity' => max(1, min(CartLink::MAX_QUANTITY, (int) (($m[4] ?? '') !== '' ? $m[4] : 1))),
+                    'length' => ($m[3] ?? '') !== '' ? (float) str_replace(',', '.', $m[3]) : null,
+                ], fn ($v): bool => $v !== null);
 
                 continue;
             }

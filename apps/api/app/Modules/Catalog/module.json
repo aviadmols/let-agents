@@ -11,10 +11,13 @@
     "features": [
         { "name": "daily_sync", "default": true },
         { "name": "live_sync", "default": true },
-        { "name": "refresh", "default": true }
+        { "name": "refresh", "default": true },
+        { "name": "page_choices", "default": false }
     ],
     "settings": [
         { "name": "max_products", "type": "int", "default": 10000, "min": 100, "max": 200000, "scope": "shop", "unit": "products" },
-        { "name": "max_content_items", "type": "int", "default": 2000, "min": 0, "max": 50000, "scope": "shop", "unit": "items" }
+        { "name": "max_content_items", "type": "int", "default": 2000, "min": 0, "max": 50000, "scope": "shop", "unit": "items" },
+        { "name": "page_choices_per_run", "type": "int", "default": 600, "min": 10, "max": 5000, "scope": "shop", "unit": "pages" },
+        { "name": "page_choices_delay_ms", "type": "int", "default": 2000, "min": 500, "max": 15000, "scope": "shop", "unit": "milliseconds" }
     ]
 }

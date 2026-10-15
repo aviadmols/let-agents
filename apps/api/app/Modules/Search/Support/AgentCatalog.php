@@ -5,6 +5,7 @@ namespace App\Modules\Search\Support;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
@@ -153,6 +154,7 @@ final class AgentCatalog
             : (($currency ?: 'ILS') === 'ILS' ? '₪' : $currency.' ').rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
         // Never the separator inside a line's own words.
         $clean = fn (string $text): string => trim((string) preg_replace('/\s+/u', ' ', str_replace('|', '/', $text)));
+        $pageChoices = self::choices($products->pluck('id')->all());
         $groups = [];
 
         foreach ($products as $product) {
@@ -161,6 +163,9 @@ final class AgentCatalog
             $choices = array_filter((array) ($product->payload['variations'] ?? []), fn ($variant): bool => is_array($variant) && ($variant['stock']['in_stock'] ?? false));
             // How many the store has, when it counts them (every line here is in stock).
             $units = $product->payload['stock']['quantity'] ?? null;
+            // Sold by length: every length with its price, so a project can be counted from the line.
+            $lengths = self::lengths($pageChoices[(string) $product->id] ?? []);
+            $asked = array_filter($pageChoices[(string) $product->id] ?? [], fn (array $f): bool => (bool) ($f['required'] ?? false));
 
             // As short as a line can be: an AI's browser reads only so much of a page. A product
             // with options is ordered by its id alone; the order page asks the shopper to choose.
@@ -169,7 +174,11 @@ final class AgentCatalog
                 $clean((string) $product->title),
                 $money($product->price === null ? null : (float) $product->price, $product->currency),
                 is_numeric($units) && (int) $units > 0 ? $t('everything_stock', ['units' => (int) $units]) : null,
-                $choices === [] ? null : '+'.$t('everything_options'),
+                $lengths !== [] ? $t('everything_lengths', ['list' => implode('; ', array_map(
+                    fn (array $v): string => self::metres((float) $v['meters']).'m '.$money(isset($v['price']) ? (float) $v['price'] : null, $product->currency),
+                    $lengths,
+                ))]) : null,
+                $lengths === [] && ($choices !== [] || $asked !== []) ? '+'.$t('everything_options') : null,
             ]));
         }
 
@@ -239,6 +248,8 @@ final class AgentCatalog
                     'title' => $v['title'] ?? null, 'cart_id' => $v['id'] ?? null, 'price' => $v['price'] ?? null, 'in_stock' => $v['in_stock'] ?? null,
                     'buy_url' => $v['buy_url'] ?? (($v['in_stock'] ?? false) ? $order(($p['id'] ?? '').'/'.($v['id'] ?? '').':1') : null),
                 ], fn ($value): bool => $value !== null), $p['variants'] ?? []) ?: null,
+                // Asked for on the product's page (a length with a price for each): ordered as id@metres:quantity.
+                'choices' => $p['choices'] ?? null,
                 'page_url' => $p['url'] ?? null,
                 'image' => $p['image'] ?? null,
             ], fn ($value): bool => $value !== null && $value !== ''), $products),
@@ -288,8 +299,69 @@ final class AgentCatalog
         $details = self::details(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
         $points = self::keyPoints(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
         $looks = self::looks(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
+        $choices = self::choices(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
 
-        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? [], $store) + array_filter(['key_points' => $points[(string) $p->id] ?? null, 'looks' => $looks[(string) $p->id] ?? null]), $ordered);
+        return array_map(function (CatalogProduct $p) use ($details, $store, $points, $looks, $choices): array {
+            $product = self::product($p, $details[(string) $p->id] ?? [], $store);
+            $asked = array_filter($choices[(string) $p->id] ?? [], fn (array $f): bool => $f['required']);
+
+            // A product whose page asks for a choice is never bought by a store link: the store
+            // would empty the cart. It goes through our order page, which sends it to its page.
+            if ($asked !== []) {
+                unset($product['buy_url'], $product['cart_id']);
+            }
+
+            return $product + array_filter([
+                'key_points' => $points[(string) $p->id] ?? null,
+                'looks' => $looks[(string) $p->id] ?? null,
+                'choices' => $choices[(string) $p->id] ?? null,
+            ]);
+        }, $ordered);
+    }
+
+    /**
+     * What each product's page asks for before the cart that the feed does not carry (a length),
+     * as last read from the page, by product id. Products whose page asks for nothing are left out.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public static function choices(array $productIds): array
+    {
+        return CatalogProductChoice::query()->whereIn('product_id', $productIds)->get(['product_id', 'fields'])
+            ->filter(fn (CatalogProductChoice $c): bool => $c->fields !== [])
+            ->mapWithKeys(fn (CatalogProductChoice $c): array => [(string) $c->product_id => array_map(fn (array $field): array => [
+                'label' => (string) ($field['label'] ?? ''),
+                'kind' => (string) ($field['kind'] ?? 'choice'),
+                'required' => (bool) ($field['required'] ?? false),
+                'values' => array_map(fn (array $v): array => array_filter([
+                    'label' => (string) ($v['label'] ?? ''),
+                    'price' => $v['price'] ?? null,
+                    'meters' => $v['meters'] ?? null,
+                ], fn ($x): bool => $x !== null), (array) ($field['values'] ?? [])),
+            ], $c->fields)])->all();
+    }
+
+    /**
+     * The lengths a product is sold by, shortest first: the values of its length field that say
+     * how many metres.
+     *
+     * @param  list<array<string, mixed>>  $fields
+     * @return list<array<string, mixed>>
+     */
+    public static function lengths(array $fields): array
+    {
+        $field = collect($fields)->first(fn (array $f): bool => ($f['kind'] ?? '') === 'length');
+        $values = array_values(array_filter((array) ($field['values'] ?? []), fn (array $v): bool => isset($v['meters'])));
+        usort($values, fn (array $a, array $b): int => (float) $a['meters'] <=> (float) $b['meters']);
+
+        return $values;
+    }
+
+    /** 3 → "3", 4.2 → "4.2", 5.40 → "5.4". */
+    private static function metres(float $meters): string
+    {
+        return rtrim(rtrim(number_format($meters, 3, '.', ''), '0'), '.');
     }
 
     /** When the products were last read from the store, as ISO 8601. @param list<string> $externalIds */
