@@ -2060,6 +2060,12 @@
       '.la-ai-menu{display:flex;flex-wrap:wrap;align-items:center;gap:8px}',
       '.la-ai-menu[hidden]{display:none}',
       '.la-ai-note{font-size:12.5px;opacity:.7;flex-basis:100%}',
+      '.drawer .la-modebar{flex-wrap:wrap}',
+      '.la-ai-top{position:relative;padding:0;flex-wrap:nowrap;gap:6px}',
+      '.la-ai-top>.la-ai-note{display:none}',
+      '.la-ai-top .la-ai-open{padding:6px 12px;font-size:13px}',
+      '.la-ai-top .la-ai-menu{position:absolute;top:calc(100% + 8px);inset-inline-end:0;z-index:20;flex-direction:column;align-items:stretch;gap:6px;min-width:220px;max-width:280px;padding:10px;border-radius:14px;background:var(--rs-bg);border:1px solid var(--rs-line);box-shadow:0 10px 30px rgba(0,0,0,.16)}',
+      '.la-ai-top .la-ai-menu .la-ai-note{display:block;margin-top:2px;line-height:1.45}',
       '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
       '.la-focus-row{display:flex;flex-wrap:wrap;gap:8px}',
       'a.d-chip{color:inherit;text-decoration:none}',
@@ -2880,13 +2886,16 @@
      * press, so no popup blocker stops it, and goes where it should when the link is ready.
      */
     function aiShareRow(raw, ids, picked) {
-      var forAi = !!state.config.aiShare;
+      // No ids: the whole store, from the drawer's header, tied to no search. The AI's words and
+      // links come ready in the config, so the press opens at once, with no request.
+      var whole = ids === null;
+      var forAi = whole ? !!state.config.aiAsk : !!state.config.aiShare;
       var forPeople = !!state.config.shareResults;
       if (!forAi && !forPeople) {
         return null;
       }
-      var row = el('div', 'la-ai');
-      row.setAttribute('data-ai-share', '');
+      var row = el('div', 'la-ai' + (whole ? ' la-ai-top' : ''));
+      row.setAttribute('data-ai-share', whole ? 'store' : '');
       var note = el('span', 'la-ai-note');
       var menus = [];
 
@@ -2903,8 +2912,12 @@
           menu.hidden = !show;
           open.setAttribute('aria-expanded', show ? 'true' : 'false');
           note.textContent = show ? help : '';
+          // In the header the menu drops down, its note inside it.
+          if (whole && show) {
+            menu.appendChild(note);
+          }
           // The AI's link is made while the shopper chooses, so it opens at once.
-          if (show && forAiMenu) {
+          if (show && forAiMenu && !whole) {
             shareSearch(raw, ids());
           }
         });
@@ -2921,6 +2934,13 @@
 
       // The tab opens now, inside the press; the link fills it when ready.
       var openWith = function (address) {
+        if (whole) {
+          var ready = win.open(address(state.config.aiAsk), '_blank');
+          if (ready) {
+            ready.opener = null;
+          }
+          return;
+        }
         var tab = win.open('about:blank', '_blank');
         shareSearch(raw, ids()).then(function (data) {
           if (!data) {
@@ -2937,6 +2957,10 @@
         });
       };
       var withLink = function (use) {
+        if (whole) {
+          use(state.config.aiAsk);
+          return;
+        }
         shareSearch(raw, ids()).then(function (data) {
           if (!data) {
             note.textContent = label('ai_failed');
@@ -2949,15 +2973,7 @@
 
       if (forAi) {
         var aiChoices = [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['perplexity', 'Perplexity'], ['copy', label('ai_copy')]];
-        if (state.config.mcpUrl) {
-          aiChoices.push(['connect', label('ai_connect')]);
-        }
-        group('\u2726 ' + label('ai_share'), label('ai_share_help'), aiChoices, function (choice) {
-          // The store's connector, to add once in Claude or ChatGPT: its address copied, and where to paste it.
-          if (choice === 'connect') {
-            copyText(state.config.mcpUrl, function () { note.textContent = label('ai_connect_help'); });
-            return;
-          }
+        group('\u2726 ' + label(whole ? 'ai_share_short' : 'ai_share'), label(whole ? 'ai_store_help' : 'ai_share_help'), aiChoices, function (choice) {
           if (choice === 'copy') {
             withLink(function (data) { copyText(data.prompt, copied); });
             return;
@@ -2967,13 +2983,14 @@
       }
 
       if (forPeople) {
-        var link = function () { return storeLink(raw, picked); };
-        var words = function () { return label('share_text', { store: state.config.shopName || '', query: raw.trim() }) + ' ' + link(); };
+        var link = function () { return whole ? win.location.origin + '/' : storeLink(raw, picked); };
+        var said = function () { return whole ? label('share_store_text', { store: state.config.shopName || '' }) : label('share_text', { store: state.config.shopName || '', query: raw.trim() }); };
+        var words = function () { return said() + ' ' + link(); };
         var choices = [['whatsapp', 'WhatsApp'], ['link', label('ai_copy')]];
         if (typeof win.navigator.share === 'function') {
           choices.push(['more', label('share_more')]);
         }
-        group('\u2197 ' + label('share_results'), label('share_help'), choices, function (choice) {
+        group('\u2197 ' + label(whole ? 'share_short' : 'share_results'), label(whole ? 'share_store_help' : 'share_help'), choices, function (choice) {
           if (choice === 'whatsapp') {
             var tab = win.open('https://wa.me/?text=' + encodeURIComponent(words()), '_blank');
             if (tab) {
@@ -2982,7 +2999,7 @@
             return;
           }
           if (choice === 'more') {
-            win.navigator.share({ title: label('share_results'), text: label('share_text', { store: state.config.shopName || '', query: raw.trim() }), url: link() })
+            win.navigator.share({ title: label(whole ? 'share_short' : 'share_results'), text: said(), url: link() })
               .catch(function () { /* closed by the shopper */ });
             return;
           }
@@ -4874,6 +4891,10 @@
         strip.appendChild(modeSwitch(function () { return field.value; }));
       }
       strip.appendChild(cols);
+      var topShare = aiShareRow('', null, null);
+      if (topShare) {
+        strip.appendChild(topShare);
+      }
       sheet.appendChild(strip);
 
       var scroll = el('div', 'scroll');
@@ -5235,7 +5256,7 @@
           while (barAt.firstChild) {
             barAt.removeChild(barAt.firstChild);
           }
-          var ask = one ? null : aiShareRow(raw, function () {
+          var ask = one || drawerMode() ? null : aiShareRow(raw, function () {
             return viewOf(pool, picked).map(function (record) { return String(record.id).slice(2); });
           }, picked);
           if (ask) {

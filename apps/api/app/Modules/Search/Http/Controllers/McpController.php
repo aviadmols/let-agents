@@ -78,7 +78,8 @@ final class McpController
         }
 
         $store = AgentCatalog::store($connection);
-        $locale = in_array($store['locale'], ['he', 'en'], true) ? $store['locale'] : 'he';
+        // What the AI is told is in English; it answers the shopper in the shopper's own language.
+        $locale = AgentCatalog::AI_LOCALE;
 
         return match ($method) {
             'initialize' => self::result($id, [

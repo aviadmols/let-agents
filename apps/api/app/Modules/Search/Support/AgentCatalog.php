@@ -25,6 +25,12 @@ final class AgentCatalog
 
     private const MAX_VARIANTS = 30;
 
+    /** What an AI is told is always in English; it answers the shopper in the shopper's language. */
+    public const AI_LOCALE = 'en';
+
+    /** How many words of a product's looks go into the whole catalogue in short. */
+    private const LOOKS_WORDS = 6;
+
     /** A public link on the platform's own address (agents.lets.co.il), never the address a request happened to come on. */
     public static function publicUrl(string $path): string
     {
@@ -35,33 +41,39 @@ final class AgentCatalog
     }
 
     /**
-     * What an AI is told before anything else, on every page it reads: where every product is,
-     * how to buy, and to end every answer with the link that buys.
+     * What an AI is told before anything else, on every page it reads: the shopper's language and
+     * a tone of service, where every product is, how to buy, and to end every answer with the link
+     * that buys. Always in English, the language models follow best; the AI answers the shopper in
+     * the shopper's own language.
      *
      * @param  array<string, mixed>  $store
      * @return list<string>
      */
-    public static function instructions(array $store, string $time): array
+    public static function instructions(array $store, string $time, bool $everything = false): array
     {
-        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
-        $t = fn (string $key, array $params = []): string => (string) __('search::share.'.$key, $params, $locale);
+        $t = fn (string $key, array $params = []): string => (string) __('search::share.'.$key, $params, self::AI_LOCALE);
         $catalog = $store['catalog'] ?? null;
         $shopify = ($store['platform'] ?? '') === 'shopify';
 
         return array_values(array_filter([
-            $catalog ? $t('guide_search', ['store' => $store['name']]).' '.$catalog.'?q=… ('.$t('guide_example').' '.$catalog.'?q='.$t('guide_example_query').'; '.$t('guide_pages').' &page=2; JSON: &format=json)' : null,
+            $t('guide_language'),
+            $t('guide_tone', ['store' => $store['name'] ?? '']),
+            // What models drop most: the one link that buys. Early, with how an answer looks.
+            $t('guide_end'),
+            $t('guide_format'),
+            $everything ? $t('guide_everything', ['store' => $store['name'] ?? '']) : ($catalog ? $t('guide_whole_store', ['url' => $catalog.'?format=json']) : null),
             $t('guide_products'),
             $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo'),
-            $catalog ? $t('guide_order').' '.$catalog.'/cart?items='.$t('guide_item').':1,'.$t('guide_item').'/'.$t('guide_cart_id').':2' : null,
-            $t('guide_end'),
+            $catalog ? $t('guide_order', ['example' => $catalog.'/cart?items=1234:1,5678/91011:2']) : null,
             $t('guide_images'),
             $t('guide_rules', ['time' => $time]),
         ]));
     }
 
     /**
-     * The addresses in our system an AI can open to act for the shopper: search the whole store,
-     * every product a page at a time, and the order as one link to the store's checkout.
+     * What an AI can do for the shopper in our system: the order as one link to the store's
+     * checkout, which the AI writes from the ids and the shopper presses. No address an AI would
+     * have to open from a pattern: its browser opens only addresses it has seen.
      *
      * @param  array<string, mixed>  $store
      * @return list<array{name: string, url: string, does: string}>
@@ -74,15 +86,8 @@ final class AgentCatalog
             return [];
         }
 
-        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
-        $t = fn (string $key): string => (string) __('search::share.action_'.$key, [], $locale);
-
         return [
-            ['name' => 'search', 'url' => $catalog.'?q={words}&format=json', 'does' => $t('search')],
-            ['name' => 'all_products', 'url' => $catalog.'?format=json&page={n}', 'does' => $t('all')],
-            ['name' => 'similar', 'url' => $catalog.'/similar/{product_id}', 'does' => $t('similar')],
-            ['name' => 'order', 'url' => $catalog.'/cart?items={product_id}:{quantity},{product_id}/{option_cart_id}:{quantity}', 'does' => $t('order')],
-            ['name' => 'check_order', 'url' => $catalog.'/cart?items={…}&format=json', 'does' => $t('check')],
+            ['name' => 'order', 'url' => $catalog.'/cart?items={id}:{quantity},{id}/{cart_id}:{quantity}', 'does' => (string) __('search::share.action_order', [], self::AI_LOCALE)],
         ];
     }
 
@@ -130,6 +135,64 @@ final class AgentCatalog
     }
 
     /**
+     * Every product in stock, inside the one JSON an AI was given: an AI's browser often will not
+     * open the links written in a page it read, so what it needs to choose and to order is here, in
+     * short. By category, cheapest first; each row: id, name, price, a few words of how it looks,
+     * and its options in stock (the id the cart takes, name, price). The order link is made from
+     * the ids by the AI and pressed by the shopper, so the AI never has to open it. Inside the
+     * shop's tenant.
+     *
+     * @param  array<string, mixed>  $store
+     * @return array<string, mixed>
+     */
+    public static function everything(array $store, int $limit): array
+    {
+        $t = fn (string $key, array $params = []): string => (string) __('search::share.'.$key, $params, self::AI_LOCALE);
+        $products = CatalogProduct::query()->whereNull('removed_at')->where('in_stock', true)
+            ->orderBy('price')->orderBy('id')->limit(max(1, $limit))
+            ->get(['id', 'external_id', 'title', 'price', 'payload']);
+        $words = [];
+
+        RetrievalImage::query()->whereIn('product_id', $products->pluck('id')->all())->whereNotNull('caption_words')->orderBy('id')
+            ->get(['product_id', 'caption_words'])
+            ->each(function (RetrievalImage $image) use (&$words): void {
+                $list = is_array($image->caption_words) ? $image->caption_words : (array) json_decode((string) $image->caption_words, true);
+                $words[(string) $image->product_id] ??= implode(', ', array_slice(array_map('strval', $list), 0, self::LOOKS_WORDS));
+            });
+
+        $groups = [];
+
+        foreach ($products as $product) {
+            $path = $product->categoryPaths()[0] ?? [];
+            $category = $path === [] ? $t('everything_other') : implode(' > ', $path);
+            $options = [];
+
+            foreach (array_slice((array) ($product->payload['variations'] ?? []), 0, self::MAX_VARIANTS) as $variant) {
+                if (is_array($variant) && trim((string) ($variant['title'] ?? '')) !== '' && ($variant['stock']['in_stock'] ?? false)) {
+                    $options[] = [(string) ($variant['external_id'] ?? ''), (string) $variant['title'], is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null];
+                }
+            }
+
+            $row = [(string) $product->external_id, (string) $product->title, $product->price === null ? null : (float) $product->price, $words[(string) $product->id] ?? ''];
+            $groups[$category][] = $options === [] ? $row : [...$row, $options];
+        }
+
+        // Categories in a fixed order, so the same store gives the same JSON.
+        ksort($groups, SORT_STRING);
+        $catalog = $store['catalog'] ?? '';
+
+        return array_filter([
+            'how' => $t('everything_how'),
+            'row' => ['id', 'title', 'price', 'looks', 'options'],
+            'option' => ['cart_id', 'title', 'price'],
+            'order_link' => $catalog.'/cart?items={id}:{quantity},{id}/{cart_id}:{quantity}',
+            'order_example' => $products->count() >= 2 ? $catalog.'/cart?items='.$products[0]->external_id.':1,'.$products[1]->external_id.':2' : null,
+            'count' => $products->count(),
+            'by_category' => $groups,
+        ], fn ($value): bool => $value !== null);
+    }
+
+    /**
      * How to do what a shopper usually asks, step by step, with the commands above.
      *
      * @param  array<string, mixed>  $store
@@ -137,33 +200,9 @@ final class AgentCatalog
      */
     public static function tasks(array $store): array
     {
-        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
         $keys = ['find', 'visual', 'compare', 'project', 'order', 'missing'];
 
-        return array_combine($keys, array_map(fn (string $key): string => (string) __('search::share.task_'.$key, [], $locale), $keys));
-    }
-
-    /**
-     * The store's connector, for an AI that can call tools: the same commands, as MCP tools.
-     *
-     * @param  array<string, mixed>  $store
-     * @return array<string, mixed>|null
-     */
-    public static function mcp(array $store): ?array
-    {
-        $catalog = $store['catalog'] ?? null;
-
-        if ($catalog === null) {
-            return null;
-        }
-
-        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
-
-        return [
-            'url' => str_replace('/c/', '/api/v1/mcp/', $catalog),
-            'use' => (string) __('search::share.mcp_use', [], $locale),
-            'tools' => ['search_products', 'get_product', 'store_policies', 'create_cart_link'],
-        ];
+        return array_combine($keys, array_map(fn (string $key): string => (string) __('search::share.task_'.$key, [], self::AI_LOCALE), $keys));
     }
 
     /**
@@ -184,10 +223,9 @@ final class AgentCatalog
         $order = fn (string $items): ?string => $catalog === null ? null : $catalog.'/cart?items='.$items;
 
         return array_filter([
-            'for_ai' => self::instructions($store, $time),
+            'for_ai' => self::instructions($store, $time, isset($more['everything'])),
             'tasks' => self::tasks($store),
             'actions' => self::actions($store),
-            'mcp' => self::mcp($store),
             'store' => array_intersect_key($store, array_flip(['name', 'url', 'platform', 'catalog'])),
             'prices_as_of' => $asOf,
         ] + $more + [

@@ -58,6 +58,10 @@ return [
         'label' => 'Products in a search shared with an AI',
         'description' => 'The first ones the shopper saw, each with its details, sizes and price.',
     ],
+    'ai_catalog_products' => [
+        'label' => 'Products in the store file for an AI',
+        'description' => 'Every product in stock, one short row each, cheapest first. A larger store also gets links to the rest.',
+    ],
     'requests_per_minute' => [
         'label' => 'Search requests per minute',
         'description' => 'Per IP address and site. Protects against floods.',

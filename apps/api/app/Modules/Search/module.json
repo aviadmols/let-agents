@@ -209,6 +209,15 @@
             "unit": "products"
         },
         {
+            "name": "ai_catalog_products",
+            "type": "int",
+            "default": 2500,
+            "min": 100,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
             "name": "requests_per_minute",
             "type": "int",
             "default": 120,

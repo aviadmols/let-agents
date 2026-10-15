@@ -34,9 +34,10 @@
         <h1>{{ $heading }}</h1>
         <p class="muted">{{ $t('intro', ['time' => $time]) }}</p>
         @if ($storeSearch)<p><a class="go" href="{{ $storeSearch }}" rel="noopener">{{ $t('on_store', ['store' => $s['store']['name']]) }}</a></p>@endif
-        @include('search::partials.guide', ['store' => $s['store'], 'time' => $time, 'connector' => $connector])
+        @php($ai = \App\Modules\Search\Support\AgentCatalog::forAi($s['store'], $s['products'], (string) $s['as_of'], array_filter(['browse' => $browse, 'query' => $s['query'], 'policies' => $s['policies'] ?? null])))
+        @include('search::partials.guide', ['store' => $s['store'], 'lines' => $ai['for_ai'] ?? []])
         @include('search::partials.browse', ['browse' => $browse])
-        @include('search::partials.json', ['ai' => \App\Modules\Search\Support\AgentCatalog::forAi($s['store'], $s['products'], (string) $s['as_of'], array_filter(['browse' => $browse, 'query' => $s['query'], 'policies' => $s['policies'] ?? null])), 'json' => $json])
+        @include('search::partials.json', ['ai' => $ai, 'json' => $json])
 
         @php($read = $s['read'] ?? [])
         @if (($read['min_price'] ?? null) !== null || ($read['max_price'] ?? null) !== null || ($read['filters'] ?? []) !== [])

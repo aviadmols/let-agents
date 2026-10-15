@@ -87,8 +87,10 @@ final class SearchIndexController
             'aiShare' => Features::enabled('search.ai_share', $shopId),
             // "Share the results": the same link, to a friend.
             'shareResults' => Features::enabled('search.share_results', $shopId),
-            // "Connect for good": the store's connector (MCP), for a shopper whose AI takes one.
-            'mcpUrl' => Features::enabled('search.agent_connector', $shopId) ? AgentCatalog::publicUrl('api/v1/mcp/'.$site) : '',
+            // "Ask my AI" in the drawer's header: the whole store in one JSON, with the words to send and
+            // where each AI opens with them. Ready here, so the press opens at once with no request.
+            'aiAsk' => Features::enabled('search.ai_share', $shopId) && Features::enabled('search.agent_connector', $shopId)
+                ? self::aiAsk((string) (Shop::query()->whereKey($shopId)->value('name') ?? ''), AgentCatalog::publicUrl('c/'.$site).'?format=json', $locale) : null,
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';
@@ -117,6 +119,22 @@ final class SearchIndexController
     public static function color(string $value): string
     {
         return preg_match('/^#[0-9a-f]{6}$/i', trim($value)) === 1 ? strtolower(trim($value)) : '';
+    }
+
+    /**
+     * The words a shopper sends their own AI (in the shopper's language, so the AI answers in it)
+     * with the store's JSON, and where each AI opens with them already typed.
+     *
+     * @return array{prompt: string, open: array<string, string>}
+     */
+    private static function aiAsk(string $store, string $url, string $locale): array
+    {
+        $words = (string) __('search::share.ask', ['store' => $store, 'url' => $url], $locale);
+
+        return [
+            'prompt' => $words,
+            'open' => array_map(fn (string $at): string => str_replace('{q}', rawurlencode($words), $at), ShareController::OPEN),
+        ];
     }
 
     /** The number the on-page module offers, read from the same settings; null when the shop has none. */

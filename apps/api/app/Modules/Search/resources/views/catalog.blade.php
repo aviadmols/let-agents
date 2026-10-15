@@ -21,7 +21,7 @@
 <body>
 <main>
     <h1>{{ $heading }}</h1>
-    @include('search::partials.guide', ['store' => $store, 'time' => $time, 'connector' => $connector])
+    @include('search::partials.guide', ['store' => $store, 'lines' => $ai['for_ai'] ?? []])
     @include('search::partials.browse', ['browse' => $ai['browse'] ?? null])
     @include('search::partials.json', ['ai' => $ai, 'json' => $at($c['page']).(str_contains($at($c['page']), '?') ? '&' : '?').'format=json'])
 
