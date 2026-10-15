@@ -202,7 +202,7 @@ final class ShareSearchTest extends TestCase
         app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', '3')->get()->each(fn (CatalogProduct $p) => $p->update(['payload' => ['stock' => ['quantity' => 4]] + $p->payload])));
         Cache::flush();
         $this->assertContains('id 3 | טבעת יוקרה | ₪9000 | stock 4 | +options', array_merge(...array_values($this->getJson("/c/{$this->site}?format=json")->json('everything.by_category'))));
-        $this->assertSame('https://agents.example.test/c/'.$this->site.'/cart?items=2:1,1:2', $all['everything']['order_example']);
+        $this->assertSame('https://www.rings.test/?la_order=2:1,1:2', $all['everything']['order_example'], 'the order on the store\'s own address');
         $raw = $this->get("/c/{$this->site}?format=json")->assertHeader('Content-Type', 'application/json; charset=utf-8')->getContent();
         $this->assertStringContainsString("\n\"id 1 | טבעת סוליטר | ₪2400 | +options\",\n", $raw, 'a line a product, never the whole store on one line, and no indent');
         $this->assertArrayNotHasKey('products', $all, 'not the same products twice');
@@ -293,14 +293,13 @@ final class ShareSearchTest extends TestCase
         // Every page tells the AI how: the order link is among its commands.
         $actions = $this->getJson("/c/{$this->site}?format=json")->json('actions');
         $this->assertSame(['order'], array_column($actions, 'name'), 'only what the AI writes, never an address it must open');
-        $this->assertStringContainsString('/c/'.$this->site.'/cart?items=', collect($actions)->firstWhere('name', 'order')['url']);
+        $this->assertStringStartsWith('https://www.rings.test/?la_order=', collect($actions)->firstWhere('name', 'order')['url']);
 
         // WooCommerce, one product with its size: to the store, the product added.
         $this->get("/c/{$this->site}/cart?items=1/11:2")->assertRedirect('https://www.rings.test/?add-to-cart=1&variation_id=11&quantity=2');
 
-        // The size not chosen yet: a page with each size, each a link that completes the order.
-        $this->get("/c/{$this->site}/cart?items=1")->assertOk()->assertSee('בחרו אפשרות כדי להמשיך לתשלום')
-            ->assertSee('/c/'.$this->site.'/cart?items='.rawurlencode('1/11:1'), false)->assertDontSee(rawurlencode('1/12:1'), false);
+        // The size not chosen yet: to the store's own page, where the order is completed.
+        $this->get("/c/{$this->site}/cart?items=1")->assertRedirect('https://www.rings.test/?la_order='.rawurlencode('1:1'));
         $check = $this->getJson("/c/{$this->site}/cart?items=1&format=json")->assertOk()->json();
         $this->assertFalse($check['ready']);
         $this->assertSame('choose_option', $check['problems'][0]['problem']);
@@ -327,7 +326,7 @@ final class ShareSearchTest extends TestCase
         $this->assertStringContainsString('create_cart_link', $hello['instructions']);
         $rpc('notifications/initialized', [], null)->assertStatus(202);
 
-        $this->assertSame(['search_products', 'get_product', 'store_policies', 'create_cart_link'], array_column($rpc('tools/list')->json('result.tools'), 'name'));
+        $this->assertSame(['search_products', 'get_product', 'store_policies', 'create_cart_link', 'calculate_cart'], array_column($rpc('tools/list')->json('result.tools'), 'name'));
 
         $found = $rpc('tools/call', ['name' => 'search_products', 'arguments' => ['query' => 'טבעת זהב לבן עד 3000 ש"ח']])->assertOk()->json('result');
         $this->assertFalse($found['isError']);
@@ -381,7 +380,7 @@ final class ShareSearchTest extends TestCase
 
         // Every tool asks the store, says it reads only, and needs no login; the product tools show cards.
         $tools = collect($rpc('tools/list')->json('result.tools'))->keyBy('name');
-        $this->assertSame(['find_store', 'search_products', 'get_product', 'store_policies', 'create_cart_link'], $tools->keys()->all());
+        $this->assertSame(['find_store', 'search_products', 'get_product', 'store_policies', 'create_cart_link', 'calculate_cart'], $tools->keys()->all());
         $this->assertSame(['store'], $tools['search_products']['inputSchema']['required']);
         $this->assertSame(['store', 'items'], $tools['create_cart_link']['inputSchema']['required']);
         $tools->each(function (array $tool): void {
@@ -454,7 +453,7 @@ final class ShareSearchTest extends TestCase
         $beam = $this->getJson("/c/{$this->site}?format=json&q=".rawurlencode('קורת אורן'))->json('products.0');
         $this->assertSame('אורך', $beam['choices'][0]['label']);
         $this->assertEquals([4.2, 3.0], array_column($beam['choices'][0]['values'], 'meters'));
-        $this->assertStringContainsString('/c/'.$this->site.'/cart?items=7:1', $beam['buy_url'], 'through our order page');
+        $this->assertSame('https://www.rings.test/?la_order=7:1', $beam['buy_url'], 'through the order on the store\'s own page');
 
         // An order with a ring and four beams of 3 m: the ring by the link, the beams on their page.
         $order = $this->getJson("/c/{$this->site}/cart?items=1/11:1,7@3:4&format=json")->assertOk()->json();
@@ -465,9 +464,8 @@ final class ShareSearchTest extends TestCase
         $this->assertFalse($order['one_link']);
 
         // The page walks the shopper through it, the link first: a checkout link replaces the cart.
-        $page = $this->get("/c/{$this->site}/cart?items=1/11:1,7@3:4")->assertOk();
-        $page->assertSee('data-cart-steps', false)->assertSee('לבחור: 3.00 מטר')->assertSee('₪39.84')
-            ->assertSeeInOrder(['checkout-link/?products=11:1', 'https://www.rings.test/p/7', 'https://www.rings.test/%D7%A2%D7%92%D7%9C%D7%94/'], false);
+        // Opened, to the store's own page, where our script completes it.
+        $this->get("/c/{$this->site}/cart?items=1/11:1,7@3:4")->assertRedirect('https://www.rings.test/?la_order='.rawurlencode('1/11:1,7@3:4'));
 
         // A length the product is not sold in: every length to choose from, said plainly.
         $wrong = $this->getJson("/c/{$this->site}/cart?items=7@2.5:2&format=json")->json('on_store.0');
@@ -523,5 +521,51 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('7@{metres}:{quantity}', $beam['order_as']);
         $this->assertEquals([['metres' => 3.0, 'label' => '3.00 מטר', 'price' => 39.84], ['metres' => 4.2, 'label' => '4.20 מטר', 'price' => 55.78]], $beam['lengths'], 'shortest first');
         $this->assertArrayNotHasKey('buy_url', $beam, 'never a store link for it');
+    }
+
+    public function test_an_order_is_every_line_checked_in_code_with_two_totals_and_how_to_add_it_on_the_store(): void
+    {
+        Http::fake(['www.rings.test/checkout-link/' => Http::response('', 404)]);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $beam = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '7', 'type' => 'simple', 'status' => 'publish', 'title' => 'קורת אורן',
+                'url' => 'https://www.rings.test/p/7', 'price' => 13.28, 'in_stock' => true, 'purchasable' => true, 'hash' => 'h7', 'payload' => ['stock' => ['in_stock' => true, 'managed' => true, 'quantity' => 4]]]);
+            CatalogProductChoice::query()->create(['shop_id' => $this->shop->id, 'product_id' => $beam->id, 'fields' => [['key' => 'addon-7-%d7%90-0', 'label' => 'אורך', 'kind' => 'length', 'required' => true,
+                'values' => [['value' => '3-00-%d7%9e-1', 'label' => '3.00 מטר', 'price' => 39.84, 'meters' => 3.0]]]]]);
+        });
+        $order = fn (string $items) => $this->getJson("/api/v1/search/{$this->site}/order?items=".rawurlencode($items), self::ORIGIN)->assertOk()->json();
+
+        $o = $order('1/11:2,7@3:5,2:1,9999:1');
+        [$ring, $beam, $toChoose, $unknown] = $o['lines'];
+
+        $this->assertSame(['ready', 2, 2400, 4800], [$ring['status'], $ring['quantity'], $ring['unit_price'], $ring['line_total']]);
+        $this->assertSame(['post_url' => 'https://www.rings.test/p/1', 'fields' => ['add-to-cart' => '1', 'variation_id' => '11', 'quantity' => '2']], $ring['add'], 'what the product form posts');
+
+        // Five asked, four in stock: four, and said so; the length posted the way the page names it.
+        $this->assertSame(['quantity_reduced', 5, 4, 4], [$beam['status'], $beam['quantity_asked'], $beam['quantity'], $beam['stock']]);
+        $this->assertEqualsWithDelta(159.36, $beam['line_total'], 0.001);
+        $this->assertSame('3-00-%d7%9e-1', $beam['add']['fields']['addon-7-%d7%90-0']);
+        $this->assertSame('3.00 מטר', $beam['length']['label']);
+
+        // No option chosen: every option to choose from, priced, the one out of stock last.
+        $this->assertSame('requires_manual_option_selection', $toChoose['status']);
+        $this->assertSame(['21', '22'], array_column($toChoose['choose'], 'option'));
+        $this->assertSame([true, false], array_column($toChoose['choose'], 'in_stock'));
+        $this->assertSame('unknown_product', $unknown['status']);
+
+        // What goes into the cart now, and the whole order with the choice at its cheapest.
+        $this->assertEqualsWithDelta(4959.36, $o['totals']['auto_total'], 0.001);
+        $this->assertEqualsWithDelta(6759.36, $o['totals']['order_total'], 0.001);
+        $this->assertTrue($o['totals']['order_total_is_estimate']);
+        $this->assertSame([2, 1, 1], [$o['totals']['auto_lines'], $o['totals']['manual_lines'], $o['totals']['unavailable_lines']]);
+        $this->assertSame('calculated_at_checkout', $o['shipping'], 'never counted');
+        $this->assertSame('https://www.rings.test/?la_order='.rawurlencode('1/11:2,7@3:4,2:1'), $o['order_url'], 'on the store, as the store will take it');
+        $this->assertSame('https://www.rings.test/cart/', $o['cart_url']);
+
+        // Shopify: a variant and a quantity, for /cart/add.js.
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->update(['platform' => 'shopify']));
+        $this->assertSame(['variant' => '11', 'quantity' => 2], $order('1/11:2')['lines'][0]['add']);
+
+        // From another site: refused.
+        $this->getJson("/api/v1/search/{$this->site}/order?items=1:1", ['Origin' => 'https://evil.test'])->assertForbidden();
     }
 }

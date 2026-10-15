@@ -6,9 +6,11 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Search\Actions\CalculateCart;
 use App\Modules\Search\Actions\SearchForAgent;
 use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Search\Support\CartLink;
+use App\Modules\Search\Support\OrderItems;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -105,7 +107,7 @@ final class AppMcpController
             return self::answered($id, ['stores' => $stores], $stores === [] ? 'No store of Lets Search matches; ask the shopper for the store\'s web address.' : null);
         }
 
-        if (! in_array($tool, ['search_products', 'get_product', 'store_policies', 'create_cart_link'], true)) {
+        if (! in_array($tool, ['search_products', 'get_product', 'store_policies', 'create_cart_link', 'calculate_cart'], true)) {
             return self::failure($id, -32602, 'Unknown tool: '.$tool);
         }
 
@@ -122,6 +124,7 @@ final class AppMcpController
             'get_product' => ['products' => AgentCatalog::products([(string) ($arguments['id'] ?? '')], $store)] + ['as_of' => AgentCatalog::asOf([(string) ($arguments['id'] ?? '')])],
             'store_policies' => ['policies' => AgentCatalog::policies()],
             'create_cart_link' => CartLink::build($connection, array_values(array_filter((array) ($arguments['items'] ?? []), 'is_array'))),
+            'calculate_cart' => app(CalculateCart::class)->handle($connection, OrderItems::named(OrderItems::fromTool((array) ($arguments['items'] ?? [])))),
         });
 
         if ($tool === 'get_product' && $data['products'] === []) {
@@ -222,6 +225,7 @@ final class AppMcpController
             'get_product' => $cards('reading', 'read'),
             'store_policies' => $noauth,
             'create_cart_link' => $cards('ordering', 'ordered'),
+            'calculate_cart' => $cards('ordering', 'ordered'),
         ];
 
         return [

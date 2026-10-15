@@ -16,11 +16,11 @@ use Illuminate\Http\Response;
 /**
  * GET /c/{site}/cart?items=PRODUCT:QTY,PRODUCT/OPTION:QTY[&format=json]
  *
- * The order a shopper's AI put together, as one link: opened, it goes straight to the store's
- * checkout with every item in the cart (Shopify), or to the store with the item added
- * (WooCommerce, one item a link). When an option must still be chosen (a size, a colour), a short
- * page lists the options, each a link that completes the order. As JSON: the link and what is
- * missing, for the AI to check before it answers. Nothing is bought here.
+ * The order a shopper's AI put together, as one link (an older link: the AI is now given the
+ * store's own ?la_order=…): opened, it goes straight to the store's checkout with every item in
+ * the cart when one link holds it all; otherwise to the store's own page with the order, which our
+ * script there completes (CalculateCart). As JSON: the link and what is missing, for the AI to
+ * check before it answers. Nothing is bought here.
  */
 final class StoreCartController
 {
@@ -55,14 +55,12 @@ final class StoreCartController
             return redirect()->away($cart['url'], 302, $headers);
         }
 
-        $locale = in_array($store['locale'], ['he', 'en'], true) ? $store['locale'] : 'he';
+        // Anything else (an option or a length still to choose, a page's field, more than one line
+        // on an older WooCommerce): the order on the store's own page, where our script shows it and
+        // puts it in the cart. The shopper never stays on an address of ours.
         $line = fn (array $item): string => $item['product'].(($item['variant'] ?? '') !== '' ? '/'.$item['variant'] : '').(($item['length'] ?? null) !== null ? '@'.$item['length'] : '').':'.$item['quantity'];
-        $chosen = fn (string $product, string $option): string => AgentCatalog::publicUrl('c/'.$site.'/cart?items='.rawurlencode(implode(',', array_map(
-            fn (array $item): string => $item['product'] === $product ? $product.'/'.$option.':'.$item['quantity'] : $line($item),
-            $items,
-        ))));
 
-        return response()->view('search::cart', ['store' => $store, 'cart' => $cart, 'locale' => $locale, 'chosen' => $chosen], 200, $headers);
+        return redirect()->away(AgentCatalog::orderBase($store).rawurlencode(implode(',', array_map($line, $items))), 302, $headers);
     }
 
     /**

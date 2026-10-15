@@ -5,10 +5,12 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Search\Actions\CalculateCart;
 use App\Modules\Search\Actions\SearchForAgent;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Search\Support\CartLink;
+use App\Modules\Search\Support\OrderItems;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -108,6 +110,7 @@ final class McpController
             'get_product' => (AgentCatalog::products([(string) ($arguments['id'] ?? '')], AgentCatalog::store($connection))[0] ?? ['error' => 'unknown_product']) + ['as_of' => AgentCatalog::asOf([(string) ($arguments['id'] ?? '')])],
             'store_policies' => ['store' => AgentCatalog::store($connection), 'policies' => AgentCatalog::policies()],
             'create_cart_link' => CartLink::build($connection, array_values(array_filter((array) ($arguments['items'] ?? []), 'is_array'))),
+            'calculate_cart' => app(CalculateCart::class)->handle($connection, OrderItems::named(OrderItems::fromTool((array) ($arguments['items'] ?? [])))),
             default => null,
         });
 
@@ -160,6 +163,22 @@ final class McpController
                         'variant' => ['type' => 'string', 'description' => $t('cart_variant')],
                         'quantity' => ['type' => 'integer', 'minimum' => 1, 'maximum' => CartLink::MAX_QUANTITY, 'default' => 1],
                         'length' => ['type' => 'number', 'minimum' => 0, 'description' => $t('cart_length')],
+                    ],
+                    'required' => ['product'],
+                ]]],
+                'required' => ['items'],
+            ]],
+            // The order checked in code before it is given: price, stock (never more than the store
+            // has), the option or length, the two totals, and its link on the store's own page.
+            ['name' => 'calculate_cart', 'title' => $t('calculate_title'), 'description' => $t('calculate'), 'annotations' => $read, 'inputSchema' => [
+                'type' => 'object',
+                'properties' => ['items' => ['type' => 'array', 'maxItems' => OrderItems::MAX_LINES, 'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'product' => ['type' => 'string', 'description' => $t('cart_product')],
+                        'variant' => ['type' => 'string', 'description' => $t('cart_variant')],
+                        'length' => ['type' => 'number', 'minimum' => 0, 'description' => $t('cart_length')],
+                        'quantity' => ['type' => 'integer', 'minimum' => 1, 'maximum' => OrderItems::MAX_QUANTITY, 'default' => 1],
                     ],
                     'required' => ['product'],
                 ]]],

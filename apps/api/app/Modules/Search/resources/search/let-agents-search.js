@@ -2812,6 +2812,279 @@
       return '₪' + Number(amount).toLocaleString('en-US', { maximumFractionDigits: 2 });
     }
 
+    // ---------------------------------------------------------------- the order an AI wrote
+
+    var ORDER_CSS = [
+      '.la-order-overlay{position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}',
+      '.la-order{position:relative;background:var(--rs-bg,#fff);color:var(--rs-fg,#1b1b1f);width:min(560px,100%);max-height:92vh;overflow:auto;border-radius:16px;padding:20px 18px 16px;box-shadow:0 20px 60px rgba(0,0,0,.3);font:14px/1.45 inherit;box-sizing:border-box}',
+      '.la-order h2{margin:0 0 12px;font-size:19px}',
+      '.la-order-x{all:unset;cursor:pointer;position:absolute;top:10px;inset-inline-end:14px;font-size:24px;line-height:1;opacity:.6}',
+      '.la-order-line{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--rs-line,#e7e7ec)}',
+      '.la-order-line img{width:56px;height:56px;object-fit:contain;border-radius:8px;background:var(--rs-soft,#f5f5f8);flex:none}',
+      '.la-order-main{flex:1;min-width:0}',
+      '.la-order-title{font-weight:600}',
+      '.la-order-sub{font-size:12.5px;opacity:.75}',
+      '.la-order-price{font-weight:700;white-space:nowrap}',
+      '.la-order select{margin-top:6px;width:100%;padding:7px;border-radius:8px;border:1px solid var(--rs-line,#d0d0d8);font:inherit;background:var(--rs-bg,#fff);color:inherit}',
+      '.la-order-state{font-size:12.5px;margin-top:4px}',
+      '.la-order-state.ok{color:#1f7a3a}.la-order-state.bad{color:#b42318}',
+      '.la-order-foot{border-top:1px solid var(--rs-line,#e7e7ec);padding-top:12px;margin-top:4px;display:flex;flex-direction:column;gap:6px}',
+      '.la-order-total{font-weight:700;font-size:15px}',
+      '.la-order-note{font-size:12.5px;opacity:.75}',
+      '.la-order-go{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;border-radius:12px;padding:12px;font-weight:700;background:var(--rs-accent,#111);color:var(--rs-accent-fg,#fff);margin-top:4px}',
+      '.la-order-go[disabled]{opacity:.5;cursor:default}'
+    ].join('');
+
+    /**
+     * ?la_order=…: the order a shopper's AI wrote, checked on the server line by line (price, stock,
+     * the option or length chosen), shown on the store's own page and put in its cart from here:
+     * Shopify in one request (/cart/add.js), WooCommerce a line at a time the way its product form
+     * posts (a variation, or the length its page asks for, with it). A line still to choose gets
+     * its choices here, each priced. Then to the store's cart. The shopper never leaves the store.
+     */
+    function openOrder(items) {
+      var host = shadowHost('let-agents-order');
+      var style = doc.createElement('style');
+      style.textContent = ORDER_CSS;
+      host.root.appendChild(style);
+      var overlay = el('div', 'la-order-overlay');
+      var box = el('div', 'la-order');
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', label('order_title'));
+      box.dir = (doc.documentElement.getAttribute('dir') || 'rtl');
+      overlay.appendChild(box);
+      host.root.appendChild(overlay);
+      var shut = function () {
+        if (host.host.parentNode) {
+          host.host.parentNode.removeChild(host.host);
+        }
+      };
+      overlay.addEventListener('click', function (event) {
+        if (event.target === overlay) {
+          shut();
+        }
+      });
+      var close = el('button', 'la-order-x', '×');
+      close.type = 'button';
+      close.setAttribute('aria-label', label('close'));
+      close.addEventListener('click', shut);
+      box.appendChild(close);
+      box.appendChild(el('h2', null, label('order_title')));
+      var body = el('div', null, label('order_loading'));
+      box.appendChild(body);
+
+      win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/order?items=' + encodeURIComponent(items), { mode: 'cors', credentials: 'omit' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (order) {
+          if (!order || !order.lines || !order.lines.length) {
+            body.textContent = label('order_empty');
+            return;
+          }
+          drawOrder(box, body, order);
+        })
+        .catch(function () { body.textContent = label('order_empty'); });
+    }
+
+    function drawOrder(box, body, order) {
+      while (body.firstChild) {
+        body.removeChild(body.firstChild);
+      }
+      var rows = [];
+
+      order.lines.forEach(function (line) {
+        var row = el('div', 'la-order-line');
+        if (line.image) {
+          var img = el('img');
+          img.src = line.image;
+          img.alt = '';
+          img.loading = 'lazy';
+          row.appendChild(img);
+        }
+        var main = el('div', 'la-order-main');
+        main.appendChild(el('div', 'la-order-title', line.title || line.product));
+        var sub = [];
+        if (line.option && line.option.title) {
+          sub.push(line.option.title);
+        }
+        if (line.length && line.length.label) {
+          sub.push((line.field ? line.field + ': ' : '') + line.length.label);
+        }
+        if (line.quantity) {
+          sub.push('× ' + line.quantity + (line.unit_price != null ? ' · ' + shekels(line.unit_price) : ''));
+        }
+        if (sub.length) {
+          main.appendChild(el('div', 'la-order-sub', sub.join(' · ')));
+        }
+        var state = el('div', 'la-order-state');
+        var entry = { line: line, add: line.add || null, state: state, price: line.auto ? line.line_total : 0 };
+
+        if (line.status === 'quantity_reduced') {
+          state.textContent = label('order_reduced', { n: line.quantity });
+        } else if (line.status === 'out_of_stock') {
+          state.textContent = label('order_out');
+          state.className = 'la-order-state bad';
+        } else if (line.status === 'unknown_product') {
+          state.textContent = label('order_unknown');
+          state.className = 'la-order-state bad';
+        } else if (line.status === 'requires_manual_option_selection' && line.choose) {
+          var select = el('select');
+          var placeholder = el('option', null, label('order_choose', { field: line.field || label('order_option') }));
+          placeholder.value = '';
+          select.appendChild(placeholder);
+          line.choose.forEach(function (choice, at) {
+            var option = el('option', null, (choice.label || '') + (choice.price != null ? ' · ' + shekels(choice.price) : '') + (choice.in_stock ? '' : ' (' + label('order_out') + ')'));
+            option.value = String(at);
+            option.disabled = !choice.in_stock;
+            select.appendChild(option);
+          });
+          select.addEventListener('change', function () {
+            var choice = line.choose[Number(select.value)];
+            entry.add = choice && choice.in_stock ? choice.add : null;
+            entry.price = choice && choice.price != null ? choice.price * (line.quantity || 1) : 0;
+            totals();
+          });
+          main.appendChild(select);
+        }
+        main.appendChild(state);
+        row.appendChild(main);
+        if (line.auto) {
+          row.appendChild(el('div', 'la-order-price', shekels(line.line_total)));
+        }
+        if (line.page_url && line.status !== 'unknown_product') {
+          var page = el('a', 'la-order-sub', label('order_page'));
+          page.href = line.page_url;
+          main.appendChild(page);
+        }
+        body.appendChild(row);
+        rows.push(entry);
+      });
+
+      var foot = el('div', 'la-order-foot');
+      var now = el('div', 'la-order-total');
+      var all = el('div', 'la-order-note');
+      var left = el('div', 'la-order-note');
+      foot.appendChild(now);
+      foot.appendChild(all);
+      foot.appendChild(left);
+      foot.appendChild(el('div', 'la-order-note', label('order_shipping')));
+      var go = el('button', 'la-order-go', label('order_add'));
+      go.type = 'button';
+      foot.appendChild(go);
+      body.appendChild(foot);
+
+      function totals() {
+        var ready = rows.filter(function (r) { return r.add && !r.done; });
+        var sum = rows.reduce(function (s, r) { return s + (r.add ? r.price : 0); }, 0);
+        var waiting = rows.filter(function (r) { return !r.add && r.line.status === 'requires_manual_option_selection'; });
+        now.textContent = label('order_now', { amount: shekels(sum) });
+        all.textContent = waiting.length && order.totals.order_total_is_estimate
+          ? label('order_estimate', { amount: shekels(sum + waiting.reduce(function (s, r) { return s + (r.line.from_total || 0); }, 0)) })
+          : label('order_total', { amount: shekels(sum) });
+        left.textContent = waiting.length ? label('order_pick_first', { count: waiting.length }) : '';
+        go.disabled = ready.length === 0;
+      }
+      totals();
+
+      go.addEventListener('click', function () {
+        if (go.getAttribute('data-done')) {
+          win.location.href = order.cart_url;
+          return;
+        }
+        var ready = rows.filter(function (r) { return r.add && !r.done; });
+        if (!ready.length) {
+          return;
+        }
+        go.disabled = true;
+        go.textContent = label('order_adding');
+        addLines(order.platform, ready).then(function () {
+          var waiting = rows.filter(function (r) { return !r.done && r.line.status === 'requires_manual_option_selection'; });
+          go.disabled = false;
+          go.setAttribute('data-done', '1');
+          go.textContent = label('order_to_cart');
+          totals();
+          go.disabled = false;
+          // Everything in: straight to the cart; a choice left, the shopper chooses and adds again,
+          // and the cart is a link away all the same.
+          if (!waiting.length && rows.every(function (r) { return r.done || !r.add; })) {
+            win.setTimeout(function () { win.location.href = order.cart_url; }, 900);
+          } else {
+            go.removeAttribute('data-done');
+            go.textContent = label('order_add');
+            if (!foot.querySelector('[data-to-cart]')) {
+              var toCart = el('a', 'la-order-go', label('order_to_cart'));
+              toCart.href = order.cart_url;
+              toCart.setAttribute('data-to-cart', '1');
+              foot.appendChild(toCart);
+            }
+          }
+        });
+      });
+    }
+
+    /** The lines into the store's own cart, from its own page: Shopify at once, WooCommerce one by one. */
+    function addLines(platform, rows) {
+      var mark = function (row, ok) {
+        row.done = ok;
+        row.state.textContent = label(ok ? 'order_added' : 'order_failed');
+        row.state.className = 'la-order-state ' + (ok ? 'ok' : 'bad');
+      };
+
+      if (platform === 'shopify') {
+        var lines = rows.map(function (r) { return { id: Number(r.add.variant), quantity: r.add.quantity }; });
+        return win.fetch(win.location.origin + '/cart/add.js', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ items: lines, attributes: { la_source: 'ai' } })
+        }).then(function (response) {
+          rows.forEach(function (r) { mark(r, response.ok); });
+        }).catch(function () {
+          rows.forEach(function (r) { mark(r, false); });
+        });
+      }
+
+      // WooCommerce: what its product form posts, to the product's page on this very address. A
+      // page answers 200 even when it did not add (a field missing), so the cart itself says.
+      var posted = rows.reduce(function (chain, r) {
+        return chain.then(function () {
+          var target;
+          try {
+            var at = new URL(r.add.post_url, win.location.origin);
+            target = win.location.origin + at.pathname + at.search;
+          } catch (e) {
+            target = r.add.post_url;
+          }
+          var form = new URLSearchParams();
+          Object.keys(r.add.fields || {}).forEach(function (name) { form.append(name, r.add.fields[name]); });
+          return win.fetch(target, { method: 'POST', credentials: 'same-origin', body: form, redirect: 'follow' })
+            .then(function (response) { mark(r, response.ok); })
+            .catch(function () { mark(r, false); });
+        });
+      }, Promise.resolve());
+
+      return posted.then(function () {
+        return win.fetch(win.location.origin + '/wp-json/wc/store/v1/cart', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (cart) {
+            if (!cart || !cart.items) {
+              return;
+            }
+            var held = {};
+            cart.items.forEach(function (item) {
+              held[String(item.id)] = true;
+              if (item.parent) {
+                held[String(item.parent)] = true;
+              }
+            });
+            rows.forEach(function (r) {
+              var fields = r.add.fields || {};
+              mark(r, !!(held[String(fields.variation_id || '')] || held[String(fields['add-to-cart'] || '')]));
+            });
+          })
+          .catch(function () { /* the store has no cart API: the pages' answers stand */ });
+      });
+    }
+
     var SHARED = {};
 
     /** The search handed to the shopper's own AI: a short link, the words to send, where to open them. Once per search and products. */
@@ -6448,6 +6721,15 @@
           forceRegular = true;
           chooseFromLink(sharedQuery, shared.get('la_f'));
           openPanel(sharedQuery, true);
+        }
+      });
+    }
+    // An order a shopper's AI wrote (?la_order=…): completed here, on the store's own page.
+    var orderItems = shared ? String(shared.get('la_order') || '').trim().slice(0, 2000) : '';
+    if (orderItems) {
+      load().then(function (data) {
+        if (data) {
+          openOrder(orderItems);
         }
       });
     }

@@ -133,6 +133,27 @@
     return box;
   }
 
+  // A checked order (calculate_cart): its lines, what goes into the cart now, and one button that
+  // opens it on the store's own site, where it goes into the cart.
+  function checked(o) {
+    var box = el('div', 'order');
+    box.appendChild(el('div', 'title', label('order_title', 'Your order') + (data.store && data.store.name ? ' · ' + data.store.name : '')));
+    var list = el('ul', 'muted');
+    (o.lines || []).forEach(function (l) {
+      var what = (l.title || l.product || '') + (l.option ? ' · ' + l.option.title : '') + (l.length ? ' · ' + l.length.label : '');
+      var state = l.status === 'ready' ? money(l.line_total, o.currency) : label('problem_' + l.status, l.status);
+      list.appendChild(el('li', null, what + ' × ' + (l.quantity || l.quantity_asked) + ' — ' + state));
+    });
+    box.appendChild(list);
+    if (o.totals) {
+      box.appendChild(el('div', 'price', label('checkout', 'To checkout') + ': ' + money(o.totals.auto_total, o.currency)));
+    }
+    if (o.order_url) {
+      box.appendChild(button('buy', label('checkout', 'To checkout'), o.order_url));
+    }
+    return box;
+  }
+
   function draw() {
     while (root.firstChild) {
       root.removeChild(root.firstChild);
@@ -144,6 +165,8 @@
       var row = el('div', 'row');
       data.products.forEach(function (p) { row.appendChild(card(p)); });
       root.appendChild(row);
+    } else if (data.lines) {
+      root.appendChild(checked(data));
     } else if (data.url !== undefined || data.links) {
       root.appendChild(order(data));
     }

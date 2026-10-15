@@ -29,6 +29,17 @@ final class AgentCatalog
     /** What an AI is told is always in English; it answers the shopper in the shopper's language. */
     public const AI_LOCALE = 'en';
 
+    /**
+     * The order as a link on the store's own address: our script there shows it and puts it in the
+     * store's cart (CalculateCart), so the shopper never leaves the store. The lines follow.
+     *
+     * @param  array<string, mixed>  $store
+     */
+    public static function orderBase(array $store): string
+    {
+        return rtrim((string) ($store['url'] ?? ''), '/').'/?la_order=';
+    }
+
     /** A public link on the platform's own address (agents.lets.co.il), never the address a request happened to come on. */
     public static function publicUrl(string $path): string
     {
@@ -63,7 +74,7 @@ final class AgentCatalog
             $everything ? $t('guide_everything', ['store' => $store['name'] ?? '']) : ($catalog ? $t('guide_whole_store', ['url' => $catalog.'?format=json']) : null),
             $t('guide_products'),
             $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo'),
-            $catalog ? $t('guide_order', ['example' => $catalog.'/cart?items=1234:1,5678/91011:2']) : null,
+            $catalog ? $t('guide_order', ['example' => self::orderBase($store).'1234:1,5678/91011:2,14283@4.2:6']) : null,
             $t('guide_images'),
             $t('guide_rules', ['time' => $time]),
         ]));
@@ -86,7 +97,7 @@ final class AgentCatalog
         }
 
         return [
-            ['name' => 'order', 'url' => $catalog.'/cart?items={id}:{quantity},{id}/{cart_id}:{quantity}', 'does' => (string) __('search::share.action_order', [], self::AI_LOCALE)],
+            ['name' => 'order', 'url' => self::orderBase($store).'{id}:{quantity},{id}/{option_id}:{quantity},{id}@{metres}:{quantity}', 'does' => (string) __('search::share.action_order', [], self::AI_LOCALE)],
         ];
     }
 
@@ -189,8 +200,8 @@ final class AgentCatalog
 
         return array_filter([
             'how' => $t('everything_how'),
-            'order_link' => $catalog.'/cart?items={id}:{quantity},{id}:{quantity}',
-            'order_example' => $products->count() >= 2 ? $catalog.'/cart?items='.$products[0]->external_id.':1,'.$products[1]->external_id.':2' : null,
+            'order_link' => self::orderBase($store).'{id}:{quantity},{id}:{quantity}',
+            'order_example' => $products->count() >= 2 ? self::orderBase($store).$products[0]->external_id.':1,'.$products[1]->external_id.':2' : null,
             'count' => $products->count(),
             'by_category' => $groups,
         ], fn ($value): bool => $value !== null);
@@ -224,7 +235,7 @@ final class AgentCatalog
         $catalog = $store['catalog'] ?? null;
         // Every product and option in stock can be bought from here: its own link, or our order
         // command for it, which finds what the store needs (a variant) when the link opens.
-        $order = fn (string $items): ?string => $catalog === null ? null : $catalog.'/cart?items='.$items;
+        $order = fn (string $items): ?string => $catalog === null ? null : self::orderBase($store).$items;
 
         return array_filter([
             'for_ai' => self::instructions($store, $time, isset($more['everything'])),

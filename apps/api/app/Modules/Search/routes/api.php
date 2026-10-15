@@ -6,6 +6,7 @@ use App\Modules\Search\Http\Controllers\PluginSearchController;
 use App\Modules\Search\Http\Controllers\SearchController;
 use App\Modules\Search\Http\Controllers\SearchEventsController;
 use App\Modules\Search\Http\Controllers\SearchIndexController;
+use App\Modules\Search\Http\Controllers\SearchOrderController;
 use App\Modules\Search\Http\Controllers\SearchPhotoController;
 use App\Modules\Search\Http\Controllers\SearchScriptController;
 use App\Modules\Search\Http\Controllers\ShareController;
@@ -24,6 +25,8 @@ Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}', SearchController::class)->name('api.search.query');
     Route::post('search/{site}/events', SearchEventsController::class)->name('api.search.events');
     Route::post('search/{site}/share', ShareController::class)->name('api.search.share');
+    // The order an AI wrote, checked, for our script on the store's page to put in its cart.
+    Route::get('search/{site}/order', SearchOrderController::class)->name('api.search.order');
     // The store as a connector for a shopper's own AI (Model Context Protocol over HTTP).
     Route::match(['get', 'post', 'delete'], 'mcp/{site}', McpController::class)->name('api.search.mcp');
 });

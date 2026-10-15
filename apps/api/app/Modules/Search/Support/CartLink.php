@@ -220,7 +220,7 @@ final class CartLink
     }
 
     /** The one variant of a Shopify product without options, from its public product page, when it can be bought. */
-    private static function onlyVariant(CatalogProduct $product): ?string
+    public static function onlyVariant(CatalogProduct $product): ?string
     {
         if (! is_string($product->url) || $product->url === '') {
             return null;
