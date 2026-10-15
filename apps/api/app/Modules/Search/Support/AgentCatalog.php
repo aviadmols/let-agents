@@ -240,17 +240,21 @@ final class AgentCatalog
                 'was' => $p['regular_price'] ?? null,
                 'currency' => $p['currency'] ?? null,
                 'in_stock' => $p['in_stock'] ?? null,
+                'stock' => $p['stock'] ?? null,
+                'must_choose' => $p['must_choose'] ?? null,
+                'order_as' => $p['order_as'] ?? null,
                 'details' => array_map(fn (array $values): string => implode(', ', $values), $p['details'] ?? []) ?: null,
                 'key_points' => $p['key_points'] ?? null,
                 'looks' => $p['looks'] ?? null,
                 'buy_url' => $p['buy_url'] ?? (($p['variants'] ?? []) === [] && ($p['in_stock'] ?? false) ? $order(($p['id'] ?? '').':1') : null),
                 'cart_id' => $p['cart_id'] ?? null,
                 'options' => array_map(fn (array $v): array => array_filter([
-                    'title' => $v['title'] ?? null, 'cart_id' => $v['id'] ?? null, 'price' => $v['price'] ?? null, 'in_stock' => $v['in_stock'] ?? null,
+                    'title' => $v['title'] ?? null, 'cart_id' => $v['id'] ?? null, 'price' => $v['price'] ?? null, 'in_stock' => $v['in_stock'] ?? null, 'stock' => $v['stock'] ?? null,
                     'buy_url' => $v['buy_url'] ?? (($v['in_stock'] ?? false) ? $order(($p['id'] ?? '').'/'.($v['id'] ?? '').':1') : null),
                 ], fn ($value): bool => $value !== null), $p['variants'] ?? []) ?: null,
                 // Asked for on the product's page (a length with a price for each): ordered as id@metres:quantity.
                 'choices' => $p['choices'] ?? null,
+                'lengths' => $p['lengths'] ?? null,
                 'page_url' => $p['url'] ?? null,
                 'image' => $p['image'] ?? null,
             ], fn ($value): bool => $value !== null && $value !== ''), $products),
@@ -312,10 +316,27 @@ final class AgentCatalog
                 unset($product['buy_url'], $product['cart_id']);
             }
 
+            $lengths = self::lengths($choices[(string) $p->id] ?? []);
+            $id = (string) $p->external_id;
+
             return $product + array_filter([
                 'key_points' => $points[(string) $p->id] ?? null,
                 'looks' => $looks[(string) $p->id] ?? null,
                 'choices' => $choices[(string) $p->id] ?? null,
+                // Sold by length: each length the store sells, with its price.
+                'lengths' => array_map(fn (array $v): array => array_filter(['metres' => $v['meters'], 'label' => $v['label'] ?? null, 'price' => $v['price'] ?? null], fn ($x): bool => $x !== null), $lengths) ?: null,
+                // What the shopper must choose before the cart takes it, and how the order writes it.
+                'must_choose' => match (true) {
+                    $lengths !== [] => 'length',
+                    ($product['variants'] ?? []) !== [] => 'option',
+                    $asked !== [] => (string) (array_values($asked)[0]['label'] ?? 'choice'),
+                    default => null,
+                },
+                'order_as' => match (true) {
+                    $lengths !== [] => $id.'@{metres}:{quantity}',
+                    ($product['variants'] ?? []) !== [] => $id.'/{option_id}:{quantity}',
+                    default => $id.':{quantity}',
+                },
             ]);
         }, $ordered);
     }
@@ -392,6 +413,7 @@ final class AgentCatalog
                 'title' => CatalogProduct::variantLabel($variant),
                 'price' => is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null,
                 'in_stock' => (bool) ($variant['stock']['in_stock'] ?? false),
+                'stock' => self::units((array) ($variant['stock'] ?? [])),
                 'buy_url' => $store === null || ! ($variant['stock']['in_stock'] ?? false) ? null : CartLink::buyUrl($store, (string) $product->external_id, (string) ($variant['external_id'] ?? '')),
             ], fn ($value): bool => $value !== null && $value !== '');
         }
@@ -407,6 +429,8 @@ final class AgentCatalog
             'regular_price' => $product->on_sale && $product->regular_price !== null ? (float) $product->regular_price : null,
             'currency' => $product->currency ?: 'ILS',
             'in_stock' => (bool) $product->in_stock,
+            // How many the store has, when it counts them: an order never asks for more.
+            'stock' => self::units((array) ($payload['stock'] ?? [])),
             'details' => $details,
             // A product without options is bought from here; one with options, from the option chosen.
             'buy_url' => $store === null || $variants !== [] || ! $product->in_stock ? null : CartLink::buyUrl($store, (string) $product->external_id, (string) ($payload['variant_id'] ?? '')),
@@ -414,6 +438,12 @@ final class AgentCatalog
             'variants' => $variants,
             'description' => $text === '' ? null : Str::limit($text, self::MAX_DESCRIPTION),
         ], fn ($value): bool => $value !== null && $value !== [] && $value !== '');
+    }
+
+    /** The units a store counts (its stock managed), null when it does not count them. @param array<string, mixed> $stock */
+    public static function units(array $stock): ?int
+    {
+        return is_numeric($stock['quantity'] ?? null) && ($stock['managed'] ?? true) !== false ? max(0, (int) $stock['quantity']) : null;
     }
 
     /**

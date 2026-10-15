@@ -494,4 +494,34 @@ final class ShareSearchTest extends TestCase
         $this->assertSame(['צבע: ירוק'], $green['unknown_filters']);
         $this->assertSame(3, $green['total'], 'nothing taken away by a filter the store has not');
     }
+
+    public function test_a_product_says_its_stock_what_must_be_chosen_and_how_it_is_ordered(): void
+    {
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $ring = CatalogProduct::query()->where('external_id', '1')->sole();
+            $payload = $ring->payload;
+            $payload['stock'] = ['in_stock' => true, 'managed' => true, 'quantity' => 3];
+            $payload['variations'][0]['stock'] = ['in_stock' => true, 'managed' => true, 'quantity' => 2];
+            $ring->update(['payload' => $payload]);
+            $beam = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '7', 'type' => 'simple', 'status' => 'publish', 'title' => 'קורת אורן',
+                'url' => 'https://www.rings.test/p/7', 'price' => 13.28, 'in_stock' => true, 'purchasable' => true, 'hash' => 'h7', 'payload' => []]);
+            CatalogProductChoice::query()->create(['shop_id' => $this->shop->id, 'product_id' => $beam->id, 'fields' => [['key' => 'addon-7-x-0', 'label' => 'אורך', 'kind' => 'length', 'required' => true,
+                'values' => [['value' => 'b', 'label' => '4.20 מטר', 'price' => 55.78, 'meters' => 4.2], ['value' => 'a', 'label' => '3.00 מטר', 'price' => 39.84, 'meters' => 3.0]]]]]);
+        });
+        $get = fn (string $id) => $this->call('POST', '/api/v1/mcp', [], [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'get_product', 'arguments' => ['store' => $this->site, 'id' => $id]]]))->json('result.structuredContent.products.0');
+
+        $ring = $get('1');
+        $this->assertSame(3, $ring['stock'], 'what the store counts');
+        $this->assertSame(2, $ring['variants'][0]['stock']);
+        $this->assertArrayNotHasKey('stock', $ring['variants'][1], 'not counted: not said');
+        $this->assertSame('option', $ring['must_choose']);
+        $this->assertSame('1/{option_id}:{quantity}', $ring['order_as']);
+
+        $beam = $get('7');
+        $this->assertSame('length', $beam['must_choose']);
+        $this->assertSame('7@{metres}:{quantity}', $beam['order_as']);
+        $this->assertEquals([['metres' => 3.0, 'label' => '3.00 מטר', 'price' => 39.84], ['metres' => 4.2, 'label' => '4.20 מטר', 'price' => 55.78]], $beam['lengths'], 'shortest first');
+        $this->assertArrayNotHasKey('buy_url', $beam, 'never a store link for it');
+    }
 }
