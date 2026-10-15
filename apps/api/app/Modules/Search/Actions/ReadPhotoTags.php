@@ -9,6 +9,7 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -42,7 +43,8 @@ final class ReadPhotoTags
 
     public const SECOND_ACTION = 'search.second_look';
 
-    public const PROMPT_VERSION = 10;
+    /** 11: stones by colour, light and shape, never by name, as the store's pictures are described (caption v4). */
+    public const PROMPT_VERSION = 11;
 
     public const SECOND_VERSION = 1;
 
@@ -314,7 +316,7 @@ final class ReadPhotoTags
                     'also' => self::words($data['also'] ?? [], 3, [$object]),
                     'around' => self::words($data['around'] ?? [], 4, [$object]),
                     // The one detail that tells it apart most (v10: "key") leads the details, and weighs the most.
-                    'details' => self::words([$data['key'] ?? null, ...(array) ($data['details'] ?? []), ...(array) ($data['maybe'] ?? [])], 9, [$object]),
+                    'details' => self::words([$data['key'] ?? null, ...(array) ($data['details'] ?? []), ...(array) ($data['maybe'] ?? [])], 9, [$object], true),
                     'lacks' => self::words($data['lacks'] ?? [], 4, []),
                     'box' => self::box($data['box'] ?? null),
                     'others' => self::others($data['others'] ?? [], $object),
@@ -454,7 +456,7 @@ final class ReadPhotoTags
      * @param  list<string|null>  $except
      * @return list<string>
      */
-    private static function words(mixed $values, int $limit, array $except): array
+    private static function words(mixed $values, int $limit, array $except, bool $looks = false): array
     {
         $out = [];
         $taken = array_map(fn (?string $w): string => HebrewSearch::normalize($w), $except);
@@ -462,7 +464,9 @@ final class ReadPhotoTags
         foreach ((array) $values as $value) {
             $word = self::word($value);
 
-            if ($word !== null && ! in_array(HebrewSearch::normalize($word), $taken, true)) {
+            // A stone's name is never a word of how a photo looks (the store's pictures say none
+            // either); what the object plainly lacks may name one ("יהלום").
+            if ($word !== null && (! $looks || preg_match(CaptionsPictures::STONE_NAMES, $word) !== 1) && ! in_array(HebrewSearch::normalize($word), $taken, true)) {
                 $out[] = $word;
                 $taken[] = HebrewSearch::normalize($word);
             }
@@ -508,7 +512,7 @@ final class ReadPhotoTags
                 continue;
             }
 
-            $out[] = ['object' => $name, 'details' => self::words([$other['key'] ?? null, ...(array) ($other['details'] ?? []), ...(array) ($other['maybe'] ?? [])], 9, [$name]), 'lacks' => self::words($other['lacks'] ?? [], 4, []), 'box' => $box];
+            $out[] = ['object' => $name, 'details' => self::words([$other['key'] ?? null, ...(array) ($other['details'] ?? []), ...(array) ($other['maybe'] ?? [])], 9, [$name], true), 'lacks' => self::words($other['lacks'] ?? [], 4, []), 'box' => $box];
         }
 
         return array_slice($out, 0, 3);

@@ -6,6 +6,7 @@ return [
     'matching_off' => 'Matching with a model is off for this shop.',
     'query_vectors' => 'Search vectors: :count new queries today.',
     'images_indexed' => 'Pictures: :products products with a picture, :embedded given a vector, :kept unchanged, :pending waiting.',
+    'captions_busy' => 'The pictures of this shop are already being described; this one did not start.',
     'images_busy' => 'Another picture scan of this shop is already running; this one did not start.',
     'captioned' => 'Picture descriptions: :described described, :left left.',
     'captions_off' => 'Picture descriptions are off in this shop.',

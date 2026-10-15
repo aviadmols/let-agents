@@ -21,6 +21,7 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -41,10 +42,10 @@ final class CaptionImages implements CaptionsPictures
     /** 4: stones by colour, light and shape, never by name: a photo cannot tell a ruby from a garnet. */
     public const PROMPT_VERSION = 4;
 
-    /** Names of stones and gems, in Hebrew and English: never a word of how a picture looks. */
-    public const STONE_NAMES = '/(?<![\p{L}])(?:רובי|אופל|ספיר|אמרלד|אזמרגד|טופז|בלו טופז|יהלום|יהלומים|זירקון|פנינה|פנינים|אקוומרין|אמטיסט|גרנט|טורמלין|ציטרין|פרידוט|טנזנייט|מורגנייט|אוניקס|טורקיז|ג\'ייד|לאפיס|מוסניט|ruby|opal|sapphire|emerald|topaz|diamonds?|zircon|pearls?|aquamarine|amethyst|garnet|tourmaline|citrine|peridot|tanzanite|morganite|onyx|turquoise|jade|lapis|moissanite)(?![\p{L}])/iu';
-
     private const BATCH = 16;
+
+    /** How long a describer holds the shop: a part of 200 pictures takes minutes, not this. */
+    private const LOCK_SECONDS = 1500;
 
     private const MAX_WORDS = 14;
 
@@ -73,8 +74,30 @@ final class CaptionImages implements CaptionsPictures
             action: self::ACTION,
             shopId: $shopId,
             trigger: $trigger,
-            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->describe($run, $shopId)),
+            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->locked($run, $shopId)),
         );
+    }
+
+    /**
+     * Two describers of the same shop at once would pay for the same pictures twice. A lock of its
+     * own, not the picture scan's: describing does not wait for a scan that holds it, and a lock a
+     * restart left behind ends with its time.
+     */
+    private function locked(RunContext $run, string $shopId): void
+    {
+        $lock = Cache::lock('retrieval:captions:'.$shopId, self::LOCK_SECONDS);
+
+        if (! $lock->get()) {
+            $run->output(['stopped' => 'already_running'])->summary('retrieval::runs.captions_busy');
+
+            return;
+        }
+
+        try {
+            $this->describe($run, $shopId);
+        } finally {
+            $lock->release();
+        }
     }
 
     /** What a picture's description is keyed by: written again only when one of these changes. */

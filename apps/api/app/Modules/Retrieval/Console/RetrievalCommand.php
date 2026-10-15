@@ -28,6 +28,9 @@ final class RetrievalCommand extends Command
     /** How long the pictures step goes on; what is left, the night and the scan button finish. */
     private const PICTURE_MINUTES = 50;
 
+    /** The last shop's pictures step did nothing: both its parts were held by another scan. */
+    private bool $idle = false;
+
     protected $signature = 'retrieval
         {step : index, images, pictures, match or nightly}
         {target? : shop slug or ID}
@@ -69,17 +72,32 @@ final class RetrievalCommand extends Command
         $until = now()->addMinutes(self::PICTURE_MINUTES);
         $runs = [];
 
+        $busy = 0;
+
         foreach ([fn (): Run => app(BuildImageIndex::class)->handle($shop->id), fn (): Run => app(CaptionImages::class)->handle($shop->id)] as $part) {
             do {
                 $run = $part();
                 $runs[] = $run;
             } while (in_array($run->output['stopped'] ?? null, ['more', 'time_budget'], true) && now()->lt($until));
 
+            $stopped = $run->output['stopped'] ?? null;
+
+            // Another scan holds the pictures (or a restart left its lock): the descriptions, which
+            // need only the pictures already seen, go on all the same.
+            if ($stopped === 'already_running') {
+                $busy++;
+
+                continue;
+            }
+
             // Descriptions only once every picture has its look.
-            if (($run->output['stopped'] ?? null) !== null) {
+            if ($stopped !== null) {
                 break;
             }
         }
+
+        // Nothing done because both parts were held: not a step that ended, one to try again.
+        $this->idle = $busy === 2;
 
         return $runs;
     }
@@ -102,8 +120,11 @@ final class RetrievalCommand extends Command
                 $this->line("{$shop->slug}: ".$run->summary());
                 $failed += $run->status->value === 'succeeded' ? 0 : 1;
             }
+            $failed += $this->idle ? 1 : 0;
+            $this->idle = false;
         }
 
+        // A step that did nothing is never shown as done (the store's scan card reads this).
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 
