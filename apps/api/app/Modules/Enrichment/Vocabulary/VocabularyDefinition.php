@@ -408,6 +408,8 @@ final class VocabularyDefinition
     public function titleSpecs(string $title, ?string $type): array
     {
         $specs = [];
+        // Where in the words each measure's number was read.
+        $at = [];
 
         foreach ($this->attributes() as $attribute) {
             $capture = $attribute['title_capture'] ?? null;
@@ -416,11 +418,11 @@ final class VocabularyDefinition
                 continue;
             }
 
-            if (@preg_match('~'.$capture['pattern'].'~iu', $title, $match) !== 1 || ! isset($match[$capture['group']])) {
+            if (@preg_match('~'.$capture['pattern'].'~iu', $title, $match, PREG_OFFSET_CAPTURE) !== 1 || ! isset($match[$capture['group']]) || $match[$capture['group']][1] < 0) {
                 continue;
             }
 
-            $number = (float) str_replace(',', '.', $match[$capture['group']]);
+            $number = (float) str_replace(',', '.', $match[$capture['group']][0]);
             $value = $number * (float) ($capture['factor'] ?? 1);
 
             if ($value < (float) $attribute['min'] || $value > (float) $attribute['max']) {
@@ -430,8 +432,20 @@ final class VocabularyDefinition
             $specs[$attribute['key']] = [
                 'value' => round($value, 6),
                 'unit' => Units::CANONICAL[$attribute['dimension']],
-                'quote' => $match[0],
+                'quote' => $match[0][0],
             ];
+            $at[$match[$capture['group']][1]][] = $attribute['key'];
+        }
+
+        // One number read as several measures ("3*3.60" as a length, a width and a height of 3 cm
+        // each) is none of them: the words do not say which it is. Two numbers alike in two places
+        // ("45×45") are two measures, and stay.
+        foreach ($at as $keys) {
+            if (count($keys) > 1) {
+                foreach ($keys as $key) {
+                    unset($specs[$key]);
+                }
+            }
         }
 
         return $specs;

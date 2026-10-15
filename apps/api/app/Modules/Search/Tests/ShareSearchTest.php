@@ -177,6 +177,29 @@ final class ShareSearchTest extends TestCase
         $this->get("/c/{$this->site}")->assertNotFound();
     }
 
+    public function test_the_order_an_ai_put_together_is_one_link_to_the_stores_checkout(): void
+    {
+        // Every page tells the AI how: the order link is among its commands.
+        $actions = $this->getJson("/c/{$this->site}?format=json")->json('actions');
+        $this->assertSame(['search', 'all_products', 'order', 'check_order'], array_column($actions, 'name'));
+        $this->assertStringContainsString('/c/'.$this->site.'/cart?items=', $actions[2]['url']);
+
+        // WooCommerce, one product with its size: to the store, the product added.
+        $this->get("/c/{$this->site}/cart?items=1/11:2")->assertRedirect('https://www.rings.test/?add-to-cart=1&variation_id=11&quantity=2');
+
+        // The size not chosen yet: a page with each size, each a link that completes the order.
+        $this->get("/c/{$this->site}/cart?items=1")->assertOk()->assertSee('בחרו אפשרות כדי להמשיך לתשלום')
+            ->assertSee('/c/'.$this->site.'/cart?items='.rawurlencode('1/11:1'), false)->assertDontSee(rawurlencode('1/12:1'), false);
+        $check = $this->getJson("/c/{$this->site}/cart?items=1&format=json")->assertOk()->json();
+        $this->assertFalse($check['ready']);
+        $this->assertSame('choose_option', $check['problems'][0]['problem']);
+
+        // Shopify: every item in one cart, straight to checkout.
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->update(['platform' => 'shopify']));
+        $this->get("/c/{$this->site}/cart?items=1/11:2,2/21")->assertRedirect('https://www.rings.test/cart/11:2,21:1?attributes[la_source]=ai');
+        $this->assertTrue($this->getJson("/c/{$this->site}/cart?items=1/11,2/21&format=json")->json('ready'));
+    }
+
     public function test_the_store_is_a_connector_a_shoppers_ai_searches_reads_and_makes_a_cart_link_with(): void
     {
         $rpc = fn (string $method, array $params = [], ?int $id = 1) => $this->call('POST', "/api/v1/mcp/{$this->site}", [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json, text/event-stream'],

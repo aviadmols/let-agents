@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Search\Http\Controllers\SharePageController;
+use App\Modules\Search\Http\Controllers\StoreCartController;
 use App\Modules\Search\Http\Controllers\StoreCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,3 +15,9 @@ Route::get('c/{site}', StoreCatalogController::class)
     ->middleware('throttle:search-share')
     ->where('site', '[a-f0-9]{24}')
     ->name('search.catalog');
+
+// The order an AI put together, as one link to the store's checkout.
+Route::get('c/{site}/cart', StoreCartController::class)
+    ->middleware('throttle:search-share')
+    ->where('site', '[a-f0-9]{24}')
+    ->name('search.cart');

@@ -99,6 +99,17 @@ final class CodeReadingTest extends TestCase
         [$definition, $problems] = VocabularyDefinition::parse($data);
         $this->assertSame([], $problems);
         $this->assertSame(['thickness_mm' => ['value' => 20.0, 'unit' => 'mm', 'quote' => '20X45 מ"מ'], 'width_mm' => ['value' => 45.0, 'unit' => 'mm', 'quote' => '20X45 מ"מ']], $definition->titleSpecs($board->title, 'planed_board'));
+        $this->assertSame([45.0, 45.0], array_column($definition->titleSpecs($corner->title, 'planed_board'), 'value'), 'two numbers alike in two places: two measures');
+
+        // One number read by several measures' patterns is none of them ("3*3.60": 3 cm long, wide and high).
+        $loose = $data;
+        $loose['attributes'] = array_values(array_filter($loose['attributes'], fn (array $a): bool => ($a['type'] ?? 'number') !== 'number'));
+        foreach (['length_mm', 'width_mm', 'height_mm'] as $key) {
+            $loose['attributes'][] = ['key' => $key, 'type' => 'number', 'dimension' => 'length', 'min' => 1, 'max' => 10000, 'label' => ['he' => $key, 'en' => $key],
+                'title_capture' => ['pattern' => '(\d+(?:\.\d+)?)\s*\*', 'group' => 1, 'factor' => 10]];
+        }
+        [$looseDefinition] = VocabularyDefinition::parse($loose);
+        $this->assertSame([], $looseDefinition->titleSpecs('קיט פרגולה 3*3.60 מטר', null));
         app(ImportVocabulary::class)->handle($this->shop->id, $data, 'test');
 
         $run = app(ReadProductsInCode::class)->handle($this->shop->id);

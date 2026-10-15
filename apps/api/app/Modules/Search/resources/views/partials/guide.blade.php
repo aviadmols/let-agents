@@ -9,8 +9,8 @@
         @endif
         <li>{{ $t('guide_products') }}</li>
         <li>{{ $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo') }}</li>
-        @if ($shopify)
-            <li>{{ $t('guide_combined') }} <code>{{ rtrim($store['url'], '/') }}/cart/{{ $t('guide_cart_id') }}:1,{{ $t('guide_cart_id') }}:2?attributes[la_source]=ai</code></li>
+        @if ($catalog)
+            <li>{{ $t('guide_order') }} <code>{{ $catalog }}/cart?items={{ $t('guide_item') }}:1,{{ $t('guide_item') }}/{{ $t('guide_cart_id') }}:2</code></li>
         @endif
         <li><strong>{{ $t('guide_end') }}</strong></li>
         <li>{{ $t('guide_rules', ['time' => $time]) }}</li>

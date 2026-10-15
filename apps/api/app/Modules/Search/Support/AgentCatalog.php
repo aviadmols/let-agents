@@ -50,10 +50,36 @@ final class AgentCatalog
             $catalog ? $t('guide_search', ['store' => $store['name']]).' '.$catalog.'?q=… ('.$t('guide_example').' '.$catalog.'?q='.$t('guide_example_query').'; '.$t('guide_pages').' &page=2; JSON: &format=json)' : null,
             $t('guide_products'),
             $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo'),
-            $shopify ? $t('guide_combined').' '.rtrim((string) $store['url'], '/').'/cart/'.$t('guide_cart_id').':1,'.$t('guide_cart_id').':2?attributes[la_source]=ai' : null,
+            $catalog ? $t('guide_order').' '.$catalog.'/cart?items='.$t('guide_item').':1,'.$t('guide_item').'/'.$t('guide_cart_id').':2' : null,
             $t('guide_end'),
             $t('guide_rules', ['time' => $time]),
         ]));
+    }
+
+    /**
+     * The addresses in our system an AI can open to act for the shopper: search the whole store,
+     * every product a page at a time, and the order as one link to the store's checkout.
+     *
+     * @param  array<string, mixed>  $store
+     * @return list<array{name: string, url: string, does: string}>
+     */
+    public static function actions(array $store): array
+    {
+        $catalog = $store['catalog'] ?? null;
+
+        if ($catalog === null) {
+            return [];
+        }
+
+        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
+        $t = fn (string $key): string => (string) __('search::share.action_'.$key, [], $locale);
+
+        return [
+            ['name' => 'search', 'url' => $catalog.'?q={words}&format=json', 'does' => $t('search')],
+            ['name' => 'all_products', 'url' => $catalog.'?format=json&page={n}', 'does' => $t('all')],
+            ['name' => 'order', 'url' => $catalog.'/cart?items={product_id}:{quantity},{product_id}/{option_cart_id}:{quantity}', 'does' => $t('order')],
+            ['name' => 'check_order', 'url' => $catalog.'/cart?items={…}&format=json', 'does' => $t('check')],
+        ];
     }
 
     /**
@@ -71,6 +97,7 @@ final class AgentCatalog
 
         return array_filter([
             'for_ai' => self::instructions($store, $time),
+            'actions' => self::actions($store),
             'store' => array_intersect_key($store, array_flip(['name', 'url', 'platform', 'catalog'])),
             'prices_as_of' => $asOf,
         ] + $more + [
