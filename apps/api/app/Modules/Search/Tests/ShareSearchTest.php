@@ -197,6 +197,10 @@ final class ShareSearchTest extends TestCase
         $rows = array_merge(...array_values($all['everything']['by_category']));
         // One short line a product, its id written out first; an option is chosen on the order page.
         $this->assertSame(['id 2 | טבעת וינטג׳ | ₪1800 | +options', 'id 1 | טבעת סוליטר | ₪2400 | +options', 'id 3 | טבעת יוקרה | ₪9000 | +options'], $rows, 'cheapest first');
+        // How many the store has, when it counts them.
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', '3')->get()->each(fn (CatalogProduct $p) => $p->update(['payload' => ['stock' => ['quantity' => 4]] + $p->payload])));
+        Cache::flush();
+        $this->assertContains('id 3 | טבעת יוקרה | ₪9000 | stock 4 | +options', array_merge(...array_values($this->getJson("/c/{$this->site}?format=json")->json('everything.by_category'))));
         $this->assertSame('https://agents.example.test/c/'.$this->site.'/cart?items=2:1,1:2', $all['everything']['order_example']);
         $raw = $this->get("/c/{$this->site}?format=json")->assertHeader('Content-Type', 'application/json; charset=utf-8')->getContent();
         $this->assertStringContainsString("\n\"id 1 | טבעת סוליטר | ₪2400 | +options\",\n", $raw, 'a line a product, never the whole store on one line, and no indent');

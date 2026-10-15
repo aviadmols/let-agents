@@ -159,6 +159,8 @@ final class AgentCatalog
             $path = $product->categoryPaths()[0] ?? [];
             $category = $path === [] ? $t('everything_other') : implode(' > ', $path);
             $choices = array_filter((array) ($product->payload['variations'] ?? []), fn ($variant): bool => is_array($variant) && ($variant['stock']['in_stock'] ?? false));
+            // How many the store has, when it counts them (every line here is in stock).
+            $units = $product->payload['stock']['quantity'] ?? null;
 
             // As short as a line can be: an AI's browser reads only so much of a page. A product
             // with options is ordered by its id alone; the order page asks the shopper to choose.
@@ -166,6 +168,7 @@ final class AgentCatalog
                 'id '.$product->external_id,
                 $clean((string) $product->title),
                 $money($product->price === null ? null : (float) $product->price, $product->currency),
+                is_numeric($units) && (int) $units > 0 ? $t('everything_stock', ['units' => (int) $units]) : null,
                 $choices === [] ? null : '+'.$t('everything_options'),
             ]));
         }
