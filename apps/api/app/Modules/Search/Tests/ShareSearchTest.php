@@ -474,4 +474,24 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('unknown_length', $wrong['problem']);
         $this->assertSame(['4.20 מטר', '3.00 מטר'], array_column($wrong['choices'], 'label'));
     }
+
+    public function test_search_filters_hold_in_code_and_an_unknown_one_is_said(): void
+    {
+        $rpc = fn (array $arguments) => $this->call('POST', '/api/v1/mcp', [], [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'search_products', 'arguments' => ['store' => $this->site] + $arguments]]))->json('result.structuredContent');
+
+        // White gold only, the dearest first: the store's own filter, by its name and value.
+        $white = $rpc(['query' => '', 'filters' => ['attributes' => ['מתכת' => 'זהב לבן'], 'sort' => 'price_desc']]);
+        $this->assertSame(['3', '1'], array_column($white['products'], 'id'));
+        $this->assertSame(['attributes' => ['מתכת' => 'זהב לבן'], 'sort' => 'price_desc'], $white['filters']);
+
+        // A budget holds whatever the words: under 3000, in stock.
+        $budget = $rpc(['query' => 'טבעת', 'filters' => ['max_price' => 3000, 'in_stock' => true, 'sort' => 'price_asc']]);
+        $this->assertSame(['2', '1'], array_column($budget['products'], 'id'));
+
+        // A filter the store does not have is said, not guessed.
+        $green = $rpc(['query' => 'טבעת', 'filters' => ['attributes' => ['צבע' => 'ירוק']]]);
+        $this->assertSame(['צבע: ירוק'], $green['unknown_filters']);
+        $this->assertSame(3, $green['total'], 'nothing taken away by a filter the store has not');
+    }
 }

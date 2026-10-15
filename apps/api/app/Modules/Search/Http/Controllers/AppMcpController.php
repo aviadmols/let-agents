@@ -118,7 +118,7 @@ final class AppMcpController
         $shopId = (string) $connection->shop_id;
         $store = AgentCatalog::store($connection);
         $data = $tenant->run($shopId, fn (): array => match ($tool) {
-            'search_products' => $search->handle($shopId, (string) ($arguments['query'] ?? ''), (int) ($arguments['limit'] ?? 10), (int) ($arguments['page'] ?? 1), $store),
+            'search_products' => $search->handle($shopId, (string) ($arguments['query'] ?? ''), (int) ($arguments['limit'] ?? 10), (int) ($arguments['page'] ?? 1), $store, null, (array) ($arguments['filters'] ?? [])),
             'get_product' => ['products' => AgentCatalog::products([(string) ($arguments['id'] ?? '')], $store)] + ['as_of' => AgentCatalog::asOf([(string) ($arguments['id'] ?? '')])],
             'store_policies' => ['policies' => AgentCatalog::policies()],
             'create_cart_link' => CartLink::build($connection, array_values(array_filter((array) ($arguments['items'] ?? []), 'is_array'))),

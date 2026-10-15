@@ -104,7 +104,7 @@ final class McpController
         $shopId = (string) $connection->shop_id;
 
         $data = $tenant->run($shopId, fn (): ?array => match ($tool) {
-            'search_products' => ['store' => AgentCatalog::store($connection)] + $search->handle($shopId, (string) ($arguments['query'] ?? ''), (int) ($arguments['limit'] ?? 10), (int) ($arguments['page'] ?? 1), AgentCatalog::store($connection)),
+            'search_products' => ['store' => AgentCatalog::store($connection)] + $search->handle($shopId, (string) ($arguments['query'] ?? ''), (int) ($arguments['limit'] ?? 10), (int) ($arguments['page'] ?? 1), AgentCatalog::store($connection), null, (array) ($arguments['filters'] ?? [])),
             'get_product' => (AgentCatalog::products([(string) ($arguments['id'] ?? '')], AgentCatalog::store($connection))[0] ?? ['error' => 'unknown_product']) + ['as_of' => AgentCatalog::asOf([(string) ($arguments['id'] ?? '')])],
             'store_policies' => ['store' => AgentCatalog::store($connection), 'policies' => AgentCatalog::policies()],
             'create_cart_link' => CartLink::build($connection, array_values(array_filter((array) ($arguments['items'] ?? []), 'is_array'))),
@@ -135,6 +135,14 @@ final class McpController
                     'query' => ['type' => 'string', 'description' => $t('search_query')],
                     'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => SearchForAgent::MAX, 'default' => 10],
                     'page' => ['type' => 'integer', 'minimum' => 1, 'default' => 1, 'description' => $t('search_page')],
+                    'filters' => ['type' => 'object', 'description' => $t('search_filters'), 'properties' => [
+                        'category' => ['type' => 'string', 'description' => $t('filter_category')],
+                        'min_price' => ['type' => 'number', 'minimum' => 0],
+                        'max_price' => ['type' => 'number', 'minimum' => 0],
+                        'in_stock' => ['type' => 'boolean', 'description' => $t('filter_in_stock')],
+                        'attributes' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => $t('filter_attributes')],
+                        'sort' => ['type' => 'string', 'enum' => ['relevance', 'price_asc', 'price_desc']],
+                    ]],
                 ],
             ]],
             ['name' => 'get_product', 'title' => $t('product_title'), 'description' => $t('product'), 'annotations' => $read, 'inputSchema' => [
