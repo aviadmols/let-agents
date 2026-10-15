@@ -21,6 +21,20 @@ final class PatternMatch
     private const SUFFIXES = ['', 'ים', 'ות', 'יות', 'ית', 'ת', 'ה', 'י', 'יים', 's', 'es'];
 
     /**
+     * Words that name a value and also something else, and the words around them that mean the
+     * something else: "חום" is brown, and heat ("מוריד את החום", "עמיד בחום", "בידוד חום",
+     * "חום גבוה", "חום וקור"). Read there, it names no colour.
+     *
+     * @var array<string, array{before: string, after: string}> by the word's stem
+     */
+    private const OTHER_MEANING = [
+        'חום' => [
+            'before' => '/(?:^|[\s,(])(?:מוריד|מורידה|מורידים|להוריד|הורדת|מפחית|מפחיתה|להפחית|הפחתת|מונע|מונעת|עמיד|עמידה|עמידים|עמידות|חסין|חסינה|חסינות|בידוד|מבודד|מבודדת|מבודדים|מחזיר|מחזירה|החזר|הולכת|מוליך|העברת|נגד|מפני|דרגת|טמפרטורת|פיזור|מפזר|מקור|גלי|מכת|קרינת|לחץ|את)\s*$/u',
+            'after' => '/^\s*(?:גבוה|גבוהה|גבוהים|קיצוני|קיצונית|השמש|שמש|קרינה|הקרינה|וקור|ו-?קור|עד\s*\d|של\s*\d|\d)/u',
+        ],
+    ];
+
+    /**
      * The first whole-word match of any of the patterns, in their order: [offset, length] in
      * bytes, or null.
      *
@@ -36,7 +50,7 @@ final class PatternMatch
         foreach ($patterns as $pattern) {
             if (@preg_match_all('~'.$pattern.'~imu', $text, $matches, PREG_OFFSET_CAPTURE) > 0) {
                 foreach ($matches[0] as [$found, $offset]) {
-                    if ($found !== '' && self::whole($text, (int) $offset, strlen($found))) {
+                    if ($found !== '' && self::whole($text, (int) $offset, strlen($found)) && ! self::otherMeaning($text, (int) $offset, $found)) {
                         return [(int) $offset, strlen($found)];
                     }
                 }
@@ -50,6 +64,24 @@ final class PatternMatch
     public static function any(string $text, array $patterns): bool
     {
         return self::first($text, $patterns) !== null;
+    }
+
+    /** Whether a word that also means something else is used in that other meaning here ("מוריד את החום"). */
+    public static function otherMeaning(string $text, int $offset, string $found): bool
+    {
+        foreach (self::OTHER_MEANING as $stem => $around) {
+            if (! str_starts_with(mb_strtolower($found), $stem)) {
+                continue;
+            }
+
+            // The words before it, without the letters joined to it ("ה" in "החום", "ב" in "בחום").
+            $before = (string) preg_replace('/\p{L}*\z/u', '', substr($text, 0, $offset));
+            $after = substr($text, $offset + strlen($found));
+
+            return preg_match($around['before'], $before) === 1 || preg_match($around['after'], $after) === 1;
+        }
+
+        return false;
     }
 
     /** Whether the match at $offset stands as a word of its own: only a prefix before it, only an ending after. */

@@ -114,6 +114,7 @@ return [
     'ai_failed' => 'We could not prepare the link. Please try again.',
     'share_results' => 'Share the results',
     'share_help' => 'A link to the results as they are now, filters included.',
+    'share_copied' => 'Link copied: it opens the store with this search.',
     'share_more' => 'More…',
     'share_text' => 'Look what I found at :store: :query',
     'ai_share_short' => 'My AI',

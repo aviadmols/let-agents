@@ -17,6 +17,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BrandResolver;
 use App\Modules\Enrichment\Scanning\ContentDigest;
+use App\Modules\Enrichment\Scanning\PatternMatch;
 use App\Modules\Enrichment\Scanning\ProductFamily;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
@@ -226,5 +227,15 @@ final class CodeReadingTest extends TestCase
     private function make(array $attributes): CatalogProduct
     {
         return new CatalogProduct(array_replace(['title' => 'x', 'payload' => []], $attributes));
+    }
+
+    public function test_heat_is_not_brown(): void
+    {
+        foreach (['מוריד את החום בדירה כ-20%', 'עמיד בחום ובקור', 'בידוד חום מעולה', '20% מוריד חום', 'עמיד לחום עד 80 מעלות'] as $heat) {
+            $this->assertNull(PatternMatch::first($heat, ['חום']), $heat);
+        }
+        foreach (['שולחן בצבע חום', 'ארון חום כהה', 'כיסא חום'] as $brown) {
+            $this->assertNotNull(PatternMatch::first($brown, ['חום']), $brown);
+        }
     }
 }

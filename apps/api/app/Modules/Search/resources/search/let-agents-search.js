@@ -911,6 +911,7 @@
     var pauseTimer = null;
     var visitorId = null;
     var currentSheet = null; // where results are shown now, for "similar items" to replace
+    var lastSearch = ''; // the words last searched, for "share" in the drawer's header
 
     function label(key, params) {
       var text = String(state.labels[key] || key);
@@ -2983,8 +2984,18 @@
       }
 
       if (forPeople) {
-        var link = function () { return whole ? win.location.origin + '/' : storeLink(raw, picked); };
-        var said = function () { return whole ? label('share_store_text', { store: state.config.shopName || '' }) : label('share_text', { store: state.config.shopName || '', query: raw.trim() }); };
+        // In the header: the search open now, with what was chosen beside it, as the store's own
+        // link (?la_q=…&la_f=…); the store itself only when nothing was searched yet.
+        var words_ = function () { return whole ? lastSearch : raw.trim(); };
+        var link = function () {
+          if (!whole) {
+            return storeLink(raw, picked);
+          }
+          return lastSearch ? storeLink(lastSearch, chosenFor(lastSearch)) : win.location.origin + '/';
+        };
+        var said = function () {
+          return words_() ? label('share_text', { store: state.config.shopName || '', query: words_() }) : label('share_store_text', { store: state.config.shopName || '' });
+        };
         var words = function () { return said() + ' ' + link(); };
         var choices = [['whatsapp', 'WhatsApp'], ['link', label('ai_copy')]];
         if (typeof win.navigator.share === 'function') {
@@ -3003,7 +3014,7 @@
               .catch(function () { /* closed by the shopper */ });
             return;
           }
-          copyText(link(), copied);
+          copyText(link(), function () { note.textContent = label('share_copied'); });
         });
       }
 
@@ -5020,6 +5031,7 @@
 
     /** @param {boolean} [spelling] the store's search page opening: spelling only, never a model on a page load */
     function openPanel(raw, spelling) {
+      lastSearch = String(raw || '').trim();
       var sheet = openSheet(label('all_results', { query: raw }), raw);
       var body = drawerMode() ? waiting(label('drawer_thinking')) : el('div', 'section', label('searching'));
       sheet.appendChild(body);
