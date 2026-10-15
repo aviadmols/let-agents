@@ -153,4 +153,21 @@ final class HebrewSearchTest extends TestCase
 
         $this->assertSame(array_column($cases, 2), json_decode($process->getOutput(), true), 'a loose match never shows an answer to another question');
     }
+
+    public function test_a_generic_word_is_not_asked_of_a_product(): void
+    {
+        $engine = HebrewSearch::build([
+            ['id' => 'p:1', 'title' => 'מקלטר 4 שיניים', 'keywords' => 'גינון גינה'],
+            ['id' => 'p:2', 'title' => 'ארגז כלים', 'keywords' => ''],
+            ['id' => 'p:3', 'title' => 'ספריי צבע לכלים ולריהוט גינה', 'keywords' => ''],
+        ]);
+
+        // "כלים לגינה" is about the garden: the rake is found though it never says "כלים", and a box
+        // that says "כלים" alone is not; what says both is not put before what says the garden.
+        $ids = array_column(HebrewSearch::search($engine, HebrewSearch::normalize('כלים לגינה')), 'id');
+        $this->assertContains('p:1', $ids);
+        $this->assertNotContains('p:2', $ids);
+        // With no other word, a generic word is the query.
+        $this->assertContains('p:2', array_column(HebrewSearch::search($engine, HebrewSearch::normalize('כלים')), 'id'));
+    }
 }

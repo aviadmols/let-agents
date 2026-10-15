@@ -79,9 +79,11 @@ final class BuildSearchIndex
 
     private function build(RunContext $run, string $shopId): void
     {
-        $synonyms = $this->synonyms();
+        $own = $this->synonyms();
+        // The shop's own, then the word families every shop shares; only its own are counted.
+        $synonyms = [...$own, ...self::families()];
         $items = [];
-        $counts = ['product' => 0, 'content' => 0, 'category' => 0, 'synonyms' => count($synonyms)];
+        $counts = ['product' => 0, 'content' => 0, 'category' => 0, 'synonyms' => count($own)];
 
         // What each product's picture shows, in words, joins its words: found by what it looks like.
         $seen = RetrievalImage::query()->whereNotNull('caption_words')->pluck('caption_words', 'product_id')->map(fn ($w): array => is_array($w) ? $w : (array) json_decode((string) $w, true));
@@ -387,6 +389,30 @@ final class BuildSearchIndex
 
             if ($term !== '' && $means !== []) {
                 $out[] = [$term, $means];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The word families every shop shares (HebrewSearch::FAMILIES), as synonyms: "גינה" is added
+     * to whatever says "גינון", so a shopper's garden finds the store's gardening.
+     *
+     * @return list<array{0: string, 1: list<string>}>
+     */
+    private static function families(): array
+    {
+        $out = [];
+
+        foreach (HebrewSearch::FAMILIES as $family) {
+            $words = array_values(array_unique(array_map(fn (string $w): string => HebrewSearch::normalize($w), $family)));
+            foreach ($words as $term) {
+                foreach ($words as $other) {
+                    if ($other !== $term) {
+                        $out[] = [$term, [$other]];
+                    }
+                }
             }
         }
 

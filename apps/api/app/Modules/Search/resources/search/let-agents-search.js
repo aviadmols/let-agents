@@ -271,18 +271,33 @@
 
   var DESCRIBES = ['בצבע', 'בגוונ', 'בגימור'];
 
+  // Words that only say "things" ("כלים לגינה" is about the garden), normalized: the server's GENERIC.
+  var GENERIC = ['כלימ', 'כלי', 'ציוד', 'מוצרימ', 'מוצר', 'אביזרימ', 'אביזר', 'פריטימ', 'פריט', 'דברימ', 'חפצימ', 'things', 'products', 'items', 'stuff'];
+
   function rank(index, query) {
     var tokens = query.split(' ');
     var score = {};
     var hits = {};
     var found = [];
+    // A generic word is neither counted nor asked of a record; with no other word, it is the query.
+    var generic = {};
+    var genericCount = 0;
+    for (var g = 0; g < tokens.length; g++) {
+      if (GENERIC.indexOf(tokens[g]) !== -1) {
+        generic[g] = true;
+        genericCount++;
+      }
+    }
+    if (genericCount === tokens.length) {
+      generic = {};
+    }
     // A word that only says what follows is a colour or a finish ("בצבע שחור") is not counted.
-    var counted = tokens.filter(function (token) { return DESCRIBES.indexOf(token) === -1; }).length || tokens.length;
+    var counted = tokens.filter(function (token, at) { return DESCRIBES.indexOf(token) === -1 && !generic[at]; }).length || tokens.length;
     var needed = counted <= 2 ? counted : counted - 1;
     // The words that must all be there for a record to hold the whole query ("בצבע" is not one).
     var required = [];
     for (var q = 0; q < tokens.length; q++) {
-      if (FILLER.indexOf(tokens[q]) === -1 && DESCRIBES.indexOf(tokens[q]) === -1) {
+      if (FILLER.indexOf(tokens[q]) === -1 && DESCRIBES.indexOf(tokens[q]) === -1 && !generic[q]) {
         required.push(q);
       }
     }
@@ -313,8 +328,10 @@
         }
       }
       for (var b = 0; b < bestOrder.length; b++) {
-        score[bestOrder[b]] = (score[bestOrder[b]] || 0) + best[bestOrder[b]];
-        hits[bestOrder[b]] = (hits[bestOrder[b]] || 0) + 1;
+        // A generic word adds a little to the score of what holds it (the server's GENERIC_WEIGHT).
+        score[bestOrder[b]] = (score[bestOrder[b]] || 0) + best[bestOrder[b]] * (generic[t] ? 0.2 : 1);
+        // ...and never to what is found.
+        hits[bestOrder[b]] = (hits[bestOrder[b]] || 0) + (generic[t] ? 0 : 1);
         if (!matched[bestOrder[b]]) {
           matched[bestOrder[b]] = {};
         }

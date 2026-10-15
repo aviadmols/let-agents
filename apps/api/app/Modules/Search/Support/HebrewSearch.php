@@ -60,6 +60,29 @@ final class HebrewSearch
     private const DESCRIBES = ['בצבע', 'בגוונ', 'בגימור'];
 
     /**
+     * Words of one family, in every shop: a shopper's word and the store's are the same subject
+     * ("גינה" and the store's category "גינון"), or the same word spelled two ways ("השקיה",
+     * "השקייה"). Each is added to whatever holds another (BuildSearchIndex). Only families whose
+     * words mean nothing else.
+     */
+    public const FAMILIES = [
+        ['גינה', 'גינון', 'גינות', 'גנן', 'גננות'],
+        ['השקיה', 'השקייה'],
+        ['ניקוי', 'ניקיון', 'נקיון'],
+        ['ריהוט', 'רהיטים'],
+        ['אמבטיה', 'אמבט'],
+        ['מקלחת', 'מקלחון'],
+        ['תאורה', 'תאורת'],
+        ['אינסטלציה', 'אינסטלטור'],
+    ];
+
+    /** How much a generic word counts in a record's score, against 1 for a word that says what. */
+    public const GENERIC_WEIGHT = 0.2;
+
+    /** Words that only say "things" ("כלים לגינה", "ציוד לגינה", "מוצרים לניקוי"), normalized. */
+    private const GENERIC = ['כלימ', 'כלי', 'ציוד', 'מוצרימ', 'מוצר', 'אביזרימ', 'אביזר', 'פריטימ', 'פריט', 'דברימ', 'חפצימ', 'things', 'products', 'items', 'stuff'];
+
+    /**
      * What a sentence is about, in the catalogue's words: question and filler words dropped, then
      * every word no product or page holds anything close to ("ביתית", "וזולה"). "מה הכי טוב
      * למברגה ביתית וזולה" is "למברגה". Empty when nothing is left.
@@ -631,13 +654,17 @@ final class HebrewSearch
         $score = [];
         $hits = [];
         $found = [];
+        // "כלים לגינה" is about the garden: a word that only says "things" is neither counted nor
+        // asked of a record, and holding it alone finds nothing; with no other word, it is the query.
+        $generic = array_filter($tokens, fn (string $t): bool => in_array($t, self::GENERIC, true));
+        $generic = count($generic) === count($tokens) ? [] : $generic;
         // A word that only says what follows is a colour or a finish ("בצבע שחור") is not counted.
-        $counted = count(array_filter($tokens, fn (string $t): bool => ! in_array($t, self::DESCRIBES, true))) ?: count($tokens);
+        $counted = count(array_filter($tokens, fn (string $t, int $at): bool => ! in_array($t, self::DESCRIBES, true) && ! isset($generic[$at]), ARRAY_FILTER_USE_BOTH)) ?: count($tokens);
         $needed = $counted <= 2 ? $counted : $counted - 1;
         // The words that must all be there for a record to hold the whole query: filler words
         // ("עם", "של") are not asked of it, nor "בצבע": "מקדחה בצבע שחור" is a black drill, and
         // a black hook "בצבע שחור" holds two of its words but not the drill.
-        $required = array_keys(array_filter($tokens, fn (string $t): bool => ! in_array($t, self::FILLER, true) && ! in_array($t, self::DESCRIBES, true)));
+        $required = array_keys(array_filter($tokens, fn (string $t, int $at): bool => ! in_array($t, self::FILLER, true) && ! in_array($t, self::DESCRIBES, true) && ! isset($generic[$at]), ARRAY_FILTER_USE_BOTH));
         $required = $required === [] ? array_keys($tokens) : $required;
         $matched = [];
 
@@ -656,8 +683,10 @@ final class HebrewSearch
             }
 
             foreach ($best as $at => $value) {
-                $score[$at] = ($score[$at] ?? 0) + $value;
-                $hits[$at] = ($hits[$at] ?? 0) + 1;
+                // A generic word adds a little to the score of what holds it, never to what is found:
+                // "כלים לגינה" puts the garden tools before paint that says "כלים".
+                $score[$at] = ($score[$at] ?? 0) + $value * (isset($generic[$position]) ? self::GENERIC_WEIGHT : 1);
+                $hits[$at] = ($hits[$at] ?? 0) + (isset($generic[$position]) ? 0 : 1);
                 $matched[$at][$position] = true;
             }
         }
