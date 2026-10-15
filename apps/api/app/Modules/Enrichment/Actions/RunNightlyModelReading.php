@@ -96,13 +96,19 @@ final class RunNightlyModelReading
 
                 $totals = ['asked' => 0, 'applied' => 0, 'rejected' => 0, 'stale' => 0, 'submitted' => 0, 'batches' => 0, 'stopped' => null, 'via' => $viaBatch ? 'batch' : 'direct', 'model' => $model];
 
+                // The details first; then what a shopper should know from each description (up to
+                // four points, each resting on a quote), which the other family reviews.
+                $tasks = Features::enabled('enrichment.auto_highlights', $shopId) ? [TaskType::ProductExtraction, TaskType::ProductHighlights] : [TaskType::ProductExtraction];
+
                 for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
                     if ($batch === null) {
-                        foreach ($vocabularies as $vocabulary) {
-                            $batch = $this->batches->handle($shopId, TaskType::ProductExtraction, $vocabulary->id, limit: $limit)['batch'] ?? null;
+                        foreach ($tasks as $task) {
+                            foreach ($vocabularies as $vocabulary) {
+                                $batch = $this->batches->handle($shopId, $task, $vocabulary->id, limit: $limit)['batch'] ?? null;
 
-                            if ($batch !== null) {
-                                break;
+                                if ($batch !== null) {
+                                    break 2;
+                                }
                             }
                         }
                     }

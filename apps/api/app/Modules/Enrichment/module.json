@@ -55,6 +55,10 @@
         {
             "name": "picture_suggestions",
             "default": true
+        },
+        {
+            "name": "auto_highlights",
+            "default": true
         }
     ],
     "settings": [

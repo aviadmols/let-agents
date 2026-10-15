@@ -109,6 +109,7 @@ final class AgentCatalog
                 'currency' => $p['currency'] ?? null,
                 'in_stock' => $p['in_stock'] ?? null,
                 'details' => array_map(fn (array $values): string => implode(', ', $values), $p['details'] ?? []) ?: null,
+                'key_points' => $p['key_points'] ?? null,
                 'buy_url' => $p['buy_url'] ?? null,
                 'cart_id' => $p['cart_id'] ?? null,
                 'options' => array_map(fn (array $v): array => array_filter([
@@ -144,8 +145,9 @@ final class AgentCatalog
         $products = CatalogProduct::query()->whereIn('external_id', $externalIds)->whereNull('removed_at')->get()->keyBy('external_id');
         $ordered = array_values(array_filter(array_map(fn (string $id): ?CatalogProduct => $products[$id] ?? null, $externalIds)));
         $details = self::details(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
+        $points = self::keyPoints(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
 
-        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? [], $store), $ordered);
+        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? [], $store) + array_filter(['key_points' => $points[(string) $p->id] ?? null]), $ordered);
     }
 
     /** When the products were last read from the store, as ISO 8601. @param list<string> $externalIds */
@@ -197,6 +199,28 @@ final class AgentCatalog
             'variants' => $variants,
             'description' => $text === '' ? null : Str::limit($text, self::MAX_DESCRIPTION),
         ], fn ($value): bool => $value !== null && $value !== [] && $value !== '');
+    }
+
+    /**
+     * What a shopper should know from each product's description, as the reading found it and the
+     * other family approved it: up to four short points, "key: one sentence".
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, list<string>> by product id
+     */
+    private static function keyPoints(array $productIds): array
+    {
+        $out = [];
+
+        EnrichmentFact::query()->whereIn('product_id', $productIds)->where('kind', FactKind::Highlight)->where('status', FactStatus::Approved)
+            ->orderBy('id')->get(['product_id', 'key', 'value_text'])
+            ->each(function (EnrichmentFact $fact) use (&$out): void {
+                if (count($out[(string) $fact->product_id] ?? []) < 4) {
+                    $out[(string) $fact->product_id][] = trim($fact->key.': '.$fact->value_text, ': ');
+                }
+            });
+
+        return $out;
     }
 
     /**

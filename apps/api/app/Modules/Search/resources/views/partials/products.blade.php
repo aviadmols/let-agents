@@ -31,6 +31,9 @@
                     @endforeach
                 </ul>
             @endif
+            @if (! empty($p['key_points']))
+                <ul class="options">@foreach ($p['key_points'] as $point)<li>{{ $point }}</li>@endforeach</ul>
+            @endif
             @isset($p['description'])<p class="muted">{{ $p['description'] }}</p>@endisset
             <p>
                 @isset($p['buy_url'])<a class="buy" href="{{ $p['buy_url'] }}" rel="nofollow noopener">{{ $t('buy') }}</a> · @endisset

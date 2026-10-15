@@ -33,6 +33,10 @@ return [
         'label' => 'Nightly review of waiting details',
         'description' => 'Every night a model of another family checks the details the reader was unsure of: right is approved, wrong rejected, unsure goes to a person.',
     ],
+    'auto_highlights' => [
+        'label' => 'The key points of every product description',
+        'description' => 'In the nightly reading and the first scan, after the details: up to four practical points from each description (what else is needed, where it fits, how to install, what is included), each resting on a quote, no praise and no numbers the text does not have. A model of another family reviews them.',
+    ],
     'picture_suggestions' => [
         'label' => 'Suggestions from the picture for missing details',
         'description' => 'A button that suggests a value for a detail of looks (colour, stone, shape, pattern) from the product\'s picture. Only details a picture can show, and nothing is kept without approval.',

@@ -164,7 +164,15 @@ final class ShareSearchTest extends TestCase
             ->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
             ->assertSee('2 מוצרים ל&quot;טבעת זהב לבן&quot;', false);
 
+        // What a shopper should know from the description, once approved, goes to the AI too.
+        app(TenantContext::class)->run($this->shop->id, fn () => EnrichmentFact::query()->create(['shop_id' => $this->shop->id,
+            'product_id' => CatalogProduct::query()->where('external_id', '2')->value('id'), 'kind' => FactKind::Highlight, 'key' => 'מתאים לאצבע דקה', 'value_text' => 'הפס צר ועדין.',
+            'quote' => 'פס צר', 'origin' => FactOrigin::Model, 'status' => FactStatus::Approved, 'input_hash' => 'hl']));
+        Cache::flush();
+
         $all = $this->getJson("/c/{$this->site}?format=json")->assertOk()->json();
+        $vintage = collect($all['products'])->firstWhere('id', '2');
+        $this->assertSame(['מתאים לאצבע דקה: הפס צר ועדין.'], $vintage['key_points']);
         $this->assertSame('for_ai', array_key_first($all));
         $this->assertSame(3, $all['total'], 'no words: every product of the store');
         $this->assertSame(1, $all['pages']);
