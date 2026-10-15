@@ -10,7 +10,8 @@
     "provider": "CatalogServiceProvider",
     "features": [
         { "name": "daily_sync", "default": true },
-        { "name": "live_sync", "default": true }
+        { "name": "live_sync", "default": true },
+        { "name": "refresh", "default": true }
     ],
     "settings": [
         { "name": "max_products", "type": "int", "default": 10000, "min": 100, "max": 200000, "scope": "shop", "unit": "products" },

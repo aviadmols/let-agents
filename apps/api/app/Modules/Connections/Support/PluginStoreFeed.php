@@ -3,8 +3,10 @@
 namespace App\Modules\Connections\Support;
 
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
+use App\Modules\Connections\Contracts\ReadsChangedProducts;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
+use Carbon\CarbonInterface;
 use Generator;
 use Illuminate\Http\Client\ConnectionException;
 
@@ -12,7 +14,7 @@ use Illuminate\Http\Client\ConnectionException;
  * The feed as the WooCommerce Let Agents plugin serves it: /let-agents/v1/feed/*, paged by ascending ID
  * with an "after" cursor.
  */
-final class PluginStoreFeed implements PlatformStoreFeed
+final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 {
     public function platform(): string
     {
@@ -54,6 +56,30 @@ final class PluginStoreFeed implements PlatformStoreFeed
     public function products(StoreConnection $connection): Generator
     {
         yield from $this->pages($connection, '/feed/products');
+    }
+
+    public function changedProducts(StoreConnection $connection, CarbonInterface $since): ?Generator
+    {
+        return $this->changed($connection, $since);
+    }
+
+    /**
+     * What the store changed since a moment, in every status: a published product is read again,
+     * one made a draft, pending or private has gone. A product deleted outright leaves no trace and
+     * is the nightly read's. A stock change from an order saves the product, so it is seen too.
+     *
+     * @return Generator<int, array{records: list<array<string, mixed>>, gone: list<string>}>
+     */
+    private function changed(StoreConnection $connection, CarbonInterface $since): Generator
+    {
+        foreach ($this->pages($connection, '/feed/products', ['since' => $since->copy()->utc()->format('Y-m-d\TH:i:s\Z'), 'status' => 'any']) as $records) {
+            $records = array_values(array_filter($records, fn ($r): bool => is_array($r) && isset($r['external_id'])));
+
+            yield [
+                'records' => array_values(array_filter($records, fn (array $r): bool => ($r['status'] ?? 'publish') === 'publish')),
+                'gone' => array_values(array_map(fn (array $r): string => (string) $r['external_id'], array_filter($records, fn (array $r): bool => ($r['status'] ?? 'publish') !== 'publish'))),
+            ];
+        }
     }
 
     public function content(StoreConnection $connection, string $type): Generator

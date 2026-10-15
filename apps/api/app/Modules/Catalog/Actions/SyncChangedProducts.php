@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Cache;
  * store is asked what changed since the last look (catalog.live_sync, every few minutes), and only
  * that is saved, the same way the nightly read saves it (SyncCatalog::saveProducts). A product
  * taken off the store is marked removed. Nothing is written to the activity log when nothing
- * changed. A platform that cannot say what changed (the plugin, today) waits for the night.
+ * changed. A platform that cannot say what changed waits for the night.
  *
  * Categories, pages and anything the nightly read decides from the whole store (removed products
  * that left no trace, a store behind a password) stay the nightly read's.

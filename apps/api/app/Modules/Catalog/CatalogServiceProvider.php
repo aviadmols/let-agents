@@ -42,6 +42,16 @@ final class CatalogServiceProvider extends ModuleServiceProvider
 
             // And between nights, what each store changed (catalog.live_sync): a new product is
             // searchable within minutes. A few cheap questions to the store; nothing when nothing changed.
+            // Prices and stock three times a day (catalog.refresh): the products alone.
+            foreach (['08:30', '14:30', '20:30'] as $at) {
+                $schedule->command('catalog:sync --refresh')
+                    ->dailyAt($at)
+                    ->timezone('Asia/Jerusalem')
+                    ->name('catalog:refresh-'.$at)
+                    ->withoutOverlapping(60)
+                    ->onOneServer();
+            }
+
             $schedule->command('catalog:sync-changes')
                 ->everyTenMinutes()
                 ->name('catalog:sync-changes')

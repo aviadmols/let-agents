@@ -5,6 +5,8 @@ namespace App\Modules\Catalog\Tests;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\SyncCatalog;
+use App\Modules\Catalog\Actions\SyncChangedProducts;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -16,6 +18,7 @@ use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -31,6 +34,11 @@ final class SyncCatalogTest extends TestCase
     private int $failuresLeft = 0;
 
     private bool $rejectToken = false;
+
+    /** @var list<array<string, mixed>> the queries the products were asked with */
+    private array $asked = [];
+
+    private int $contentReads = 0;
 
     protected function setUp(): void
     {
@@ -69,6 +77,51 @@ final class SyncCatalogTest extends TestCase
             $this->assertTrue($product->in_stock);
             $this->assertSame('Makita', $product->brand);
             $this->assertSame(1, CatalogContent::query()->count());
+        });
+    }
+
+    public function test_between_nights_the_products_alone_are_refreshed_and_only_a_change_is_written(): void
+    {
+        app(SyncCatalog::class)->handle($this->shop->id);
+        $reads = $this->contentReads;
+
+        $this->assertNull(app(SyncCatalog::class)->refresh($this->shop->id), 'nothing changed: no run, no rebuild');
+
+        // A sale moved the price, the stock system emptied one, and one left the store.
+        $this->products['12']['price']['price'] = '249';
+        $this->products['11']['stock'] = ['in_stock' => false, 'status' => 'outofstock'];
+        unset($this->products['13']);
+        Event::fake([CatalogProductsChanged::class]);
+
+        $run = app(SyncCatalog::class)->refresh($this->shop->id);
+
+        $this->assertSame(SyncCatalog::REFRESH, $run->action);
+        $this->assertSame(1, $run->output['products']['removed']);
+        $this->assertSame(['11', '12'], $run->output['changed']);
+        $this->assertSame($reads, $this->contentReads, 'no pages or posts read between nights');
+        Event::assertDispatched(CatalogProductsChanged::class);
+        $this->inShop(function (): void {
+            $this->assertSame('249.00', CatalogProduct::query()->where('external_id', '12')->value('price'));
+            $this->assertFalse((bool) CatalogProduct::query()->where('external_id', '11')->value('in_stock'));
+            $this->assertNotNull(CatalogProduct::query()->where('external_id', '13')->value('removed_at'));
+        });
+    }
+
+    public function test_a_woocommerce_store_says_what_changed_within_minutes(): void
+    {
+        app(SyncCatalog::class)->handle($this->shop->id);
+        $this->products['12']['price']['price'] = '199';
+        $this->products['13']['status'] = 'draft';
+        $this->asked = [];
+
+        $run = app(SyncChangedProducts::class)->handle($this->shop->id);
+
+        $this->assertNotNull($run, 'the plugin can say what changed: no wait for the night');
+        $this->assertSame('any', $this->asked[0]['status'], 'every status, so one taken off the store is seen');
+        $this->assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', $this->asked[0]['since']);
+        $this->inShop(function (): void {
+            $this->assertSame('199.00', CatalogProduct::query()->where('external_id', '12')->value('price'));
+            $this->assertNotNull(CatalogProduct::query()->where('external_id', '13')->value('removed_at'), 'made a draft: off the catalogue');
         });
     }
 
@@ -209,13 +262,22 @@ final class SyncCatalogTest extends TestCase
                 ['external_id' => '1751', 'name' => 'כלי עבודה חשמליים', 'parent_id' => null, 'path' => ['כלי עבודה חשמליים'], 'hash' => 'c1'],
                 ['external_id' => '2360', 'name' => 'מסורים', 'parent_id' => '1751', 'path' => ['כלי עבודה חשמליים', 'מסורים'], 'hash' => 'c2'],
             ]]),
-            str_ends_with($path, '/feed/products') => $this->page(array_values($this->products), (int) ($query['after'] ?? 0), (int) ($query['per_page'] ?? 50)),
-            str_ends_with($path, '/feed/content') => Http::response(['data' => ($query['after'] ?? '0') === '0'
+            str_ends_with($path, '/feed/products') => $this->products($query),
+            str_ends_with($path, '/feed/content') && ++$this->contentReads > 0 => Http::response(['data' => ($query['after'] ?? '0') === '0'
                 ? [['external_id' => '900', 'type' => 'post', 'title' => 'איך בוחרים מסור', 'text' => 'מדריך', 'terms' => ['category' => ['בלוג']], 'hash' => 'p1']]
                 : [], 'meta' => ['next_after' => null]]),
             str_ends_with($path, '/status') => Http::response(['data' => ['plugin' => ['content_post_types' => ['post']]]]),
             default => Http::response(['code' => 'rest_no_route'], 404),
         };
+    }
+
+    /** The products as the plugin serves them: published ones, or every status when asked for "any". @param array<string, mixed> $query */
+    private function products(array $query): mixed
+    {
+        $this->asked[] = $query;
+        $any = ($query['status'] ?? 'publish') === 'any';
+
+        return $this->page(array_values(array_filter($this->products, fn (array $r): bool => $any || $r['status'] === 'publish')), (int) ($query['after'] ?? 0), (int) ($query['per_page'] ?? 50));
     }
 
     /** @param list<array<string, mixed>> $records */

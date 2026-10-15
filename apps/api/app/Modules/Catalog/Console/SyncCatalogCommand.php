@@ -18,12 +18,16 @@ use Illuminate\Console\Command;
  */
 final class SyncCatalogCommand extends Command
 {
-    protected $signature = 'catalog:sync {shop? : shop slug or ID} {--scheduled : queue every connected shop}';
+    protected $signature = 'catalog:sync {shop? : shop slug or ID} {--scheduled : queue every connected shop} {--refresh : the products alone (prices, stock), between nights}';
 
     protected $description = 'Read shop catalogs from their store feeds.';
 
     public function handle(SyncCatalog $sync, TenantContext $tenant): int
     {
+        if ($this->option('refresh')) {
+            return $this->refresh($sync, $tenant);
+        }
+
         if ($this->option('scheduled')) {
             // Plugin stores once their connection was tested; Shopify stores from install on, since
             // the app's token is their connection and no plugin test ever marks them.
@@ -56,5 +60,33 @@ final class SyncCatalogCommand extends Command
         $this->line((string) $run->summary());
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /** Prices and stock between nights: one shop, or every connected shop with catalog.refresh on. */
+    private function refresh(SyncCatalog $sync, TenantContext $tenant): int
+    {
+        $key = (string) $this->argument('shop');
+        $shopIds = $key !== ''
+            ? Shop::query()->where('slug', $key)->orWhere('id', $key)->pluck('id')
+            : $tenant->runUnscoped(fn () => StoreConnection::query()
+                ->where(fn ($q) => $q->where('status', ConnectionStatus::Connected)->orWhere('platform', 'shopify'))
+                ->whereHas('shop', fn ($shop) => $shop->where('status', 'active'))
+                ->pluck('shop_id'));
+
+        foreach ($shopIds as $shopId) {
+            if ($key === '' && ! Features::enabled('catalog.refresh', (string) $shopId)) {
+                continue;
+            }
+
+            try {
+                $run = $sync->refresh((string) $shopId);
+                $this->line($run === null ? "{$shopId}: no change" : (string) $run->summary());
+            } catch (\Throwable $e) {
+                // One store's trouble never stops the others.
+                report($e);
+            }
+        }
+
+        return self::SUCCESS;
     }
 }

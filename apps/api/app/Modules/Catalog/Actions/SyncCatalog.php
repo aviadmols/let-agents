@@ -4,6 +4,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -32,6 +33,8 @@ final class SyncCatalog
 
     public const ACTION = 'catalog.sync';
 
+    public const REFRESH = 'catalog.refresh';
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -46,6 +49,47 @@ final class SyncCatalog
             shopId: $shopId,
             trigger: $trigger,
             work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->sync($shopId, $run)),
+        );
+    }
+
+    /**
+     * The products alone, between nights (catalog.refresh): prices, stock and what the store took
+     * off, so a sale or a stock update the store made without marking the product changed (an
+     * inventory system writing straight to it) is not a day late. No categories, pages or posts,
+     * and the search is rebuilt only when a product really changed. The run is written only then.
+     */
+    public function refresh(string $shopId, RunTrigger $trigger = RunTrigger::Schedule): ?Run
+    {
+        $connection = $this->tenant->run($shopId, fn () => StoreConnection::query()->first());
+
+        if ($connection === null) {
+            return null;
+        }
+
+        try {
+            $changed = [];
+            $products = $this->tenant->run($shopId, function () use ($shopId, $connection, &$changed): array {
+                return $this->syncProducts($shopId, $connection, $changed);
+            });
+        } catch (StoreFeedUnavailable) {
+            // The nightly read reports a store that cannot be read; a refresh stays quiet.
+            return null;
+        }
+
+        if ($changed === [] && $products['removed'] === 0) {
+            return null;
+        }
+
+        return $this->runs->track(
+            agent: self::AGENT,
+            action: self::REFRESH,
+            shopId: $shopId,
+            trigger: $trigger,
+            work: function (RunContext $run) use ($shopId, $products, $changed): void {
+                $run->output(['products' => $products, 'changed' => array_slice($changed, 0, 50)])
+                    ->summary('catalog::runs.refreshed', ['updated' => (string) ($products['updated'] + $products['created']), 'removed' => (string) $products['removed']]);
+                event(new CatalogProductsChanged($shopId, $changed));
+            },
         );
     }
 
@@ -115,7 +159,8 @@ final class SyncCatalog
     }
 
     /** @return array{total: int, created: int, updated: int, unchanged: int, removed: int, capped: bool} */
-    private function syncProducts(string $shopId, StoreConnection $connection): array
+    /** @param  list<string>  $changed  filled with the products created or updated */
+    private function syncProducts(string $shopId, StoreConnection $connection, array &$changed = []): array
     {
         $limit = (int) Settings::get('catalog.max_products', $shopId);
         $categoryIds = CatalogCategory::query()->pluck('id', 'external_id');
@@ -134,6 +179,9 @@ final class SyncCatalog
                 $seen[$externalId] = true;
                 $counts['total']++;
                 $counts[$outcome]++;
+                if ($outcome !== 'unchanged') {
+                    $changed[] = (string) $externalId;
+                }
             }
 
             if ($counts['capped']) {
