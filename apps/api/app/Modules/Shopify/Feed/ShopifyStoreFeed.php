@@ -374,6 +374,8 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
             'handle' => (string) ($node['handle'] ?? ''),
             'url' => (string) ($node['onlineStoreUrl'] ?? $shop['base'].'/products/'.($node['handle'] ?? '')),
             'sku' => (string) ($variants[0]['sku'] ?? ''),
+            // A product without options is bought as its one variant: a cart link needs its id.
+            'variant_id' => $simple && isset($variants[0]['id']) ? self::id($variants[0]['id']) : '',
             'gtin' => (string) ($first['barcode'] ?? ''),
             'short_description' => '',
             'description' => self::text($node['descriptionHtml'] ?? ''),

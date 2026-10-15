@@ -62,7 +62,7 @@ final class ShareSearch
                     'store' => AgentCatalog::store($connection),
                     'query' => $query,
                     'read' => AgentCatalog::read($shopId, $query),
-                    'products' => AgentCatalog::products($ids),
+                    'products' => AgentCatalog::products($ids, AgentCatalog::store($connection)),
                     'policies' => AgentCatalog::policies(),
                     'as_of' => AgentCatalog::asOf($ids),
                 ],

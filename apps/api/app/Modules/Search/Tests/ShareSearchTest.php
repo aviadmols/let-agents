@@ -18,6 +18,7 @@ use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -100,8 +101,11 @@ final class ShareSearchTest extends TestCase
         $page = $this->get($path)->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $page->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
             ->assertSee('זהב לבן')->assertSee('₪2,400')->assertSee('עד ₪3,000')->assertSee('מתכת: זהב לבן')
-            ->assertSee('מידה 7 – ₪2,400 (אזל מהמלאי)')->assertSee('ניתן להחזיר תוך 14 יום.')->assertSee('https://www.rings.test/policies/refund')
-            ->assertSee('application/ld+json', false)->assertSee('"@type":"Product"', false)
+            ->assertSee('מידה 7 – ₪2,400')->assertSee('(אזל מהמלאי)')->assertSee('ניתן להחזיר תוך 14 יום.')->assertSee('https://www.rings.test/policies/refund')
+            ->assertSee('application/ld+json', false)->assertSee('"@context":"https://schema.org"', false)->assertSee('"@type":"Product"', false)
+            // For the AI: the instructions, then everything as JSON, and a buy link on every option in stock.
+            ->assertSee('data-ai-guide', false)->assertSee('data-ai-json', false)->assertSee('סיים כל תשובה שממליצה על מוצר בקישור')
+            ->assertSee('href="https://www.rings.test/?add-to-cart=1&amp;variation_id=11"', false)->assertDontSee('variation_id=12', false)
             // Shared with a friend: a preview in the chat, and the way to the same search on the store.
             ->assertSee('<meta property="og:title" content="חיפוש בטבעות ושות׳: &quot;טבעת זהב לבן עד 3000 ש&quot;ח&quot;">', false)
             ->assertSee('<meta property="og:image" content="https://cdn.rings.test/1.jpg">', false)
@@ -110,9 +114,13 @@ final class ShareSearchTest extends TestCase
 
         $json = $this->getJson($path.'?format=json')->assertOk()->json();
         $this->assertSame(['טבעת סוליטר', 'טבעת יוקרה'], array_column($json['products'], 'title'), 'the products the shopper saw, in their order');
-        $this->assertSame(['זהב לבן'], $json['products'][0]['details']['מתכת']);
+        $this->assertSame('for_ai', array_key_first($json), 'the instructions come first');
+        $this->assertStringContainsString('סיים כל תשובה', implode(' ', $json['for_ai']));
+        $this->assertSame('זהב לבן', $json['products'][0]['details']['מתכת']);
+        $this->assertSame('https://www.rings.test/?add-to-cart=1&variation_id=11', $json['products'][0]['options'][0]['buy_url']);
         $this->assertSame(3000.0, (float) $json['read']['max_price']);
         $this->assertArrayNotHasKey('vid', $json);
+        $this->assertStringStartsWith(rtrim((string) config('app.url'), '/').'/s/', $sent['url'], 'the platform\'s own address, whatever address the request came on');
 
         $share = app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->sole());
         $this->assertSame(2, $share->opens);
@@ -147,6 +155,28 @@ final class ShareSearchTest extends TestCase
         $this->assertSame(0, app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->count()));
     }
 
+    public function test_the_whole_store_is_one_page_for_an_ai_instructions_first_every_product_with_its_buy_link(): void
+    {
+        config(['upsell.shop_domain' => 'agents.example.test']);
+        $page = $this->get("/c/{$this->site}?q=".rawurlencode('טבעת זהב לבן'))->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $page->assertSee('כל המוצרים של טבעות ושות׳')->assertSee('data-ai-guide', false)->assertSee('data-ai-json', false)
+            ->assertSee('https://agents.example.test/c/'.$this->site.'?q=…')
+            ->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
+            ->assertSee('2 מוצרים ל&quot;טבעת זהב לבן&quot;', false);
+
+        $all = $this->getJson("/c/{$this->site}?format=json")->assertOk()->json();
+        $this->assertSame('for_ai', array_key_first($all));
+        $this->assertSame(3, $all['total'], 'no words: every product of the store');
+        $this->assertSame(1, $all['pages']);
+        $this->assertSame('https://agents.example.test/c/'.$this->site, $all['store']['catalog']);
+        $this->assertNotEmpty($all['policies']['promises']);
+
+        $this->get('/c/'.str_repeat('0', 24))->assertNotFound();
+        Features::override('search.agent_connector', false, $this->shop->id);
+        Cache::flush();
+        $this->get("/c/{$this->site}")->assertNotFound();
+    }
+
     public function test_the_store_is_a_connector_a_shoppers_ai_searches_reads_and_makes_a_cart_link_with(): void
     {
         $rpc = fn (string $method, array $params = [], ?int $id = 1) => $this->call('POST', "/api/v1/mcp/{$this->site}", [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json, text/event-stream'],
@@ -164,7 +194,8 @@ final class ShareSearchTest extends TestCase
         $this->assertFalse($found['isError']);
         $this->assertSame(['טבעת סוליטר'], array_column($found['structuredContent']['products'], 'title'), 'white gold, up to 3000: not the yellow one, not the 9000 one');
         $this->assertSame([['name' => 'מתכת', 'value' => 'זהב לבן']], $found['structuredContent']['read']['filters']);
-        $this->assertEquals(['id' => '11', 'title' => 'מידה 6', 'price' => 2400, 'in_stock' => true], $found['structuredContent']['products'][0]['variants'][0]);
+        $this->assertEquals(['id' => '11', 'title' => 'מידה 6', 'price' => 2400, 'in_stock' => true, 'buy_url' => 'https://www.rings.test/?add-to-cart=1&variation_id=11'], $found['structuredContent']['products'][0]['variants'][0]);
+        $this->assertStringContainsString('buy_url', $hello['instructions'], 'told to end every answer with the buy link');
         $this->assertJson($found['content'][0]['text']);
 
         $this->assertSame('טבעת וינטג׳', $rpc('tools/call', ['name' => 'get_product', 'arguments' => ['id' => '2']])->json('result.structuredContent.title'));

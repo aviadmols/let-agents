@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Search\Models\SearchShare;
+use App\Modules\Search\Support\AgentCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -34,20 +35,20 @@ final class SharePageController
         $snapshot = $share->snapshot;
 
         if ($request->query('format') === 'json') {
-            return response()->json($snapshot, 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return response()->json(AgentCatalog::forAi($snapshot['store'], $snapshot['products'], (string) $snapshot['as_of'], ['query' => $snapshot['query'], 'read' => $snapshot['read'] ?? null, 'policies' => $snapshot['policies'] ?? null]), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         }
 
         $locale = in_array($snapshot['store']['locale'] ?? 'he', ['he', 'en'], true) ? $snapshot['store']['locale'] : 'he';
 
         // The store's connector, when it offers one, for an AI that can connect for good.
         $connection = $tenant->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $share->shop_id)->first());
-        $connector = $connection !== null && Features::enabled('search.agent_connector', $share->shop_id) ? route('api.search.mcp', ['site' => $connection->site_key]) : null;
+        $connector = $connection !== null && Features::enabled('search.agent_connector', $share->shop_id) ? AgentCatalog::publicUrl('api/v1/mcp/'.$connection->site_key) : null;
 
         // The same search on the store itself, for a person the link was sent to.
         $base = rtrim((string) ($snapshot['store']['url'] ?? ''), '/');
         $storeSearch = $base === '' || ($snapshot['query'] ?? '') === '' ? null
             : (($snapshot['store']['platform'] ?? '') === 'shopify' ? $base.'/search?q='.rawurlencode($snapshot['query']) : $base.'/?s='.rawurlencode($snapshot['query']).'&post_type=product');
 
-        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'storeSearch' => $storeSearch, 'json' => route('search.share', ['token' => $share->token, 'format' => 'json'])], 200, $headers);
+        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'storeSearch' => $storeSearch, 'json' => AgentCatalog::publicUrl('s/'.$share->token.'?format=json')], 200, $headers);
     }
 }

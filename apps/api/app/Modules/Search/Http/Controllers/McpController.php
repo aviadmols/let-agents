@@ -103,8 +103,8 @@ final class McpController
         $shopId = (string) $connection->shop_id;
 
         $data = $tenant->run($shopId, fn (): ?array => match ($tool) {
-            'search_products' => ['store' => AgentCatalog::store($connection)] + $search->handle($shopId, (string) ($arguments['query'] ?? ''), (int) ($arguments['limit'] ?? 8)),
-            'get_product' => (AgentCatalog::products([(string) ($arguments['id'] ?? '')])[0] ?? ['error' => 'unknown_product']) + ['as_of' => AgentCatalog::asOf([(string) ($arguments['id'] ?? '')])],
+            'search_products' => ['store' => AgentCatalog::store($connection)] + $search->handle($shopId, (string) ($arguments['query'] ?? ''), (int) ($arguments['limit'] ?? 10), (int) ($arguments['page'] ?? 1), AgentCatalog::store($connection)),
+            'get_product' => (AgentCatalog::products([(string) ($arguments['id'] ?? '')], AgentCatalog::store($connection))[0] ?? ['error' => 'unknown_product']) + ['as_of' => AgentCatalog::asOf([(string) ($arguments['id'] ?? '')])],
             'store_policies' => ['store' => AgentCatalog::store($connection), 'policies' => AgentCatalog::policies()],
             'create_cart_link' => CartLink::build($connection, array_values(array_filter((array) ($arguments['items'] ?? []), 'is_array'))),
             default => null,
@@ -132,9 +132,9 @@ final class McpController
                 'type' => 'object',
                 'properties' => [
                     'query' => ['type' => 'string', 'description' => $t('search_query')],
-                    'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => SearchForAgent::MAX, 'default' => 8],
+                    'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => SearchForAgent::MAX, 'default' => 10],
+                    'page' => ['type' => 'integer', 'minimum' => 1, 'default' => 1, 'description' => $t('search_page')],
                 ],
-                'required' => ['query'],
             ]],
             ['name' => 'get_product', 'title' => $t('product_title'), 'description' => $t('product'), 'annotations' => $read, 'inputSchema' => [
                 'type' => 'object',

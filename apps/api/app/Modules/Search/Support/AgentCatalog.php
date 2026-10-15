@@ -23,7 +23,77 @@ final class AgentCatalog
 
     private const MAX_VARIANTS = 30;
 
-    /** @return array{name: string, url: string, locale: string, platform: string} */
+    /** A public link on the platform's own address (agents.lets.co.il), never the address a request happened to come on. */
+    public static function publicUrl(string $path): string
+    {
+        $domain = trim((string) config('upsell.shop_domain'));
+        $root = $domain !== '' ? 'https://'.$domain : rtrim((string) config('app.url'), '/');
+
+        return $root.'/'.ltrim($path, '/');
+    }
+
+    /**
+     * What an AI is told before anything else, on every page it reads: where every product is,
+     * how to buy, and to end every answer with the link that buys.
+     *
+     * @param  array<string, mixed>  $store
+     * @return list<string>
+     */
+    public static function instructions(array $store, string $time): array
+    {
+        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
+        $t = fn (string $key, array $params = []): string => (string) __('search::share.'.$key, $params, $locale);
+        $catalog = $store['catalog'] ?? null;
+        $shopify = ($store['platform'] ?? '') === 'shopify';
+
+        return array_values(array_filter([
+            $catalog ? $t('guide_search', ['store' => $store['name']]).' '.$catalog.'?q=… ('.$t('guide_example').' '.$catalog.'?q='.$t('guide_example_query').'; '.$t('guide_pages').' &page=2; JSON: &format=json)' : null,
+            $t('guide_products'),
+            $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo'),
+            $shopify ? $t('guide_combined').' '.rtrim((string) $store['url'], '/').'/cart/'.$t('guide_cart_id').':1,'.$t('guide_cart_id').':2?attributes[la_source]=ai' : null,
+            $t('guide_end'),
+            $t('guide_rules', ['time' => $time]),
+        ]));
+    }
+
+    /**
+     * The page as an AI reads it most easily: one JSON object, the instructions first, then each
+     * product with only what helps to choose and to buy.
+     *
+     * @param  array<string, mixed>  $store
+     * @param  list<array<string, mixed>>  $products
+     * @param  array<string, mixed>  $more  query, read, total, page, pages, next_page, policies
+     * @return array<string, mixed>
+     */
+    public static function forAi(array $store, array $products, string $asOf, array $more = []): array
+    {
+        $time = Carbon::parse($asOf)->timezone('Asia/Jerusalem')->format('d.m.Y H:i');
+
+        return array_filter([
+            'for_ai' => self::instructions($store, $time),
+            'store' => array_intersect_key($store, array_flip(['name', 'url', 'platform', 'catalog'])),
+            'prices_as_of' => $asOf,
+        ] + $more + [
+            'products' => array_map(fn (array $p): array => array_filter([
+                'id' => $p['id'] ?? null,
+                'title' => $p['title'] ?? null,
+                'price' => $p['price'] ?? null,
+                'was' => $p['regular_price'] ?? null,
+                'currency' => $p['currency'] ?? null,
+                'in_stock' => $p['in_stock'] ?? null,
+                'details' => array_map(fn (array $values): string => implode(', ', $values), $p['details'] ?? []) ?: null,
+                'buy_url' => $p['buy_url'] ?? null,
+                'cart_id' => $p['cart_id'] ?? null,
+                'options' => array_map(fn (array $v): array => array_filter([
+                    'title' => $v['title'] ?? null, 'cart_id' => $v['id'] ?? null, 'price' => $v['price'] ?? null, 'in_stock' => $v['in_stock'] ?? null, 'buy_url' => $v['buy_url'] ?? null,
+                ], fn ($value): bool => $value !== null), $p['variants'] ?? []) ?: null,
+                'page_url' => $p['url'] ?? null,
+                'image' => $p['image'] ?? null,
+            ], fn ($value): bool => $value !== null && $value !== ''), $products),
+        ], fn ($value): bool => $value !== null && $value !== [] && $value !== '');
+    }
+
+    /** @return array{name: string, url: string, locale: string, platform: string, catalog: string|null} */
     public static function store(StoreConnection $connection): array
     {
         return [
@@ -31,6 +101,8 @@ final class AgentCatalog
             'url' => (string) $connection->site_url,
             'locale' => (string) ($connection->shop?->content_locale ?? 'he'),
             'platform' => (string) $connection->platform,
+            // The store's page for an AI: every product, searchable, with the instructions on top.
+            'catalog' => $connection->site_key ? self::publicUrl('c/'.$connection->site_key) : null,
         ];
     }
 
@@ -40,13 +112,13 @@ final class AgentCatalog
      * @param  list<string>  $externalIds
      * @return list<array<string, mixed>>
      */
-    public static function products(array $externalIds): array
+    public static function products(array $externalIds, ?array $store = null): array
     {
         $products = CatalogProduct::query()->whereIn('external_id', $externalIds)->whereNull('removed_at')->get()->keyBy('external_id');
         $ordered = array_values(array_filter(array_map(fn (string $id): ?CatalogProduct => $products[$id] ?? null, $externalIds)));
         $details = self::details(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
 
-        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? []), $ordered);
+        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? [], $store), $ordered);
     }
 
     /** When the products were last read from the store, as ISO 8601. @param list<string> $externalIds */
@@ -61,7 +133,7 @@ final class AgentCatalog
      * @param  array<string, list<string>>  $details
      * @return array<string, mixed>
      */
-    private static function product(CatalogProduct $product, array $details): array
+    private static function product(CatalogProduct $product, array $details, ?array $store = null): array
     {
         $payload = (array) $product->payload;
         $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) (($payload['short_description'] ?? '') ?: ($payload['description'] ?? '')))));
@@ -76,6 +148,7 @@ final class AgentCatalog
                 'title' => (string) $variant['title'],
                 'price' => is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null,
                 'in_stock' => (bool) ($variant['stock']['in_stock'] ?? false),
+                'buy_url' => $store === null || ! ($variant['stock']['in_stock'] ?? false) ? null : CartLink::buyUrl($store, (string) $product->external_id, (string) ($variant['external_id'] ?? '')),
             ], fn ($value): bool => $value !== null && $value !== '');
         }
 
@@ -91,6 +164,9 @@ final class AgentCatalog
             'currency' => $product->currency ?: 'ILS',
             'in_stock' => (bool) $product->in_stock,
             'details' => $details,
+            // A product without options is bought from here; one with options, from the option chosen.
+            'buy_url' => $store === null || $variants !== [] || ! $product->in_stock ? null : CartLink::buyUrl($store, (string) $product->external_id, (string) ($payload['variant_id'] ?? '')),
+            'cart_id' => $variants === [] && ($payload['variant_id'] ?? '') !== '' ? (string) $payload['variant_id'] : null,
             'variants' => $variants,
             'description' => $text === '' ? null : Str::limit($text, self::MAX_DESCRIPTION),
         ], fn ($value): bool => $value !== null && $value !== [] && $value !== '');

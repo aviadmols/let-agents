@@ -5,6 +5,7 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Modules\Search\Actions\ShareSearch;
 use App\Modules\Search\Http\StorefrontSite;
+use App\Modules\Search\Support\AgentCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,7 +50,7 @@ final class ShareController
 
         $saved = $share->handle($connection, $query, $ids);
         $locale = in_array($body['locale'] ?? null, ['he', 'en'], true) ? (string) $body['locale'] : (string) ($connection->shop?->content_locale ?? 'he');
-        $url = route('search.share', ['token' => $saved->token]);
+        $url = AgentCatalog::publicUrl('s/'.$saved->token);
         $words = __('search::share.ask', ['store' => (string) ($connection->shop?->name ?? ''), 'url' => $url], $locale);
 
         return response()->json([

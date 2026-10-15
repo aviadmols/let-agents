@@ -58,19 +58,19 @@ final class CartLink
             }
 
             if ($connection->platform === 'shopify') {
-                $variant = $variant !== '' ? $variant : self::onlyVariant($product);
+                $variant = $variant !== '' ? $variant : ((string) (((array) $product->payload)['variant_id'] ?? '') ?: self::onlyVariant($product));
                 if ($variant === null) {
                     $problems[] = ['product' => $productId, 'problem' => 'not_available'];
 
                     continue;
                 }
                 $lines[] = $variant.':'.$quantity;
-                $links[] = ['product' => $productId, 'url' => $base.'/cart/'.$variant.':'.$quantity.'?attributes[la_source]=ai'];
+                $links[] = ['product' => $productId, 'url' => (string) self::buyUrl(['platform' => 'shopify', 'url' => $base], $productId, $variant, $quantity)];
 
                 continue;
             }
 
-            $links[] = ['product' => $productId, 'url' => $base.'/?'.http_build_query(array_filter(['add-to-cart' => $productId, 'variation_id' => $variant ?: null, 'quantity' => $quantity]))];
+            $links[] = ['product' => $productId, 'url' => (string) self::buyUrl(['platform' => (string) $connection->platform, 'url' => $base], $productId, $variant ?: null, $quantity)];
         }
 
         $url = $connection->platform === 'shopify'
@@ -78,6 +78,25 @@ final class CartLink
             : ($links[0]['url'] ?? null);
 
         return ['url' => $url, 'links' => $links, 'problems' => $problems];
+    }
+
+    /**
+     * The link that buys one product (or one of its options) at once: on Shopify the store's
+     * checkout with it already in the cart, marked as from an AI; on WooCommerce the store with it
+     * added to the cart. Null on Shopify without a variant to buy. No request is made.
+     *
+     * @param  array{platform: string, url: string}  $store
+     */
+    public static function buyUrl(array $store, string $productId, ?string $variantId, int $quantity = 1): ?string
+    {
+        $base = rtrim($store['url'], '/');
+        $quantity = max(1, min(self::MAX_QUANTITY, $quantity));
+
+        if ($store['platform'] === 'shopify') {
+            return $variantId === null || $variantId === '' ? null : $base.'/cart/'.$variantId.':'.$quantity.'?attributes[la_source]=ai';
+        }
+
+        return $base.'/?'.http_build_query(array_filter(['add-to-cart' => $productId, 'variation_id' => $variantId ?: null, 'quantity' => $quantity > 1 ? $quantity : null]));
     }
 
     /** The one variant of a Shopify product without options, from its public product page, when it can be bought. */
