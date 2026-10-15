@@ -4,6 +4,7 @@ namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
@@ -13,6 +14,7 @@ use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Support\LoadedIndex;
@@ -98,7 +100,7 @@ final class ShareSearchTest extends TestCase
         $this->assertSame($sent['url'], $again['url'], 'the same search and products: one link');
 
         $path = (string) parse_url($sent['url'], PHP_URL_PATH);
-        $page = $this->get($path)->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $page = $this->get($path)->assertOk()->assertHeader('X-Robots-Tag', 'noindex');
         $page->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
             ->assertSee('זהב לבן')->assertSee('₪2,400')->assertSee('עד ₪3,000')->assertSee('מתכת: זהב לבן')
             ->assertSee('מידה 7 – ₪2,400')->assertSee('(אזל מהמלאי)')->assertSee('ניתן להחזיר תוך 14 יום.')->assertSee('https://www.rings.test/policies/refund')
@@ -115,10 +117,10 @@ final class ShareSearchTest extends TestCase
         $json = $this->getJson($path.'?format=json')->assertOk()->json();
         $this->assertSame(['טבעת סוליטר', 'טבעת יוקרה'], array_column($json['products'], 'title'), 'the products the shopper saw, in their order');
         $this->assertSame('for_ai', array_key_first($json), 'the instructions come first');
-        $this->assertSame(['find', 'compare', 'project', 'order', 'missing'], array_keys($json['tasks']), 'then how to do what a shopper asks');
+        $this->assertSame(['find', 'visual', 'compare', 'project', 'order', 'missing'], array_keys($json['tasks']), 'then how to do what a shopper asks');
         $this->assertStringContainsString('/api/v1/mcp/'.$this->site, $json['mcp']['url'], 'and the connector, for an AI that calls tools');
         $this->assertStringContainsString('לעולם אל תיצור', implode(' ', $json['for_ai']), 'never a picture of its own');
-        $this->assertStringContainsString($sent['url'].'?format=json', $sent['prompt'], 'the AI is sent the JSON');
+        $this->assertStringEndsWith($sent['url'].'?format=json', $sent['prompt'], 'one sentence and the JSON link: the JSON holds the rest');
         $this->assertStringContainsString('סיים כל תשובה', implode(' ', $json['for_ai']));
         $this->assertSame('זהב לבן', $json['products'][0]['details']['מתכת']);
         $this->assertSame('https://www.rings.test/?add-to-cart=1&variation_id=11', $json['products'][0]['options'][0]['buy_url']);
@@ -162,7 +164,7 @@ final class ShareSearchTest extends TestCase
     public function test_the_whole_store_is_one_page_for_an_ai_instructions_first_every_product_with_its_buy_link(): void
     {
         config(['upsell.shop_domain' => 'agents.example.test']);
-        $page = $this->get("/c/{$this->site}?q=".rawurlencode('טבעת זהב לבן'))->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $page = $this->get("/c/{$this->site}?q=".rawurlencode('טבעת זהב לבן'))->assertOk()->assertHeader('X-Robots-Tag', 'noindex');
         $page->assertSee('כל המוצרים של טבעות ושות׳')->assertSee('data-ai-guide', false)->assertSee('data-ai-json', false)
             ->assertSee('https://agents.example.test/c/'.$this->site.'?q=…')
             ->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
@@ -202,6 +204,51 @@ final class ShareSearchTest extends TestCase
 
     }
 
+    public function test_the_ai_matches_by_looks_from_the_pictures_already_described_and_asks_for_look_alikes(): void
+    {
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $ring = CatalogProduct::query()->where('external_id', '1')->first();
+            RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $ring->id, 'external_id' => '1', 'title' => $ring->title,
+                'image_url' => 'https://cdn.rings.test/1.jpg', 'url_hash' => 'h1', 'caption' => 'טבעת סוליטר בזהב לבן עם אבן עגולה שקופה', 'caption_words' => ['טבעת', 'סוליטר', 'זהב לבן']]);
+        });
+
+        $json = $this->getJson("/c/{$this->site}?format=json&q=".rawurlencode('טבעת סוליטר'))->assertOk()->json();
+        $this->assertSame('טבעת סוליטר בזהב לבן עם אבן עגולה שקופה (טבעת, סוליטר, זהב לבן)', $json['products'][0]['looks'], 'how it looks, read at night, no picture opened now');
+        $this->assertContains('similar', array_column($json['actions'], 'name'));
+
+        $like = $this->getJson("/c/{$this->site}/similar/1")->assertOk()->json();
+        $this->assertSame('טבעת סוליטר', $like['like']);
+        $this->assertSame('for_ai', array_key_first($like));
+        $this->get("/c/{$this->site}/similar/".rawurlencode('<x>'))->assertNotFound();
+    }
+
+    public function test_every_category_and_page_of_the_whole_store_is_a_link_the_ai_can_open(): void
+    {
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => '50', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'product_count' => 2, 'hash' => 'c50']);
+            $rings->products()->attach(CatalogProduct::query()->whereIn('external_id', ['1', '3'])->pluck('id')->all());
+        });
+
+        // The front page: where everything is, written out in full, as links and in its JSON.
+        $front = $this->getJson("/c/{$this->site}?format=json")->assertOk()->json();
+        $this->assertSame([['name' => 'טבעות', 'products' => 2, 'url' => $front['store']['catalog'].'?cat=50&compact=1&format=json']], $front['browse']['categories']);
+        $this->assertSame([$front['store']['catalog'].'?compact=1&format=json'], $front['browse']['all_products']);
+        $this->get("/c/{$this->site}")->assertSee('data-ai-browse', false)->assertSee('href="'.e($front['store']['catalog'].'?cat=50&compact=1&format=json').'"', false);
+
+        // A category, in short: its products only, what is needed to pick and buy.
+        $category = $this->getJson($front['browse']['categories'][0]['url'])->assertOk()->json();
+        $this->assertSame(['1', '3'], collect($category['products'])->pluck('id')->sort()->values()->all());
+        $this->assertEmpty(array_diff(array_keys($category['products'][0]), ['id', 'title', 'price', 'in_stock', 'buy_url', 'cart_id', 'options', 'looks']), 'in short');
+
+        // The shared search has them too: the AI is not held to what the search found.
+        $sent = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'], json_encode(['q' => 'טבעת']))->json();
+        $this->assertSame('טבעות', $this->getJson(parse_url($sent['url'], PHP_URL_PATH).'?format=json')->json('browse.categories.0.name'));
+        $this->assertStringContainsString('?format=json', $sent['prompt']);
+
+        // The connector's address for "connect for good".
+        $this->assertStringEndsWith('/api/v1/mcp/'.$this->site, $this->getJson("/api/v1/search/{$this->site}/index", self::ORIGIN)->json('config.mcpUrl'));
+    }
+
     public function test_a_woocommerce_store_without_checkout_links_gets_the_add_to_cart_link(): void
     {
         Http::fake(['www.rings.test/checkout-link/' => Http::response('', 404)]);
@@ -214,8 +261,8 @@ final class ShareSearchTest extends TestCase
     {
         // Every page tells the AI how: the order link is among its commands.
         $actions = $this->getJson("/c/{$this->site}?format=json")->json('actions');
-        $this->assertSame(['search', 'all_products', 'order', 'check_order'], array_column($actions, 'name'));
-        $this->assertStringContainsString('/c/'.$this->site.'/cart?items=', $actions[2]['url']);
+        $this->assertSame(['search', 'all_products', 'similar', 'order', 'check_order'], array_column($actions, 'name'));
+        $this->assertStringContainsString('/c/'.$this->site.'/cart?items=', collect($actions)->firstWhere('name', 'order')['url']);
 
         // WooCommerce, one product with its size: to the store, the product added.
         $this->get("/c/{$this->site}/cart?items=1/11:2")->assertRedirect('https://www.rings.test/?add-to-cart=1&variation_id=11&quantity=2');

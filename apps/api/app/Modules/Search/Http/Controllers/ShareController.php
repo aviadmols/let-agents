@@ -51,9 +51,10 @@ final class ShareController
         $saved = $share->handle($connection, $query, $ids);
         $locale = in_array($body['locale'] ?? null, ['he', 'en'], true) ? (string) $body['locale'] : (string) ($connection->shop?->content_locale ?? 'he');
         $url = AgentCatalog::publicUrl('s/'.$saved->token);
-        // The search the shopper made, and the whole store beside it, as the JSON an AI reads best: the AI is not held to what the search found.
-        $catalog = AgentCatalog::publicUrl('c/'.$connection->site_key);
-        $words = __('search::share.ask', ['store' => (string) ($connection->shop?->name ?? ''), 'url' => $url.'?format=json', 'catalog' => $catalog.'?format=json'], $locale);
+        // One sentence and one link: the JSON holds the rest (the instructions, the tasks, the commands,
+        // and every category and page of the whole store written out, since an AI's browser opens
+        // only addresses it has seen).
+        $words = __('search::share.ask', ['store' => (string) ($connection->shop?->name ?? ''), 'url' => $url.'?format=json'], $locale);
 
         return response()->json([
             'url' => $url,

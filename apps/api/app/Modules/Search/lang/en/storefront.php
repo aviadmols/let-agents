@@ -116,6 +116,8 @@ return [
     'share_help' => 'A link to the results as they are now, filters included.',
     'share_more' => 'More…',
     'share_text' => 'Look what I found at :store: :query',
+    'ai_connect' => 'Connect my AI for good (MCP)',
+    'ai_connect_help' => 'The connection address is copied. In Claude: Settings → Connectors → Add custom connector, and paste it. In ChatGPT: Settings → Connectors (developer mode). From now on the AI searches the store and makes the checkout link itself.',
     'read_remove' => 'Remove: :name',
     'filter_price' => 'Price',
     'filter_size' => 'Size',

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Actions;
 
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Search\Support\HebrewSearch;
@@ -16,7 +17,11 @@ use App\Modules\Search\Support\LoadedIndex;
  */
 final class SearchForAgent
 {
+    /** Products a page, at most, for an AI that asks (the connector). */
     public const MAX = 50;
+
+    /** Products a page, at most, in the whole catalogue in short (StoreCatalogController). */
+    public const LARGEST_PAGE = 200;
 
     public function __construct(private readonly SearchCatalog $search) {}
 
@@ -24,12 +29,18 @@ final class SearchForAgent
      * @param  array<string, mixed>|null  $store  AgentCatalog::store, for the buy links
      * @return array{query: string, read: array<string, mixed>, total: int, page: int, pages: int, products: list<array<string, mixed>>, as_of: string}
      */
-    public function handle(string $shopId, string $query, int $limit = 10, int $page = 1, ?array $store = null): array
+    public function handle(string $shopId, string $query, int $limit = 10, int $page = 1, ?array $store = null, ?string $category = null): array
     {
         $query = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $query)), 0, 200);
-        $limit = max(1, min(self::MAX, $limit));
+        $limit = max(1, min(self::LARGEST_PAGE, $limit));
         $page = max(1, $page);
         $ids = $query === '' ? $this->everything() : $this->found($shopId, $query);
+
+        // One category and those under it ("גינה" holds "כלי גינה").
+        if ($category !== null && $category !== '') {
+            $inside = $this->inCategory($category);
+            $ids = array_values(array_filter($ids, fn (string $id): bool => isset($inside[$id])));
+        }
         $pages = max(1, (int) ceil(count($ids) / $limit));
         $external = array_slice($ids, ($page - 1) * $limit, $limit);
 
@@ -58,6 +69,23 @@ final class SearchForAgent
         }
 
         return array_map(fn (string $id): string => substr($id, 2), $ids);
+    }
+
+    /** @return array<string, true> the external ids of a category's products and of the categories under it */
+    private function inCategory(string $externalId): array
+    {
+        $categories = CatalogCategory::query()->whereNull('removed_at')->get();
+        $category = $categories->firstWhere('external_id', $externalId);
+
+        if ($category === null) {
+            return [];
+        }
+
+        $branch = $category->branchExternalIds($categories);
+
+        return array_fill_keys(CatalogProduct::query()->whereNull('removed_at')
+            ->whereHas('categories', fn ($q) => $q->whereIn('external_id', $branch))
+            ->pluck('external_id')->map(fn ($id): string => (string) $id)->all(), true);
     }
 
     /** @return list<string> every product the store sells now, in stock first, newest first */

@@ -2,7 +2,7 @@
 
 return [
     // The words sent to the shopper's AI with the link.
-    'ask' => 'I want to buy from :store. What I searched for and found, as JSON: :url . Every product of the store, searchable: :catalog . Work only from this JSON (it starts with instructions, tasks and commands for you), and search the whole store for whatever is needed, not only what I found. Help me choose, and end every answer with one link to the store\'s checkout with every product already in it (the "order" command on the page). Do not write me an order letter and do not browse the store\'s own site.',
+    'ask' => 'I want to buy from :store. Everything you need, and your instructions, are here; work by them: :url',
     'title' => 'A search at :store: ":query"',
     'title_no_query' => 'Products from :store',
     'intro' => 'A shopper sent this search to their own AI to take advice before buying. The information is the store\'s own. Prices and stock as of :time; the purchase itself is made on the store\'s product page.',
@@ -48,7 +48,14 @@ return [
     'cart_problem_unknown_product' => 'This product is not in the store',
     'cart_problem_not_available' => 'This product is not available now',
     'guide_images' => 'Pictures: show only the picture in the product\'s image field. Never create, draw or bring another picture of a product.',
-    'task_find' => 'Finding a product: use the search command in the shopper\'s words (price, colour and size may be in them). Nothing found? Try a broader word, or go through all_products.',
+    'browse_title' => 'The whole store: links to open',
+    'browse_all' => 'Every product in short (id, name, price, stock, buy link):',
+    'browse_page' => 'Page :n',
+    'browse_categories' => 'By category:',
+    'task_find' => 'Finding a product: open the link of the right category in browse, or the pages of every product in short. If you can open an address you make, the search command in the shopper\'s words works too.',
+    'task_visual' => 'Matching by looks: every product has looks, how it looks in its picture. For the shopper\'s photo or description: describe its kind, colour, stone and shape in words, search with them, and compare with looks. "Something like this product": the similar command with its id. There is no need to open pictures.',
+    'action_similar' => 'Products that look like one product (by their pictures, of the same kind), as JSON.',
+    'looks' => 'Looks',
     'task_compare' => 'Comparing: set the price, stock, details and key_points of each product side by side. Add nothing that is not written.',
     'task_project' => 'A list for a project (a table, a pergola): break it into parts, search the whole store for each, count quantities only from measures that are written, and say plainly what you assume.',
     'task_order' => 'Ordering: build one link with the order command, every product and quantity in it (a product with a size or colour: product_id/the option\'s cart_id). Check it first with check_order if you like. Give it to the shopper at the end of the answer.',

@@ -2,12 +2,14 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -78,8 +80,52 @@ final class AgentCatalog
         return [
             ['name' => 'search', 'url' => $catalog.'?q={words}&format=json', 'does' => $t('search')],
             ['name' => 'all_products', 'url' => $catalog.'?format=json&page={n}', 'does' => $t('all')],
+            ['name' => 'similar', 'url' => $catalog.'/similar/{product_id}', 'does' => $t('similar')],
             ['name' => 'order', 'url' => $catalog.'/cart?items={product_id}:{quantity},{product_id}/{option_cart_id}:{quantity}', 'does' => $t('order')],
             ['name' => 'check_order', 'url' => $catalog.'/cart?items={…}&format=json', 'does' => $t('check')],
+        ];
+    }
+
+    /**
+     * An address of the store's page for an AI, written out in full: an AI's browser opens only
+     * addresses it has seen, never one it would have to make from a pattern.
+     *
+     * @param  array<string, mixed>  $store
+     * @param  array<string, mixed>  $asked  q, cat, compact, page
+     */
+    public static function catalogUrl(array $store, array $asked): string
+    {
+        return ($store['catalog'] ?? '').'?'.http_build_query(array_filter([
+            'q' => ($asked['q'] ?? '') ?: null,
+            'cat' => ($asked['cat'] ?? '') ?: null,
+            'compact' => ($asked['compact'] ?? false) ? 1 : null,
+            'page' => (int) ($asked['page'] ?? 1) > 1 ? (int) $asked['page'] : null,
+            'format' => 'json',
+        ]));
+    }
+
+    /**
+     * Where everything is, as links an AI can open: every category with its products, and the whole
+     * catalogue in short, page by page. Inside the shop's tenant.
+     *
+     * @param  array<string, mixed>  $store
+     * @return array{categories: list<array{name: string, products: int, url: string}>, all_products: list<string>}
+     */
+    public static function browse(array $store, int $perPage): array
+    {
+        $categories = CatalogCategory::query()->whereNull('removed_at')->where('product_count', '>', 0)
+            ->orderBy('depth')->orderByDesc('product_count')->limit(120)->get()
+            ->sortBy(fn (CatalogCategory $c): string => implode(' > ', (array) $c->path))
+            ->map(fn (CatalogCategory $c): array => [
+                'name' => implode(' > ', array_map('strval', (array) $c->path)) ?: (string) $c->name,
+                'products' => (int) $c->product_count,
+                'url' => self::catalogUrl($store, ['cat' => (string) $c->external_id, 'compact' => true]),
+            ])->values()->all();
+        $pages = max(1, (int) ceil(CatalogProduct::query()->whereNull('removed_at')->count() / max(1, $perPage)));
+
+        return [
+            'categories' => $categories,
+            'all_products' => array_map(fn (int $page): string => self::catalogUrl($store, ['compact' => true, 'page' => $page]), range(1, min($pages, 50))),
         ];
     }
 
@@ -92,7 +138,7 @@ final class AgentCatalog
     public static function tasks(array $store): array
     {
         $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
-        $keys = ['find', 'compare', 'project', 'order', 'missing'];
+        $keys = ['find', 'visual', 'compare', 'project', 'order', 'missing'];
 
         return array_combine($keys, array_map(fn (string $key): string => (string) __('search::share.task_'.$key, [], $locale), $keys));
     }
@@ -154,6 +200,7 @@ final class AgentCatalog
                 'in_stock' => $p['in_stock'] ?? null,
                 'details' => array_map(fn (array $values): string => implode(', ', $values), $p['details'] ?? []) ?: null,
                 'key_points' => $p['key_points'] ?? null,
+                'looks' => $p['looks'] ?? null,
                 'buy_url' => $p['buy_url'] ?? (($p['variants'] ?? []) === [] && ($p['in_stock'] ?? false) ? $order(($p['id'] ?? '').':1') : null),
                 'cart_id' => $p['cart_id'] ?? null,
                 'options' => array_map(fn (array $v): array => array_filter([
@@ -164,6 +211,21 @@ final class AgentCatalog
                 'image' => $p['image'] ?? null,
             ], fn ($value): bool => $value !== null && $value !== ''), $products),
         ], fn ($value): bool => $value !== null && $value !== [] && $value !== '');
+    }
+
+    /**
+     * The same, in short, for the whole catalogue a page at a time: what an AI needs to pick and to
+     * buy (id, name, price, stock, buy link, options), the rest on the product's own search.
+     *
+     * @param  array<string, mixed>  $data  forAi's answer
+     * @return array<string, mixed>
+     */
+    public static function short(array $data): array
+    {
+        $keep = array_flip(['id', 'title', 'price', 'in_stock', 'buy_url', 'cart_id', 'options', 'looks']);
+        $data['products'] = array_map(fn (array $p): array => array_intersect_key($p, $keep), (array) ($data['products'] ?? []));
+
+        return $data;
     }
 
     /** @return array{name: string, url: string, locale: string, platform: string, catalog: string|null} */
@@ -193,8 +255,9 @@ final class AgentCatalog
         $ordered = array_values(array_filter(array_map(fn (string $id): ?CatalogProduct => $products[$id] ?? null, $externalIds)));
         $details = self::details(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
         $points = self::keyPoints(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
+        $looks = self::looks(array_map(fn (CatalogProduct $p): string => (string) $p->id, $ordered));
 
-        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? [], $store) + array_filter(['key_points' => $points[(string) $p->id] ?? null]), $ordered);
+        return array_map(fn (CatalogProduct $p): array => self::product($p, $details[(string) $p->id] ?? [], $store) + array_filter(['key_points' => $points[(string) $p->id] ?? null, 'looks' => $looks[(string) $p->id] ?? null]), $ordered);
     }
 
     /** When the products were last read from the store, as ISO 8601. @param list<string> $externalIds */
@@ -246,6 +309,28 @@ final class AgentCatalog
             'variants' => $variants,
             'description' => $text === '' ? null : Str::limit($text, self::MAX_DESCRIPTION),
         ], fn ($value): bool => $value !== null && $value !== [] && $value !== '');
+    }
+
+    /**
+     * How each product looks, as the picture scan described its main picture at night (the stone's
+     * colour, the metal, the shape, the cut), with the words a shopper would use: what lets an AI
+     * match a photo or "something like this" by reading, without opening a picture.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, string> by product id
+     */
+    private static function looks(array $productIds): array
+    {
+        $out = [];
+
+        RetrievalImage::query()->whereIn('product_id', $productIds)->whereNotNull('caption')->orderBy('id')
+            ->get(['product_id', 'caption', 'caption_words'])
+            ->each(function (RetrievalImage $image) use (&$out): void {
+                $words = is_array($image->caption_words) ? $image->caption_words : (array) json_decode((string) $image->caption_words, true);
+                $out[(string) $image->product_id] ??= trim((string) $image->caption.($words !== [] ? ' ('.implode(', ', array_map('strval', $words)).')' : ''));
+            });
+
+        return $out;
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Search\Support\ResultGroups;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
@@ -86,6 +87,8 @@ final class SearchIndexController
             'aiShare' => Features::enabled('search.ai_share', $shopId),
             // "Share the results": the same link, to a friend.
             'shareResults' => Features::enabled('search.share_results', $shopId),
+            // "Connect for good": the store's connector (MCP), for a shopper whose AI takes one.
+            'mcpUrl' => Features::enabled('search.agent_connector', $shopId) ? AgentCatalog::publicUrl('api/v1/mcp/'.$site) : '',
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';

@@ -116,6 +116,8 @@ return [
     'share_help' => 'קישור לתוצאות כפי שהן עכשיו, עם הסינון.',
     'share_more' => 'עוד…',
     'share_text' => 'תראו מה מצאתי ב:store: :query',
+    'ai_connect' => 'חיבור קבוע ל-AI (MCP)',
+    'ai_connect_help' => 'כתובת החיבור הועתקה. ב-Claude: הגדרות ← Connectors ← Add custom connector, והדביקו. ב-ChatGPT: הגדרות ← Connectors (מצב מפתחים). מעכשיו ה-AI מחפש בחנות ומכין קישור לתשלום בעצמו.',
     'read_remove' => 'להסיר: :name',
     'filter_price' => 'מחיר',
     'filter_size' => 'גודל',

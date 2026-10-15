@@ -2948,7 +2948,16 @@
       var copied = function () { note.textContent = label('ai_copied'); };
 
       if (forAi) {
-        group('\u2726 ' + label('ai_share'), label('ai_share_help'), [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['perplexity', 'Perplexity'], ['copy', label('ai_copy')]], function (choice) {
+        var aiChoices = [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['perplexity', 'Perplexity'], ['copy', label('ai_copy')]];
+        if (state.config.mcpUrl) {
+          aiChoices.push(['connect', label('ai_connect')]);
+        }
+        group('\u2726 ' + label('ai_share'), label('ai_share_help'), aiChoices, function (choice) {
+          // The store's connector, to add once in Claude or ChatGPT: its address copied, and where to paste it.
+          if (choice === 'connect') {
+            copyText(state.config.mcpUrl, function () { note.textContent = label('ai_connect_help'); });
+            return;
+          }
           if (choice === 'copy') {
             withLink(function (data) { copyText(data.prompt, copied); });
             return;

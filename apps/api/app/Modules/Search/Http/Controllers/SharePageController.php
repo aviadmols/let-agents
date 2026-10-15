@@ -25,7 +25,8 @@ final class SharePageController
         $share = preg_match('/^[a-z0-9]{8,24}$/', $token) === 1
             ? $tenant->runUnscoped(fn () => SearchShare::query()->where('token', $token)->first())
             : null;
-        $headers = ['X-Robots-Tag' => 'noindex, nofollow', 'Cache-Control' => 'public, max-age=300'];
+        // Never indexed; its links are followed, so an AI can open every category and page from it.
+        $headers = ['X-Robots-Tag' => 'noindex', 'Cache-Control' => 'public, max-age=300'];
 
         if ($share === null || $share->expires_at->isPast()) {
             return response()->view('search::share', ['share' => null, 'locale' => 'he'], $share === null ? 404 : 410, $headers);
@@ -34,11 +35,13 @@ final class SharePageController
         $tenant->runUnscoped(fn () => SearchShare::query()->whereKey($share->id)->increment('opens'));
         $snapshot = $share->snapshot;
 
-        if ($request->query('format') === 'json') {
-            return response()->json(AgentCatalog::forAi($snapshot['store'], $snapshot['products'], (string) $snapshot['as_of'], ['query' => $snapshot['query'], 'read' => $snapshot['read'] ?? null, 'policies' => $snapshot['policies'] ?? null]), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-        }
-
         $locale = in_array($snapshot['store']['locale'] ?? 'he', ['he', 'en'], true) ? $snapshot['store']['locale'] : 'he';
+        // Every category and the whole catalogue in short, as links: the AI is not held to what the search found.
+        $browse = empty($snapshot['store']['catalog']) ? null : $tenant->run((string) $share->shop_id, fn (): array => AgentCatalog::browse($snapshot['store'], StoreCatalogController::COMPACT_PER_PAGE));
+
+        if ($request->query('format') === 'json') {
+            return response()->json(AgentCatalog::forAi($snapshot['store'], $snapshot['products'], (string) $snapshot['as_of'], array_filter(['browse' => $browse, 'query' => $snapshot['query'], 'read' => $snapshot['read'] ?? null, 'policies' => $snapshot['policies'] ?? null])), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        }
 
         // The store's connector, when it offers one, for an AI that can connect for good.
         $connection = $tenant->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $share->shop_id)->first());
@@ -49,6 +52,6 @@ final class SharePageController
         $storeSearch = $base === '' || ($snapshot['query'] ?? '') === '' ? null
             : (($snapshot['store']['platform'] ?? '') === 'shopify' ? $base.'/search?q='.rawurlencode($snapshot['query']) : $base.'/?s='.rawurlencode($snapshot['query']).'&post_type=product');
 
-        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'storeSearch' => $storeSearch, 'json' => AgentCatalog::publicUrl('s/'.$share->token.'?format=json')], 200, $headers);
+        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'storeSearch' => $storeSearch, 'browse' => $browse, 'json' => AgentCatalog::publicUrl('s/'.$share->token.'?format=json')], 200, $headers);
     }
 }

@@ -22,6 +22,7 @@
 <main>
     <h1>{{ $heading }}</h1>
     @include('search::partials.guide', ['store' => $store, 'time' => $time, 'connector' => $connector])
+    @include('search::partials.browse', ['browse' => $ai['browse'] ?? null])
     @include('search::partials.json', ['ai' => $ai, 'json' => $at($c['page']).(str_contains($at($c['page']), '?') ? '&' : '?').'format=json'])
 
     <form method="get" action="{{ $store['catalog'] }}" role="search">
