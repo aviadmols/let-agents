@@ -2594,7 +2594,23 @@
       position();
       if (d.fresh) {
         d.fresh = false;
+        // On a phone our sheet takes over the typing. A theme that keeps its own search panel as a
+        // focus trap (Prestige) pulls the focus straight back, the keyboard closes and letters are
+        // lost: its panel is closed first, then the focus moves, and comes back if the theme's
+        // closing hands it elsewhere a moment later.
+        if (d.mobile) {
+          closeThemeSearch();
+        }
         focusField(d);
+        if (d.mobile) {
+          [0, 120, 400].forEach(function (wait) {
+            setTimeout(function () {
+              if (dropdown === d && doc.activeElement !== d.host) {
+                focusField(d);
+              }
+            }, wait);
+          });
+        }
       }
 
       clearTimeout(pauseTimer);
