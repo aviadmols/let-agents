@@ -52,6 +52,7 @@ final class AgentCatalog
             $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo'),
             $catalog ? $t('guide_order').' '.$catalog.'/cart?items='.$t('guide_item').':1,'.$t('guide_item').'/'.$t('guide_cart_id').':2' : null,
             $t('guide_end'),
+            $t('guide_images'),
             $t('guide_rules', ['time' => $time]),
         ]));
     }
@@ -83,6 +84,43 @@ final class AgentCatalog
     }
 
     /**
+     * How to do what a shopper usually asks, step by step, with the commands above.
+     *
+     * @param  array<string, mixed>  $store
+     * @return array<string, string>
+     */
+    public static function tasks(array $store): array
+    {
+        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
+        $keys = ['find', 'compare', 'project', 'order', 'missing'];
+
+        return array_combine($keys, array_map(fn (string $key): string => (string) __('search::share.task_'.$key, [], $locale), $keys));
+    }
+
+    /**
+     * The store's connector, for an AI that can call tools: the same commands, as MCP tools.
+     *
+     * @param  array<string, mixed>  $store
+     * @return array<string, mixed>|null
+     */
+    public static function mcp(array $store): ?array
+    {
+        $catalog = $store['catalog'] ?? null;
+
+        if ($catalog === null) {
+            return null;
+        }
+
+        $locale = in_array($store['locale'] ?? 'he', ['he', 'en'], true) ? $store['locale'] : 'he';
+
+        return [
+            'url' => str_replace('/c/', '/api/v1/mcp/', $catalog),
+            'use' => (string) __('search::share.mcp_use', [], $locale),
+            'tools' => ['search_products', 'get_product', 'store_policies', 'create_cart_link'],
+        ];
+    }
+
+    /**
      * The page as an AI reads it most easily: one JSON object, the instructions first, then each
      * product with only what helps to choose and to buy.
      *
@@ -94,10 +132,16 @@ final class AgentCatalog
     public static function forAi(array $store, array $products, string $asOf, array $more = []): array
     {
         $time = Carbon::parse($asOf)->timezone('Asia/Jerusalem')->format('d.m.Y H:i');
+        $catalog = $store['catalog'] ?? null;
+        // Every product and option in stock can be bought from here: its own link, or our order
+        // command for it, which finds what the store needs (a variant) when the link opens.
+        $order = fn (string $items): ?string => $catalog === null ? null : $catalog.'/cart?items='.$items;
 
         return array_filter([
             'for_ai' => self::instructions($store, $time),
+            'tasks' => self::tasks($store),
             'actions' => self::actions($store),
+            'mcp' => self::mcp($store),
             'store' => array_intersect_key($store, array_flip(['name', 'url', 'platform', 'catalog'])),
             'prices_as_of' => $asOf,
         ] + $more + [
@@ -110,10 +154,11 @@ final class AgentCatalog
                 'in_stock' => $p['in_stock'] ?? null,
                 'details' => array_map(fn (array $values): string => implode(', ', $values), $p['details'] ?? []) ?: null,
                 'key_points' => $p['key_points'] ?? null,
-                'buy_url' => $p['buy_url'] ?? null,
+                'buy_url' => $p['buy_url'] ?? (($p['variants'] ?? []) === [] && ($p['in_stock'] ?? false) ? $order(($p['id'] ?? '').':1') : null),
                 'cart_id' => $p['cart_id'] ?? null,
                 'options' => array_map(fn (array $v): array => array_filter([
-                    'title' => $v['title'] ?? null, 'cart_id' => $v['id'] ?? null, 'price' => $v['price'] ?? null, 'in_stock' => $v['in_stock'] ?? null, 'buy_url' => $v['buy_url'] ?? null,
+                    'title' => $v['title'] ?? null, 'cart_id' => $v['id'] ?? null, 'price' => $v['price'] ?? null, 'in_stock' => $v['in_stock'] ?? null,
+                    'buy_url' => $v['buy_url'] ?? (($v['in_stock'] ?? false) ? $order(($p['id'] ?? '').'/'.($v['id'] ?? '').':1') : null),
                 ], fn ($value): bool => $value !== null), $p['variants'] ?? []) ?: null,
                 'page_url' => $p['url'] ?? null,
                 'image' => $p['image'] ?? null,
@@ -131,6 +176,8 @@ final class AgentCatalog
             'platform' => (string) $connection->platform,
             // The store's page for an AI: every product, searchable, with the instructions on top.
             'catalog' => $connection->site_key ? self::publicUrl('c/'.$connection->site_key) : null,
+            // A WooCommerce store that takes checkout links: every buy link goes straight to checkout.
+            'checkout_link' => CartLink::takesCheckoutLinks($connection),
         ];
     }
 

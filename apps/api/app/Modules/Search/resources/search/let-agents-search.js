@@ -2812,6 +2812,58 @@
       return SHARED[key];
     }
 
+    /**
+     * The results as they are now, as a link to the store itself: opened, the store's page shows
+     * them, with the same filters chosen (?la_q=words&la_f=metal.white_gold,sale,sort.price:asc).
+     * Made here, no request: a friend gets the store, not a page of ours.
+     */
+    function storeLink(raw, c) {
+      var chosenNow = [];
+      Object.keys((c && c.f) || {}).forEach(function (code) {
+        var facet = (state.facets || [])[Math.floor(code / 1000)];
+        var value = facet && facet.v[code % 1000];
+        if (value && !(c.read || []).some(function (named) { return String(named.code) === String(code); })) {
+          chosenNow.push(facet.k + '.' + value.k);
+        }
+      });
+      if (c && c.sale) {
+        chosenNow.push('sale');
+      }
+      if (c && c.stock) {
+        chosenNow.push('stock');
+      }
+      if (c && c.sort) {
+        chosenNow.push('sort.' + c.sort);
+      }
+      return win.location.origin + '/?la_q=' + encodeURIComponent(raw.trim()) + (chosenNow.length ? '&la_f=' + encodeURIComponent(chosenNow.join(',')) : '');
+    }
+
+    /** The filters a shared link names (storeLink), chosen for its words before its results are shown. */
+    function chooseFromLink(raw, list) {
+      var c = chosenFor(raw);
+      String(list || '').split(',').forEach(function (token) {
+        if (token === 'sale' || token === 'stock') {
+          c[token] = true;
+          return;
+        }
+        if (token.indexOf('sort.') === 0) {
+          c.sort = token.slice(5);
+          return;
+        }
+        var dot = token.indexOf('.');
+        (state.facets || []).forEach(function (facet, at) {
+          if (facet.k !== token.slice(0, dot)) {
+            return;
+          }
+          (facet.v || []).forEach(function (value, i) {
+            if (value.k === token.slice(dot + 1)) {
+              c.f[at * 1000 + i] = true;
+            }
+          });
+        });
+      });
+    }
+
     /** Copies text; when the page may not, shows it to copy by hand. */
     function copyText(text, done) {
       if (win.navigator.clipboard && win.navigator.clipboard.writeText) {
@@ -2827,7 +2879,7 @@
      * short link: the products shown, as filtered (ids() at the press). A new tab opens at the
      * press, so no popup blocker stops it, and goes where it should when the link is ready.
      */
-    function aiShareRow(raw, ids) {
+    function aiShareRow(raw, ids, picked) {
       var forAi = !!state.config.aiShare;
       var forPeople = !!state.config.shareResults;
       if (!forAi && !forPeople) {
@@ -2838,7 +2890,7 @@
       var note = el('span', 'la-ai-note');
       var menus = [];
 
-      var group = function (text, help, choices, go) {
+      var group = function (text, help, choices, go, forAiMenu) {
         var open = el('button', 'd-chip la-ai-open', text);
         open.type = 'button';
         open.setAttribute('aria-expanded', 'false');
@@ -2851,8 +2903,8 @@
           menu.hidden = !show;
           open.setAttribute('aria-expanded', show ? 'true' : 'false');
           note.textContent = show ? help : '';
-          // The link is made while the shopper chooses, so the phone's share sheet opens at once.
-          if (show) {
+          // The AI's link is made while the shopper chooses, so it opens at once.
+          if (show && forAiMenu) {
             shareSearch(raw, ids());
           }
         });
@@ -2902,28 +2954,30 @@
             return;
           }
           openWith(function (data) { return data.open[choice]; });
-        });
+        }, true);
       }
 
       if (forPeople) {
-        var words = function (data) { return label('share_text', { store: state.config.shopName || '', query: raw.trim() }) + ' ' + data.url; };
+        var link = function () { return storeLink(raw, picked); };
+        var words = function () { return label('share_text', { store: state.config.shopName || '', query: raw.trim() }) + ' ' + link(); };
         var choices = [['whatsapp', 'WhatsApp'], ['link', label('ai_copy')]];
         if (typeof win.navigator.share === 'function') {
           choices.push(['more', label('share_more')]);
         }
         group('\u2197 ' + label('share_results'), label('share_help'), choices, function (choice) {
           if (choice === 'whatsapp') {
-            openWith(function (data) { return 'https://wa.me/?text=' + encodeURIComponent(words(data)); });
+            var tab = win.open('https://wa.me/?text=' + encodeURIComponent(words()), '_blank');
+            if (tab) {
+              tab.opener = null;
+            }
             return;
           }
-          withLink(function (data) {
-            if (choice === 'more') {
-              win.navigator.share({ title: label('share_results'), text: label('share_text', { store: state.config.shopName || '', query: raw.trim() }), url: data.url })
-                .catch(function () { /* closed by the shopper */ });
-              return;
-            }
-            copyText(data.url, copied);
-          });
+          if (choice === 'more') {
+            win.navigator.share({ title: label('share_results'), text: label('share_text', { store: state.config.shopName || '', query: raw.trim() }), url: link() })
+              .catch(function () { /* closed by the shopper */ });
+            return;
+          }
+          copyText(link(), copied);
         });
       }
 
@@ -5174,7 +5228,7 @@
           }
           var ask = one ? null : aiShareRow(raw, function () {
             return viewOf(pool, picked).map(function (record) { return String(record.id).slice(2); });
-          });
+          }, picked);
           if (ask) {
             barAt.appendChild(ask);
           }
@@ -6321,8 +6375,25 @@
     } else {
       win.setTimeout(shortlistStart, 1200);
     }
+    // A shared link (storeLink): the results open, with their filters, on the store's own page.
+    var shared = null;
+    try {
+      shared = new URLSearchParams(win.location.search);
+    } catch (e) {
+      shared = null;
+    }
+    var sharedQuery = shared ? String(shared.get('la_q') || '').trim().slice(0, 120) : '';
+    if (sharedQuery) {
+      load().then(function (data) {
+        if (data) {
+          forceRegular = true;
+          chooseFromLink(sharedQuery, shared.get('la_f'));
+          openPanel(sharedQuery, true);
+        }
+      });
+    }
     // The store's own search page: our regular results over it, when the shop wants them there.
-    var searched = searchPageQuery();
+    var searched = sharedQuery ? null : searchPageQuery();
     if (searched) {
       load().then(function (data) {
         if (data && state.config.resultsPage) {

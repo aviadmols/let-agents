@@ -115,6 +115,10 @@ final class ShareSearchTest extends TestCase
         $json = $this->getJson($path.'?format=json')->assertOk()->json();
         $this->assertSame(['טבעת סוליטר', 'טבעת יוקרה'], array_column($json['products'], 'title'), 'the products the shopper saw, in their order');
         $this->assertSame('for_ai', array_key_first($json), 'the instructions come first');
+        $this->assertSame(['find', 'compare', 'project', 'order', 'missing'], array_keys($json['tasks']), 'then how to do what a shopper asks');
+        $this->assertStringContainsString('/api/v1/mcp/'.$this->site, $json['mcp']['url'], 'and the connector, for an AI that calls tools');
+        $this->assertStringContainsString('לעולם אל תיצור', implode(' ', $json['for_ai']), 'never a picture of its own');
+        $this->assertStringContainsString($sent['url'].'?format=json', $sent['prompt'], 'the AI is sent the JSON');
         $this->assertStringContainsString('סיים כל תשובה', implode(' ', $json['for_ai']));
         $this->assertSame('זהב לבן', $json['products'][0]['details']['מתכת']);
         $this->assertSame('https://www.rings.test/?add-to-cart=1&variation_id=11', $json['products'][0]['options'][0]['buy_url']);
@@ -183,6 +187,27 @@ final class ShareSearchTest extends TestCase
         Features::override('search.agent_connector', false, $this->shop->id);
         Cache::flush();
         $this->get("/c/{$this->site}")->assertNotFound();
+    }
+
+    public function test_a_woocommerce_store_that_takes_checkout_links_gets_every_product_in_one_link_to_checkout(): void
+    {
+        // WooCommerce 9.9+: /checkout-link/ sends on to the cart.
+        Http::fake(['www.rings.test/checkout-link/' => Http::response('', 302, ['Location' => 'https://www.rings.test/cart/?wc_error=empty'])]);
+        Cache::flush();
+
+        // One option, several products: one link to checkout with all of them, an option by its own id.
+        $this->get("/c/{$this->site}/cart?items=1/11:2,3/31:1")->assertRedirect('https://www.rings.test/checkout-link/?products=11:2,31:1');
+        $json = $this->getJson("/c/{$this->site}?format=json&q=".rawurlencode('טבעת סוליטר'))->json();
+        $this->assertSame('https://www.rings.test/checkout-link/?products=11:1', $json['products'][0]['options'][0]['buy_url']);
+
+    }
+
+    public function test_a_woocommerce_store_without_checkout_links_gets_the_add_to_cart_link(): void
+    {
+        Http::fake(['www.rings.test/checkout-link/' => Http::response('', 404)]);
+        Cache::flush();
+
+        $this->get("/c/{$this->site}/cart?items=1/11:2")->assertRedirect('https://www.rings.test/?add-to-cart=1&variation_id=11&quantity=2');
     }
 
     public function test_the_order_an_ai_put_together_is_one_link_to_the_stores_checkout(): void

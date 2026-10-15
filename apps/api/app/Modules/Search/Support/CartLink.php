@@ -4,6 +4,7 @@ namespace App\Modules\Search\Support;
 
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -13,8 +14,10 @@ use Throwable;
  * detail is ever asked for.
  *
  * Shopify: one cart permalink for every item (/cart/{variant}:{qty},…), marked as coming from an
- * AI (cart attribute la_source=ai). A product without options has its one variant read live from
- * its public product page. WooCommerce: one add-to-cart link per item.
+ * AI (cart attribute la_source=ai). A product without options has its one variant from the sync,
+ * or read live from its public product page. WooCommerce: one checkout link for every item
+ * (/checkout-link/?products={id}:{qty},…, an option by its own id), where the store has them
+ * (WooCommerce 9.9 and later); otherwise an add-to-cart link per item.
  * Inside the shop's tenant.
  */
 final class CartLink
@@ -23,13 +26,16 @@ final class CartLink
 
     public const MAX_QUANTITY = 20;
 
+    /** How long a store's answer to "do you take checkout links?" is kept. */
+    private const PROBE_SECONDS = 86400;
+
     /**
      * @param  list<array<string, mixed>>  $items  each {product, variant?, quantity?}
      * @return array{url: string|null, links: list<array{product: string, url: string}>, problems: list<array{product: string, problem: string, options?: list<array{id: string, title: string, in_stock: bool}>}>}
      */
     public static function build(StoreConnection $connection, array $items): array
     {
-        $base = rtrim((string) $connection->site_url, '/');
+        $store = self::store($connection);
         $lines = [];
         $links = [];
         $problems = [];
@@ -57,7 +63,7 @@ final class CartLink
                 continue;
             }
 
-            if ($connection->platform === 'shopify') {
+            if ($store['platform'] === 'shopify') {
                 $variant = $variant !== '' ? $variant : ((string) (((array) $product->payload)['variant_id'] ?? '') ?: self::onlyVariant($product));
                 if ($variant === null) {
                     $problems[] = ['product' => $productId, 'problem' => 'not_available'];
@@ -65,27 +71,30 @@ final class CartLink
                     continue;
                 }
                 $lines[] = $variant.':'.$quantity;
-                $links[] = ['product' => $productId, 'url' => (string) self::buyUrl(['platform' => 'shopify', 'url' => $base], $productId, $variant, $quantity)];
-
-                continue;
+            } elseif ($store['checkout_link']) {
+                // An option is bought by its own id.
+                $lines[] = ($variant !== '' ? $variant : $productId).':'.$quantity;
             }
 
-            $links[] = ['product' => $productId, 'url' => (string) self::buyUrl(['platform' => (string) $connection->platform, 'url' => $base], $productId, $variant ?: null, $quantity)];
+            $links[] = ['product' => $productId, 'url' => (string) self::buyUrl($store, $productId, $variant ?: null, $quantity)];
         }
 
-        $url = $connection->platform === 'shopify'
-            ? ($lines === [] ? null : $base.'/cart/'.implode(',', $lines).'?attributes[la_source]=ai')
-            : ($links[0]['url'] ?? null);
+        $url = match (true) {
+            $lines === [] => $links[0]['url'] ?? null,
+            $store['platform'] === 'shopify' => $store['url'].'/cart/'.implode(',', $lines).'?attributes[la_source]=ai',
+            default => $store['url'].'/checkout-link/?products='.implode(',', $lines),
+        };
 
         return ['url' => $url, 'links' => $links, 'problems' => $problems];
     }
 
     /**
-     * The link that buys one product (or one of its options) at once: on Shopify the store's
-     * checkout with it already in the cart, marked as from an AI; on WooCommerce the store with it
-     * added to the cart. Null on Shopify without a variant to buy. No request is made.
+     * The link that buys one product (or one of its options) at once: the store's checkout with it
+     * already in the cart (Shopify, marked as from an AI; WooCommerce with checkout links), or the
+     * store with it added to the cart (an older WooCommerce). Null on Shopify without a variant
+     * to buy. No request is made.
      *
-     * @param  array{platform: string, url: string}  $store
+     * @param  array{platform: string, url: string, checkout_link?: bool}  $store
      */
     public static function buyUrl(array $store, string $productId, ?string $variantId, int $quantity = 1): ?string
     {
@@ -96,7 +105,46 @@ final class CartLink
             return $variantId === null || $variantId === '' ? null : $base.'/cart/'.$variantId.':'.$quantity.'?attributes[la_source]=ai';
         }
 
+        if ($store['checkout_link'] ?? false) {
+            return $base.'/checkout-link/?products='.($variantId ?: $productId).':'.$quantity;
+        }
+
         return $base.'/?'.http_build_query(array_filter(['add-to-cart' => $productId, 'variation_id' => $variantId ?: null, 'quantity' => $quantity > 1 ? $quantity : null]));
+    }
+
+    /** @return array{platform: string, url: string, checkout_link: bool} */
+    public static function store(StoreConnection $connection): array
+    {
+        return [
+            'platform' => (string) $connection->platform,
+            'url' => rtrim((string) $connection->site_url, '/'),
+            'checkout_link' => self::takesCheckoutLinks($connection),
+        ];
+    }
+
+    /**
+     * Whether a WooCommerce store takes checkout links (9.9 and later): asked once a day. One that
+     * does sends /checkout-link/ on to its cart; one that does not has no such page.
+     */
+    public static function takesCheckoutLinks(StoreConnection $connection): bool
+    {
+        if ($connection->platform === 'shopify' || (string) $connection->site_url === '') {
+            return false;
+        }
+
+        $base = rtrim((string) $connection->site_url, '/');
+
+        return (bool) Cache::remember('cart:checkout-link:'.hash('sha256', $base), self::PROBE_SECONDS, function () use ($base): bool {
+            try {
+                $response = Http::withoutRedirecting()->timeout(6)->connectTimeout(3)->get($base.'/checkout-link/');
+            } catch (Throwable) {
+                return false;
+            }
+
+            $to = rtrim((string) $response->header('Location'), '/');
+
+            return $response->redirect() && $to !== '' && $to !== $base && ! str_starts_with($to, $base.'/?');
+        });
     }
 
     /** The one variant of a Shopify product without options, from its public product page, when it can be bought. */

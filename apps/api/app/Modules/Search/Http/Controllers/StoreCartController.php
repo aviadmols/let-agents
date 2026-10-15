@@ -41,7 +41,7 @@ final class StoreCartController
         }
 
         // Everything chosen, and one link holds it all: to the checkout.
-        if ($cart['url'] !== null && $cart['problems'] === [] && ($store['platform'] === 'shopify' || count($cart['links']) === 1)) {
+        if ($cart['url'] !== null && $cart['problems'] === [] && ($store['platform'] === 'shopify' || ($store['checkout_link'] ?? false) || count($cart['links']) === 1)) {
             return redirect()->away($cart['url'], 302, $headers);
         }
 
