@@ -1,0 +1,134 @@
+<?php
+
+namespace App\Modules\Search\Tests;
+
+use App\Core\Facades\Features;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactOrigin;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Models\SearchShare;
+use App\Modules\Search\Support\LoadedIndex;
+use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * A shopper's search handed to their own AI: a short link to the words, what they were read as,
+ * the products with what the store approved of them and the store's policies, as a page an AI
+ * reads and as JSON. No model, nothing about the shopper, never indexed.
+ */
+final class ShareSearchTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const TOKEN = 'lat_8888888888888888888888888888888888888888888888888';
+
+    private const ORIGIN = ['Origin' => 'https://www.rings.test'];
+
+    private Shop $shop;
+
+    private string $site;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        LoadedIndex::forget();
+        $this->shop = Shop::factory()->create(['name' => 'טבעות ושות׳', 'content_locale' => 'he']);
+        Features::override('search.semantic', false, $this->shop->id);
+        Features::override('search.pictures', false, $this->shop->id);
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $this->shop->id, 'site_url' => 'https://www.rings.test', 'access_token' => self::TOKEN]));
+        $this->site = SiteKeys::site(self::TOKEN);
+
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $vocabulary = EnrichmentVocabulary::query()->create(['shop_id' => $this->shop->id, 'key' => 'jewelry', 'version' => 1, 'root_category_external_id' => '*', 'active' => true, 'definition_hash' => 'h',
+                'definition' => ['schema_version' => 1, 'key' => 'jewelry', 'name' => ['he' => 'תכשיטים', 'en' => 'Jewelry'], 'root_category_external_id' => '*',
+                    'product_types' => [['key' => 'ring', 'label' => ['he' => 'טבעת', 'en' => 'Ring']]],
+                    'attributes' => [['key' => 'metal', 'type' => 'enum', 'label' => ['he' => 'מתכת', 'en' => 'Metal'], 'values' => [
+                        ['key' => 'white_gold', 'label' => ['he' => 'זהב לבן', 'en' => 'White gold']], ['key' => 'yellow_gold', 'label' => ['he' => 'זהב צהוב', 'en' => 'Yellow gold']]]]]]]);
+
+            foreach ([['1', 'טבעת סוליטר', 2400, 'white_gold'], ['2', 'טבעת וינטג׳', 1800, 'yellow_gold'], ['3', 'טבעת יוקרה', 9000, 'white_gold']] as [$id, $title, $price, $metal]) {
+                $product = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'variable', 'status' => 'publish', 'title' => $title,
+                    'url' => "https://www.rings.test/p/{$id}", 'image_url' => "https://cdn.rings.test/{$id}.jpg", 'price' => $price, 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}",
+                    'synced_at' => now(), 'payload' => ['description' => '<p>טבעת עבודת יד.</p>', 'variations' => [
+                        ['external_id' => "{$id}1", 'title' => 'מידה 6', 'price' => ['price' => (string) $price], 'stock' => ['in_stock' => true]],
+                        ['external_id' => "{$id}2", 'title' => 'מידה 7', 'price' => ['price' => (string) $price], 'stock' => ['in_stock' => false]],
+                    ]]]);
+                foreach ([[FactKind::Type, 'type', 'ring'], [FactKind::Choice, 'metal', $metal]] as $i => [$kind, $key, $value]) {
+                    EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'vocabulary_id' => $vocabulary->id, 'kind' => $kind, 'key' => $key,
+                        'value_text' => $value, 'origin' => FactOrigin::Code, 'status' => FactStatus::Approved, 'input_hash' => "f{$id}{$i}"]);
+                }
+            }
+
+            $returns = CatalogContent::query()->create(['shop_id' => $this->shop->id, 'type' => 'page', 'external_id' => 'policy-1', 'title' => 'מדיניות החזרות', 'url' => 'https://www.rings.test/policies/refund', 'body' => 'ניתן להחזיר תוך 14 יום.', 'hash' => 'p']);
+            EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'content_id' => $returns->id, 'kind' => FactKind::Promise, 'key' => 'returns', 'value_text' => '14 יום',
+                'quote' => 'ניתן להחזיר תוך 14 יום.', 'origin' => FactOrigin::Code, 'status' => FactStatus::Approved, 'input_hash' => 'pr']);
+        });
+
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+    }
+
+    public function test_a_search_is_handed_to_the_shoppers_ai_as_a_page_it_reads_and_nothing_else(): void
+    {
+        $this->assertTrue($this->getJson("/api/v1/search/{$this->site}/index", self::ORIGIN)->assertOk()->json('config.aiShare'), 'the script shows the button');
+
+        $sent = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],
+            json_encode(['q' => 'טבעת זהב לבן עד 3000 ש"ח', 'ids' => ['1', '3', 'nope'], 'locale' => 'he']))->assertCreated()->json();
+
+        $this->assertMatchesRegularExpression('#/s/[a-z0-9]{12}$#', $sent['url']);
+        $this->assertStringContainsString($sent['url'], $sent['prompt']);
+        $this->assertStringContainsString('טבעות ושות׳', $sent['prompt']);
+        $this->assertSame('https://chatgpt.com/?q='.rawurlencode($sent['prompt']), $sent['open']['chatgpt']);
+        $this->assertStringStartsWith('https://claude.ai/new?q=', $sent['open']['claude']);
+
+        $again = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],
+            json_encode(['q' => 'טבעת זהב לבן עד 3000 ש"ח', 'ids' => ['1', '3']]))->json();
+        $this->assertSame($sent['url'], $again['url'], 'the same search and products: one link');
+
+        $path = (string) parse_url($sent['url'], PHP_URL_PATH);
+        $page = $this->get($path)->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $page->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
+            ->assertSee('זהב לבן')->assertSee('₪2,400')->assertSee('עד ₪3,000')->assertSee('מתכת: זהב לבן')
+            ->assertSee('מידה 7 – ₪2,400 (אזל מהמלאי)')->assertSee('ניתן להחזיר תוך 14 יום.')->assertSee('https://www.rings.test/policies/refund')
+            ->assertSee('application/ld+json', false)->assertSee('"@type":"Product"', false);
+
+        $json = $this->getJson($path.'?format=json')->assertOk()->json();
+        $this->assertSame(['טבעת סוליטר', 'טבעת יוקרה'], array_column($json['products'], 'title'), 'the products the shopper saw, in their order');
+        $this->assertSame(['זהב לבן'], $json['products'][0]['details']['מתכת']);
+        $this->assertSame(3000.0, (float) $json['read']['max_price']);
+        $this->assertArrayNotHasKey('vid', $json);
+
+        $share = app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->sole());
+        $this->assertSame(2, $share->opens);
+    }
+
+    public function test_without_products_the_words_find_them_and_an_expired_link_says_so(): void
+    {
+        $sent = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],
+            json_encode(['q' => 'טבעת וינטג']))->assertCreated()->json();
+        $path = (string) parse_url($sent['url'], PHP_URL_PATH);
+        $this->get($path)->assertOk()->assertSee('טבעת וינטג׳');
+
+        app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->update(['expires_at' => now()->subMinute()]));
+        $this->get($path)->assertStatus(410)->assertSee('הקישור הזה פג');
+        $this->get('/s/nosuchtoken1')->assertNotFound();
+    }
+
+    public function test_off_for_a_shop_or_from_another_site_nothing_is_made(): void
+    {
+        $body = json_encode(['q' => 'טבעת']);
+        $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://evil.test', 'CONTENT_TYPE' => 'text/plain'], $body)->assertForbidden();
+
+        Features::override('search.ai_share', false, $this->shop->id);
+        $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'], $body)->assertNotFound();
+        $this->assertSame(0, app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->count()));
+    }
+}

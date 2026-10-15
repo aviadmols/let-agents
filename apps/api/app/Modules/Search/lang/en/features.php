@@ -33,6 +33,10 @@ return [
         'label' => 'Tag bank on pages',
         'description' => 'At night, for every product and guide: a model writes tags such as "materials for building a deck" or "deck screws", the search checks there is something to show, and a model from another family checks each tag against what it shows. Needed for the tag bank view of the on-page module.',
     ],
+    'ai_share' => [
+        'label' => 'Ask my own AI about this search',
+        'description' => 'In the search results: a button that hands the search, the products with their details and the store\'s policies to the shopper\'s own ChatGPT, Claude or Perplexity, in a short link. The shopper takes advice there, and the purchase stays on the store. No model, no cost, and nothing about the shopper.',
+    ],
     'similar' => [
         'label' => 'Similar items in the results',
         'description' => 'A button on every product in the results. By picture where the pictures are scanned, and by the meaning of the product name and description otherwise. From vectors that already exist, with no model and no cost.',

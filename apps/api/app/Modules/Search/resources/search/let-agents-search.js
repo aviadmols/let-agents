@@ -2054,6 +2054,12 @@
       '.la-read{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 0 10px}',
       '.la-read .d-chip{display:inline-flex;align-items:center;gap:8px;font-weight:600;padding:6px 14px}',
       '.la-read .d-chip span{font-size:15px;line-height:1;opacity:.85}',
+      // "Ask my AI": one button, then where to send the search.
+      '.la-ai{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 12px}',
+      '.la-ai-open{font-weight:600}',
+      '.la-ai-menu{display:flex;flex-wrap:wrap;align-items:center;gap:8px}',
+      '.la-ai-menu[hidden]{display:none}',
+      '.la-ai-note{font-size:12.5px;opacity:.7;flex-basis:100%}',
       '.la-focus p{margin:0;font-size:14px;line-height:1.5}',
       '.la-focus-row{display:flex;flex-wrap:wrap;gap:8px}',
       'a.d-chip{color:inherit;text-decoration:none}',
@@ -2780,6 +2786,86 @@
 
     function shekels(amount) {
       return '₪' + Number(amount).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    }
+
+    var SHARED = {};
+
+    /** The search handed to the shopper's own AI: a short link, the words to send, where to open them. Once per search and products. */
+    function shareSearch(raw, ids) {
+      var key = normalize(raw) + '|' + ids.join(',');
+      if (!SHARED[key]) {
+        SHARED[key] = win.fetch(API + '/search/' + encodeURIComponent(ctx.site) + '/share', {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ q: raw, ids: ids.slice(0, 24), locale: LOCALE })
+        }).then(function (response) { return response.ok ? response.json() : null; })
+          .catch(function () { return null; })
+          .then(function (data) {
+            if (!data) {
+              delete SHARED[key];
+            }
+            return data;
+          });
+      }
+      return SHARED[key];
+    }
+
+    /**
+     * "Ask my AI" above the results: one button, then ChatGPT, Claude, Perplexity or a link to
+     * copy. The products sent are the ones shown, as filtered (ids() at the press). The AI's tab
+     * opens at the press, so no popup blocker stops it, and goes to the AI when the link is ready.
+     */
+    function aiShareRow(raw, ids) {
+      if (!state.config.aiShare) {
+        return null;
+      }
+      var row = el('div', 'la-ai');
+      row.setAttribute('data-ai-share', '');
+      var open = el('button', 'd-chip la-ai-open', '\u2726 ' + label('ai_share'));
+      open.type = 'button';
+      open.setAttribute('aria-expanded', 'false');
+      var menu = el('div', 'la-ai-menu');
+      menu.hidden = true;
+      var note = el('span', 'la-ai-note', label('ai_share_help'));
+      open.addEventListener('click', function () {
+        menu.hidden = !menu.hidden;
+        open.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+      });
+      [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['perplexity', 'Perplexity'], ['copy', label('ai_copy')]].forEach(function (choice) {
+        var button = el('button', 'd-chip', choice[1]);
+        button.type = 'button';
+        button.setAttribute('data-ai', choice[0]);
+        button.addEventListener('click', function () {
+          var tab = choice[0] === 'copy' ? null : win.open('about:blank', '_blank');
+          shareSearch(raw, ids()).then(function (data) {
+            if (!data) {
+              if (tab) {
+                tab.close();
+              }
+              note.textContent = label('ai_failed');
+              return;
+            }
+            if (tab) {
+              tab.opener = null;
+              tab.location.href = data.open[choice[0]];
+              return;
+            }
+            var done = function () { note.textContent = label('ai_copied'); };
+            if (win.navigator.clipboard && win.navigator.clipboard.writeText) {
+              win.navigator.clipboard.writeText(data.prompt).then(done, function () { win.prompt(label('ai_copy'), data.url); });
+            } else {
+              win.prompt(label('ai_copy'), data.url);
+            }
+          });
+        });
+        menu.appendChild(button);
+      });
+      menu.appendChild(note);
+      row.appendChild(open);
+      row.appendChild(menu);
+      return row;
     }
 
     /**
@@ -5023,6 +5109,12 @@
           showing = page;
           while (barAt.firstChild) {
             barAt.removeChild(barAt.firstChild);
+          }
+          var ask = one ? null : aiShareRow(raw, function () {
+            return viewOf(pool, picked).map(function (record) { return String(record.id).slice(2); });
+          });
+          if (ask) {
+            barAt.appendChild(ask);
           }
           var read = one ? null : readRow(raw, picked, function (left) { openPanel(left); }, refresh);
           if (read) {

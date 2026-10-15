@@ -12,6 +12,7 @@ use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchPhotoAsk;
+use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\StoredPageTags;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -144,7 +145,9 @@ final class SearchCommand extends Command
         // days (the small thumbnail, what was seen, the tags and the results stay). The marked ones keep
         // the photo too, as the check set every change to photo search is measured against.
         $photos = SearchPhotoAsk::query()->whereNull('verdict')->whereNotNull('photo')->where('created_at', '<', now()->subDays((int) Settings::get('search.photo_keep_days')))->update(['photo' => null]);
-        $this->line("Pruned {$terms} query rows and {$clicks} click rows before {$before}; let go of {$photos} full photos.");
+        // A search handed to a shopper's AI: gone a day after its link expires.
+        $shares = SearchShare::query()->withoutGlobalScopes()->where('expires_at', '<', now()->subDay())->delete();
+        $this->line("Pruned {$terms} query rows and {$clicks} click rows before {$before}; let go of {$photos} full photos and {$shares} shared searches.");
 
         return self::SUCCESS;
     }

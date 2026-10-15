@@ -6,6 +6,7 @@ use App\Modules\Search\Http\Controllers\SearchEventsController;
 use App\Modules\Search\Http\Controllers\SearchIndexController;
 use App\Modules\Search\Http\Controllers\SearchPhotoController;
 use App\Modules\Search\Http\Controllers\SearchScriptController;
+use App\Modules\Search\Http\Controllers\ShareController;
 use App\Modules\Search\Http\Controllers\SimilarController;
 use App\Modules\Search\Http\Controllers\SizeHelpController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,7 @@ Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/sizes', SizeHelpController::class)->name('api.search.sizes');
     Route::get('search/{site}', SearchController::class)->name('api.search.query');
     Route::post('search/{site}/events', SearchEventsController::class)->name('api.search.events');
+    Route::post('search/{site}/share', ShareController::class)->name('api.search.share');
 });
 
 // A photo costs one picture embedding, so it has its own, tighter bucket.

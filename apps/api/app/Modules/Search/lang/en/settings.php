@@ -50,6 +50,14 @@ return [
         'label' => 'Minimum length for search by meaning',
         'description' => 'A shorter query is searched by spelling only.',
     ],
+    'ai_share_days' => [
+        'label' => 'Days a search shared with an AI stays open',
+        'description' => 'Then the link says it expired, and a day later it is deleted.',
+    ],
+    'ai_share_products' => [
+        'label' => 'Products in a search shared with an AI',
+        'description' => 'The first ones the shopper saw, each with its details, sizes and price.',
+    ],
     'requests_per_minute' => [
         'label' => 'Search requests per minute',
         'description' => 'Per IP address and site. Protects against floods.',

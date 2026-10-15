@@ -52,6 +52,10 @@
             "default": true
         },
         {
+            "name": "ai_share",
+            "default": true
+        },
+        {
             "name": "size_alternatives",
             "default": false
         },
@@ -177,6 +181,24 @@
             "max": 50,
             "scope": "global",
             "unit": "characters"
+        },
+        {
+            "name": "ai_share_days",
+            "type": "int",
+            "default": 7,
+            "min": 1,
+            "max": 30,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
+            "name": "ai_share_products",
+            "type": "int",
+            "default": 12,
+            "min": 1,
+            "max": 24,
+            "scope": "shop",
+            "unit": "products"
         },
         {
             "name": "requests_per_minute",

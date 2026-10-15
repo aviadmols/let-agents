@@ -1,0 +1,31 @@
+<?php
+
+return [
+    // The words sent to the shopper's AI with the link.
+    'ask' => 'I am thinking about buying from :store. The link has my search, the products I found with their details, and the store\'s policies: :url . Please read the page, help me compare and choose what suits me, and ask me what you need to know. Prices and stock are as of the time on the page; check the product page before buying.',
+    'title' => 'A search at :store: ":query"',
+    'title_no_query' => 'Products from :store',
+    'intro' => 'A shopper sent this search to their own AI to take advice before buying. The information is the store\'s own. Prices and stock as of :time; the purchase itself is made on the store\'s product page.',
+    'for_ai' => 'For the AI: every product here is the store\'s, with the details the store approved. Do not invent details that are not written. When a detail is missing, say so and suggest asking the store. Price and stock may change: point to the product page before buying. The same as JSON: :json',
+    'read' => 'What the search understood',
+    'up_to' => 'Up to :amount',
+    'from' => 'From :amount',
+    'between' => ':min to :max',
+    'products' => 'The products (:count)',
+    'price' => 'Price',
+    'was' => 'instead of :amount',
+    'in_stock' => 'In stock',
+    'out_of_stock' => 'Out of stock',
+    'brand' => 'Brand',
+    'sku' => 'SKU',
+    'details' => 'Details',
+    'variants' => 'Options',
+    'description' => 'Description',
+    'to_product' => 'The product page at the store',
+    'policies' => 'The store\'s policies',
+    'policy_pages' => 'The full policy pages',
+    'none' => 'No products were found for this search.',
+    'gone' => 'This link has expired or does not exist.',
+    'gone_help' => 'Search again on the store\'s site and send a new link.',
+    'by' => 'Prepared by Lets Search',
+];
