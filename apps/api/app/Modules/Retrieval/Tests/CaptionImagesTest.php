@@ -82,4 +82,13 @@ final class CaptionImagesTest extends TestCase
         $near = app(TenantContext::class)->run($shop->id, fn () => app(PictureContent::class)->picturesNearWords($shop->id, 'מברגה', 5));
         $this->assertSame('1', $near[0]['external_id'], 'the drill is found by what its picture shows');
     }
+
+    public function test_a_stone_is_never_named_in_the_words_of_how_a_picture_looks(): void
+    {
+        $words = ['טבעת', 'רובי', 'אבן אדומה', 'יהלומים קטנים', 'Diamond', 'אבן לבנה חלבית', 'בלו טופז', 'זהב צהוב', 'רוביקון'];
+        $kept = array_values(array_filter($words, fn (string $w): bool => preg_match(CaptionImages::STONE_NAMES, $w) !== 1));
+
+        $this->assertSame(['טבעת', 'אבן אדומה', 'אבן לבנה חלבית', 'זהב צהוב', 'רוביקון'], $kept, 'by colour and look; a word that only starts like a stone stays');
+        $this->assertSame(4, CaptionImages::PROMPT_VERSION, 'every picture is described again in plain words');
+    }
 }

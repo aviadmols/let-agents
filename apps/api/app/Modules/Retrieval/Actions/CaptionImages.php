@@ -38,7 +38,11 @@ final class CaptionImages implements CaptionsPictures
 
     public const ACTION = 'retrieval.caption_images';
 
-    public const PROMPT_VERSION = 3;
+    /** 4: stones by colour, light and shape, never by name: a photo cannot tell a ruby from a garnet. */
+    public const PROMPT_VERSION = 4;
+
+    /** Names of stones and gems, in Hebrew and English: never a word of how a picture looks. */
+    public const STONE_NAMES = '/(?<![\p{L}])(?:רובי|אופל|ספיר|אמרלד|אזמרגד|טופז|בלו טופז|יהלום|יהלומים|זירקון|פנינה|פנינים|אקוומרין|אמטיסט|גרנט|טורמלין|ציטרין|פרידוט|טנזנייט|מורגנייט|אוניקס|טורקיז|ג\'ייד|לאפיס|מוסניט|ruby|opal|sapphire|emerald|topaz|diamonds?|zircon|pearls?|aquamarine|amethyst|garnet|tourmaline|citrine|peridot|tanzanite|morganite|onyx|turquoise|jade|lapis|moissanite)(?![\p{L}])/iu';
 
     private const BATCH = 16;
 
@@ -143,10 +147,11 @@ Describe this product photo.';
                     $stats['cost_usd'] += $cost;
 
                     $caption = trim(mb_substr((string) ($reply->data['caption'] ?? ''), 0, 500));
+                    // A stone's name is never a look: a word that names one is left out, whatever the model wrote.
                     $words = array_values(array_unique(array_filter(array_map(
                         fn ($w): string => trim(mb_substr(is_string($w) ? $w : '', 0, 40)),
                         array_slice((array) ($reply->data['words'] ?? []), 0, self::MAX_WORDS),
-                    ))));
+                    ), fn (string $w): bool => $w !== '' && preg_match(self::STONE_NAMES, $w) !== 1)));
 
                     if ($caption === '' && $words === []) {
                         $stats['skipped']++;
