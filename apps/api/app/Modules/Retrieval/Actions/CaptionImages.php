@@ -43,8 +43,9 @@ final class CaptionImages implements CaptionsPictures
      * 4: stones by colour, light and shape, never by name: a photo cannot tell a ruby from a garnet.
      * 5: more of how it looks: the metal's colour in two words, every colour as a word of its own,
      * the finish and the style; up to 18 words.
+     * 6: the same care for clothes, shoes, bags and accessories, furniture and the rest.
      */
-    public const PROMPT_VERSION = 5;
+    public const PROMPT_VERSION = 6;
 
     private const BATCH = 16;
 

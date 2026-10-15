@@ -89,6 +89,6 @@ final class CaptionImagesTest extends TestCase
         $kept = array_values(array_filter($words, fn (string $w): bool => preg_match(CaptionImages::STONE_NAMES, $w) !== 1));
 
         $this->assertSame(['טבעת', 'אבן אדומה', 'אבן לבנה חלבית', 'זהב צהוב', 'רוביקון'], $kept, 'by colour and look; a word that only starts like a stone stays');
-        $this->assertSame(5, CaptionImages::PROMPT_VERSION, 'every picture is described again in plain words');
+        $this->assertSame(6, CaptionImages::PROMPT_VERSION, 'every picture is described again in plain words');
     }
 }
