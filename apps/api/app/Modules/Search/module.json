@@ -60,6 +60,10 @@
             "default": true
         },
         {
+            "name": "share_results",
+            "default": true
+        },
+        {
             "name": "size_alternatives",
             "default": false
         },

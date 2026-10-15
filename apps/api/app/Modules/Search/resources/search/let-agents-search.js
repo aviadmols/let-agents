@@ -2812,62 +2812,124 @@
       return SHARED[key];
     }
 
+    /** Copies text; when the page may not, shows it to copy by hand. */
+    function copyText(text, done) {
+      if (win.navigator.clipboard && win.navigator.clipboard.writeText) {
+        win.navigator.clipboard.writeText(text).then(done, function () { win.prompt(label('ai_copy'), text); });
+      } else {
+        win.prompt(label('ai_copy'), text);
+      }
+    }
+
     /**
-     * "Ask my AI" above the results: one button, then ChatGPT, Claude, Perplexity or a link to
-     * copy. The products sent are the ones shown, as filtered (ids() at the press). The AI's tab
-     * opens at the press, so no popup blocker stops it, and goes to the AI when the link is ready.
+     * Above the results: "Ask my AI" (ChatGPT, Claude, Perplexity, or a link to copy) and "Share
+     * the results" (WhatsApp, a link to copy, or the phone's own share sheet). Both send the same
+     * short link: the products shown, as filtered (ids() at the press). A new tab opens at the
+     * press, so no popup blocker stops it, and goes where it should when the link is ready.
      */
     function aiShareRow(raw, ids) {
-      if (!state.config.aiShare) {
+      var forAi = !!state.config.aiShare;
+      var forPeople = !!state.config.shareResults;
+      if (!forAi && !forPeople) {
         return null;
       }
       var row = el('div', 'la-ai');
       row.setAttribute('data-ai-share', '');
-      var open = el('button', 'd-chip la-ai-open', '\u2726 ' + label('ai_share'));
-      open.type = 'button';
-      open.setAttribute('aria-expanded', 'false');
-      var menu = el('div', 'la-ai-menu');
-      menu.hidden = true;
-      var note = el('span', 'la-ai-note', label('ai_share_help'));
-      open.addEventListener('click', function () {
-        menu.hidden = !menu.hidden;
-        open.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
-      });
-      [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['perplexity', 'Perplexity'], ['copy', label('ai_copy')]].forEach(function (choice) {
-        var button = el('button', 'd-chip', choice[1]);
-        button.type = 'button';
-        button.setAttribute('data-ai', choice[0]);
-        button.addEventListener('click', function () {
-          var tab = choice[0] === 'copy' ? null : win.open('about:blank', '_blank');
-          shareSearch(raw, ids()).then(function (data) {
-            if (!data) {
-              if (tab) {
-                tab.close();
-              }
-              note.textContent = label('ai_failed');
-              return;
-            }
+      var note = el('span', 'la-ai-note');
+      var menus = [];
+
+      var group = function (text, help, choices, go) {
+        var open = el('button', 'd-chip la-ai-open', text);
+        open.type = 'button';
+        open.setAttribute('aria-expanded', 'false');
+        var menu = el('div', 'la-ai-menu');
+        menu.hidden = true;
+        menus.push([open, menu]);
+        open.addEventListener('click', function () {
+          var show = menu.hidden;
+          menus.forEach(function (pair) { pair[1].hidden = true; pair[0].setAttribute('aria-expanded', 'false'); });
+          menu.hidden = !show;
+          open.setAttribute('aria-expanded', show ? 'true' : 'false');
+          note.textContent = show ? help : '';
+          // The link is made while the shopper chooses, so the phone's share sheet opens at once.
+          if (show) {
+            shareSearch(raw, ids());
+          }
+        });
+        choices.forEach(function (choice) {
+          var button = el('button', 'd-chip', choice[1]);
+          button.type = 'button';
+          button.setAttribute('data-share', choice[0]);
+          button.addEventListener('click', function () { go(choice[0]); });
+          menu.appendChild(button);
+        });
+        row.appendChild(open);
+        row.appendChild(menu);
+      };
+
+      // The tab opens now, inside the press; the link fills it when ready.
+      var openWith = function (address) {
+        var tab = win.open('about:blank', '_blank');
+        shareSearch(raw, ids()).then(function (data) {
+          if (!data) {
             if (tab) {
-              tab.opener = null;
-              tab.location.href = data.open[choice[0]];
+              tab.close();
+            }
+            note.textContent = label('ai_failed');
+            return;
+          }
+          if (tab) {
+            tab.opener = null;
+            tab.location.href = address(data);
+          }
+        });
+      };
+      var withLink = function (use) {
+        shareSearch(raw, ids()).then(function (data) {
+          if (!data) {
+            note.textContent = label('ai_failed');
+            return;
+          }
+          use(data);
+        });
+      };
+      var copied = function () { note.textContent = label('ai_copied'); };
+
+      if (forAi) {
+        group('\u2726 ' + label('ai_share'), label('ai_share_help'), [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['perplexity', 'Perplexity'], ['copy', label('ai_copy')]], function (choice) {
+          if (choice === 'copy') {
+            withLink(function (data) { copyText(data.prompt, copied); });
+            return;
+          }
+          openWith(function (data) { return data.open[choice]; });
+        });
+      }
+
+      if (forPeople) {
+        var words = function (data) { return label('share_text', { store: state.config.shopName || '', query: raw.trim() }) + ' ' + data.url; };
+        var choices = [['whatsapp', 'WhatsApp'], ['link', label('ai_copy')]];
+        if (typeof win.navigator.share === 'function') {
+          choices.push(['more', label('share_more')]);
+        }
+        group('\u2197 ' + label('share_results'), label('share_help'), choices, function (choice) {
+          if (choice === 'whatsapp') {
+            openWith(function (data) { return 'https://wa.me/?text=' + encodeURIComponent(words(data)); });
+            return;
+          }
+          withLink(function (data) {
+            if (choice === 'more') {
+              win.navigator.share({ title: label('share_results'), text: label('share_text', { store: state.config.shopName || '', query: raw.trim() }), url: data.url })
+                .catch(function () { /* closed by the shopper */ });
               return;
             }
-            var done = function () { note.textContent = label('ai_copied'); };
-            if (win.navigator.clipboard && win.navigator.clipboard.writeText) {
-              win.navigator.clipboard.writeText(data.prompt).then(done, function () { win.prompt(label('ai_copy'), data.url); });
-            } else {
-              win.prompt(label('ai_copy'), data.url);
-            }
+            copyText(data.url, copied);
           });
         });
-        menu.appendChild(button);
-      });
-      menu.appendChild(note);
-      row.appendChild(open);
-      row.appendChild(menu);
+      }
+
+      row.appendChild(note);
       return row;
     }
-
     /**
      * What the words were read as, above the results: the price range and the filters they name,
      * each a chosen chip with its ×. The × takes the words out of the box and searches again

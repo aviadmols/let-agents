@@ -43,6 +43,11 @@ final class SharePageController
         $connection = $tenant->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $share->shop_id)->first());
         $connector = $connection !== null && Features::enabled('search.agent_connector', $share->shop_id) ? route('api.search.mcp', ['site' => $connection->site_key]) : null;
 
-        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'json' => route('search.share', ['token' => $share->token, 'format' => 'json'])], 200, $headers);
+        // The same search on the store itself, for a person the link was sent to.
+        $base = rtrim((string) ($snapshot['store']['url'] ?? ''), '/');
+        $storeSearch = $base === '' || ($snapshot['query'] ?? '') === '' ? null
+            : (($snapshot['store']['platform'] ?? '') === 'shopify' ? $base.'/search?q='.rawurlencode($snapshot['query']) : $base.'/?s='.rawurlencode($snapshot['query']).'&post_type=product');
+
+        return response()->view('search::share', ['share' => $share, 's' => $snapshot, 'locale' => $locale, 'connector' => $connector, 'storeSearch' => $storeSearch, 'json' => route('search.share', ['token' => $share->token, 'format' => 'json'])], 200, $headers);
     }
 }

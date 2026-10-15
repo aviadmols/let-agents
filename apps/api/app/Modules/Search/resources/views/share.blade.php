@@ -11,7 +11,15 @@
     @if ($share === null)
         <title>{{ $t('gone') }}</title>
     @else
-        <title>{{ $s['query'] !== '' ? $t('title', ['store' => $s['store']['name'], 'query' => $s['query']]) : $t('title_no_query', ['store' => $s['store']['name']]) }}</title>
+        @php($heading = $s['query'] !== '' ? $t('title', ['store' => $s['store']['name'], 'query' => $s['query']]) : $t('title_no_query', ['store' => $s['store']['name']]))
+        <title>{{ $heading }}</title>
+        {{-- The preview WhatsApp, Facebook or a chat shows where the link is shared. --}}
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="{{ $heading }}">
+        <meta property="og:description" content="{{ $t('preview', ['count' => count($s['products']), 'store' => $s['store']['name']]) }}">
+        @if (! empty($s['products'][0]['image']))<meta property="og:image" content="{{ $s['products'][0]['image'] }}">@endif
+        <meta property="og:site_name" content="{{ $s['store']['name'] }}">
+        <meta name="twitter:card" content="summary_large_image">
         <script type="application/ld+json">{!! json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'ItemList',
@@ -52,6 +60,7 @@
         dd { margin: 0; }
         a { color: inherit; }
         footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+        .go { display: inline-block; background: var(--fg); color: var(--bg); text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 8px; margin: 4px 0 8px; }
         @media (max-width: 520px) { article { grid-template-columns: 1fr; } article img { width: 100%; height: auto; aspect-ratio: 1; } }
     </style>
 </head>
@@ -64,6 +73,7 @@
         @php($time = \Illuminate\Support\Carbon::parse($s['as_of'])->timezone('Asia/Jerusalem')->format('d.m.Y H:i'))
         <h1>{{ $s['query'] !== '' ? $t('title', ['store' => $s['store']['name'], 'query' => $s['query']]) : $t('title_no_query', ['store' => $s['store']['name']]) }}</h1>
         <p class="muted">{{ $t('intro', ['time' => $time]) }}</p>
+        @if ($storeSearch)<p><a class="go" href="{{ $storeSearch }}" rel="noopener">{{ $t('on_store', ['store' => $s['store']['name']]) }}</a></p>@endif
         <p class="ai">{{ $t('for_ai', ['json' => $json]) }}@if ($connector) {{ $t('connector', ['url' => $connector]) }}@endif</p>
 
         @php($read = $s['read'] ?? [])

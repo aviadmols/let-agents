@@ -32,7 +32,8 @@ final class ShareController
             return $connection;
         }
 
-        if (! Features::enabled('search.storefront', $connection->shop_id) || ! Features::enabled('search.ai_share', $connection->shop_id)) {
+        if (! Features::enabled('search.storefront', $connection->shop_id)
+            || (! Features::enabled('search.ai_share', $connection->shop_id) && ! Features::enabled('search.share_results', $connection->shop_id))) {
             return response()->json(['error' => 'share_off'], 404);
         }
 

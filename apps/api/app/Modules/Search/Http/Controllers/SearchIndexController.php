@@ -84,6 +84,8 @@ final class SearchIndexController
             'buttonColor' => self::color((string) Settings::get('search.button_color', $shopId)),
             // "Ask my AI": the search and its products, handed to the shopper's own AI in a link.
             'aiShare' => Features::enabled('search.ai_share', $shopId),
+            // "Share the results": the same link, to a friend.
+            'shareResults' => Features::enabled('search.share_results', $shopId),
         ];
         $labels = trans('search::storefront', [], $locale);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';

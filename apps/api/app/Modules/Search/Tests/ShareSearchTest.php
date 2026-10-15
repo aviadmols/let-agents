@@ -79,7 +79,9 @@ final class ShareSearchTest extends TestCase
 
     public function test_a_search_is_handed_to_the_shoppers_ai_as_a_page_it_reads_and_nothing_else(): void
     {
-        $this->assertTrue($this->getJson("/api/v1/search/{$this->site}/index", self::ORIGIN)->assertOk()->json('config.aiShare'), 'the script shows the button');
+        $config = $this->getJson("/api/v1/search/{$this->site}/index", self::ORIGIN)->assertOk()->json('config');
+        $this->assertTrue($config['aiShare'], 'the script shows the button for the AI');
+        $this->assertTrue($config['shareResults'], 'and the one for a friend');
 
         $sent = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],
             json_encode(['q' => 'טבעת זהב לבן עד 3000 ש"ח', 'ids' => ['1', '3', 'nope'], 'locale' => 'he']))->assertCreated()->json();
@@ -99,7 +101,12 @@ final class ShareSearchTest extends TestCase
         $page->assertSee('טבעת סוליטר')->assertSee('טבעת יוקרה')->assertDontSee('טבעת וינטג')
             ->assertSee('זהב לבן')->assertSee('₪2,400')->assertSee('עד ₪3,000')->assertSee('מתכת: זהב לבן')
             ->assertSee('מידה 7 – ₪2,400 (אזל מהמלאי)')->assertSee('ניתן להחזיר תוך 14 יום.')->assertSee('https://www.rings.test/policies/refund')
-            ->assertSee('application/ld+json', false)->assertSee('"@type":"Product"', false);
+            ->assertSee('application/ld+json', false)->assertSee('"@type":"Product"', false)
+            // Shared with a friend: a preview in the chat, and the way to the same search on the store.
+            ->assertSee('<meta property="og:title" content="חיפוש בטבעות ושות׳: &quot;טבעת זהב לבן עד 3000 ש&quot;ח&quot;">', false)
+            ->assertSee('<meta property="og:image" content="https://cdn.rings.test/1.jpg">', false)
+            ->assertSee('2 מוצרים מטבעות ושות׳')
+            ->assertSee('href="https://www.rings.test/?s='.rawurlencode('טבעת זהב לבן עד 3000 ש"ח').'&amp;post_type=product"', false);
 
         $json = $this->getJson($path.'?format=json')->assertOk()->json();
         $this->assertSame(['טבעת סוליטר', 'טבעת יוקרה'], array_column($json['products'], 'title'), 'the products the shopper saw, in their order');
@@ -128,7 +135,14 @@ final class ShareSearchTest extends TestCase
         $body = json_encode(['q' => 'טבעת']);
         $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://evil.test', 'CONTENT_TYPE' => 'text/plain'], $body)->assertForbidden();
 
+        // The AI's button off: sharing with a friend still makes links.
         Features::override('search.ai_share', false, $this->shop->id);
+        $this->assertFalse($this->getJson("/api/v1/search/{$this->site}/index", self::ORIGIN)->json('config.aiShare'));
+        $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'], $body)->assertCreated();
+        app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->delete());
+
+        // Both off: no link at all.
+        Features::override('search.share_results', false, $this->shop->id);
         $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'], $body)->assertNotFound();
         $this->assertSame(0, app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->count()));
     }

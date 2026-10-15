@@ -8,6 +8,8 @@ return [
     'intro' => 'A shopper sent this search to their own AI to take advice before buying. The information is the store\'s own. Prices and stock as of :time; the purchase itself is made on the store\'s product page.',
     'for_ai' => 'For the AI: every product here is the store\'s, with the details the store approved. Do not invent details that are not written. When a detail is missing, say so and suggest asking the store. Price and stock may change: point to the product page before buying. The same as JSON: :json',
     'connector' => 'For an AI that speaks MCP: the store can be added as a connector, to search it directly: :url',
+    'preview' => ':count products from :store',
+    'on_store' => 'This search at :store',
     'read' => 'What the search understood',
     'up_to' => 'Up to :amount',
     'from' => 'From :amount',

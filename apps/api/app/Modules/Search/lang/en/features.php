@@ -37,6 +37,10 @@ return [
         'label' => 'Ask my own AI about this search',
         'description' => 'In the search results: a button that hands the search, the products with their details and the store\'s policies to the shopper\'s own ChatGPT, Claude or Perplexity, in a short link. The shopper takes advice there, and the purchase stays on the store. No model, no cost, and nothing about the shopper.',
     ],
+    'share_results' => [
+        'label' => 'Share the search results',
+        'description' => 'In the search results: a button that sends the results to a friend on WhatsApp, as a link to copy or through the phone\'s share sheet. The link shows the products as filtered, and leads to the search on the store.',
+    ],
     'agent_connector' => [
         'label' => 'The store as a connector for the shopper\'s AI (MCP)',
         'description' => 'An address anyone adds to their Claude or ChatGPT as a connector: the AI searches the store, reads product details and policies, and makes a link to the store\'s own cart. Buying and paying stay on the store. No model of ours, no cost.',
