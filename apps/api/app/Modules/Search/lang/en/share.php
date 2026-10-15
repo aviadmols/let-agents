@@ -17,6 +17,7 @@ return [
     'guide_buy_shopify' => 'The "Buy now" link of a product or of the chosen option opens the store\'s checkout with it already in the cart. A product with options is bought from its option\'s link.',
     'guide_buy_woo' => 'The "Buy now" link of a product or of the chosen option adds it to the store\'s cart and opens the store. A product with options is bought from its option\'s link.',
     'guide_end' => 'Most important: every answer that recommends products ends with ONE order link holding all of them, written in that same answer, never later (you write it from the ids, as explained below; you never need to open anything for it). Before sending an answer that names products, check the link is in it. When a size or a colour must be chosen, ask first. Do not write an order letter to the store.',
+    'guide_shipping' => 'Shipping: never add a shipping cost to a total or an offer, and never guess one. Say that shipping is calculated at the store\'s checkout.',
     'guide_format' => 'Do all the work here, from this JSON alone: read the lines, choose, count quantities, add up the total and write the order link. Then write the shopper a short, clear answer in their language: each product with its name, price and why it fits; the total; and, as the last line, the order link.',
     'guide_rules' => 'Say only what is written here; when a detail is missing, say so. Prices and stock are as of :time and may change. Payment is made on the store: never ask for payment details.',
     'catalog_title' => 'Every product of :store',

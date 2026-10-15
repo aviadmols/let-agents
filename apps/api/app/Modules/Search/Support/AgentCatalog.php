@@ -59,6 +59,7 @@ final class AgentCatalog
             // What models drop most: the one link that buys. Early, with how an answer looks.
             $t('guide_end'),
             $t('guide_format'),
+            $t('guide_shipping'),
             $everything ? $t('guide_everything', ['store' => $store['name'] ?? '']) : ($catalog ? $t('guide_whole_store', ['url' => $catalog.'?format=json']) : null),
             $t('guide_products'),
             $shopify ? $t('guide_buy_shopify') : $t('guide_buy_woo'),
@@ -383,12 +384,12 @@ final class AgentCatalog
         $variants = [];
 
         foreach (array_slice((array) ($payload['variations'] ?? []), 0, self::MAX_VARIANTS) as $variant) {
-            if (! is_array($variant) || trim((string) ($variant['title'] ?? '')) === '') {
+            if (! is_array($variant) || CatalogProduct::variantLabel($variant) === '') {
                 continue;
             }
             $variants[] = array_filter([
                 'id' => (string) ($variant['external_id'] ?? ''),
-                'title' => (string) $variant['title'],
+                'title' => CatalogProduct::variantLabel($variant),
                 'price' => is_numeric($variant['price']['price'] ?? null) ? (float) $variant['price']['price'] : null,
                 'in_stock' => (bool) ($variant['stock']['in_stock'] ?? false),
                 'buy_url' => $store === null || ! ($variant['stock']['in_stock'] ?? false) ? null : CartLink::buyUrl($store, (string) $product->external_id, (string) ($variant['external_id'] ?? '')),

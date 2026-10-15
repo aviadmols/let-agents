@@ -68,7 +68,7 @@ final class CartLink
             }
 
             $options = array_values(array_filter(array_map(fn ($v): ?array => is_array($v) && ($v['external_id'] ?? '') !== ''
-                ? ['id' => (string) $v['external_id'], 'title' => (string) ($v['title'] ?? ''), 'in_stock' => (bool) ($v['stock']['in_stock'] ?? false)]
+                ? ['id' => (string) $v['external_id'], 'title' => CatalogProduct::variantLabel($v) ?: (string) $v['external_id'], 'in_stock' => (bool) ($v['stock']['in_stock'] ?? false)]
                 : null, (array) (((array) $product->payload)['variations'] ?? []))));
             $variant = (string) ($item['variant'] ?? '');
 

@@ -103,6 +103,31 @@ class CatalogProduct extends Model
         return (string) ($this->payload['description'] ?? '');
     }
 
+    /**
+     * An option's name as a shopper reads it: its title (Shopify), or what its attributes are
+     * (WooCommerce variations come with attributes and no title): "גוון: אלון · אורך: 3.68 מטר".
+     * An attribute left open ("any") says only its name.
+     *
+     * @param  array<string, mixed>  $variant  one of the payload's variations
+     */
+    public static function variantLabel(array $variant): string
+    {
+        $title = trim((string) ($variant['title'] ?? ''));
+
+        if ($title !== '') {
+            return $title;
+        }
+
+        $parts = array_map(function ($attribute): string {
+            $name = trim((string) ($attribute['name'] ?? $attribute['key'] ?? ''));
+            $value = trim((string) ($attribute['value'] ?? ''));
+
+            return $value === '' ? $name : ($name === '' ? $value : $name.': '.$value);
+        }, array_filter((array) ($variant['attributes'] ?? []), 'is_array'));
+
+        return implode(' · ', array_filter($parts, fn (string $part): bool => $part !== ''));
+    }
+
     /** @return list<list<string>> every category path the product is listed under */
     public function categoryPaths(): array
     {

@@ -90,7 +90,8 @@ final class PageChoices
             default => 'choice',
         };
 
-        return ['key' => rawurldecode($input->getAttribute('name')), 'label' => $label, 'kind' => $kind, 'required' => $required, 'values' => $values];
+        // The name exactly as the page has it (a theme may keep it percent-encoded): the form posts it so.
+        return ['key' => $input->getAttribute('name'), 'label' => $label, 'kind' => $kind, 'required' => $required, 'values' => $values];
     }
 
     /** @return array{value: string, label: string, price: float|null, meters?: float} */
@@ -112,7 +113,7 @@ final class PageChoices
         $meters = self::meters($label);
 
         return array_filter([
-            'value' => rawurldecode(trim($node->getAttribute('value'))),
+            'value' => trim($node->getAttribute('value')),
             'label' => $label,
             'price' => $total === null ? null : round($total, 2),
             'meters' => $meters,

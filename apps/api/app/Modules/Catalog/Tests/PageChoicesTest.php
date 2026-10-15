@@ -46,15 +46,15 @@ final class PageChoicesTest extends TestCase
         $fields = PageChoices::read((string) PageChoices::form('<html><body><h1>עץ</h1>'.self::GUETA.'</body></html>'), 13.28);
 
         $this->assertSame([[
-            'key' => 'addon-7-אורך-0',
+            'key' => 'addon-7-%d7%90%d7%95%d7%a8%d7%9a-0',
             'label' => 'אורך',
             'kind' => 'length',
             'required' => true,
             'values' => [
-                ['value' => '3-00-מטר-1', 'label' => '3.00 מטר', 'price' => 39.84, 'meters' => 3.0],
-                ['value' => '4-20-מטר-2', 'label' => '4.20 מטר', 'price' => 55.78, 'meters' => 4.2],
+                ['value' => '3-00-%d7%9e%d7%98%d7%a8-1', 'label' => '3.00 מטר', 'price' => 39.84, 'meters' => 3.0],
+                ['value' => '4-20-%d7%9e%d7%98%d7%a8-2', 'label' => '4.20 מטר', 'price' => 55.78, 'meters' => 4.2],
             ],
-        ]], $fields, 'the total as the page wrote it, else the price and its share: 13.28 × 4.2');
+        ]], $fields, 'the total as the page wrote it, else the price and its share: 13.28 × 4.2; the name and values as the form posts them');
     }
 
     public function test_any_store_s_product_add_ons_are_read_the_same_way(): void
@@ -136,5 +136,12 @@ final class PageChoicesTest extends TestCase
         $pages['https://wood.test/p/7'] = str_replace('data-price="39.84"', 'data-price="45"', $pages['https://wood.test/p/7']);
         $this->assertSame(1, $read->handle($shop->id)?->output['changed']);
         $this->assertEquals([45.0, 63.0], array_column($tenant->run($shop->id, fn () => CatalogProductChoice::query()->whereHas('product', fn ($p) => $p->where('external_id', '7'))->sole())->fields[0]['values'], 'price'));
+    }
+
+    public function test_a_woocommerce_option_is_named_by_its_attributes(): void
+    {
+        $this->assertSame('גוון: אלון · אורך: 3.68 מטר', CatalogProduct::variantLabel(['attributes' => [['key' => 'pa_color', 'name' => 'גוון', 'value' => 'אלון'], ['key' => 'pa_length', 'name' => 'אורך', 'value' => '3.68 מטר']]]));
+        $this->assertSame('מידה 7', CatalogProduct::variantLabel(['title' => 'מידה 7', 'attributes' => [['name' => 'x', 'value' => 'y']]]), 'a title first (Shopify)');
+        $this->assertSame('גוון', CatalogProduct::variantLabel(['attributes' => [['name' => 'גוון', 'value' => '']]]), 'left open: its name');
     }
 }
