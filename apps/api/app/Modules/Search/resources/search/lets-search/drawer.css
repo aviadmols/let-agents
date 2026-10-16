@@ -399,6 +399,10 @@
   .ls-card .ls-add { min-width: 0; }
   .ls-saved-item__actions .ls-btn--sm { --h: 32px; font-size: var(--lsp-text-xs); padding-inline: 12px; }
   .ls-saved-item__actions .ls-add { min-width: 88px; }
+  /* the heart on a card: a smaller circle, a bigger heart, frosted over the picture */
+  .ls-card__heart { inset-block-start: 6px; inset-inline-end: 6px; }
+  .ls-card__heart .ls-heart { width: 34px; height: 34px; background: color-mix(in srgb, var(--ls-bg) 58%, transparent); -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4); box-shadow: 0 1px 2px rgb(11 11 12 / .08), inset 0 0 0 1px rgb(255 255 255 / .35); }
+  .ls-card__heart .ls-heart svg { width: 19px; height: 19px; }
   /* and in the "similar to" box, with its heart */
   .ls-of__actions .ls-btn--sm { --h: 34px; font-size: var(--lsp-text-xs); padding-inline: 14px; }
   .ls-of__actions .ls-add { min-width: 88px; }
