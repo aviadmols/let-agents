@@ -425,3 +425,11 @@
    and the buttons get the width (they were pushed into the picture's 104px column) */
 .ls-root.no-compare .ls-saved-item { grid-template-columns: 104px minmax(0, 1fr); }
 @media (max-width: 720px) { .ls-root.no-compare .ls-saved-item { grid-template-columns: 80px minmax(0, 1fr); } }
+
+/* popular searches: one row that scrolls (a drag with the mouse too), or all of them on a press */
+.ls-welcome .ls-sec__title { align-items: baseline; }
+.ls-sec__more { font-size: var(--lsp-text-xs); font-weight: 500; color: var(--ls-fg-strong-muted); text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 3px; padding: 4px 0; }
+@media (hover: hover) and (pointer: fine) { .ls-sec__more:hover { color: var(--ls-fg); } .ls-chips--drag:not(.is-all) { cursor: grab; } }
+.ls-chips--drag.is-dragging { cursor: grabbing; user-select: none; }
+.ls-chips--drag.is-dragging .ls-chip { pointer-events: none; }
+.ls-chips--drag.is-all { flex-wrap: wrap; overflow: visible; mask-image: none; -webkit-mask-image: none; }

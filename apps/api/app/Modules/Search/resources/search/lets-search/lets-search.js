@@ -72,7 +72,7 @@
       open: 'חיפוש חכם', close: 'סגירה', saved: 'שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
       placeholder: 'חפשו מוצר, או שאלו כל דבר', placeholderProduct: 'שאלו על המוצר הזה, או חפשו כל דבר', clear: 'ניקוי', photo: 'חיפוש לפי תמונה', send: 'שליחה',
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.',
-      recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
+      recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
       showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
@@ -121,7 +121,7 @@
       open: 'Smart search', close: 'Close', saved: 'Saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
       placeholder: 'Search for a product, or ask anything', placeholderProduct: 'Ask about this product, or search anything', clear: 'Clear', photo: 'Search by photo', send: 'Send',
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.',
-      recent: 'Recent searches', popular: 'Popular in the store', tryAsk: 'You could ask', removeRecent: 'Remove',
+      recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
       showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
@@ -935,7 +935,9 @@
     var pop = S.config.popular || [];
     var asks = off('ask') ? [] : LANG === 'he' ? ['תוך כמה זמן זה מגיע?', 'אפשר להחזיר או להחליף?'] : ['How long does delivery take?', 'Can I return or exchange it?'];
     return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t('welcomeSub')) + '</p>' +
-      (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + '</div><div class="ls-chips" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' : '') +
+      // one row that scrolls (a swipe, or a drag with the mouse); the small button opens them all
+      (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + (pop.length > 3 ? '<button class="ls-sec__more" data-pop-all aria-expanded="' + !!S.popAll + '">' + esc(t(S.popAll ? 'popLess' : 'popAll')) + '</button>' : '') + '</div>' +
+        '<div class="ls-chips ls-chips--drag' + (S.popAll ? ' is-all' : '') + '" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' : '') +
       (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (q) { return '<button class="ls-ask ls-ask--example" data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400">' + esc(q) + '</span></span></button>'; }).join('') +
       '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
@@ -2376,6 +2378,9 @@
     }
     if (!el) { return; }
     var d = el.dataset;
+    // the press that ends a drag of a row of chips is not a press on a chip
+    if (el.closest('.ls-chips--drag') && dragged) { e.preventDefault(); dragged = false; return; }
+    if (d.popAll !== undefined) { S.popAll = !S.popAll; render(); return; }
     if (d.close !== undefined) { e.preventDefault(); close(); return; }
     if (d.layerClose !== undefined) { hideLayer(); return; }
     if (d.tab) { S.tab = d.tab; S.wide = null; if (S.tab !== 'chat') { hideLive(); } render(); if (S.tab === 'chat') { INPUT.focus({ preventScroll: true }); } return; }
@@ -2463,7 +2468,7 @@
   (function () {
     var row = null, x0 = 0, s0 = 0;
     root.addEventListener('pointerdown', function (e) {
-      var r = e.target.closest && e.target.closest('.ls-mini-row');
+      var r = e.target.closest && e.target.closest('.ls-mini-row, .ls-chips--drag:not(.is-all)');
       if (!r || e.pointerType !== 'mouse' || e.button !== 0) { return; }
       row = r; x0 = e.clientX; s0 = r.scrollLeft; dragged = false;
     });
