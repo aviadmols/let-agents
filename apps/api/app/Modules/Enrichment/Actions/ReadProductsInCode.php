@@ -13,6 +13,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BrandResolver;
 use App\Modules\Enrichment\Scanning\CodeReading;
+use App\Modules\Enrichment\Scanning\NaturalColours;
 use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\ProductFamily;
 use App\Modules\Enrichment\Scanning\TryOnEligibility;
@@ -95,7 +96,15 @@ final class ReadProductsInCode
         $pictures = $readText ? PictureText::for() : [];
         $now = now();
 
-        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'tryon_yes' => 0, 'tryon_no' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0];
+        // The stones and stone colours already approved from a model's reading or a person: a stone's own
+        // colour is implied from them too (NaturalColours), not only from what code reads here.
+        $said = [];
+        foreach (EnrichmentFact::query()->where('kind', FactKind::Choice)->whereIn('key', [NaturalColours::STONE, NaturalColours::COLOUR])
+            ->where('status', FactStatus::Approved)->where('origin', '!=', FactOrigin::Code)->whereNotNull('product_id')->get(['product_id', 'key', 'value_text']) as $fact) {
+            $said[$fact->product_id][$fact->key][] = (string) $fact->value_text;
+        }
+
+        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'tryon_yes' => 0, 'tryon_no' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0, 'implied_colours' => 0];
         $brandSources = [];
         $families = [];
         $samples = [];
@@ -104,6 +113,13 @@ final class ReadProductsInCode
             $counts['products']++;
             $vocabulary = $branchOf[$product->id] ?? null;
             $reading = CodeReading::read($product, $brands, $vocabulary?->definition(), $readText, isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : null);
+            // A ruby is red: the colour its stones imply, where nothing says one of its own.
+            $of = fn (string $key): array => [...(array) ($reading['text_choices'][$key]['values'] ?? []), ...(isset($reading['category_choices'][$key]) ? [(string) $reading['category_choices'][$key]] : []), ...($said[$product->id][$key] ?? [])];
+            $implied = NaturalColours::implied($vocabulary?->definition(), $reading['type']['key'] ?? null, $of(NaturalColours::STONE), $of(NaturalColours::COLOUR));
+            if ($implied !== []) {
+                $reading['implied_choices'] = [NaturalColours::COLOUR => $implied];
+                $counts['implied_colours']++;
+            }
             $hash = hash('sha256', ($vocabulary?->id ?? '-').'|'.json_encode($reading, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
             $counts['with_brand'] += isset($reading['brand']) ? 1 : 0;
@@ -205,6 +221,12 @@ final class ReadProductsInCode
                     foreach ($choice['values'] as $value) {
                         $write(self::fromPicture($choice['source'], $key, $vocabulary, $status) + ['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$choice['source'],
                             'confidence' => CodeReading::CONFIDENCE[$choice['source']], 'evidence' => ['source' => $choice['source'], 'ref' => mb_substr($choice['quote'], 0, 300)]]);
+                    }
+                }
+                // Implied by what the product is made of (a ruby is red): code, never superseded by a model reading.
+                foreach ((array) ($reading['implied_choices'] ?? []) as $key => $values) {
+                    foreach ($values as $value) {
+                        $write(['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => $product->title, 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_implied', 'evidence' => ['source' => 'implied']]);
                     }
                 }
                 foreach ((array) ($reading['text_specs'] ?? []) as $key => $spec) {
