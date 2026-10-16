@@ -56,6 +56,20 @@ final class AssistantBlockTest extends TestCase
 
     public function test_the_block_carries_the_products_tags_and_questions_wherever_the_shop_takes_questions(): void
     {
+        // Two rings in rose gold: the most common other metal in the store, but no pendant has it,
+        // so "a similar pendant in rose gold?" would have no answer and is never asked.
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $vocabulary = EnrichmentVocabulary::query()->firstOrFail();
+            foreach (['8', '9'] as $id) {
+                $ring = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "טבעת {$id}",
+                    'url' => "https://store.test/p/{$id}", 'price' => 900, 'in_stock' => true, 'purchasable' => true, 'hash' => "r{$id}", 'payload' => []]);
+                foreach ([[FactKind::Type, 'type', 'ring'], [FactKind::Choice, 'metal', 'a_rose_gold']] as $i => [$kind, $key, $value]) {
+                    EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'product_id' => $ring->id, 'vocabulary_id' => $vocabulary->id, 'kind' => $kind, 'key' => $key,
+                        'value_text' => $value, 'origin' => FactOrigin::Code, 'status' => FactStatus::Approved, 'input_hash' => "r{$id}{$i}"]);
+                }
+            }
+        });
+
         $block = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
 
         $this->assertSame('שאלו את Rocks and Gold AI', $block['title']);

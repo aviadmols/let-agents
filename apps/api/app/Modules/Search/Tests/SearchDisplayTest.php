@@ -18,6 +18,7 @@ use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -111,24 +112,38 @@ final class SearchDisplayTest extends TestCase
             'shop_id' => $shop->id, 'site_url' => 'https://www.rings.test', 'access_token' => self::TOKEN,
         ]));
         $this->product('7', 'טבעת סוליטר');
+        $this->product('8', 'עגילי זהב', ['payload' => ['title' => 'עגילי זהב', 'tags' => ['עגילים']]]);
+        $this->product('9', 'צמיד כסף');
         $this->assertSame('succeeded', app(BuildSearchIndex::class)->handle($shop->id)->status->value);
 
-        $term = fn (string $shopId, string $query, int $searches, int $empty = 0, int $daysAgo = 1) => app(TenantContext::class)->run($shopId, fn () => SearchTerm::query()->create([
-            'shop_id' => $shopId, 'day' => now()->subDays($daysAgo)->toDateString(), 'query' => $query,
-            'searches' => $searches, 'empty' => $empty, 'clicks' => 0, 'last_results' => $empty < $searches ? 4 : 0,
-        ]));
-        $term($shop->id, 'טבעת', 9);
-        $term($shop->id, 'עגילים', 3);
-        $term($shop->id, 'שרשרת', 2);                 // too few
-        $term($shop->id, 'יהלום ורוד', 6, 5);         // mostly found nothing
-        $term($shop->id, '0521234567', 8);            // reads like a number someone typed about themselves
-        $term($shop->id, 'צמיד', 7, 0, 45);           // too long ago
-        $term($shop->id, CountSearch::PHOTO, 20);     // photo searches, counted under a marker
-        $term($other->id, 'אימפקט', 50);              // another shop's
+        // A query searched this many times a day, on each of the given days back
+        $term = function (string $shopId, string $query, int $perDay, array $days = [1, 2, 3, 4, 5], int $empty = 0): void {
+            foreach ($days as $daysAgo) {
+                app(TenantContext::class)->run($shopId, fn () => SearchTerm::query()->create([
+                    'shop_id' => $shopId, 'day' => now()->subDays($daysAgo)->toDateString(), 'query' => $query,
+                    'searches' => $perDay, 'empty' => $empty, 'clicks' => 0, 'last_results' => $empty < $perDay ? 4 : 0,
+                ]));
+            }
+        };
+        $site = '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index';
+        $popular = fn (): array => $this->getJson($site, ['Origin' => 'https://www.rings.test'])->assertOk()->json('config.popular');
 
-        $index = $this->getJson('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index', ['Origin' => 'https://www.rings.test'])->assertOk()->json();
+        $term($shop->id, 'טבעת', 4);                        // 20 searches on 5 days: a trend
+        $term($shop->id, 'עגילי זהב', 2);                    // 10 on 5 days, whole words of its products
+        $this->assertSame([], $popular(), 'too few searches in the shop to tell a trend');
 
-        $this->assertSame(['טבעת', 'עגילים'], $index['config']['popular']);
+        Cache::flush();
+        $term($shop->id, 'א', 30);                           // a letter typed and left
+        $term($shop->id, 'טבע', 10);                         // half a word
+        $term($shop->id, 'סוליטר', 40, [1]);                 // many, but on one day: a moment
+        $term($shop->id, 'כסף', 1);                          // a few, however steady
+        $term($shop->id, 'טבעת זהב', 4, empty: 3);           // mostly found nothing
+        $term($shop->id, 'שרשרת', 5);                        // the shop sells none
+        $term($shop->id, 'צמיד', 7, [40, 41, 42, 43]);       // too long ago
+        $term($shop->id, CountSearch::PHOTO, 20);            // photo searches, counted under a marker
+        $term($other->id, 'אימפקט', 50);                     // another shop's
+
+        $this->assertSame(['טבעת', 'עגילי זהב'], $popular());
     }
 
     /** @param  array<string, mixed>  $overrides */

@@ -1643,10 +1643,15 @@ final class BuildPageBank
             $tags[$label] = ['label' => $label, 'query' => $fact->kind === FactKind::Type || $typeLabel === '' ? $label : $typeLabel.' '.$label];
         }
 
-        // Another value of one of its choices, the one the most products have: "יש דגם דומה בזהב לבן?"
+        // Another value of one of its choices, the one the most products of its own type have: "יש דגם דומה
+        // בזהב לבן?". Only among its type, so the question has an answer (an Ipe deck board is no answer
+        // for a pine beam); without a type there is nothing to hold it to, and it is not asked.
         $others = [];
-        foreach ($facts->where('kind', FactKind::Choice)->unique('key')->take(3) as $fact) {
+        $sameType = $type === null ? null : EnrichmentFact::query()->where('status', FactStatus::Approved)->where('kind', FactKind::Type)
+            ->where('value_text', $type->value_text)->where('product_id', '!=', $product->id)->select('product_id');
+        foreach ($sameType === null ? [] : $facts->where('kind', FactKind::Choice)->unique('key')->take(3) as $fact) {
             $other = EnrichmentFact::query()->where('status', FactStatus::Approved)->where('kind', FactKind::Choice)->where('key', $fact->key)
+                ->whereIn('product_id', $sameType)
                 ->where('value_text', '!=', $fact->value_text)->selectRaw('value_text, count(*) as n')->groupBy('value_text')
                 ->orderByDesc('n')->orderBy('value_text')->first();
             if ($other !== null) {

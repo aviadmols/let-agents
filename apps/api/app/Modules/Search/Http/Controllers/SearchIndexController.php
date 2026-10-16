@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * GET /api/v1/search/{site}/index?locale=he
@@ -67,7 +68,8 @@ final class SearchIndexController
             // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
             'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
             // "Popular in the store" on the empty drawer: this shop's own searches, never sample words.
-            'popular' => $tenant->run($shopId, fn (): array => self::popular()),
+            // Worked out once an hour per shop and index: it reads the index's own words.
+            'popular' => Cache::remember('search:popular:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::popular($shopId, (string) $index->items))),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),
             // What each product carries, as the shop set it on its search display screen.
@@ -119,30 +121,81 @@ final class SearchIndexController
         ];
     }
 
+    /** Hebrew letters that join the front of a word ("והטבעת", "בזהב"). */
+    private const PREFIX = '/^[והבלמשכ]+(?=\p{L}{2})/u';
+
     /**
-     * The shop's most searched words of the last 30 days that found products. Every shopper sees them,
-     * so only words many searches share: at least three, short, and nothing that reads like a number
-     * someone typed about themselves. Inside the shop (TenantContext), so never another shop's.
+     * The shop's popular searches of the last 30 days: a trend, never a moment or a few searches.
+     * Shown only when the shop has enough searches to tell (search.popular_min_shop_searches); a phrase
+     * searched often (search.popular_min_searches) on enough different days (search.popular_min_days),
+     * that mostly found products, and made of whole words the shop's own products use, so a letter or
+     * half a word typed and left ("א", "טבע") is never one. Every shopper sees them: nothing that reads
+     * like a number or an address someone typed about themselves, no counted marker ("[photo]").
+     * Inside the shop (TenantContext), so never another shop's.
      *
      * @return list<string>
      */
-    private static function popular(): array
+    private static function popular(string $shopId, string $index): array
     {
+        $since = now()->subDays(30)->toDateString();
+        if ((int) SearchTerm::query()->whereDate('day', '>=', $since)->sum('searches') < (int) Settings::get('search.popular_min_shop_searches', $shopId)) {
+            return [];
+        }
+
+        $known = self::catalogWords($index);
+
         return SearchTerm::query()
-            ->whereDate('day', '>=', now()->subDays(30)->toDateString())
+            ->whereDate('day', '>=', $since)
             ->selectRaw('query, SUM(searches) as total')
             ->groupBy('query')
-            ->havingRaw('SUM(searches) >= ?', [3])
+            ->havingRaw('SUM(searches) >= ?', [(int) Settings::get('search.popular_min_searches', $shopId)])
+            // one row per query and day: the days it was searched on
+            ->havingRaw('COUNT(*) >= ?', [(int) Settings::get('search.popular_min_days', $shopId)])
             ->havingRaw('SUM(empty) * 2 < SUM(searches)')
             ->orderByDesc('total')->orderBy('query')
-            ->limit(20)
+            ->limit(40)
             ->pluck('query')
-            ->map(fn ($q): string => trim((string) $q))
-            // a counted marker ("[photo]" for a photo search, a redacted piece) is not a word anyone searched
-            ->filter(fn (string $q): bool => $q !== '' && mb_strlen($q) <= 30 && ! preg_match('/\d{5,}|@|[\[\]]/u', $q))
+            ->map(fn ($q): string => trim((string) preg_replace('/\s+/u', ' ', (string) $q)))
+            ->filter(fn (string $q): bool => $q !== '' && mb_strlen($q) <= 30 && ! preg_match('/\d{5,}|@|[\[\]]/u', $q) && self::wholeWords($q, $known))
             ->take(12)
             ->values()
             ->all();
+    }
+
+    /**
+     * Every word the shop's products use, in their titles and extra words.
+     *
+     * @return array<string, true>
+     */
+    private static function catalogWords(string $index): array
+    {
+        $words = [];
+        foreach ((array) (json_decode($index, true)['items'] ?? []) as $item) {
+            if (($item['t'] ?? null) !== 'product') {
+                continue;
+            }
+            foreach (self::words(($item['title'] ?? '').' '.($item['kw'] ?? '')) as $word) {
+                $words[$word] = true;
+                $words[(string) preg_replace(self::PREFIX, '', $word)] = true;
+            }
+        }
+
+        return $words;
+    }
+
+    /** Each word is two letters or more and a whole word the shop's products use (with or without a joined prefix). */
+    private static function wholeWords(string $query, array $known): bool
+    {
+        $words = self::words($query);
+
+        return $words !== [] && collect($words)->every(fn (string $w): bool => mb_strlen($w) >= 2
+            && (isset($known[$w]) || isset($known[(string) preg_replace(self::PREFIX, '', $w)])));
+    }
+
+    /** @return list<string> */
+    private static function words(string $text): array
+    {
+        return array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($text)) ?: [], fn (string $w): bool => $w !== ''));
     }
 
     /** The number the on-page module offers, read from the same settings; null when the shop has none. */

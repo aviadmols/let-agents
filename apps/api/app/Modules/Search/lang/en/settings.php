@@ -61,6 +61,18 @@ return [
         'label' => 'Largest photo to search by',
         'description' => 'A bigger photo is refused. The browser shrinks photos before sending, so this rarely happens.',
     ],
+    'popular_min_searches' => [
+        'label' => 'Popular search: times searched',
+        'description' => 'In the last 30 days. A phrase searched fewer times is not shown under "Popular in the store".',
+    ],
+    'popular_min_days' => [
+        'label' => 'Popular search: on how many different days',
+        'description' => 'A trend, not a moment: a phrase searched on only a day or two is not shown, however often.',
+    ],
+    'popular_min_shop_searches' => [
+        'label' => 'Popular searches shown from this many shop searches',
+        'description' => 'All the shop\'s searches in the last 30 days. Fewer: not enough to go on, and "Popular in the store" is not shown.',
+    ],
     'photos_per_day' => [
         'label' => 'Photo searches a day',
         'description' => 'Per shop. Beyond it the camera answers that the service is not available today. 0 turns it off.',

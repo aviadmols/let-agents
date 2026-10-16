@@ -220,6 +220,33 @@
             "unit": "kilobytes"
         },
         {
+            "name": "popular_min_searches",
+            "type": "int",
+            "default": 10,
+            "min": 3,
+            "max": 100000,
+            "scope": "shop",
+            "unit": "searches"
+        },
+        {
+            "name": "popular_min_days",
+            "type": "int",
+            "default": 4,
+            "min": 1,
+            "max": 30,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
+            "name": "popular_min_shop_searches",
+            "type": "int",
+            "default": 200,
+            "min": 0,
+            "max": 1000000,
+            "scope": "shop",
+            "unit": "searches"
+        },
+        {
             "name": "photos_per_day",
             "type": "int",
             "default": 500,

@@ -1137,7 +1137,11 @@
         '<span class="ls-match" style="--m:' + (m / 100) + '"><span class="ls-match__bar"><i></i></span><span class="ls-num">' + esc(t('match', { n: m })) + '</span></span></span></a>';
     }).join('') + '</div></div>';
   }
-  function gridN() { return S.expanded && !isPhone() ? 8 : 4; }
+  // how many cards a results turn shows before "show all": 12 on a phone or the large view, 8 in the drawer;
+  // after "show all" on a phone, every one, in place
+  function gridN(turn) { return turn && turn.more ? turn.more : isPhone() || S.expanded ? 12 : 8; }
+  // "show all": on a phone the rest load right there, under the cards already seen; elsewhere the large view
+  function allBtn(turn, label, opt) { return '<button class="ls-btn ls-btn--secondary ls-btn--block" style="margin-top:20px"' + (opt ? ' data-opt' : '') + (isPhone() ? ' data-more="' : ' data-wide="') + turn.id + '">' + esc(label) + '</button>'; }
   function prow(r) {
     return '<a class="ls-prow" data-opt href="' + esc(r.url) + '" data-goto="' + esc(pid(r.id)) + '"><img class="ls-prow__img" src="' + esc(r.img || '') + '" alt="" decoding="async">' +
       '<div class="ls-prow__body"><div class="ls-prow__title" dir="auto">' + esc(decode(r.title)) + '</div><div class="ls-prow__sub">' + priceHtml(r) + (r.s === 0 ? '<span class="ls-stock ls-stock--out">' + esc(t('outStock')) + '</span>' : '') + '</div></div></a>';
@@ -1330,9 +1334,9 @@
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>';
     html += chipRow(turn);
     if (!list.length) { return html + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
-    var n = gridN();
+    var n = gridN(turn);
     html += '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>';
-    if (list.length > n) { html += '<button class="ls-btn ls-btn--secondary ls-btn--block" style="margin-top:20px" data-opt data-wide="' + turn.id + '">' + esc(t('showAll', { n: list.length })) + '</button>'; }
+    if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
     html += guidesHtml(turn.content, turn.q);
     if (!off('ask')) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-ask="' + esc(turn.q) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>';
     return html;
@@ -1531,9 +1535,9 @@
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
     if (!(turn.ids || []).length) { return '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>'; }
-    var list = filtered(turn), n = gridN();
+    var list = filtered(turn), n = gridN(turn);
     return (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
-      (list.length > n ? '<button class="ls-btn ls-btn--secondary ls-btn--block" style="margin-top:20px" data-wide="' + turn.id + '">' + esc(t('allSimilar', { n: list.length })) + '</button>' : '');
+      (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '');
   }
 
   // ---------------------------------------------------------------- photo
@@ -1742,7 +1746,11 @@
     head += (b.popularity && b.popularity.popular ? '<span class="ls-pop" title="' + esc(b.popularity.text || '') + '">' + icon('trend', 'ls-icon--sm') + esc(b.popularity.badge || t('popular30')) + '</span>' : '') + '</div></div>';
     var html = head;
     // suggested next steps first, as the shop's block offers them; the product's sections follow
-    var qs = (b.assistant && b.assistant.questions) || [];
+    // the comparison only when this shopper viewed a product of the same kind, and named: "להשוות עם X"
+    var vb = String(turn.id) === String(PAGE && PAGE.id) ? viewedBefore() : null;
+    var qs = ((b.assistant && b.assistant.questions) || []).filter(function (q) { return q.about !== 'compare' || vb; }).slice(0, 5).map(function (q) {
+      return q.about === 'compare' && q.named ? Object.assign({}, q, { text: String(q.named).replace(':title', decode(vb.title)) }) : q;
+    });
     if (qs.length) {
       html += '<div class="ls-stack" style="margin-bottom:14px">' + qs.map(function (q) {
         var act = q.about === 'similar_items' ? 'data-similar="' + esc(turn.id) + '"' : q.about === 'similar' && q.query ? 'data-q="' + esc(q.query) + '"' : q.about === 'compare' ? 'data-cmp-viewed="' + esc(turn.id) + '"' : 'data-ask="' + esc(q.question || q.text) + '"';
@@ -2425,6 +2433,17 @@
     if (d.add) { e.preventDefault(); if (el.dataset.state === 'done') { win.location.href = CFG.cartUrl; return; } addToCart(el, d.add, null, S.pressQ); return; }
     if (d.options) { e.preventDefault(); optionsLayer(d.options, S.pressQ); return; }
     if (d.similar) { e.preventDefault(); similarTurn(d.similar); return; }
+    if (d.more) {
+      // the rest of the results, right under the ones seen: nothing moves, nothing jumps to the top
+      var mt = turnById(d.more);
+      if (!mt) { return; }
+      var rest = filtered(mt).map(function (r) { return r.id; }), from = gridN(mt);
+      mt.more = rest.length;
+      var keepY = BODY.scrollTop, again = function () { if (mt === S.live) { renderLive(false); } else { persist(); render(); } BODY.scrollTop = keepY; };
+      again();
+      products(rest.slice(from, from + 48)).then(again);
+      return;
+    }
     if (d.wide) {
       // "show all" from the live results keeps the search first, then opens it large
       if (d.wide === 'live') { if (!S.live) { return; } submit(S.live.q, 'search'); d = { wide: S.turns[S.turns.length - 1].id }; }
