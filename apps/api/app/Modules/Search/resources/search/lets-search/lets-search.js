@@ -778,9 +778,6 @@
         '<div class="ls-flow" role="log" aria-label="' + esc(t('open')) + '"></div></div>' +
       '<div class="ls-layer-scrim" hidden data-layer-close></div><div class="ls-layer" role="dialog" aria-modal="true" hidden></div>' +
       '<div class="ls-toast" role="status" hidden></div></div>' +
-    // the phone's own picker (take a photo, or choose one), opened straight from the camera button: never display:none,
-    // which iOS will not open from a press
-    '<input type="file" accept="image/*" class="ls-vh" tabindex="-1" aria-hidden="true" data-file data-photo-pick>' +
     // "Powered by": always at the drawer's foot, outside the scrolling body
     credit();
   var INPUT = D.querySelector('input'), FIELD = D.querySelector('[data-field]'), SUG = D.querySelector('.ls-suggest'), SUGIN = SUG.firstChild, BODY = D.querySelector('.ls-dbody'), FLOW = D.querySelector('.ls-flow');
@@ -1568,21 +1565,15 @@
 
   // ---------------------------------------------------------------- photo
   var MAXKB = 5120;
-  // the camera button: on a phone the phone's own picker at once (inside the press, or iOS opens nothing);
-  // elsewhere the sheet with a drop zone
-  function photoPick() {
-    MAXKB = S.config.photoMaxKb || 5120;
-    var pick = D.querySelector('[data-photo-pick]');
-    if (isPhone() && pick) { pick.value = ''; pick.click(); return; }
-    photoLayer();
-  }
+  // the camera button and "search by photo": the sheet below, to choose a picture or take one
+  function photoPick() { photoLayer(); }
   function photoLayer() {
     MAXKB = S.config.photoMaxKb || 5120;
     var mb = Math.round(MAXKB / 1024) + 'MB';
     showLayer(t('photoTitle'),
       '<div class="ls-upload" data-drop><span class="ls-ibtn ls-ibtn--solid">' + icon('camera') + '</span><div class="ls-upload__title">' + esc(t('photoTitle')) + '</div><div style="font-size:14px;color:var(--ls-fg-muted)">' + esc(isPhone() ? t('photoDropMobile') : t('photoDrop')) + '</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><label class="ls-btn ls-btn--primary ls-btn--sm">' + icon('image', 'ls-icon--sm') + esc(t('photoChoose')) + '<input type="file" accept="image/jpeg,image/png,image/webp" hidden data-file></label>' +
-      '<label class="ls-btn ls-btn--secondary ls-btn--sm">' + icon('camera', 'ls-icon--sm') + esc(t('photoTake')) + '<input type="file" accept="image/*" capture="environment" hidden data-file></label></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><label class="ls-btn ls-btn--primary ls-btn--sm">' + icon('image', 'ls-icon--sm') + esc(t('photoChoose')) + '<input type="file" accept="image/*" class="ls-vh" tabindex="-1" data-file></label>' +
+      '<label class="ls-btn ls-btn--secondary ls-btn--sm">' + icon('camera', 'ls-icon--sm') + esc(t('photoTake')) + '<input type="file" accept="image/*" capture="environment" class="ls-vh" tabindex="-1" data-file></label></div>' +
       '<div class="ls-upload__note" data-photo-msg>' + esc(t('photoPrivate', { mb: mb })) + '</div></div>', '');
   }
   function photoFile(file) {
