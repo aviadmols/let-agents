@@ -2532,14 +2532,16 @@
   });
   // on a phone the search field slides away while scrolling down, and comes back on the way up (or at the top);
   // never while it is being typed in
-  var lastY = 0;
+  // It moves only after a steady run one way (30px), never on the bounce at either end, so it never flickers.
+  var lastY = 0, run = 0;
   BODY.addEventListener('scroll', function () {
-    var y = BODY.scrollTop, dy = y - lastY;
+    var y = BODY.scrollTop, max = BODY.scrollHeight - BODY.clientHeight, dy = y - lastY;
     D.querySelector('.ls-dhead').classList.toggle('is-scrolled', y > 4 && !isPhone());
-    if (!isPhone() || y < 40 || root.activeElement === INPUT) { D.classList.remove('is-field-away'); }
-    else if (dy > 6) { D.classList.add('is-field-away'); }
-    else if (dy < -6) { D.classList.remove('is-field-away'); }
-    if (Math.abs(dy) > 6 || y < 40) { lastY = y; }
+    lastY = y;
+    if (!isPhone() || y < 60 || root.activeElement === INPUT) { D.classList.remove('is-field-away'); run = 0; return; }
+    if (y <= 0 || y >= max - 2) { return; }
+    run = dy * run < 0 ? dy : run + dy;
+    if (run > 30) { D.classList.add('is-field-away'); } else if (run < -30) { D.classList.remove('is-field-away'); }
   }, { passive: true });
   INPUT.addEventListener('focus', function () { D.classList.remove('is-field-away'); });
   root.addEventListener('focusin', fitViewport); root.addEventListener('focusout', function () { setTimeout(fitViewport, 50); });

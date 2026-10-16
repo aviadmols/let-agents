@@ -438,8 +438,8 @@
    up. Only a transform: nothing under the finger moves, so the scroll never jumps (a collapsing height did). */
 @media (max-width: 720px) {
   .ls-drawer .ls-dmain { overflow: hidden; }
-  .ls-drawer .ls-dfield { position: absolute; inset-inline: 0; top: 0; z-index: 3; background: var(--ls-bg); transition: transform 280ms var(--lsp-ease-out), opacity 200ms ease; }
+  .ls-drawer .ls-dfield { position: absolute; inset-inline: 0; top: 0; z-index: 3; background: var(--ls-bg); will-change: transform; transition: transform 380ms var(--lsp-ease-drawer), opacity 300ms ease; }
   .ls-drawer .ls-dbody { padding-top: calc(var(--ls-fh, 60px) + 8px); }
   .ls-drawer.is-saved .ls-dbody { padding-top: 8px; }
-  .ls-drawer.is-field-away .ls-dfield { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+  .ls-drawer.is-field-away .ls-dfield { transform: translateY(-100%); opacity: 0; pointer-events: none; transition: transform 320ms var(--lsp-ease-in-out), opacity 240ms ease 60ms; }
 }
