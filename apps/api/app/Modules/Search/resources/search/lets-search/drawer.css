@@ -442,8 +442,10 @@
    up. Only a transform: nothing under the finger moves, so the scroll never jumps (a collapsing height did). */
 @media (max-width: 720px) {
   .ls-drawer .ls-dmain { overflow: hidden; }
-  .ls-drawer .ls-dfield { position: absolute; inset-inline: 0; top: 0; z-index: 3; background: var(--ls-bg); will-change: transform; transition: transform 380ms var(--lsp-ease-drawer), opacity 300ms ease; }
+  /* in: glides down and settles softly; out: lifts away, a little quicker. A light shadow while it floats over results */
+  .ls-drawer .ls-dfield { position: absolute; inset-inline: 0; top: 0; z-index: 3; background: var(--ls-bg); will-change: transform; box-shadow: 0 10px 18px -16px rgb(11 11 12 / 0); transition: transform 460ms cubic-bezier(.22, 1, .36, 1), opacity 320ms ease, box-shadow 300ms ease; }
+  .ls-drawer.is-field-floating .ls-dfield { box-shadow: 0 10px 18px -14px rgb(11 11 12 / .22); }
   .ls-drawer .ls-dbody { padding-top: calc(var(--ls-fh, 60px) + 8px); }
   .ls-drawer.is-saved .ls-dbody { padding-top: 8px; }
-  .ls-drawer.is-field-away .ls-dfield { transform: translateY(-100%); opacity: 0; pointer-events: none; transition: transform 320ms var(--lsp-ease-in-out), opacity 240ms ease 60ms; }
+  .ls-drawer.is-field-away .ls-dfield { transform: translateY(calc(-100% - 14px)); opacity: 0; pointer-events: none; transition: transform 340ms cubic-bezier(.55, 0, .45, 1), opacity 220ms ease 90ms, box-shadow 200ms ease; }
 }

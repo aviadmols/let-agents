@@ -2538,6 +2538,7 @@
     var y = BODY.scrollTop, max = BODY.scrollHeight - BODY.clientHeight, dy = y - lastY;
     D.querySelector('.ls-dhead').classList.toggle('is-scrolled', y > 4 && !isPhone());
     lastY = y;
+    D.classList.toggle('is-field-floating', isPhone() && y > 8);
     if (!isPhone() || y < 60 || root.activeElement === INPUT) { D.classList.remove('is-field-away'); run = 0; return; }
     if (y <= 0 || y >= max - 2) { return; }
     run = dy * run < 0 ? dy : run + dy;
