@@ -4,6 +4,7 @@ namespace App\Modules\Enrichment\Tests;
 
 use App\Core\Facades\Features;
 use App\Modules\Enrichment\Actions\ImportVocabulary;
+use App\Modules\Enrichment\Actions\ProposeSchema;
 use App\Modules\Enrichment\Actions\ReadProductsInCode;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
@@ -52,5 +53,25 @@ final class NaturalColoursTest extends TestCase
         $implied = $this->inShop(fn () => EnrichmentFact::query()->where('product_id', $ruby->id)->where('key', 'stone_color')->where('status', FactStatus::Approved)->sole());
         $this->assertSame([FactOrigin::Code, 'code_implied'], [$implied->origin, $implied->status_reason]);
         $this->assertSame(EnrichmentVocabulary::query()->withoutGlobalScopes()->whereKey($vocabulary->id)->value('id'), $implied->vocabulary_id);
+    }
+
+    public function test_the_first_scan_keeps_the_colours_its_stones_imply_though_no_title_says_them(): void
+    {
+        // the sample: rubies and sapphires named, no colour named anywhere
+        $coverage = ['product_types' => ['ring' => 1.0], 'attributes' => [
+            'stone' => ['share' => 0.4, 'values' => ['ruby' => 0.2, 'sapphire' => 0.2, 'garnet' => 0.0]],
+            'stone_color' => ['share' => 0.0, 'values' => ['red' => 0.0, 'blue' => 0.0, 'green' => 0.0]],
+        ]];
+        $drops = array_column(ProposeSchema::unread($coverage), 'key');
+
+        $this->assertNotContains('stone_color', $drops, 'the colour attribute stays: a ruby says red');
+        $this->assertNotContains('stone_color.red', $drops);
+        $this->assertContains('stone_color.blue', $drops, 'a sapphire says no colour of its own');
+        $this->assertContains('stone_color.green', $drops, 'no emerald in the sample');
+        $this->assertContains('stone.garnet', $drops, 'a stone the sample never named still goes');
+
+        // no stone that implies a colour: an unread colour attribute goes, as before
+        $coverage['attributes']['stone']['values'] = ['sapphire' => 0.4];
+        $this->assertContains('stone_color', array_column(ProposeSchema::unread($coverage), 'key'));
     }
 }

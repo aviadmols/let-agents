@@ -13,6 +13,7 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Scanning\KnowledgeEvidence;
+use App\Modules\Enrichment\Scanning\NaturalColours;
 use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\SchemaStats;
 use App\Modules\Enrichment\Scanning\TextNormalizer;
@@ -355,9 +356,18 @@ final class ProposeSchema
                 $asked[(string) ($entry['key'] ?? '')] = true;
             }
         }
+        // A colour a stone in the sample implies stays, though no title said it: titles name a ruby, never its
+        // red (NaturalColours). Without it the code pass has no red to write, and "אבן אדומה" finds no ruby.
+        $implied = [];
+        foreach ((array) ($coverage['attributes'][NaturalColours::STONE]['values'] ?? []) as $stone => $share) {
+            if ((float) $share > 0.0 && isset(NaturalColours::OF[$stone])) {
+                $implied[NaturalColours::OF[$stone]] = true;
+            }
+        }
         $out = [];
         foreach ($coverage['attributes'] as $key => $attribute) {
-            if ((float) $attribute['share'] === 0.0) {
+            $keeps = (string) $key === NaturalColours::COLOUR ? $implied : [];
+            if ((float) $attribute['share'] === 0.0 && $keeps === []) {
                 if (isset($asked[(string) $key])) {
                     continue;
                 }
@@ -366,7 +376,7 @@ final class ProposeSchema
                 continue;
             }
             foreach ((array) ($attribute['values'] ?? []) as $value => $share) {
-                if ((float) $share === 0.0) {
+                if ((float) $share === 0.0 && ! isset($keeps[(string) $value])) {
                     $out[] = ['kind' => 'value', 'key' => $key.'.'.$value, 'why' => $why];
                 }
             }
