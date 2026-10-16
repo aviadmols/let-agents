@@ -4,11 +4,17 @@ namespace App\Modules\Enrichment;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
+use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Enrichment\Actions\RereadPage;
 use App\Modules\Enrichment\Console\EnrichmentCommand;
+use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
+use App\Modules\Enrichment\Listeners\RebuildCards;
 use App\Modules\Enrichment\Support\EnrichmentScanDetails;
+use App\Modules\Enrichment\Support\StoredCards;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Event;
 
 final class EnrichmentServiceProvider extends ModuleServiceProvider
 {
@@ -18,10 +24,15 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
         $this->app->tag([EnrichmentScanDetails::class], ScanDetails::TAG);
         // Another module may ask for one page to be read again; it gets the code readers only.
         $this->app->bind(RereadsPages::class, RereadPage::class);
+        // The cards every model reads: one product, page or post, or the store, as one JSON.
+        $this->app->bind(ReadsCards::class, StoredCards::class);
     }
 
     protected function bootModule(): void
     {
+        // A sync's products are carded at once: a new product is read by every model minutes after it is published.
+        Event::listen([CatalogUpdated::class, CatalogProductsChanged::class], RebuildCards::class);
+
         // Every night, after the catalogue has been synced: everything code can read about a shop,
         // read again, skipping what has not changed. And once a week, early Sunday Israel time, the
         // audit samples a few articles and asks whether code read them well — it only ever proposes.

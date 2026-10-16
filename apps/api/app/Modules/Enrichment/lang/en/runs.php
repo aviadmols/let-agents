@@ -15,6 +15,7 @@ return [
     'structure_whole' => 'A vocabulary already covers the whole catalog, so it was not divided into branches.',
     'web_lookup' => 'Checked on the web: :product (:certainty).',
     'schema_scored' => 'Scored the vocabulary of :branch: :score of 100 (:hard hard failures).',
+    'cards_built' => 'Cards: :products products and :contents pages and posts, :changed changed.',
     'read_in_code' => 'Code read :products products (:changed changed): brand for :brands, :families size families, :types types from categories, :specs sizes from titles.',
     'read_promises' => 'Code read :pages pages: :shop_promises store promises and :product_promises points from product text.',
     'read_content' => 'Code read :articles articles: :takeaways takeaways, and :empty articles it found nothing in.',

@@ -249,4 +249,16 @@ return [
         'label' => 'Reviewer output price (per million tokens)',
         'description' => 'For each run\'s cost.',
     ],
+    'card_text_chars' => [
+        'label' => 'Description length on a product or page card',
+        'description' => 'How many characters of the description, past repeats and boilerplate, go on the card every model reads.',
+    ],
+    'card_max_variants' => [
+        'label' => 'Variants on a product card',
+        'description' => 'How many of a product\'s sizes, colours or models go on its card.',
+    ],
+    'card_max_related' => [
+        'label' => 'Related products on a card, per kind',
+        'description' => 'How many complements, alternatives and other sizes go on the card, per kind, best first.',
+    ],
 ];

@@ -8,6 +8,7 @@ return [
     'ranker' => 'Superlatives calculator',
     'planner' => 'Vocabulary planner',
     'matcher' => 'Article product matcher',
+    'cards' => 'Product and page cards',
     'code_reader' => 'Code reader',
     'relator' => 'Product relations calculator',
     'picture_reader' => 'Suggests details of looks from the picture',

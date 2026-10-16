@@ -43,6 +43,8 @@ final class RunNightlyReading
         'model' => RunNightlyModelReading::class,
         // What the reading left waiting, checked by the other family.
         'review' => RunNightlyReview::class,
+        // The cards every model reads, with what the night approved. Code only.
+        'cards' => BuildCards::class,
     ];
 
     public function __construct(private readonly RecordsRuns $runs) {}

@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\AuditContentReading;
+use App\Modules\Enrichment\Actions\BuildCards;
 use App\Modules\Enrichment\Actions\BuildStructure;
 use App\Modules\Enrichment\Actions\CollectProviderBatches;
 use App\Modules\Enrichment\Actions\ComputeProductRelations;
@@ -46,7 +47,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, collect, vocabulary, schema, structure, code, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, collect, vocabulary, schema, structure, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results}
         {--template= : vocabulary template name}
@@ -76,6 +77,8 @@ final class EnrichmentCommand extends Command
             'collect' => $this->collect(),
             'rankings' => $this->rankings(),
             'code' => $this->shopStep(fn (Shop $shop): Run => app(ReadProductsInCode::class)->handle($shop->id)),
+            // The cards every model reads, for the whole shop at once (a sync and the night keep them since).
+            'cards' => $this->shopStep(fn (Shop $shop): Run => app(BuildCards::class)->handle($shop->id)),
             // Read only: where the vocabulary's words would mislead code (WordAudit).
             'words' => $this->words(),
             // The shop's own vocabulary: counted in code, then written and reviewed, for the operator to approve.

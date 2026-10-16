@@ -628,6 +628,33 @@
             "max": 400,
             "scope": "global",
             "unit": "usd"
+        },
+        {
+            "name": "card_text_chars",
+            "type": "int",
+            "default": 4000,
+            "min": 500,
+            "max": 20000,
+            "scope": "global",
+            "unit": "characters"
+        },
+        {
+            "name": "card_max_variants",
+            "type": "int",
+            "default": 40,
+            "min": 1,
+            "max": 200,
+            "scope": "global",
+            "unit": "products"
+        },
+        {
+            "name": "card_max_related",
+            "type": "int",
+            "default": 6,
+            "min": 0,
+            "max": 30,
+            "scope": "global",
+            "unit": "products"
         }
     ],
     "agents": [

@@ -102,6 +102,24 @@ final class AnswerQuestionTest extends TestCase
         $this->assertSame([['question' => 'האם זה מתאים לחוץ?', 'answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'source' => 'store']], $box['recent']);
     }
 
+    public function test_the_writer_reads_the_products_card_without_its_prices_or_stock(): void
+    {
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '31538')->update(['payload' => [
+            'title' => 'טיק ברומזי 19x120 מ"מ מחורץ', 'description' => 'מתאים לשימוש חוץ ופנים.', 'stock' => ['quantity' => 7, 'managed' => true],
+            'variations' => [['external_id' => '1', 'title' => 'אורך 2.4 מטר', 'price' => ['price' => 79], 'stock' => ['in_stock' => true, 'quantity' => 4]]],
+        ]]));
+        $this->model->replies = [['about_product' => true], ['answer' => 'יש באורך 2.4 מטר.', 'source' => 'store'], self::VERIFIED];
+
+        $this->ask('באילו אורכים זה מגיע?')->assertOk();
+
+        $sent = json_decode($this->model->calls[1]['user'], true);
+        $this->assertSame(['אורך 2.4 מטר'], $sent['product']['options'], 'its options by name, so "which lengths" has an answer');
+        $this->assertSame('טיק ברומזי 19x120 מ"מ מחורץ', $sent['product']['title']);
+        foreach (['price', 'regular_price', 'stock', 'in_stock', 'variants'] as $never) {
+            $this->assertArrayNotHasKey($never, $sent['product'], 'prices and stock are the store\'s page to say, live');
+        }
+    }
+
     public function test_general_knowledge_answers_only_after_code_and_a_second_model_check_them(): void
     {
         // The store's text says nothing about using it: general guidance for products like it, checked.

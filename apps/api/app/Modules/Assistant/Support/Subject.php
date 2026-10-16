@@ -4,10 +4,8 @@ namespace App\Modules\Assistant\Support;
 
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
-use App\Modules\Enrichment\Enums\FactKind;
-use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Models\EnrichmentContentProduct;
-use App\Modules\Enrichment\Models\EnrichmentFact;
 
 /**
  * The page a shopper is asking about: a product, or a guide the store published.
@@ -38,37 +36,19 @@ final class Subject
         public readonly array $brief,
     ) {}
 
+    /**
+     * The product as its card says it (Enrichment cards: one JSON every model reads), without what the
+     * shopper's assistant never speaks of: prices and stock, which the store's page says live. Its
+     * options by name only ("מידה 6"), so "which sizes are there" has an answer.
+     */
     public static function product(CatalogProduct $product, int $maxTextChars): self
     {
-        $facts = EnrichmentFact::query()
-            ->with('vocabulary')
-            ->where('product_id', $product->id)
-            ->where('status', FactStatus::Approved)
-            ->orderBy('kind')->orderBy('key')
-            ->get();
-
-        $lines = [];
-        $highlights = [];
-
-        foreach ($facts as $fact) {
-            if ($fact->kind === FactKind::Highlight) {
-                $highlights[] = $fact->key.': '.$fact->value_text;
-
-                continue;
-            }
-
-            $definition = $fact->vocabulary?->definition();
-            $lines[] = match ($fact->kind) {
-                FactKind::Type => $definition?->label('type', (string) $fact->value_text, 'he') ?? (string) $fact->value_text,
-                FactKind::Choice => ($definition?->label('attribute', $fact->key, 'he') ?? $fact->key).': '.($definition?->label('attribute', $fact->key, 'he', (string) $fact->value_text) ?? $fact->value_text),
-                FactKind::Spec => ($definition?->label('attribute', $fact->key, 'he') ?? $fact->key).': '.rtrim(rtrim(number_format((float) $fact->value_number, 3, '.', ''), '0'), '.').' '.$fact->unit,
-                FactKind::Use => ($definition?->label('use', (string) $fact->value_text, 'he') ?? (string) $fact->value_text),
-                default => $fact->key.': '.$fact->value_text,
-            };
+        $card = app(ReadsCards::class)->product($product->id) ?? [];
+        $category = (string) ($card['category'] ?? implode(' > ', $product->categoryPaths()[0] ?? []));
+        $related = [];
+        foreach ((array) ($card['related'] ?? []) as $kind => $list) {
+            $related[$kind] = array_values(array_map(fn (array $other): string => (string) $other['title'], (array) $list));
         }
-
-        $category = implode(' > ', $product->categoryPaths()[0] ?? []);
-        $text = trim(implode("\n", array_filter([$product->shortDescription(), $product->description()])));
 
         return new self(
             self::PRODUCT,
@@ -76,13 +56,18 @@ final class Subject
             $product->shop_id,
             $product->external_id,
             $product->title,
-            [
-                'title' => $product->title,
+            array_filter([
+                'title' => (string) ($card['title'] ?? $product->title),
+                'type' => $card['type'] ?? null,
+                'brand' => $card['brand'] ?? null,
                 'category' => $category,
-                'facts' => array_values(array_unique($lines)),
-                'highlights' => $highlights,
-                'text' => mb_substr($text, 0, $maxTextChars),
-            ],
+                'options' => array_values(array_map(fn (array $variant): string => (string) $variant['title'], (array) ($card['variants'] ?? []))),
+                'facts' => (array) ($card['facts'] ?? []),
+                'uses' => (array) ($card['uses'] ?? []),
+                'highlights' => (array) ($card['highlights'] ?? []),
+                'related' => $related,
+                'text' => mb_substr((string) ($card['text'] ?? ''), 0, $maxTextChars),
+            ], fn ($value): bool => $value !== null && $value !== '' && $value !== []),
             ['title' => $product->title, 'category' => $category],
         );
     }
