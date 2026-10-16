@@ -960,6 +960,8 @@
     // only words that read as a product search switch to the results
     if (aboutProduct(q)) { askOnly(q); return; }
     var was = S.live, isNew = !was || !SUG.classList.contains('is-on');
+    // a new search starts clean: what was on screen (results, similar items, answers) waits behind the dashed line
+    if (!was && S.turns.some(function (x) { return !x.prev; })) { S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; persist(); render(); }
     if (!was || was.q !== q) {
       var local = hits(q).filter(function (r) { return r.t === 'product'; });
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
