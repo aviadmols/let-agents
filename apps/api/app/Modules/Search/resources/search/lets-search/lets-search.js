@@ -87,7 +87,7 @@
       general: 'זו תשובה כללית למוצרים מהסוג הזה. לפרטים מדויקים כדאי לבדוק בהוראות היצרן.',
       noInfo: 'לא מצאתי את זה באתר.', teamNow: 'הצוות זמין עכשיו · עד :t', teamBack: 'הצוות חוזר :when', teamWa: 'לשאול את הצוות בוואטסאפ',
       waText: 'לא מצאתי את זה באתר. הצוות של החנות יכול לענות על זה ישירות.', leadText: 'לא מצאתי את זה באתר. להשאיר פרטים, והצוות יחזור אליך עם תשובה?', meanwhile: 'בינתיים, אולי זה יעזור',
-      name: 'שם', contact: 'טלפון או מייל', consent: 'אני מאשר/ת שהחנות תשמור את פרטיי כדי לחזור אליי עם תשובה לשאלה הזו.', leadSend: 'שליחה לצוות', leadNo: 'לא תודה, רק רציתי לשאול',
+      leadQuestion: 'מה תרצו לשאול?', leadNeedQuestion: 'כתבו מה תרצו לשאול', name: 'שם', contact: 'טלפון או מייל', consent: 'אני מאשר/ת שהחנות תשמור את פרטיי כדי לחזור אליי עם תשובה לשאלה הזו.', leadSend: 'שליחה לצוות', leadNo: 'לא תודה, רק רציתי לשאול',
       leadNeedName: 'איך קוראים לך?', leadBadContact: 'צריך טלפון (9–10 ספרות) או כתובת מייל', leadNeedConsent: 'צריך לאשר כדי שנוכל לחזור אליך', leadDone: 'קיבלנו, :name. נחזור אליך :when.', leadDoneSub: 'השאלה והפרטים נשלחו לצוות של :shop.', leadDeclined: 'בסדר גמור. אפשר להמשיך לשאול אותי כל דבר.', leadError: 'משהו השתבש בשליחה. נסו שוב.',
       error: 'משהו השתבש בדרך', errorSub: 'החיבור נקטע לפני שהתשובה הגיעה. השאלה נשמרה.', retry: 'נסו שוב',
       photoTitle: 'חיפוש לפי תמונה', photoDrop: 'גררו לכאן תמונה, או בחרו אחת', photoDropMobile: 'צלמו מוצר או בחרו תמונה מהגלריה', photoChoose: 'בחירת תמונה', photoTake: 'צילום', photoPrivate: 'JPG, PNG או WEBP עד :mb · התמונה משמשת רק לחיפוש הזה ולא נשמרת',
@@ -136,7 +136,7 @@
       general: 'This is a general answer for products of this kind. Check the maker\'s instructions for exact details.',
       noInfo: 'I couldn\'t find that on the site.', teamNow: 'The team is available now · until :t', teamBack: 'The team is back :when', teamWa: 'Ask the team on WhatsApp',
       waText: 'I couldn\'t find that on the site. The store\'s team can answer it directly.', leadText: 'I couldn\'t find that on the site. Leave your details and the team will get back to you?', meanwhile: 'Meanwhile, this might help',
-      name: 'Name', contact: 'Phone or email', consent: 'I agree that the store keeps my details to get back to me about this question.', leadSend: 'Send to the team', leadNo: 'No thanks, I just wanted to ask',
+      leadQuestion: 'What would you like to ask?', leadNeedQuestion: 'Write what you would like to ask', name: 'Name', contact: 'Phone or email', consent: 'I agree that the store keeps my details to get back to me about this question.', leadSend: 'Send to the team', leadNo: 'No thanks, I just wanted to ask',
       leadNeedName: 'What\'s your name?', leadBadContact: 'Enter a phone number or an email address', leadNeedConsent: 'Please agree so we can get back to you', leadDone: 'Got it, :name. We\'ll get back to you :when.', leadDoneSub: 'Your question and details went to the :shop team.', leadDeclined: 'No problem. Ask me anything else.', leadError: 'Something went wrong. Try again.',
       error: 'Something went wrong', errorSub: 'The connection dropped before the answer arrived. Your question is saved.', retry: 'Try again',
       photoTitle: 'Search by photo', photoDrop: 'Drop a photo here, or choose one', photoDropMobile: 'Take a photo or choose one from your gallery', photoChoose: 'Choose a photo', photoTake: 'Take a photo', photoPrivate: 'JPG, PNG or WEBP up to :mb · used only for this search, never stored',
@@ -763,7 +763,8 @@
       '<button class="ls-ibtn" aria-label="' + esc(t('close')) + '" data-close>' + icon('x') + '</button></div></div>' +
     '<div class="ls-menu" role="menu" hidden></div>' +
     '<button class="ls-edge" type="button" data-expand aria-label="' + esc(t('expand')) + '"><span class="ls-edge__grip"></span><span class="ls-edge__tip">' + esc(t('expand')) + '</span></button>' +
-    '<div class="ls-dfield">' +
+    // the field sits at the top of the main area: on a phone it floats over the results and slides away on scroll
+    '<div class="ls-dmain"><div class="ls-dfield">' +
       '<label class="ls-field" data-field>' + icon('search') +
         '<input type="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ls-suggest" aria-autocomplete="list" placeholder="' + esc(t('placeholder')) + '" aria-label="' + esc(t('placeholder')) + '">' +
         '<button class="ls-ibtn ls-ibtn--sm ls-clear" type="button" aria-label="' + esc(t('clear')) + '" data-clear>' + icon('x', 'ls-icon--sm') + '</button>' +
@@ -771,7 +772,7 @@
         '<button class="ls-ibtn" type="button" aria-label="' + esc(t('photo')) + '" data-photo>' + icon('camera') + '</button>' +
         '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm ls-field__send" type="button" aria-label="' + esc(t('send')) + '" data-submit>' + icon('send', 'ls-icon--sm') + '</button>' +
       '</label></div>' +
-    '<div class="ls-dmain"><div class="ls-dbody ls-scroll">' +
+    '<div class="ls-dbody ls-scroll">' +
         // what's being typed: live results at the top of the conversation, pushing the earlier turns down
         '<div class="ls-suggest" id="ls-suggest" role="listbox" aria-label="' + esc(t('placeholder')) + '"><div class="ls-suggest__in"></div></div>' +
         '<div class="ls-flow" role="log" aria-label="' + esc(t('open')) + '"></div></div>' +
@@ -790,11 +791,13 @@
   // viewport, from its own top. innerHeight is never mixed in: on iOS it disagrees with the fixed layer
   // once the keyboard is up, and the sheet was pushed up and cut.
   function fitViewport() {
-    var vv = win.visualViewport, phone = isPhone() && vv;
+    var a = root.activeElement, typing = !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName);
+    var vv = win.visualViewport, phone = isPhone() && vv && typing;
     R.style.top = phone ? vv.offsetTop + 'px' : '';
     R.style.height = phone ? vv.height + 'px' : '';
     R.style.bottom = phone ? 'auto' : '';
-    if (vv) { D.style.setProperty('--ls-vh', vv.height + 'px'); }
+    // otherwise the sheet keeps the small viewport's height (CSS): the same whether the toolbar is in or out
+    if (phone) { D.style.setProperty('--ls-vh', vv.height + 'px'); } else { D.style.removeProperty('--ls-vh'); }
   }
 
   // ---------------------------------------------------------------- open / close
@@ -1077,7 +1080,10 @@
     c.auto = {};
     Object.keys(best).forEach(function (k) { c.auto[best[k]] = true; });
     var acts = (turn.actions || []).map(function (a) { return a.id || a; });
-    c.autoStock = !c.no.stock && (/(^|\s)(במלאי|in stock)(\s|$)/i.test(q) || acts.indexOf('in_stock') >= 0);
+    // in stock by default in every search (a pill the shopper can take off, and it stays off), unless nothing found is;
+    // marked as read from the words only when the words said it
+    c.saidStock = /(^|\s)(במלאי|in stock)(\s|$)/i.test(q) || acts.indexOf('in_stock') >= 0;
+    c.autoStock = !c.no.stock && (c.saidStock || all.some(function (r) { return r.s === 1; }));
     c.autoSale = !c.no.sale && (/(^|\s)(ב?מבצע|on sale)(\s|$)/i.test(q) || acts.indexOf('on_sale') >= 0);
     c.autoSort = c.no.sort ? '' : acts.indexOf('cheapest') >= 0 ? 'asc' : acts.indexOf('dearest') >= 0 ? 'desc' : acts.indexOf('newest') >= 0 ? 'new' : '';
   }
@@ -1110,7 +1116,7 @@
   function activeRow(turn) {
     var c = C(turn), pills = [];
     codesOn(c).forEach(function (code) { var x = valueOf(code); if (x && x.value) { pills.push({ key: 'f:' + code, label: x.value.l, auto: !c.f[code], sw: swatch(x.facet, x.value) }); } });
-    if (onStock(c)) { pills.push({ key: 'stock', label: t('inStock'), auto: !c.stock }); }
+    if (onStock(c)) { pills.push({ key: 'stock', label: t('inStock'), auto: !c.stock && !!c.saidStock }); }
     if (onSale(c)) { pills.push({ key: 'sale', label: t('onSale'), auto: !c.sale }); }
     if (!pills.length) { return ''; }
     return '<div class="ls-active" role="group" aria-label="' + esc(t('activeFilters')) + '">' + pills.map(function (p) {
@@ -1257,7 +1263,7 @@
   function chipRow(turn) {
     var fc = facetChips(turn, 4), c = C(turn), act = activeFilters(c);
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
-    if (fc.stock || onStock(c)) { chips += chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock); }
+    if (fc.stock || onStock(c)) { chips += chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock && !!c.saidStock); }
     if (fc.sale || onSale(c)) { chips += chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale); }
     fc.codes.forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(v.l, onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(f, v)); });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
@@ -1486,6 +1492,18 @@
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html;
   }
+  // leave your details for the store to come back to you: the question first (what was asked, still editable), then
+  // a name, a phone or an email and consent. Sent as the shop's callback about this question (shoppers.callbacks).
+  function leadForm(turn, q) {
+    var e = turn.errs || {};
+    return '<form class="ls-form" data-lead="' + turn.id + '" novalidate>' +
+      '<div class="ls-input"><label for="lq-' + turn.id + '">' + esc(t('leadQuestion')) + '</label><textarea id="lq-' + turn.id + '" name="question" rows="2" dir="auto"' + (e.question ? ' aria-invalid="true" aria-describedby="lqe-' + turn.id + '"' : '') + '>' + esc(turn.lq != null ? turn.lq : q || '') + '</textarea>' + (e.question ? '<span class="ls-input__err" id="lqe-' + turn.id + '">' + esc(t('leadNeedQuestion')) + '</span>' : '') + '</div>' +
+      '<div class="ls-input"><label for="ln-' + turn.id + '">' + esc(t('name')) + '</label><input id="ln-' + turn.id + '" name="name" autocomplete="name" value="' + esc(turn.ln || '') + '"' + (e.name ? ' aria-invalid="true" aria-describedby="lne-' + turn.id + '"' : '') + '>' + (e.name ? '<span class="ls-input__err" id="lne-' + turn.id + '">' + esc(t('leadNeedName')) + '</span>' : '') + '</div>' +
+      '<div class="ls-input"><label for="lc-' + turn.id + '">' + esc(t('contact')) + '</label><input id="lc-' + turn.id + '" name="contact" autocomplete="tel" inputmode="email" dir="ltr" style="text-align:' + (DIR === 'rtl' ? 'right' : 'left') + '" value="' + esc(turn.lc || '') + '"' + (e.contact ? ' aria-invalid="true" aria-describedby="lce-' + turn.id + '"' : '') + '>' + (e.contact ? '<span class="ls-input__err" id="lce-' + turn.id + '">' + esc(t('leadBadContact')) + '</span>' : '') + '</div>' +
+      '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(t('consent')) + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
+      (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
+      '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary">' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
+  }
   function noInfoHtml(turn) {
     var h = hours(), link = wa((S.config.whatsappMessage || ':question').replace(':question', turn.q)), html = '';
     if (turn.lead === 'done') {
@@ -1496,14 +1514,8 @@
       html = '<div class="ls-hours"><span class="ls-dot"></span>' + esc(t('teamNow', { t: h.until || '' })) + '</div><p class="ls-noanswer__text">' + esc(t('waText')) + '</p>' +
         '<a class="ls-btn ls-btn--primary" href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp') + esc(t('teamWa')) + '</a>';
     } else if (S.config.callbacks !== false) {
-      var e = turn.errs || {};
       html = '<div class="ls-hours"><span class="ls-dot ls-dot--off"></span>' + esc(t('teamBack', { when: h.when || '' })) + '</div><p class="ls-noanswer__text">' + esc(t('leadText')) + '</p>' +
-        '<form class="ls-form" data-lead="' + turn.id + '" novalidate>' +
-          '<div class="ls-input"><label for="ln-' + turn.id + '">' + esc(t('name')) + '</label><input id="ln-' + turn.id + '" name="name" autocomplete="name" value="' + esc(turn.ln || '') + '"' + (e.name ? ' aria-invalid="true" aria-describedby="lne-' + turn.id + '"' : '') + '>' + (e.name ? '<span class="ls-input__err" id="lne-' + turn.id + '">' + esc(t('leadNeedName')) + '</span>' : '') + '</div>' +
-          '<div class="ls-input"><label for="lc-' + turn.id + '">' + esc(t('contact')) + '</label><input id="lc-' + turn.id + '" name="contact" autocomplete="tel" inputmode="email" dir="ltr" style="text-align:' + (DIR === 'rtl' ? 'right' : 'left') + '" value="' + esc(turn.lc || '') + '"' + (e.contact ? ' aria-invalid="true" aria-describedby="lce-' + turn.id + '"' : '') + '>' + (e.contact ? '<span class="ls-input__err" id="lce-' + turn.id + '">' + esc(t('leadBadContact')) + '</span>' : '') + '</div>' +
-          '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(t('consent')) + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
-          (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
-          '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary">' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
+        leadForm(turn, turn.q);
     } else {
       html = '<p class="ls-noanswer__text">' + esc(t('noInfo')) + '</p>';
     }
@@ -1773,11 +1785,18 @@
     if (b.assurances && b.assurances.length) {
       html += '<div class="ls-block"><div class="ls-block__title">' + esc(t('promises')) + '</div>' + b.assurances.map(function (a) { return '<div class="ls-promise">' + icon(a.scope === 'shop' ? 'truck' : 'check', 'ls-icon--sm') + '<div>' + esc(a.text) + (a.note ? '<small>' + esc(a.note) + '</small>' : '') + '</div></div>'; }).join('') + '</div>';
     }
-    var c = b.contact;
-    if (c && c.number) {
-      var h = hours();
-      html += '<div class="ls-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || t('talkTitle')) + '</div><div class="ls-hours" style="margin:4px 0 0"><span class="ls-dot' + (h.open ? '' : ' ls-dot--off') + '"></span>' + esc(h.open ? (c.online_label || '') : (c.offline_note || c.offline_label || '')) + '</div></div>' +
+    // someone who knows: WhatsApp only while the store answers it; otherwise (or with no WhatsApp) the details form,
+    // with the last question asked about this product already in it
+    var c = b.contact, h = hours();
+    if (c && c.number && h.open) {
+      html += '<div class="ls-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || t('talkTitle')) + '</div><div class="ls-hours" style="margin:4px 0 0"><span class="ls-dot"></span>' + esc(c.online_label || '') + '</div></div>' +
         '<a class="ls-btn ls-btn--secondary ls-btn--sm" target="_blank" rel="noopener" href="https://wa.me/' + esc(c.number) + '?text=' + encodeURIComponent(String(c.message || '').replace(':product', decode(r.title)).replace(':url', win.location.href)) + '">' + icon('whatsapp', 'ls-icon--sm') + esc(c.button || t('talkBtn')) + '</a></div>';
+    }
+    else if (S.config.callbacks !== false) {
+      var asked = S.turns.filter(function (x) { return x.kind === 'answer' && String(x.ctx) === String(turn.id) && x.q; }).pop();
+      html += '<div class="ls-block"><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || t('talkTitle')) + '</div>' +
+        (turn.lead === 'done' ? '<div class="ls-done ls-focus-in" style="margin-top:10px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>'
+          : turn.lead === 'no' ? '' : '<div class="ls-hours" style="margin:4px 0 10px"><span class="ls-dot ls-dot--off"></span>' + esc(h.when ? t('teamBack', { when: h.when }) : t('leadText')) + '</div>' + leadForm(turn, asked ? asked.q : '')) + '</div>';
     }
     html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('aboutNote')) + '</span></div>';
     return html;
@@ -2057,7 +2076,7 @@
       var html = activeRow(turn) ? '<div class="ls-fgroup ls-fgroup--active"><div class="ls-fgroup__t">' + esc(t('activeFilters')) + '</div>' + activeRow(turn) + '</div>' : '';
       html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(t('sort')) + '</div><div class="ls-chips">' + ['', 'asc', 'desc', 'new'].map(function (s) { return '<button class="ls-chip" aria-pressed="' + (so === s) + '" data-fsort="' + s + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(sortLabel(s)) + '</button>'; }).join('') + '</div></div>';
       if (fc.stock || fc.sale || onStock(c) || onSale(c)) {
-        html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(LANG === 'he' ? 'זמינות' : 'Availability') + '</div><div class="ls-chips">' + ((fc.stock || onStock(c)) ? chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock) : '') + ((fc.sale || onSale(c)) ? chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale) : '') + '</div></div>';
+        html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(LANG === 'he' ? 'זמינות' : 'Availability') + '</div><div class="ls-chips">' + ((fc.stock || onStock(c)) ? chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock && !!c.saidStock) : '') + ((fc.sale || onSale(c)) ? chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale) : '') + '</div></div>';
       }
       Object.keys(groups).forEach(function (g) {
         var facet = S.facets[g], colours = groups[g].some(function (code) { return swatch(facet, facet.v[code % 1000]); });
@@ -2300,12 +2319,13 @@
     if (f.matches('[data-lead]')) {
       var turn = S.turns.filter(function (x) { return x.id === f.dataset.lead; })[0];
       var name = f.name.value.trim(), contact = f.contact.value.trim(), ok = f.consent.checked, digits = contact.replace(/\D/g, '');
-      var errs = { name: !name, contact: !(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact) || (digits.length >= 9 && digits.length <= 12 && !/[a-z]/i.test(contact))), consent: !ok };
-      turn.ln = name; turn.lc = contact; turn.lk = ok;
-      if (errs.name || errs.contact || errs.consent) { turn.errs = errs; render(); var bad = BODY.querySelector('[data-lead="' + turn.id + '"] [aria-invalid="true"]'); if (bad) { bad.focus(); } return; }
+      var question = f.question ? f.question.value.trim() : String(turn.q || '');
+      var errs = { question: !question, name: !name, contact: !(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact) || (digits.length >= 9 && digits.length <= 12 && !/[a-z]/i.test(contact))), consent: !ok };
+      turn.ln = name; turn.lc = contact; turn.lk = ok; turn.lq = question;
+      if (errs.question || errs.name || errs.contact || errs.consent) { turn.errs = errs; render(); var bad = BODY.querySelector('[data-lead="' + turn.id + '"] [aria-invalid="true"]'); if (bad) { bad.focus(); } return; }
       turn.errs = {};
       // the shop's callback about this question, as the search drawer always sent it (shoppers.callbacks)
-      json(API + '/widget/' + SITE + '/signup', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ vid: visitor(), contact: contact, name: name, consent: true, locale: LANG, question: turn.q, type: 'search', id: turn.askId || 'search' }) }).then(function (r) {
+      json(API + '/widget/' + SITE + '/signup', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ vid: visitor(), contact: contact, name: name, consent: true, locale: LANG, question: question, type: turn.kind === 'about' ? 'product' : 'search', id: turn.kind === 'about' ? String(turn.id) : turn.askId || 'search' }) }).then(function (r) {
         var status = r.body && r.body.data ? r.body.data.status : null;
         if (status === 'invalid_contact') { turn.errs = { contact: true }; render(); return; }
         if (status !== 'saved' && status !== 'code_sent') { throw new Error('lead'); }
@@ -2500,6 +2520,12 @@
     if (Math.abs(dy) > 6 || y < 40) { lastY = y; }
   }, { passive: true });
   INPUT.addEventListener('focus', function () { D.classList.remove('is-field-away'); });
+  root.addEventListener('focusin', fitViewport); root.addEventListener('focusout', function () { setTimeout(fitViewport, 50); });
+  // the results start under the floating field, whatever its height (a context line can make it taller)
+  (function () {
+    var fieldBox = D.querySelector('.ls-dfield'), setH = function () { D.style.setProperty('--ls-fh', fieldBox.offsetHeight + 'px'); };
+    if (win.ResizeObserver) { new win.ResizeObserver(setH).observe(fieldBox); } else { win.addEventListener('resize', setH); }
+  })();
 
   // product sliders: the arrows follow the row's position; a mouse can drag it (and a drag isn't a click)
   var dragged = false;
