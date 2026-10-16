@@ -778,6 +778,9 @@
         '<div class="ls-flow" role="log" aria-label="' + esc(t('open')) + '"></div></div>' +
       '<div class="ls-layer-scrim" hidden data-layer-close></div><div class="ls-layer" role="dialog" aria-modal="true" hidden></div>' +
       '<div class="ls-toast" role="status" hidden></div></div>' +
+    // the phone's own picker (take a photo, or choose one), opened straight from the camera button: never display:none,
+    // which iOS will not open from a press
+    '<input type="file" accept="image/*" class="ls-vh" tabindex="-1" aria-hidden="true" data-file data-photo-pick>' +
     // "Powered by": always at the drawer's foot, outside the scrolling body
     credit();
   var INPUT = D.querySelector('input'), FIELD = D.querySelector('[data-field]'), SUG = D.querySelector('.ls-suggest'), SUGIN = SUG.firstChild, BODY = D.querySelector('.ls-dbody'), FLOW = D.querySelector('.ls-flow');
@@ -949,7 +952,7 @@
   // As the shopper types, the results come up the way Enter shows them (count, sort, filters, cards,
   // guides), at the top of the conversation: from the index at once, then the server's list a beat
   // later. Filters chosen here stay while typing, and go with the search when it's sent.
-  var liveTimer = null, pauseTimer = null;
+  var liveTimer = null, pauseTimer = null, meaningTimer = null;
   function onType() {
     var q = INPUT.value.trim();
     FIELD.classList.toggle('has-text', !!q);
@@ -969,15 +972,17 @@
       var local = hits(q).filter(function (r) { return r.t === 'product'; });
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
       readTags(S.live);
-      clearTimeout(liveTimer); clearTimeout(pauseTimer);
+      clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer);
       liveTimer = setTimeout(function () { liveServer(q); }, 180);
     }
     renderLive(isNew);
     announce(isQuestion(q) ? t('announceQuestion') : t('announceResults', { n: filtered(S.live).length }));
   }
-  function liveServer(q) {
-    // typing=1: spelling only and nothing counted on the server; the search is counted once the shopper pauses
-    json(API + '/search/' + SITE + '?q=' + encodeURIComponent(q) + '&typing=1' + visitQuery()).then(function (r) {
+  // typing=1: spelling only and nothing counted on the server; the search is counted once the shopper pauses.
+  // Half a second after the last key the words are asked again by meaning too (meaning=1), so "מברגה עם בטריה"
+  // finds the store's "סוללות" while still typing: one vector per wording, kept on the server.
+  function liveServer(q, byMeaning) {
+    json(API + '/search/' + SITE + '?q=' + encodeURIComponent(q) + '&typing=1' + (byMeaning ? '&meaning=1' : '') + visitQuery()).then(function (r) {
       var lv = S.live;
       if (!lv || lv.q !== q) { return; }
       var d = r.body || {};
@@ -989,8 +994,11 @@
       lv.actions = d.actions || [];
       readTags(lv);
       renderLive(false);
-      clearTimeout(pauseTimer);
-      pauseTimer = setTimeout(function () { if (S.live === lv) { countSearch(q, ids.length); } }, PAUSE_MS);
+      if (!byMeaning) {
+        clearTimeout(pauseTimer);
+        pauseTimer = setTimeout(function () { if (S.live === lv) { countSearch(q, lv.ids.length); } }, PAUSE_MS);
+        if (wordsOf(q).length >= 2 || ids.length < 4) { clearTimeout(meaningTimer); meaningTimer = setTimeout(function () { if (S.live === lv) { liveServer(q, true); } }, 500); }
+      }
       return products(filtered(lv).slice(0, 8).map(function (x) { return x.id; })).then(function () { if (S.live === lv) { renderLive(false); } });
     }).catch(function () { /* the index results stay */ });
   }
@@ -1009,7 +1017,7 @@
     mark_active();
   }
   function hideLive() {
-    clearTimeout(liveTimer); clearTimeout(pauseTimer);
+    clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer);
     S.live = null; S.active = -1;
     if (SUG.classList.contains('is-on')) { SUG.classList.remove('is-on'); SUGIN.innerHTML = ''; }
     INPUT.setAttribute('aria-expanded', 'false'); INPUT.removeAttribute('aria-activedescendant');
@@ -1556,6 +1564,14 @@
 
   // ---------------------------------------------------------------- photo
   var MAXKB = 5120;
+  // the camera button: on a phone the phone's own picker at once (inside the press, or iOS opens nothing);
+  // elsewhere the sheet with a drop zone
+  function photoPick() {
+    MAXKB = S.config.photoMaxKb || 5120;
+    var pick = D.querySelector('[data-photo-pick]');
+    if (isPhone() && pick) { pick.value = ''; pick.click(); return; }
+    photoLayer();
+  }
   function photoLayer() {
     MAXKB = S.config.photoMaxKb || 5120;
     var mb = Math.round(MAXKB / 1024) + 'MB';
@@ -1567,11 +1583,14 @@
   }
   function photoFile(file) {
     var msg = LAYER.querySelector('[data-photo-msg]'), mb = Math.round(MAXKB / 1024) + 'MB';
-    var tooBig = function () { if (msg) { msg.textContent = t('photoBig', { mb: mb }); msg.style.color = 'var(--ls-danger)'; } };
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { if (msg) { msg.textContent = t('photoType'); msg.style.color = 'var(--ls-danger)'; } return; }
-    // shrunk in the browser first (as before: 1600px, JPEG), so a large phone photo still fits
+    // said in the sheet when it is open, else in a toast (the phone's picker has no sheet)
+    var say = function (text) { if (msg) { msg.textContent = text; msg.style.color = 'var(--ls-danger)'; } else { toast(text); } };
+    if (!/^image\//.test(file.type || 'image/')) { say(t('photoType')); return; }
+    // shrunk in the browser first (as before: 1600px, JPEG), so a large phone photo still fits; an iPhone's
+    // HEIC becomes a JPEG here, and only a picture the browser could not read is refused
     shrink(file).then(function (blob) {
-      if (blob.size > MAXKB * 1024) { tooBig(); return; }
+      if (!/^image\/(jpeg|png|webp)$/.test(blob.type)) { say(t('photoType')); return; }
+      if (blob.size > MAXKB * 1024) { say(t('photoBig', { mb: mb })); return; }
       hideLayer();
       var reader = new FileReader();
       reader.onload = function () { photoSend(blob, String(reader.result)); };
@@ -1591,7 +1610,10 @@
   }
   function photoSend(blob, src) {
     S.tab = 'chat'; S.wide = null;
+    // the photo search stands first, alone: what was on screen waits behind the dashed line
+    S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; hideLive(); INPUT.value = ''; FIELD.classList.remove('has-text');
     var turn = addTurn({ kind: 'photo', src: src, loading: true });
+    BODY.scrollTop = 0;
     // as SearchPhotoController reads it: the photo, and the visit beside it for the reports
     var form = new FormData(), seen = visit();
     form.append('photo', blob, 'photo.jpg');
@@ -2433,7 +2455,7 @@
     }
     if (d.clear !== undefined) { e.preventDefault(); INPUT.value = ''; INPUT.focus(); onType(); return; }
     if (d.submit !== undefined) { e.preventDefault(); submit(INPUT.value); return; }
-    if (d.photo !== undefined) { e.preventDefault(); photoLayer(); return; }
+    if (d.photo !== undefined) { e.preventDefault(); photoPick(); return; }
     if (d.focus !== undefined) { INPUT.focus(); return; }
     if (d.q) { e.preventDefault(); submit(d.q, 'search'); return; }
     if (d.ask) { e.preventDefault(); submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
@@ -2678,7 +2700,7 @@
     };
     input.addEventListener('input', function () { if (input.value.trim()) { go(input.value); } });
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(input.value); } });
-    sr.querySelector('[data-photo]').addEventListener('click', function (e) { e.preventDefault(); open({ focus: false }); photoLayer(); });
+    sr.querySelector('[data-photo]').addEventListener('click', function (e) { e.preventDefault(); open({ focus: false }); photoPick(); });
     at.parentNode.insertBefore(h, at.nextSibling);
   }
   // ---------------------------------------------------------------- size help on a product page (as before)
@@ -2938,13 +2960,13 @@
       if (pq && pq.length <= 120) { loadIndex().then(function () { if (S.config.resultsPage) { S.spellingNext = true; open({ focus: false }); submit(pq, 'search'); } }); }
     }
   }
-  win.LetsSearch = { open: open, close: close, search: function (q) { open({ focus: false }); submit(q, 'search'); }, ask: function (q) { open({ focus: false }); submit(q, 'ask'); }, similar: function (id) { open({ focus: false }); similarTurn(String(id)); }, photo: function () { open({ focus: false }); photoLayer(); }, state: S, _photoFile: photoFile, _root: root, _learn: LEARN };
+  win.LetsSearch = { open: open, close: close, search: function (q) { open({ focus: false }); submit(q, 'search'); }, ask: function (q) { open({ focus: false }); submit(q, 'ask'); }, similar: function (id) { open({ focus: false }); similarTurn(String(id)); }, photo: function () { open({ focus: false }); photoPick(); }, state: S, _photoFile: photoFile, _root: root, _learn: LEARN };
   if (!win.LetAgentsSearch) {
     win.LetAgentsSearch = {
       addToCart: function (externalId, button, onAdded) { loadIndex().then(function () { addToCart(button || null, String(externalId).replace(/^p:/, ''), null, null, null, null, onAdded); }); },
       canSimilar: function () { return S.index ? S.config.similar !== false : true; },
       similar: function (item) { var id = String(item && (item.external_id || item.id) || '').replace(/^p:/, ''); if (id) { open({ focus: false }); loadIndex().then(function () { similarTurn(id); }); } },
-      photo: function () { open({ focus: false }); photoLayer(); },
+      photo: function () { open({ focus: false }); photoPick(); },
       ask: function (question, productIds, about) { var q = String(question || '').trim(); open({ focus: !q }); if (q) { loadIndex().then(function () { submit(q, 'ask', !!about); }); } },
       search: function (query) { var q = String(query || '').trim(); open({ focus: !q }); if (q) { loadIndex().then(function () { submit(q, 'search'); }); } }
     };

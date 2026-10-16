@@ -74,6 +74,8 @@ final class HebrewSearch
         ['מקלחת', 'מקלחון'],
         ['תאורה', 'תאורת'],
         ['אינסטלציה', 'אינסטלטור'],
+        // a shopper's "בטריה" is the store's "סוללה" (a drill "עם בטריה", "כולל סוללות")
+        ['סוללה', 'סוללות', 'בטריה', 'בטריות', 'בטרייה', 'בטרייות'],
     ];
 
     /** How much a generic word counts in a record's score, against 1 for a word that says what. */

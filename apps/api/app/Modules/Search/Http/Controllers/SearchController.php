@@ -42,8 +42,12 @@ final class SearchController
         // The store's own search page opening (spelling=1): counted, but spelling only, as no page
         // load may reach a model.
         $spelling = $typing || $request->boolean('spelling');
+        // A pause in the typing (typing=1&meaning=1, sent by the drawer half a second after the last key):
+        // by meaning too, so "בטריה" finds what the store calls "סוללה". One vector per wording (QueryVectors
+        // keeps it), still not counted. Never on a page opening.
+        $meaning = ! $spelling || ($typing && $request->boolean('meaning'));
         $visit = Visit::from($request, ['sid' => $request->query('sid'), 'page' => $request->query('page'), 'ref' => $request->query('ref')]);
-        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: ! $spelling, visit: $visit);
+        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: $meaning, visit: $visit);
 
         return response()->json($result, 200, ['Cache-Control' => 'no-store'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

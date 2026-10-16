@@ -297,6 +297,11 @@ final class SearchFlowTest extends TestCase
         $this->assertFalse($result['semantic']);
         $this->assertSame([], $this->meaningAsked, 'no vector per keystroke');
         $this->assertSame(0, $this->inShop(fn () => SearchTerm::query()->count()), 'nothing counted while typing');
+
+        // A pause in the typing: by meaning too, and still not counted
+        $this->getJson("/api/v1/search/{$this->site}?q=".urlencode('מקיטא').'&typing=1&meaning=1', ['Origin' => 'https://www.store.test'])->assertOk();
+        $this->assertNotSame([], $this->meaningAsked, 'a pause reads the words by meaning');
+        $this->assertSame(0, $this->inShop(fn () => SearchTerm::query()->count()));
     }
 
     public function test_the_stores_own_search_page_is_searched_by_spelling_only_and_counted(): void
@@ -320,6 +325,20 @@ final class SearchFlowTest extends TestCase
 
         $result = $this->search('קרש')->json();
         $this->assertEqualsCanonicalizing(['103', '104'], array_column($result['groups']['product'], 'external_id'));
+    }
+
+    public function test_a_shoppers_battery_is_the_stores_battery_while_typing(): void
+    {
+        // as at the hardware store: one drill shares "עם" with the words, the one with batteries says "סוללות"
+        $this->inShop(function (): void {
+            $this->product('301', 'מקדחה נטענת 18V כולל 2 סוללות ומטען');
+            $this->product('302', 'מקדחה נטענת עם ידית צד');
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $result = $this->getJson("/api/v1/search/{$this->site}?q=".urlencode('מקדחה נטענת עם בטריה').'&typing=1', ['Origin' => 'https://www.store.test'])->assertOk()->json();
+
+        $this->assertContains('301', array_column($result['groups']['product'], 'external_id'), '"בטריה" finds the store\'s "סוללות", by spelling alone');
     }
 
     public function test_the_storefront_counts_paused_searches_and_clicks_without_anything_about_the_shopper(): void
