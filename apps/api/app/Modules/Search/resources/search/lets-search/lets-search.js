@@ -776,7 +776,9 @@
         '<div class="ls-suggest" id="ls-suggest" role="listbox" aria-label="' + esc(t('placeholder')) + '"><div class="ls-suggest__in"></div></div>' +
         '<div class="ls-flow" role="log" aria-label="' + esc(t('open')) + '"></div></div>' +
       '<div class="ls-layer-scrim" hidden data-layer-close></div><div class="ls-layer" role="dialog" aria-modal="true" hidden></div>' +
-      '<div class="ls-toast" role="status" hidden></div></div>';
+      '<div class="ls-toast" role="status" hidden></div></div>' +
+    // "Powered by": always at the drawer's foot, outside the scrolling body
+    credit();
   var INPUT = D.querySelector('input'), FIELD = D.querySelector('[data-field]'), SUG = D.querySelector('.ls-suggest'), SUGIN = SUG.firstChild, BODY = D.querySelector('.ls-dbody'), FLOW = D.querySelector('.ls-flow');
   var LAYER = D.querySelector('.ls-layer'), LSCRIM = D.querySelector('.ls-layer-scrim'), TOAST = D.querySelector('.ls-toast'), MENU = D.querySelector('.ls-menu');
   var TABS = D.querySelector('.ls-tabs');
@@ -784,6 +786,16 @@
   function announce(s) { LIVE.textContent = ''; setTimeout(function () { LIVE.textContent = s; }, 40); }
   function placePill() { var p = TABS.querySelector('.ls-tabs__pill'), s = TABS.querySelector('[aria-selected="true"]'); if (p && s && s.offsetWidth) { p.style.left = s.offsetLeft + 'px'; p.style.width = s.offsetWidth + 'px'; } }
   function isPhone() { return win.matchMedia('(max-width: 720px)').matches; }
+  // On a phone the whole layer covers exactly what can be seen: with the keyboard up that is the visual
+  // viewport, from its own top. innerHeight is never mixed in: on iOS it disagrees with the fixed layer
+  // once the keyboard is up, and the sheet was pushed up and cut.
+  function fitViewport() {
+    var vv = win.visualViewport, phone = isPhone() && vv;
+    R.style.top = phone ? vv.offsetTop + 'px' : '';
+    R.style.height = phone ? vv.height + 'px' : '';
+    R.style.bottom = phone ? 'auto' : '';
+    if (vv) { D.style.setProperty('--ls-vh', vv.height + 'px'); }
+  }
 
   // ---------------------------------------------------------------- open / close
   var lastFocus = null, closeTimer = null;
@@ -796,18 +808,23 @@
       clearTimeout(closeTimer);
       if (!doc.body.contains(host)) { doc.body.appendChild(host); }
       R.classList.add('is-open');
+      fitViewport();
       if (opts.from && opts.text) { fly(opts.from, opts.text); }
       requestAnimationFrame(function () { R.classList.add('is-open'); SCRIM.classList.add('is-open'); D.classList.add('is-open'); placePill(); });
       doc.documentElement.style.overflow = 'hidden';
       try { win.history.pushState({ lets: 1 }, ''); } catch (e) { /* file:// */ }
-      if (S.ctx && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
+      // every opening starts clean: what was searched or asked before waits behind the dashed line
+      S.turns.forEach(function (x) { x.prev = true; });
+      S.showPrev = false;
+      // "about this product" only from the product page's own search row; the header's search is the store's search
+      if (opts.about && S.ctx && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
     }
     S.askMode = !!(opts.about && S.ctx);
     // opened from the product page's own search row: only the product's information, and under it only
     // the line that loads the previous conversation (everything asked before, on this page too, waits there)
     if (opts.about && S.ctx) {
       var ab = S.turns.filter(function (x) { return x.kind === 'about' && x.id === S.ctx; }).pop();
-      S.turns.forEach(function (x) { if (x !== ab) { x.prev = true; } });
+      S.turns.forEach(function (x) { x.prev = x !== ab; });
       if (ab) { S.turns = S.turns.filter(function (x) { return x !== ab; }).concat([ab]); }
       S.showPrev = false; S.tab = 'chat'; S.wide = null; BODY.scrollTop = 0;
     }
@@ -893,12 +910,12 @@
     var prevHtml = before.length ? '<div class="ls-prev">' + (S.showPrev ? '<span class="ls-prev__label">' + esc(t('prevChat')) + '</span>'
       : '<button class="ls-prev__btn" data-prev>' + icon('history', 'ls-icon--sm') + esc(t('loadPrev')) + ' <span class="ls-num">(' + before.length + ')</span></button>') + '</div>' +
       (S.showPrev ? '<div class="ls-turns ls-turns--prev">' + before.slice(-8).map(turnHtml).reverse().join('') + '</div>' : '') : '';
-    if (!list.length) { FLOW.innerHTML = welcome() + prevHtml + credit(); return; }
+    if (!list.length) { FLOW.innerHTML = welcome() + prevHtml; return; }
     var shown = S.showAll ? list : list.slice(-8);
     var html = shown.map(turnHtml).reverse().join('');
     if (list.length > shown.length) { html += '<div class="ls-earlier"><button class="ls-btn ls-btn--ghost ls-btn--sm" data-earlier>' + esc(LANG === 'he' ? 'הצגת ' + (list.length - shown.length) + ' פניות קודמות' : 'Show ' + (list.length - shown.length) + ' earlier') + '</button></div>'; }
     var newest = Object.keys(fresh).length, keep = BODY.scrollTop;
-    FLOW.innerHTML = '<div class="ls-turns">' + html + '</div>' + prevHtml + credit();
+    FLOW.innerHTML = '<div class="ls-turns">' + html + '</div>' + prevHtml;
     fresh = {};
     if (isPhone()) {
       var first = BODY.querySelector('.ls-turns > .ls-turn');
@@ -908,18 +925,18 @@
   function credit() { return '<div class="ls-credit">' + mark() + '<a href="https://lets.ai" target="_blank" rel="noopener">' + esc(t('powered')) + '</a></div>'; }
   // On a product page the questions go with the product, invisibly: the field says so, nothing else does.
   function renderCtx() {
-    var ph = S.ctx && rec(S.ctx) ? t('placeholderProduct') : t('placeholder');
+    var ph = S.askMode && S.ctx && rec(S.ctx) ? t('placeholderProduct') : t('placeholder');
     if (INPUT.placeholder !== ph) { INPUT.placeholder = ph; INPUT.setAttribute('aria-label', ph); }
   }
 
   // ---------------------------------------------------------------- welcome (empty drawer)
   function welcome() {
-    var pop = (S.config.popular || ['אימפקט', 'פרגולה', 'שמן לעץ', 'מסילות למדפים', 'ברגים לדק']);
-    var asks = LANG === 'he' ? ['איזה אימפקט מתאים לפרגולה?', 'אילו ביטים מתאימים לאימפקט?', 'תוך כמה זמן זה מגיע?'] : ['Which impact driver suits a pergola?', 'How long does delivery take?'];
+    // the shop's own most searched words (the index config), never anyone else's: none yet, no section
+    var pop = S.config.popular || [];
+    var asks = off('ask') ? [] : LANG === 'he' ? ['תוך כמה זמן זה מגיע?', 'אפשר להחזיר או להחליף?'] : ['How long does delivery take?', 'Can I return or exchange it?'];
     return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t('welcomeSub')) + '</p>' +
-      (S.recent.length ? '<div class="ls-sec__title">' + esc(t('recent')) + '</div><div class="ls-stack">' + S.recent.slice(0, 4).map(function (q) { return '<div class="ls-row" style="padding-inline:0"><button class="ls-row" style="padding:0;min-height:40px" data-q="' + esc(q) + '">' + icon('history') + '<span class="ls-row__text">' + esc(q) + '</span></button><button class="ls-ibtn ls-ibtn--sm" aria-label="' + esc(t('removeRecent')) + '" data-unrecent="' + esc(q) + '">' + icon('x', 'ls-icon--sm') + '</button></div>'; }).join('') + '</div>' : '') +
-      '<div class="ls-sec__title">' + esc(t('popular')) + '</div><div class="ls-chips" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' +
-      '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div><div class="ls-stack">' + asks.map(function (q) { return '<button class="ls-ask ls-ask--example" data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400">' + esc(q) + '</span></span></button>'; }).join('') +
+      (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + '</div><div class="ls-chips" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' : '') +
+      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (q) { return '<button class="ls-ask ls-ask--example" data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400">' + esc(q) + '</span></span></button>'; }).join('') +
       '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
 
@@ -1320,7 +1337,8 @@
     var turn = turnById(S.wide);
     if (!turn) { S.wide = null; return ''; }
     if (turn.kind === 'compare') { return compareHtml(turn); }
-    var back = '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-narrow style="margin-inline-start:-12px">' + icon('back', 'ls-icon--sm') + esc(t('backToChat')) + '</button>';
+    // no "back to chat" here: the tab above and the search field lead back
+    var back = '';
     var similar = turn.kind === 'similar';
     if (turn.loading) { return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size) + '</div>' : '') + '</div><div style="padding:12px 0">' + thinking() + '</div>'; }
     if (turn.error) { return '<div class="ls-wide-head">' + back + '</div>' + errorHtml(turn); }
@@ -1331,7 +1349,7 @@
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn) + '</div>' +
       (similar && !(turn.ids || []).length ? '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>' : list.length ? '<div class="ls-grid">' + shown.map(card).join('') + '</div>' : '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '</div>') +
       (list.length > shown.length ? '<div class="ls-more"><button class="ls-btn ls-btn--secondary" data-loadmore="' + turn.id + '">' + esc(t('loadMore')) + '</button></div>' : '') +
-      (!similar && CFG.searchUrl ? '<div class="ls-more"><a class="ls-btn ls-btn--link" href="' + esc(CFG.searchUrl + '?s=' + encodeURIComponent(turn.q)) + '">' + esc(t('onSite')) + '</a></div>' : '') + credit();
+      (!similar && CFG.searchUrl ? '<div class="ls-more"><a class="ls-btn ls-btn--link" href="' + esc(CFG.searchUrl + '?s=' + encodeURIComponent(turn.q)) + '">' + esc(t('onSite')) + '</a></div>' : '');
   }
 
   // ---------------------------------------------------------------- ask turn
@@ -1354,7 +1372,7 @@
           // a shopper who got an answer is worth asking, once a page, and only where the shop set it up
           var lead = LEARN.bank && LEARN.bank.lead && !LEARN.offered ? { given: {}, step: 0, state: null, busy: true } : null;
           if (lead) { LEARN.offered = true; }
-          update(turn, { loading: false, answer: d.answer, picks: [], sources: [], general: d.source === 'general', follow: followUps(q), leadFlow: lead });
+          update(turn, { loading: false, answer: d.answer, picks: [], sources: [], general: d.source === 'general', follow: [], leadFlow: lead });
           announce(t('announceReady') + ': ' + d.answer);
           if (lead) { learn('lead_start', null, null, {}); leadStep(turn, {}); }
         } else {
@@ -1378,7 +1396,7 @@
       turn.askId = d.ask_id ? String(d.ask_id) : null;
       return products(picks.map(function (p) { return p.id; })).then(function () {
         if (d.outcome === 'answered') {
-          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], general: d.from === 'general', follow: (d.follow && d.follow.length ? d.follow : followUps(q)) });
+          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], general: d.from === 'general', follow: d.follow || [] });
           announce(t('announceReady') + ': ' + d.answer);
         } else {
           var rel = related(q);
@@ -1430,12 +1448,6 @@
       hits(w).forEach(function (x) { if (x.t === 'product' && x.s === 1 && !seen[x.id] && out.length < 2 && (x.title + ' ' + (x.kw || '')).indexOf(stem) >= 0) { seen[x.id] = 1; out.push(pid(x.id)); } });
     });
     return out;
-  }
-  function followUps(q) {
-    if (LANG !== 'he') { return []; }
-    if (/ביט/.test(q)) { return ['מה ההבדל בין שני הסטים?', 'יש גם ביטים ארוכים?']; }
-    if (/אימפקט|פרגולה/.test(q)) { return ['צריך גם ביטים?', 'מה ההבדל בין אימפקט למברגה?']; }
-    return [];
   }
   function answerHtml(turn) {
     if (turn.loading) { return thinking(); }
@@ -1720,19 +1732,17 @@
     var b = turn.bank || {};
     head += (b.popularity && b.popularity.popular ? '<span class="ls-pop" title="' + esc(b.popularity.text || '') + '">' + icon('trend', 'ls-icon--sm') + esc(b.popularity.badge || t('popular30')) + '</span>' : '') + '</div></div>';
     var html = head;
-    if (b.teaser && b.teaser.text) { html += '<p class="ls-teaser">' + esc(b.teaser.text) + '</p>'; }
-    // the sections in the order the learning chose (a held-out visitor: the order it never touched)
-    var sections = (b.sections || []).map(function (s) { return sectionHtml(s, turn); }).filter(Boolean);
-    html += sections.slice(0, 1).join('');
-    // suggested next steps, as the shop's block offers them
+    // suggested next steps first, as the shop's block offers them; the product's sections follow
     var qs = (b.assistant && b.assistant.questions) || [];
     if (qs.length) {
-      html += '<div class="ls-stack" style="margin-top:14px">' + qs.map(function (q) {
+      html += '<div class="ls-stack" style="margin-bottom:14px">' + qs.map(function (q) {
         var act = q.about === 'similar_items' ? 'data-similar="' + esc(turn.id) + '"' : q.about === 'similar' && q.query ? 'data-q="' + esc(q.query) + '"' : q.about === 'compare' ? 'data-cmp-viewed="' + esc(turn.id) + '"' : 'data-ask="' + esc(q.question || q.text) + '"';
         return '<button class="ls-row" ' + act + ' style="background:var(--ls-bg-sunken);min-height:48px">' + mark() + '<span class="ls-row__text">' + esc(q.text) + '</span><span class="ls-row__end" style="opacity:1">' + icon('fwd', 'ls-icon--sm') + '</span></button>';
       }).join('') + '</div>';
     }
-    html += sections.slice(1).join('');
+    if (b.teaser && b.teaser.text) { html += '<p class="ls-teaser">' + esc(b.teaser.text) + '</p>'; }
+    // the sections in the order the learning chose (a held-out visitor: the order it never touched)
+    html += (b.sections || []).map(function (s) { return sectionHtml(s, turn); }).filter(Boolean).join('');
     // what this visitor looked at, and more from the search that brought them here
     var seen = LEARN.recent && LEARN.recent.products;
     if (seen && seen.length) { html += '<div class="ls-block"><div class="ls-block__title"><span>' + esc(bankLabel('recent_title', t('recentTitle'))) + '</span></div>' + miniRow(seen) + '</div>'; }
@@ -1804,7 +1814,7 @@
   // ---------------------------------------------------------------- saved + compare
   function savedView() {
     if (!S.saved.length) {
-      return '<div class="ls-saved-empty"><span class="ls-ibtn">' + icon('heart') + '</span><b>' + esc(t('savedEmptyT')) + '</b>' + esc(t('savedEmpty')) + '</div>' + credit();
+      return '<div class="ls-saved-empty"><span class="ls-ibtn">' + icon('heart') + '</span><b>' + esc(t('savedEmptyT')) + '</b>' + esc(t('savedEmpty')) + '</div>';
     }
     var list = S.saved.map(rec).filter(Boolean);
     var html = '<div class="ls-saved-tools" style="padding-top:8px">' +
@@ -1823,7 +1833,7 @@
     html += '<div class="ls-compare-bar"><button class="ls-btn ls-btn--primary" data-compare' + (n < 2 ? ' disabled' : '') + '>' + icon('compare', 'ls-icon--sm') + esc(n < 2 ? t('compareNeed') : t('compareN', { n: n + '/5' })) + '</button></div>';
     html += '<p class="pg-note" style="font-size:12px;color:var(--ls-fg-muted);margin:12px 0 0">' + esc(S.phone ? t('phoneKept', { p: S.phone }) : t('savedNote')) + (S.phone && WISH.phone ? ' · <button class="ls-btn ls-btn--link" style="font-size:12px" data-phone-out>' + esc(shortWord('phone_out', t('phoneOut'))) + '</button>' : '') + '</p>';
     if (!S.phone && !(SHORT && SHORT.phoneLogin === false)) { html += phoneBox(); }
-    return html + credit();
+    return html;
   }
   function phoneBox() {
     var st = S.phoneStep || '';
@@ -1852,7 +1862,7 @@
       '<tr class="is-diff"><th>' + esc(t('price')) + '</th>' + d.products.map(function (p) { return '<td class="ls-num">' + money(p.price) + (p.regular_price > p.price ? ' <s style="color:var(--ls-fg-muted);font-weight:400">' + money(p.regular_price) + '</s>' : '') + '</td>'; }).join('') + '</tr>' +
       '<tr><th>' + esc(t('stock')) + '</th>' + d.products.map(function (p) { return '<td>' + esc(p.in_stock ? t('inStock') : t('outStock')) + '</td>'; }).join('') + '</tr>' +
       rows.map(function (row) { return '<tr' + (row.differs ? ' class="is-diff"' : '') + '><th>' + esc(row.label) + '</th>' + row.values.map(function (v) { return '<td>' + esc(v == null ? '—' : v) + '</td>'; }).join('') + '</tr>'; }).join('') +
-      '</tbody></table></div>' + credit();
+      '</tbody></table></div>';
   }
   function compare() {
     var ids = S.pick.slice(0, 5);
@@ -2492,9 +2502,7 @@
   })();
   // keep the field above the phone keyboard
   if (win.visualViewport) {
-    var vv = win.visualViewport;
-    var onVV = function () { D.style.setProperty('--ls-vh', vv.height + 'px'); D.style.bottom = isPhone() ? Math.max(0, win.innerHeight - vv.height - vv.offsetTop) + 'px' : ''; };
-    vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV);
+    win.visualViewport.addEventListener('resize', fitViewport); win.visualViewport.addEventListener('scroll', fitViewport);
   }
   win.addEventListener('resize', placePill);
 

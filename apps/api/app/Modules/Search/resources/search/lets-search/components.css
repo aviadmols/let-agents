@@ -201,7 +201,7 @@
 
 /* product row in suggestions: picture, name, price. No buttons. */
 .ls-prow { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--lsp-r-sm); transition: background-color 120ms ease; color: inherit; text-decoration: none; }
-.ls-prow__img { width: 52px; height: 52px; border-radius: var(--lsp-r-xs); background: var(--ls-bg-sunken); object-fit: contain; mix-blend-mode: multiply; flex: none; padding: 4px; }
+.ls-prow__img { width: 52px; height: 52px; border-radius: var(--lsp-r-xs); background: var(--ls-bg-sunken); object-fit: cover; flex: none; padding: 0; }
 .ls-prow__body { flex: 1; min-width: 0; }
 .ls-prow__title { font-size: var(--lsp-text-md); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ls-prow__sub { margin-top: 2px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); display: flex; gap: 8px; }
@@ -245,7 +245,7 @@
 /* ---------------------------------------------------------------- product card (drawer / results) */
 .ls-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .ls-card__media { position: relative; aspect-ratio: 1; border-radius: var(--ls-r-image); background: var(--ls-bg-sunken); overflow: hidden; }
-.ls-card__media img { width: 100%; height: 100%; object-fit: contain; padding: 10%; mix-blend-mode: multiply; transition: transform 500ms var(--lsp-ease-out); }
+.ls-card__media img { width: 100%; height: 100%; object-fit: cover; padding: 0; transition: transform 500ms var(--lsp-ease-out); }
 @media (hover: hover) and (pointer: fine) { .ls-card:hover .ls-card__media img { transform: scale(1.04); } }
 .ls-card__heart { position: absolute; inset-block-start: 8px; inset-inline-end: 8px; }
 .ls-card__badge { position: absolute; inset-block-start: 10px; inset-inline-start: 10px; height: 24px; padding-inline: 10px; border-radius: 999px; display: inline-flex; align-items: center; background: var(--ls-bg); font-size: var(--lsp-text-xs); font-weight: 500; box-shadow: var(--lsp-shadow-sm); }
@@ -318,7 +318,7 @@
 @media (hover: hover) and (pointer: fine) { .ls-pick:hover { background: var(--ls-bg-sunken); } }
 .ls-pick__media { position: relative; width: 72px; height: 72px; border-radius: var(--lsp-r-sm); background: var(--ls-bg-sunken); }
 .ls-pick:hover .ls-pick__media { background: var(--ls-bg); }
-.ls-pick__media img { width: 100%; height: 100%; object-fit: contain; padding: 8px; mix-blend-mode: multiply; }
+.ls-pick__media img { width: 100%; height: 100%; object-fit: cover; padding: 0; border-radius: inherit; }
 .ls-pick__media::after { content: counter(pick); position: absolute; inset-block-start: -6px; inset-inline-start: -6px; width: 22px; height: 22px; border-radius: 50%; background: var(--ls-fg); color: var(--ls-bg); font-size: 12px; font-weight: 600; display: grid; place-items: center; box-shadow: 0 0 0 3px var(--ls-bg); }
 .ls-pick__title { font-size: var(--lsp-text-md); font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ls-pick__why { margin-top: 4px; font-size: var(--lsp-text-sm); color: var(--ls-fg-strong-muted); line-height: 1.45; }
@@ -354,7 +354,7 @@
 .ls-seen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
 .ls-seen__label { font-size: var(--lsp-text-md); }
 .ls-seen__label b { font-weight: 600; }
-.ls-tag { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding-inline: 12px 6px; border-radius: 999px; background: var(--ls-bg-sunken); font-size: var(--lsp-text-sm); }
+.ls-tag { display: inline-flex; align-items: center; gap: 2px; height: 26px; padding-inline: 10px 4px; border-radius: 999px; background: var(--ls-bg-sunken); font-size: var(--lsp-text-xs); }
 .ls-tag button { position: relative; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: var(--ls-fg-muted); }
 .ls-tag button::before { content: ""; position: absolute; inset: -12px -8px; }
 .ls-best { position: absolute; inset-block-end: 10px; inset-inline-start: 10px; height: 24px; padding-inline: 10px; border-radius: 999px; background: var(--ls-fg); color: var(--ls-bg); font-size: var(--lsp-text-xs); font-weight: 500; display: inline-flex; align-items: center; }

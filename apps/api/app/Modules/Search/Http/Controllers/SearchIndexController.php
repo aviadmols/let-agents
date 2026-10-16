@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
@@ -65,6 +66,8 @@ final class SearchIndexController
             'callbacks' => Features::enabled('shoppers.callbacks', $shopId),
             // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
             'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
+            // "Popular in the store" on the empty drawer: this shop's own searches, never sample words.
+            'popular' => $tenant->run($shopId, fn (): array => self::popular()),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),
             // What each product carries, as the shop set it on its search display screen.
@@ -114,6 +117,31 @@ final class SearchIndexController
             'prompt' => $words,
             'open' => array_map(fn (string $at): string => str_replace('{q}', rawurlencode($words), $at), ShareController::OPEN),
         ];
+    }
+
+    /**
+     * The shop's most searched words of the last 30 days that found products. Every shopper sees them,
+     * so only words many searches share: at least three, short, and nothing that reads like a number
+     * someone typed about themselves. Inside the shop (TenantContext), so never another shop's.
+     *
+     * @return list<string>
+     */
+    private static function popular(): array
+    {
+        return SearchTerm::query()
+            ->whereDate('day', '>=', now()->subDays(30)->toDateString())
+            ->selectRaw('query, SUM(searches) as total')
+            ->groupBy('query')
+            ->havingRaw('SUM(searches) >= ?', [3])
+            ->havingRaw('SUM(empty) * 2 < SUM(searches)')
+            ->orderByDesc('total')->orderBy('query')
+            ->limit(20)
+            ->pluck('query')
+            ->map(fn ($q): string => trim((string) $q))
+            ->filter(fn (string $q): bool => $q !== '' && mb_strlen($q) <= 30 && ! preg_match('/\d{5,}|@/u', $q))
+            ->take(6)
+            ->values()
+            ->all();
     }
 
     /** The number the on-page module offers, read from the same settings; null when the shop has none. */

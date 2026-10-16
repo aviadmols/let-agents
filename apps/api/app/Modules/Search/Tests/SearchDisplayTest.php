@@ -12,6 +12,7 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Filament\Merchant\Pages\SearchDisplay;
+use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -95,6 +96,37 @@ final class SearchDisplayTest extends TestCase
             $this->assertArrayNotHasKey($gone, $index['config']);
         }
         $this->assertArrayNotHasKey('labels', $index, 'the drawer carries its own words');
+        $this->assertSame([], $index['config']['popular'], 'no searches yet: no popular words, never sample ones');
+    }
+
+    public function test_popular_searches_are_the_shops_own(): void
+    {
+        LoadedIndex::forget();
+        $shop = $this->shop = Shop::factory()->create();
+        $other = Shop::factory()->create();
+        Features::override('search.semantic', false, $shop->id);
+        Features::override('search.pictures', false, $shop->id);
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
+            'shop_id' => $shop->id, 'site_url' => 'https://www.rings.test', 'access_token' => self::TOKEN,
+        ]));
+        $this->product('7', 'טבעת סוליטר');
+        $this->assertSame('succeeded', app(BuildSearchIndex::class)->handle($shop->id)->status->value);
+
+        $term = fn (string $shopId, string $query, int $searches, int $empty = 0, int $daysAgo = 1) => app(TenantContext::class)->run($shopId, fn () => SearchTerm::query()->create([
+            'shop_id' => $shopId, 'day' => now()->subDays($daysAgo)->toDateString(), 'query' => $query,
+            'searches' => $searches, 'empty' => $empty, 'clicks' => 0, 'last_results' => $empty < $searches ? 4 : 0,
+        ]));
+        $term($shop->id, 'טבעת', 9);
+        $term($shop->id, 'עגילים', 3);
+        $term($shop->id, 'שרשרת', 2);                 // too few
+        $term($shop->id, 'יהלום ורוד', 6, 5);         // mostly found nothing
+        $term($shop->id, '0521234567', 8);            // reads like a number someone typed about themselves
+        $term($shop->id, 'צמיד', 7, 0, 45);           // too long ago
+        $term($other->id, 'אימפקט', 50);              // another shop's
+
+        $index = $this->getJson('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index', ['Origin' => 'https://www.rings.test'])->assertOk()->json();
+
+        $this->assertSame(['טבעת', 'עגילים'], $index['config']['popular']);
     }
 
     /** @param  array<string, mixed>  $overrides */
