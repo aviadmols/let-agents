@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Let Agents
  * Plugin URI:        https://github.com/aviadmols/let-agents
- * Description:       Connects this WooCommerce store to Let Agents, the smart shopping assistant. Gives Let Agents read-only access to the catalog and content, shows the Let Agents widget on product pages and articles, adds Let Agents search to the store's search box, can save a shopper's cart as an order waiting for payment when they leave their email before checkout, and adds a reports page.
- * Version:           0.8.1
+ * Description:       Connects this WooCommerce store to Let Agents, the smart shopping assistant. Gives Let Agents read-only access to the catalog and content, adds Lets Search to the store (search, answers about the product or article being read, and a wishlist), and adds a reports page.
+ * Version:           0.9.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Let Agents
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LET_AGENTS_VERSION', '0.8.1' );
+define( 'LET_AGENTS_VERSION', '0.9.0' );
 define( 'LET_AGENTS_FILE', __FILE__ );
 define( 'LET_AGENTS_DIR', __DIR__ );
 

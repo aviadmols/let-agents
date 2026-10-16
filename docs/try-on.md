@@ -1,5 +1,7 @@
 # מודול Try-On — מפרט
 
+> **הוסר: 2026-10-16** (החלטת הבעלים). החנות עברה למגירה אחת, "Lets Search" (`Search/resources/search/lets-search.js`), ו‑Try-On לא עבר איתה. ראו §17. מה שלמטה הוא התיעוד של מה שנבנה, לשם ההיסטוריה.
+
 > **עדכון:** 2026-10-14. **סטטוס:** הצעה. החלטה: [ADR 0012](ADR/0012-try-on.md). מחירי Replicate **לא אומתו מול Replicate עצמה**, רק מאגרגטורים. לאמת בריצת ה‑bake-off (§7) לפני קביעת תקרה.
 > **מה זה המסמך:** צינור ה‑Try-On, הטבלאות, ה‑API, החלון, המתג, העלות, הלוג והמסכים.
 
@@ -451,3 +453,15 @@ Actions: `GatePhoto`, `BuildTryOnPrompt`, `GenerateTryOn`, `CheckTryOn`, `StampI
 - **עוד לא:** מוצרים דומים בחלון, עותק לשיתוף עם חותמת, ה‑bake-off של המודלים. **החלון לא נבדק בדפדפן מול שרת אמיתי** (רק תחביר ובדיקות השרת).
 
 - **בדיקה של הצוות לפני שהמדידה פועלת ללקוחות:** בכל עמוד מוצר מוסיפים לכתובת `?let_agents_preview=<מפתח התצוגה של החנות>&let_agents_tryon=1`. על מוצר שהסריקה לא סימנה, במקום `1` כותבים את הסוג: `ring`, `bracelet`, `necklace`, `earrings`, `watch`, `top`, `bottom`, `dress`, `outerwear` או `furniture`. זה נשאר בדפדפן יום אחד; `let_agents_tryon=0` מכבה. השרת בודק את המפתח (בלי מפתח: 404 כמו ללקוח), וכל המגבלות והעלויות נספרות. הקישור עם המפתח מופיע בראש "יומן Try-On".
+
+---
+
+## 17. הוסר (2026-10-16)
+
+> החלטת הבעלים: Try-On הוסר. החנות מציגה רק את מגירת החיפוש "Lets Search", ו‑Try-On לא נכלל בה.
+
+- **הוסר:** החלון בחנות (`let-agents-tryon.js`), הנתיבים `try-on/{site}/config`, `{site}/photos`, `{site}/tries`, `{site}/tries/{id}` ו‑`try-on/file` (עונים 404), ה‑controller, הפעולות (`GatePhoto`, `StartTryOn`, `RunTryOn`, `PickProductPicture`), `RunTryOnJob`, `Picture`, `TryOnClasses`, הפרומפטים, המסכים ("יומן Try-On" למפעיל, הסיכום לסוחר) וכל הגדרות `try_on.*`.
+- **נשאר:** `GET /api/v1/try-on/let-agents-tryon.js` עונה 200 עם סקריפט ריק (`/* Lets Search: Try-On was removed */`, אותן כותרות מטמון), לחנויות שעוד על תוסף ישן. הדגלים `try_on.enabled` (כבוי) ו‑`try_on.paused` (דלוק) נשארים מוצהרים, כי קוד אחר עוד שואל אותם.
+- **הנתונים נשארים:** הטבלאות `try_on_photos`, `try_on_jobs`, `try_on_steps`, `try_on_files` והשורות שלהן (כולל הפרומפט שנשלח בכל שלב והעלות), והמודלים. שום טבלה לא נמחקה.
+- **פרטיות:** `try-on:prune` ממשיך לרוץ כל לילה ב‑03:50 ומוחק את התמונות שעבר תאריך השמירה שלהן (`expires_at`, שנקבע כשהתמונה הגיעה); השורות נשארות בלי נתיבים.
+- **סימוני הסריקה** (`FactKind::TryOn`, `TryOnEligibility` ב‑Enrichment) לא נגעו: הם ידע על המוצר.

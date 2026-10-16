@@ -4,7 +4,6 @@ namespace App\Modules\Widget\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
-use App\Core\Features\UnknownFeature;
 use App\Core\Modules\ModuleRepository;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsPopularity;
@@ -156,14 +155,7 @@ final class BuildPageBank
             'dir' => $this->locale === 'he' ? 'rtl' : 'ltr',
             'page' => ['type' => $type, 'id' => $externalId],
             'enabled' => false,
-            'placement' => [
-                'selector' => (string) Settings::get("widget.{$type}_selector", $shopId),
-                'position' => (string) Settings::get("widget.{$type}_position", $shopId),
-                'floating' => (bool) Settings::get('widget.floating_fallback', $shopId),
-            ],
             'bank_version' => 1,
-            // Circles, the assistant that opens from one closed line, or a bank of tags. Same bank either way.
-            'layout' => (string) Settings::get('widget.layout', $shopId),
             'teaser' => null,
             'sections' => [],
             'compare' => null,
@@ -199,7 +191,6 @@ final class BuildPageBank
         $this->traced('curated', $bank['sections']);
         $bank['bank_version'] = max(1, $version);
         $bank['teaser'] = $bank['sections'] === [] ? null : $this->teaser($bank['sections'][0]);
-        $bank['tryon'] = $type === 'product' ? $this->tryOn($shopId, $externalId) : null;
         $bank['compare'] = $compare;
         // The question box (Assistant module), when the shop has it on for this kind of page, and
         // how many questions were already asked here: the assistant's line says so. On a guide the
@@ -207,10 +198,8 @@ final class BuildPageBank
         $bank['ask'] = Features::enabled($type === 'product' ? 'assistant.on_products' : 'assistant.on_content', $shopId);
         $bank['asked'] = $bank['ask'] ? $this->tenant->run($shopId, fn (): int => $this->asked($type, $externalId)) : 0;
         $bank['questions'] = $bank['ask'] ? $this->tenant->run($shopId, fn (): array => $this->askedQuestions($type, $externalId)) : [];
-        // The field above the module: it matches what the page holds while the shopper types,
-        // with the answers this page already gave, and asks only on Enter.
-        $bank['find'] = Features::enabled('widget.find_field', $shopId);
-        $bank['answers'] = $bank['ask'] && $bank['find'] ? $this->tenant->run($shopId, fn (): array => $this->savedAnswers($type, $externalId)) : [];
+        // The answers this page already gave: the drawer's "questions shoppers asked" on this product.
+        $bank['answers'] = $bank['ask'] ? $this->tenant->run($shopId, fn (): array => $this->savedAnswers($type, $externalId)) : [];
         // What this page is worth being asked, whether or not anybody has asked it yet. The
         // closed widget puts one of these in front of a shopper who has opened nothing, so it
         // has to be in the bank rather than fetched when the question box opens.
@@ -230,12 +219,14 @@ final class BuildPageBank
         $bank['lead'] = Features::enabled('leads.enabled', $shopId);
         // What this page offers a reader, in the version being tried on them.
         $bank['cta'] = app(OffersCallsToAction::class)->forPage($shopId, $type, $externalId, $this->locale);
-        // The tag bank: what a shopper on this page may want next, written and checked at night,
-        // each searched now so it follows stock. Only in the tag view; the other views keep theirs.
-        $bank['tags'] = $bank['layout'] === 'tags' ? $this->tenant->run($shopId, fn (): array => $this->tags($shopId, $type, $externalId, $maxProducts)) : [];
-        // Under the add-to-cart: what this product is, as tags, and questions worth asking about it;
-        // a question or a tag opens the smart drawer. Built in code from its facts, cached with the page.
-        $bank['assistant'] = $bank['layout'] === 'assistant' && $type === 'product' && $bank['ask']
+        // The page's tags: what a shopper on this page may want next, written and checked at night,
+        // each searched now so it follows stock. Empty unless the shop has page tags on (Search's
+        // PageTags decides), so a shop without them pays no search here.
+        $bank['tags'] = $this->tenant->run($shopId, fn (): array => $this->tags($shopId, $type, $externalId, $maxProducts));
+        // What this product is, as tags, and questions worth asking about it: the drawer's next steps
+        // on "about this product", and its kinds for "compare with what you viewed". Built in code
+        // from its facts, cached with the page.
+        $bank['assistant'] = $type === 'product' && $bank['ask']
             ? $this->tenant->run($shopId, fn (): ?array => $this->assistantBlock($shopId, $externalId, $bank['questions']))
             : null;
 
@@ -1376,39 +1367,6 @@ final class BuildPageBank
             return ! in_array($candidate, self::SWITCHABLE, true)
                 || Features::enabled('widget.show_'.$candidate, $shopId);
         }));
-    }
-
-    /**
-     * Whether the product can be tried on (docs/try-on.md): the shop turned Try-On on and the catalog
-     * scan marked the product with a try-on class. The widget then loads the Try-On window, and only
-     * then. Read by key and by fact: the Widget does not depend on the TryOn module.
-     *
-     * The store team's test (`?let_agents_preview=<key>&let_agents_tryon=1`, PageBankController) asks
-     * with $test: the flag is not asked, and a product the scan did not mark takes the class the
-     * team named ($testClass) or the one its name says (`auto`), so it can be tried on any product page.
-     *
-     * @return array{class: string, test?: bool}|null
-     */
-    public function tryOn(string $shopId, string $externalId, bool $test = false, ?string $testClass = null): ?array
-    {
-        try {
-            if (Features::enabled('try_on.paused') || (! $test && ! Features::enabled('try_on.enabled', $shopId))) {
-                return null;
-            }
-        } catch (UnknownFeature) {
-            return null;
-        }
-
-        $class = $this->tenant->run($shopId, fn () => EnrichmentFact::query()->where('kind', FactKind::TryOn)->where('key', 'class')->where('status', FactStatus::Approved)
-            ->whereHas('product', fn ($q) => $q->where('external_id', $externalId)->whereNull('removed_at'))->latest('id')->value('value_text'));
-
-        // In the test, a product the scan did not mark: the class the team named, or `auto`, which
-        // the Try-On server reads as "the class the product's name says".
-        if ((! is_string($class) || $class === 'none') && $test) {
-            $class = $testClass ?? 'auto';
-        }
-
-        return is_string($class) && $class !== 'none' ? ['class' => $class] + ($test ? ['test' => true] : []) : null;
     }
 
     /**

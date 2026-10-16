@@ -15,7 +15,7 @@ use Filament\Navigation\NavigationGroup;
 final class PanelNavigation
 {
     /** Operator panel, top to bottom. */
-    public const OPERATOR = ['overview', 'shops', 'catalog', 'scan', 'discovery', 'shoppers', 'try_on', 'analytics', 'system'];
+    public const OPERATOR = ['overview', 'shops', 'catalog', 'scan', 'discovery', 'shoppers', 'analytics', 'system'];
 
     /** Merchant panel, under the loose screens at the top (home, analytics): what a shop owner does, in order. */
     public const MERCHANT = ['search', 'shoppers', 'on_page', 'settings'];

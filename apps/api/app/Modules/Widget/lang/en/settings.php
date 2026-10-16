@@ -1,40 +1,6 @@
 <?php
 
-$positions = [
-    'after' => 'After the element',
-    'before' => 'Before the element',
-    'prepend' => 'Inside the element, at the start',
-    'append' => 'Inside the element, at the end',
-];
-
 return [
-    'layout' => [
-        'label' => 'Layout',
-        'description' => 'Circles: a row of circles with the key sentence above them, each opening a panel. Assistant: one closed line that invites a click and opens into a conversation whose suggestions are the same parts. Tag bank: "you may also want to see" over a row of tags such as "materials for building a deck" or "deck screws", each opening its results; the tags are written at night by themselves, and their order is learned from what shoppers open and buy. Same content, no model call on page load.',
-        'options' => ['circles' => 'Circles', 'chat' => 'Assistant (chat)', 'tags' => 'Tag bank', 'assistant' => 'Under the buy button: tags and questions'],
-    ],
-    'product_selector' => [
-        'label' => 'Where to show it on product pages (CSS selector)',
-        'description' => 'A class or any CSS selector from the store theme, such as .product-summary or form.cart. The first matching element is used.',
-    ],
-    'product_position' => [
-        'label' => 'Position on product pages',
-        'description' => 'Where to place the widget relative to that element.',
-        'options' => $positions,
-    ],
-    'content_selector' => [
-        'label' => 'Where to show it on articles (CSS selector)',
-        'description' => 'A class or CSS selector in the article template, such as .entry-content.',
-    ],
-    'content_position' => [
-        'label' => 'Position on articles',
-        'description' => 'Where to place the widget relative to that element.',
-        'options' => $positions,
-    ],
-    'floating_fallback' => [
-        'label' => 'Float at the bottom when the element is missing',
-        'description' => 'When no element matches, show a small button at the bottom of the screen instead of nothing.',
-    ],
     'common_highlight_products' => [
         'label' => 'Highlight repeated across many products',
         'description' => 'A highlight whose quote appears on at least this many products, such as a standing note about size tolerance, is shown last and never becomes the key sentence.',

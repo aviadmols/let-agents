@@ -3,10 +3,10 @@
 return [
     'enabled' => [
         'label' => 'Try-On on the storefront',
-        'description' => 'Shoppers try clothes and jewelry on their own photo, or see furniture in their room. Off until turned on, for every shop or for one.',
+        'description' => 'Try-On was removed from the storefront and the panels: no shop offers it, whatever this says. The photos it kept are deleted on their keeping date.',
     ],
     'paused' => [
         'label' => 'Try-On paused everywhere',
-        'description' => 'While on, no shop offers Try-On, not even through the team\'s test link. Turn it off to bring Try-On back.',
+        'description' => 'Try-On was removed. Stays on, so no old code offers it.',
     ],
 ];

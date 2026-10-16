@@ -6,12 +6,16 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * GET /api/v1/widget/let-agents.js — the storefront widget. Served by the app rather than as a static
- * file so every store gets a new version within minutes of a deploy, without a plugin update.
+ * GET /api/v1/widget/let-agents.js — the address stores on the older plugin still print. It now
+ * serves the Lets Search drawer (Search's built resources/search/lets-search.js), which reads the
+ * old window.LetAgentsContext as its config and refuses to load twice, so a page that prints both
+ * addresses gets one drawer. Served by the app so every store runs the newest file minutes after
+ * a deploy, without a plugin update.
  */
 final class WidgetScriptController
 {
-    public const PATH = __DIR__.'/../../resources/widget/let-agents.js';
+    /** Read from disk, not imported: the drawer is Search's file, not a class Widget may use. */
+    public const PATH = __DIR__.'/../../../Search/resources/search/lets-search.js';
 
     public function __invoke(Request $request): Response
     {

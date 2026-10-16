@@ -9,7 +9,6 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\AgentCatalog;
-use App\Modules\Search\Support\ResultGroups;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,9 +17,9 @@ use Illuminate\Http\Response;
 /**
  * GET /api/v1/search/{site}/index?locale=he
  *
- * Everything the search box needs to suggest as the shopper types, with no call per keystroke:
- * the shop's records (titles and their extra words, links and pictures), the shop's settings,
- * and the labels in the page's language. Public data, cached by version.
+ * Everything the search drawer needs to suggest as the shopper types, with no call per keystroke:
+ * the shop's records (titles and their extra words, links and pictures) and the shop's settings.
+ * The drawer carries its own words. Public data, cached by version.
  */
 final class SearchIndexController
 {
@@ -47,15 +46,8 @@ final class SearchIndexController
 
         $config = [
             'selector' => (string) Settings::get('search.input_selector', $shopId),
-            'results' => (string) Settings::get('search.results', $shopId),
-            // The shopper may switch between the regular search (under the site's box) and the smart one (the drawer); the browser remembers it.
-            'modeChoice' => Features::enabled('search.mode_choice', $shopId),
             // The store's own search page shows our regular results over it.
             'resultsPage' => Features::enabled('search.results_page', $shopId),
-            // The regular search's suggestions as a list beside the categories, or a grid of large cards.
-            'dropdown' => (string) Settings::get('search.dropdown_layout', $shopId),
-            'suggestions' => (int) Settings::get('search.suggestions', $shopId),
-            'perGroup' => (int) Settings::get('search.results_per_group', $shopId),
             // The camera shows only where the shop's pictures already have vectors.
             'photos' => Features::enabled('search.photos', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
             'photoMaxKb' => (int) Settings::get('search.photo_max_kb'),
@@ -71,18 +63,13 @@ final class SearchIndexController
                 'days' => array_map(fn (string $day): string => trim((string) Settings::get('widget.hours_'.$day, $shopId)), ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'])],
             // Without a WhatsApp, or after hours: the chat asks for a name and a way back, kept as a callback.
             'callbacks' => Features::enabled('shoppers.callbacks', $shopId),
-            'drawerSide' => (string) Settings::get('search.drawer_side', $shopId),
             // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
             'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
-            'drawerColumns' => (int) Settings::get('search.drawer_columns', $shopId),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),
-            // How the results look, as the shop set it on its search display screen.
-            'groups' => ResultGroups::parse((string) Settings::get('search.groups', $shopId)),
+            // What each product carries, as the shop set it on its search display screen.
             'price' => (bool) Settings::get('search.show_price', $shopId),
             'cart' => (bool) Settings::get('search.show_cart', $shopId),
-            'hover' => (bool) Settings::get('search.hover_image', $shopId),
-            'buttonColor' => self::color((string) Settings::get('search.button_color', $shopId)),
             // "Ask my AI": the search and its products, handed to the shopper's own AI in a link.
             'aiShare' => Features::enabled('search.ai_share', $shopId),
             // "Share the results": the same link, to a friend.
@@ -92,8 +79,7 @@ final class SearchIndexController
             'aiAsk' => Features::enabled('search.ai_share', $shopId) && Features::enabled('search.agent_connector', $shopId)
                 ? self::aiAsk((string) (Shop::query()->whereKey($shopId)->value('name') ?? ''), AgentCatalog::publicUrl('c/'.$site).'?format=json', $locale) : null,
         ];
-        $labels = trans('search::storefront', [], $locale);
-        $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale.json_encode($labels)), 0, 24).'"';
+        $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale), 0, 24).'"';
         $headers = ['ETag' => $etag, 'Cache-Control' => 'public, max-age=300'];
 
         if ($request->header('If-None-Match') === $etag) {
@@ -106,19 +92,12 @@ final class SearchIndexController
             'enabled' => true,
             'hash' => $index->hash,
             'config' => $config,
-            'labels' => $labels,
             'items' => $data['items'] ?? [],
             // The filters beside the results and the phrases that are actions (BuildSearchIndex).
             'facets' => $data['facets'] ?? [],
             'size' => $data['size'] ?? null,
             'actions' => $data['actions'] ?? [],
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-
-    /** The shop's own button colour as #rrggbb, or empty for the theme's. */
-    public static function color(string $value): string
-    {
-        return preg_match('/^#[0-9a-f]{6}$/i', trim($value)) === 1 ? strtolower(trim($value)) : '';
     }
 
     /**

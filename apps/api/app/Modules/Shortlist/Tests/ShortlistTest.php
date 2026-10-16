@@ -15,7 +15,7 @@ use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shortlist\Actions\ProductCards;
-use App\Modules\Shortlist\Http\Controllers\ShortlistController;
+use App\Modules\Shortlist\Http\Controllers\ShortlistScriptController;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -83,14 +83,31 @@ final class ShortlistTest extends TestCase
         $this->getJson("/api/v1/shortlist/{$this->site}/config")->assertOk()->assertExactJson(['compare' => false, 'wishlist' => false]);
         $this->getJson("/api/v1/shortlist/{$this->site}/compare?ids=11,12")->assertNotFound();
         $this->postJson("/api/v1/shortlist/{$this->site}/wishlist", ['token' => self::BROWSER, 'add' => ['11']])->assertNotFound();
-        $this->getJson("/api/v1/shortlist/{$this->site}/paths")->assertNotFound();
         $this->assertSame(0, ShortlistWishlist::query()->withoutGlobalScopes()->count());
 
         Features::override('shortlist.compare', true, $this->shop->id);
         $config = $this->getJson("/api/v1/shortlist/{$this->site}/config?locale=he")->assertOk()->json();
-        $this->assertSame([true, false, 5, 'Rocks and Gold'], [$config['compare'], $config['wishlist'], $config['compareMax'], $config['shopName']]);
-        $this->assertSame('השוואה (:n/:max)', $config['labels']['compare_tray']);
+        // What the search drawer reads, and nothing of the old buttons' placement.
+        $this->assertSame(['compare', 'wishlist', 'compareMax', 'wishlistWhatsapp', 'phoneLogin', 'shopName', 'labels'], array_keys($config));
+        $this->assertSame([true, false, 5, 'Rocks and Gold', false], [$config['compare'], $config['wishlist'], $config['compareMax'], $config['shopName'], $config['phoneLogin']]);
+        $this->assertSame('רשימת המשאלות שלי ב:shop', $config['labels']['share_text']);
+        $this->assertSame('התנתקות', $config['labels']['phone_out']);
+        $this->assertArrayHasKey('phone_consent', $config['labels']);
+        $this->assertArrayNotHasKey('phone_sms', $config['labels'], 'the SMS text is the server\'s');
         $this->getJson("/api/v1/shortlist/{$this->site}/config", ['Origin' => 'https://evil.test'])->assertForbidden();
+        $this->getJson("/api/v1/shortlist/{$this->site}/paths")->assertNotFound();
+    }
+
+    public function test_the_old_buttons_script_answers_for_old_plugins_and_does_nothing(): void
+    {
+        $response = $this->get('/api/v1/shortlist/let-agents-shortlist.js')->assertOk()
+            ->assertHeader('Content-Type', 'application/javascript; charset=utf-8')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+        $this->assertSame(ShortlistScriptController::SCRIPT, $response->getContent());
+        $this->assertStringContainsString('max-age=300', (string) $response->headers->get('Cache-Control'));
+        $this->assertLessThan(200, strlen((string) $response->getContent()));
+        $this->get('/api/v1/shortlist/let-agents-shortlist.js', ['If-None-Match' => (string) $response->headers->get('ETag')])->assertStatus(304);
     }
 
     public function test_the_table_is_the_products_approved_facts_with_where_they_differ(): void
@@ -176,16 +193,5 @@ final class ShortlistTest extends TestCase
         $this->assertSame(1, ShortlistWishlist::query()->withoutGlobalScopes()->count(), 'a request to report erases nothing');
         event(new ShopperDataRequested($this->shop->id, 'redact', 'a@b.test', '7001'));
         $this->assertSame(0, ShortlistWishlist::query()->withoutGlobalScopes()->where('customer_ref', 'shopify:7001')->count());
-    }
-
-    public function test_the_themes_cards_are_named_by_their_links(): void
-    {
-        Features::override('shortlist.wishlist', true, $this->shop->id);
-
-        $paths = $this->getJson("/api/v1/shortlist/{$this->site}/paths")->assertOk()->json('paths');
-
-        $this->assertSame(['/products/ring-11' => '11', '/products/ring-12' => '12', '/products/ring-13' => '13'], $paths);
-        $this->assertSame('/products/טבעת', ShortlistController::path('https://store.test/collections/rings/products/%D7%98%D7%91%D7%A2%D7%AA'), 'a card inside a collection, in Hebrew');
-        $this->assertSame('/product/ring-5', ShortlistController::path('https://store.test/product/Ring-5/'));
     }
 }

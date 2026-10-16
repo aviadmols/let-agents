@@ -8,8 +8,6 @@ use App\Core\Settings\InvalidSettingValue;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
-use App\Modules\Search\Http\Controllers\SearchIndexController;
-use App\Modules\Search\Support\ResultGroups;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -19,8 +17,8 @@ use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
- * How the search shows in the shop, on one screen: what works in the search box, where all the
- * results open, and how they look, with the shop's own products in a preview beside it.
+ * How the search shows in the shop, on one screen: what works in the search drawer and what each
+ * product in it carries, with the shop's own products in a preview beside it.
  *
  * Every switch here is a feature or a setting the store already reads; the screen only writes
  * them, through Features and Settings, so a value outside its declared range is refused.
@@ -45,9 +43,6 @@ class SearchDisplay extends Page
 
     /** @var array<string, mixed> */
     public array $data = [];
-
-    /** @var list<array{key: string, on: bool}> the groups in their order, each with its switch */
-    public array $groups = [];
 
     /** The preview's width: desktop or phone. Not saved. */
     public string $device = 'desktop';
@@ -97,12 +92,9 @@ class SearchDisplay extends Page
 
         if ($shop === null) {
             $this->data = [];
-            $this->groups = [];
 
             return;
         }
-
-        $color = SearchIndexController::color((string) Settings::get('search.button_color', $shop));
 
         $this->data = [
             'storefront' => Features::enabled('search.storefront', $shop),
@@ -110,35 +102,13 @@ class SearchDisplay extends Page
             'ask' => Features::enabled('assistant.on_search', $shop),
             'whatsapp' => Features::enabled('assistant.search_whatsapp', $shop),
             'whatsapp_message' => (string) Settings::get('assistant.search_whatsapp_message', $shop),
-            'results' => (string) Settings::get('search.results', $shop),
-            'mode_choice' => Features::enabled('search.mode_choice', $shop),
-            'dropdown' => (string) Settings::get('search.dropdown_layout', $shop),
             'content_by_meaning' => Features::enabled('search.content_by_meaning', $shop),
-            'drawer_side' => (string) Settings::get('search.drawer_side', $shop),
-            'drawer_columns' => (string) Settings::get('search.drawer_columns', $shop),
-            'suggestions' => (int) Settings::get('search.suggestions', $shop),
             'per_group' => (int) Settings::get('search.results_per_group', $shop),
             'price' => (bool) Settings::get('search.show_price', $shop),
             'cart' => (bool) Settings::get('search.show_cart', $shop),
             'similar' => Features::enabled('search.similar', $shop),
-            'hover' => (bool) Settings::get('search.hover_image', $shop),
-            'own_color' => $color !== '',
-            'color' => $color !== '' ? $color : '#111827',
             'selector' => (string) Settings::get('search.input_selector', $shop),
         ];
-
-        $shown = ResultGroups::parse((string) Settings::get('search.groups', $shop));
-        $this->groups = [
-            ...array_map(fn (string $key): array => ['key' => $key, 'on' => true], $shown),
-            ...array_map(fn (string $key): array => ['key' => $key, 'on' => false], array_values(array_diff(ResultGroups::ALL, $shown))),
-        ];
-    }
-
-    public function pickResults(string $mode): void
-    {
-        if (in_array($mode, ['panel', 'drawer', 'page'], true)) {
-            $this->data['results'] = $mode;
-        }
     }
 
     public function pickDevice(string $device): void
@@ -146,32 +116,11 @@ class SearchDisplay extends Page
         $this->device = $device === 'phone' ? 'phone' : 'desktop';
     }
 
-    /** One group up or down the list. */
-    public function moveGroup(int $at, int $by): void
-    {
-        $to = $at + $by;
-
-        if (! isset($this->groups[$at], $this->groups[$to])) {
-            return;
-        }
-
-        [$this->groups[$at], $this->groups[$to]] = [$this->groups[$to], $this->groups[$at]];
-        $this->groups = array_values($this->groups);
-    }
-
     public function save(): void
     {
         $shop = $this->shop;
 
         if ($shop === null) {
-            return;
-        }
-
-        $groups = array_values(array_map(fn (array $g): string => (string) $g['key'], array_filter($this->groups, fn (array $g): bool => (bool) ($g['on'] ?? false))));
-
-        if ($groups === []) {
-            Notification::make()->warning()->title(__('search::ui.display.one_group'))->send();
-
             return;
         }
 
@@ -184,23 +133,14 @@ class SearchDisplay extends Page
                 'assistant.on_search' => 'ask',
                 'assistant.search_whatsapp' => 'whatsapp',
                 'search.similar' => 'similar',
-                'search.mode_choice' => 'mode_choice',
                 'search.content_by_meaning' => 'content_by_meaning',
             ] as $feature => $field) {
                 Features::override($feature, (bool) ($d[$field] ?? false), $shop);
             }
 
-            Settings::set('search.results', (string) ($d['results'] ?? 'panel'), $shop);
-            Settings::set('search.dropdown_layout', (string) ($d['dropdown'] ?? 'list'), $shop);
-            Settings::set('search.drawer_side', (string) ($d['drawer_side'] ?? 'start'), $shop);
-            Settings::set('search.drawer_columns', (string) ($d['drawer_columns'] ?? '2'), $shop);
-            Settings::set('search.suggestions', (int) ($d['suggestions'] ?? 6), $shop);
             Settings::set('search.results_per_group', (int) ($d['per_group'] ?? 12), $shop);
             Settings::set('search.show_price', (bool) ($d['price'] ?? true), $shop);
             Settings::set('search.show_cart', (bool) ($d['cart'] ?? true), $shop);
-            Settings::set('search.hover_image', (bool) ($d['hover'] ?? false), $shop);
-            Settings::set('search.groups', ResultGroups::compose($groups), $shop);
-            Settings::set('search.button_color', ($d['own_color'] ?? false) ? SearchIndexController::color((string) ($d['color'] ?? '')) : '', $shop);
 
             $message = trim((string) ($d['whatsapp_message'] ?? ''));
             $message === '' ? Settings::clear('assistant.search_whatsapp_message', $shop) : Settings::set('assistant.search_whatsapp_message', $message, $shop);
@@ -247,7 +187,7 @@ class SearchDisplay extends Page
     /**
      * A few of the shop's own products for the preview, the ones with pictures first.
      *
-     * @return list<array{title: string, image: string|null, image2: string|null, price: string|null}>
+     * @return list<array{title: string, image: string|null, price: string|null}>
      */
     public function previewProducts(): array
     {
@@ -259,11 +199,10 @@ class SearchDisplay extends Page
 
         return app(TenantContext::class)->run($shop, fn (): array => CatalogProduct::query()->active()
             ->where('in_stock', true)->whereNotNull('image_url')->orderBy('id')->limit(self::PREVIEW)
-            ->get(['id', 'title', 'image_url', 'price', 'currency', 'payload'])
+            ->get(['id', 'title', 'image_url', 'price', 'currency'])
             ->map(fn (CatalogProduct $p): array => [
                 'title' => (string) $p->title,
                 'image' => $p->image_url,
-                'image2' => data_get($p->payload, 'images.1.url'),
                 'price' => $p->price === null ? null : self::money((float) $p->price, $p->currency),
             ])->all());
     }

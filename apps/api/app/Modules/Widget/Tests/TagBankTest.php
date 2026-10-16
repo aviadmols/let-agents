@@ -3,7 +3,6 @@
 namespace App\Modules\Widget\Tests;
 
 use App\Core\Facades\Features;
-use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsScore;
 use App\Modules\Assistant\Models\AssistantAnswer;
@@ -16,8 +15,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The tag view: "you may also want to see" over the page's tags, each a section with the usual
- * product cards and guides. The other views never carry them.
+ * The page's tags in the bank, each a section with the usual product cards and guides, and the
+ * answers the page already gave.
  */
 final class TagBankTest extends TestCase
 {
@@ -58,12 +57,11 @@ final class TagBankTest extends TestCase
         Features::override('widget.on_products', true, $this->shop->id);
     }
 
-    public function test_the_tag_view_carries_the_tags_as_sections_and_the_other_views_do_not(): void
+    public function test_the_page_tags_are_carried_as_sections_and_a_shop_without_them_gets_none(): void
     {
-        Settings::set('widget.layout', 'tags', $this->shop->id);
         $bank = app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he');
 
-        $this->assertSame('tags', $bank['layout']);
+        $this->assertArrayNotHasKey('layout', $bank, 'one drawer: no look to choose');
         $this->assertSame(['ברגים לדק', 'מדריכי דק'], array_column($bank['tags'], 'chip'), 'a tag whose products are all gone is not shown');
         $this->assertSame([BuildPageBank::tagCandidate('ברגים לדק'), BuildPageBank::tagCandidate('מדריכי דק')], array_column($bank['tags'], 'candidate'), 'each tag is its own section in what shoppers do');
         $this->assertMatchesRegularExpression('/^tag:[a-f0-9]{12}$/', $bank['tags'][0]['candidate']);
@@ -73,13 +71,19 @@ final class TagBankTest extends TestCase
         $this->assertSame('איך בונים דק', $bank['tags'][1]['guides'][0]['title']);
         $this->assertSame('תרצו לראות גם', $bank['labels']['tags_title']);
 
-        Settings::set('widget.layout', 'circles', $this->shop->id);
+        // Search decides whether a shop has page tags (search.page_tags); one without them gets nothing here.
+        $this->app->instance(PageTags::class, new class implements PageTags
+        {
+            public function forPage(string $shopId, string $type, string $externalId, int $perTag): array
+            {
+                return [];
+            }
+        });
         $this->assertSame([], app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he')['tags']);
     }
 
     public function test_the_tags_shoppers_respond_to_come_first(): void
     {
-        Settings::set('widget.layout', 'tags', $this->shop->id);
         app(TenantContext::class)->run($this->shop->id, fn () => AnalyticsScore::query()->create([
             'shop_id' => $this->shop->id, 'scope' => AnalyticsScore::SCOPE_PAGE, 'candidate' => BuildPageBank::tagCandidate('מדריכי דק'),
             'page_type' => 'product', 'page_external_id' => '201', 'related_external_id' => '',
@@ -91,7 +95,7 @@ final class TagBankTest extends TestCase
         $this->assertSame(['מדריכי דק', 'ברגים לדק'], array_column($bank['tags'], 'chip'), 'the one shoppers opened and bought from leads');
     }
 
-    public function test_the_field_gets_the_answers_this_page_already_gave_and_nothing_else(): void
+    public function test_the_drawer_gets_the_answers_this_page_already_gave_and_nothing_else(): void
     {
         app(TenantContext::class)->run($this->shop->id, function (): void {
             $page = CatalogProduct::query()->where('external_id', '201')->value('id');
@@ -107,13 +111,12 @@ final class TagBankTest extends TestCase
 
         $bank = app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he');
 
-        $this->assertTrue($bank['find']);
+        $this->assertArrayNotHasKey('find', $bank, 'the old field above the module is gone; its answers stay');
         $this->assertSame([['q' => 'כל כמה זמן לשמן?', 'a' => 'פעם בשנה.']], $bank['answers']);
-        $this->assertSame('חפשו או שאלו על המוצר…', $bank['labels']['find_placeholder']);
 
-        Features::override('widget.find_field', false, $this->shop->id);
+        // A shop that takes no questions on its products shows no answers either.
+        Features::override('assistant.on_products', false, $this->shop->id);
         $off = app(BuildPageBank::class)->handle($this->shop->id, 'product', '201', 'he');
-        $this->assertFalse($off['find']);
         $this->assertSame([], $off['answers']);
     }
 }

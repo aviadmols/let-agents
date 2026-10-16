@@ -6,7 +6,6 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Http\Visit;
 use App\Core\Tenancy\TenantContext;
-use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shortlist\Actions\BuildComparison;
@@ -20,12 +19,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * What the storefront's compare and wishlist buttons ask for, all public and all code: no model
- * is called here. Both are off until the shop turns them on (shortlist.compare, shortlist.wishlist).
+ * What the search drawer's compare and saved list ask for (lets-search.js), all public and all code:
+ * no model is called here. Both are off until the shop turns them on (shortlist.compare, shortlist.wishlist).
  *
- *   GET  /api/v1/shortlist/{site}/config            what is on, where the buttons go, the labels
+ *   GET  /api/v1/shortlist/{site}/config            what is on, sharing, sign-in by phone, the labels
  *   GET  /api/v1/shortlist/{site}/compare?ids=…      the comparison table, from approved facts
- *   GET  /api/v1/shortlist/{site}/paths              product address → id, for the theme's own cards
  *   POST /api/v1/shortlist/{site}/wishlist           a browser's list: read it, add, remove
  *   GET  /api/v1/shortlist/{site}/shared/{code}      a shared list, read-only
  *   ANY  /api/v1/shortlist/proxy/wishlist            the same list through Shopify's app proxy,
@@ -51,18 +49,13 @@ final class ShortlistController
         if ($compare || $wishlist) {
             $config += [
                 'compareMax' => (int) Settings::get('shortlist.compare_max', $shopId),
-                'cardSelector' => trim((string) Settings::get('shortlist.card_selector', $shopId)),
-                'productSelector' => trim((string) Settings::get('shortlist.product_selector', $shopId)),
-                'wishlistPlace' => $wishlist ? trim((string) Settings::get('shortlist.wishlist_place', $shopId)) : '',
-                'wishlistFloating' => (bool) Settings::get('shortlist.wishlist_floating', $shopId),
-                'wishlistHeader' => $wishlist && (bool) Settings::get('shortlist.wishlist_header', $shopId),
                 'wishlistWhatsapp' => (bool) Settings::get('shortlist.wishlist_whatsapp', $shopId),
                 // Keeping the list by phone, with a code by SMS: only where the shop turned it on and the platform can text.
                 'phoneLogin' => $wishlist && Features::enabled('shortlist.wishlist_phone', $shopId) && app(SendsSms::class)->ready(),
-                'heartPlain' => (bool) Settings::get('shortlist.heart_plain', $shopId),
                 // For the share message: "My wishlist at Rocks and Gold".
                 'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
-                'labels' => trans('shortlist::storefront', [], $locale),
+                // The words the drawer takes from the store: signing in by phone and the share message.
+                'labels' => array_diff_key((array) trans('shortlist::storefront', [], $locale), ['phone_sms' => true]),
             ];
         }
 
@@ -93,33 +86,6 @@ final class ShortlistController
         });
 
         return response()->json($table, 200, ['Cache-Control' => 'public, max-age=300'], self::JSON);
-    }
-
-    public function paths(Request $request, TenantContext $tenant, string $site): JsonResponse
-    {
-        $connection = self::site($request, $site);
-        if ($connection instanceof JsonResponse) {
-            return $connection;
-        }
-
-        $shopId = $connection->shop_id;
-        if (! Features::enabled('shortlist.compare', $shopId) && ! Features::enabled('shortlist.wishlist', $shopId)) {
-            return response()->json(['error' => 'shortlist_off'], 404);
-        }
-
-        $paths = $tenant->run($shopId, function (): array {
-            $paths = [];
-            foreach (CatalogProduct::query()->active()->whereNotNull('url')->select(['id', 'external_id', 'url'])->orderBy('id')->toBase()->lazy(500) as $product) {
-                $path = self::path((string) $product->url);
-                if ($path !== null) {
-                    $paths[$path] = (string) $product->external_id;
-                }
-            }
-
-            return $paths;
-        });
-
-        return response()->json(['paths' => (object) $paths], 200, ['Cache-Control' => 'public, max-age=300'], self::JSON);
     }
 
     public function wishlist(Request $request, TenantContext $tenant, KeepWishlist $keep, ProductCards $cards, string $site): JsonResponse
@@ -266,24 +232,5 @@ final class ShortlistController
     private static function locale(Request $request): string
     {
         return in_array($request->query('locale'), ['he', 'en'], true) ? (string) $request->query('locale') : 'he';
-    }
-
-    /**
-     * A product's address as the theme links to it: the path, decoded, lower case, with no trailing
-     * slash. A Shopify card inside a collection links to /collections/x/products/y: the product part.
-     */
-    public static function path(string $url): ?string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! is_string($path) || $path === '') {
-            return null;
-        }
-
-        $path = mb_strtolower(rtrim(rawurldecode($path), '/'));
-        if (preg_match('#/products/[^/]+$#u', $path, $m) === 1) {
-            $path = $m[0];
-        }
-
-        return $path === '' ? null : $path;
     }
 }

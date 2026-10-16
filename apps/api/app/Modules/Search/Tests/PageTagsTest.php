@@ -4,6 +4,7 @@ namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Features\FeatureManager;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -22,6 +23,8 @@ use App\Modules\Search\Support\StoredPageTags;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -147,13 +150,27 @@ final class PageTagsTest extends TestCase
         $this->assertSame([], $this->calls);
     }
 
-    public function test_choosing_the_tag_bank_is_enough_to_have_tags(): void
+    public function test_a_shop_that_had_chosen_the_tag_bank_keeps_its_tags(): void
     {
         Features::override('search.page_tags', false, $this->shop->id);
         $this->assertFalse(StoredPageTags::wanted($this->shop->id));
 
-        Settings::set('widget.layout', 'tags', $this->shop->id);
-        $this->assertTrue(StoredPageTags::wanted($this->shop->id), 'the look of the module turns the tags on, with no second switch');
+        // the module's look, as it was saved before the looks were removed
+        $other = Shop::factory()->create();
+        DB::table('setting_overrides')->insert([
+            ['key' => 'widget.layout', 'scope' => (string) $this->shop->id, 'value' => json_encode('tags'), 'created_at' => now(), 'updated_at' => now()],
+            ['key' => 'widget.layout', 'scope' => (string) $other->id, 'value' => json_encode('circles'), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('feature_overrides')->where('key', 'search.page_tags')->where('scope', (string) $this->shop->id)->delete();
+        Cache::flush();
+
+        (require base_path('app/Modules/Search/Database/Migrations/2026_10_16_600001_page_tags_stay_on_where_the_tag_bank_was_chosen.php'))->up();
+        // a migration runs in its own process; here the manager's in-memory copy of the overrides is let go
+        $this->app->forgetInstance(FeatureManager::class);
+        Features::clearResolvedInstances();
+
+        $this->assertTrue(StoredPageTags::wanted($this->shop->id), 'the tag bank shop keeps writing its tags');
+        $this->assertFalse(StoredPageTags::wanted($other->id), 'a shop with another look is left as it was');
     }
 
     private function inShop(callable $callback): mixed

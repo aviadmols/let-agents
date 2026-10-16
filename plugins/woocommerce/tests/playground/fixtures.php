@@ -165,6 +165,29 @@ $long_id = wp_insert_post(
 	)
 );
 
+$wishlist_id = wp_insert_post(
+	array(
+		'post_type'    => 'post',
+		'post_status'  => 'publish',
+		'post_title'   => 'הלב של רשימת המשאלות',
+		'post_content' => '<p>לפני.</p>[let_agents_wishlist]<p>אחרי.</p>',
+	)
+);
+
+// A store from before 0.9.0: the widget in preview, its search off, an offer after paragraph 2.
+// The next request migrates it to one mode, preview, so the team still gets Lets Search, and the
+// offer is gone.
+update_option(
+	'let_agents_settings',
+	array(
+		'widget_mode'         => 'preview',
+		'search_mode'         => 'off',
+		'cta_after_paragraph' => 2,
+		'content_post_types'  => array( 'post', 'page' ),
+	),
+	false
+);
+
 $protected_id = wp_insert_post(
 	array(
 		'post_type'     => 'post',
@@ -277,6 +300,7 @@ file_put_contents(
 			'guide'       => $guide_id,
 			'cta'         => $cta_id,
 			'long'        => $long_id,
+			'wishlist'    => $wishlist_id,
 			'protected'   => $protected_id,
 			'terms'       => $terms_id,
 			'classic_checkout' => $classic_checkout_id,

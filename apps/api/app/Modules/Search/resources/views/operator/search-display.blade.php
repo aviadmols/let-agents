@@ -3,8 +3,6 @@
     @php($d = $this->data)
     @php($status = $this->status())
     @php($products = $this->previewProducts())
-    @php($mode = $d['results'] ?? 'panel')
-    @php($accent = ($d['own_color'] ?? false) ? ($d['color'] ?? '#111827') : '#111827')
     @php($hours = rtrim((string) \Filament\Facades\Filament::getUrl(), '/').'/opening-hours')
 
     <style>
@@ -31,13 +29,6 @@
         .lad-sw input:checked+span{background:var(--lad-on)}
         .lad-sw input:checked+span:after{inset-inline-start:23px}
         .lad-sw input:focus-visible+span{outline:2px solid var(--lad-on);outline-offset:2px}
-        .lad-modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:14px}
-        .lad-mode{border:1.5px solid var(--lad-line);border-radius:12px;padding:12px;background:var(--lad-card);text-align:start;cursor:pointer;display:flex;flex-direction:column;gap:8px;font:inherit;color:inherit}
-        .lad-mode[aria-checked="true"]{border-color:var(--lad-on);box-shadow:0 0 0 1px var(--lad-on) inset}
-        .lad-mode b{font-weight:600;font-size:14.5px}
-        .lad-mode small{color:var(--lad-muted);font-size:12.5px;line-height:1.4}
-        .lad-thumb{height:70px;border-radius:8px;background:var(--lad-soft);position:relative;overflow:hidden}
-        .lad-thumb i{position:absolute;display:block}
         .lad-seg{display:inline-flex;border:1px solid var(--lad-line);border-radius:10px;overflow:hidden}
         .lad-seg button{border:0;background:var(--lad-card);color:inherit;padding:8px 14px;font:inherit;font-size:13.5px;cursor:pointer}
         .lad-seg button[aria-checked="true"]{background:var(--lad-ink);color:var(--lad-card)}
@@ -45,10 +36,6 @@
         .lad-lbl{display:block;font-size:13.5px;font-weight:600;margin-bottom:8px}
         .lad-range{display:flex;align-items:center;gap:10px}
         .lad-range input{accent-color:var(--lad-on);width:220px;max-width:100%}
-        .lad-grp{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--lad-line);border-radius:10px;margin-top:8px}
-        .lad-grp span.n{flex:1}
-        .lad-arrow{border:1px solid var(--lad-line);background:var(--lad-card);color:inherit;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;line-height:1}
-        .lad-arrow[disabled]{opacity:.35;cursor:default}
         .lad-chk{display:flex;align-items:center;gap:10px;font-size:14px;min-height:32px;cursor:pointer}
         .lad-chk input{width:17px;height:17px;accent-color:var(--lad-on);margin:0}
         .lad-field{width:100%;box-sizing:border-box;border:1px solid var(--lad-line);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;background:var(--lad-card);color:inherit}
@@ -62,10 +49,8 @@
         .lad-sin{display:flex;align-items:center;gap:8px;border:1.5px solid #111827;border-radius:10px;padding:8px 12px;margin:12px 16px 0;color:#6b7280}
         .lad-sin span{flex:1}
         .lad-ph{margin:12px 16px;height:90px;border-radius:10px;background:#f3f4f6}
-        .lad-pop{position:absolute;inset-inline:16px;top:96px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 24px 44px -22px rgba(0,0,0,.3);z-index:2;overflow:hidden}
         .lad-dim{position:absolute;inset:0;background:rgba(17,24,39,.38);z-index:3}
         .lad-drawer{position:absolute;top:0;bottom:0;width:68%;background:#fff;z-index:4;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.25);inset-inline-start:0}
-        .lad-drawer.end{inset-inline-start:auto;inset-inline-end:0}
         .lad-store.phone .lad-drawer{width:100%}
         .lad-dh{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #f0f1f3;font-weight:600}
         .lad-din{margin:8px 10px;border:1.5px solid #111827;border-radius:10px;padding:7px 10px;color:#6b7280}
@@ -82,7 +67,6 @@
         .lad-chips{display:flex;gap:6px;flex-wrap:wrap}
         .lad-chips span{border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;font-size:11.5px}
         .lad-line{padding:5px 0;border-top:1px solid #f0f1f3}
-        .lad-foot{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid #f0f1f3}
         .lad-wa{padding:7px 12px;background:#ecfdf3;color:#166534;border-top:1px solid #dcfce7}
         .lad-note{font-size:12.5px;color:var(--lad-muted);padding:10px 14px;border-top:1px solid var(--lad-line)}
     </style>
@@ -100,7 +84,7 @@
     @if ($this->shop === null)
         <x-filament::section>{{ __('search::ui.no_shop') }}</x-filament::section>
     @else
-    <div class="lad" style="--lad-accent:{{ $accent }};--lad-accent-fg:{{ \App\Modules\Search\Support\ReadableInk::on($accent) }}">
+    <div class="lad" style="--lad-accent:#111827;--lad-accent-fg:#fff">
     <form wire:submit="save" class="lad-cols">
         <div class="lad-form">
 
@@ -141,88 +125,6 @@
                 </div>
             </section>
 
-            {{-- Where all the results open --}}
-            <section class="lad-card">
-                <h2>{{ $t('where.title') }}</h2>
-                <p class="lad-help">{{ $t('where.help') }}</p>
-                <div class="lad-modes" role="radiogroup" aria-label="{{ $t('where.title') }}">
-                    @foreach (['panel', 'drawer', 'page'] as $option)
-                        <button type="button" role="radio" aria-checked="{{ $mode === $option ? 'true' : 'false' }}" class="lad-mode" wire:click="pickResults('{{ $option }}')">
-                            <span class="lad-thumb" aria-hidden="true">
-                                <i style="top:8px;inset-inline:10px;height:8px;border-radius:3px;background:#fff;border:1px solid #c7ccd3"></i>
-                                @if ($option === 'panel')
-                                    <i style="top:20px;inset-inline:10px;bottom:8px;border-radius:5px;background:#fff;border:1px solid #d6dae0"></i>
-                                @elseif ($option === 'drawer')
-                                    <i style="inset:0;background:rgba(17,24,39,.25)"></i>
-                                    <i style="top:0;bottom:0;inset-inline-start:0;width:55%;background:#fff"></i>
-                                @else
-                                    @for ($n = 0; $n < 8; $n++)
-                                        <i style="top:{{ $n < 4 ? 24 : 46 }}px;inset-inline-start:{{ 12 + ($n % 4) * 22 }}px;width:16px;height:16px;border-radius:3px;background:#d9cfbf"></i>
-                                    @endfor
-                                @endif
-                            </span>
-                            <b>{{ $t('where.'.$option.'.label') }}</b>
-                            <small>{{ $t('where.'.$option.'.help') }}</small>
-                        </button>
-                    @endforeach
-                </div>
-
-                @if ($mode === 'drawer')
-                    <div class="lad-opt">
-                        <div>
-                            <span class="lad-lbl">{{ $t('where.side') }}</span>
-                            <div class="lad-seg" role="radiogroup" aria-label="{{ $t('where.side') }}">
-                                @foreach (['start', 'end'] as $side)
-                                    <button type="button" role="radio" aria-checked="{{ ($d['drawer_side'] ?? 'start') === $side ? 'true' : 'false' }}" wire:click="$set('data.drawer_side', '{{ $side }}')">{{ $t('where.sides.'.$side) }}</button>
-                                @endforeach
-                            </div>
-                        </div>
-                        <div>
-                            <span class="lad-lbl">{{ $t('where.columns') }}</span>
-                            <div class="lad-seg" role="radiogroup" aria-label="{{ $t('where.columns') }}">
-                                @foreach (['2', '1'] as $columns)
-                                    <button type="button" role="radio" aria-checked="{{ (string) ($d['drawer_columns'] ?? '2') === $columns ? 'true' : 'false' }}" wire:click="$set('data.drawer_columns', '{{ $columns }}')">{{ $t('where.columns_'.$columns) }}</button>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <div class="lad-row" style="margin-top:16px;border-top:1px solid var(--lad-line)">
-                    <div class="lad-rt">
-                        <b id="lad-mode-choice">{{ $t('where.choice.label') }}</b>
-                        <small>{{ $t('where.choice.help') }}</small>
-                    </div>
-                    <label class="lad-sw">
-                        <input type="checkbox" role="switch" aria-labelledby="lad-mode-choice" wire:model.live="data.mode_choice">
-                        <span></span>
-                    </label>
-                </div>
-
-                <div class="lad-row" style="border-top:1px solid var(--lad-line)">
-                    <div class="lad-rt">
-                        <b>{{ $t('where.dropdown.label') }}</b>
-                        <small>{{ $t('where.dropdown.help') }}</small>
-                    </div>
-                    <div class="lad-seg" role="radiogroup" aria-label="{{ $t('where.dropdown.label') }}">
-                        @foreach (['list', 'grid'] as $look)
-                            <button type="button" role="radio" aria-checked="{{ ($d['dropdown'] ?? 'list') === $look ? 'true' : 'false' }}" wire:click="$set('data.dropdown', '{{ $look }}')">{{ $t('where.dropdown.'.$look) }}</button>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div class="lad-row" style="border-top:1px solid var(--lad-line)">
-                    <div class="lad-rt">
-                        <b id="lad-content-meaning">{{ $t('where.content_meaning.label') }}</b>
-                        <small>{{ $t('where.content_meaning.help') }}</small>
-                    </div>
-                    <label class="lad-sw">
-                        <input type="checkbox" role="switch" aria-labelledby="lad-content-meaning" wire:model.live="data.content_by_meaning">
-                        <span></span>
-                    </label>
-                </div>
-            </section>
-
             {{-- How the results look --}}
             <section class="lad-card">
                 <h2>{{ $t('look.title') }}</h2>
@@ -230,54 +132,30 @@
 
                 <div class="lad-opt" style="border-top:0;padding-top:0">
                     <div>
-                        <label class="lad-lbl" for="lad-sugg">{{ $t('look.suggestions') }}</label>
-                        <div class="lad-range"><input id="lad-sugg" type="range" min="1" max="12" wire:model.live="data.suggestions"><strong>{{ $d['suggestions'] ?? 6 }}</strong></div>
-                    </div>
-                    <div>
                         <label class="lad-lbl" for="lad-per">{{ $t('look.per_group') }}</label>
                         <div class="lad-range"><input id="lad-per" type="range" min="4" max="48" step="4" wire:model.live="data.per_group"><strong>{{ $d['per_group'] ?? 12 }}</strong></div>
                     </div>
                 </div>
 
                 <div class="lad-opt">
-                    <div style="flex:1 1 260px">
-                        <span class="lad-lbl">{{ $t('look.groups') }}</span>
-                        @foreach ($this->groups as $at => $group)
-                            <div class="lad-grp" wire:key="group-{{ $group['key'] }}">
-                                <span class="n" id="lad-g-{{ $group['key'] }}">{{ $t('groups.'.$group['key']) }}</span>
-                                <button type="button" class="lad-arrow" wire:click="moveGroup({{ $at }}, -1)" @disabled($at === 0) aria-label="{{ $t('look.up', ['group' => $t('groups.'.$group['key'])]) }}">↑</button>
-                                <button type="button" class="lad-arrow" wire:click="moveGroup({{ $at }}, 1)" @disabled($at === count($this->groups) - 1) aria-label="{{ $t('look.down', ['group' => $t('groups.'.$group['key'])]) }}">↓</button>
-                                <label class="lad-sw" style="margin-top:0">
-                                    <input type="checkbox" role="switch" aria-labelledby="lad-g-{{ $group['key'] }}" wire:model.live="groups.{{ $at }}.on">
-                                    <span></span>
-                                </label>
-                            </div>
-                        @endforeach
-                    </div>
                     <div style="flex:1 1 240px">
                         <span class="lad-lbl">{{ $t('look.on_product') }}</span>
-                        @foreach (['price', 'cart', 'similar', 'hover'] as $key)
+                        @foreach (['price', 'cart', 'similar'] as $key)
                             <label class="lad-chk"><input type="checkbox" wire:model.live="data.{{ $key }}">{{ $t('look.'.$key) }}</label>
                         @endforeach
                     </div>
                 </div>
 
-                <div class="lad-opt">
-                    <div>
-                        <span class="lad-lbl">{{ $t('look.color') }}</span>
-                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                            <div class="lad-seg" role="radiogroup" aria-label="{{ $t('look.color') }}">
-                                <button type="button" role="radio" aria-checked="{{ ($d['own_color'] ?? false) ? 'false' : 'true' }}" wire:click="$set('data.own_color', false)">{{ $t('look.color_theme') }}</button>
-                                <button type="button" role="radio" aria-checked="{{ ($d['own_color'] ?? false) ? 'true' : 'false' }}" wire:click="$set('data.own_color', true)">{{ $t('look.color_own') }}</button>
-                            </div>
-                            @if ($d['own_color'] ?? false)
-                                <input type="color" wire:model.live="data.color" aria-label="{{ $t('look.color_own') }}" style="width:40px;height:36px;border:1px solid var(--lad-line);border-radius:8px;padding:2px;background:var(--lad-card)">
-                                <small class="lad-help" style="margin:0">{{ $t('look.color_help') }}</small>
-                            @endif
-                        </div>
+                <div class="lad-row" style="margin-top:16px;border-top:1px solid var(--lad-line)">
+                    <div class="lad-rt">
+                        <b id="lad-content-meaning">{{ $t('look.content_meaning.label') }}</b>
+                        <small>{{ $t('look.content_meaning.help') }}</small>
                     </div>
+                    <label class="lad-sw">
+                        <input type="checkbox" role="switch" aria-labelledby="lad-content-meaning" wire:model.live="data.content_by_meaning">
+                        <span></span>
+                    </label>
                 </div>
-
             </section>
 
             {{-- When the search does not take over the theme's by itself: the ways to put it there by hand. --}}
@@ -323,10 +201,7 @@
         </div>
 
         {{-- The preview, with the shop's own products --}}
-        @php($shown = array_values(array_map(fn ($g) => $g['key'], array_filter($this->groups, fn ($g) => $g['on']))))
         @php($phone = $this->device === 'phone')
-        @php($cols = $mode === 'drawer' ? ((string) ($d['drawer_columns'] ?? '2') === '1' ? 1 : 2) : ($mode === 'page' ? ($phone ? 2 : 3) : ($phone ? 2 : 3)))
-        @php($count = $mode === 'drawer' ? 4 : min(6, (int) ($d['suggestions'] ?? 6)))
         <aside class="lad-prev" aria-label="{{ $t('preview.title') }}">
             <div class="lad-pv">
                 <div class="lad-pvh">
@@ -356,52 +231,26 @@
                         @php($cards = function (int $n, int $columns) use ($products, $d) {
                             return view('search::operator.search-display-cards', ['products' => array_slice($products, 0, $n), 'columns' => $columns, 'd' => $d])->render();
                         })
-                        @php($groups = [
-                            'product' => '<div class="lad-sec"><h4>'.e($t('groups.product')).'</h4>'.$cards($count, $cols).'</div>',
-                            'category' => '<div class="lad-sec"><h4>'.e($t('groups.category')).'</h4><div class="lad-chips"><span>'.e($t('preview.category_a')).'</span><span>'.e($t('preview.category_b')).'</span></div></div>',
-                            'content' => '<div class="lad-sec"><h4>'.e($t('groups.content')).'</h4><div class="lad-line">'.e($t('preview.guide_a')).'</div><div class="lad-line">'.e($t('preview.guide_b')).'</div></div>',
-                        ])
-
-                        @if ($mode === 'drawer')
-                            <div class="lad-dim"></div>
-                            <div class="lad-drawer {{ ($d['drawer_side'] ?? 'start') === 'end' ? 'end' : '' }}">
-                                <div class="lad-dh"><span>{{ $t('preview.results_for') }}</span><span aria-hidden="true">✕</span></div>
-                                <div style="flex:1;overflow:hidden">
-                                    @foreach ($shown as $key)
-                                        {!! $groups[$key] !!}
-                                    @endforeach
-                                </div>
-                                @if (($d['whatsapp'] ?? false) && $status['number'] !== null)
-                                    <div class="lad-wa">{{ $t('preview.whatsapp') }}</div>
-                                @endif
-                                <div class="lad-din">{{ ($d['ask'] ?? false) ? $t('preview.search_or_ask') : $t('preview.search') }}</div>
+                        <div class="lad-dim"></div>
+                        <div class="lad-drawer">
+                            <div class="lad-dh"><span>{{ $t('preview.results_for') }}</span><span aria-hidden="true">✕</span></div>
+                            <div style="flex:1;overflow:hidden">
+                                <div class="lad-sec"><h4>{{ $t('groups.product') }}</h4>{!! $cards(4, 2) !!}</div>
+                                <div class="lad-sec"><h4>{{ $t('groups.category') }}</h4><div class="lad-chips"><span>{{ $t('preview.category_a') }}</span><span>{{ $t('preview.category_b') }}</span></div></div>
+                                <div class="lad-sec"><h4>{{ $t('groups.content') }}</h4><div class="lad-line">{{ $t('preview.guide_a') }}</div><div class="lad-line">{{ $t('preview.guide_b') }}</div></div>
                             </div>
-                        @elseif ($mode === 'panel')
-                            <div class="lad-pop">
-                                @foreach ($shown as $key)
-                                    {!! $groups[$key] !!}
-                                @endforeach
-                                <div class="lad-foot"><span>{{ $t('preview.all') }}</span>@if ($d['ask'] ?? false)<span style="font-weight:600">{{ $t('preview.ask') }}</span>@endif</div>
-                                @if (($d['whatsapp'] ?? false) && $status['number'] !== null)
-                                    <div class="lad-wa">{{ $t('preview.whatsapp') }}</div>
-                                @endif
-                            </div>
-                        @else
-                            <div class="lad-pop" style="top:96px">
-                                <div class="lad-sec"><h4>{{ $t('preview.suggestions') }}</h4>{!! $cards(min(3, $count), 3) !!}</div>
-                            </div>
-                        @endif
+                            @if (($d['whatsapp'] ?? false) && $status['number'] !== null)
+                                <div class="lad-wa">{{ $t('preview.whatsapp') }}</div>
+                            @endif
+                            <div class="lad-din">{{ ($d['ask'] ?? false) ? $t('preview.search_or_ask') : $t('preview.search') }}</div>
+                        </div>
                     @endif
                 </div>
                 <div class="lad-note">
                     @if (! ($d['storefront'] ?? false))
                         {{ $t('preview.note_off') }}
-                    @elseif ($mode === 'drawer')
-                        {{ $t('preview.note_drawer', ['side' => $t('where.sides.'.($d['drawer_side'] ?? 'start')), 'columns' => $t('where.columns_'.(($d['drawer_columns'] ?? '2') === '1' ? '1' : '2'))]) }}
-                    @elseif ($mode === 'panel')
-                        {{ $t('preview.note_panel') }}
                     @else
-                        {{ $t('preview.note_page') }}
+                        {{ $t('preview.note_drawer') }}
                     @endif
                     @if ($products === [])
                         {{ $t('preview.no_products') }}

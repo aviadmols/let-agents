@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.8.1
+Stable tag: 0.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,15 +25,15 @@ Customer details are never shared: orders reach Let Agents only as totals, produ
 
 The plugin reads the store, and writes only one thing: a draft post on the site's blog, when the store team publishes a guide in Let Agents. The owner publishes it from WordPress; once published it is never changed again. Nothing else in the store is ever changed, and the write needs both the token and a signature only Let Agents can make.
 
-= The widget on the store =
+= Lets Search on the store =
 
-WooCommerce > Let Agents > Widget on the store:
+WooCommerce > Let Agents > Lets Search on the store:
 
 * Off: nothing is added to the store.
-* Preview (the default): only the store team sees the widget, when logged in to WordPress or after opening a preview link from Let Agents. Visitors are counted in the reports but see nothing.
+* Preview (the default): only the store team sees Lets Search, when logged in to WordPress or after opening a preview link from Let Agents. It shows them a preview strip.
 * Live: every visitor sees it.
 
-Where the widget shows (a CSS class or selector of the theme, before or after it) is set per store in Let Agents. The widget script is served by Let Agents, reads live prices and stock from the WooCommerce Store API, and adds to the cart through the same API.
+Lets Search is one script served by Let Agents ({api}/search/lets-search.js). It opens from the store's search box and search icons, answers the store's results page, and on product pages and on the post types shared with Let Agents it starts with that page. It reads live prices and stock from the WooCommerce Store API and adds to the cart through the same API. [let_agents_wishlist] prints a heart that opens the wishlist; any link to #wishlist does the same.
 
 = Reports =
 
@@ -41,9 +41,8 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 
 = Privacy =
 
-* The widget keeps an anonymous visitor ID in a first-party cookie (let_agents_vid) and localStorage, and sends Let Agents the page path, the product or article ID and what was done with the widget. No names, emails or query strings.
+* Lets Search keeps an anonymous visitor ID in a first-party cookie (let_agents_vid) and localStorage, and sends Let Agents the page path, the product or article ID and what was done with Lets Search. No names, emails or query strings.
 * When an order is placed, the plugin sends Let Agents a keyed hash of the order ID, the total and currency, product IDs with quantities and line totals, and the anonymous visitor ID. Never names, emails, phone numbers, addresses, payment details, notes or coupons. The request runs in the background and never slows checkout.
-* When a shopper leaves their email before checkout, the plugin sends Let Agents that email with the text the shopper agreed to, the order ID and a link to it in the store admin, product IDs with quantities and line totals, the total and currency, what they searched for in the store, and the anonymous visitor ID. Nothing else about the shopper. It too runs in the background.
 * Requests from the plugin to Let Agents are signed with a key derived from the access token.
 
 == Installation ==
@@ -53,6 +52,12 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.9.0 =
+* One script on the store: Lets Search, the drawer, loaded from {api}/search/lets-search.js. The product-page widget, the old search box script and their display modes are removed; everything they did is in the drawer, and page views, searches, add to cart and orders are counted as before.
+* One mode instead of two. A store that had the widget or the search live is live; else, if either was in preview, it is in preview; else off. A store that had the search off and the widget on still gets the drawer, so product pages keep their help and learning.
+* The page being read (a product, or an entry of a post type shared with Let Agents) is sent with the search context.
+* [lets_cta] and the offer after paragraph N are removed: the shortcode prints nothing, so old posts do not show it. [let_agents_wishlist] now prints a heart linking to #wishlist, which opens the drawer's saved tab.
 
 = 0.8.1 =
 * [let_agents_wishlist]: the wishlist heart, with the number of products saved, wherever the shop places it (a header, a menu). A click opens the list.

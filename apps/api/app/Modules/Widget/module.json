@@ -79,71 +79,9 @@
         {
             "name": "show_article_products",
             "default": true
-        },
-        {
-            "name": "find_field",
-            "default": true
         }
     ],
     "settings": [
-        {
-            "name": "layout",
-            "type": "enum",
-            "options": [
-                "circles",
-                "chat",
-                "tags",
-                "assistant"
-            ],
-            "default": "circles",
-            "scope": "shop"
-        },
-        {
-            "name": "product_selector",
-            "type": "string",
-            "default": "form.cart",
-            "min": 1,
-            "max": 200,
-            "scope": "shop"
-        },
-        {
-            "name": "product_position",
-            "type": "enum",
-            "options": [
-                "after",
-                "before",
-                "prepend",
-                "append"
-            ],
-            "default": "after",
-            "scope": "shop"
-        },
-        {
-            "name": "content_selector",
-            "type": "string",
-            "default": ".entry-content",
-            "min": 1,
-            "max": 200,
-            "scope": "shop"
-        },
-        {
-            "name": "content_position",
-            "type": "enum",
-            "options": [
-                "after",
-                "before",
-                "prepend",
-                "append"
-            ],
-            "default": "after",
-            "scope": "shop"
-        },
-        {
-            "name": "floating_fallback",
-            "type": "bool",
-            "default": true,
-            "scope": "shop"
-        },
         {
             "name": "max_products",
             "type": "int",

@@ -22,30 +22,24 @@
             <code dir="ltr" style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(0,0,0,.05);border-radius:6px">?let_agents_preview={{ $d['preview_key'] }}</code>
         </x-filament::section>
 
-        <x-filament::section :heading="__('widget::ui.preview.placement_heading')">
-            <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <x-filament::section :heading="__('widget::ui.preview.drawer_heading')">
+            <p style="font-size:14px">{{ __('widget::ui.preview.drawer_where') }}</p>
+            <table style="width:100%;font-size:14px;border-collapse:collapse;margin-top:8px">
                 @foreach (['product', 'content'] as $type)
-                    @php($p = $d['placement'][$type])
                     <tr style="border-top:1px solid #e4e4e7">
                         <td style="padding:8px 6px;width:30%">{{ __("widget::ui.preview.page_types.{$type}") }}</td>
-                        <td style="padding:8px 6px">
-                            @if ($p['enabled'])
-                                <code dir="ltr">{{ $p['selector'] }}</code>
-                                · {{ __("widget::settings.{$type}_position.options.{$p['position']}") }}
-                            @else
-                                {{ __('widget::ui.preview.off') }}
-                            @endif
-                        </td>
+                        <td style="padding:8px 6px">{{ $d['pages'][$type] ? __("widget::ui.preview.about_{$type}") : __('widget::ui.preview.off') }}</td>
                     </tr>
                 @endforeach
-                <tr style="border-top:1px solid #e4e4e7">
-                    <td style="padding:8px 6px">{{ __('widget::settings.floating_fallback.label') }}</td>
-                    <td style="padding:8px 6px">{{ $d['floating'] ? __('widget::ui.yes') : __('widget::ui.no') }}</td>
-                </tr>
             </table>
-            <div style="margin-top:12px">
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                @if ($d['frame_url'])
+                    <x-filament::button tag="a" :href="$d['frame_url']" target="_blank" color="gray" size="sm" data-drawer-frame>
+                        {{ __('widget::ui.preview.open_frame') }}
+                    </x-filament::button>
+                @endif
                 <x-filament::button tag="a" :href="$d['configure_url']" color="gray" size="sm">
-                    {{ __('widget::ui.preview.change_placement') }}
+                    {{ __('widget::ui.preview.change_settings') }}
                 </x-filament::button>
             </div>
         </x-filament::section>

@@ -1,10 +1,6 @@
 <?php
 
 return [
-    'dropdown_layout' => [
-        'label' => 'Regular search display',
-        'description' => 'A list beside categories and guides, or a grid of large product cards across the full width.',
-    ],
     'size_attribute' => [
         'label' => 'What "size" is measured by',
         'description' => 'The key of the store vocabulary attribute (e.g. diamonds_total_carat or diameter) that "biggest", "smallest" and "size X" use. Empty: those phrases do not change results.',
@@ -12,19 +8,6 @@ return [
     'input_selector' => [
         'label' => 'Search boxes on the site',
         'description' => 'CSS selector of the search fields Let Agents search attaches to. Several, separated by commas.',
-    ],
-    'results' => [
-        'label' => 'Where full results show',
-        'description' => 'In LetAgents\'s panel over the page, or on the site\'s own search results page in LetAgents\'s order.',
-        'options' => [
-            'panel' => 'In LetAgents\'s panel',
-            'drawer' => 'In a side drawer, with a field for more searches and questions at the bottom',
-            'page' => 'On the site\'s search page',
-        ],
-    ],
-    'suggestions' => [
-        'label' => 'Products in suggestions',
-        'description' => 'How many products show under the box while typing.',
     ],
     'results_per_group' => [
         'label' => 'Results per group',
@@ -194,14 +177,6 @@ return [
         'label' => 'Answers in the search box',
         'description' => 'How many answers shoppers already got go into the search, the most asked first. 0 to show none.',
     ],
-    'drawer_side' => [
-        'label' => 'Which side the drawer opens from',
-        'description' => 'Start is right on a Hebrew site and left on an English one. On a phone the drawer takes the whole screen.',
-        'options' => [
-            'start' => 'The start side (right in Hebrew)',
-            'end' => 'The end side (left in Hebrew)',
-        ],
-    ],
     'photo_tags_provider' => [
         'label' => 'Photo reading provider',
         'description' => 'anthropic or openai.',
@@ -254,18 +229,6 @@ return [
         'label' => 'Likeness that counts as the same picture',
         'description' => 'An uploaded photo at least this alike (0 to 1) to a product picture is that product\'s own picture: it comes first, whatever was seen and whatever tags were chosen.',
     ],
-    'drawer_columns' => [
-        'label' => 'Products per row in the drawer',
-        'description' => 'In the side drawer of search results: two products a row, or one large product.',
-        'options' => [
-            2 => 'Two products a row',
-            1 => 'One product a row',
-        ],
-    ],
-    'groups' => [
-        'label' => 'Result groups and their order',
-        'description' => 'Products, categories and guides, in order. A group not on the list is not shown.',
-    ],
     'show_price' => [
         'label' => 'Price on every product',
         'description' => 'The live price from the store beside every product in the results.',
@@ -273,14 +236,6 @@ return [
     'show_cart' => [
         'label' => 'Add to cart button',
         'description' => 'On every product that can be bought directly. Opens the theme\'s cart.',
-    ],
-    'hover_image' => [
-        'label' => 'Second picture on hover',
-        'description' => 'When a product has more than one picture, the second shows while the pointer is on it.',
-    ],
-    'button_color' => [
-        'label' => 'Button colour',
-        'description' => 'Empty: like the theme\'s buttons. Otherwise a colour as #RRGGBB.',
     ],
     'photo_rank_provider' => [
         'label' => 'Provider of the model that orders the results',

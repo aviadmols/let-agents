@@ -8,8 +8,6 @@
         "Enrichment",
         "Admin",
         "Shopify",
-        "Runs",
-        "Ai",
         "Sms"
     ],
     "provider": "ShortlistServiceProvider",
@@ -47,51 +45,9 @@
             "unit": "products"
         },
         {
-            "name": "card_selector",
-            "type": "string",
-            "default": "",
-            "min": 0,
-            "max": 300,
-            "scope": "shop"
-        },
-        {
-            "name": "product_selector",
-            "type": "string",
-            "default": "form[action*=\"/cart/add\"], form.cart",
-            "min": 0,
-            "max": 300,
-            "scope": "shop"
-        },
-        {
-            "name": "wishlist_floating",
-            "type": "bool",
-            "default": true,
-            "scope": "shop"
-        },
-        {
-            "name": "wishlist_header",
-            "type": "bool",
-            "default": false,
-            "scope": "shop"
-        },
-        {
             "name": "wishlist_whatsapp",
             "type": "bool",
             "default": true,
-            "scope": "shop"
-        },
-        {
-            "name": "heart_plain",
-            "type": "bool",
-            "default": false,
-            "scope": "shop"
-        },
-        {
-            "name": "wishlist_place",
-            "type": "string",
-            "default": "",
-            "min": 0,
-            "max": 300,
             "scope": "shop"
         },
         {
@@ -102,52 +58,6 @@
             "max": 600,
             "scope": "global",
             "unit": "requests"
-        },
-        {
-            "name": "card_finder_provider",
-            "type": "enum",
-            "options": [
-                "openai",
-                "anthropic",
-                "gemini"
-            ],
-            "default": "openai",
-            "scope": "global"
-        },
-        {
-            "name": "card_finder_model",
-            "type": "string",
-            "default": "gpt-5.4-mini",
-            "min": 1,
-            "max": 120,
-            "scope": "global"
-        },
-        {
-            "name": "card_finder_input_usd_per_million",
-            "type": "float",
-            "default": 1,
-            "min": 0,
-            "max": 100,
-            "scope": "global",
-            "unit": "usd"
-        },
-        {
-            "name": "card_finder_output_usd_per_million",
-            "type": "float",
-            "default": 8,
-            "min": 0,
-            "max": 400,
-            "scope": "global",
-            "unit": "usd"
-        },
-        {
-            "name": "card_finder_max_output_tokens",
-            "type": "int",
-            "default": 300,
-            "min": 50,
-            "max": 2000,
-            "scope": "global",
-            "unit": "tokens"
         },
         {
             "name": "phone_codes_per_hour",
@@ -184,28 +94,6 @@
             "max": 365,
             "scope": "global",
             "unit": "days"
-        }
-    ],
-    "agents": [
-        {
-            "name": "card_finder",
-            "action": "find_cards",
-            "when": "live",
-            "features": [],
-            "roles": [
-                {
-                    "role": "writer",
-                    "provider": "card_finder_provider",
-                    "model": "card_finder_model",
-                    "prices": [
-                        "card_finder_input_usd_per_million",
-                        "card_finder_output_usd_per_million"
-                    ],
-                    "prompts": [
-                        "card_finder"
-                    ]
-                }
-            ]
         }
     ]
 }

@@ -160,7 +160,7 @@ final class OrderHistory {
 
 	private static function can_send(): bool {
 		return function_exists( 'wc_get_orders' ) && function_exists( 'as_enqueue_async_action' )
-			&& 'off' !== Settings::widget_mode() && null !== SiteKeys::site();
+			&& 'off' !== Settings::mode() && null !== SiteKeys::site();
 	}
 
 	private static function schedule( int $page, int $tries, int $delay = 0 ): void {

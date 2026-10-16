@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Search\Http\Controllers\AppMcpController;
+use App\Modules\Search\Http\Controllers\LetsSearchScriptController;
 use App\Modules\Search\Http\Controllers\McpController;
 use App\Modules\Search\Http\Controllers\PluginSearchController;
 use App\Modules\Search\Http\Controllers\SearchController;
@@ -8,7 +9,6 @@ use App\Modules\Search\Http\Controllers\SearchEventsController;
 use App\Modules\Search\Http\Controllers\SearchIndexController;
 use App\Modules\Search\Http\Controllers\SearchOrderController;
 use App\Modules\Search\Http\Controllers\SearchPhotoController;
-use App\Modules\Search\Http\Controllers\SearchScriptController;
 use App\Modules\Search\Http\Controllers\ShareController;
 use App\Modules\Search\Http\Controllers\SimilarController;
 use App\Modules\Search\Http\Controllers\SizeHelpController;
@@ -16,7 +16,11 @@ use Illuminate\Support\Facades\Route;
 
 // Prefixed /api/v1 by the module loader. Public: the storefront calls these from every visitor,
 // except the plugin route, which the store's own server signs.
-Route::get('search/let-agents-search.js', SearchScriptController::class)->name('api.search.script');
+// The Lets Search drawer (built: resources/search/lets-search/build.js). Before search/{site}.
+Route::get('search/lets-search.js', LetsSearchScriptController::class)->name('api.search.lets-search');
+// The old search script's address, still printed by stores on older plugins and the Shopify embed:
+// it serves the same drawer, which reads their LetAgentsSearchContext as its settings.
+Route::get('search/let-agents-search.js', LetsSearchScriptController::class)->name('api.search.script');
 
 Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/index', SearchIndexController::class)->name('api.search.index');

@@ -4,14 +4,13 @@ namespace App\Modules\TryOn;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\TryOn\Console\PruneTryOnCommand;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * Try-On: a product on the shopper or in their room (docs/try-on.md, ADR 0012). Off for every shop
- * until it is turned on (`try_on.enabled`).
+ * Try-On was removed from the storefront and the panels (the owner's word). What stays: its tables
+ * and their rows (what happened and what it cost), and the nightly deletion of the photos and
+ * pictures it kept, on each photo's keeping date. The flags stay declared and off (`try_on.enabled`
+ * off, `try_on.paused` on) for code that still asks them.
  */
 final class TryOnServiceProvider extends ModuleServiceProvider
 {
@@ -22,9 +21,6 @@ final class TryOnServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
-        // A photo or a try costs money: a few a minute from one address to one shop.
-        RateLimiter::for('try-on', fn (Request $request): Limit => Limit::perMinute(10)->by('try-on:'.$request->ip().'|'.$request->route('site')));
-
         if ($this->app->runningInConsole()) {
             $this->commands([PruneTryOnCommand::class]);
         }

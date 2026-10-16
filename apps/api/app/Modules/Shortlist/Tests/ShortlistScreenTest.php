@@ -71,20 +71,17 @@ final class ShortlistScreenTest extends TestCase
             ->assertDontSee('data-switch="compare"', false)
             ->set('data.wishlist', true)
             ->assertSee('#wishlist')
-            ->set('data.card_selector', '.product-card')
             ->assertSee('[let_agents_wishlist]')
-            ->set('data.wishlist_place', '.header__icon--search')
-            ->set('data.wishlist_floating', false)
-            ->set('data.wishlist_header', true)
+            // The old buttons' placement is gone: the heart lives in the search drawer.
+            ->assertDontSee('data.card_selector')
+            ->assertDontSee('data.wishlist_place')
             ->set('data.wishlist_whatsapp', false)
             ->call('save');
 
         $this->assertTrue(Features::enabled('shortlist.compare', $this->mine->id));
         $this->assertTrue(Features::enabled('shortlist.wishlist', $this->mine->id));
-        $this->assertSame('.product-card', Settings::get('shortlist.card_selector', $this->mine->id));
-        $this->assertSame('.header__icon--search', Settings::get('shortlist.wishlist_place', $this->mine->id));
-        $this->getJson('/api/v1/shortlist/'.SiteKeys::site(self::TOKEN).'/config')->assertJsonPath('wishlistPlace', '.header__icon--search')
-            ->assertJsonPath('wishlistFloating', false)->assertJsonPath('wishlistHeader', true)->assertJsonPath('wishlistWhatsapp', false);
+        $this->assertFalse(Settings::get('shortlist.wishlist_whatsapp', $this->mine->id));
+        $this->getJson('/api/v1/shortlist/'.SiteKeys::site(self::TOKEN).'/config')->assertJsonPath('wishlistWhatsapp', false)->assertJsonMissingPath('wishlistPlace');
         $this->assertFalse(Features::enabled('shortlist.wishlist', $this->theirs->id), 'their own shop only');
 
         // Shoppers keep lists and compare.

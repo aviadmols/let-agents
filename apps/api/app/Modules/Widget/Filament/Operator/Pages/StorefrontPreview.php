@@ -3,7 +3,6 @@
 namespace App\Modules\Widget\Filament\Operator\Pages;
 
 use App\Core\Facades\Features;
-use App\Core\Facades\Settings;
 use App\Core\Tenancy\NeedsShopContext;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -18,8 +17,8 @@ use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
- * Where the widget shows on a store, and links that show it to the store team before it is
- * live for everyone: the page address plus ?let_agents_preview=<key>. The key stays in a cookie for
+ * The Lets Search drawer on a store, and links that show it to the store team before it is live
+ * for everyone: the page address plus ?let_agents_preview=<key>. The key stays in a cookie for
  * 30 days, so the team can keep browsing the store.
  */
 final class StorefrontPreview extends Page
@@ -71,7 +70,9 @@ final class StorefrontPreview extends Page
             return null;
         }
 
-        return app(TenantContext::class)->run($this->shop, function (): array {
+        $slug = Shop::query()->whereKey($this->shop)->value('slug');
+
+        return app(TenantContext::class)->run($this->shop, function () use ($slug): array {
             $connection = StoreConnection::query()->latest()->first();
             $key = $connection?->previewKey();
 
@@ -103,19 +104,13 @@ final class StorefrontPreview extends Page
                 'preview_key' => $key,
                 'site_key' => $connection?->site_key,
                 'plugin_version' => $connection?->info('plugin.version'),
-                'placement' => [
-                    'product' => [
-                        'enabled' => Features::enabled('widget.on_products', $this->shop),
-                        'selector' => Settings::get('widget.product_selector', $this->shop),
-                        'position' => Settings::get('widget.product_position', $this->shop),
-                    ],
-                    'content' => [
-                        'enabled' => Features::enabled('widget.on_content', $this->shop),
-                        'selector' => Settings::get('widget.content_selector', $this->shop),
-                        'position' => Settings::get('widget.content_position', $this->shop),
-                    ],
+                // On which pages the drawer opens with what it knows about the page.
+                'pages' => [
+                    'product' => Features::enabled('widget.on_products', $this->shop),
+                    'content' => Features::enabled('widget.on_content', $this->shop),
                 ],
-                'floating' => Settings::get('widget.floating_fallback', $this->shop),
+                // The drawer on a sample page of this shop, drawn inside the panel.
+                'frame_url' => $slug === null ? null : url('widget-preview/'.$slug).'?type=product',
                 'products' => $products,
                 'articles' => $articles,
                 'catalog_products' => CatalogProduct::query()->active()->count(),

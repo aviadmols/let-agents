@@ -3,7 +3,6 @@
 namespace App\Modules\Search\Support;
 
 use App\Core\Facades\Features;
-use App\Core\Facades\Settings;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Models\SearchPageTags;
@@ -14,20 +13,13 @@ final class StoredPageTags implements PageTags
     public function __construct(private readonly SearchCatalog $search) {}
 
     /**
-     * Tags are written and shown for a shop that turned them on, or that chose the tag bank as
-     * the look of its on-page module: choosing the look is enough, with no second switch to find.
+     * Tags are written and shown for a shop that turned them on. A shop that had chosen the tag bank
+     * as its module's look (before the search drawer) had them turned on by migration
+     * 2026_10_16_600001, so its tags keep being written.
      */
     public static function wanted(string $shopId): bool
     {
-        if (Features::enabled('search.page_tags', $shopId)) {
-            return true;
-        }
-
-        try {
-            return Settings::get('widget.layout', $shopId) === 'tags';
-        } catch (\Throwable) {
-            return false;
-        }
+        return Features::enabled('search.page_tags', $shopId);
     }
 
     public function forPage(string $shopId, string $type, string $externalId, int $perTag): array

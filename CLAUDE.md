@@ -69,16 +69,15 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - Hebrew text: never `trim($s, '•…')` with multibyte characters (PHP trims bytes and cuts letters);
   use a `/u` regex. Hebrew final letters (ן ם ך ף ץ) differ from their regular forms in patterns.
 
-## Planned (docs only so far): strict first scan, Try-On, Site rename
+## Planned (docs only so far): strict first scan, Site rename
 
 - ADR 0011 / `docs/strict-scan.md`: one vocabulary per branch leaf with a buyer's checklist, a score
   (code metrics + pilot extraction + cross-family review) and a gate before the full scan; merchant
   screen for missing info; "ask the web" needs two independent verbatim sources and a person's approval.
   `enrichment.schema_auto_advance` stays off until the score is calibrated.
-- ADR 0012 / `docs/try-on.md`: module `TryOn`, flag `tryon.enabled` off by default (per-shop override
-  through `Features`), Replicate behind a new `Ai\Contracts\ImageDriver`, own spend cap, every step logged
-  with its prompt. Model calls only on the two POST routes (photo, job). Process, prompts and costs are
-  operator-only; the merchant sees counts.
+- Try-On was removed on 2026-10-16 (the owner's word): its storefront script, routes and screens are
+  gone; `/api/v1/try-on/let-agents-tryon.js` answers a tiny retired script for old stores. Its models,
+  migrations and rows stay, and `try-on:prune` still deletes expired photos nightly (privacy).
 - ADR 0013: the tenant becomes `Site` (`site_id`). Until that commit lands, code still says `Shop`.
 
 - Try-On marks are code-only facts (`FactKind::TryOn`, key `class`): `none` is written for known-not-eligible, nothing for undecided
@@ -115,9 +114,12 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 
 ## Search, pictures and the daily review (apps/api, ADR 0008)
 
-- `Search` owns the store's search box. `Support/HebrewSearch.php` and `resources/search/let-agents-search.js`
+- `Search` owns the store's search box. `Support/HebrewSearch.php` and `resources/search/hebrew-search-engine.js`
   are one algorithm in two languages; change both or neither, `HebrewSearchTest` runs them on one
-  fixture and requires identical ids in identical order. The index (`search_indexes`) is rebuilt at
+  fixture and requires identical ids in identical order. The storefront runs one script, the Lets Search
+  drawer (`resources/search/lets-search.js`, built from `lets-search/` and the engine with
+  `npm run build:lets-search`; `LetsSearchBuildTest` fails when it is stale), served at
+  `/api/v1/search/lets-search.js` and at the old `/search/let-agents-search.js` address. The index (`search_indexes`) is rebuilt at
   02:40 and on demand; synonyms are applied at build time, never at query time.
 - `SearchCatalog` merges spelling (exact matches first), meaning (`SemanticSearch::nearText`) and
   pictures (`picturesNearText`) by reciprocal rank. `CountSearch` counts once per tab; query text
@@ -136,14 +138,16 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   Use a small PHP script with `str_replace`, or the editor.
 ## Storefront widget and analytics (apps/api)
 
-- `Widget` serves `/api/v1/widget/let-agents.js` (source: `Widget/resources/widget/let-agents.js`, plain ES5-ish JS,
-  no build step) and `/api/v1/widget/{site}/page`, built in code from approved facts only. Placement
-  is a per-shop CSS selector setting. Shopper-facing sentences are templates in `widget::bank`.
-  Two layouts from one bank (`widget.layout`): `circles` (the row of circles, one panel) and
-  `chat` (one closed teaser line that opens into a conversation whose suggestions are the same
-  sections; a chosen section's rendered body is moved into an assistant bubble after a short
-  "thinking" pause — no model call, only a typed question reaches the Assistant). Both use the soft
-  look: gradient hairlines from `--let-agents-glow-1/2/3`, the store's `--let-agents-accent` only on buttons.
+- Since 2026-10-16 the storefront runs ONE script, the Lets Search drawer (see Search above); the old
+  widget, search box, shortlist script and their display modes (layouts, placement, panel/page/drawer
+  results) are gone. Old script addresses stay for stores on an older plugin: `/widget/let-agents.js`
+  and `/search/let-agents-search.js` serve the drawer, `/shortlist/let-agents-shortlist.js` a tiny
+  retired script. The drawer keeps every contract of the old scripts (events, visitor id cookie, ask
+  bodies, `la_q`/`la_f`/`la_order`/`la_list` links, `window.LetAgentsSearch`); change one only with its
+  server side. In preview mode shoppers get it `silent` (counted, nothing shown).
+- `Widget` serves `/api/v1/widget/{site}/page`, built in code from approved facts only: on a product
+  page the drawer shows it as "about this product", in the bank's (learned) section order, and sends
+  its beacons. Shopper-facing sentences are templates in `widget::bank`.
 - `Analytics` stores beacons validated against `packages/event-spec` (copied to
   `resources/event-spec` in the image) and plugin order summaries; `BuildShopReport` is the one
   report for the plugin, the operator panel and later the merchant panel.
@@ -151,8 +155,8 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   section order, clicked items first, never-clicked products dropped after enough openings. Sections
   carry spare products for that, so trim to `widget.max_products` only there.
 - `ComputePopularity` (same nightly command) writes `analytics_popularity`: adds to the cart and
-  orders per product. let-agents.js reports the store's own add-to-cart button as `source: page`. The
-  widget's popularity line reads the table (`BuildPageBank::popularity()`), never the events.
+  orders per product. The drawer reports the store's own add-to-cart button as `source: page`. The
+  bank's popularity line reads the table (`BuildPageBank::popularity()`), never the events.
 - `Assistant` answers shoppers' questions (`/widget/{site}/ask`, `/widget/{site}/questions`): saved
   answers first, contact details and daily limits in code, a small model checks the question is
   about the product, the writer answers from store information first and general knowledge second
@@ -172,8 +176,8 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   for a channel that cannot deliver it (`Support\Channels`): email needs a real mailer, phones wait
   for an SMS provider. The Widget reads history through `Shoppers\Contracts\VisitHistory`, never
   the tables. The "products you viewed" circle is one visitor's own, so it can never be in the page
-  bank, which is cached and shared: `POST widget/{site}/recent` serves it and the widget adds the
-  circle itself, like `compare`.
+  bank, which is cached and shared: `POST widget/{site}/recent` serves it and the drawer adds it
+  itself, like the comparison with the product viewed before.
 - Highlights (`product_highlights`, facts of kind `highlight`) are written from longer text
   (`enrichment.max_highlight_text_chars`); a reviewer of highlights must read that same text.
 - A route under `api/*` gets `Access-Control-Allow-Origin: *` from Laravel's CORS config; origin

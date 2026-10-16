@@ -1,9 +1,7 @@
 <div class="lad-grid" style="grid-template-columns:repeat({{ $columns }},minmax(0,1fr))">
     @forelse ($products as $product)
         <div class="lad-pc">
-            @if (($d['hover'] ?? false) && $product['image2'])
-                <img class="lad-pi" src="{{ $product['image2'] }}" alt="" loading="lazy" title="{{ __('search::ui.display.preview.hover_shown') }}">
-            @elseif ($product['image'])
+            @if ($product['image'])
                 <img class="lad-pi" src="{{ $product['image'] }}" alt="" loading="lazy">
             @else
                 <span class="lad-pi"></span>

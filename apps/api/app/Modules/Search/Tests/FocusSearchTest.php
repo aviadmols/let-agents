@@ -25,7 +25,7 @@ final class FocusSearchTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const SCRIPT = __DIR__.'/../resources/search/let-agents-search.js';
+    private const SCRIPT = __DIR__.'/../resources/search/hebrew-search-engine.js';
 
     private Shop $shop;
 

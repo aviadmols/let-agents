@@ -11,7 +11,6 @@ use LetAgents\Storefront\OrderHistory;
 use LetAgents\Storefront\OrderReporter;
 use LetAgents\Storefront\PostSchema;
 use LetAgents\Storefront\Search;
-use LetAgents\Storefront\Widget;
 use LetAgents\Storefront\WishlistHeart;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,14 +23,17 @@ final class Plugin {
 
 	public static function boot(): void {
 		Legacy::migrate();
+		// 0.9.0: the widget's and the search's modes become the one mode of Lets Search.
+		Settings::migrate();
 		add_action( 'init', array( self::class, 'load_translations' ) );
 		add_action( 'init', array( self::class, 'forget_cart_capture' ) );
 		add_action( 'rest_api_init', array( Routes::class, 'register' ) );
 		// The one write route: drafts of the posts the store team publishes in Let Agents.
 		add_action( 'rest_api_init', array( PostRoutes::class, 'register' ) );
 
-		Widget::register();
+		// Lets Search, the one storefront script. The page it runs on travels in its context.
 		Search::register();
+		// [lets_cta] in old posts prints nothing now.
 		CallToAction::register();
 		WishlistHeart::register();
 		OrderReporter::register();

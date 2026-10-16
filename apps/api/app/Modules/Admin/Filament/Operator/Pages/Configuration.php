@@ -62,17 +62,9 @@ class Configuration extends Page implements HasForms
         'shown' => [
             'widget.on_products',
             'widget.on_content',
-            'widget.layout',
             'widget.max_products',
             'widget.popularity',
             'widget.promises',
-        ],
-        'placement' => [
-            'widget.product_selector',
-            'widget.product_position',
-            'widget.content_selector',
-            'widget.content_position',
-            'widget.floating_fallback',
         ],
         'panels' => [
             'widget.show_highlights',
@@ -94,18 +86,12 @@ class Configuration extends Page implements HasForms
             'assistant.questions_per_shop_per_day',
         ],
         'search' => [
-            'search.results',
-            'search.drawer_side',
-            'search.drawer_columns',
             'search.similar',
             'assistant.on_search',
             'assistant.search_whatsapp',
             'assistant.search_whatsapp_message',
-            'search.groups',
             'search.show_price',
             'search.show_cart',
-            'search.hover_image',
-            'search.button_color',
             'assistant.ask_review',
         ],
         'whatsapp' => [

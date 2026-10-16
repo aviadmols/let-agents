@@ -7,7 +7,6 @@ use App\Core\Facades\Settings;
 use App\Core\Settings\InvalidSettingValue;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
-use App\Modules\Shortlist\Actions\FindThemeCards;
 use App\Modules\Shortlist\Models\ShortlistCount;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
 use App\Modules\Sms\Contracts\Phone;
@@ -22,8 +21,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 /**
- * Compare and wishlist in one store: whether they are on and where their buttons go, and what
- * shoppers do with them: the lists kept, how many are in a store account, the products saved
+ * Compare and wishlist in one store (both live in the search drawer): whether they are on, sharing
+ * and keeping the list by phone, and what shoppers do with them: the lists kept, how many are in a store account, the products saved
  * most, the comparisons opened and the products compared most.
  *
  * Plain fields, saved through Features and Settings, so a value out of its range is refused.
@@ -119,14 +118,8 @@ class Shortlists extends Page
             'wishlist' => Features::enabled('shortlist.wishlist', $shop),
             'compare_max' => (int) Settings::get('shortlist.compare_max', $shop),
             'wishlist_max' => (int) Settings::get('shortlist.wishlist_max', $shop),
-            'card_selector' => (string) Settings::get('shortlist.card_selector', $shop),
-            'product_selector' => (string) Settings::get('shortlist.product_selector', $shop),
-            'wishlist_floating' => (bool) Settings::get('shortlist.wishlist_floating', $shop),
-            'wishlist_header' => (bool) Settings::get('shortlist.wishlist_header', $shop),
             'wishlist_whatsapp' => (bool) Settings::get('shortlist.wishlist_whatsapp', $shop),
             'wishlist_phone' => Features::enabled('shortlist.wishlist_phone', $shop),
-            'heart_plain' => (bool) Settings::get('shortlist.heart_plain', $shop),
-            'wishlist_place' => (string) Settings::get('shortlist.wishlist_place', $shop),
         ];
     }
 
@@ -145,16 +138,8 @@ class Shortlists extends Page
             Features::override('shortlist.wishlist', (bool) ($d['wishlist'] ?? false), $shop);
             Settings::set('shortlist.compare_max', (int) ($d['compare_max'] ?? 5), $shop);
             Settings::set('shortlist.wishlist_max', (int) ($d['wishlist_max'] ?? 100), $shop);
-            Settings::set('shortlist.wishlist_floating', (bool) ($d['wishlist_floating'] ?? true), $shop);
-            Settings::set('shortlist.wishlist_header', (bool) ($d['wishlist_header'] ?? false), $shop);
             Settings::set('shortlist.wishlist_whatsapp', (bool) ($d['wishlist_whatsapp'] ?? true), $shop);
             Features::override('shortlist.wishlist_phone', (bool) ($d['wishlist_phone'] ?? false), $shop);
-            Settings::set('shortlist.heart_plain', (bool) ($d['heart_plain'] ?? false), $shop);
-
-            // Empty: no buttons there (no category cards; not on the product page; no heart in the header).
-            foreach (['card_selector', 'product_selector', 'wishlist_place'] as $key) {
-                Settings::set("shortlist.{$key}", trim((string) ($d[$key] ?? '')), $shop);
-            }
         } catch (InvalidSettingValue $e) {
             Notification::make()->danger()->title(__('shortlist::ui.invalid'))->body($e->getMessage())->send();
 
@@ -163,31 +148,6 @@ class Shortlists extends Page
 
         Notification::make()->success()->title(__('shortlist::ui.saved'))->body(__('shortlist::ui.saved_body'))->send();
         $this->load();
-    }
-
-    /** A page of the store to look for the cards on first, when the manager names one. */
-    public string $cardsPage = '';
-
-    /** The theme's product cards, found on the store's own category page and put in the field, not saved. */
-    public function findCards(): void
-    {
-        if ($this->shop === null) {
-            return;
-        }
-
-        $found = app(FindThemeCards::class)->handle($this->shop, $this->cardsPage !== '' ? $this->cardsPage : null);
-
-        if (! $found['found']) {
-            $no = ($found['reason'] ?? '') === 'no_page';
-            // What each page answered, so the manager sees why: blocked, empty, or no cards found.
-            $tried = implode("\n", array_map(fn (array $t): string => __('shortlist::ui.cards_tried', ['page' => rawurldecode($t['page']), 'status' => (string) ($t['status'] ?? '—'), 'links' => (string) $t['links']]), $found['tried']));
-            Notification::make()->warning()->title(__($no ? 'shortlist::ui.cards_no_page' : 'shortlist::ui.cards_not_found'))->body($no ? null : __('shortlist::ui.cards_not_found_body')."\n".$tried)->persistent()->send();
-
-            return;
-        }
-
-        $this->data['card_selector'] = (string) $found['selector'];
-        Notification::make()->success()->title(__('shortlist::ui.cards_found', ['cards' => (string) $found['cards']]))->body(__('shortlist::ui.cards_found_body', ['page' => rawurldecode((string) $found['page'])]))->send();
     }
 
     /** Whether the platform can send SMS: without it, keeping the list by phone shows nowhere. */

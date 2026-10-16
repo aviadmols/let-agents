@@ -50,8 +50,8 @@ final class OrderReporter {
 	 * @param \WC_Order|false|null $order
 	 */
 	private static function queue( $order ): void {
-		// Reported while either the widget or the search is on: each counts the purchases it led to.
-		if ( ! $order instanceof \WC_Order || ( 'off' === Settings::widget_mode() && 'off' === Settings::search_mode() ) || null === SiteKeys::site() ) {
+		// Reported while Lets Search is not off: it counts the purchases it led to.
+		if ( ! $order instanceof \WC_Order || 'off' === Settings::mode() || null === SiteKeys::site() ) {
 			return;
 		}
 

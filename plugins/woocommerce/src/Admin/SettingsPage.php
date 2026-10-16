@@ -29,8 +29,7 @@ final class SettingsPage {
 		add_action( 'admin_post_let_agents_generate_token', array( self::class, 'generate_token' ) );
 		add_action( 'admin_post_let_agents_revoke_token', array( self::class, 'revoke_token' ) );
 		add_action( 'admin_post_let_agents_save_settings', array( self::class, 'save_settings' ) );
-		add_action( 'admin_post_let_agents_save_widget', array( self::class, 'save_widget' ) );
-		add_action( 'admin_post_let_agents_save_search', array( self::class, 'save_search' ) );
+		add_action( 'admin_post_let_agents_save_mode', array( self::class, 'save_mode' ) );
 		add_action( 'admin_post_let_agents_send_order_history', array( self::class, 'send_order_history' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( LET_AGENTS_FILE ), array( self::class, 'action_links' ) );
 		add_action( 'admin_notices', array( self::class, 'woocommerce_missing_notice' ) );
@@ -86,25 +85,15 @@ final class SettingsPage {
 
 		$types = isset( $_POST['content_post_types'] ) ? (array) wp_unslash( $_POST['content_post_types'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- sanitized against registered post types.
 		Settings::save_content_post_types( array_map( 'sanitize_key', $types ) );
-		Settings::save_cta_after_paragraph( isset( $_POST['cta_after_paragraph'] ) ? (int) $_POST['cta_after_paragraph'] : 0 );
 
 		wp_safe_redirect( self::url( array( 'let_agents_notice' => 'saved' ) ) );
 		exit;
 	}
 
-	public static function save_widget(): void {
-		self::authorize( 'let_agents_save_widget' );
+	public static function save_mode(): void {
+		self::authorize( 'let_agents_save_mode' );
 
-		Settings::save_widget_mode( isset( $_POST['widget_mode'] ) ? sanitize_key( wp_unslash( $_POST['widget_mode'] ) ) : 'preview' );
-
-		wp_safe_redirect( self::url( array( 'let_agents_notice' => 'saved' ) ) );
-		exit;
-	}
-
-	public static function save_search(): void {
-		self::authorize( 'let_agents_save_search' );
-
-		Settings::save_search_mode( isset( $_POST['search_mode'] ) ? sanitize_key( wp_unslash( $_POST['search_mode'] ) ) : 'off' );
+		Settings::save_mode( isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : 'preview' );
 
 		wp_safe_redirect( self::url( array( 'let_agents_notice' => 'saved' ) ) );
 		exit;
@@ -220,54 +209,31 @@ final class SettingsPage {
 				</form>
 			<?php endif; ?>
 
-			<h2><?php esc_html_e( 'Widget on the store', 'let-agents' ); ?></h2>
-			<p><?php esc_html_e( 'Where the widget shows on product pages and articles is set in Let Agents, by a CSS class or selector of your theme.', 'let-agents' ); ?></p>
+			<h2><?php esc_html_e( 'Lets Search on the store', 'let-agents' ); ?></h2>
+			<p><?php esc_html_e( 'One script from Let Agents: it opens from the store\'s search box and search icons, and on product pages and articles it starts with what matters about the page. Suggestions forgive spelling mistakes, results come with live prices and add to cart, and shoppers can ask questions and keep a wishlist. If Let Agents does not answer, the store\'s own search runs as before.', 'let-agents' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="let_agents_save_widget" />
-				<?php wp_nonce_field( 'let_agents_save_widget' ); ?>
+				<input type="hidden" name="action" value="let_agents_save_mode" />
+				<?php wp_nonce_field( 'let_agents_save_mode' ); ?>
 				<?php
-				$mode  = Settings::widget_mode();
+				$mode  = Settings::mode();
 				$modes = array(
 					'off'     => array( __( 'Off', 'let-agents' ), __( 'Nothing is added to the store.', 'let-agents' ) ),
-					'preview' => array( __( 'Preview', 'let-agents' ), __( 'Only the store team sees the widget: managers logged in to WordPress, or a browser that opened a preview link from Let Agents. Visitors are counted in the reports but see nothing.', 'let-agents' ) ),
-					'live'    => array( __( 'Live', 'let-agents' ), __( 'Every visitor sees the widget.', 'let-agents' ) ),
+					'preview' => array( __( 'Preview', 'let-agents' ), __( 'Only the store team sees Lets Search: managers logged in to WordPress, or a browser that opened a preview link from Let Agents.', 'let-agents' ) ),
+					'live'    => array( __( 'Live', 'let-agents' ), __( 'Every visitor sees Lets Search.', 'let-agents' ) ),
 				);
 				?>
 				<fieldset>
 					<?php foreach ( $modes as $value => $text ) : ?>
 						<label style="display:block;margin-block:6px">
-							<input type="radio" name="widget_mode" value="<?php echo esc_attr( $value ); ?>" <?php checked( $mode, $value ); ?> />
+							<input type="radio" name="mode" value="<?php echo esc_attr( $value ); ?>" <?php checked( $mode, $value ); ?> />
 							<strong><?php echo esc_html( $text[0] ); ?></strong> — <?php echo esc_html( $text[1] ); ?>
 						</label>
 					<?php endforeach; ?>
 				</fieldset>
 				<?php if ( null === $token ) : ?>
-					<p class="description"><?php esc_html_e( 'The widget loads only after a token is created and connected in Let Agents.', 'let-agents' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Lets Search loads only after a token is created and connected in Let Agents.', 'let-agents' ); ?></p>
 				<?php endif; ?>
-				<?php submit_button( __( 'Save', 'let-agents' ) ); ?>
-			</form>
-
-			<h2><?php esc_html_e( 'Search on the store', 'let-agents' ); ?></h2>
-			<p><?php esc_html_e( 'Let Agents search in the store\'s own search box: suggestions while typing that forgive spelling mistakes, and results grouped into products, guides and categories. Which search fields it attaches to is set in Let Agents. If Let Agents does not answer, the store\'s own search runs as before.', 'let-agents' ); ?></p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="let_agents_save_search" />
-				<?php wp_nonce_field( 'let_agents_save_search' ); ?>
-				<?php
-				$search_mode  = Settings::search_mode();
-				$search_modes = array(
-					'off'     => array( __( 'Off', 'let-agents' ), __( 'The store\'s search stays as it is.', 'let-agents' ) ),
-					'preview' => array( __( 'Preview', 'let-agents' ), __( 'Only the store team sees Let Agents search: managers logged in to WordPress, or a browser that opened a preview link from Let Agents.', 'let-agents' ) ),
-					'live'    => array( __( 'Live', 'let-agents' ), __( 'Every visitor searches with Let Agents.', 'let-agents' ) ),
-				);
-				?>
-				<fieldset>
-					<?php foreach ( $search_modes as $value => $text ) : ?>
-						<label style="display:block;margin-block:6px">
-							<input type="radio" name="search_mode" value="<?php echo esc_attr( $value ); ?>" <?php checked( $search_mode, $value ); ?> />
-							<strong><?php echo esc_html( $text[0] ); ?></strong> — <?php echo esc_html( $text[1] ); ?>
-						</label>
-					<?php endforeach; ?>
-				</fieldset>
+				<p class="description"><?php esc_html_e( 'Put [let_agents_wishlist] in a header or a menu for a heart that opens the wishlist, or link to #wishlist.', 'let-agents' ); ?></p>
 				<?php submit_button( __( 'Save', 'let-agents' ) ); ?>
 			</form>
 
@@ -316,15 +282,6 @@ final class SettingsPage {
 					<?php endforeach; ?>
 				</fieldset>
 
-				<h3><?php esc_html_e( 'Where the offer sits inside a post', 'let-agents' ); ?></h3>
-				<p class="description"><?php esc_html_e( 'Let Agents can drop its offer after a paragraph, so you do not have to edit posts. Put [lets_cta] in a post to place it by hand instead — a post that has one is left alone.', 'let-agents' ); ?></p>
-				<p>
-					<label>
-						<?php esc_html_e( 'After paragraph', 'let-agents' ); ?>
-						<input type="number" name="cta_after_paragraph" min="0" max="20" value="<?php echo esc_attr( (string) Settings::cta_after_paragraph() ); ?>" style="width:5em" />
-					</label>
-					<span class="description"><?php esc_html_e( '0 places it only where you write the shortcode.', 'let-agents' ); ?></span>
-				</p>
 				<?php submit_button( __( 'Save', 'let-agents' ) ); ?>
 			</form>
 		</div>
@@ -336,7 +293,7 @@ final class SettingsPage {
 			'revoked' => array( 'warning', __( 'The token was revoked. Let Agents can no longer read this store.', 'let-agents' ) ),
 			'saved'   => array( 'success', __( 'Settings saved.', 'let-agents' ) ),
 			'history' => array( 'success', __( 'Sending past orders to Let Agents. It runs in the background and can take a while in a large store.', 'let-agents' ) ),
-			'history_unavailable' => array( 'warning', __( 'Past orders can be sent only when the store is connected to Let Agents and the widget is not off.', 'let-agents' ) ),
+			'history_unavailable' => array( 'warning', __( 'Past orders can be sent only when the store is connected to Let Agents and Lets Search is not off.', 'let-agents' ) ),
 		);
 
 		if ( 'generated' === $notice && ! $token_shown ) {

@@ -93,7 +93,8 @@ final class PageBankTest extends TestCase
         $this->assertTrue($bank['enabled']);
         $this->assertFalse($bank['preview']);
         $this->assertSame($this->shop->id, $bank['shop']);
-        $this->assertSame(['selector' => 'form.cart', 'position' => 'after', 'floating' => true], $bank['placement']);
+        $this->assertArrayNotHasKey('placement', $bank, 'the drawer finds its own place on the page');
+        $this->assertArrayNotHasKey('tryon', $bank);
         $this->assertSame(['highlights', 'specs', 'complement', 'guides'], array_column($bank['sections'], 'candidate'), 'where the model stands is part of what to know');
 
         [$position, $specs, $complement, $guides] = $bank['sections'];
@@ -157,22 +158,20 @@ final class PageBankTest extends TestCase
         $this->assertNotNull($this->page('content', '900')->json('contact'), 'articles get the strip too');
     }
 
-    public function test_the_shop_picks_circles_or_the_assistant_and_words_its_sign_up(): void
+    public function test_the_shop_words_its_sign_up(): void
     {
-        $this->assertSame('circles', $this->page('product', '10')->json('layout'), 'circles unless the shop chooses otherwise');
+        $this->assertNull($this->page('product', '10')->json('layout'), 'one drawer: no look to choose');
 
-        Settings::set('widget.layout', 'chat', $this->shop->id);
         Features::override('shoppers.signup', true, $this->shop->id);
         Settings::set('shoppers.signup_title', 'הירשמו לאתר וקבלו 5% הנחה', $this->shop->id);
         Settings::set('shoppers.signup_note', 'וגם נשמור לכם את המוצרים שראיתם, לכל מכשיר.', $this->shop->id);
         Cache::flush();
 
         $bank = $this->page('product', '10')->json();
-        $this->assertSame('chat', $bank['layout']);
         $this->assertSame('הירשמו לאתר וקבלו 5% הנחה', $bank['signup']['title']);
         $this->assertSame('וגם נשמור לכם את המוצרים שראיתם, לכל מכשיר.', $bank['signup']['note']);
         $this->assertStringContainsString('היסטוריית הפעילות', $bank['signup']['consent'], 'the built-in consent names the activity history');
-        $this->assertArrayHasKey('chat_teaser', $bank['labels']);
+        $this->assertArrayHasKey('signup_need_consent', $bank['labels'], 'the drawer\'s sign-up words come with the page');
 
         Settings::set('shoppers.signup_note', '', $this->shop->id);
         Cache::flush();
@@ -318,14 +317,12 @@ final class PageBankTest extends TestCase
         $this->assertSame('מוצר אחד שמתאים למדריך', $bank['teaser']['text']);
     }
 
-    public function test_placement_and_switches_come_from_the_shop_settings(): void
+    public function test_the_switches_come_from_the_shop_settings(): void
     {
-        Settings::set('widget.product_selector', '.my-theme .summary', $this->shop->id);
-        Settings::set('widget.product_position', 'before', $this->shop->id);
         Features::override('widget.on_content', false, $this->shop->id);
         Cache::flush();
 
-        $this->assertSame(['selector' => '.my-theme .summary', 'position' => 'before', 'floating' => true], $this->page('product', '10')->json('placement'));
+        $this->assertTrue($this->page('product', '10')->json('enabled'));
 
         $article = $this->page('content', '900')->json();
         $this->assertFalse($article['enabled']);
@@ -347,15 +344,17 @@ final class PageBankTest extends TestCase
         $this->assertFalse($this->page('product', '10', preview: str_repeat('a', 32))->json('preview'));
     }
 
-    public function test_the_script_is_served_with_a_version_tag(): void
+    public function test_the_old_script_address_serves_the_drawer_with_a_version_tag(): void
     {
         $response = $this->get('/api/v1/widget/let-agents.js')->assertOk()->assertHeader('Content-Type', 'application/javascript; charset=utf-8');
-        $this->assertStringContainsString('LetAgentsContext', (string) $response->getContent());
+        $this->assertSame($this->get('/api/v1/search/lets-search.js')->getContent(), $response->getContent(), 'stores on the old plugin get the Lets Search drawer');
+        $this->assertStringContainsString('LetAgentsContext', (string) $response->getContent(), 'which reads the old plugin\'s page context');
+        $this->assertStringContainsString('if (win.LetsSearch) { return; }', (string) $response->getContent(), 'and loads once on a page that prints both addresses');
 
         $this->get('/api/v1/widget/let-agents.js', ['If-None-Match' => $response->headers->get('ETag')])->assertStatus(304);
     }
 
-    public function test_the_operator_gets_preview_links_and_the_placement(): void
+    public function test_the_operator_gets_preview_links_and_the_sample_page(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('operator'));
         $this->actingAs(User::factory()->operator()->create());
@@ -370,7 +369,8 @@ final class PageBankTest extends TestCase
                 ->assertOk()
                 ->assertSee('https://store.test/product/jigsaw/?let_agents_preview='.$key, false)
                 ->assertSee('https://store.test/guide/?let_agents_preview='.$key, false)
-                ->assertSee('form.cart');
+                ->assertSee(url('widget-preview/'.$this->shop->slug).'?type=product', false)
+                ->assertDontSee('form.cart');
         }
     }
 

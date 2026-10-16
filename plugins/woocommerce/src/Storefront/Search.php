@@ -8,23 +8,27 @@ use LetAgents\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Let Agents search in the store's own search box, on every page.
+ * Lets Search on the store: one script from the Let Agents server, the drawer.
  *
- * The script comes from the Let Agents server and attaches to the search fields Let Agents was told about.
- * It downloads nothing until someone focuses a field. Suggestions are computed in the browser;
- * full results come from Let Agents, or, when the store keeps its own results page, that page is
- * ordered by Let Agents here, so what the box suggested and what the page lists agree.
+ * It answers the store's search box and search icons, and on a product page or an article it
+ * starts with "about this page" and learns from it. Since 0.9.0 it is the only script: the
+ * product-page widget, the old search box and their display modes are gone, and the page the
+ * widget used to be told about now travels in this context as `page`.
+ *
+ * When the store keeps its own results page, that page is ordered by Let Agents here, so what the
+ * drawer suggested and what the page lists agree.
  *
  *   off       nothing changes
  *   preview   only the store team sees it: managers logged in to WordPress, or a browser that
- *             opened a Let Agents preview link
+ *             opened a Let Agents preview link. The drawer shows them a preview strip. Shoppers get
+ *             it silent: nothing shown, their page views and the store's own adds still counted.
  *   live      everyone
  *
  * If Let Agents does not answer, the store's own search runs as it always did.
  */
 final class Search {
 
-	public const HANDLE = 'let-agents-search';
+	public const HANDLE = 'lets-search';
 
 	private const PREVIEW_COOKIE = 'let_agents_preview';
 
@@ -42,9 +46,9 @@ final class Search {
 		add_filter( 'posts_search', array( self::class, 'drop_like_search' ), 10, 2 );
 	}
 
-	/** Whether this visitor gets Let Agents search now. */
+	/** Whether this visitor gets Lets Search now. */
 	public static function active(): bool {
-		$mode = Settings::search_mode();
+		$mode = Settings::mode();
 
 		if ( 'off' === $mode || null === SiteKeys::site() || is_admin() ) {
 			return false;
@@ -65,9 +69,16 @@ final class Search {
 	}
 
 	public static function enqueue(): void {
-		if ( ! self::active() ) {
+		$mode = Settings::mode();
+
+		if ( 'off' === $mode || null === SiteKeys::site() || is_admin() ) {
 			return;
 		}
+
+		// A shopper while the store is in preview gets the script silent: nothing is shown, but the page
+		// view, the store's own add to cart and the search's attribution count, as the widget counted
+		// them in preview before (the learning has its baseline before the drawer goes live).
+		$silent = ! self::active();
 
 		$api         = Settings::api_url();
 		$woocommerce = Plugin::woocommerce_active();
@@ -84,9 +95,23 @@ final class Search {
 			'customer'  => is_user_logged_in() ? SiteKeys::customer( get_current_user_id() ) : null,
 		);
 
+		// The page being read, so the drawer starts with it and its views and learning are counted.
+		$page = self::page();
+
+		if ( null !== $page ) {
+			$context['page'] = $page;
+		}
+
+		// In preview the team sees the drawer with a strip saying visitors do not see it yet.
+		if ( $silent ) {
+			$context['silent'] = true;
+		} elseif ( 'preview' === $mode ) {
+			$context['preview'] = true;
+		}
+
 		wp_enqueue_script(
 			self::HANDLE,
-			$api . '/search/let-agents-search.js',
+			$api . '/search/lets-search.js',
 			array(),
 			null, // The server versions the file itself.
 			array(
@@ -96,6 +121,31 @@ final class Search {
 		);
 
 		wp_add_inline_script( self::HANDLE, 'window.LetAgentsSearchContext = ' . wp_json_encode( $context ) . ';', 'before' );
+	}
+
+	/**
+	 * The product page, or an entry of a post type shared with Let Agents; null elsewhere.
+	 *
+	 * @return array{type: string, id: string}|null
+	 */
+	public static function page(): ?array {
+		if ( Plugin::woocommerce_active() && function_exists( 'is_product' ) && is_product() ) {
+			return array(
+				'type' => 'product',
+				'id'   => (string) get_queried_object_id(),
+			);
+		}
+
+		$types = Settings::content_post_types();
+
+		if ( array() !== $types && is_singular( $types ) ) {
+			return array(
+				'type' => 'content',
+				'id'   => (string) get_queried_object_id(),
+			);
+		}
+
+		return null;
 	}
 
 	/**

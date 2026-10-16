@@ -49,10 +49,6 @@ return [
         'label' => 'Similar items in the results',
         'description' => 'A button on every product in the results. By picture where the pictures are scanned, and by the meaning of the product name and description otherwise. From vectors that already exist, with no model and no cost.',
     ],
-    'mode_choice' => [
-        'label' => 'Shoppers choose: regular or smart search',
-        'description' => 'A switch in the search window. Regular: suggestions open under the site\'s search box. Smart: the side drawer, with a field for searches and questions. The choice is kept in the shopper\'s browser.',
-    ],
     'photo_tags' => [
         'label' => 'Tags from a photo',
         'description' => 'In photo search, a model reads the photo and shows the shop\'s tags that fit it. A tag searches for itself.',

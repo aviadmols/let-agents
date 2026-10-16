@@ -55,23 +55,24 @@ final class ConfigurationPageTest extends TestCase
         $areas = $page->instance()->areas();
 
         // A store's own areas come before the modules.
-        $this->assertSame(['shown', 'placement', 'panels', 'assistant', 'search', 'whatsapp', 'signup'], $page->instance()->storeAreas());
+        $this->assertSame(['shown', 'panels', 'assistant', 'search', 'whatsapp', 'signup'], $page->instance()->storeAreas());
         $this->assertArrayHasKey(self::TENANCY, $areas);
 
         // Every declared key belongs to exactly one area.
         $keys = array_merge(...array_column($areas, 'keys'));
         $this->assertSame(array_values(array_unique($keys)), $keys, 'no key is offered twice');
         $this->assertContains('tenancy.api_access', $keys);
-        $this->assertContains('widget.layout', $keys);
+        $this->assertContains('widget.max_products', $keys);
+        $this->assertNotContains('widget.layout', $keys, 'the module looks went with the old widget');
 
         // And only the open area is on the form.
         $page->call('openArea', self::TENANCY)
             ->assertFormFieldExists('f__tenancy__api_access')
             ->assertFormFieldExists('s__tenancy__max_active_api_keys')
-            ->assertFormFieldDoesNotExist('s__widget__layout');
+            ->assertFormFieldDoesNotExist('s__widget__max_products');
 
         $page->call('openArea', 'shown')
-            ->assertFormFieldExists('s__widget__layout')
+            ->assertFormFieldExists('s__widget__max_products')
             ->assertFormFieldDoesNotExist('f__tenancy__api_access');
     }
 

@@ -1,5 +1,8 @@
 {% comment %}
-  Let Agents search, on every page of the store, once the merchant switches this app embed on.
+  Lets Search, the drawer, on every page of the store, once the merchant switches this app embed on.
+  It is the only Let Agents script on the storefront: search, "about this product" on product pages,
+  answers, the wishlist and shared links all come from {api}/search/lets-search.js, which carries its
+  own styles and search engine. (The product-page block that loaded let-agents.js is gone.)
 
   The app writes two shop metafields at install (namespace let_agents): site_key, the store's public
   key, and api, the Let Agents API address. Without either nothing is printed, so a store that has not
@@ -7,7 +10,8 @@
 
   The context mirrors what the WooCommerce plugin prints (plugins/woocommerce/src/Storefront/Search.php),
   mapped to Shopify: no Store API or nonce; prices, stock and the cart come from the storefront's own
-  public endpoints under `root`. The script itself downloads nothing until a shopper focuses a field.
+  public endpoints under `root`. `page` names the product or article being read, so the drawer starts
+  with it and counts its views and learning.
 {% endcomment %}
 {%- liquid
   assign site = shop.metafields.let_agents.site_key.value | strip
@@ -17,6 +21,15 @@
     assign api = api | remove_last: '/'
   endif
   assign api_scheme = api | slice: 0, 8
+
+  assign page_type = ''
+  if template.name == 'product' and product
+    assign page_type = 'product'
+    assign page_id = product.id | append: ''
+  elsif template.name == 'article' and article
+    assign page_type = 'content'
+    assign page_id = article.id | append: ''
+  endif
 -%}
 {%- if site != blank and api != blank and api_scheme == 'https://' -%}
   <script>
@@ -32,9 +45,12 @@
       "shopCurrency": {{ shop.currency | json }},
       "moneyFormat": {{ shop.money_format | strip_html | json }},
       "loggedIn": {% if customer %}true{% else %}false{% endif %}
+      {%- if page_type != '' -%},
+      "page": { "type": {{ page_type | json }}, "id": {{ page_id | json }} }
+      {%- endif %}
     };
   </script>
-  <script src="{{ api | append: '/search/let-agents-search.js' | escape }}" defer></script>
+  <script src="{{ api | append: '/search/lets-search.js' | escape }}" defer></script>
 {%- endif -%}
 
 {%- comment -%} A guide Let Agents wrote carries its questions in let_agents.faq: search engines read them as FAQPage. {%- endcomment -%}

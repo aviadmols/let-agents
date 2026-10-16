@@ -75,15 +75,12 @@
                         <input type="number" min="10" max="200" wire:model="data.wishlist_max" class="lsl-field num">
                     </div>
                     <div class="lsl-row">
-                        <div class="lsl-rt"><b>{{ $t('wish_link') }}</b><small>{{ $t('wish_link_help') }}</small><code class="lsl-field code" style="display:inline-block;width:auto">#wishlist</code></div>
-                    </div>
-                    <div class="lsl-row">
-                        <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_floating.label') }}</b><small>{{ __('shortlist::settings.wishlist_floating.description') }}</small></div>
-                        <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_floating"><span></span></label>
-                    </div>
-                    <div class="lsl-row">
-                        <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_header.label') }}</b><small>{{ __('shortlist::settings.wishlist_header.description') }}</small></div>
-                        <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_header"><span></span></label>
+                        <div class="lsl-rt">
+                            <b>{{ $t('wish_link') }}</b><small>{{ $t('wish_link_help') }}</small><code class="lsl-field code" style="display:inline-block;width:auto">#wishlist</code>
+                            <small style="margin-top:6px">{{ $t('wish_heart_help') }}</small>
+                            <code class="lsl-field code" style="display:inline-block;width:auto">&lt;span data-let-agents-wishlist&gt;&lt;/span&gt;</code>
+                            <code class="lsl-field code" style="display:inline-block;width:auto">[let_agents_wishlist]</code>
+                        </div>
                     </div>
                     <div class="lsl-row">
                         <div class="lsl-rt"><b>{{ __('shortlist::features.wishlist_phone.label') }}</b><small>{{ __('shortlist::features.wishlist_phone.description') }}</small></div>
@@ -93,45 +90,10 @@
                         <p class="lsl-help" style="color:#b45309">{{ $t('sms_missing') }}</p>
                     @endif
                     <div class="lsl-row">
-                        <div class="lsl-rt"><b>{{ __('shortlist::settings.heart_plain.label') }}</b><small>{{ __('shortlist::settings.heart_plain.description') }}</small></div>
-                        <label class="lsl-sw"><input type="checkbox" wire:model="data.heart_plain"><span></span></label>
-                    </div>
-                    <div class="lsl-row">
                         <div class="lsl-rt"><b>{{ __('shortlist::settings.wishlist_whatsapp.label') }}</b><small>{{ __('shortlist::settings.wishlist_whatsapp.description') }}</small></div>
                         <label class="lsl-sw"><input type="checkbox" wire:model="data.wishlist_whatsapp"><span></span></label>
                     </div>
-                    <div class="lsl-row">
-                        <div class="lsl-rt">
-                            <b>{{ __('shortlist::settings.wishlist_place.label') }}</b>
-                            <small>{{ __('shortlist::settings.wishlist_place.description') }}</small>
-                            <input type="text" wire:model="data.wishlist_place" class="lsl-field code" placeholder=".header__icon--search">
-                            <small style="margin-top:6px">{{ $t('wish_heart_help') }}</small>
-                            <code class="lsl-field code" style="display:inline-block;width:auto">&lt;span data-let-agents-wishlist&gt;&lt;/span&gt;</code>
-                            <code class="lsl-field code" style="display:inline-block;width:auto">[let_agents_wishlist]</code>
-                        </div>
-                    </div>
                 @endif
-                @endif
-
-                @if (($data['compare'] ?? false) || ($data['wishlist'] ?? false))
-                    <div class="lsl-row">
-                        <div class="lsl-rt">
-                            <b>{{ __('shortlist::settings.card_selector.label') }}</b>
-                            <small>{{ __('shortlist::settings.card_selector.description') }}</small>
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <input type="text" wire:model="data.card_selector" class="lsl-field code" placeholder=".product-card, li.product" style="flex:1">
-                                <button type="button" class="lsl-save" style="background:transparent;color:inherit;border:1px solid var(--lsl-line);white-space:nowrap" wire:click="findCards" wire:loading.attr="disabled" wire:target="findCards">{{ $t('find_cards') }}</button>
-                            </div>
-                            <input type="url" wire:model="cardsPage" class="lsl-field code" style="margin-top:6px" placeholder="{{ $t('cards_page') }}" dir="ltr">
-                        </div>
-                    </div>
-                    <div class="lsl-row">
-                        <div class="lsl-rt">
-                            <b>{{ __('shortlist::settings.product_selector.label') }}</b>
-                            <small>{{ __('shortlist::settings.product_selector.description') }}</small>
-                            <input type="text" wire:model="data.product_selector" class="lsl-field code">
-                        </div>
-                    </div>
                 @endif
 
                 <div style="margin-top:14px">

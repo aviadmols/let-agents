@@ -37,7 +37,7 @@ final class InstallGuideTest extends TestCase
         $page->assertSee('input[name=&quot;s&quot;]', false);
         $page->assertSee(SiteKeys::site(self::TOKEN), false);
         $page->assertSee('https://www.store.test/?let_agents_preview='.$connection->previewKey(), false);
-        $page->assertSee('let-agents-search.js', false);
+        $page->assertSee('/search/lets-search.js', false);
     }
 
     public function test_before_the_site_is_connected_the_code_waits(): void
@@ -50,6 +50,6 @@ final class InstallGuideTest extends TestCase
             ->assertOk()
             ->assertSee(__('search::ui.install.checks.connected.no'))
             ->assertSee(__('search::ui.install.other.no_key'))
-            ->assertDontSee('let-agents-search.js', false);
+            ->assertDontSee('lets-search.js', false);
     }
 }

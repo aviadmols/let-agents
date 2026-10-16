@@ -1,0 +1,130 @@
+/*
+ * Lets Search — design tokens.
+ *
+ * Two layers:
+ *   1. Primitives (--lsp-*): the raw values of the Lets Search look. Components read colour, ground
+ *      and control/card radius only through the semantic layer; the type scale, small radii,
+ *      depth and motion primitives are shared by both looks and read directly.
+ *   2. Semantic (--ls-*): what components read. The store look ([data-ls-theme="store"]) replaces
+ *      only this layer, each value falling back to ours when the store gives nothing usable.
+ *
+ * The script writes the store's values as --store-* on the host (font, text, ground, accent,
+ * radius, base size) after checking contrast. A failing accent is darkened along its own hue
+ * until it passes AA; a value it can't read stays unset, so ours applies.
+ */
+
+:root,
+:host {
+  /* ---------- primitives: ink and grays ---------- */
+  --lsp-ink: #0b0b0c;
+  --lsp-ink-2: #1d1d20;
+  --lsp-white: #ffffff;
+  --lsp-gray-25: #fbfbfb;
+  --lsp-gray-50: #f6f6f7;
+  --lsp-gray-100: #efeff1;
+  --lsp-gray-200: #e4e4e7;
+  --lsp-gray-300: #d2d2d7;
+  --lsp-gray-400: #a3a3ab;
+  --lsp-gray-500: #64646c;   /* 5.8:1 on white, 5.0:1 on the hover fill: secondary text */
+  --lsp-gray-600: #4d4d54;   /* 8.2:1: strong secondary */
+
+  /* status, used only where it carries meaning */
+  --lsp-green: #157f3d;
+  --lsp-green-soft: #eaf6ee;
+  --lsp-red: #b42318;
+  --lsp-red-soft: #fdf0ef;
+  --lsp-amber: #9a5b00;
+
+  /* ---------- primitives: type ---------- */
+  --lsp-font: "Google Sans", "Google Sans Text", "Heebo", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --lsp-text-xs: 12px;
+  --lsp-text-sm: 13px;
+  --lsp-text-md: 14px;
+  --lsp-text-base: 15px;
+  --lsp-text-lg: 17px;
+  --lsp-text-xl: 20px;
+  --lsp-text-2xl: 24px;
+
+  /* ---------- primitives: shape ---------- */
+  --lsp-r-xs: 8px;
+  --lsp-r-sm: 12px;
+  --lsp-r-md: 16px;
+  --lsp-r-lg: 20px;
+  --lsp-r-xl: 24px;
+  --lsp-r-pill: 999px;
+
+  /* ---------- primitives: depth (offset + soft blur, two layers) ---------- */
+  --lsp-shadow-sm: 0 1px 2px rgb(11 11 12 / .06), 0 1px 1px rgb(11 11 12 / .03);
+  --lsp-shadow-md: 0 10px 28px -10px rgb(11 11 12 / .16), 0 2px 6px rgb(11 11 12 / .05);
+  --lsp-shadow-lg: 0 28px 72px -18px rgb(11 11 12 / .26), 0 8px 22px -10px rgb(11 11 12 / .10);
+
+  /* ---------- primitives: motion ---------- */
+  --lsp-ease-out: cubic-bezier(.23, 1, .32, 1);
+  --lsp-ease-in-out: cubic-bezier(.77, 0, .175, 1);
+  --lsp-ease-drawer: cubic-bezier(.32, .72, 0, 1);
+  --lsp-dur-press: 140ms;
+  --lsp-dur-hover: 180ms;
+  --lsp-dur-pop: 200ms;
+  --lsp-dur-focus: 360ms;
+  --lsp-dur-drawer: 440ms;
+  --lsp-stagger: 45ms;
+
+  /* ================= semantic layer (what components read) ================= */
+  --ls-font: var(--lsp-font);
+  --ls-size: var(--lsp-text-base);
+
+  --ls-bg: var(--lsp-white);              /* panels, drawer, cards */
+  --ls-bg-sunken: var(--lsp-gray-50);     /* image wells, composer, quiet fills */
+  --ls-bg-hover: var(--lsp-gray-100);
+  --ls-bg-pressed: var(--lsp-gray-200);
+  --ls-fg: var(--lsp-ink);
+  --ls-fg-muted: var(--lsp-gray-500);
+  --ls-fg-strong-muted: var(--lsp-gray-600);
+  --ls-fg-faint: var(--lsp-gray-400);     /* icons and decoration only, never text */
+  --ls-line: var(--lsp-gray-200);
+  --ls-line-strong: var(--lsp-gray-300);
+
+  --ls-accent: var(--lsp-ink);            /* primary buttons, selected chips, focus */
+  --ls-accent-fg: var(--lsp-white);
+  --ls-accent-hover: var(--lsp-ink-2);
+
+  --ls-success: var(--lsp-green);
+  --ls-success-soft: var(--lsp-green-soft);
+  --ls-danger: var(--lsp-red);
+  --ls-danger-soft: var(--lsp-red-soft);
+
+  --ls-r-control: var(--lsp-r-pill);      /* buttons, chips, field */
+  --ls-r-card: var(--lsp-r-lg);
+  --ls-r-image: var(--lsp-r-sm);
+  --ls-r-panel: var(--lsp-r-xl);
+
+  --ls-shadow-float: var(--lsp-shadow-md);
+  --ls-shadow-panel: var(--lsp-shadow-lg);
+  --ls-scrim: rgb(11 11 12 / .32);
+}
+
+/*
+ * The store's look: the store manager's choice in the Shopify / WordPress dashboard.
+ * Each value is the store's, or ours when the store gives nothing usable.
+ */
+:host([data-ls-theme="store"]),
+[data-ls-theme="store"] {
+  --ls-font: var(--store-font, var(--lsp-font));
+  --ls-size: var(--store-size, var(--lsp-text-base));
+  --ls-bg: var(--store-bg, var(--lsp-white));
+  --ls-fg: var(--store-fg, var(--lsp-ink));
+  /* the script checks this against the ground and sets --store-fg-muted darker when it fails AA */
+  --ls-fg-muted: var(--store-fg-muted, color-mix(in srgb, var(--ls-fg) 66%, var(--ls-bg)));
+  --ls-fg-strong-muted: color-mix(in srgb, var(--ls-fg) 78%, var(--ls-bg));
+  --ls-bg-sunken: color-mix(in srgb, var(--ls-fg) 4%, var(--ls-bg));
+  --ls-bg-hover: color-mix(in srgb, var(--ls-fg) 7%, var(--ls-bg));
+  --ls-bg-pressed: color-mix(in srgb, var(--ls-fg) 11%, var(--ls-bg));
+  --ls-line: color-mix(in srgb, var(--ls-fg) 12%, var(--ls-bg));
+  --ls-line-strong: color-mix(in srgb, var(--ls-fg) 20%, var(--ls-bg));
+  --ls-accent: var(--store-accent, var(--lsp-ink));
+  --ls-accent-fg: var(--store-accent-fg, var(--lsp-white));
+  --ls-accent-hover: color-mix(in srgb, var(--ls-accent) 88%, black);
+  --ls-r-control: var(--store-radius, var(--lsp-r-pill));
+  --ls-r-card: min(var(--store-radius, var(--lsp-r-lg)), 24px);
+  --ls-r-image: min(var(--store-radius, var(--lsp-r-sm)), 16px);
+}

@@ -172,8 +172,8 @@ final class SearchFlowTest extends TestCase
         $response = $this->getJson("/api/v1/search/{$this->site}/index?locale=he", ['Origin' => 'https://www.store.test'])->assertOk();
 
         $response->assertJsonPath('enabled', true)
-            ->assertJsonPath('config.results', 'panel')
-            ->assertJsonPath('labels.products', 'מוצרים');
+            ->assertJsonPath('config.selector', 'input[name="s"], input[type="search"]')
+            ->assertJsonMissingPath('labels');
         $this->assertCount(6, $response->json('items'));
 
         $this->get("/api/v1/search/{$this->site}/index?locale=he", ['If-None-Match' => $response->headers->get('ETag')])->assertStatus(304);

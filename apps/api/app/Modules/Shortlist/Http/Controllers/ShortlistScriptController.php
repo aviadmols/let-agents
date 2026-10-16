@@ -6,18 +6,17 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * GET /api/v1/shortlist/let-agents-shortlist.js — the compare and wishlist buttons. The search
- * script loads it only in a shop that turned either on. Served by the app, so every store has a new
- * version within minutes of a deploy.
+ * GET /api/v1/shortlist/let-agents-shortlist.js — retired. The heart, the compare box and the saved
+ * list live in the search drawer now (Search's lets-search.js, its "saved" tab). A store still on an
+ * old plugin asks for this address, so it answers with a script that does nothing, cached as before.
  */
 final class ShortlistScriptController
 {
-    public const PATH = __DIR__.'/../../resources/shortlist/let-agents-shortlist.js';
+    public const SCRIPT = "/* Lets Search: the saved list lives in the search drawer now */\n";
 
     public function __invoke(Request $request): Response
     {
-        $script = (string) file_get_contents(self::PATH);
-        $etag = '"'.substr(hash('sha256', $script), 0, 20).'"';
+        $etag = '"'.substr(hash('sha256', self::SCRIPT), 0, 20).'"';
 
         $headers = [
             'Content-Type' => 'application/javascript; charset=utf-8',
@@ -30,6 +29,6 @@ final class ShortlistScriptController
             return response('', 304, $headers);
         }
 
-        return response($script, 200, $headers);
+        return response(self::SCRIPT, 200, $headers);
     }
 }

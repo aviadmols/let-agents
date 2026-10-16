@@ -148,13 +148,10 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['picture' => 0, 'text' => 1], $this->asked);
     }
 
-    public function test_the_shop_chooses_the_drawer_its_side_and_whether_similar_items_show(): void
+    public function test_the_shop_chooses_whether_similar_items_show(): void
     {
-        Settings::set('search.results', 'drawer', $this->shop->id);
-        Settings::set('search.drawer_side', 'end', $this->shop->id);
-
         $config = $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index')->assertOk()->json('config');
-        $this->assertSame(['drawer', 'end', true], [$config['results'], $config['drawerSide'], $config['similar']]);
+        $this->assertTrue($config['similar']);
         // When the team answers WhatsApp, read in the browser; and whether a name and a way back can be left instead.
         $this->assertCount(7, $config['hours']['days']);
         $this->assertSame('Asia/Jerusalem', $config['hours']['timezone']);

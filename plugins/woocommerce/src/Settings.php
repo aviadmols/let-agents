@@ -17,36 +17,71 @@ final class Settings {
 	/** The Let Agents server. A site can point elsewhere with the LET_AGENTS_API_URL constant in wp-config.php. */
 	public const DEFAULT_API_URL = 'https://api-production-dfb8a.up.railway.app/api/v1';
 
-	/** Whether the storefront widget loads, and for whom. New installs start in preview. */
-	public static function widget_mode(): string {
+	/** Keys only the scripts removed in 0.9.0 read: dropped from the saved option when it is migrated. */
+	private const LEGACY_KEYS = array( 'widget_mode', 'search_mode', 'cta_after_paragraph' );
+
+	/**
+	 * Whether Lets Search loads on the store, and for whom. New installs start in preview.
+	 *
+	 * Until 0.9.0 the product-page widget and the search had a mode each; a store that never saved
+	 * the new one is read from those (see legacy_mode()), so it keeps working before migrate() ran.
+	 */
+	public static function mode(): string {
 		$stored = get_option( self::OPTION, array() );
-		$mode   = is_array( $stored ) && isset( $stored['widget_mode'] ) ? (string) $stored['widget_mode'] : 'preview';
+		$stored = is_array( $stored ) ? $stored : array();
+
+		if ( ! isset( $stored['mode'] ) ) {
+			return self::legacy_mode( $stored );
+		}
+
+		$mode = (string) $stored['mode'];
 
 		return in_array( $mode, self::MODES, true ) ? $mode : 'preview';
 	}
 
-	public static function save_widget_mode( string $mode ): void {
-		$stored                = get_option( self::OPTION, array() );
-		$stored                = is_array( $stored ) ? $stored : array();
-		$stored['widget_mode'] = in_array( $mode, self::MODES, true ) ? $mode : 'preview';
+	public static function save_mode( string $mode ): void {
+		$stored         = get_option( self::OPTION, array() );
+		$stored         = is_array( $stored ) ? $stored : array();
+		$stored['mode'] = in_array( $mode, self::MODES, true ) ? $mode : 'preview';
 
 		update_option( self::OPTION, $stored, false );
 	}
 
-	/** Whether Let Agents search runs in the store's search box, and for whom. Off until the store turns it on. */
-	public static function search_mode(): string {
-		$stored = get_option( self::OPTION, array() );
-		$mode   = is_array( $stored ) && isset( $stored['search_mode'] ) ? (string) $stored['search_mode'] : 'off';
+	/**
+	 * One mode instead of two, written once: live if the widget or the search was live, else
+	 * preview if either was in preview, else off. Unsaved modes count as their old defaults
+	 * (widget preview, search off), which is what the store was running.
+	 */
+	public static function migrate(): void {
+		$stored = get_option( self::OPTION, false );
 
-		return in_array( $mode, self::MODES, true ) ? $mode : 'off';
-	}
+		if ( ! is_array( $stored ) || isset( $stored['mode'] ) ) {
+			return;
+		}
 
-	public static function save_search_mode( string $mode ): void {
-		$stored                = get_option( self::OPTION, array() );
-		$stored                = is_array( $stored ) ? $stored : array();
-		$stored['search_mode'] = in_array( $mode, self::MODES, true ) ? $mode : 'off';
+		$stored['mode'] = self::legacy_mode( $stored );
+
+		foreach ( self::LEGACY_KEYS as $key ) {
+			unset( $stored[ $key ] );
+		}
 
 		update_option( self::OPTION, $stored, false );
+	}
+
+	/**
+	 * @param array<string, mixed> $stored
+	 */
+	private static function legacy_mode( array $stored ): string {
+		$widget = isset( $stored['widget_mode'] ) ? (string) $stored['widget_mode'] : 'preview';
+		$search = isset( $stored['search_mode'] ) ? (string) $stored['search_mode'] : 'off';
+		$widget = in_array( $widget, self::MODES, true ) ? $widget : 'preview';
+		$search = in_array( $search, self::MODES, true ) ? $search : 'off';
+
+		if ( 'live' === $widget || 'live' === $search ) {
+			return 'live';
+		}
+
+		return 'preview' === $widget || 'preview' === $search ? 'preview' : 'off';
 	}
 
 	/** Base URL of the Let Agents API, without a trailing slash. HTTPS only, except on this machine. */
@@ -73,22 +108,6 @@ final class Settings {
 	 *
 	 * @return list<string>
 	 */
-	/** Which paragraph the offer is dropped after, or 0 to place it only by shortcode. */
-	public static function cta_after_paragraph(): int {
-		$stored = get_option( self::OPTION, array() );
-		$after  = is_array( $stored ) && isset( $stored['cta_after_paragraph'] ) ? (int) $stored['cta_after_paragraph'] : 0;
-
-		return max( 0, min( 20, $after ) );
-	}
-
-	public static function save_cta_after_paragraph( int $after ): void {
-		$stored                        = get_option( self::OPTION, array() );
-		$stored                        = is_array( $stored ) ? $stored : array();
-		$stored['cta_after_paragraph'] = max( 0, min( 20, $after ) );
-
-		update_option( self::OPTION, $stored );
-	}
-
 	public static function content_post_types(): array {
 		$stored = get_option( self::OPTION, array() );
 		$types  = is_array( $stored ) && isset( $stored['content_post_types'] ) ? (array) $stored['content_post_types'] : array( 'post', 'page' );

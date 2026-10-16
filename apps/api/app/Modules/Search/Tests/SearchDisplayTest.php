@@ -13,7 +13,6 @@ use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Filament\Merchant\Pages\SearchDisplay;
 use App\Modules\Search\Support\LoadedIndex;
-use App\Modules\Search\Support\ResultGroups;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,47 +46,27 @@ final class SearchDisplayTest extends TestCase
         $screen = Livewire::test(SearchDisplay::class)
             ->assertOk()
             ->assertSee('טבעת סוליטר בכסף')
-            ->assertSet('data.results', 'panel')
-            ->assertSet('groups.0.key', 'product');
+            ->assertSet('data.price', true);
 
-        $screen->call('pickResults', 'drawer')
-            ->set('data.drawer_side', 'end')
-            ->set('data.drawer_columns', '1')
-            ->set('data.price', false)
+        $screen->set('data.price', false)
             ->set('data.cart', false)
-            ->set('data.hover', true)
-            ->set('data.own_color', true)
-            ->set('data.color', '#C4452D')
-            ->set('data.suggestions', 4)
-            ->set('data.mode_choice', true)
-            ->call('moveGroup', 2, -1)
-            ->set('groups.2.on', false)
+            ->set('data.similar', false)
+            ->set('data.per_group', 8)
+            ->set('data.content_by_meaning', true)
             ->set('shop', $theirs->id)
             ->call('save')
             ->assertHasNoErrors();
 
-        $this->assertSame('drawer', Settings::get('search.results', $mine->id));
-        $this->assertSame('end', Settings::get('search.drawer_side', $mine->id));
-        $this->assertSame('1', (string) Settings::get('search.drawer_columns', $mine->id));
         $this->assertFalse(Settings::get('search.show_price', $mine->id));
         $this->assertFalse(Settings::get('search.show_cart', $mine->id));
-        $this->assertTrue(Settings::get('search.hover_image', $mine->id));
-        $this->assertSame('#c4452d', Settings::get('search.button_color', $mine->id));
-        $this->assertSame(4, Settings::get('search.suggestions', $mine->id));
-        $this->assertTrue(Features::enabled('search.mode_choice', $mine->id), 'shoppers may choose regular or smart search');
-        // Guides moved above categories, and categories turned off.
-        $this->assertSame('product,content', Settings::get('search.groups', $mine->id));
+        $this->assertFalse(Features::enabled('search.similar', $mine->id));
+        $this->assertSame(8, Settings::get('search.results_per_group', $mine->id));
+        $this->assertTrue(Features::enabled('search.content_by_meaning', $mine->id));
 
         // The address cannot point the screen at another shop.
-        $this->assertSame('panel', Settings::get('search.results', $theirs->id));
         $this->assertTrue(Settings::get('search.show_price', $theirs->id));
-        $this->assertFalse(Features::enabled('search.mode_choice', $theirs->id));
-
-        // Every group off is refused: the results need at least one.
-        Livewire::test(SearchDisplay::class)
-            ->set('groups.0.on', false)->set('groups.1.on', false)->set('groups.2.on', false)
-            ->call('save');
-        $this->assertSame('product,content', Settings::get('search.groups', $mine->id));
+        $this->assertTrue(Settings::get('search.show_cart', $theirs->id));
+        $this->assertFalse(Features::enabled('search.content_by_meaning', $theirs->id));
     }
 
     public function test_the_store_is_told_what_the_shop_chose(): void
@@ -103,32 +82,19 @@ final class SearchDisplayTest extends TestCase
             'image_url' => 'https://www.rings.test/front.jpg',
             'payload' => ['images' => [['url' => 'https://www.rings.test/front.jpg'], ['url' => 'https://www.rings.test/side.jpg']]],
         ]);
-        Settings::set('search.groups', 'content,product', $shop->id);
         Settings::set('search.show_price', false, $shop->id);
-        Settings::set('search.hover_image', true, $shop->id);
-        Settings::set('search.button_color', '#c4452d', $shop->id);
-        Features::override('search.mode_choice', true, $shop->id);
 
         $this->assertSame('succeeded', app(BuildSearchIndex::class)->handle($shop->id)->status->value);
 
         $index = $this->getJson('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index', ['Origin' => 'https://www.rings.test'])->assertOk()->json();
 
-        $this->assertSame(['content', 'product'], $index['config']['groups']);
         $this->assertFalse($index['config']['price']);
         $this->assertTrue($index['config']['cart']);
-        $this->assertTrue($index['config']['hover']);
-        $this->assertSame('#c4452d', $index['config']['buttonColor']);
-        $this->assertTrue($index['config']['modeChoice'], 'the shopper is offered regular or smart search');
-
-        $ring = collect($index['items'])->firstWhere('id', 'p:7');
-        $this->assertSame('https://www.rings.test/side.jpg', $ring['i2'], 'the second picture, for hover');
-    }
-
-    public function test_groups_keep_their_order_and_drop_what_is_unknown(): void
-    {
-        $this->assertSame(['content', 'product'], ResultGroups::parse(' content , product,content,shoes'));
-        $this->assertSame(ResultGroups::ALL, ResultGroups::parse(''), 'nothing valid saved: every group');
-        $this->assertSame('category,product', ResultGroups::compose(['category', 'product']));
+        // Only what the drawer reads: the old search box's display modes are gone.
+        foreach (['results', 'modeChoice', 'dropdown', 'suggestions', 'perGroup', 'drawerSide', 'drawerColumns', 'groups', 'hover', 'buttonColor'] as $gone) {
+            $this->assertArrayNotHasKey($gone, $index['config']);
+        }
+        $this->assertArrayNotHasKey('labels', $index, 'the drawer carries its own words');
     }
 
     /** @param  array<string, mixed>  $overrides */

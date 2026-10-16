@@ -51,13 +51,6 @@ final class PageBankController
         $preview = $request->query('preview');
         $bank['preview'] = is_string($preview) && hash_equals($connection->previewKey(), $preview);
 
-        // The store team tries Try-On on its own pages before it is on for shoppers: with the preview
-        // key, `tryon=1` (the product's own class) or a class to use where the scan marked none.
-        $tryon = (string) $request->query('tryon', '');
-        if ($bank['preview'] && $type === 'product' && preg_match('/^(1|[a-z_]{2,20})$/', $tryon) === 1) {
-            $bank['tryon'] = $build->tryOn($shopId, $id, test: true, testClass: $tryon === '1' ? null : $tryon);
-        }
-
         // The store team, in preview, gets a link to the panel page that says why each circle is there.
         if ($bank['preview']) {
             $bank['explain_url'] = url('operator/widget/page').'?'.http_build_query(['shop' => $shopId, 'type' => $type, 'id' => $id]);

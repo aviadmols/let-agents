@@ -5,7 +5,8 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "build:lets-search": "node apps/api/app/Modules/Search/resources/search/lets-search/build.js"
   },
   "engines": {
     "node": ">=22"

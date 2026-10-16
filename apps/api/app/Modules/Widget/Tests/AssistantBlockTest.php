@@ -3,7 +3,6 @@
 namespace App\Modules\Widget\Tests;
 
 use App\Core\Facades\Features;
-use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -55,10 +54,8 @@ final class AssistantBlockTest extends TestCase
         Features::override('shortlist.compare', true, $this->shop->id);
     }
 
-    public function test_the_block_carries_the_products_tags_and_questions_in_its_layout_only(): void
+    public function test_the_block_carries_the_products_tags_and_questions_wherever_the_shop_takes_questions(): void
     {
-        Settings::set('widget.layout', 'assistant', $this->shop->id);
-
         $block = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
 
         $this->assertSame('שאלו את Rocks and Gold AI', $block['title']);
@@ -81,13 +78,14 @@ final class AssistantBlockTest extends TestCase
         $again = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
         $this->assertContains('אפשר להחזיר או להחליף?', array_column($again['questions'], 'text'));
 
-        Settings::set('widget.layout', 'circles', $this->shop->id);
+        // The drawer's next steps and its kinds for a comparison come from it; without questions there is none.
+        Features::override('assistant.on_products', false, $this->shop->id);
         $this->assertNull(app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant']);
+        $this->assertNull(app(BuildPageBank::class)->handle($this->shop->id, 'content', '1', 'he')['assistant'] ?? null, 'a guide has no product block');
     }
 
     public function test_similar_items_and_the_comparison_only_among_its_own_kind_and_its_series_where_others_share_it(): void
     {
-        Settings::set('widget.layout', 'assistant', $this->shop->id);
         app(TenantContext::class)->run($this->shop->id, function (): void {
             // A Shopify store with tags only: "כל המוצרים" on every product says nothing of kind.
             // "sale 20%" is a campaign both are in, not a kind they share.

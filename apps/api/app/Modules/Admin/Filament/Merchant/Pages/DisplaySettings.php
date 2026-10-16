@@ -12,9 +12,9 @@ use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
 /**
- * What a shop owner may change about their own widget: whether it shows at all, where on the page
- * it sits, which of the two layouts it uses, what the assistant may answer, and the wording of the
- * WhatsApp strip and the sign-up.
+ * What a shop owner may change about the drawer in their store: on which pages it shows, which
+ * panels it holds, what the assistant may answer, and the wording of the WhatsApp strip and the
+ * sign-up. There is one design, so there is no look or placement to choose.
  *
  * The same screen the operator uses, with two things taken away. The shop is the one in the
  * address and cannot be switched, and only the keys named here are on it: a merchant never sees

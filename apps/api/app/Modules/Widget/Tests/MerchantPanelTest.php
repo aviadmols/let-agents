@@ -58,13 +58,13 @@ final class MerchantPanelTest extends TestCase
 
         // The areas are a shop owner's, and there are no others.
         $this->assertSame(
-            ['shown', 'placement', 'panels', 'assistant', 'whatsapp', 'signup'],
+            ['shown', 'panels', 'assistant', 'whatsapp', 'signup'],
             array_keys($screen->instance()->areas()),
             'nothing about the platform is offered here at all',
         );
 
-        // Wording and placement are theirs.
-        $screen->call('openArea', 'shown')->assertFormFieldExists('s__widget__layout');
+        // What their pages show and how it is worded are theirs.
+        $screen->call('openArea', 'shown')->assertFormFieldExists('s__widget__max_products');
         $screen->call('openArea', 'whatsapp')->assertFormFieldExists('s__widget__whatsapp_number');
 
         // Caps, limits, enrichment and which model answers are not.
@@ -72,9 +72,9 @@ final class MerchantPanelTest extends TestCase
             $screen->assertFormFieldDoesNotExist($field);
         }
 
-        $screen->call('openArea', 'shown')->set('data.s__widget__layout', 'chat')->call('save')->assertHasNoErrors();
-        $this->assertSame('chat', Settings::get('widget.layout', $this->mine->id));
-        $this->assertNotSame('chat', Settings::get('widget.layout', $this->theirs->id), 'only their own shop');
+        $screen->call('openArea', 'shown')->set('data.s__widget__max_products', '6')->call('save')->assertHasNoErrors();
+        $this->assertSame(6, Settings::get('widget.max_products', $this->mine->id));
+        $this->assertNotSame(6, Settings::get('widget.max_products', $this->theirs->id), 'only their own shop');
 
         // A key that is not on the screen cannot be written from it.
         $before = Settings::get('catalog.max_products', $this->mine->id);
@@ -87,7 +87,7 @@ final class MerchantPanelTest extends TestCase
 
         $this->assertSame($before, Settings::get('catalog.max_products', $this->mine->id));
         $this->assertNotSame(7, Settings::get('catalog.max_products', $this->theirs->id));
-        $this->assertSame('chat', Settings::get('widget.layout', $this->mine->id), 'and the shop stayed theirs');
+        $this->assertSame(6, Settings::get('widget.max_products', $this->mine->id), 'and the shop stayed theirs');
     }
 
     public function test_the_sign_ups_page_shows_this_shops_people_and_no_one_elses(): void

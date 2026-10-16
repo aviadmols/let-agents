@@ -201,8 +201,8 @@ class ShopSearches extends Page
 
     /**
      * How to put the search on this shop's site, filled in with its own details: whether the
-     * store is connected and with which plugin, the field the search attaches to, how results
-     * open, a preview link for the team, and the code for a site without the plugin.
+     * store is connected and with which plugin, the field the search attaches to, a preview link
+     * for the team, and the code for a site without the plugin.
      *
      * @return array<string, mixed>|null
      */
@@ -223,7 +223,6 @@ class ShopSearches extends Page
                 'plugin_version' => $connection?->info('plugin.version'),
                 'indexed' => SearchIndex::query()->exists(),
                 'selector' => (string) Settings::get('search.input_selector', $this->shop),
-                'results' => (string) Settings::get('search.results', $this->shop),
                 'preview_url' => $site === null || $connection === null ? null : $site.'/?let_agents_preview='.$connection->previewKey(),
                 'api' => url('/api/v1'),
                 'locale' => 'he',

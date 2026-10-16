@@ -9,10 +9,9 @@ return [
     'default_option' => 'Default (:value)',
     'saved' => 'Settings saved',
     'display_title' => 'How it shows in your store',
-    'display_help' => 'What shows in your store, where it sits and how it is worded. A change is saved at once and reaches shoppers within a few minutes.',
+    'display_help' => 'What shows in your store and how it is worded. A change is saved at once and reaches shoppers within a few minutes.',
     'groups' => [
-        'shown' => ['title' => 'What shows in the store', 'help' => 'Which pages get the widget, how it looks and how many products a list holds.'],
-        'placement' => ['title' => 'Where it sits on the page', 'help' => 'By a class or selector of your theme. When none is found the widget floats in the corner.'],
+        'shown' => ['title' => 'What shows in the store', 'help' => 'Which pages get the drawer and how many products a list holds.'],
         'panels' => ['title' => 'What the shopper is offered', 'help' => 'Every panel the widget can show. What is off here simply never appears to customers.'],
         'assistant' => ['title' => 'What the assistant answers', 'help' => 'Answers are written from the store\'s own information and checked before a shopper sees them.'],
         'search' => ['title' => 'Search and questions in the search', 'help' => 'How results open, whether shoppers may ask the assistant from the search box, and what happens with no exact match: a WhatsApp message to the shop.'],

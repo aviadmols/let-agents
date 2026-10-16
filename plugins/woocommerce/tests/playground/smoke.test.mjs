@@ -268,39 +268,88 @@ test('the manifest gives counts and a fingerprint', async () => {
   assert.equal(again.body.data.fingerprint, body.data.fingerprint, 'stable while nothing changes');
 });
 
-const pageHtml = async (query) => {
-  const res = await fetch(`${base}/?${new URLSearchParams(query)}`, { redirect: 'follow' });
+// The store team's browser: the preview cookie a Let Agents preview link leaves behind.
+const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+const previewKey = crypto.createHmac('sha256', tokenHash).update('let-agents-preview').digest('hex').slice(0, 32);
+const siteKey = crypto.createHash('sha256').update(`let-agents-site|${tokenHash}`).digest('hex').slice(0, 24);
+
+const pageHtml = async (query, { team = false } = {}) => {
+  const res = await fetch(`${base}/?${new URLSearchParams(query)}`, {
+    redirect: 'follow',
+    headers: team ? { Cookie: `let_agents_preview=${previewKey}` } : {},
+  });
   assert.equal(res.status, 200, `page ${JSON.stringify(query)}`);
   return res.text();
 };
 
-const letAgentsContext = (html) => {
+const searchContext = (html) => {
   // WordPress appends "//# sourceURL=..." to inline scripts, so match the JSON line only.
-  const match = html.match(/window\.LetAgentsContext = (\{.*\});\n/);
+  const match = html.match(/window\.LetAgentsSearchContext = (\{.*\});\n/);
   return match ? JSON.parse(match[1]) : null;
 };
 
-test('product pages and shared articles load the widget, with a site key derived from the token', async () => {
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
-  const site = crypto.createHash('sha256').update(`let-agents-site|${hash}`).digest('hex').slice(0, 24);
+const scriptTag = (html) => html.match(/<script[^>]*src="https:\/\/[^"]+\/api\/v1\/search\/lets-search\.js"[^>]*>/);
 
+const noOldScripts = (html, where) => {
+  for (const old of ['widget/let-agents.js', 'let-agents-search.js', 'let-agents-shortlist.js', 'let-agents-tryon.js', 'window.LetAgentsContext']) {
+    assert.ok(!html.includes(old), `${where}: no ${old}`);
+  }
+};
+
+test('in preview a visitor sees nothing, but the page still counts (the script runs silent)', async () => {
   const html = await pageHtml({ post_type: 'product', p: String(P.drill) });
-  const product = letAgentsContext(html);
-  assert.ok(product, 'LetAgentsContext on a product page');
-  assert.equal(product.site, site, 'the same formula as the Let Agents server');
-  assert.equal(product.mode, 'preview', 'new installs start in preview');
-  assert.equal(product.preview, null, 'visitors never get the preview key');
-  assert.deepEqual(product.page, { type: 'product', id: String(P.drill) });
-  assert.match(product.script, /^https:\/\/.+\/api\/v1\/widget\/let-agents\.js$/);
-  assert.match(product.storeApi, /wc\/store\/v1\/$/);
-  const tag = html.match(/<script[^>]*src="https:\/\/[^"]+\/widget\/let-agents\.js"[^>]*>/);
-  assert.ok(tag, 'the widget script is loaded from Let Agents');
-  assert.match(tag[0], /\sdefer[\s>=]/, 'deferred, so it never blocks the page');
+  const ctx = searchContext(html);
+  assert.ok(scriptTag(html), 'the script loads, to count the page view and the store\'s own add to cart');
+  assert.ok(ctx, 'with its context');
+  assert.equal(ctx.silent, true, 'silent: the drawer draws nothing for a visitor in preview');
+  assert.equal(ctx.preview, undefined, 'no preview strip for a visitor');
+  assert.deepEqual(ctx.page, { type: 'product', id: String(P.drill) }, 'the page it counts');
+  noOldScripts(html, 'visitor');
+});
 
-  const guide = letAgentsContext(await pageHtml({ p: String(fixtures.guide) }));
+test('the team gets Lets Search on a product page, with the page and the preview strip', async () => {
+  // The fixtures saved the widget in preview and the search off, as before 0.9.0: one mode, preview.
+  const html = await pageHtml({ post_type: 'product', p: String(P.drill) }, { team: true });
+  const tag = scriptTag(html);
+  assert.ok(tag, 'lets-search.js is loaded from Let Agents');
+  assert.match(tag[0], /\sdefer[\s>=]/, 'deferred, so it never blocks the page');
+  assert.equal((html.match(/\/search\/lets-search\.js/g) ?? []).length, 1, 'loaded once');
+  noOldScripts(html, 'team');
+
+  const ctx = searchContext(html);
+  assert.ok(ctx, 'LetAgentsSearchContext on a product page');
+  assert.equal(ctx.site, siteKey, 'the same formula as the Let Agents server');
+  assert.match(ctx.api, /^https:\/\/.+\/api\/v1$/);
+  assert.deepEqual(ctx.page, { type: 'product', id: String(P.drill) });
+  assert.equal(ctx.preview, true);
+  assert.equal(ctx.version, pluginVersion);
+  assert.match(ctx.storeApi, /wc\/store\/v1\/$/);
+  assert.ok(ctx.nonce, 'a Store API nonce');
+  assert.ok(ctx.cartUrl, 'the cart address');
+  assert.ok(ctx.searchUrl, 'the search address');
+  assert.equal(ctx.customer, null, 'nobody is signed in');
+  assert.equal(ctx.silent, undefined, 'the team sees the drawer');
+});
+
+test('shared articles carry their page, other pages none', async () => {
+  const guide = searchContext(await pageHtml({ p: String(fixtures.guide) }, { team: true }));
   assert.deepEqual(guide.page, { type: 'content', id: String(fixtures.guide) });
 
-  assert.equal(letAgentsContext(await pageHtml({})), null, 'not on the home page');
+  const terms = searchContext(await pageHtml({ page_id: String(fixtures.terms) }, { team: true }));
+  assert.deepEqual(terms.page, { type: 'content', id: String(fixtures.terms) }, 'pages are shared by default');
+
+  const home = searchContext(await pageHtml({}, { team: true }));
+  assert.ok(home, 'Lets Search loads on every page');
+  assert.equal('page' in home, false, 'the home page is neither a product nor an article');
+});
+
+test('a preview link turns the preview on for that browser', async () => {
+  const res = await fetch(`${base}/?${new URLSearchParams({ p: String(fixtures.guide), let_agents_preview: previewKey })}`, { redirect: 'manual' });
+  const cookies = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+  assert.ok(cookies.some((c) => c.startsWith(`let_agents_preview=${previewKey}`)), 'the preview cookie is set');
+  if (res.status === 200) {
+    assert.ok(searchContext(await res.text()), 'and the same page already has Lets Search');
+  }
 });
 
 test('past orders leave the store as summaries only: paid, from the last 24 months, never the customer', () => {
@@ -359,22 +408,30 @@ test('repeated wrong tokens lock the address out, even for the right token', asy
   assert.equal(locked.body.code, 'let_agents_rate_limited');
 });
 
-test('the call to action is placed where the author asked for it', async () => {
-  // Preview mode by default, and the widget only loads for the team — but the slot itself is
-  // written by the plugin, so a visitor's HTML carries it either way.
-  const html = await pageHtml({ p: String(fixtures.cta) });
-  const slots = html.match(/class="let-agents-cta"/g) ?? [];
-
-  assert.equal(slots.length, 1, 'one slot, where the shortcode was');
-  assert.ok(html.indexOf('פסקה ראשונה') < html.indexOf('let-agents-cta'), 'after the first paragraph');
-  assert.ok(html.indexOf('let-agents-cta') < html.indexOf('פסקה שנייה'), 'and before the second');
-  assert.ok(!html.includes('[lets_cta]'), 'the shortcode itself is never printed');
+test('[lets_cta] prints nothing now, not even the tag', async () => {
+  for (const html of [await pageHtml({ p: String(fixtures.cta) }), await pageHtml({ p: String(fixtures.cta) }, { team: true })]) {
+    assert.ok(!html.includes('let-agents-cta'), 'no slot');
+    assert.ok(!html.includes('[lets_cta]'), 'the shortcode itself is never printed');
+    assert.ok(html.includes('פסקה ראשונה') && html.includes('פסקה שנייה'), 'the post is untouched');
+  }
 });
 
-test('a post with no shortcode gets nothing until a shop asks for a paragraph', async () => {
-  const html = await pageHtml({ p: String(fixtures.long) });
+test('nothing is dropped after a paragraph, even for a store that had it set', async () => {
+  // The fixtures saved cta_after_paragraph = 2, as a store before 0.9.0 could.
+  const html = await pageHtml({ p: String(fixtures.long) }, { team: true });
+  assert.ok(!html.includes('let-agents-cta'), 'no offer slot');
+});
 
-  assert.ok(!html.includes('let-agents-cta'), 'nothing is added to a post nobody asked about');
+test('[let_agents_wishlist] is a heart that opens the drawer\'s saved tab', async () => {
+  const team = await pageHtml({ p: String(fixtures.wishlist) }, { team: true });
+  const heart = team.match(/<a href="#wishlist"[^>]*data-let-agents-wishlist[^>]*>/);
+  assert.ok(heart, 'a link to #wishlist marked data-let-agents-wishlist');
+  assert.match(heart[0], /aria-label="[^"]+"/, 'with a label for screen readers');
+  assert.ok(!team.includes('[let_agents_wishlist]'));
+
+  const visitor = await pageHtml({ p: String(fixtures.wishlist) });
+  assert.ok(!visitor.includes('data-let-agents-wishlist'), 'nothing while Lets Search does not load for the visitor');
+  assert.ok(!visitor.includes('[let_agents_wishlist]'), 'and never the raw tag');
 });
 
 test('there is no email before checkout: no cart script on the pages and no capture route', async () => {

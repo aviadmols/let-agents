@@ -7,9 +7,9 @@ namespace App\Modules\Search\Support;
  * spelling stem and a sound key, compared by cosine.
  *
  * The algorithm, its thresholds and its weights come unchanged from the search that was built and
- * measured on the pilot store (docs/search-mechanism.md there). resources/search/let-agents-search.js
+ * measured on the pilot store (docs/search-mechanism.md there). resources/search/hebrew-search-engine.js
  * runs the same algorithm in the browser for instant suggestions; the two must return the same
- * ids in the same order, so a change here is a change there, and SearchEngineParityTest checks
+ * ids in the same order, so a change here is a change there, and HebrewSearchTest checks
  * both against the same fixture.
  *
  *   $index = HebrewSearch::build($items);        // [['id' => 'p:12', 'title' => …, 'keywords' => …], …]
@@ -774,7 +774,7 @@ final class HebrewSearch
      * The one product a search is plainly for, or null: the product whose code (SKU) is what was
      * typed, or the only product that holds every word. Shown on its own, with the rest behind
      * "similar items". Not for questions or price ranges; the caller decides that.
-     * let-agents-search.js has the same rule (single()); change both or neither.
+     * hebrew-search-engine.js has the same rule (single()); change both or neither.
      *
      * @param  array<string, list<string>>  $codes  from codes()
      * @param  list<array{id: string, full?: bool}>  $hits  from search()
@@ -802,7 +802,7 @@ final class HebrewSearch
      * finds drills and black hooks, none both, so "מקדחה" and "בצבע שחור" are offered, each with
      * how many products hold all of it. The query without one of its words at a time (a word's
      * "בצבע" goes with it), the first words kept longest. Empty when a product holds every word
-     * or fewer than two words count. let-agents-search.js has the same focus(); change both.
+     * or fewer than two words count. hebrew-search-engine.js has the same focus(); change both.
      *
      * @return list<array{query: string, count: int}>
      */

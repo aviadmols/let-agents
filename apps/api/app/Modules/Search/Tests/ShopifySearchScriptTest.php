@@ -12,7 +12,7 @@ use Symfony\Component\Process\Process;
  */
 final class ShopifySearchScriptTest extends TestCase
 {
-    private const SCRIPT = __DIR__.'/../resources/search/let-agents-search.js';
+    private const SCRIPT = __DIR__.'/../resources/search/hebrew-search-engine.js';
 
     /** Runs a node expression against the script's exports, as `e`, and returns its JSON value. */
     private static function node(string $expression): mixed

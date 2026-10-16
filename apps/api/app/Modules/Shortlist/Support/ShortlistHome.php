@@ -3,7 +3,6 @@
 namespace App\Modules\Shortlist\Support;
 
 use App\Core\Facades\Features;
-use App\Core\Facades\Settings;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\HomeStatus;
 use App\Modules\Admin\Contracts\ModuleFigure;
@@ -63,20 +62,6 @@ final class ShortlistHome implements HomeSource
                 url: $wishlist,
                 action: __('shortlist::home.turn_on'),
                 weight: 60,
-            )];
-        }
-
-        if (! Settings::get('shortlist.wishlist_header', $shop->id) && trim((string) Settings::get('shortlist.wishlist_place', $shop->id)) === '') {
-            return [new ShopNotice(
-                key: 'shortlist.no_header_heart',
-                kind: ShopNotice::SETUP,
-                tone: 'warn',
-                title: __('shortlist::home.no_header_heart.title'),
-                body: __('shortlist::home.no_header_heart.body'),
-                source: __('shortlist::home.wishlist.name'),
-                url: $wishlist,
-                action: __('shortlist::home.set_up'),
-                weight: 45,
             )];
         }
 
