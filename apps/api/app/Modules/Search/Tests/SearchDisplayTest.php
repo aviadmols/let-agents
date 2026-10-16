@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\CountSearch;
 use App\Modules\Search\Filament\Merchant\Pages\SearchDisplay;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\LoadedIndex;
@@ -122,6 +123,7 @@ final class SearchDisplayTest extends TestCase
         $term($shop->id, 'יהלום ורוד', 6, 5);         // mostly found nothing
         $term($shop->id, '0521234567', 8);            // reads like a number someone typed about themselves
         $term($shop->id, 'צמיד', 7, 0, 45);           // too long ago
+        $term($shop->id, CountSearch::PHOTO, 20);     // photo searches, counted under a marker
         $term($other->id, 'אימפקט', 50);              // another shop's
 
         $index = $this->getJson('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index', ['Origin' => 'https://www.rings.test'])->assertOk()->json();

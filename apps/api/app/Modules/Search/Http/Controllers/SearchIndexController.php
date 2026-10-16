@@ -138,7 +138,8 @@ final class SearchIndexController
             ->limit(20)
             ->pluck('query')
             ->map(fn ($q): string => trim((string) $q))
-            ->filter(fn (string $q): bool => $q !== '' && mb_strlen($q) <= 30 && ! preg_match('/\d{5,}|@/u', $q))
+            // a counted marker ("[photo]" for a photo search, a redacted piece) is not a word anyone searched
+            ->filter(fn (string $q): bool => $q !== '' && mb_strlen($q) <= 30 && ! preg_match('/\d{5,}|@|[\[\]]/u', $q))
             ->take(6)
             ->values()
             ->all();
