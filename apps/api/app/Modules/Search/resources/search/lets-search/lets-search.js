@@ -1132,14 +1132,14 @@
     if (!list || !list.length) { return ''; }
     return '<div class="ls-block"><div class="ls-block__title">' + esc(t('guides')) + '</div><div class="ls-guides">' + list.map(function (c, i) {
       var r = S.records[c.id] || {}, img = c.image || c.img || r.img, kind = (c.kind || r.kind) === 'page' ? t('page') : t('guide'), m = matchOf(q, c.title, r.kw, i);
-      return '<a class="ls-guide" data-opt href="' + esc(c.url) + '">' + (img ? '<img class="ls-guide__img" src="' + esc(img) + '" alt="" loading="lazy">' : '<span class="ls-guide__img ls-guide__img--none">' + icon('doc') + '</span>') +
+      return '<a class="ls-guide" data-opt href="' + esc(c.url) + '">' + (img ? '<img class="ls-guide__img" src="' + esc(img) + '" alt="" decoding="async">' : '<span class="ls-guide__img ls-guide__img--none">' + icon('doc') + '</span>') +
         '<span class="ls-guide__body"><span class="ls-guide__kind">' + esc(kind) + '</span><span class="ls-guide__t" dir="auto">' + esc(decode(c.title)) + '</span>' +
         '<span class="ls-match" style="--m:' + (m / 100) + '"><span class="ls-match__bar"><i></i></span><span class="ls-num">' + esc(t('match', { n: m })) + '</span></span></span></a>';
     }).join('') + '</div></div>';
   }
   function gridN() { return S.expanded && !isPhone() ? 8 : 4; }
   function prow(r) {
-    return '<a class="ls-prow" data-opt href="' + esc(r.url) + '" data-goto="' + esc(pid(r.id)) + '"><img class="ls-prow__img" src="' + esc(r.img || '') + '" alt="" loading="lazy">' +
+    return '<a class="ls-prow" data-opt href="' + esc(r.url) + '" data-goto="' + esc(pid(r.id)) + '"><img class="ls-prow__img" src="' + esc(r.img || '') + '" alt="" decoding="async">' +
       '<div class="ls-prow__body"><div class="ls-prow__title" dir="auto">' + esc(decode(r.title)) + '</div><div class="ls-prow__sub">' + priceHtml(r) + (r.s === 0 ? '<span class="ls-stock ls-stock--out">' + esc(t('outStock')) + '</span>' : '') + '</div></div></a>';
   }
   function priceHtml(r) {
@@ -1263,14 +1263,15 @@
     var id = pid(r.id), saved = S.saved.indexOf(id) >= 0;
     var badge = r.s === 0 ? t('outBadge') : r.sl === 1 ? t('onSaleBadge') : '';
     return '<article class="ls-card' + (r.s === 0 ? ' is-out' : '') + '" data-card="' + esc(id) + '">' +
-      '<div class="ls-card__media"><img src="' + esc(r.img || '') + '" alt="" loading="lazy">' + pic2(r) + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
+      // the picture opens the product, as its name does
+      '<div class="ls-card__media"><a class="ls-card__link" href="' + esc(r.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || '') + '" alt="">' + pic2(r) + '</a>' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
       '<span class="ls-card__heart">' + heartBtn(id, saved, true) + '</span></div>' +
       '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' +
       '<div class="ls-card__row">' + priceHtml(r) + '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button></div>' +
       buyBtn(r, 'ls-btn--sm ls-btn--block') + '<div data-after="' + esc(id) + '"></div></article>';
   }
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
-  function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" loading="lazy" draggable="false">' : ''; }
+  function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" decoding="async" draggable="false">' : ''; }
   function heartBtn(id, on, float) { return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
   function buyBtn(r, cls) {
     var id = pid(r.id);
@@ -1312,7 +1313,7 @@
     var list = filtered(turn), total = (turn.ids || []).length, html = '';
     if (turn.single && rec(turn.single)) {
       var s = rec(turn.single);
-      html += '<div class="ls-exact"><div class="ls-pick__media"><img src="' + esc(s.img) + '" alt=""></div><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
+      html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
     }
     if (!total) {
       if (turn.focus && turn.focus.options && turn.focus.options.length) {
@@ -1463,7 +1464,7 @@
     if (turn.picks && turn.picks.length) {
       html += '<ol class="ls-picks"' + (anim ? ' style="--lsp-stagger:110ms"' : '') + '>' + turn.picks.map(function (p, i) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, buy: 0, s: 1 };
-        return '<li class="ls-pick' + (anim ? ' ls-focus-in' : '') + '" style="--i:' + (anim ? Math.round(n * 28 / 110) + i : 0) + '"><div class="ls-pick__media"><img src="' + esc(r.img || p.image || '') + '" alt=""></div><div>' +
+        return '<li class="ls-pick' + (anim ? ' ls-focus-in' : '') + '" style="--i:' + (anim ? Math.round(n * 28 / 110) + i : 0) + '"><a class="ls-pick__media" href="' + esc(r.url || p.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || p.image || '') + '" alt=""></a><div>' +
           '<a class="ls-pick__title" dir="auto" href="' + esc(r.url || p.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(r.title || p.title)) + '</a><div class="ls-pick__why">' + esc(p.why || '') + '</div>' +
           '<div class="ls-pick__row">' + priceHtml(r) + '<span style="display:flex;gap:4px;align-items:center">' + heartBtn(pid(r.id), S.saved.indexOf(pid(r.id)) >= 0) + buyBtn(r, 'ls-btn--sm') + '</span></div><div data-after="' + esc(pid(r.id)) + '"></div></div></li>';
       }).join('') + '</ol>';
@@ -1511,14 +1512,18 @@
   function similarTurn(id, size) {
     // on a desktop the similar items open large, like "show all": the product on top, filters, the full grid
     S.tab = 'chat'; S.wide = null;
+    // the similar items stand alone at the top; the search they came from waits behind the dashed line
+    S.turns.forEach(function (x) { x.prev = true; });
+    S.showPrev = false; hideLive();
     var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || null });
-    if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); BODY.scrollTop = 0; }
+    if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
+    BODY.scrollTop = 0;
     json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size ? '&limit=24' : '')).then(function (r) {
       var ids = ((r.body && r.body.products) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id); });
       return products(ids.slice(0, 24).map(pid)).then(function () {
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
         update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length) });
-        if (S.wide === turn.id) { BODY.scrollTop = 0; }
+        BODY.scrollTop = 0;
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
   }
@@ -1649,7 +1654,7 @@
       var choose = line.status === 'requires_manual_option_selection' && line.choose && !r.done ? '<div class="ls-chips ls-order__choose">' + line.choose.map(function (c, at) {
         return '<button class="ls-chip" aria-pressed="' + (turn.pickedAt[r.i] === at) + '" data-order-pick="' + turn.id + ':' + r.i + ':' + at + '"' + (c.in_stock ? '' : ' disabled') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(c.label || '') + (c.price != null ? ' <span class="ls-chip__count ls-num">' + money(c.price) + '</span>' : '') + '</button>';
       }).join('') + '</div><div class="ls-order__hint">' + esc(t('orderChoose', { field: line.field || t('orderOption') })) + '</div>' : '';
-      return '<div class="ls-order__line' + (r.done ? ' is-done' : '') + '">' + (line.image ? '<img class="ls-order__img" src="' + esc(line.image) + '" alt="" loading="lazy">' : '<span class="ls-order__img"></span>') +
+      return '<div class="ls-order__line' + (r.done ? ' is-done' : '') + '">' + (line.image ? '<img class="ls-order__img" src="' + esc(line.image) + '" alt="" decoding="async">' : '<span class="ls-order__img"></span>') +
         '<div class="ls-order__main"><div class="ls-order__name" dir="auto">' + esc(decode(line.title || line.product || '')) + '</div>' + (sub.length ? '<div class="ls-order__sub">' + esc(sub.join(' · ')) + '</div>' : '') + choose + state +
         (line.page_url && line.status !== 'unknown_product' ? '<a class="ls-order__page" href="' + esc(line.page_url) + '">' + esc(t('orderPage')) + '</a>' : '') + '</div>' +
         (line.auto ? '<div class="ls-order__price ls-num">' + money(line.line_total) + '</div>' : '') + '</div>';
@@ -1785,7 +1790,7 @@
     }
     if (s.uses && s.uses.length || s.guides && s.guides.length) {
       return wrap((s.uses && s.uses.length ? '<div class="ls-chips" style="flex-wrap:wrap;overflow:visible;mask-image:none;-webkit-mask-image:none">' + s.uses.map(function (u) { return '<span class="ls-chip ls-chip--quiet" style="cursor:default">' + esc(u) + '</span>'; }).join('') + '</div>' : '') +
-        (s.guides && s.guides.length ? '<div class="ls-guides" style="margin-top:10px">' + s.guides.slice(0, 3).map(function (g) { return '<a class="ls-guide" href="' + esc(g.url) + '" data-guide="' + esc(g.id || '') + '">' + (g.image ? '<img class="ls-guide__img" src="' + esc(g.image) + '" alt="" loading="lazy">' : '<span class="ls-guide__img ls-guide__img--none">' + icon('doc') + '</span>') + '<span class="ls-guide__body"><span class="ls-guide__kind">' + esc(t('guide')) + '</span><span class="ls-guide__t" dir="auto">' + esc(decode(g.title)) + '</span></span></a>'; }).join('') + '</div>' : ''), s.title);
+        (s.guides && s.guides.length ? '<div class="ls-guides" style="margin-top:10px">' + s.guides.slice(0, 3).map(function (g) { return '<a class="ls-guide" href="' + esc(g.url) + '" data-guide="' + esc(g.id || '') + '">' + (g.image ? '<img class="ls-guide__img" src="' + esc(g.image) + '" alt="" decoding="async">' : '<span class="ls-guide__img ls-guide__img--none">' + icon('doc') + '</span>') + '<span class="ls-guide__body"><span class="ls-guide__kind">' + esc(t('guide')) + '</span><span class="ls-guide__t" dir="auto">' + esc(decode(g.title)) + '</span></span></a>'; }).join('') + '</div>' : ''), s.title);
     }
     if (s.items && s.items.length) {
       return wrap('<ul class="ls-points">' + s.items.slice(0, 6).map(function (i) { return '<li><span>' + (i.key ? '<b>' + esc(i.key) + '</b> ' : '') + esc(i.text || '') + '</span></li>'; }).join('') + '</ul>', s.title);
@@ -1797,7 +1802,7 @@
     return '<div class="ls-slider"><button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--prev" type="button" data-slide="-1" aria-label="' + esc(t('slidePrev')) + '" disabled>' + icon('back', 'ls-icon--sm') + '</button>' +
       '<div class="ls-mini-row">' + list.slice(0, 6).map(function (p) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, pr: p.price };
-        return '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" loading="lazy" draggable="false">' + pic2(r) + '<span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
+        return '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" decoding="async" draggable="false">' + pic2(r) + '<span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
       }).join('') + '</div>' +
       '<button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--next" type="button" data-slide="1" aria-label="' + esc(t('slideNext')) + '">' + icon('fwd', 'ls-icon--sm') + '</button></div>';
   }
@@ -2359,6 +2364,8 @@
     }
     return turn.kind === 'results' || turn.kind === 'answer' ? turn.q : null;
   }
+  // a picture that fails leaves its frame empty and clean, never the browser's broken-image mark
+  root.addEventListener('error', function (e) { if (e.target && e.target.tagName === 'IMG') { e.target.classList.add('is-broken'); } }, true);
   root.addEventListener('click', function (e) {
     var el = e.target.closest('button, a, [data-close]');
     if (el && !(el.closest('.ls-mini-row') && dragged)) {
@@ -2460,7 +2467,18 @@
     if (d.cmpViewed) { submit(LANG === 'he' ? 'מה ההבדל בין המוצר הזה לבין מה שראיתי קודם?' : 'How does this compare with what I viewed?', 'ask', true); return; }
     if (d.goto && el.tagName === 'A') { remember(INPUT.value.trim() || ''); }
   });
-  BODY.addEventListener('scroll', function () { D.querySelector('.ls-dhead').classList.toggle('is-scrolled', BODY.scrollTop > 4 && !isPhone()); }, { passive: true });
+  // on a phone the search field slides away while scrolling down, and comes back on the way up (or at the top);
+  // never while it is being typed in
+  var lastY = 0;
+  BODY.addEventListener('scroll', function () {
+    var y = BODY.scrollTop, dy = y - lastY;
+    D.querySelector('.ls-dhead').classList.toggle('is-scrolled', y > 4 && !isPhone());
+    if (!isPhone() || y < 40 || root.activeElement === INPUT) { D.classList.remove('is-field-away'); }
+    else if (dy > 6) { D.classList.add('is-field-away'); }
+    else if (dy < -6) { D.classList.remove('is-field-away'); }
+    if (Math.abs(dy) > 6 || y < 40) { lastY = y; }
+  }, { passive: true });
+  INPUT.addEventListener('focus', function () { D.classList.remove('is-field-away'); });
 
   // product sliders: the arrows follow the row's position; a mouse can drag it (and a drag isn't a click)
   var dragged = false;

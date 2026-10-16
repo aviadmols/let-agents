@@ -433,3 +433,9 @@
 .ls-chips--drag.is-dragging { cursor: grabbing; user-select: none; }
 .ls-chips--drag.is-dragging .ls-chip { pointer-events: none; }
 .ls-chips--drag.is-all { flex-wrap: wrap; overflow: visible; mask-image: none; -webkit-mask-image: none; }
+
+/* phone: the search field slides away while scrolling down, back on the way up */
+@media (max-width: 720px) {
+  .ls-drawer .ls-dfield { max-height: 160px; overflow: hidden; transition: max-height 280ms var(--lsp-ease-out), padding 280ms var(--lsp-ease-out), opacity 200ms ease; }
+  .ls-drawer.is-field-away .ls-dfield { max-height: 0; padding-block: 0; opacity: 0; pointer-events: none; }
+}

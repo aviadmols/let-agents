@@ -389,3 +389,9 @@
   .ls .ls-drawer.is-open, .ls .ls-sheet.is-open { opacity: 1; visibility: visible; transition: opacity 200ms ease !important; }
   .ls .ls-scrim { transition: opacity 200ms ease !important; }
 }
+
+/* a product with no picture, or one that failed: the frame stays, empty and clean */
+.ls img[src=""], .ls img:not([src]), .ls img.is-broken { visibility: hidden; }
+/* the product's picture opens its page, as its name does */
+.ls-card__link { position: absolute; inset: 0; display: block; }
+a.ls-pick__media { display: block; }
