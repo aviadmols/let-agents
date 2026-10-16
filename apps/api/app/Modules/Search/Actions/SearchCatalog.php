@@ -53,6 +53,12 @@ final class SearchCatalog
     /** Products a tagged photo returns, for the shopper to narrow by tag in the browser. */
     private const PHOTO_TAGGED = 60;
 
+    /** At least this many products of the kind photographed, and a photo search shows only that kind. */
+    private const PHOTO_KIND_MIN = 3;
+
+    /** In a shop of tools (search.photo_match = function), what a picture shows weighs at least this against how it looks. */
+    private const PHOTO_FUNCTION_WEIGHT = 0.75;
+
     /** Products a tag of words brings, before the picture orders them. */
     private const PHOTO_PER_TAG = 200;
 
@@ -568,6 +574,11 @@ final class SearchCatalog
         $looks = array_column($hits, 'similarity', 'external_id');
         $about = array_column($content, 'similarity', 'external_id');
         $weight = (float) Settings::get('retrieval.content_weight');
+        // A shop of tools (search.photo_match = function): what the picture shows counts over how it looks, so a
+        // yellow pair of snips is not "like" a yellow screwdriver. A shop of clothes or jewelry (look) keeps the balance.
+        if ((string) Settings::get('search.photo_match', $shopId) === 'function') {
+            $weight = max($weight, self::PHOTO_FUNCTION_WEIGHT);
+        }
         $similarity = [];
         foreach (array_unique([...array_keys($looks), ...array_keys($about)]) as $id) {
             $v = $looks[$id] ?? null;
@@ -593,6 +604,12 @@ final class SearchCatalog
         // above a drill whose picture is not scanned yet.
         $main = array_keys(array_filter($tags, fn (array $t): bool => ($t['main'] ?? false) === true));
         $isMain = fn (array $c): int => isset($objectNamed[$c['external_id']]) || array_intersect($members[$c['external_id']], $main) !== [] ? 1 : 0;
+        // Only the kind photographed, when the shop has enough of it: a screwdriver's photo shows screwdrivers,
+        // however alike a yellow pair of snips or a drill looks (and nothing else can be lifted above them later)
+        $ofKind = array_values(array_filter($candidates, fn (array $c): bool => $isMain($c) === 1));
+        if (count($ofKind) >= self::PHOTO_KIND_MIN) {
+            $candidates = $ofKind;
+        }
         // When the main category holds none of what the object's own words name, the category was
         // chosen by a shared word: "סטים" (power-tool kits) for "סט ביטים". Then the bit sets come
         // first. When it holds some ("טבעת" among the rings), the picture orders them as before.

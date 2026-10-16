@@ -273,6 +273,14 @@ return [
         'label' => 'How many leading products are ordered again',
         'description' => 'The first products the model sees and orders. The rest stay after them.',
     ],
+    'photo_match' => [
+        'label' => 'In photo search, what counts after the kind of product',
+        'description' => 'Only products of the kind seen in the photo are shown (a screwdriver: screwdrivers only). Function: what the product is and does orders them, colour hardly at all (tools, home, building). Look: colour, style and shape order them (clothes, fashion, jewelry).',
+        'options' => [
+            'function' => 'Function',
+            'look' => 'Look',
+        ],
+    ],
     'photo_words_weight' => [
         'label' => 'Weight of the product\'s name in photo search',
         'description' => 'How much a product whose name holds the words seen in the photo ("band", "plain", "solitaire") rises in the order. 0 = pictures only.',

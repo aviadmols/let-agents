@@ -680,6 +680,16 @@
             "scope": "shop"
         },
         {
+            "name": "photo_match",
+            "type": "enum",
+            "options": [
+                "function",
+                "look"
+            ],
+            "default": "function",
+            "scope": "shop"
+        },
+        {
             "name": "visit_keep_days",
             "type": "int",
             "default": 90,

@@ -560,6 +560,28 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame(['41', '40'], array_column($result['groups']['product'], 'external_id'), 'the drill before the closer-scoring tool box');
     }
 
+    public function test_a_screwdrivers_photo_shows_only_screwdrivers_however_alike_yellow_snips_look(): void
+    {
+        // Gueta: a yellow-handled screwdriver brought yellow tin snips and a drill first, by their looks.
+        $this->inShop(function (): void {
+            $drivers = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k1', 'name' => 'מברגים', 'path' => ['מברגים'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 3]);
+            $snips = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k2', 'name' => 'מספריים', 'path' => ['מספריים'], 'depth' => 0, 'hash' => 'k2', 'product_count' => 1]);
+            $this->shirt('60', 'מספרי פח צהובים', [0.85, 0.1, 0.35]);
+            CatalogProduct::query()->where('external_id', '60')->sole()->categories()->attach($snips->id);
+            foreach (['61' => 'מברג פיליפס ידית גומי', '62' => 'מברג שטוח ארוך', '63' => 'מברג מבודד 1000V'] as $id => $title) {
+                CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []])
+                    ->categories()->attach($drivers->id);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'מברג', 'main' => 'מברגים', 'around' => ['מספריים'], 'sure' => 0.9, 'sellable' => true]);
+
+        $ids = array_column($this->upload()->assertOk()->json('groups.product'), 'external_id');
+
+        $this->assertEqualsCanonicalizing(['61', '62', '63'], $ids, 'only the screwdrivers: the snips look alike and do something else');
+    }
+
     public function test_what_the_reader_calls_the_object_comes_first_whatever_category_it_chose(): void
     {
         // Gueta: a photo of a bit set was read as "סט ביטים", but the category chosen was "סטים",
