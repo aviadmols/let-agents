@@ -25,6 +25,9 @@ final class ShareController
         'perplexity' => 'https://www.perplexity.ai/search?q={q}',
     ];
 
+    /** A question goes into the AI's address with the words: kept short enough for any browser. */
+    private const QUESTION_CHARS = 300;
+
     public function __invoke(Request $request, ShareSearch $share, string $site): JsonResponse
     {
         $connection = StorefrontSite::resolve($request, $site);
@@ -54,7 +57,12 @@ final class ShareController
         // One sentence and one link: the JSON holds the rest (the instructions, the tasks, the commands,
         // and every category and page of the whole store written out, since an AI's browser opens
         // only addresses it has seen).
-        $words = __('search::share.ask', ['store' => (string) ($connection->shop?->name ?? ''), 'url' => $url.'?format=json'], $locale);
+        $store = ['store' => (string) ($connection->shop?->name ?? ''), 'url' => $url.'?format=json'];
+        // A question the shopper asked in the drawer (asked=true): the words start with it, so their own AI
+        // works on it with the store's information and brings back an order.
+        $words = ($body['asked'] ?? false) === true && $query !== ''
+            ? __('search::share.ask_question', $store + ['question' => mb_substr($query, 0, self::QUESTION_CHARS)], $locale)
+            : __('search::share.ask', $store, $locale);
 
         return response()->json([
             'url' => $url,

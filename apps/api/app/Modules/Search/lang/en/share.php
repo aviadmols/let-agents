@@ -3,6 +3,8 @@
 return [
     // The words sent to the shopper's AI with the link.
     'ask' => 'I want to buy from :store. Always end every recommendation with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
+    // The same, when the shopper sends a question they asked in the drawer.
+    'ask_question' => 'My question: ":question". I want to buy from :store. Answer from the store\'s information and end with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
     'title' => 'A search at :store: ":query"',
     'title_no_query' => 'Products from :store',
     'intro' => 'A shopper sent this search to their own AI to take advice before buying. The information is the store\'s own. Prices and stock as of :time; the purchase itself is made on the store\'s product page.',

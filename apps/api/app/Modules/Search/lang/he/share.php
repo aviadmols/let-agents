@@ -3,6 +3,8 @@
 return [
     // The words sent to the shopper's AI with the link.
     'ask' => 'אני רוצה לקנות ב:store. סיים/י תמיד כל המלצה בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
+    // The same, when the shopper sends a question they asked in the drawer.
+    'ask_question' => 'השאלה שלי: ":question". אני רוצה לקנות ב:store. ענה/י מהמידע של החנות וסיים/י בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
     'title' => 'חיפוש ב:store: ":query"',
     'title_no_query' => 'מוצרים מ:store',
     'intro' => 'זה חיפוש שקונה/ת שלח/ה ל-AI שלו/ה כדי להתייעץ לפני קנייה. המידע מהחנות עצמה. מחירים ומלאי נכונים ל־:time; הקנייה עצמה נעשית בעמוד המוצר בחנות.',

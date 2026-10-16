@@ -115,6 +115,7 @@
       shareText: 'תראו מה מצאתי ב:store: :q', shareStoreText: 'תראו את :store:',
       aiAsk: 'לשאול את ה-AI שלי', aiHelp: 'החיפוש והמוצרים נשלחים ל-AI שתבחרו, כדי להתייעץ לפני הקנייה.', aiStoreHelp: 'כל החנות נשלחת ל-AI שתבחרו: הוא ימליץ, ישווה ויכין קישור לתשלום עם המוצרים בסל.',
       aiCopy: 'העתקת קישור', aiCopied: 'הקישור הועתק. אפשר להדביק אותו בכל AI.', aiFailed: 'לא הצלחנו להכין את הקישור. נסו שוב.', aiFor: 'נשלח: ":q" · :n מוצרים',
+      kitTitle: 'יש בחנות ערכה מוכנה', myAiTitle: 'רוצים לבדוק לעומק עם ה-AI שלכם?', myAiSub: 'הוא יקבל את השאלה ואת כל המידע מהחנות, ויחזיר הזמנה מוכנה לסל כאן.', aiPromptQ: 'השאלה שלי: ":q". אני רוצה לקנות ב:store. ענה/י מהמידע של החנות וסיים/י בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
       aiPrompt: 'אני רוצה לקנות ב:store. סיים/י תמיד כל המלצה בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url'
     },
     en: {
@@ -164,6 +165,7 @@
       shareText: 'Look what I found at :store: :q', shareStoreText: 'Have a look at :store:',
       aiAsk: 'Ask my AI', aiHelp: 'The search and its products go to the AI you choose, to take advice before buying.', aiStoreHelp: 'The whole store goes to the AI you choose: it recommends, compares and makes a checkout link with the products in the cart.',
       aiCopy: 'Copy link', aiCopied: 'Link copied. Paste it into any AI.', aiFailed: 'We could not prepare the link. Please try again.', aiFor: 'Sending: ":q" · :n products',
+      kitTitle: 'The store has a ready-made kit', myAiTitle: 'Want to look deeper with your own AI?', myAiSub: 'It gets the question and all the store\'s information, and brings back an order ready for the cart here.', aiPromptQ: 'My question: ":q". I want to buy from :store. Answer from the store\'s information and end with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
       aiPrompt: 'I want to buy from :store. Always end every recommendation with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url'
     }
   }[LANG];
@@ -622,6 +624,9 @@
   }
   function isQuestion(q) {
     if (!q || off('ask')) { return false; }
+    // "תבנה לי הזמנה לבניית פרגולה": a request to put an order together is asked, not searched (the shared
+    // engine reads questions alike on the server; this is the drawer's own)
+    if (buildAsk(q)) { return true; }
     if (S.engine && S.engine.isQuestion) { try { if (S.engine.isQuestion(q)) { return true; } } catch (e) { /* none */ } }
     return /\?\s*$/.test(q) || /^(איזה|איזו|אילו|איך|כמה|האם|מה|למה|מתי|אפשר|יש לכם|יש לך|which|what|how|can|does|is|do|why)\b/i.test(q.trim()) || q.trim().split(/\s+/).length >= 5;
   }
@@ -1474,10 +1479,10 @@
   function answerHtml(turn) {
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
-    if (turn.noInfo) { return noInfoHtml(turn); }
+    if (turn.noInfo) { return kitsHtml(turn) + noInfoHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
     var n = String(turn.answer || '').split(' ').length;
-    var html = '<div class="ls-answer' + (anim ? ' ls-words' : '') + '"><p>' + (anim ? words(turn.answer) : esc(turn.answer)) + '</p></div>';
+    var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '"><p>' + (anim ? words(turn.answer) : esc(turn.answer)) + '</p></div>';
     if (turn.picks && turn.picks.length) {
       html += '<ol class="ls-picks"' + (anim ? ' style="--lsp-stagger:110ms"' : '') + '>' + turn.picks.map(function (p, i) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, buy: 0, s: 1 };
@@ -1495,7 +1500,7 @@
     html += leadFlowHtml(turn);
     var h = hours(), link = S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
-    return html;
+    return html + myAi(turn);
   }
   // leave your details for the store to come back to you: the question first (what was asked, still editable), then
   // a name, a phone or an email and consent. Sent as the shop's callback about this question (shoppers.callbacks).
@@ -2188,16 +2193,16 @@
   // the AI's link: from the server (a snapshot it reads), or, when that fails, the store's own link
   var SHARES = {};
   function shareFor(cx) {
-    var key = cx.q + '|' + cx.ids.join(',');
+    var key = cx.q + '|' + cx.ids.join(',') + (cx.asked ? '|asked' : '');
     if (!SHARES[key]) {
       // text/plain, so the request needs no preflight; the body is JSON either way
-      SHARES[key] = json(API + '/search/' + SITE + '/share', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ q: cx.q, ids: cx.ids, locale: LANG }) }).then(function (r) {
+      SHARES[key] = json(API + '/search/' + SITE + '/share', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ q: cx.q, ids: cx.ids, locale: LANG, asked: !!cx.asked }) }).then(function (r) {
         var d = r.ok && r.body && (r.body.data || r.body);
         if (d && d.prompt && d.open) { return d; }
         throw new Error('share');
       }).catch(function () {
         delete SHARES[key];
-        var url = shareLink(cx), words = t('aiPrompt', { store: S.config.shopName || '', url: url }), open = {};
+        var url = shareLink(cx), words = cx.asked ? t('aiPromptQ', { q: cx.q, store: S.config.shopName || '', url: url }) : t('aiPrompt', { store: S.config.shopName || '', url: url }), open = {};
         Object.keys(AI_OPEN).forEach(function (k) { open[k] = AI_OPEN[k].replace('{q}', encodeURIComponent(words)); });
         return { url: url, prompt: words, open: open };
       });
@@ -2240,6 +2245,49 @@
   }
   function hideMenu() { if (MENU.hidden) { return; } MENU.hidden = true; S.menu = ''; D.querySelector('[data-menu]').setAttribute('aria-expanded', 'false'); }
   function menuNote(text) { var n = MENU.querySelector('[data-menu-note]'); if (n) { n.textContent = text; } }
+  // A question that asks for planning, quantities or a comparison: long, or in those words. Offered, besides
+  // our answer, to the shopper's own AI with the store's whole information, to come back as an order here.
+  function complexAsk(q) {
+    return wordsOf(q).length >= 6 || buildAsk(q) || /(כמה צריך|כמה יחידות|כמה מטר|לפרויקט|פרויקט|מה ההבדל|להשוות|השוואה|מה עדיף|עדיף|לתכנן|תכנון|רשימת קניות|רשימה|כמות|how many|how much|compare|difference|which is better|project|plan)/i.test(q);
+  }
+  // "תבנה לי הזמנה לבניית פרגולה": a thing to build or assemble, or an order put together for it
+  var BUILD = /(^|\s)(תבנה|תבני|תרכיב|תרכיבי|בנה|בני|לבנות|בניית|לבניית|לבנייה|להרכיב|הרכבה|להרכבת|build|assemble|put together)(\s|$)|הזמנה (ל|עבור)|order for/i;
+  function buildAsk(q) { return BUILD.test(String(q || '')); }
+  // The store's own ready-made kit of what is to be built: a product named kit / set / ערכה with every word that
+  // names the thing ("קיט פרגולה" for "הזמנה לבניית פרגולה"). Words of the store's catalogue only, so any shop.
+  var KIT = /(^|[^\p{L}])(קיט|ערכה|ערכת|סט|kit|set)([^\p{L}]|$)/iu;
+  var PLAN_WORDS = /^(תבנה|תבני|תרכיב|תרכיבי|בנה|בני|לבנות|בניית|לבניית|לבנייה|להרכיב|הרכבה|להרכבת|הזמנה|להזמין|לי|לנו|עבור|בשביל|צריך|רוצה|רוצים|build|assemble|put|together|order|me|us|need|want|kit|set|קיט|ערכה|סט)$/i;
+  function kitsFor(q) {
+    if (!buildAsk(q)) { return []; }
+    var thing = wordsOf(q).filter(function (w) { return w.length >= 2 && !STOP.test(w) && !PLAN_WORDS.test(w) && !PLAN_WORDS.test(stem(w)); });
+    if (!thing.length) { return []; }
+    var found = Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) {
+      return r && r.t === 'product' && KIT.test(r.title || '') && thing.every(function (w) { return says(r.title + ' ' + (r.kw || ''), w) || says(r.title + ' ' + (r.kw || ''), stem(w)); });
+    });
+    found.sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1); });
+    return found.slice(0, 3).map(function (r) { return r.id; });
+  }
+  function kitsHtml(turn) {
+    if (turn.kits === undefined) { turn.kits = kitsFor(turn.q); }
+    var list = (turn.kits || []).map(rec).filter(Boolean);
+    return list.length ? '<div class="ls-kit"><div class="ls-block__title" style="margin-bottom:6px">' + esc(t('kitTitle')) + '</div>' + list.map(prow).join('') + '</div>' : '';
+  }
+  function myAi(turn) {
+    var ask = S.config.aiAsk;
+    if (!turn || !turn.q || !ask || !ask.open || off('aiShare') || !complexAsk(turn.q)) { return ''; }
+    return '<div class="ls-myai"><div class="ls-myai__t">' + esc(t('myAiTitle')) + '</div><div class="ls-myai__s">' + esc(t('myAiSub')) + '</div><div class="ls-myai__btns">' +
+      ['chatgpt', 'claude', 'perplexity'].filter(function (k) { return ask.open[k]; }).map(function (k) { return '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-ai-ask="' + k + '" data-turn="' + turn.id + '">' + logo(k) + esc({ chatgpt: 'ChatGPT', claude: 'Claude', perplexity: 'Perplexity' }[k]) + '</button>'; }).join('') +
+      '</div></div>';
+  }
+  // the question and the products of its answer, handed to the shopper's own AI
+  function askAiAbout(turn, choice) {
+    if (!turn) { return; }
+    var ids = (turn.picks || []).map(function (p) { return pid(p.id); }).slice(0, 24);
+    var tab = win.open('about:blank', '_blank');
+    shareFor({ q: turn.q, ids: ids, turn: null, asked: true }).then(function (data) {
+      if (tab) { try { tab.opener = null; } catch (e) { /* fine */ } tab.location.href = data.open[choice]; } else { win.location.href = data.open[choice]; }
+    }, function () { if (tab) { tab.close(); } toast(t('aiFailed')); });
+  }
   function askAi(choice) {
     var cx = shareCtx();
     // the tab opens inside the press, so no popup blocker stops it, and goes where it should once the link is ready
@@ -2441,6 +2489,7 @@
     if (d.menu !== undefined) { if (MENU.hidden) { showMenu(''); } else { hideMenu(); } return; }
     if (d.menuView !== undefined) { showMenu(d.menuView); return; }
     if (d.ai) { askAi(d.ai); return; }
+    if (d.aiAsk) { askAiAbout(turnById(d.turn), d.aiAsk); return; }
     if (d.share && el.closest('.ls-menu')) { shareGo(d.share); return; }
     if (d.expand !== undefined) { hideMenu(); toggleExpand(); return; }
     if (d.new !== undefined) {

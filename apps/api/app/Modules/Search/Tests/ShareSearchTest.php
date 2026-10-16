@@ -143,6 +143,17 @@ final class ShareSearchTest extends TestCase
         $this->assertSame(2, $share->opens);
     }
 
+    public function test_a_question_asked_in_the_drawer_goes_to_the_shoppers_ai_in_its_own_words(): void
+    {
+        $asked = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],
+            json_encode(['q' => 'איזו טבעת מתאימה לאירוסין בתקציב 3000?', 'ids' => ['1'], 'asked' => true, 'locale' => 'he']))->assertCreated()->json();
+
+        $this->assertStringStartsWith('השאלה שלי: "איזו טבעת מתאימה לאירוסין בתקציב 3000?"', $asked['prompt'], 'their AI works on the question itself');
+        $this->assertStringContainsString('קישור אחד להזמנה', $asked['prompt'], 'and brings back an order');
+        $this->assertStringContainsString($asked['url'], $asked['prompt']);
+        $this->assertSame('https://claude.ai/new?q='.rawurlencode($asked['prompt']), $asked['open']['claude']);
+    }
+
     public function test_without_products_the_words_find_them_and_an_expired_link_says_so(): void
     {
         $sent = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],
