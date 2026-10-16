@@ -1261,12 +1261,14 @@
     var id = pid(r.id), saved = S.saved.indexOf(id) >= 0;
     var badge = r.s === 0 ? t('outBadge') : r.sl === 1 ? t('onSaleBadge') : '';
     return '<article class="ls-card' + (r.s === 0 ? ' is-out' : '') + '" data-card="' + esc(id) + '">' +
-      '<div class="ls-card__media"><img src="' + esc(r.img || '') + '" alt="" loading="lazy">' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
+      '<div class="ls-card__media"><img src="' + esc(r.img || '') + '" alt="" loading="lazy">' + pic2(r) + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
       '<span class="ls-card__heart">' + heartBtn(id, saved, true) + '</span></div>' +
       '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' +
       '<div class="ls-card__row">' + priceHtml(r) + '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button></div>' +
       buyBtn(r, 'ls-btn--sm ls-btn--block') + '<div data-after="' + esc(id) + '"></div></article>';
   }
+  // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
+  function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" loading="lazy" draggable="false">' : ''; }
   function heartBtn(id, on, float) { return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
   function buyBtn(r, cls) {
     var id = pid(r.id);
@@ -1793,7 +1795,7 @@
     return '<div class="ls-slider"><button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--prev" type="button" data-slide="-1" aria-label="' + esc(t('slidePrev')) + '" disabled>' + icon('back', 'ls-icon--sm') + '</button>' +
       '<div class="ls-mini-row">' + list.slice(0, 6).map(function (p) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, pr: p.price };
-        return '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" loading="lazy" draggable="false"><span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
+        return '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" loading="lazy" draggable="false">' + pic2(r) + '<span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
       }).join('') + '</div>' +
       '<button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--next" type="button" data-slide="1" aria-label="' + esc(t('slideNext')) + '">' + icon('fwd', 'ls-icon--sm') + '</button></div>';
   }
@@ -1819,12 +1821,11 @@
     var list = S.saved.map(rec).filter(Boolean);
     var html = '<div class="ls-saved-tools" style="padding-top:8px">' +
       (SHORT && SHORT.wishlistWhatsapp === false ? '' : '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-share-wa>' + icon('whatsapp', 'ls-icon--sm') + esc(t('shareWa')) + '</button>') +
-      '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-copy>' + icon('link', 'ls-icon--sm') + esc(t('copyLink')) + '</button>' +
-      '<button class="ls-btn ls-btn--quiet ls-btn--sm" data-ask="' + esc(t('diffAsk')) + '">' + mark() + esc(t('diffAsk')) + '</button></div>';
+      '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-copy>' + icon('link', 'ls-icon--sm') + esc(t('copyLink')) + '</button></div>';
     html += '<div>' + list.map(function (r) {
       var id = pid(r.id), on = S.pick.indexOf(id) >= 0;
       return '<div class="ls-saved-item"><label class="ls-check-row" title="' + esc(t('pickToCompare')) + '"><input type="checkbox" data-pick="' + esc(id) + '"' + (on ? ' checked' : '') + ' aria-label="' + esc(t('pickToCompare')) + '"></label>' +
-        '<a class="ls-saved-item__media" href="' + esc(r.url) + '" tabindex="-1"><img src="' + esc(r.img) + '" alt=""></a>' +
+        '<a class="ls-saved-item__media" href="' + esc(r.url) + '" tabindex="-1"><img src="' + esc(r.img) + '" alt="">' + pic2(r) + '</a>' +
         '<div class="ls-saved-item__body"><a class="ls-saved-item__t" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a><div class="ls-saved-item__price">' + priceHtml(r) + (r.s === 0 ? ' <span class="ls-stock">' + esc(t('outStock')) + '</span>' : '') + '</div>' +
           '<div class="ls-saved-item__actions">' + buyBtn(r, 'ls-btn--sm') + (r.s === 0 ? '' : '<button class="ls-btn ls-btn--ghost ls-btn--sm ls-saved-item__sim" data-similar="' + esc(id) + '">' + icon('grid', 'ls-icon--sm') + esc(t('similar')) + '</button>') + '</div><div data-after="' + esc(id) + '"></div></div>' +
         '<button class="ls-ibtn ls-ibtn--sm ls-saved-item__x" aria-label="' + esc(t('remove')) + '" data-heart="' + esc(id) + '">' + icon('x', 'ls-icon--sm') + '</button></div>';
