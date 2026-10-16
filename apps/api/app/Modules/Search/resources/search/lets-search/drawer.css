@@ -399,6 +399,10 @@
   .ls-card .ls-add { min-width: 0; }
   .ls-saved-item__actions .ls-btn--sm { --h: 32px; font-size: var(--lsp-text-xs); padding-inline: 12px; }
   .ls-saved-item__actions .ls-add { min-width: 88px; }
+  /* and in the "similar to" box, with its heart */
+  .ls-of__actions .ls-btn--sm { --h: 34px; font-size: var(--lsp-text-xs); padding-inline: 14px; }
+  .ls-of__actions .ls-add { min-width: 88px; }
+  .ls-of__actions .ls-ibtn { width: 34px; height: 34px; }
   .ls-saved-item { grid-template-columns: auto 80px minmax(0, 1fr); gap: 10px; }
   .ls-saved-item__media { width: 80px; height: 80px; }
   .ls-guide { grid-template-columns: 96px minmax(0, 1fr); }
