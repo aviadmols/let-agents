@@ -2,7 +2,7 @@
     @forelse ($products as $product)
         <div class="lad-pc">
             @if ($product['image'])
-                <img class="lad-pi" src="{{ $product['image'] }}" alt="" loading="lazy">
+                <img class="lad-pi{{ ($d['images'] ?? 'cover') === 'frame' ? ' is-frame' : '' }}" src="{{ $product['image'] }}" alt="" loading="lazy">
             @else
                 <span class="lad-pi"></span>
             @endif

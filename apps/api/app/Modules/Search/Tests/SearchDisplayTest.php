@@ -4,6 +4,7 @@ namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Settings\SettingManager;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
@@ -49,10 +50,12 @@ final class SearchDisplayTest extends TestCase
         $screen = Livewire::test(SearchDisplay::class)
             ->assertOk()
             ->assertSee('טבעת סוליטר בכסף')
-            ->assertSet('data.price', true);
+            ->assertSet('data.price', true)
+            ->assertSet('data.images', 'cover');
 
         $screen->set('data.price', false)
             ->set('data.cart', false)
+            ->set('data.images', 'frame')
             ->set('data.similar', false)
             ->set('data.per_group', 8)
             ->set('data.content_by_meaning', true)
@@ -62,6 +65,7 @@ final class SearchDisplayTest extends TestCase
 
         $this->assertFalse(Settings::get('search.show_price', $mine->id));
         $this->assertFalse(Settings::get('search.show_cart', $mine->id));
+        $this->assertSame('frame', Settings::get('search.image_fit', $mine->id));
         $this->assertFalse(Features::enabled('search.similar', $mine->id));
         $this->assertSame(8, Settings::get('search.results_per_group', $mine->id));
         $this->assertTrue(Features::enabled('search.content_by_meaning', $mine->id));
@@ -69,7 +73,25 @@ final class SearchDisplayTest extends TestCase
         // The address cannot point the screen at another shop.
         $this->assertTrue(Settings::get('search.show_price', $theirs->id));
         $this->assertTrue(Settings::get('search.show_cart', $theirs->id));
+        $this->assertSame('cover', Settings::get('search.image_fit', $theirs->id));
         $this->assertFalse(Features::enabled('search.content_by_meaning', $theirs->id));
+    }
+
+    public function test_pictures_are_framed_at_gueta_and_fill_their_square_at_rocks(): void
+    {
+        $gueta = Shop::factory()->create(['slug' => 'gueta-avigdor']);
+        $rocks = Shop::factory()->create(['slug' => 'rocks-and-gold']);
+        $other = Shop::factory()->create();
+        Settings::set('search.image_fit', 'frame', $rocks->id);
+
+        (require base_path('app/Modules/Search/Database/Migrations/2026_10_17_100001_pictures_framed_at_gueta_and_filled_at_rocks.php'))->up();
+        // a migration runs in its own process; here the manager's in-memory copy of the overrides is let go
+        $this->app->forgetInstance(SettingManager::class);
+        Settings::clearResolvedInstances();
+
+        $this->assertSame('frame', Settings::get('search.image_fit', $gueta->id));
+        $this->assertSame('cover', Settings::get('search.image_fit', $rocks->id));
+        $this->assertSame('cover', Settings::get('search.image_fit', $other->id), 'every other shop keeps the default');
     }
 
     public function test_the_store_is_told_what_the_shop_chose(): void
@@ -86,6 +108,7 @@ final class SearchDisplayTest extends TestCase
             'payload' => ['images' => [['url' => 'https://www.rings.test/front.jpg'], ['url' => 'https://www.rings.test/side.jpg']]],
         ]);
         Settings::set('search.show_price', false, $shop->id);
+        Settings::set('search.image_fit', 'frame', $shop->id);
 
         $this->assertSame('succeeded', app(BuildSearchIndex::class)->handle($shop->id)->status->value);
 
@@ -93,6 +116,7 @@ final class SearchDisplayTest extends TestCase
 
         $this->assertFalse($index['config']['price']);
         $this->assertTrue($index['config']['cart']);
+        $this->assertSame('frame', $index['config']['images']);
         // Only what the drawer reads: the old search box's display modes are gone.
         foreach (['results', 'modeChoice', 'dropdown', 'suggestions', 'perGroup', 'drawerSide', 'drawerColumns', 'groups', 'hover', 'buttonColor'] as $gone) {
             $this->assertArrayNotHasKey($gone, $index['config']);

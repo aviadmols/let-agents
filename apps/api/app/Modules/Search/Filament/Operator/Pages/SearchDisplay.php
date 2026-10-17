@@ -106,6 +106,7 @@ class SearchDisplay extends Page
             'per_group' => (int) Settings::get('search.results_per_group', $shop),
             'price' => (bool) Settings::get('search.show_price', $shop),
             'cart' => (bool) Settings::get('search.show_cart', $shop),
+            'images' => (string) Settings::get('search.image_fit', $shop),
             'similar' => Features::enabled('search.similar', $shop),
             'selector' => (string) Settings::get('search.input_selector', $shop),
         ];
@@ -141,6 +142,7 @@ class SearchDisplay extends Page
             Settings::set('search.results_per_group', (int) ($d['per_group'] ?? 12), $shop);
             Settings::set('search.show_price', (bool) ($d['price'] ?? true), $shop);
             Settings::set('search.show_cart', (bool) ($d['cart'] ?? true), $shop);
+            Settings::set('search.image_fit', ($d['images'] ?? 'cover') === 'frame' ? 'frame' : 'cover', $shop);
 
             $message = trim((string) ($d['whatsapp_message'] ?? ''));
             $message === '' ? Settings::clear('assistant.search_whatsapp_message', $shop) : Settings::set('assistant.search_whatsapp_message', $message, $shop);

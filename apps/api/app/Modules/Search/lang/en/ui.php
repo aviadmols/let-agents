@@ -319,6 +319,9 @@ return [
             'price' => 'Price',
             'cart' => '"Add to cart" button (opens the theme\'s cart)',
             'similar' => '"Similar items" button',
+            'images' => 'Product pictures',
+            'images_cover' => 'Fill the square (cover)',
+            'images_frame' => 'Whole, in a light frame (for pictures on white)',
             'content_meaning' => [
                 'label' => 'Guides and pages by meaning too',
                 'help' => 'Off: a guide or a page shows only when it holds the words searched. On: also when it is close in meaning.',

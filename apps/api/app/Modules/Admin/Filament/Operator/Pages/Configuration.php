@@ -92,6 +92,7 @@ class Configuration extends Page implements HasForms
             'assistant.search_whatsapp_message',
             'search.show_price',
             'search.show_cart',
+            'search.image_fit',
             'assistant.ask_review',
         ],
         'whatsapp' => [

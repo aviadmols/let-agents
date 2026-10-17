@@ -249,6 +249,11 @@ return [
         'label' => 'Add to cart button',
         'description' => 'On every product that can be bought directly. Opens the theme\'s cart.',
     ],
+    'image_fit' => [
+        'label' => 'Product pictures',
+        'description' => 'Fill the square and crop the edges, or show whole inside a light frame (suits pictures on a white ground).',
+        'options' => ['cover' => 'Fill the square', 'frame' => 'Whole, in a frame'],
+    ],
     'photo_rank_provider' => [
         'label' => 'Provider of the model that orders the results',
         'description' => 'anthropic, openai or gemini.',

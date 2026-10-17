@@ -620,6 +620,13 @@
             "scope": "shop"
         },
         {
+            "name": "image_fit",
+            "type": "enum",
+            "options": ["cover", "frame"],
+            "default": "cover",
+            "scope": "shop"
+        },
+        {
             "name": "photo_rank_provider",
             "type": "string",
             "default": "anthropic",

@@ -75,6 +75,8 @@ final class SearchIndexController
             // What each product carries, as the shop set it on its search display screen.
             'price' => (bool) Settings::get('search.show_price', $shopId),
             'cart' => (bool) Settings::get('search.show_cart', $shopId),
+            // Product pictures fill their square ("cover"), or show whole in a light frame ("frame").
+            'images' => (string) Settings::get('search.image_fit', $shopId),
             // "Ask my AI": the search and its products, handed to the shopper's own AI in a link.
             'aiShare' => Features::enabled('search.ai_share', $shopId),
             // "Share the results": the same link, to a friend.

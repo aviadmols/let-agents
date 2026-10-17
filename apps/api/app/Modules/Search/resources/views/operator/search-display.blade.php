@@ -59,6 +59,7 @@
         .lad-grid{display:grid;gap:10px}
         .lad-pc{display:flex;flex-direction:column;gap:5px;min-width:0}
         .lad-pi{aspect-ratio:1;border-radius:8px;background:#ece6dc;object-fit:cover;width:100%;display:block}
+        .lad-pi.is-frame{object-fit:contain;padding:10%;mix-blend-mode:multiply;box-sizing:border-box}
         .lad-pt{font-size:11.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
         .lad-pp{font-size:11.5px;font-weight:700}
         .lad-pb{display:flex;gap:5px}
@@ -142,6 +143,15 @@
                         <span class="lad-lbl">{{ $t('look.on_product') }}</span>
                         @foreach (['price', 'cart', 'similar'] as $key)
                             <label class="lad-chk"><input type="checkbox" wire:model.live="data.{{ $key }}">{{ $t('look.'.$key) }}</label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="lad-opt">
+                    <div style="flex:1 1 240px">
+                        <span class="lad-lbl">{{ $t('look.images') }}</span>
+                        @foreach (['cover', 'frame'] as $fit)
+                            <label class="lad-chk"><input type="radio" name="lad-images" value="{{ $fit }}" wire:model.live="data.images">{{ $t('look.images_'.$fit) }}</label>
                         @endforeach
                     </div>
                 </div>
