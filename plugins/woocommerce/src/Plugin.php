@@ -6,6 +6,7 @@ use LetAgents\Admin\ReportsPage;
 use LetAgents\Admin\SettingsPage;
 use LetAgents\Rest\PostRoutes;
 use LetAgents\Rest\Routes;
+use LetAgents\Storefront\AgentDiscovery;
 use LetAgents\Storefront\CallToAction;
 use LetAgents\Storefront\OrderHistory;
 use LetAgents\Storefront\OrderReporter;
@@ -38,6 +39,8 @@ final class Plugin {
 		WishlistHeart::register();
 		OrderReporter::register();
 		PostSchema::register();
+		// An AI agent at the store's address finds its catalogue and MCP server without a link.
+		AgentDiscovery::register();
 		// Outside is_admin(): its pages are sent by Action Scheduler, which also runs from cron.
 		OrderHistory::register();
 

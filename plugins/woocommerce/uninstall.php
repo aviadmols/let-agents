@@ -13,3 +13,5 @@ global $wpdb;
 
 // Failed-attempt counters and one-time token hand-offs are short-lived transients.
 $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_let\\_agents\\_%' OR option_name LIKE '\\_transient\\_timeout\\_let\\_agents\\_%'" ); // phpcs:ignore WordPress.DB
+// The last discovery files kept for agents (/llms.txt, the MCP server card).
+$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'let\\_agents\\_discovery\\_%'" ); // phpcs:ignore WordPress.DB

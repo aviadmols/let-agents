@@ -298,6 +298,19 @@ const noOldScripts = (html, where) => {
   }
 };
 
+test('while the store is in preview, nothing is told to AI agents: no /llms.txt, no MCP card, no links', async () => {
+  const llms = await fetch(`${base}/llms.txt`);
+  assert.notEqual(llms.status, 200, 'no llms.txt before the store is live');
+  // Not ours: whatever WordPress or the server answers at that address, it is not the store's MCP card.
+  for (const path of ['.well-known/mcp/server-card.json', '.well-known/mcp.json']) {
+    const card = await fetch(`${base}/${path}`, { redirect: 'manual' });
+    const body = await card.text();
+    assert.ok(!body.includes('co.lets.agents') && !body.includes('streamable-http'), `no MCP server card at /${path} before the store is live`);
+  }
+  const html = await pageHtml({ post_type: 'product', p: String(P.drill) });
+  assert.ok(!html.includes('title="llms.txt"'), 'no link in the head either');
+});
+
 test('in preview a visitor sees nothing, but the page still counts (the script runs silent)', async () => {
   const html = await pageHtml({ post_type: 'product', p: String(P.drill) });
   const ctx = searchContext(html);
