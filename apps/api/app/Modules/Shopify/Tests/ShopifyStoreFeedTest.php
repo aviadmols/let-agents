@@ -224,6 +224,46 @@ final class ShopifyStoreFeedTest extends TestCase
             && data_get($request->data(), 'variables.ids') === ['gid://shopify/Product/8001', 'gid://shopify/Product/8002']);
     }
 
+    public function test_a_shirt_with_more_variants_than_a_page_holds_has_every_colour_and_size_read_with_its_stock(): void
+    {
+        app(SyncCatalog::class)->handle($this->shop->id);
+
+        // 5 colours in 6 sizes: 30 variants, the products page holds the first 2.
+        $this->changed = [$this->product('8020', 'חולצת טריקו', 'tee', [
+            'hasOnlyDefaultVariant' => false,
+            'variantsCount' => ['count' => 30],
+            'priceRangeV2' => ['minVariantPrice' => ['amount' => '89.0'], 'maxVariantPrice' => ['amount' => '89.0']],
+            'options' => [
+                ['name' => 'Color', 'optionValues' => [['name' => 'Ocean Mist', 'swatch' => ['color' => '#1c2b4b']], ['name' => 'שחור', 'swatch' => null], ['name' => 'לבן'], ['name' => 'אדום'], ['name' => 'פסים ירוק-לבן']]],
+                ['name' => 'מידה', 'optionValues' => array_map(fn (string $s): array => ['name' => $s], ['XS', 'S', 'M', 'L', 'XL', 'XXL'])],
+            ],
+            'variants' => ['nodes' => array_map(fn (array $v): array => array_diff_key($v, array_flip(['barcode', 'selectedOptions', 'image'])), array_slice($this->shirtVariants(), 0, 2))],
+        ])];
+
+        app(SyncChangedProducts::class)->handle($this->shop->id);
+
+        $this->inShop(function (): void {
+            $tee = CatalogProduct::query()->where('external_id', '8020')->sole();
+            $this->assertSame(30, $tee->variations_count, 'every variant, not the first page');
+            $this->assertArrayNotHasKey('variations_truncated', $tee->payload);
+
+            $variants = $tee->variants;
+            $this->assertCount(30, $variants);
+            $blackM = $variants->first(fn ($v) => $v->color_label === 'שחור' && $v->size_label === 'M');
+            $this->assertSame([['black'], false], [$blackM->color_families, $blackM->in_stock], 'black in M is sold out');
+            $this->assertTrue($variants->first(fn ($v) => $v->color_label === 'שחור' && $v->size_label === 'L')->in_stock);
+
+            $mist = $variants->firstWhere('color_label', 'Ocean Mist');
+            $this->assertSame([['navy'], '#1C2B4B'], [$mist->color_shades, $mist->color_hex], 'a name nobody knows, read by the store\x27s swatch');
+            $this->assertSame('stripes', $variants->firstWhere('color_label', 'פסים ירוק-לבן')->pattern);
+            $this->assertSame(['XS', 'S', 'M', 'L', 'XL', 'XXL'], $variants->where('color_label', 'אדום')->sortBy('size_position')->pluck('size_key')->values()->all());
+            $this->assertSame('https://cdn.shopify.com/tee-3.jpg', $variants->firstWhere('color_label', 'אדום')->image_url);
+        });
+
+        Http::assertSent(fn (Request $request): bool => str_contains((string) data_get($request->data(), 'query'), 'query ProductVariants')
+            && data_get($request->data(), 'variables.id') === 'gid://shopify/Product/8020');
+    }
+
     public function test_a_store_whose_details_cannot_be_read_still_has_its_catalog_read(): void
     {
         $this->failDetails = true;
@@ -314,6 +354,10 @@ final class ShopifyStoreFeedTest extends TestCase
                 ['id' => 'gid://shopify/Collection/4002', 'title' => 'כלי עבודה חשמליים', 'handle' => 'power-tools', 'description' => '', 'updatedAt' => '2026-09-01T08:00:00Z', 'image' => null, 'productsCount' => ['count' => 40]],
             ])],
             'ChangedProducts' => ['products' => $this->connection($this->changed)],
+            // The shirt's 30 variants, 20 a page as if the store answered so.
+            'ProductVariants' => ['product' => ['variants' => $after === null
+                ? $this->connection(array_slice($this->shirtVariants(), 0, 20), 'variants-1')
+                : $this->connection(array_slice($this->shirtVariants(), 20))]],
             'Products' => ['products' => $this->lockedStore($after === null
                 ? $this->connection([$this->saw(), $this->sawBlade(), $this->posOnly()], 'cursor-1')
                 : $this->connection([$this->drill()]))],
@@ -409,6 +453,31 @@ final class ShopifyStoreFeedTest extends TestCase
                 ['id' => 'gid://shopify/ProductVariant/9102', 'title' => '185', 'sku' => 'SAW-185', 'price' => '299.00', 'compareAtPrice' => '349.00', 'availableForSale' => true],
             ]],
         ]);
+    }
+
+    /** @return list<array<string, mixed>> a shirt's 30 variants as the variants query gives them: black in M sold out */
+    private function shirtVariants(): array
+    {
+        $variants = [];
+
+        foreach (['Ocean Mist', 'שחור', 'לבן', 'אדום', 'פסים ירוק-לבן'] as $c => $color) {
+            foreach (['XS', 'S', 'M', 'L', 'XL', 'XXL'] as $s => $size) {
+                $id = 9500 + $c * 10 + $s;
+                $variants[] = [
+                    'id' => "gid://shopify/ProductVariant/{$id}",
+                    'title' => "{$color} / {$size}",
+                    'sku' => "TEE-{$id}",
+                    'price' => '89.00',
+                    'compareAtPrice' => null,
+                    'availableForSale' => ! ($color === 'שחור' && $size === 'M'),
+                    'barcode' => '',
+                    'selectedOptions' => [['name' => 'Color', 'value' => $color], ['name' => 'מידה', 'value' => $size]],
+                    'image' => ['url' => "https://cdn.shopify.com/tee-{$c}.jpg"],
+                ];
+            }
+        }
+
+        return $variants;
     }
 
     /** @return array<string, mixed> one default variant, sold out */

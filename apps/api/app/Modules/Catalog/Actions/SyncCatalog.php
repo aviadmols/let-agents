@@ -39,6 +39,7 @@ final class SyncCatalog
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
         private readonly StoreFeed $feed,
+        private readonly BuildProductVariants $variants,
     ) {}
 
     public function handle(string $shopId, RunTrigger $trigger = RunTrigger::Manual): Run
@@ -108,6 +109,8 @@ final class SyncCatalog
         try {
             $categories = $this->syncCategories($shopId, $connection);
             $products = $this->syncProducts($shopId, $connection);
+            // Products unchanged since before they had variant rows get them now, once.
+            $products['variants_built'] = $this->variants->missing();
             $content = $this->syncContent($shopId, $connection);
         } catch (StoreFeedUnavailable $e) {
             $run->fail($e->summaryKey(), $e->summaryParams(), $e->getMessage());
@@ -271,6 +274,7 @@ final class SyncCatalog
                     $product->categories()->sync(
                         collect(FeedRecord::productCategoryIds($record))->map(fn (string $id) => $categoryIds->get($id))->filter()->values()->all(),
                     );
+                    $this->variants->product($product);
                 }
             }
         });

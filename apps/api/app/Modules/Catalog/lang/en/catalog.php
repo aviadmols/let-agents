@@ -13,6 +13,7 @@ return [
         'product' => 'Product',
         'text' => 'Text from the store',
         'specs' => 'Specs and links',
+        'variants' => 'Colours, sizes and stock',
         'content' => 'Article',
     ],
     'fields' => [
@@ -41,10 +42,19 @@ return [
         'excerpt' => 'Excerpt',
         'body' => 'Text',
         'url' => 'Address',
+        'colors' => 'Colours',
+        'colors_help' => 'The colour families the product is sold in, as code read them from the store\'s colour names. A colour whose variants are all sold out is marked "sold out".',
+        'sizes' => 'Sizes',
+        'variant_rows' => 'Each variant',
+        'variant_rows_help' => 'The store\'s name for the colour, the family and shade it reads as, pattern, size and stock. A colour name code does not know is marked with a question mark.',
     ],
     'values' => [
         'yes' => 'Yes',
         'no' => 'No',
+        'in_stock' => 'In stock',
+        'out_of_stock' => 'Sold out',
+        'units' => ':count units',
+        'unknown_color' => '?',
     ],
     'relations' => [
         'upsell' => 'Upsell',

@@ -10,6 +10,7 @@ use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Catalog\Support\FeedRecord;
 use App\Modules\Connections\Contracts\StoreFeed;
 use App\Modules\Connections\Models\StoreConnection;
@@ -204,6 +205,55 @@ final class SyncCatalogTest extends TestCase
         $shuffled['relations'] = array_reverse($record['relations']);
 
         $this->assertSame(FeedRecord::product($record)['hash'], FeedRecord::product($shuffled)['hash']);
+    }
+
+    public function test_a_product_with_variants_has_a_row_for_each_and_its_stock_follows_the_store(): void
+    {
+        $variant = fn (string $id, string $color, string $size, bool $inStock): array => [
+            'external_id' => $id,
+            'status' => 'publish',
+            'attributes' => [['key' => 'pa_color', 'name' => 'צבע', 'value' => $color], ['key' => 'pa_size', 'name' => 'מידה', 'value' => $size]],
+            'price' => ['price' => '99', 'regular_price' => '99', 'on_sale' => false],
+            'stock' => ['in_stock' => $inStock, 'managed' => false, 'quantity' => null],
+            'purchasable' => $inStock,
+            'image' => '',
+        ];
+        $this->products['14'] = ['type' => 'variable', 'title' => 'חולצת טריקו', 'attributes' => [
+            ['key' => 'pa_color', 'name' => 'צבע', 'values' => ['שחור', 'נייבי'], 'used_for_variations' => true],
+            ['key' => 'pa_size', 'name' => 'מידה', 'values' => ['S', 'M'], 'used_for_variations' => true],
+        ], 'variations' => [
+            $variant('141', 'שחור', 'S', true),
+            $variant('142', 'שחור', 'M', true),
+            $variant('143', 'נייבי', 'S', false),
+            $variant('144', 'נייבי', 'M', true),
+        ]] + $this->record('14');
+
+        app(SyncCatalog::class)->handle($this->shop->id);
+
+        $this->inShop(function (): void {
+            $shirt = CatalogProduct::query()->where('external_id', '14')->sole();
+            $this->assertSame(['141', '142', '143', '144'], $shirt->variants->pluck('external_id')->all());
+            $navyS = $shirt->variants->firstWhere('external_id', '143');
+            $this->assertSame([['blue'], 'S', false], [$navyS->color_families, $navyS->size_key, $navyS->in_stock]);
+            $this->assertSame(0, CatalogProduct::query()->where('external_id', '11')->sole()->variants()->count(), 'a product without variants has no rows');
+        });
+
+        // Navy in S is back in stock, black in M sold out: the rows follow.
+        $this->products['14']['variations'][2]['stock']['in_stock'] = true;
+        $this->products['14']['variations'][1]['stock']['in_stock'] = false;
+        app(SyncCatalog::class)->refresh($this->shop->id);
+
+        $this->inShop(function (): void {
+            $stock = CatalogProduct::query()->where('external_id', '14')->sole()->variants->pluck('in_stock', 'external_id')->all();
+            $this->assertSame(['141' => true, '142' => false, '143' => true, '144' => true], $stock);
+        });
+
+        // Rows lost, or never built for a product unchanged since before they existed: the nightly read builds them.
+        $this->inShop(fn () => CatalogVariant::query()->delete());
+        $run = app(SyncCatalog::class)->handle($this->shop->id);
+
+        $this->assertSame(1, $run->output['products']['variants_built']);
+        $this->inShop(fn () => $this->assertSame(4, CatalogVariant::query()->count()));
     }
 
     private function inShop(callable $callback): mixed

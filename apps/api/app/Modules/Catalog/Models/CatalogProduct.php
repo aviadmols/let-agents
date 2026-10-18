@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -74,6 +75,12 @@ class CatalogProduct extends Model
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(CatalogCategory::class, 'catalog_category_product', 'product_id', 'category_id');
+    }
+
+    /** @return HasMany<CatalogVariant, $this> in the store's order */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(CatalogVariant::class, 'product_id')->orderBy('position');
     }
 
     /** @param Builder<CatalogProduct> $query */

@@ -4,6 +4,7 @@ namespace App\Modules\Catalog;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Catalog\Console\BuildVariantsCommand;
 use App\Modules\Catalog\Console\ReadPageChoicesCommand;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
@@ -77,6 +78,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
             SyncCatalogCommand::class,
             SyncChangedProductsCommand::class,
             ReadPageChoicesCommand::class,
+            BuildVariantsCommand::class,
         ];
     }
 }

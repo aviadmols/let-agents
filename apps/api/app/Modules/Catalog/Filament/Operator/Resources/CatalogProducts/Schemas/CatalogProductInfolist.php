@@ -3,6 +3,7 @@
 namespace App\Modules\Catalog\Filament\Operator\Resources\CatalogProducts\Schemas;
 
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogVariant;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -120,6 +121,91 @@ final class CatalogProductInfolist
                                 'id' => $record->external_id,
                             ])),
                     ]),
+                Section::make(__('catalog::catalog.sections.variants'))
+                    ->visible(fn (CatalogProduct $record): bool => $record->variants()->exists())
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('variant_colors')
+                            ->label(__('catalog::catalog.fields.colors'))
+                            ->state(fn (CatalogProduct $record): array => self::colors($record))
+                            ->helperText(__('catalog::catalog.fields.colors_help'))
+                            ->badge()
+                            ->placeholder('-'),
+                        TextEntry::make('variant_sizes')
+                            ->label(__('catalog::catalog.fields.sizes'))
+                            ->state(fn (CatalogProduct $record): array => self::sizes($record))
+                            ->badge()
+                            ->placeholder('-'),
+                        TextEntry::make('variant_rows')
+                            ->label(__('catalog::catalog.fields.variant_rows'))
+                            ->state(fn (CatalogProduct $record): array => $record->variants->map(fn (CatalogVariant $variant): string => self::variantLine($variant))->all())
+                            ->helperText(__('catalog::catalog.fields.variant_rows_help'))
+                            ->listWithLineBreaks()
+                            ->columnSpanFull(),
+                    ]),
             ]);
+    }
+
+    /**
+     * The colour families the product comes in, in the order its variants first name them; a
+     * family none of whose variants is in stock is marked sold out.
+     *
+     * @return list<string>
+     */
+    private static function colors(CatalogProduct $record): array
+    {
+        $families = [];
+
+        foreach ($record->variants as $variant) {
+            foreach ($variant->families() as $family) {
+                $families[$family->value] = [$family, ($families[$family->value][1] ?? false) || $variant->in_stock];
+            }
+        }
+
+        return array_values(array_map(
+            fn (array $entry): string => $entry[0]->label().($entry[1] ? '' : ' · '.__('catalog::catalog.values.out_of_stock')),
+            $families,
+        ));
+    }
+
+    /** @return list<string> the sizes in the store's order, a sold-out one marked */
+    private static function sizes(CatalogProduct $record): array
+    {
+        $sizes = [];
+
+        foreach ($record->variants->filter(fn (CatalogVariant $v): bool => $v->size_label !== null)->sortBy('size_position') as $variant) {
+            $sizes[$variant->size_label] = ($sizes[$variant->size_label] ?? false) || $variant->in_stock;
+        }
+
+        return array_map(
+            fn (string $size, bool $inStock): string => $size.($inStock ? '' : ' · '.__('catalog::catalog.values.out_of_stock')),
+            array_map('strval', array_keys($sizes)),
+            array_values($sizes),
+        );
+    }
+
+    /** "כחול כהה → נייבי (כחול) · פסים · M · במלאי · 3 יח׳" */
+    private static function variantLine(CatalogVariant $variant): string
+    {
+        $color = null;
+
+        if ($variant->color_label !== null) {
+            $shades = $variant->shades();
+            $color = $shades === []
+                ? $variant->color_label.' '.__('catalog::catalog.values.unknown_color')
+                : $variant->color_label.' → '.implode(', ', array_map(fn ($s): string => $s->label(), $shades))
+                    .' ('.implode(', ', array_map(fn ($f): string => $f->label(), $variant->families())).')';
+        }
+
+        $options = (array) $variant->options;
+
+        return implode(' · ', array_filter([
+            $color,
+            $variant->fabricPattern()?->label(),
+            $variant->size_label,
+            ...array_map(fn (string $name, string $value): string => $name.': '.$value, array_map('strval', array_keys($options)), array_values($options)),
+            __($variant->in_stock ? 'catalog::catalog.values.in_stock' : 'catalog::catalog.values.out_of_stock'),
+            $variant->quantity === null ? null : __('catalog::catalog.values.units', ['count' => $variant->quantity]),
+        ], fn (?string $part): bool => $part !== null && $part !== ''));
     }
 }

@@ -33,6 +33,14 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
     private const VARIANTS_PER_PRODUCT = 25;
 
     /**
+     * A product with more variants than the page holds (a shirt in 6 colours and 6 sizes is 36) has
+     * them read on their own (VARIANTS), this many a request, up to MAX_VARIANTS_PER_PRODUCT.
+     */
+    private const VARIANTS_PER_REQUEST = 100;
+
+    private const MAX_VARIANTS_PER_PRODUCT = 250;
+
+    /**
      * The details are read apart from the page (see DETAILS), a few products a request: their
      * variants carry a weight and a picture each, which costs about 150 points a product.
      */
@@ -78,7 +86,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
               featuredMedia { preview { image { url altText } } }
               media(first: 4) { nodes { preview { image { url altText } } } }
               priceRangeV2 { minVariantPrice { amount } maxVariantPrice { amount } }
-              options { name optionValues { name } }
+              options { name optionValues { name swatch { color } } }
               collections(first: $collections) { nodes { id title handle } }
               variants(first: $variants) { nodes { id title sku price compareAtPrice availableForSale } }
             }
@@ -99,6 +107,19 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
               variants(first: $variants) {
                 nodes { id barcode selectedOptions { name value } image { url } inventoryItem { measurement { weight { unit value } } } }
               }
+            }
+          }
+        }
+        GRAPHQL;
+
+    // Every variant of one product, past the ones its page held: with what DETAILS gives the first
+    // ones, but the weight.
+    private const VARIANTS = <<<'GRAPHQL'
+        query ProductVariants($id: ID!, $first: Int!, $after: String) {
+          product(id: $id) {
+            variants(first: $first, after: $after) {
+              nodes { id title sku price compareAtPrice availableForSale barcode selectedOptions { name value } image { url } }
+              pageInfo { hasNextPage endCursor }
             }
           }
         }
@@ -182,6 +203,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
             // published product counts, its link made from its handle.
             $nodes = $locked ? $active : array_values(array_filter($active, fn (array $node): bool => is_string($node['onlineStoreUrl'] ?? null)));
             $details = $this->details($install, array_column($nodes, 'id'));
+            [$nodes, $details] = $this->allVariants($install, $nodes, $details);
             $records = [];
 
             foreach ($nodes as $node) {
@@ -221,6 +243,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
             $on = array_values(array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) === 'ACTIVE' && is_string($node['onlineStoreUrl'] ?? null)));
             $gone = array_values(array_map(fn (array $node): string => self::id($node['id']), array_filter($nodes, fn (array $node): bool => ($node['status'] ?? null) !== 'ACTIVE')));
             $details = $on === [] ? [] : $this->details($install, array_column($on, 'id'));
+            [$on, $details] = $this->allVariants($install, $on, $details);
 
             yield [
                 'records' => array_map(fn (array $node): array => $this->product($node, $shop, $details[$node['id']] ?? null), $on),
@@ -464,9 +487,18 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 
             $name = self::line($option['name'] ?? '');
             $values = array_values(array_filter(array_map(fn ($v): string => self::line(is_array($v) ? ($v['name'] ?? '') : ''), (array) ($option['optionValues'] ?? [])), fn (string $v): bool => $v !== ''));
+            // The colour the store set for a value's swatch ("Ocean Mist": "#5f8a99"), where it set one.
+            $swatches = [];
+            foreach ((array) ($option['optionValues'] ?? []) as $value) {
+                $color = is_array($value) ? data_get($value, 'swatch.color') : null;
+                if (is_string($color) && $color !== '' && self::line($value['name'] ?? '') !== '') {
+                    $swatches[self::line($value['name'])] = $color;
+                }
+            }
 
             if ($name !== '' && $values !== []) {
-                $attributes[] = ['name' => $name, 'key' => $name, 'taxonomy' => false, 'values' => $values, 'used_for_variations' => true, 'visible' => true];
+                $attributes[] = ['name' => $name, 'key' => $name, 'taxonomy' => false, 'values' => $values, 'used_for_variations' => true, 'visible' => true]
+                    + ($swatches === [] ? [] : ['swatches' => $swatches]);
             }
         }
 
@@ -513,25 +545,9 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 
                 $variants = [];
                 foreach ((array) data_get($node, 'variants.nodes', []) as $variant) {
-                    if (! is_array($variant) || ! isset($variant['id'])) {
-                        continue;
+                    if (is_array($variant) && isset($variant['id'])) {
+                        $variants[$variant['id']] = self::variantDetails($variant);
                     }
-
-                    $weight = data_get($variant, 'inventoryItem.measurement.weight');
-                    $weighed = is_array($weight) && is_numeric($weight['value'] ?? null) && (float) $weight['value'] > 0;
-
-                    $variants[$variant['id']] = [
-                        'barcode' => self::line($variant['barcode'] ?? ''),
-                        'attributes' => array_values(array_map(fn (array $o): array => [
-                            'key' => self::line($o['name'] ?? ''),
-                            'name' => self::line($o['name'] ?? ''),
-                            'value' => self::line($o['value'] ?? ''),
-                        ], array_filter((array) ($variant['selectedOptions'] ?? []), fn ($o): bool => is_array($o)
-                            && self::line($o['name'] ?? '') !== '' && ($o['value'] ?? '') !== 'Default Title'))),
-                        'image' => (string) data_get($variant, 'image.url', ''),
-                        'weight' => $weighed ? self::decimal($weight['value']) : '',
-                        'weight_unit' => $weighed ? (self::UNITS[$weight['unit'] ?? ''] ?? strtolower((string) ($weight['unit'] ?? ''))) : '',
-                    ];
                 }
 
                 $details[$node['id']] = ['meta' => $meta, 'variants' => $variants];
@@ -539,6 +555,89 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
         }
 
         return $details;
+    }
+
+    /**
+     * A variant's options, barcode, picture and weight, from the details query or the variants one.
+     *
+     * @param  array<string, mixed>  $variant
+     * @return array<string, mixed>
+     */
+    private static function variantDetails(array $variant): array
+    {
+        $weight = data_get($variant, 'inventoryItem.measurement.weight');
+        $weighed = is_array($weight) && is_numeric($weight['value'] ?? null) && (float) $weight['value'] > 0;
+
+        return [
+            'barcode' => self::line($variant['barcode'] ?? ''),
+            'attributes' => array_values(array_map(fn (array $o): array => [
+                'key' => self::line($o['name'] ?? ''),
+                'name' => self::line($o['name'] ?? ''),
+                'value' => self::line($o['value'] ?? ''),
+            ], array_filter((array) ($variant['selectedOptions'] ?? []), fn ($o): bool => is_array($o)
+                && self::line($o['name'] ?? '') !== '' && ($o['value'] ?? '') !== 'Default Title'))),
+            'image' => (string) data_get($variant, 'image.url', ''),
+            'weight' => $weighed ? self::decimal($weight['value']) : '',
+            'weight_unit' => $weighed ? (self::UNITS[$weight['unit'] ?? ''] ?? strtolower((string) ($weight['unit'] ?? ''))) : '',
+        ];
+    }
+
+    /**
+     * Every variant of the products that have more than their page held, read on their own, with
+     * their options and pictures added to the details. A product whose variants cannot be read
+     * keeps the ones the page had (and is marked cut short, as before).
+     *
+     * @param  list<array<string, mixed>>  $nodes
+     * @param  array<string, array{meta: array<string, string>, variants: array<string, array<string, mixed>>}>  $details
+     * @return array{0: list<array<string, mixed>>, 1: array<string, array{meta: array<string, string>, variants: array<string, array<string, mixed>>}>}
+     */
+    private function allVariants(ShopifyInstall $install, array $nodes, array $details): array
+    {
+        foreach ($nodes as $i => $node) {
+            $read = count((array) data_get($node, 'variants.nodes', []));
+
+            if ((int) data_get($node, 'variantsCount.count', 0) <= $read) {
+                continue;
+            }
+
+            $variants = [];
+            $after = null;
+
+            try {
+                do {
+                    $connection = data_get($this->api->query($install, self::VARIANTS, ['id' => $node['id'], 'first' => self::VARIANTS_PER_REQUEST, 'after' => $after]), 'product.variants');
+
+                    if (! is_array($connection)) {
+                        break;
+                    }
+
+                    foreach ((array) ($connection['nodes'] ?? []) as $variant) {
+                        if (is_array($variant) && isset($variant['id'])) {
+                            $variants[] = $variant;
+                        }
+                    }
+
+                    $next = data_get($connection, 'pageInfo.endCursor');
+                    $after = data_get($connection, 'pageInfo.hasNextPage') === true && is_string($next) && $next !== $after ? $next : null;
+                } while ($after !== null && count($variants) < self::MAX_VARIANTS_PER_PRODUCT);
+            } catch (StoreFeedUnavailable) {
+                continue;
+            }
+
+            if (count($variants) <= $read) {
+                continue;
+            }
+
+            $variants = array_slice($variants, 0, self::MAX_VARIANTS_PER_PRODUCT);
+            $nodes[$i]['variants']['nodes'] = $variants;
+            $details[$node['id']]['meta'] ??= [];
+
+            foreach ($variants as $variant) {
+                $details[$node['id']]['variants'][$variant['id']] ??= self::variantDetails($variant);
+            }
+        }
+
+        return [$nodes, $details];
     }
 
     /**
