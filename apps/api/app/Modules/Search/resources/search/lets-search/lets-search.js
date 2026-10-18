@@ -1144,7 +1144,15 @@
   }
   function productSearch(q) { return !isQuestion(q) && q.length >= 3 && hits(q).some(function (r) { return r.t === 'product'; }); }
   // only when opened from the product page's own search row; the header's icon opens the regular search
-  function aboutProduct(q) { return !!(S.askMode && S.ctx && rec(S.ctx) && !productSearch(q) && !(LEARN.bank && LEARN.bank.ask === false)); }
+  // a question about the product on screen: it asks, or it points at the product. A description of what the
+  // shopper wants ("יהלום עם זהב צהוב ויהלומים קטנים מסביב") is a search, and shows products, not an answer
+  var ABOUT_WORDS = ['זה', 'הזה', 'הזאת', 'הזו', 'זאת', 'שלו', 'שלה', 'אותו', 'אותה', 'בו', 'בה', 'המוצר', 'הפריט', 'אפשר', 'יש', 'מתאים', 'מתאימה', 'כמה', 'it', 'this', 'its', 'does', 'can', 'is'];
+  function asksAboutIt(q) {
+    if (isQuestion(q)) { return true; }
+    var words = String(q || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+    return words.some(function (w) { return ABOUT_WORDS.indexOf(w) !== -1; });
+  }
+  function aboutProduct(q) { return !!(S.askMode && S.ctx && rec(S.ctx) && !productSearch(q) && asksAboutIt(q) && !(LEARN.bank && LEARN.bank.ask === false)); }
   function askOnly(q) {
     clearTimeout(liveTimer);
     S.live = null;
