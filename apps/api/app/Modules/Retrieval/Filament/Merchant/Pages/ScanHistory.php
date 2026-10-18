@@ -18,6 +18,9 @@ final class ScanHistory extends OperatorScanHistory
 
     protected static ?int $navigationSort = 10;
 
+    /** The scan summary shows each product's picture; the gallery stays reachable from its link. */
+    protected static bool $shouldRegisterNavigation = false;
+
     /** The shop opens on the pictures, as a gallery. */
     public string $display = 'gallery';
 }

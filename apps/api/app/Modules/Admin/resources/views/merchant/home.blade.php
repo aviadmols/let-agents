@@ -9,8 +9,8 @@
     @php($attention = $this->attention())
 
     <div class="lp-page" data-home>
-        {{-- the five first steps, until they are done; then one closing line, until hidden --}}
-        @if ($steps !== [] && ! ($done === count($steps) && $this->stepsHidden()))
+        {{-- the five first steps, while any is left; once all are done they leave the home --}}
+        @if ($steps !== [] && $done < count($steps))
             <section class="lp-card" data-first-steps>
                 @if ($done === count($steps))
                     <div class="lp-wins-done">
@@ -81,13 +81,14 @@
             </section>
         @endif
 
-        {{-- what needs the manager --}}
+        {{-- what needs the manager, only when something does --}}
+        @if ($attention !== [])
         <section class="lp-card" data-attention>
             <div class="lp-card-t">
                 <h2>{{ $t('attention.title') }}</h2>
                 <a class="lp-link" href="{{ $this->inboxUrl() }}">{{ $t('attention.all') }}</a>
             </div>
-            @forelse ($attention as $notice)
+            @foreach ($attention as $notice)
                 <a @if ($notice->url) href="{{ $notice->url }}" @endif class="lp-row" data-notice="{{ $notice->key }}">
                     <span class="lp-pill" data-tone="{{ match ($notice->tone) { 'bad' => 'bad', 'warn' => 'warn', default => 'good' } }}"><i></i>{{ $notice->count !== null ? number_format($notice->count) : __('admin::home.kinds.'.$notice->kind) }}</span>
                     <span class="lp-grow">
@@ -95,9 +96,8 @@
                         @if ($notice->body)<span class="lp-row-s">{{ $notice->body }}</span>@endif
                     </span>
                 </a>
-            @empty
-                <p class="lp-empty">{{ $t('attention.none') }}</p>
-            @endforelse
+            @endforeach
         </section>
+        @endif
     </div>
 </x-filament-panels::page>

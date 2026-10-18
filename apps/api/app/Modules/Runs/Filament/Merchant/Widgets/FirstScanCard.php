@@ -29,6 +29,18 @@ final class FirstScanCard extends Widget implements OverviewBlock
     /** The step whose details are open. */
     public ?string $open = null;
 
+    /**
+     * On the home only for a new store, until its first scan is behind it; after that what each
+     * scan did is on the timeline, and "scan changes" is on the scan summary.
+     */
+    public static function canView(): bool
+    {
+        $shop = Filament::getTenant();
+
+        // An operator keeps it: the whole chain again is theirs.
+        return $shop instanceof Shop && (FirstScan::isNew($shop) || (Auth::user() instanceof User && Auth::user()->is_operator));
+    }
+
     public function toggle(string $step): void
     {
         $this->open = $this->open === $step || ! array_key_exists($step, FirstScan::STEPS) ? null : $step;

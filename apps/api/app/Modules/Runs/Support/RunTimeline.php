@@ -20,8 +20,8 @@ final class RunTimeline implements TimelineSource
 {
     private const MAX = 400;
 
-    /** The runs the shop sees on its own timeline: the store's scan. The rest is mechanics, the operator's. */
-    private const FOR_SHOP = ['catalog.sync'];
+    /** A summary line the shop does not see: a model, a cost, tokens, or the machinery under the scan. */
+    private const NOT_FOR_SHOP = '/\$|\btokens?\b|gpt-|claude|gemini|openai|anthropic|מודל|model|וקטור|vector|batch|באצ|בקשות|prompt|פרומפט/iu';
 
     /** The kind an action's runs are shown as, by the longest matching prefix. */
     private const KINDS = [
@@ -62,7 +62,7 @@ final class RunTimeline implements TimelineSource
                 who: $run->trigger->label(),
                 costUsd: $run->cost_usd === null ? null : (float) $run->cost_usd,
                 tone: $failed ? 'bad' : '',
-                forShop: ! $failed && in_array($run->action, self::FOR_SHOP, true),
+                forShop: ! $failed && $summary !== null && preg_match(self::NOT_FOR_SHOP, $summary) !== 1,
                 shopTitle: $summary,
             );
         }

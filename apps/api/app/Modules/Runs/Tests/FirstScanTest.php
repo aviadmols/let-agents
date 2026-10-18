@@ -3,6 +3,7 @@
 namespace App\Modules\Runs\Tests;
 
 use App\Modules\Admin\Models\User;
+use App\Modules\Runs\Contracts\ScansShops;
 use App\Modules\Runs\Filament\Merchant\Widgets\FirstScanCard;
 use App\Modules\Runs\Jobs\FirstScanStep;
 use App\Modules\Runs\Models\Run;
@@ -97,11 +98,9 @@ final class FirstScanTest extends TestCase
         $operator = User::factory()->operator()->create();
         Livewire::actingAs($operator)->test(FirstScanCard::class)->assertSee('סריקה מלאה מחדש');
 
-        Livewire::actingAs($merchant)->test(FirstScanCard::class)
-            ->assertSee('לסרוק שינויים ומוצרים חדשים')
-            ->assertDontSee('סריקה מלאה מחדש')
-            ->call('startFull')
-            ->call('start');
+        // The manager's card left the home with the first scan; they scan the changes from the scan summary.
+        $this->assertFalse(Livewire::actingAs($merchant)->test(FirstScanCard::class)->instance()::canView());
+        app(ScansShops::class)->scanChanges($shop);
 
         Bus::assertChained(array_fill(0, count(FirstScan::CHANGES), FirstScanStep::class));
         $this->assertSame(FirstScan::CHANGES, FirstScan::steps($shop), 'the changes only: catalogue, pictures, products, pages, search');

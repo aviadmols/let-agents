@@ -7,6 +7,7 @@ use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Runs\Contracts\CallJournal;
 use App\Modules\Runs\Contracts\RecordsRuns;
+use App\Modules\Runs\Contracts\ScansShops;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Runs\Models\RunCall;
 use App\Modules\Runs\Support\CallLog;
@@ -14,12 +15,14 @@ use App\Modules\Runs\Support\RunRecorder;
 use App\Modules\Runs\Support\RunStack;
 use App\Modules\Runs\Support\RunTimeline;
 use App\Modules\Runs\Support\ScanHome;
+use App\Modules\Runs\Support\ShopScans;
 use Illuminate\Console\Scheduling\Schedule;
 
 final class RunsServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->bind(ScansShops::class, ShopScans::class);
         $this->app->tag([RunTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ScanHome::class], HomeSource::TAG);

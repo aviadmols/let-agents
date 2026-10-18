@@ -224,6 +224,20 @@ final class BuildShopKnowledge
         $this->put(self::POSTS, 'posts', implode("\n", array_values(array_unique($lines))), ['read' => $read, 'hidden' => $hidden, 'wanted' => $wanted, 'read_at' => now()->toIso8601String()]);
     }
 
+    /** A page or post read again even though it did not change: what it taught stays until the new reading replaces it. */
+    public function forget(string $contentId): void
+    {
+        $row = $this->row(self::POSTS);
+        $terms = (array) ($row?->terms ?? []);
+
+        if ($row === null || ! isset($terms['read'][$contentId])) {
+            return;
+        }
+
+        $terms['read'][$contentId]['fingerprint'] = '';
+        $row->forceFill(['terms' => $terms])->save();
+    }
+
     /** A page or post the team wants read: first at the next reading, whatever its age. */
     public function want(string $contentId): void
     {
