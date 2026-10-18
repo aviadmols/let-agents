@@ -9,6 +9,7 @@ use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Http\Middleware\SyncTenantFromPanel;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
+use App\Modules\Admin\Support\Tips;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationBuilder;
@@ -45,6 +46,7 @@ final class MerchantPanelProvider extends PanelProvider
             ->tenantMenu(false)
             ->userMenu(false)
             ->renderHook(PanelsRenderHook::BODY_START, fn (): HtmlString => new HtmlString(view('admin::panel.icons')->render()))
+            ->renderHook(PanelsRenderHook::BODY_END, fn (): HtmlString => Tips::script())
             ->renderHook(PanelsRenderHook::CONTENT_START, fn (): HtmlString => self::topbar())
             // One flat list of screens; a screen's other pages are its tabs, or the settings side menu.
             ->navigation(fn (NavigationBuilder $builder): NavigationBuilder => MerchantNavigation::build($builder))

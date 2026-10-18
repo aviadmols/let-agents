@@ -104,12 +104,12 @@ final class SimilarItemsTest extends TestCase
         });
     }
 
-    public function test_similar_items_come_by_picture_in_stock_first_and_never_the_product_itself(): void
+    public function test_similar_items_come_by_picture_and_meaning_in_stock_first_and_never_the_product_itself(): void
     {
         $products = $this->similar('301')->assertOk()->json('products');
 
         $this->assertSame(['303', '302'], array_column($products, 'external_id'), 'not the product itself, and what is in stock first');
-        $this->assertSame(['picture' => 1, 'text' => 0], $this->asked);
+        $this->assertSame(['picture' => 1, 'text' => 1], $this->asked, 'the picture and the meaning together, now');
     }
 
     public function test_similar_items_are_of_its_own_kind_or_none(): void

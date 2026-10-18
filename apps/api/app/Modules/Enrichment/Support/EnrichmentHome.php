@@ -60,7 +60,8 @@ final class EnrichmentHome implements FirstSteps, HomeCards
             body: $top === null ? __('enrichment::home.step.body_none') : __('enrichment::home.step.body', $top),
             button: __('enrichment::home.step.button'),
             url: MissingInfo::getUrl(panel: 'merchant', tenant: $shop),
-            done: EnrichmentFact::query()->where('origin', FactOrigin::Person)->exists(),
+            // Nothing missing is nothing to do: the step is behind the shop.
+            done: $top === null || EnrichmentFact::query()->where('origin', FactOrigin::Person)->exists(),
         )];
     }
 }

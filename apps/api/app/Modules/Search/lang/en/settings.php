@@ -298,4 +298,8 @@ return [
         'label' => 'Products a search returns for filtering',
         'description' => 'Every product found, up to this many, goes to the drawer: its filters, order and count work on them. A search that finds more shows this many.',
     ],
+    'photo_colour_weight' => [
+        'label' => 'Weight of colours in photo search',
+        'description' => 'How much the colour of each part (the metal, the stone, the shirt, the pocket) decides the order, beyond how alike the pictures look. 0 turns it off.',
+    ],
 ];

@@ -631,7 +631,10 @@
         {
             "name": "image_fit",
             "type": "enum",
-            "options": ["cover", "frame"],
+            "options": [
+                "cover",
+                "frame"
+            ],
             "default": "cover",
             "scope": "shop"
         },
@@ -713,6 +716,15 @@
             "max": 365,
             "scope": "global",
             "unit": "days"
+        },
+        {
+            "name": "photo_colour_weight",
+            "type": "float",
+            "default": 0.3,
+            "min": 0,
+            "max": 2,
+            "scope": "shop",
+            "unit": "weight"
         }
     ],
     "agents": [

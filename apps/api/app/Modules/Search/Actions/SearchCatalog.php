@@ -10,6 +10,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
+use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\PhotoLook;
@@ -61,6 +62,11 @@ final class SearchCatalog
 
     /** How far down a product goes that has what the photographed object plainly lacks. */
     private const LACKS_PENALTY = 0.5;
+
+    /** A product whose words agree with the colours wanted this much comes before the rest; this much against, after. */
+    private const COLOUR_AGREES = 0.4;
+
+    private const COLOUR_DISAGREES = -0.3;
 
     /** A category tag brings all its products, up to this many. */
     private const PHOTO_CATEGORY_ALL = 5000;
@@ -197,6 +203,10 @@ final class SearchCatalog
                 array_values(array_filter($groups['product'], fn (array $r): bool => ($r['s'] ?? 0) !== 1)),
             );
 
+            // "עגילי חישוק זהב צהוב עם אבנים שקופות": the colours named, each with its part, weigh as in a
+            // photo search: what agrees comes first, what says another metal or colour goes after the rest.
+            $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
+
             // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
             $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
 
@@ -289,12 +299,18 @@ final class SearchCatalog
                 return [];
             }
 
-            // More than shown are read: those of another kind are left out.
-            $ids = array_column($this->semantic->picturesReady() ? $this->semantic->lookAlike($product->id, $limit * 4) : [], 'external_id');
-
-            if ($ids === []) {
-                $ids = array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id');
+            // Read now, from what the store sells now: the pictures that look alike and the products that
+            // mean the same, ranked together. More than shown are read: those of another kind are left out.
+            $looks = array_map('strval', array_column($this->semantic->picturesReady() ? $this->semantic->lookAlike($product->id, $limit * 4) : [], 'external_id'));
+            $means = array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id'));
+            $rank = [];
+            foreach ([$looks, $means] as $list) {
+                foreach ($list as $at => $id) {
+                    $rank[$id] = ($rank[$id] ?? 0) + 1 / (self::RRF_K + $at);
+                }
             }
+            arsort($rank);
+            $ids = array_map('strval', array_keys($rank));
 
             // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids));
@@ -310,6 +326,9 @@ final class SearchCatalog
             }
 
             usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
+            // Its own colours (the metal, the stone): a yellow-gold ring's alike are yellow gold first.
+            $own = $index['records']['p:'.$externalId] ?? null;
+            $records = $own === null ? $records : self::byColour($records, Colours::parts([trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''))]));
 
             return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
         });
@@ -410,6 +429,31 @@ final class SearchCatalog
 
             return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null] + $seen;
         });
+    }
+
+    /**
+     * Products in three bands by how their own words agree with the colours wanted: agreeing first, then
+     * those that say nothing either way, then those that say another metal or colour. The order inside
+     * each band is kept: relevance first, colour on top of it.
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @param  list<array{family: string, group: string, part: string|null, weight: float}>  $colours
+     * @return list<array<string, mixed>>
+     */
+    private static function byColour(array $records, array $colours): array
+    {
+        if ($colours === [] || count($records) < 2) {
+            return $records;
+        }
+
+        $bands = [2 => [], 1 => [], 0 => []];
+
+        foreach ($records as $record) {
+            $score = Colours::score($colours, trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '')));
+            $bands[$score >= self::COLOUR_AGREES ? 2 : ($score <= self::COLOUR_DISAGREES ? 0 : 1)][] = $record;
+        }
+
+        return [...$bands[2], ...$bands[1], ...$bands[0]];
     }
 
     /** What the reader saw, in words, for the model that orders: the object, its details, what it lacks. */
@@ -589,7 +633,16 @@ final class SearchCatalog
         $rows = CatalogProduct::query()->whereIn('external_id', array_keys($members))->get(['external_id', 'brand', 'in_stock'])->keyBy('external_id');
         // What the object lacks (a plain band has no stone): a product whose name or picture has it goes after the rest.
         $lacking = $this->holding($index, array_keys($members), $lacks);
-        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0) - (isset($lacking[$id]) ? self::LACKS_PENALTY : 0.0)], array_keys($members));
+        // The colour of each part the reader saw (the metal, the stone, the shirt, the pocket), against each
+        // product's own words: a yellow-gold ring with a white stone before a white-gold one however alike.
+        $colours = Colours::parts($description);
+        $colourWeight = (float) Settings::get('search.photo_colour_weight', $shopId);
+        $tint = [];
+        foreach (array_keys($members) as $id) {
+            $record = $index['records']['p:'.$id] ?? [];
+            $tint[$id] = $colours === [] ? 0.0 : Colours::score($colours, trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '')));
+        }
+        $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0) + $colourWeight * $tint[$id] - (isset($lacking[$id]) ? self::LACKS_PENALTY : 0.0)], array_keys($members));
 
         if ((bool) Settings::get('search.photo_in_stock_only', $shopId)) {
             $stocked = array_values(array_filter($candidates, fn (array $c): bool => (bool) $rows->get($c['external_id'])?->in_stock));
@@ -630,6 +683,7 @@ final class SearchCatalog
                 'about' => isset($about[$id]) ? (int) round(max(0, min(1, $about[$id])) * 100) : null,
                 'words' => isset($named[$id]) && $named[$id] > 0 ? (int) round($named[$id] * 100) : null,
                 'lacks' => isset($lacking[$id]) ? true : null,
+                'colour' => ($tint[$id] ?? 0.0) !== 0.0 ? (int) round($tint[$id] * 100) : null,
                 'kind' => $isMain($c) === 1,
             ], fn ($v): bool => $v !== null);
         }

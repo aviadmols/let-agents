@@ -47,13 +47,6 @@ return [
         'all_done_body' => 'The search is on, the assistant answers, and from here it only learns more.',
         'hide' => 'Hide',
     ],
-    'step' => [
-        'team' => [
-            'title' => 'Invite your team',
-            'body' => 'Whoever answers customers will see the questions that wait and can answer them.',
-            'button' => 'Invite',
-        ],
-    ],
     'attention' => [
         'title' => 'Needs your attention',
         'all' => 'All notices',

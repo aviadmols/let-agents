@@ -781,3 +781,11 @@ html.dark .fi-panel-merchant {
     .fi-panel-merchant .lp-img-box { flex-direction: column; }
     .fi-panel-merchant .lp-thumb-xl { width: 100%; height: 200px; }
 }
+
+/* ================================================================== the ⓘ and its sentence */
+
+.fi-panel-merchant .lp-tip { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-inline-start: 6px; border-radius: 50%; background: var(--la-sunk); color: var(--la-muted); font-size: 10.5px; font-weight: 600; font-style: normal; cursor: help; vertical-align: 1px; }
+.fi-panel-merchant .lp-tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); inset-inline-start: 50%; transform: translateX(50%); width: max-content; max-width: 280px; padding: 10px 12px; border-radius: 12px; background: var(--la-ink); color: var(--la-paper); font-size: 12.5px; font-weight: 400; line-height: 1.5; white-space: normal; text-align: start; box-shadow: var(--la-pop); opacity: 0; pointer-events: none; transition: opacity 140ms; z-index: 40; }
+[dir='ltr'] .fi-panel-merchant .lp-tip::after, .fi-panel-merchant[dir='ltr'] .lp-tip::after { transform: translateX(-50%); }
+.fi-panel-merchant .lp-tip:hover::after, .fi-panel-merchant .lp-tip:focus::after { opacity: 1; }
+.fi-panel-merchant .lp-tip:focus { outline: 2px solid var(--la-ink); outline-offset: 2px; }
