@@ -1886,7 +1886,21 @@
     var b = turn.bank || {};
     head += (b.popularity && b.popularity.popular ? '<span class="ls-pop" title="' + esc(b.popularity.text || '') + '">' + icon('trend', 'ls-icon--sm') + esc(b.popularity.badge || t('popular30')) + '</span>' : '') + '</div></div>';
     var html = head;
-    // suggested next steps first, as the shop's block offers them; the product's sections follow
+    // under the product, as Aviad asked (2026-10-18): its key specs, what the store promises, the tags that search
+    // for others like it, the products this visitor looked at; then what to ask, and the product's other sections
+    var sections = b.sections || [];
+    html += sections.filter(function (s) { return s.model === 'specs'; }).map(function (s) { return sectionHtml(s, turn); }).filter(Boolean).join('');
+    if (b.assurances && b.assurances.length) {
+      html += '<div class="ls-block"><div class="ls-block__title">' + esc(t('promises')) + '</div>' + b.assurances.map(function (a) { return '<div class="ls-promise">' + icon(a.scope === 'shop' ? 'truck' : 'check', 'ls-icon--sm') + '<div>' + esc(a.text) + (a.note ? '<small>' + esc(a.note) + '</small>' : '') + '</div></div>'; }).join('') + '</div>';
+    }
+    // what the product is, from its approved facts, each a search for others like it ("תליון זהב צהוב")
+    var tags = (b.assistant && b.assistant.tags) || [];
+    if (tags.length) {
+      html += '<div class="ls-block"><div class="ls-chips" style="flex-wrap:wrap;overflow:visible;mask-image:none;-webkit-mask-image:none">' + tags.map(function (tg) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(tg.query || tg.label) + '">' + esc(tg.label) + '</button>'; }).join('') + '</div></div>';
+    }
+    var seen = LEARN.recent && LEARN.recent.products;
+    if (seen && seen.length) { html += '<div class="ls-block"><div class="ls-block__title"><span>' + esc(bankLabel('recent_title', t('recentTitle'))) + '</span></div>' + miniRow(seen) + '</div>'; }
+    // suggested next steps next, as the shop's block offers them; the product's other sections follow
     // the comparison only when this shopper viewed a product of the same kind, and named: "להשוות עם X"
     var vb = String(turn.id) === String(PAGE && PAGE.id) ? viewedBefore() : null;
     var qs = ((b.assistant && b.assistant.questions) || []).filter(function (q) { return q.about !== 'compare' || vb; }).slice(0, 5).map(function (q) {
@@ -1898,19 +1912,15 @@
         return '<button class="ls-row" ' + act + ' style="background:var(--ls-bg-sunken);min-height:48px">' + mark() + '<span class="ls-row__text">' + esc(q.text) + '</span><span class="ls-row__end" style="opacity:1">' + icon('fwd', 'ls-icon--sm') + '</span></button>';
       }).join('') + '</div>';
     }
-    if (b.teaser && b.teaser.text) { html += '<p class="ls-teaser">' + esc(b.teaser.text) + '</p>'; }
-    // the sections in the order the learning chose (a held-out visitor: the order it never touched)
-    html += (b.sections || []).map(function (s) { return sectionHtml(s, turn); }).filter(Boolean).join('');
-    // what this visitor looked at, and more from the search that brought them here
-    var seen = LEARN.recent && LEARN.recent.products;
-    if (seen && seen.length) { html += '<div class="ls-block"><div class="ls-block__title"><span>' + esc(bankLabel('recent_title', t('recentTitle'))) + '</span></div>' + miniRow(seen) + '</div>'; }
+    // the specs' teaser is only their name ("מפרט"), and they are shown above already
+    if (b.teaser && b.teaser.text && b.teaser.model !== 'specs') { html += '<p class="ls-teaser">' + esc(b.teaser.text) + '</p>'; }
+    // the other sections in the order the learning chose (a held-out visitor: the order it never touched)
+    html += sections.filter(function (s) { return s.model !== 'specs'; }).map(function (s) { return sectionHtml(s, turn); }).filter(Boolean).join('');
+    // more from the search that brought them here
     var found = LEARN.searched && LEARN.searched.products;
     if (found && found.length) { html += '<div class="ls-block"><div class="ls-block__title"><span>' + esc(bankLabel('searched_title', t('searchedTitle'), { query: LEARN.searched.query || '' })) + '</span></div>' + miniRow(found) + '</div>'; }
     if (b.answers && b.answers.length) {
       html += '<div class="ls-block"><div class="ls-block__title">' + esc(t('faq')) + '</div>' + b.answers.map(function (a) { return '<details class="ls-faq"><summary>' + esc(a.q) + icon('down', 'ls-icon--sm') + '</summary><p>' + esc(a.a) + '</p></details>'; }).join('') + '</div>';
-    }
-    if (b.assurances && b.assurances.length) {
-      html += '<div class="ls-block"><div class="ls-block__title">' + esc(t('promises')) + '</div>' + b.assurances.map(function (a) { return '<div class="ls-promise">' + icon(a.scope === 'shop' ? 'truck' : 'check', 'ls-icon--sm') + '<div>' + esc(a.text) + (a.note ? '<small>' + esc(a.note) + '</small>' : '') + '</div></div>'; }).join('') + '</div>';
     }
     // someone who knows: WhatsApp only while the store answers it; otherwise (or with no WhatsApp) the details form,
     // with the last question asked about this product already in it
@@ -1937,7 +1947,7 @@
     if (s.model === 'specs') {
       var rows = s.specs && s.specs.length ? s.specs.map(function (x) { return [x.label, x.value]; }) : (LEARN.bank && LEARN.bank.compare && LEARN.bank.compare.rows || []).map(function (x) { return [x[1], x[2]]; });
       if (!rows.length) { return ''; }
-      return '<details class="ls-block ls-faq" style="border:0" data-cand="' + esc(s.candidate) + '"><summary style="padding:0;min-height:36px"><span class="ls-block__title" style="margin:0">' + esc(s.title || t('specs')) + '</span>' + icon('down', 'ls-icon--sm') + '</summary><table class="ls-specs">' + rows.map(function (x) { return '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>'; }).join('') + '</table></details>';
+      return '<details class="ls-block ls-faq ls-specs-box" style="border:0" data-cand="' + esc(s.candidate) + '"><summary style="padding:0;min-height:36px"><span class="ls-block__title" style="margin:0">' + esc(s.title || t('specs')) + '</span>' + icon('down', 'ls-icon--sm') + '</summary><table class="ls-specs">' + rows.map(function (x) { return '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>'; }).join('') + '</table></details>';
     }
     if (s.products && s.products.length) {
       var end = s.model === 'complement' ? '<button class="ls-why" data-why>' + esc(t('whyShown')) + '</button>' : s.model === 'alternative' ? '<button data-similar="' + esc(turn.id) + '">' + esc(t('seeAll')) + '</button>' : '';

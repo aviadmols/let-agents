@@ -236,6 +236,9 @@
 .ls-specs { width: 100%; border-collapse: collapse; font-size: var(--lsp-text-md); }
 .ls-specs th, .ls-specs td { text-align: start; padding: 9px 0; border-top: 1px solid var(--ls-line); vertical-align: top; }
 .ls-specs th { font-weight: 400; color: var(--ls-fg-muted); width: 42%; padding-inline-end: 12px; }
+/* the key specs, first under the product: a little bolder than the sections after them */
+.ls-specs-box > summary .ls-block__title { font-size: var(--lsp-text-md); font-weight: 700; }
+.ls-specs-box .ls-specs td { font-weight: 500; }
 .ls-faq { border-top: 1px solid var(--ls-line); }
 .ls-faq summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 0; font-size: var(--lsp-text-md); font-weight: 500; }
 .ls-faq summary::-webkit-details-marker { display: none; }
