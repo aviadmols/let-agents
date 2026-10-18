@@ -1701,8 +1701,8 @@ final class BuildPageBank
             ...array_slice($others, 0, 1),
             // Returns and delivery only where the store says something about them and the question already
             // got an answer shoppers saw: an example the assistant could not answer is never offered.
-            ...($policies['returns'] && $this->storeAnswered($returns = (string) __('widget::bank.assistant.returns', [], $this->locale)) ? [['text' => $returns, 'about' => 'product']] : []),
-            ...($policies['delivery'] && $this->storeAnswered($delivery = (string) __('widget::bank.assistant.delivery', [], $this->locale)) ? [['text' => $delivery, 'about' => 'product']] : []),
+            ...($policies['returns'] && $this->storeAnswered($returns = (string) __('assistant::prepared.returns', [], $this->locale)) ? [['text' => $returns, 'about' => 'product']] : []),
+            ...($policies['delivery'] && $this->storeAnswered($delivery = (string) __('assistant::prepared.delivery', [], $this->locale)) ? [['text' => $delivery, 'about' => 'product']] : []),
         ] as $question) {
             $questions[$question['text']] ??= $question;
         }

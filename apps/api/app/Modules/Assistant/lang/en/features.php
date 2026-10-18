@@ -33,4 +33,8 @@ return [
         'label' => 'AI help writing answers to shopper questions',
         'description' => 'On the shopper questions screen: a button that drafts an answer from the product information and the store pages, or from a few words the team typed. Nothing is published without the team.',
     ],
+    'prepare_answers' => [
+        'label' => 'Ready answers to questions about the store',
+        'description' => 'After every sync: the questions shoppers ask about the store (delivery, returns, warranty, payments…) are chosen in code from what the store\'s pages say, and answered ahead from the site\'s pages, checked by another model family. Only an answer that passed its check is shown to shoppers, without a model. Asked again only when the page it was written from changes.',
+    ],
 ];

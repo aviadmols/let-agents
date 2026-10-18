@@ -285,8 +285,6 @@ return [
         'compare_named' => 'Compare with :title',
         'compare_question' => 'What is the difference between :this and :that?',
         'more_of_type' => ':count more :type',
-        'returns' => 'Can I return or exchange it?',
-        'delivery' => 'How soon does it arrive?',
         'model' => 'model',
         'same_series' => 'More from ":series"',
     ],

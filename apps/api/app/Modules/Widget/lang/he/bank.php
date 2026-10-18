@@ -285,8 +285,6 @@ return [
         'compare_named' => 'להשוות עם :title',
         'compare_question' => 'מה ההבדל בין :this לבין :that?',
         'more_of_type' => 'עוד :count :type',
-        'returns' => 'אפשר להחזיר או להחליף?',
-        'delivery' => 'תוך כמה זמן זה מגיע?',
         'model' => 'דגם',
         'same_series' => 'עוד מוצרים מ":series"',
     ],

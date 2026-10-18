@@ -22,4 +22,5 @@ return [
     'team_draft_same_family' => 'The writer and the checker are of the same family (:family). The checker must be of another.',
     'team_draft_empty' => 'The model returned no draft.',
     'team_drafted' => 'An answer draft was written for the team. :problems things to check.',
+    'prepared' => 'Ready answers: :questions questions about the store, :answered answered and checked, :skipped already ready with their pages unchanged.',
 ];

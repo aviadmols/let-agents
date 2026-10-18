@@ -14,6 +14,10 @@
     "provider": "AssistantServiceProvider",
     "features": [
         {
+            "name": "prepare_answers",
+            "default": true
+        },
+        {
             "name": "on_products",
             "default": true
         },
@@ -47,6 +51,15 @@
         }
     ],
     "settings": [
+        {
+            "name": "prepared_per_sync",
+            "type": "int",
+            "default": 12,
+            "min": 1,
+            "max": 50,
+            "scope": "shop",
+            "unit": "questions"
+        },
         {
             "name": "answer_model",
             "type": "string",

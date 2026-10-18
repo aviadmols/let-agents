@@ -187,6 +187,54 @@ final class AnswerSiteQuestion
     }
 
     /**
+     * A question about the store answered ahead of any shopper (PrepareStoreAnswers), the same way a
+     * shopper's is: the store's pages, one family writes, the other checks. Inside the shop's tenant.
+     *
+     * Asked once: an answer stays until a page it was written from changes; "not on the site" until the
+     * site changes or the days pass (stale). The team's answers are never touched. An answer that passed
+     * its check clean and safe is the shop's at once, shown to every shopper without a model; the call
+     * is background work, held to the shop's allowance.
+     *
+     * @return string skipped | answered | not_answered | unavailable
+     */
+    public function prepareForStore(string $shopId, string $question, string $locale): string
+    {
+        $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
+        $saved = self::siteAnswers()->where('question_key', Question::key($question))->first();
+
+        if ($saved !== null && ($saved->source === 'team'
+            || ($saved->outcome === AssistantAnswer::ANSWERED && $saved->prompt_version >= self::PROMPT_VERSION && ! $this->pagesChangedSince($saved))
+            || ($saved->outcome !== AssistantAnswer::ANSWERED && ! $this->stale($saved, $shopId)))) {
+            return 'skipped';
+        }
+
+        // Written from pages that changed since, or from an older prompt: written again, from what the pages say now.
+        $saved?->delete();
+        $result = $this->ask($shopId, $question, $locale, [], forShopper: false);
+
+        if ($result['outcome'] !== AssistantAnswer::ANSWERED) {
+            return in_array($result['outcome'], ['unavailable', 'limit'], true) ? 'unavailable' : 'not_answered';
+        }
+
+        $fresh = self::siteAnswers()->where('question_key', Question::key($question))->first();
+        $flags = (array) ($fresh?->flags ?? []);
+        if ($fresh !== null && ($flags['safe'] ?? null) === true && ! ($flags['injection'] ?? false) && ! ($flags['harmful'] ?? false) && ! ($flags['personal'] ?? false)) {
+            $fresh->forceFill(['shared_at' => now(), 'flags' => $flags + ['prepared' => true]])->save();
+        }
+
+        return 'answered';
+    }
+
+    /** Whether a page an answer was written from changed after it was written. */
+    private function pagesChangedSince(AssistantAnswer $saved): bool
+    {
+        $urls = array_values(array_filter(array_map(fn ($s): ?string => is_array($s) ? ($s['url'] ?? null) : null, (array) $saved->sources)));
+        $changed = $urls === [] ? null : CatalogContent::query()->active()->whereIn('url', $urls)->max('updated_at');
+
+        return $changed !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($changed));
+    }
+
+    /**
      * @param  list<string>  $products
      * @param  bool  $followUp  the products are the turn before's: no saved answer is read or written,
      *                          since the same words were about other products for anyone else
@@ -513,7 +561,7 @@ final class AnswerSiteQuestion
      * @param  bool  $keep  false for a follow-up: the answer is about this conversation's products, never saved for the next shopper
      * @return array<string, mixed>
      */
-    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true, ?string $viewing = null): array
+    private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true, ?string $viewing = null, bool $forShopper = true): array
     {
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
@@ -524,7 +572,7 @@ final class AnswerSiteQuestion
             shopId: $shopId,
             trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,
             input: ['question' => $question, 'products' => count($shown)] + ($remember ? [] : ['evaluation' => $mode]),
-            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, $viewing, &$result, &$trace): void {
+            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, $viewing, $forShopper, &$result, &$trace): void {
                 $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
                 $writer = ['provider' => $writer->provider, 'name' => $writer->provider->value, 'model' => $writer->model];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
@@ -549,7 +597,7 @@ final class AnswerSiteQuestion
                     $scoper = ['provider' => $scoper->provider, 'name' => $scoper->provider->value, 'model' => $scoper->model];
 
                     try {
-                        $this->spend->assertCanSpend(forShopper: true, estimatedUsd: (800 * $this->price('scope_input') + self::SCOPE_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
+                        $this->spend->assertCanSpend(forShopper: $forShopper, estimatedUsd: (800 * $this->price('scope_input') + self::SCOPE_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
                         $scope = $this->call($run, $scoper, 'scope_site', (string) json_encode([
                             'store' => $this->storeBrief($shopId),
                             'question' => $question,
@@ -630,7 +678,7 @@ final class AnswerSiteQuestion
 
                 try {
                     $estimated = (int) ceil(mb_strlen($input) / 2) + 600;
-                    $this->spend->assertCanSpend(forShopper: true, estimatedUsd: (
+                    $this->spend->assertCanSpend(forShopper: $forShopper, estimatedUsd: (
                         $estimated * $this->price('answer_input') + $maxOutput * $this->price('answer_output')
                         + ($estimated + 400) * $this->price('site_check_input') + $checkOutput * $this->price('site_check_output')
                     ) / 1_000_000);

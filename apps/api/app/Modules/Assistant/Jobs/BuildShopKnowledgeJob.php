@@ -35,13 +35,14 @@ final class BuildShopKnowledgeJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(BuildShopKnowledge $knowledge, TenantContext $tenant): void
     {
-        if (! Features::enabled('assistant.knowledge', $this->shopId)) {
-            return;
+        if (Features::enabled('assistant.knowledge', $this->shopId)) {
+            $tenant->run($this->shopId, function () use ($knowledge): void {
+                $knowledge->repeated($this->shopId);
+                $knowledge->team();
+            });
         }
 
-        $tenant->run($this->shopId, function () use ($knowledge): void {
-            $knowledge->repeated($this->shopId);
-            $knowledge->team();
-        });
+        // With what the pages repeat read, the store's own questions are answered ahead of shoppers.
+        PrepareStoreAnswersJob::dispatch($this->shopId);
     }
 }

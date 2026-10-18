@@ -6,4 +6,5 @@ return [
     'ask_reviewer' => 'Reviews the search questions every day',
     'post_reader' => 'Reads the store\'s posts and articles',
     'team_helper' => 'Drafts the team answers',
+    'answer_preparer' => 'Prepares answers to questions about the store',
 ];

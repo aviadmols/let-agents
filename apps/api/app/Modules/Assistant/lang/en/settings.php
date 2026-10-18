@@ -259,4 +259,8 @@ return [
         'label' => 'AI answer drafts a day',
         'description' => 'How many drafts a store team may ask for a day. A draft already written for the same question and words comes back without a model.',
     ],
+    'prepared_per_sync' => [
+        'label' => 'Ready questions per sync',
+        'description' => 'At most this many questions about the store are answered ahead on each sync. One already answered whose pages did not change is not asked again.',
+    ],
 ];
