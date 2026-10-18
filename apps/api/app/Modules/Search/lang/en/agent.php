@@ -59,4 +59,18 @@ return [
         'problem_unknown_option' => 'no such option',
         'problem_not_available' => 'not available now',
     ],
+    'card_description' => ':store\'s catalogue for AI assistants: search its products, read one with its options, prices and stock, read its policies, and make a link that opens its checkout with the products in the cart.',
+    'llms' => [
+        'summary' => ':store (:url) sells :products products. What it sells, with prices and stock as of last night, is here for AI assistants, and a buy link for every product opens the store\'s own checkout.',
+        'for_agents' => 'For AI assistants',
+        'catalog' => 'The store\'s catalogue for AI',
+        'catalog_about' => 'every product with its price, stock and buy link, searchable.',
+        'mcp' => 'MCP server (streamable HTTP, no sign-in)',
+        'mcp_about' => 'tools to search the products, read one, read the store\'s policies and make a checkout link.',
+        'card' => 'MCP server card',
+        'card_about' => 'what the server offers, in JSON.',
+        'policies' => 'Policies',
+        'categories' => 'Categories',
+        'category_count' => ':count products',
+    ],
 ];

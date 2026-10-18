@@ -484,6 +484,26 @@ final class ShareSearchTest extends TestCase
         $this->assertSame(['4.20 מטר', '3.00 מטר'], array_column($wrong['choices'], 'label'));
     }
 
+    public function test_an_agent_finds_the_store_without_a_link_from_its_server_card_and_llms_txt(): void
+    {
+        $card = $this->get('/api/v1/mcp/'.$this->site.'/server-card')->assertOk()->assertHeader('Access-Control-Allow-Origin', '*')->json();
+        $this->assertSame('טבעות ושות׳', $card['title']);
+        $this->assertSame([['type' => 'streamable-http', 'url' => url('/api/v1/mcp/'.$this->site)]], $card['remotes'], 'where the MCP server answers');
+        $this->assertContains('search_products', array_column($card['tools'], 'name'), 'what it offers');
+        $this->assertSame(['required' => false], $card['authentication']);
+
+        $llms = $this->get('/api/v1/search/'.$this->site.'/llms.txt')->assertOk()->assertHeader('Content-Type', 'text/markdown; charset=utf-8')->getContent();
+        $this->assertStringStartsWith("# טבעות ושות׳\n", $llms);
+        $this->assertStringContainsString('sells 3 products', $llms);
+        $this->assertStringContainsString('](https://www.rings.test/policies/refund)', $llms, 'its policies, linked');
+        $this->assertStringContainsString('- [MCP server (streamable HTTP, no sign-in)]('.url('/api/v1/mcp/'.$this->site).')', $llms);
+
+        // A store that turned its connector off is not described.
+        Features::override('search.agent_connector', false, $this->shop->id);
+        $this->get('/api/v1/mcp/'.$this->site.'/server-card')->assertNotFound();
+        $this->get('/api/v1/search/'.$this->site.'/llms.txt')->assertNotFound();
+    }
+
     public function test_search_filters_hold_in_code_and_an_unknown_one_is_said(): void
     {
         $rpc = fn (array $arguments) => $this->call('POST', '/api/v1/mcp', [], [], [], ['CONTENT_TYPE' => 'application/json'],

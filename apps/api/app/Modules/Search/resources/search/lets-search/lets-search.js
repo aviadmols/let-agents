@@ -3084,6 +3084,44 @@
     }
   }
 
+  // An AI agent working in the shopper's browser (WebMCP) finds the store's search on the page itself, no link
+  // needed: two read-only tools, the same search and products the drawer shows. Only where the browser offers
+  // it (document.modelContext, or navigator.modelContext in its first form); a search an agent runs is not
+  // counted as a shopper's. Named lets_* so they never take the place of a platform's own (Shopify registers its own).
+  function agentTools() {
+    var context = doc.modelContext || (win.navigator && win.navigator.modelContext);
+    if (!context || typeof context.registerTool !== 'function' || !SITE) { return; }
+    var text = function (data) { return { content: [{ type: 'text', text: JSON.stringify(data) }] }; };
+    var brief = function (r) { return { id: pid(r.id), title: decode(r.title), url: r.url, price: r.pr == null ? null : r.pr, in_stock: r.s === 1, image: r.img || null }; };
+    var tools = [
+      {
+        name: 'lets_search_products',
+        description: 'Search this store\'s products, in the shopper\'s own words (any language; prices like "up to 300" are read too). Returns up to 12 products with their page, price and stock.',
+        inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'What the shopper is looking for' } }, required: ['query'] },
+        annotations: { readOnlyHint: true },
+        execute: function (input) {
+          var q = String((input && input.query) || '').trim();
+          if (!q) { return Promise.resolve(text({ products: [] })); }
+          return loadIndex().then(function () { return json(API + '/search/' + SITE + '?q=' + encodeURIComponent(q) + '&counted=1'); }).then(function (r) {
+            var d = r.body || {};
+            var ids = (d.ids || []).filter(function (id) { return /^p:/.test(id); });
+            if (!ids.length) { ids = ((d.groups && d.groups.product) || []).map(function (p) { return p.id; }); }
+            return text({ store: S.config.shopName || '', total: d.total || ids.length, products: ids.slice(0, 12).map(rec).filter(Boolean).map(brief) });
+          });
+        }
+      },
+      {
+        name: 'lets_get_product',
+        description: 'One product of this store by its id (from lets_search_products): its page, price, stock and picture.',
+        inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        annotations: { readOnlyHint: true },
+        execute: function (input) {
+          return loadIndex().then(function () { var r = rec(String((input && input.id) || '')); return text(r ? brief(r) : { error: 'unknown_product' }); });
+        }
+      }
+    ];
+    tools.forEach(function (tool) { try { context.registerTool(tool); } catch (e) { /* a name taken, or an older form of the API */ } });
+  }
   function boot() {
     // silent (a shopper while the store is in preview): nothing is shown, the page still counts, as the
     // product page module counted it before: the page view, the store's own add to cart, the search's attribution
@@ -3105,6 +3143,7 @@
     applyStoreTheme();
     hook();
     inlineField();
+    agentTools();
     // the page: a product (from the config, else the store's own markers) or a content page, for its learning
     if (!S.ctx) {
       var meta = win.ShopifyAnalytics && win.ShopifyAnalytics.meta && win.ShopifyAnalytics.meta.product, cls = String(doc.body.className || ''), post = cls.match(/(?:^|\s)postid-([0-9]+)(?:\s|$)/);

@@ -51,6 +51,9 @@
     };
   </script>
   <script src="{{ api | append: '/search/lets-search.js' | escape }}" defer></script>
+  {%- comment -%} An AI agent at the store finds its catalogue and MCP server without a link (the store's own address cannot hold these files on Shopify). {%- endcomment -%}
+  <link rel="alternate" type="text/markdown" title="llms.txt" href="{{ api | append: '/search/' | append: site | append: '/llms.txt' | escape }}">
+  <link rel="alternate" type="application/json" title="MCP server card" href="{{ api | append: '/mcp/' | append: site | append: '/server-card' | escape }}">
 {%- endif -%}
 
 {%- comment -%} A guide Let Agents wrote carries its questions in let_agents.faq: search engines read them as FAQPage. {%- endcomment -%}
@@ -67,7 +70,7 @@
 {% schema %}
 {
   "name": "t:blocks.app_embed.name",
-  "target": "body",
+  "target": "head",
   "settings": [
     {
       "type": "paragraph",

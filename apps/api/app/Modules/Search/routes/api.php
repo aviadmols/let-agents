@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Search\Http\Controllers\AgentDiscoveryController;
 use App\Modules\Search\Http\Controllers\AppMcpController;
 use App\Modules\Search\Http\Controllers\LetsSearchScriptController;
 use App\Modules\Search\Http\Controllers\McpController;
@@ -33,6 +34,9 @@ Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/order', SearchOrderController::class)->name('api.search.order');
     // The store as a connector for a shopper's own AI (Model Context Protocol over HTTP).
     Route::match(['get', 'post', 'delete'], 'mcp/{site}', McpController::class)->name('api.search.mcp');
+    // How an agent finds it without a link: the server described, and the store for a language model.
+    Route::get('mcp/{site}/server-card', [AgentDiscoveryController::class, 'card'])->name('api.search.mcp_card');
+    Route::get('search/{site}/llms.txt', [AgentDiscoveryController::class, 'llms'])->name('api.search.llms');
 });
 
 // Lets Search as one app inside a shopper's AI (a ChatGPT plugin, a Claude connector), every store
