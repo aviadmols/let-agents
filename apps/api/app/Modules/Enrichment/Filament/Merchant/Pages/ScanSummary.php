@@ -13,6 +13,8 @@ use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Scanning\RequiredGaps;
+use App\Modules\Retrieval\Enums\ChunkSource;
+use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Contracts\ScansShops;
 use App\Modules\Runs\Enums\RunStatus;
@@ -275,6 +277,8 @@ final class ScanSummary extends Page
                 'read_at' => $image->captioned_at?->timezone('Asia/Jerusalem')->format('j.n'),
                 'state' => $image->error !== null ? 'error' : ($image->caption !== null ? 'read' : ($image->captioned_at !== null ? 'unread' : 'waiting')),
             ],
+            'store_text' => mb_strlen(trim($product->shortDescription().' '.$product->description())),
+            'indexed' => self::indexed(ChunkSource::Product, (string) $product->id),
         ];
     }
 
@@ -460,6 +464,27 @@ final class ScanSummary extends Page
                 'title' => (string) $l->product->title, 'thumb' => $l->product->image_url, 'mentioned' => (bool) ($l->reasons['mentioned'] ?? false),
             ])->values()->all(),
             'unfound' => count(array_diff($named, $known)),
+            'indexed' => self::indexed(ChunkSource::Content, (string) $content->id),
+        ];
+    }
+
+    /**
+     * What the search knows of a product or post: the very text its meaning vectors were made from,
+     * piece by piece, and when. No model and no cost, only the text and how much of it there is.
+     *
+     * @return array{pieces: list<string>, chars: int, at: string|null, waiting: int}
+     */
+    private static function indexed(ChunkSource $source, string $id): array
+    {
+        $chunks = RetrievalChunk::query()->where('source', $source->value)->where('source_id', $id)
+            ->orderBy('position')->get(['text', 'embedded_at']);
+        $at = $chunks->max('embedded_at');
+
+        return [
+            'pieces' => $chunks->pluck('text')->map(fn ($t): string => (string) $t)->all(),
+            'chars' => (int) $chunks->sum(fn (RetrievalChunk $c): int => mb_strlen((string) $c->text)),
+            'at' => $at === null ? null : Carbon::parse($at)->timezone('Asia/Jerusalem')->format('j.n'),
+            'waiting' => $chunks->whereNull('embedded_at')->count(),
         ];
     }
 

@@ -115,6 +115,7 @@
                         @else
                             <p class="lp-empty">{{ $t('no_image') }}</p>
                         @endif
+                        @include('enrichment::merchant.scan-indexed', ['indexed' => $p['indexed'], 'store' => $p['store_text']])
                     @endif
                 </section>
             </div>
@@ -179,6 +180,7 @@
                             <p class="lp-empty">{{ $t('no_products') }}</p>
                         @endforelse
                         @if ($c['unfound'] > 0)<p class="lp-note">{{ $t('unfound', ['n' => $c['unfound']]) }}</p>@endif
+                        @include('enrichment::merchant.scan-indexed', ['indexed' => $c['indexed'], 'store' => null])
                     @endif
                 </section>
             </div>

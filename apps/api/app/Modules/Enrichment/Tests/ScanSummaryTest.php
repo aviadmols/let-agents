@@ -12,6 +12,7 @@ use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Filament\Merchant\Pages\ScanSummary;
 use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -101,6 +102,22 @@ final class ScanSummaryTest extends TestCase
         $this->assertTrue(EnrichmentFact::query()->where('product_id', $mdf->id)->where('value_text', 'מתאים למדפים')->where('origin', FactOrigin::Person)->exists());
         $this->assertSame([[$this->shop->id, 'product', '15377']], $this->rereads, 'the code readers run on it now');
         $this->assertNull(RetrievalImage::query()->where('product_id', $mdf->id)->value('caption_key'), 'its picture is read first at the next scan');
+    }
+
+    public function test_the_product_shows_the_text_its_search_vectors_were_made_from(): void
+    {
+        $trimmer = $this->product('55562', 'גוזם גדר חי חשמלי 620W');
+        $trimmer->forceFill(['payload' => ['description' => str_repeat('גוזם גדר החי החשמלי בהספק 620W הוא כלי גינון עוצמתי. ', 20)]])->save();
+        foreach (['גוזם גדר חי חשמלי 620W'."\nBrand: Hunter", 'גוזם גדר חי חשמלי 620W'."\nהספק: 620W"] as $i => $text) {
+            RetrievalChunk::query()->create(['shop_id' => $this->shop->id, 'source' => 'product', 'source_id' => $trimmer->id, 'external_id' => '55562', 'title' => $trimmer->title, 'position' => $i, 'text' => $text, 'text_hash' => hash('sha256', $text), 'embedded_at' => now()]);
+        }
+
+        Livewire::test(ScanSummary::class)
+            ->call('select', $trimmer->id)
+            ->assertSee('מה החיפוש יודע')
+            ->assertSee('2 חלקים')
+            ->assertSee('Brand: Hunter')
+            ->assertSee('החיפוש מכיר פחות ממחצית התיאור שבאתר');
     }
 
     private function product(string $external, string $title): CatalogProduct
