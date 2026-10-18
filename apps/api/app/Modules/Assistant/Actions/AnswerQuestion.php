@@ -56,6 +56,21 @@ final class AnswerQuestion
 
     private const MAX_ANSWER_CHARS = 1200;
 
+    /**
+     * What makes a question on a product's page the store's, not the product's: delivery, returns and
+     * cancelling, warranty, payments, the shop itself, and its services (resizing a ring). Its card does
+     * not say these and the writer may not promise them, so they came back "not found" though the
+     * store's pages say them. Narrower than the site's own "store" kind: "באילו אורכים זה מגיע" is the
+     * product (it comes in lengths), "מתי זה מגיע" the store (it arrives); cleaning or care is the product.
+     * Hebrew final letters are read as regular ones.
+     */
+    private const STORE_WORDS = [
+        'משלוח', 'שליח', 'איסופ', 'זמנ אספקה', 'תוכ כמה זמנ', 'כמה זמנ (?:זה )?(?:לוקח|עד)', 'מתי (?:זה |הוא |היא )?(?:מגיע|תגיע|יגיע|אקבל|יישלח|נשלח)',
+        'החז(?:י)?ר', 'החלפ', 'ביטול', 'לבטל', 'אחריות', 'תשלומ', 'סניפ', 'שעות (?:פתיחה|פעילות)', 'חנות פיזית', 'קופונ', 'אריזת מתנה',
+        'להגד(?:י)?ל', 'להקט(?:י)?נ', 'הגדלה', 'הגדלת', 'הקטנת', 'התאמת מידה', 'שינוי מידה',
+        'shipping', 'deliver', 'arriv', 'return', 'refund', 'exchange', 'warranty', 'payment', 'installment', 'resiz',
+    ];
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -78,6 +93,13 @@ final class AnswerQuestion
         }
 
         return $this->tenant->run($shopId, function () use ($shopId, $onArticle, $externalId, $question, $visitorHash, $locale): array {
+            // A question about the store asked on a product's page ("תוך כמה זמן זה מגיע?", "אפשר להחזיר?")
+            // goes to the site's answerer, which reads the store's pages; its barrier, saved answers and
+            // limits apply there. One this product already has an answer to (the team's) stays here.
+            if (! $onArticle && self::aboutTheStore($question) && Features::enabled('assistant.on_search', $shopId) && ! $this->answeredHere($externalId, $question)) {
+                return $this->bySite($shopId, $externalId, $question, $visitorHash, $locale);
+            }
+
             if (($stop = $this->guarded($shopId, $question, $visitorHash, $locale)) !== null) {
                 return $stop;
             }
@@ -336,6 +358,41 @@ final class AnswerQuestion
     }
 
     /** @return array{outcome: string, answer: string, from: string} */
+    /** Whether a question on a product's page is about the store (STORE_WORDS). */
+    public static function aboutTheStore(string $question): bool
+    {
+        $text = strtr(mb_strtolower($question), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
+
+        return preg_match('/(?<![\p{L}])[והבלש]?(?:'.implode('|', self::STORE_WORDS).')/u', $text) === 1;
+    }
+
+    /** Whether this product already has a shown answer to the question (the team's, or one written before). */
+    private function answeredHere(string $externalId, string $question): bool
+    {
+        $productId = CatalogProduct::query()->where('external_id', $externalId)->value('id');
+
+        return $productId !== null && AssistantAnswer::query()->where('product_id', $productId)->where('question_key', Question::key($question))
+            ->where('status', AssistantAnswer::SHOWN)->where('outcome', AssistantAnswer::ANSWERED)->exists();
+    }
+
+    /**
+     * The site's answer to a store question asked on a product's page, with the product as the one looked at,
+     * in this answerer's shape.
+     *
+     * @return array{outcome: string, answer: string, from: string, source?: string}
+     */
+    private function bySite(string $shopId, string $externalId, string $question, string $visitorHash, string $locale): array
+    {
+        $site = app(AnswerSiteQuestion::class)->handle($shopId, $question, $visitorHash, $locale, [$externalId], [], true);
+
+        return array_filter([
+            'outcome' => (string) ($site['outcome'] ?? 'unavailable'),
+            'answer' => (string) ($site['answer'] ?? ''),
+            'from' => (string) ($site['from'] ?? 'none'),
+            'source' => isset($site['source']) ? (string) $site['source'] : null,
+        ], fn ($value): bool => $value !== null);
+    }
+
     private function fixed(string $outcome, string $locale, string $from = 'none'): array
     {
         return ['outcome' => $outcome, 'answer' => (string) __('assistant::answers.'.$outcome, [], $locale), 'from' => $from];

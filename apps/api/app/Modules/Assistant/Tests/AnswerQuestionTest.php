@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Assistant\Actions\AnswerQuestion;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -148,6 +149,17 @@ final class AnswerQuestionTest extends TestCase
         ]));
         $this->model->replies = [['about_product' => true], ['answer' => 'מנקים אותו אחרי כל שימוש ושומרים במקום יבש.', 'source' => 'general'], self::VERIFIED];
         $this->assertSame('answered', $this->ask('איך שומרים עליו?')->json('data.outcome'));
+    }
+
+    public function test_code_tells_a_question_about_the_store_from_one_about_the_product(): void
+    {
+        foreach (['תוך כמה זמן זה מגיע?', 'אפשר להחזיר או להחליף?', 'מתי זה יגיע?', 'כמה עולה משלוח?', 'אפשר להגדיל את הטבעת?', 'יש אחריות?', 'אפשר לשלם בתשלומים?'] as $store) {
+            $this->assertTrue(AnswerQuestion::aboutTheStore($store), $store);
+        }
+        // "comes in lengths", cleaning it, its smaller version: the product's own
+        foreach (['באילו אורכים זה מגיע?', 'איזה חומר ניקוי מתאים?', 'יש את זה בגרסה הקטנה?', 'האם זה מתאים לחוץ?', 'זה מגיע עם קופסה?'] as $product) {
+            $this->assertFalse(AnswerQuestion::aboutTheStore($product), $product);
+        }
     }
 
     public function test_a_question_about_something_else_never_reaches_the_writer(): void

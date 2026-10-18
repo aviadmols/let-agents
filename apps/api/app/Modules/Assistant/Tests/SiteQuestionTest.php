@@ -233,6 +233,21 @@ final class SiteQuestionTest extends TestCase
             content: json_encode(['question' => 'שאלה', 'vid' => 'nobody']))->assertStatus(422);
     }
 
+    public function test_a_store_question_asked_on_a_product_page_is_answered_from_the_stores_pages(): void
+    {
+        // "How long until it arrives?" on a product's page: its card does not say it and the product's writer
+        // may not promise delivery, so it went "not found". Code reads it as a store question; the site's answerer takes it.
+        $this->passages = [['source' => 'content', 'source_id' => $this->inShop(fn () => CatalogContent::query()->value('id')), 'external_id' => '600', 'title' => 'משלוחים', 'text' => 'המשלוח מגיע תוך 3 ימי עסקים.', 'similarity' => 0.8]];
+        $this->replies = [['found' => true, 'answer' => 'המשלוח מגיע תוך 3 ימי עסקים.', 'refs' => ['s1']], ['supported' => true, 'on_topic' => true, 'safe' => true]];
+
+        $answer = $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/ask', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['id' => '31538', 'type' => 'product', 'question' => 'תוך כמה זמן זה מגיע?', 'vid' => self::VID, 'locale' => 'he'], JSON_UNESCAPED_UNICODE))->assertOk()->json('data');
+
+        $this->assertSame(['answered', 'המשלוח מגיע תוך 3 ימי עסקים.'], [$answer['outcome'], $answer['answer']]);
+        $this->assertSame(['assistant.site_answerer'], Run::query()->pluck('agent')->unique()->values()->all(), 'the product\'s writer is never asked');
+    }
+
     private function ask(string $question): TestResponse
     {
         return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
