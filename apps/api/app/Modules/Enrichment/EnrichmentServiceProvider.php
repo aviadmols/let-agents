@@ -3,6 +3,8 @@
 namespace App\Modules\Enrichment;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\FirstSteps;
+use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
@@ -11,6 +13,7 @@ use App\Modules\Enrichment\Console\EnrichmentCommand;
 use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Listeners\RebuildCards;
+use App\Modules\Enrichment\Support\EnrichmentHome;
 use App\Modules\Enrichment\Support\EnrichmentScanDetails;
 use App\Modules\Enrichment\Support\StoredCards;
 use Illuminate\Console\Scheduling\Schedule;
@@ -20,6 +23,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([EnrichmentHome::class], HomeCards::CARDS_TAG);
+        $this->app->tag([EnrichmentHome::class], FirstSteps::STEPS_TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([EnrichmentScanDetails::class], ScanDetails::TAG);
         // Another module may ask for one page to be read again; it gets the code readers only.

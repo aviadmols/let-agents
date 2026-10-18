@@ -66,4 +66,9 @@ return [
         'totals' => 'סך הכל: $:spent מתוך $:caps · :calls קריאות',
         'none' => 'אין חנויות עדיין.',
     ],
+    'card' => [
+        'label' => 'ניצול AI החודש',
+        'note' => 'מהמכסה החודשית · מתחדשת ב-:date',
+        'date_format' => 'j בF',
+    ],
 ];

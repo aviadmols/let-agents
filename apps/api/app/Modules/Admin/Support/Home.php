@@ -3,12 +3,17 @@
 namespace App\Modules\Admin\Support;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\FirstStep;
+use App\Modules\Admin\Contracts\FirstSteps;
+use App\Modules\Admin\Contracts\HomeCard;
+use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeNumbers;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\HomeStatus;
 use App\Modules\Admin\Contracts\ModuleFigure;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Tenancy\Models\Shop;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -89,25 +94,6 @@ final class Home
         return $notices;
     }
 
-    /**
-     * Today's cards: up to three things to do, to set up or to know, a different three each day
-     * when there are more, so the same card does not greet the manager every morning.
-     *
-     * @return list<ShopNotice>
-     */
-    public function today(Shop $shop, int $count = 3): array
-    {
-        $cards = array_values(array_filter($this->notices($shop), fn (ShopNotice $n): bool => $n->kind !== ShopNotice::REPORT));
-
-        if (count($cards) <= $count) {
-            return $cards;
-        }
-
-        $start = (int) now()->dayOfYear % count($cards);
-
-        return array_slice([...array_slice($cards, $start), ...array_slice($cards, 0, $start)], 0, $count);
-    }
-
     /** @return list<ModuleFigure> */
     public function figures(Shop $shop, int $days): array
     {
@@ -121,19 +107,84 @@ final class Home
     }
 
     /** @return array<string, mixed>|null */
-    public function numbers(Shop $shop, int $days): ?array
+    public function numbers(Shop $shop, int $days, ?CarbonInterface $since = null, ?CarbonInterface $until = null): ?array
     {
         if (! app()->bound(HomeNumbers::class)) {
             return null;
         }
 
         try {
-            return $this->tenant->run((string) $shop->id, fn (): array => app(HomeNumbers::class)->numbers($shop, $days));
+            return $this->tenant->run((string) $shop->id, fn (): array => app(HomeNumbers::class)->numbers($shop, $days, $since, $until));
         } catch (Throwable $e) {
             report($e);
 
             return null;
         }
+    }
+
+    /**
+     * The cards at the top of the home (HomeCards, 'admin.home_cards'), by order, for the period and
+     * the one of the same length before it.
+     *
+     * @return list<HomeCard>
+     */
+    public function cards(Shop $shop, CarbonInterface $since, CarbonInterface $until): array
+    {
+        $before = $since->copy()->sub($since->diff($until));
+        $cards = $this->askTagged(HomeCards::CARDS_TAG, $shop, fn (HomeCards $source): array => $source->cards($shop, $since, $until, $before));
+        usort($cards, fn (HomeCard $a, HomeCard $b): int => [$a->order, $a->key] <=> [$b->order, $b->key]);
+
+        return $cards;
+    }
+
+    /**
+     * The shop's first steps (FirstSteps, 'admin.first_steps'), by order. The page shows them until all
+     * are done and the manager hides the closing line.
+     *
+     * @return list<FirstStep>
+     */
+    public function steps(Shop $shop): array
+    {
+        $steps = $this->askTagged(FirstSteps::STEPS_TAG, $shop, fn (FirstSteps $source): array => $source->steps($shop));
+        usort($steps, fn (FirstStep $a, FirstStep $b): int => [$a->order, $a->key] <=> [$b->order, $b->key]);
+
+        return $steps;
+    }
+
+    /**
+     * What waits for the manager, for the home's "needs your attention": the weightiest few things to do
+     * or set up, then an insight.
+     *
+     * @return list<ShopNotice>
+     */
+    public function attention(Shop $shop, int $count = 4): array
+    {
+        $notices = $this->notices($shop);
+        $todo = array_values(array_filter($notices, fn (ShopNotice $n): bool => $n->kind === ShopNotice::TODO || $n->kind === ShopNotice::SETUP));
+        $insights = array_values(array_filter($notices, fn (ShopNotice $n): bool => $n->kind === ShopNotice::INSIGHT));
+
+        return array_slice([...array_slice($todo, 0, $count - (count($insights) > 0 ? 1 : 0)), ...$insights], 0, $count);
+    }
+
+    /**
+     * @template T
+     *
+     * @param  callable(object): list<T>  $ask
+     * @return list<T>
+     */
+    private function askTagged(string $tag, Shop $shop, callable $ask): array
+    {
+        $answers = [];
+
+        foreach (app()->tagged($tag) as $source) {
+            try {
+                array_push($answers, ...$this->tenant->run((string) $shop->id, fn (): array => $ask($source)));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $answers;
     }
 
     /**

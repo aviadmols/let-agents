@@ -6,6 +6,8 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\FirstSteps;
+use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
@@ -37,6 +39,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         $this->app->tag([AssistantTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([AssistantHome::class], HomeSource::TAG);
+        $this->app->tag([AssistantHome::class], HomeCards::CARDS_TAG);
+        $this->app->tag([AssistantHome::class], FirstSteps::STEPS_TAG);
         $this->app->bind(SuggestsQuestions::class, SuggestQuestions::class);
         //
     }

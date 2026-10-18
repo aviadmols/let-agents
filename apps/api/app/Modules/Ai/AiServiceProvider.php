@@ -3,6 +3,7 @@
 namespace App\Modules\Ai;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -56,6 +57,7 @@ final class AiServiceProvider extends ModuleServiceProvider
     {
         // What this module shows on the shop's home and notices.
         $this->app->tag([AllowanceHome::class], HomeSource::TAG);
+        $this->app->tag([AllowanceHome::class], HomeCards::CARDS_TAG);
         $this->app->bind(ListsProviderModels::class, SdkModelLister::class);
         $this->app->bind(SpendGuard::class, MonthlySpendGuard::class);
 

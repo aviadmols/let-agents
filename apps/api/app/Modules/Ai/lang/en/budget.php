@@ -66,4 +66,9 @@ return [
         'totals' => 'Total: $:spent of $:caps · :calls calls',
         'none' => 'No shops yet.',
     ],
+    'card' => [
+        'label' => 'AI use this month',
+        'note' => 'of the monthly allowance · renews :date',
+        'date_format' => 'F j',
+    ],
 ];

@@ -2,29 +2,40 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
-use App\Modules\Admin\Contracts\HomeStatus;
-use App\Modules\Admin\Contracts\ModuleFigure;
+use App\Modules\Admin\Contracts\FirstStep;
+use App\Modules\Admin\Contracts\HomeCard;
 use App\Modules\Admin\Contracts\OverviewBlock;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Admin\Support\Home;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
+use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
- * The shop manager's home, as in the sketch: the store's scan first when it is new; what waits
- * today; what is on and what is not; the period's numbers against the one before; what needs an
- * answer; what each module brought; and the latest notices. Every part comes from the modules
- * (Admin\Contracts\HomeSource); nothing here knows a module. No model, cost or mechanism.
+ * The shop manager's home, as the designer's panel lays it out (2026-10-18): the greeting with the period
+ * (7, 30 or 90 days, or any dates); the five first steps until they are done; four cards (what shoppers
+ * asked, the month's AI use, the products and the pages read); the period's numbers against the one before;
+ * and what needs the manager. Every part comes from the modules (HomeCards, FirstSteps, HomeSource,
+ * HomeNumbers); nothing here knows a module. No model, cost or mechanism.
  */
 final class ShopOverview extends Page
 {
     public const PERIODS = [7, 30, 90];
+
+    /** Hidden once every first step is done and the manager hid the closing line. */
+    public const STEPS_HIDDEN = 'steps.hidden';
+
+    /** The step "see it as a shopper", done when the manager opened the store from here. */
+    public const LOOK_DONE = 'step.look';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
@@ -36,8 +47,15 @@ final class ShopOverview extends Page
 
     protected string $view = 'admin::merchant.home';
 
+    /** 7, 30 or 90; 0 when the manager chose dates. */
     #[Url]
     public int $days = 30;
+
+    #[Url]
+    public string $from = '';
+
+    #[Url]
+    public string $to = '';
 
     public static function getNavigationLabel(): string
     {
@@ -50,77 +68,112 @@ final class ShopOverview extends Page
         $part = $hour < 5 ? 'night' : ($hour < 12 ? 'morning' : ($hour < 17 ? 'noon' : ($hour < 21 ? 'evening' : 'night')));
         // The first name, past a title ("Mr.", "ד״ר").
         $name = (string) collect(explode(' ', trim((string) Auth::user()?->name)))->first(fn (string $part): bool => $part !== '' && ! str_ends_with($part, '.') && ! in_array($part, ['ד״ר', 'דר', 'פרופ׳'], true));
-        // The store's own account (owner@{store}.myshopify.com) is named after the store: no name to greet.
-        $storeAccount = str_starts_with((string) Auth::user()?->email, 'owner@') && str_ends_with((string) Auth::user()?->email, '.myshopify.com');
+        // A store's own account (one a platform signs in) is named after the store: no name to greet.
+        $email = (string) Auth::user()?->email;
+        $storeAccount = (str_starts_with($email, 'owner@') && str_ends_with($email, '.myshopify.com')) || (str_starts_with($email, 'store@') && str_ends_with($email, '.wordpress'));
 
         return $name === '' || $storeAccount
             ? __("admin::home.greeting.{$part}_plain")
             : __("admin::home.greeting.{$part}", ['name' => $name]);
     }
 
-    public function getSubheading(): ?string
+    /** The heading row as the design draws it: the greeting, and the period beside it. */
+    public function getHeader(): ?View
     {
-        return __('admin::home.subheading', [
-            'date' => now()->timezone('Asia/Jerusalem')->locale(app()->getLocale())->translatedFormat(__('admin::home.date_format')),
-            'shop' => $this->shop()->name,
-        ]);
+        return view('admin::merchant.home-head', ['title' => $this->getTitle(), 'subheading' => $this->subheading()]);
+    }
+
+    public function subheading(): string
+    {
+        [$since, $until] = $this->range();
+
+        if ($this->days !== 0) {
+            return __('admin::home.subheading_days', ['shop' => $this->shop()->name, 'days' => $this->days]);
+        }
+
+        $last = $until->copy()->subDay();
+
+        return $since->isSameDay($last)
+            ? __('admin::home.subheading_day', ['shop' => $this->shop()->name, 'from' => $since->format('j.n')])
+            : __('admin::home.subheading_range', ['shop' => $this->shop()->name, 'from' => $since->format('j.n'), 'to' => $last->format('j.n')]);
     }
 
     public function setDays(int $days): void
     {
         $this->days = in_array($days, self::PERIODS, true) ? $days : 30;
+        $this->from = '';
+        $this->to = '';
     }
 
-    /** Hidden until tomorrow, on this browser's session: the cards come back the next day. */
-    public function hideToday(): void
+    /** Dates the manager chose: from the first day to the last, both included. */
+    public function setRange(string $from, string $to): void
     {
-        session()->put($this->hiddenKey(), true);
+        $a = self::date($from);
+        $b = self::date($to);
+
+        if ($a === null || $b === null || $b->lt($a) || $a->diffInDays($b) > 366) {
+            return;
+        }
+
+        $this->days = 0;
+        $this->from = $a->toDateString();
+        $this->to = $b->toDateString();
     }
 
-    public function showToday(): void
+    /** @return array{0: Carbon, 1: Carbon} the period's start, and its end (exclusive) */
+    public function range(): array
     {
-        session()->forget($this->hiddenKey());
+        if ($this->days === 0 && ($a = self::date($this->from)) !== null && ($b = self::date($this->to)) !== null && $b->gte($a)) {
+            return [$a->startOfDay(), $b->copy()->addDay()->startOfDay()];
+        }
+
+        $days = in_array($this->days, self::PERIODS, true) ? $this->days : 30;
+
+        return [now()->subDays($days)->startOfDay(), now()];
     }
 
-    public function todayHidden(): bool
+    /** @return list<HomeCard> */
+    public function cards(): array
     {
-        return (bool) session()->get($this->hiddenKey(), false);
+        [$since, $until] = $this->range();
+
+        return app(Home::class)->cards($this->shop(), $since, $until);
     }
 
-    /** The manager did what a card asked: it leaves the home (and comes back from the notices' done tab). */
-    public function markDone(string $key): void
+    /** @return list<FirstStep> */
+    public function steps(): array
     {
-        app(Home::class)->markDone($this->shop(), $key, auth()->id());
+        return app(Home::class)->steps($this->shop());
+    }
+
+    public function stepsHidden(): bool
+    {
+        return DB::table('shop_notices_done')->where('shop_id', $this->shop()->id)->where('key', self::STEPS_HIDDEN)->exists();
+    }
+
+    public function hideSteps(): void
+    {
+        app(Home::class)->markDone($this->shop(), self::STEPS_HIDDEN, auth()->id());
+    }
+
+    /** The manager opened the store as a shopper sees it, from the step. */
+    public function looked(): void
+    {
+        app(Home::class)->markDone($this->shop(), self::LOOK_DONE, auth()->id());
     }
 
     /** @return list<ShopNotice> */
-    public function today(): array
+    public function attention(): array
     {
-        return app(Home::class)->today($this->shop());
-    }
-
-    /** @return list<HomeStatus> */
-    public function statuses(): array
-    {
-        return app(Home::class)->statuses($this->shop());
-    }
-
-    /** @return list<ShopNotice> */
-    public function notices(): array
-    {
-        return app(Home::class)->notices($this->shop());
-    }
-
-    /** @return list<ModuleFigure> */
-    public function figures(): array
-    {
-        return app(Home::class)->figures($this->shop(), $this->period());
+        return app(Home::class)->attention($this->shop());
     }
 
     /** @return array<string, mixed>|null */
     public function numbers(): ?array
     {
-        return app(Home::class)->numbers($this->shop(), $this->period());
+        [$since, $until] = $this->range();
+
+        return app(Home::class)->numbers($this->shop(), $this->days ?: 30, $since, $until);
     }
 
     /** The change from the period before, as the pill under a number shows it. */
@@ -151,7 +204,7 @@ final class ShopOverview extends Page
     }
 
     /**
-     * What modules put at the top of the overview (OverviewBlock): the store's scan, first of all.
+     * What modules put at the top of the overview (OverviewBlock): the store's scan, while it is new.
      *
      * @return list<class-string>
      */
@@ -168,14 +221,9 @@ final class ShopOverview extends Page
         return 1;
     }
 
-    private function period(): int
+    private static function date(string $value): ?CarbonInterface
     {
-        return in_array($this->days, self::PERIODS, true) ? $this->days : 30;
-    }
-
-    private function hiddenKey(): string
-    {
-        return 'home.today_hidden.'.$this->shop()->id.'.'.now()->toDateString();
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? Carbon::createFromFormat('Y-m-d', $value)->startOfDay() : null;
     }
 
     private function shop(): Shop

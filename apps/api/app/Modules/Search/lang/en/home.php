@@ -19,4 +19,17 @@ return [
         'body' => 'Shoppers look for this and find nothing. A synonym or a matching product would solve it.',
         'action' => 'To site searches',
     ],
+    'step' => [
+        'on' => [
+            'title' => 'Turn Lets on in the store',
+            'body_woocommerce' => 'In WordPress: Let Agents plugin settings → Mode → Live. Until then only you see the new search.',
+            'body_shopify' => 'In Shopify: theme editor → App embeds → Lets search → Save. Until then only you see the new search.',
+            'button' => 'How to turn it on',
+        ],
+        'look' => [
+            'title' => 'See it as a shopper',
+            'body' => 'The real search, on your products, in the store itself. Only you see it until you turn it on.',
+            'button' => 'Open',
+        ],
+    ],
 ];

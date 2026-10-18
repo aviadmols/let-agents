@@ -6,6 +6,7 @@ use App\Modules\Admin\Contracts\HomeNumbers;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsOrder;
 use App\Modules\Tenancy\Models\Shop;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,11 +18,11 @@ use Illuminate\Support\Facades\DB;
  */
 final class AnalyticsHomeNumbers implements HomeNumbers
 {
-    public function numbers(Shop $shop, int $days): array
+    public function numbers(Shop $shop, int $days, ?CarbonInterface $since = null, ?CarbonInterface $until = null): array
     {
-        $until = now();
-        $since = $until->copy()->subDays($days)->startOfDay();
-        $before = $since->copy()->subDays($days);
+        $until = $until === null ? now() : Carbon::instance($until);
+        $since = $since === null ? $until->copy()->subDays($days)->startOfDay() : Carbon::instance($since);
+        $before = $since->copy()->sub($since->diff($until));
 
         $now = $this->window($since, $until);
         $then = $this->window($before, $since);

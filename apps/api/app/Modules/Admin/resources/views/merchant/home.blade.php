@@ -1,162 +1,103 @@
 <x-filament-panels::page>
+    {{-- The shop's home, as the designer's panel lays it out (ShopOverview). --}}
+    @php($t = fn (string $key, array $params = []) => __('admin::home.'.$key, $params))
     @php($home = \App\Modules\Admin\Filament\Merchant\Pages\ShopOverview::class)
-    @php($statuses = $this->statuses())
-    @php($notices = $this->notices())
-    @php($today = $this->today())
+    @php($steps = $this->steps())
+    @php($done = collect($steps)->where('done', true)->count())
+    @php($cards = $this->cards())
     @php($numbers = $this->numbers())
-    @php($figures = $this->figures())
-    @php($urgent = collect($notices)->first(fn ($n) => $n->kind === 'todo' && in_array($n->tone, ['warn', 'bad'], true)))
-    @php($icons = ['todo' => 'M12 3l10 18H2z M12 10v4M12 17h.01', 'setup' => 'M12 6v6l4 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'insight' => 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.6 1 1.3 1 2.5h6c0-1.2.3-1.9 1-2.5A6 6 0 0 0 12 3z', 'report' => 'M5 12l5 5L20 7'])
-    @php($badge = ['todo' => ['warn', 'admin::home.kinds.todo'], 'setup' => ['warn', 'admin::home.kinds.setup'], 'insight' => ['tip', 'admin::home.kinds.insight'], 'report' => ['good', 'admin::home.kinds.report']])
+    @php($attention = $this->attention())
 
-    <div class="la-page" data-home>
-        {{-- What waits today: up to three cards, a different three each day. --}}
-        @if ($today !== [])
-            <section aria-label="{{ __('admin::home.today.title') }}" style="display: grid; gap: 10px" data-today>
-                <div class="la-toolbar">
-                    <p class="la-eyebrow">{{ __('admin::home.today.title') }} · {{ __('admin::home.today.count', ['shown' => count($today), 'all' => count(array_filter($notices, fn ($n) => $n->kind !== 'report'))]) }}</p>
-                    <button type="button" class="la-btn la-btn-quiet la-btn-sm la-toolbar-end" wire:click="{{ $this->todayHidden() ? 'showToday' : 'hideToday' }}">{{ __($this->todayHidden() ? 'admin::home.today.show' : 'admin::home.today.hide') }}</button>
-                </div>
-                @unless ($this->todayHidden())
-                    <div class="la-today">
-                        @foreach ($today as $card)
-                            <article class="la-today-card" data-card="{{ $card->key }}">
-                                <span class="la-badge" data-tone="{{ $card->kind === 'todo' && $card->tone === 'info' ? 'info' : $badge[$card->kind][0] }}"><i></i>{{ __($card->kind === 'todo' && $card->tone === 'info' ? 'admin::home.kinds.approve' : $badge[$card->kind][1]) }}</span>
-                                <h3>{{ $card->title }}</h3>
-                                @if ($card->body)<p>{{ $card->body }}</p>@endif
-                                <div class="la-actions">
-                                    @if ($card->url)
-                                        <a href="{{ $card->url }}" class="la-btn {{ $loop->first ? 'la-btn-primary' : '' }}">{{ $card->action ?? __('admin::home.open') }}</a>
-                                    @endif
-                                    <button type="button" class="la-btn la-btn-quiet" wire:click="markDone(@js($card->key))" data-card-done>{{ __('admin::home.notices.mark_done') }}</button>
-                                </div>
-                            </article>
-                        @endforeach
+    <div class="lp-page" data-home>
+        {{-- the five first steps, until they are done; then one closing line, until hidden --}}
+        @if ($steps !== [] && ! ($done === count($steps) && $this->stepsHidden()))
+            <section class="lp-card" data-first-steps>
+                @if ($done === count($steps))
+                    <div class="lp-wins-done">
+                        <span class="lp-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14a7 7 0 0 1-14 0zM5 21h14a7 7 0 0 0-14 0z" fill="currentColor"/></svg></span>
+                        <div style="flex: 1"><b>{{ $t('steps.all_done') }}</b><div class="lp-note">{{ $t('steps.all_done_body') }}</div></div>
+                        <button type="button" class="lp-link" wire:click="hideSteps">{{ $t('steps.hide') }}</button>
                     </div>
-                @endunless
-            </section>
-        @endif
-
-        {{-- What is on and what is not. --}}
-        @if ($statuses !== [])
-            <section class="la-card" data-statuses>
-                <div class="la-card-head">
-                    <div><h2>{{ __('admin::home.statuses.title') }}</h2><p>{{ __('admin::home.statuses.help') }}</p></div>
-                    <span class="la-badge" data-tone="{{ collect($statuses)->contains(fn ($s) => $s->state !== 'on') ? 'warn' : 'good' }}"><i></i>{{ __('admin::home.statuses.count', ['on' => collect($statuses)->where('state', 'on')->count(), 'all' => count($statuses)]) }}</span>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr))">
-                    @foreach ($statuses as $status)
-                        <div style="display: grid; gap: 6px; align-content: start; padding: 14px 18px; box-shadow: inset -1px -1px 0 var(--la-line-2)" data-status="{{ $status->key }}" data-state="{{ $status->state }}">
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
-                                <strong style="font-size: 14px; font-weight: 600">{{ $status->name }}</strong>
-                                <span class="la-badge" data-tone="{{ ['on' => 'good', 'off' => '', 'setup' => 'warn'][$status->state] ?? '' }}"><i></i>{{ __('admin::home.states.'.$status->state) }}</span>
-                            </div>
-                            <span style="font-size: 13px; color: var(--la-muted)">{{ $status->note }}</span>
-                            @if ($status->url)
-                                <a href="{{ $status->url }}" class="la-link" style="font-size: 12px">{{ $status->action ?? __('admin::home.open') }} ←</a>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-            </section>
-        @endif
-
-        {{-- The period, as on app.lets.co.il. --}}
-        <div class="la-toolbar">
-            <span class="la-eyebrow">{{ __('admin::home.period') }}</span>
-            <div class="la-seg" role="group" aria-label="{{ __('admin::home.period') }}">
-                @foreach ($home::PERIODS as $period)
-                    <button type="button" wire:click="setDays({{ $period }})" aria-pressed="{{ $days === $period ? 'true' : 'false' }}">{{ __('admin::home.last_days', ['days' => $period]) }}</button>
-                @endforeach
-            </div>
-        </div>
-
-        {{-- The period's numbers, against the one before. --}}
-        @if ($numbers)
-            @php($uses = array_sum(array_map(fn ($f) => $f->uses, $figures)))
-            @php($usesBefore = array_sum(array_map(fn ($f) => (int) $f->previousUses, $figures)))
-            <section class="la-stats" aria-label="{{ __('admin::home.numbers.title') }}" data-numbers>
-                @foreach ([
-                    'visitors' => [number_format($numbers['visitors']['now']), $home::delta($numbers['visitors']['now'], $numbers['visitors']['before']), __('admin::home.numbers.before', ['days' => $days]), false],
-                    'uses' => [number_format($uses), $home::delta($uses, $usesBefore), __('admin::home.numbers.uses_note'), false],
-                    'adds' => [number_format($numbers['adds']['now']), $home::delta($numbers['adds']['now'], $numbers['adds']['before']), __('admin::home.numbers.before', ['days' => $days]), false],
-                    'orders' => [number_format($numbers['orders']['now']), $home::delta($numbers['orders']['now'], $numbers['orders']['before']), $numbers['all_orders'] > 0 ? __('admin::home.numbers.share', ['share' => (int) round(100 * $numbers['orders']['now'] / $numbers['all_orders'])]) : __('admin::home.numbers.before', ['days' => $days]), true],
-                    'revenue' => [$home::money($numbers['revenue']['now'], $numbers['currency']), $home::delta($numbers['revenue']['now'], $numbers['revenue']['before']), __('admin::home.numbers.before', ['days' => $days]), true],
-                ] as $key => [$value, $delta, $note, $money])
-                    <div class="la-stat" @if ($money) data-money @endif data-number="{{ $key }}">
-                        <span class="la-stat-label">{{ __('admin::home.numbers.'.$key) }}</span>
-                        <span class="la-stat-value"><bdi>{{ $value }}</bdi></span>
-                        <span class="la-stat-foot"><span class="la-delta" data-tone="{{ $delta['tone'] }}">{{ $delta['text'] }}</span>{{ $note }}</span>
-                    </div>
-                @endforeach
-            </section>
-        @endif
-
-        {{-- What needs an answer now. --}}
-        @if ($urgent)
-            <div class="la-strip" data-urgent>
-                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $icons['todo'] }}"></path></svg>
-                <p><strong>{{ $urgent->title }}.</strong> {{ $urgent->body }}</p>
-                @if ($urgent->url)<a href="{{ $urgent->url }}" class="la-btn la-btn-sm">{{ $urgent->action ?? __('admin::home.open') }}</a>@endif
-            </div>
-        @endif
-
-        <div class="la-grid-2">
-            {{-- What each module brought. --}}
-            <section class="la-card" data-modules>
-                <div class="la-card-head">
-                    <div><h2>{{ __('admin::home.modules.title') }}</h2><p>{{ __('admin::home.modules.help', ['days' => $days]) }}</p></div>
-                </div>
-                @if ($figures === [])
-                    <p class="la-empty">{{ __('admin::home.modules.none') }}</p>
                 @else
-                    @php($currency = $numbers['currency'] ?? 'ILS')
-                    <div class="la-table-wrap">
-                        <table class="la-table">
-                            <thead>
-                                <tr>
-                                    <th>{{ __('admin::home.modules.module') }}</th>
-                                    <th class="la-num">{{ __('admin::home.modules.uses') }}</th>
-                                    <th class="la-num">{{ __('admin::home.modules.adds') }}</th>
-                                    <th class="la-num">{{ __('admin::home.modules.orders') }}</th>
-                                    <th class="la-num">{{ __('admin::home.modules.revenue') }}</th>
-                                    <th class="la-num">{{ __('admin::home.modules.change') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($figures as $figure)
-                                    @php($change = $home::delta($figure->uses, (int) $figure->previousUses))
-                                    <tr data-module="{{ $figure->key }}">
-                                        <td class="la-strong">@if ($figure->url)<a href="{{ $figure->url }}" style="color: inherit; text-decoration: none">{{ $figure->name }}</a>@else{{ $figure->name }}@endif</td>
-                                        <td class="la-num">{{ number_format($figure->uses) }}</td>
-                                        <td class="la-num">{{ $figure->adds === null ? '—' : number_format($figure->adds) }}</td>
-                                        <td class="la-num">{{ $figure->orders === null ? '—' : number_format($figure->orders) }}</td>
-                                        <td class="la-num">{{ $figure->revenue === null ? '—' : $home::money($figure->revenue, $currency) }}</td>
-                                        <td class="la-num"><span class="la-delta" data-tone="{{ $change['tone'] }}">{{ $change['text'] }}</span></td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                    @php($next = collect($steps)->firstWhere('done', false)?->key)
+                    <div class="lp-card-t" style="margin-block-end: 8px">
+                        <h2>{{ $t('steps.title', ['n' => count($steps)]) }}</h2>
+                        <span class="lp-note">{{ $t('steps.progress', ['done' => $done, 'all' => count($steps)]) }}</span>
                     </div>
-                    <div class="la-card-foot"><span>{{ __('admin::home.modules.dash') }}</span></div>
+                    <div class="lp-bar"><i style="width: {{ (int) round(100 * $done / max(1, count($steps))) }}%"></i></div>
+                    <ol class="lp-wins">
+                        @foreach ($steps as $i => $step)
+                            <li @class(['lp-win', 'is-done' => $step->done, 'is-next' => $step->key === $next]) data-step="{{ $step->key }}" data-done="{{ $step->done ? '1' : '0' }}">
+                                <span class="lp-win-n">@if ($step->done)<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">{{ $t('steps.done') }}</span>@else{{ $i + 1 }}@endif</span>
+                                <div>
+                                    <div class="lp-win-t">{{ $step->title }}</div>
+                                    <div class="lp-win-s">{{ $step->body }}</div>
+                                </div>
+                                @if (! $step->done && $step->url)
+                                    <a href="{{ $step->url }}" @class(['lp-btn lp-btn-sm', 'lp-btn-primary' => $step->key === $next])
+                                       @if ($step->external) target="_blank" rel="noopener" @if ($step->key === 'look') wire:click="looked" @endif @endif>{{ $step->button }}</a>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ol>
                 @endif
             </section>
+        @endif
 
-            {{-- The latest notices. --}}
-            <section class="la-card" data-notices>
-                <div class="la-card-head">
-                    <h2>{{ __('admin::home.notices.title') }}</h2>
-                    <a href="{{ $this->inboxUrl() }}" class="la-link">{{ __('admin::home.notices.all', ['count' => count($notices)]) }}</a>
-                </div>
-                @forelse (array_slice($notices, 0, 5) as $notice)
-                    <a @if ($notice->url) href="{{ $notice->url }}" @endif class="la-list-row" style="align-items: flex-start">
-                        <span class="la-dot" data-tone="{{ $notice->tone === '' ? '' : $notice->tone }}" style="margin-top: 7px"></span>
-                        <span class="la-grow">{{ $notice->title }}<small>{{ $notice->source }}@if ($notice->at) · {{ $notice->at->diffForHumans() }}@endif</small></span>
-                    </a>
-                @empty
-                    <p class="la-empty">{{ __('admin::home.notices.none') }}</p>
-                @endforelse
+        {{-- four cards: what shoppers asked, the month's AI use, the products and the pages read --}}
+        @if ($cards !== [])
+            <section class="lp-grid-4" data-cards>
+                @foreach ($cards as $card)
+                    <div class="lp-stat" data-card="{{ $card->key }}" @if ($card->tone) data-tone="{{ $card->tone }}" @endif>
+                        <span class="lp-stat-l">{{ $card->label }}</span>
+                        <span class="lp-stat-n"><bdi>{{ $card->value }}</bdi>@if ($card->of) <small>{{ $card->of }}</small>@endif</span>
+                        @if ($card->bar !== null)<div class="lp-bar" @if ($card->tone) data-tone="{{ $card->tone }}" @endif><i style="width: {{ $card->bar }}%"></i></div>@endif
+                        <span class="lp-stat-d">
+                            @if ($card->change)@php($d = $home::delta($card->change[0], $card->change[1]))<span class="lp-delta" data-tone="{{ $d['tone'] }}">{{ $d['text'] }}</span>@endif
+                            @if ($card->pill)<span class="lp-pill" data-tone="{{ $card->tone === '' ? 'good' : $card->tone }}"><i></i>{{ $card->pill }}</span>@endif
+                            @if ($card->note)<span>{{ $card->note }}</span>@endif
+                        </span>
+                    </div>
+                @endforeach
             </section>
-        </div>
+        @endif
+
+        {{-- the period's numbers against the period before --}}
+        @if ($numbers)
+            <section class="lp-grid-4" aria-label="{{ $t('numbers.title') }}" data-numbers>
+                @foreach ([
+                    'visitors' => [$numbers['visitors'], false],
+                    'adds' => [$numbers['adds'], false],
+                    'orders' => [$numbers['orders'], false],
+                    'revenue' => [$numbers['revenue'], true],
+                ] as $key => [$pair, $money])
+                    @php($d = $home::delta($pair['now'], $pair['before']))
+                    <div class="lp-stat" data-number="{{ $key }}">
+                        <span class="lp-stat-l">{{ $t('numbers.'.$key) }}</span>
+                        <span class="lp-stat-n"><bdi>{{ $money ? $home::money($pair['now'], $numbers['currency']) : number_format($pair['now']) }}</bdi></span>
+                        <span class="lp-stat-d"><span class="lp-delta" data-tone="{{ $d['tone'] }}">{{ $d['text'] }}</span></span>
+                    </div>
+                @endforeach
+            </section>
+        @endif
+
+        {{-- what needs the manager --}}
+        <section class="lp-card" data-attention>
+            <div class="lp-card-t">
+                <h2>{{ $t('attention.title') }}</h2>
+                <a class="lp-link" href="{{ $this->inboxUrl() }}">{{ $t('attention.all') }}</a>
+            </div>
+            @forelse ($attention as $notice)
+                <a @if ($notice->url) href="{{ $notice->url }}" @endif class="lp-row" data-notice="{{ $notice->key }}">
+                    <span class="lp-pill" data-tone="{{ match ($notice->tone) { 'bad' => 'bad', 'warn' => 'warn', default => 'good' } }}"><i></i>{{ $notice->count !== null ? number_format($notice->count) : __('admin::home.kinds.'.$notice->kind) }}</span>
+                    <span class="lp-grow">
+                        <span class="lp-row-t">{{ $notice->title }}</span>
+                        @if ($notice->body)<span class="lp-row-s">{{ $notice->body }}</span>@endif
+                    </span>
+                </a>
+            @empty
+                <p class="lp-empty">{{ $t('attention.none') }}</p>
+            @endforelse
+        </section>
     </div>
 </x-filament-panels::page>
