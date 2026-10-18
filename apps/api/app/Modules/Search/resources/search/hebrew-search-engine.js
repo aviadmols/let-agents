@@ -52,6 +52,8 @@
       return word;
     }
     var base = word.length > 4 ? word.replace(/(ימ|ות)$/, '') : word;
+    // a noun and its construct form are one word ("מלחמה", "מלחמת"), and an ending written with א ("קופסא", "מקיטא")
+    base = base.length >= 5 ? base.replace(/[התא]$/, '') : base;
     return base.charAt(0) + base.slice(1).replace(/[וי]/g, '');
   }
 
@@ -217,24 +219,32 @@
         return -1;
       }
     }
+    // the query as whole words before the query inside a longer word: "הרבי" finds "…של הרבי מלובביץ׳"
+    // before "הרביעייה הפיננסית"
     if (record.name === query) {
       return 0;
     }
-    if (record.name.indexOf(query) === 0) {
+    if ((record.name + ' ').indexOf(query + ' ') === 0) {
       return 1;
     }
-    if ((' ' + record.name).indexOf(' ' + query) !== -1) {
+    if ((' ' + record.name + ' ').indexOf(' ' + query + ' ') !== -1) {
       return 2;
     }
-    if (record.name.indexOf(query) !== -1) {
+    if (record.name.indexOf(query) === 0) {
       return 3;
+    }
+    if ((' ' + record.name).indexOf(' ' + query) !== -1) {
+      return 4;
+    }
+    if (record.name.indexOf(query) !== -1) {
+      return 5;
     }
     for (i = 0; i < tokens.length; i++) {
       if ((' ' + record.name).indexOf(' ' + tokens[i]) === -1) {
-        return 5;
+        return 7;
       }
     }
-    return 4;
+    return 6;
   }
 
   // Words that are not asked of a record for it to hold the whole query (the server's FILLER list).

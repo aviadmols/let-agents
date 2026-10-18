@@ -487,6 +487,8 @@ final class HebrewSearch
         }
 
         $base = mb_strlen($word) > 4 ? (string) preg_replace('/(ימ|ות)$/u', '', $word) : $word;
+        // A noun and its construct form are one word ("מלחמה", "מלחמת"), and an ending written with א ("קופסא", "מקיטא").
+        $base = mb_strlen($base) >= 5 ? (string) preg_replace('/[התא]$/u', '', $base) : $base;
 
         return mb_substr($base, 0, 1).preg_replace('/[וי]/u', '', mb_substr($base, 1));
     }
@@ -638,12 +640,16 @@ final class HebrewSearch
             }
         }
 
+        // The query as whole words before the query inside a longer word: "הרבי" finds "…של הרבי מלובביץ׳"
+        // before "הרביעייה הפיננסית".
         return match (true) {
             $record['name'] === $query => 0,
-            str_starts_with($record['name'], $query) => 1,
-            str_contains(' '.$record['name'], ' '.$query) => 2,
-            str_contains($record['name'], $query) => 3,
-            default => self::allTokensStartWords($record['name'], $tokens) ? 4 : 5,
+            str_starts_with($record['name'].' ', $query.' ') => 1,
+            str_contains(' '.$record['name'].' ', ' '.$query.' ') => 2,
+            str_starts_with($record['name'], $query) => 3,
+            str_contains(' '.$record['name'], ' '.$query) => 4,
+            str_contains($record['name'], $query) => 5,
+            default => self::allTokensStartWords($record['name'], $tokens) ? 6 : 7,
         };
     }
 

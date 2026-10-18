@@ -50,6 +50,22 @@ final class HebrewSearchTest extends TestCase
         $this->assertSame(HebrewSearch::sound('מקיטה'), HebrewSearch::sound('מקיטא'), 'letters that sound alike meet');
         $this->assertSame('מברגה', HebrewSearch::fromKeyboard('ncrdv'), 'an English keyboard is read as Hebrew');
         $this->assertSame('', HebrewSearch::fromKeyboard('מברגה'));
+        $this->assertSame(HebrewSearch::stem('מלחמה'), HebrewSearch::stem('מלחמת'), 'a noun and its construct form meet');
+        $this->assertSame(HebrewSearch::stem('קופסה'), HebrewSearch::stem('קופסא'), 'and an ending written with א');
+    }
+
+    public function test_the_query_as_a_whole_word_comes_before_it_inside_a_longer_word(): void
+    {
+        // A book store's "הרבי": the book about the Rebbe, not "הרביעייה" that only starts with the letters.
+        $index = HebrewSearch::build([
+            ['id' => 'p:1', 't' => 'product', 'title' => 'הרביעייה הפיננסית'],
+            ['id' => 'p:2', 't' => 'product', 'title' => 'עושה שלום – משנתו המדינית של הרבי מלובביץ׳'],
+            ['id' => 'p:3', 't' => 'product', 'title' => 'מלחמת העולם'],
+            ['id' => 'p:4', 't' => 'product', 'title' => 'שורשי המלחמה'],
+        ]);
+
+        $this->assertSame('p:2', HebrewSearch::search($index, 'הרבי')[0]['id']);
+        $this->assertContains('p:3', array_column(HebrewSearch::search($index, 'מלחמה'), 'id'), '"מלחמה" finds "מלחמת העולם"');
     }
 
     public function test_records_that_hold_the_words_as_typed_come_first(): void
