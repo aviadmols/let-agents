@@ -17,6 +17,7 @@ use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
+use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Offenders;
@@ -114,6 +115,9 @@ final class AnswerSiteQuestion
 
     private const MAX_PICKS = 3;
 
+    /** @var array<string, mixed>|null how the question being handled was answered, for its ask (logged()) */
+    private ?array $answered = null;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -154,6 +158,7 @@ final class AnswerSiteQuestion
         $viewing = $fromPage && ! $followUp && $products !== [] ? $products[0] : null;
 
         return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp, $bound, $viewing): array {
+            $this->answered = null;
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
                 ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound, $viewing);
             $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
@@ -592,7 +597,7 @@ final class AnswerSiteQuestion
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
 
-        $this->runs->track(
+        $run = $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
@@ -795,7 +800,41 @@ final class AnswerSiteQuestion
             },
         );
 
+        // How this question was answered, kept with its ask (logged()): the run, the prompt, the models,
+        // the checker's verdict, what was sent, the cost and the time. Counts and ids only, no text.
+        $trace ??= [];
+        $this->answered = [
+            'run_id' => $run->id,
+            'prompt_version' => self::promptVersion('answer_site'),
+            'writer_model' => isset($trace['writer']['model']) ? mb_substr((string) $trace['writer']['model'], 0, 80) : null,
+            'checker_model' => isset($trace['check']['model']) ? mb_substr((string) $trace['check']['model'], 0, 80) : null,
+            'verdict' => isset($trace['check']['verdict']) ? (string) $trace['check']['verdict'] : (isset($trace['check']['skipped']) ? 'skipped:'.mb_substr((string) $trace['check']['skipped'], 0, 30) : null),
+            'trace' => array_filter([
+                'context' => isset($trace['context']) ? array_intersect_key((array) $trace['context'], array_flip(['mode', 'type', 'products_shown', 'products_sent', 'passages_found', 'passages_sent', 'chars'])) : null,
+                'refused' => $trace['refused'] ?? null,
+                'failed' => $trace['failed'] ?? null,
+                'scope' => $trace['scope'] ?? null,
+                'writer_ms' => $trace['writer']['ms'] ?? null,
+                'check_ms' => $trace['check']['ms'] ?? null,
+                'picks' => $trace['picks'] ?? null,
+            ], fn ($v): bool => $v !== null && $v !== []),
+            'cost_usd' => $run->cost_usd === null ? null : (float) $run->cost_usd,
+            'duration_ms' => $run->duration_ms,
+        ];
+
         return $result;
+    }
+
+    /** The version of a prompt prompt() reads: the newest file there is, the bench's v5 aside. */
+    public static function promptVersion(string $name): ?int
+    {
+        for ($version = self::PROMPT_VERSION; $version > 0; $version--) {
+            if ($version !== 5 && is_file(__DIR__.'/../Prompts/'.$name.'.v'.$version.'.md')) {
+                return $version;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1325,7 +1364,11 @@ final class AnswerSiteQuestion
                 ? mb_substr(Privacy::redact((string) ($result['answer'] ?? ''))['text'], 0, 2000) : null,
             'picks' => array_map(fn (array $p): array => ['external_id' => $p['external_id'], 'title' => $p['title'], 'why' => $p['why']], (array) ($result['picks'] ?? [])),
             'whatsapp_shown' => $whatsapp,
+            // How it was answered (ask()), and why it failed as code reads it; the nightly review may add its own.
+            ...($this->answered ?? []),
+            'failure' => AnswerFailure::classify((string) $result['outcome'], $result['reason'] ?? null, $this->answered['verdict'] ?? null, (array) ($this->answered['trace'] ?? [])),
         ]);
+        $this->answered = null;
 
         unset($result['answer_id'], $result['reason']);
 

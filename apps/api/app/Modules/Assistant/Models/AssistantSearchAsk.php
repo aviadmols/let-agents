@@ -24,6 +24,16 @@ use Illuminate\Support\Carbon;
  * @property bool $whatsapp_shown
  * @property bool $whatsapp_clicked
  * @property list<string>|null $picked external ids of picked products the shopper opened or added
+ * @property string|null $run_id the run that answered it: its calls and their ledger rows
+ * @property int|null $prompt_version
+ * @property string|null $writer_model
+ * @property string|null $checker_model
+ * @property string|null $verdict kept, answer_removed, picks_removed, rejected, or skipped:<why>
+ * @property array<string, mixed>|null $trace counts and ids of what was sent and what came of it
+ * @property float|null $cost_usd
+ * @property int|null $duration_ms
+ * @property string|null $failure why it failed, as code and the nightly review read it (AnswerFailure)
+ * @property string|null $failure_team why it failed, as the team decided
  */
 class AssistantSearchAsk extends Model
 {
@@ -41,6 +51,10 @@ class AssistantSearchAsk extends Model
             'picked' => 'array',
             'whatsapp_shown' => 'boolean',
             'whatsapp_clicked' => 'boolean',
+            'trace' => 'array',
+            'cost_usd' => 'float',
+            'prompt_version' => 'integer',
+            'duration_ms' => 'integer',
         ];
     }
 

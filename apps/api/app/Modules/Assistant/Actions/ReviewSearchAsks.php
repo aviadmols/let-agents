@@ -12,6 +12,7 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -163,6 +164,17 @@ final class ReviewSearchAsks
         $summary = mb_substr(trim((string) ($reply->data['summary'] ?? '')), 0, 1200);
 
         $this->save($day, AssistantAskReview::REVIEWED, $score, $summary === '' ? null : $summary, $improvements, array_values($scored), $counts, $reviewer->provider->value.' · '.$reviewer->model, $run);
+
+        // Each ask's failure read again with what the review said of it (AnswerFailure): a flag or a low
+        // score is a reason code alone could not see. Code only.
+        foreach ($scored as $ref => $item) {
+            $ask = $byRef[$ref];
+            $failure = AnswerFailure::classify((string) $ask->outcome, $ask->reason, $ask->verdict, (array) $ask->trace, $item);
+
+            if ($failure !== $ask->failure) {
+                $ask->forceFill(['failure' => $failure])->save();
+            }
+        }
         $run->output(['day' => $day, 'asks' => $counts['asks'], 'scored' => count($scored), 'score' => $score])
             ->summary('assistant::runs.review_done_score', ['day' => $day, 'asks' => (string) $counts['asks'], 'score' => (string) ($score ?? '—')]);
     }

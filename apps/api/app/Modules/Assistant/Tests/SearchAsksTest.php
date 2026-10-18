@@ -9,7 +9,9 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\ReviewSearchAsks;
+use App\Modules\Assistant\Filament\Operator\Pages\AnswerQuality;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Connections\Models\StoreConnection;
@@ -18,6 +20,7 @@ use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -226,6 +229,50 @@ final class SearchAsksTest extends TestCase
         $merchant = User::factory()->create();
         $merchant->attachShop($this->shop);
         $this->actingAs($merchant)->get('/operator/assistant/weak-answers')->assertForbidden();
+    }
+
+    public function test_each_ask_keeps_how_it_was_answered_and_why_it_failed_for_the_operators_quality_screen(): void
+    {
+        $this->replies = [
+            ['found' => true, 'answer' => 'מתחילים בפריימר ואז יריעה ביטומנית.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'יסוד.']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+            // Products were sent and the writer found the answer in none of them.
+            ['found' => false, 'answer' => '', 'refs' => [], 'picks' => []],
+        ];
+
+        $answered = $this->ask('מה כדאי לאיטום גג', ['701', '702', '703'])->json('data');
+        $refused = $this->ask('יש לכם גנרטור שקט?', ['701', '702'])->json('data');
+
+        $ask = $this->inShop(fn () => AssistantSearchAsk::query()->findOrFail($answered['ask_id']));
+        $this->assertNotNull($ask->run_id, 'the run holds its calls and their ledger rows');
+        $this->assertSame(AnswerSiteQuestion::promptVersion('answer_site'), $ask->prompt_version);
+        $this->assertSame('kept', $ask->verdict);
+        $this->assertNotNull($ask->writer_model);
+        $this->assertNotNull($ask->checker_model);
+        $this->assertSame(3, $ask->trace['context']['products_sent']);
+        $this->assertNull($ask->failure);
+        $this->assertGreaterThan(0, (float) $ask->cost_usd, 'what this answer cost');
+
+        $miss = $this->inShop(fn () => AssistantSearchAsk::query()->findOrFail($refused['ask_id']));
+        $this->assertSame('retrieval', $miss->failure, 'products were sent and none held the answer');
+        $this->assertSame('skipped:no_answer', $miss->verdict, 'the writer found nothing: no check was needed');
+
+        $operator = User::factory()->operator()->create();
+        $this->actingAs($operator)->get('/operator/assistant/answer-quality')->assertOk()
+            ->assertSee('יש לכם גנרטור שקט?')
+            ->assertSee(__('assistant::ui.quality.reasons.retrieval'))
+            ->assertDontSee('מה כדאי לאיטום גג', false);
+
+        Livewire::actingAs($operator)->test(AnswerQuality::class)
+            ->call('setFailure', $miss->id, 'missing_info')
+            ->call('pick', 'missing_info')
+            ->assertSee('יש לכם גנרטור שקט?')
+            ->assertSee(__('assistant::ui.quality.by_team'));
+        $this->assertSame('missing_info', $this->inShop(fn () => $miss->fresh()->failure_team), 'the team\'s reading is kept beside code\'s');
+
+        $merchant = User::factory()->create();
+        $merchant->attachShop($this->shop);
+        $this->actingAs($merchant)->get('/operator/assistant/answer-quality')->assertForbidden();
     }
 
     public function test_a_reviewer_never_checks_its_own_family(): void
