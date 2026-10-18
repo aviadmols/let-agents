@@ -22,8 +22,12 @@ final class LetsSearchScriptController
 
         $headers = [
             'Content-Type' => 'application/javascript; charset=utf-8',
-            'Cache-Control' => 'public, max-age=300',
+            // Five minutes fresh; after that the browser uses what it has at once and checks in the background,
+            // so a returning shopper never waits on the script.
+            'Cache-Control' => 'public, max-age=300, stale-while-revalidate=86400',
             'ETag' => $etag,
+            // The store's own speed tools may see how long it took.
+            'Timing-Allow-Origin' => '*',
             'X-Content-Type-Options' => 'nosniff',
         ];
 

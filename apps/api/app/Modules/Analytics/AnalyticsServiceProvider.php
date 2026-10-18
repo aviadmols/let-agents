@@ -5,11 +5,14 @@ namespace App\Modules\Analytics;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeNumbers;
+use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Analytics\Console\ComputeScoresCommand;
 use App\Modules\Analytics\Filament\Widgets\ReportChart;
+use App\Modules\Analytics\Http\Middleware\RefuseBlockedAddresses;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Analytics\Support\AnalyticsHomeNumbers;
+use App\Modules\Analytics\Support\AnalyticsReport;
 use App\Modules\Analytics\Support\BeaconSchema;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -21,6 +24,7 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([AnalyticsReport::class], ShopReport::REPORT_TAG);
         $this->app->singleton(BeaconSchema::class);
         // The row of numbers at the top of the shop's home.
         $this->app->bind(HomeNumbers::class, AnalyticsHomeNumbers::class);
@@ -28,6 +32,9 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // An address the shop blocked gets no search, no assistant and no beacon (the analytics screen).
+        $this->app['router']->pushMiddlewareToGroup('api', RefuseBlockedAddresses::class);
+
         // The charts on the report screens, mounted by name from the page view.
         Livewire::component(ReportChart::NAME, ReportChart::class);
 

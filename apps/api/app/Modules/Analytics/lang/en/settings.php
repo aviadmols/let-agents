@@ -57,4 +57,8 @@ return [
         'label' => 'Visit batches a minute, per shopper address',
         'description' => 'Past this, batches are refused until the minute ends.',
     ],
+    'ip_alert_per_day' => [
+        'label' => 'Requests a day that flag an IP address',
+        'description' => 'An address that searched more than this in one day shows on the analytics screen, where it can be blocked.',
+    ],
 ];

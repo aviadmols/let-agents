@@ -5,10 +5,12 @@ namespace App\Modules\Shortlist;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shortlist\Console\ForgetVisitsCommand;
 use App\Modules\Shortlist\Listeners\ForgetShopper;
 use App\Modules\Shortlist\Support\ShortlistHome;
+use App\Modules\Shortlist\Support\ShortlistReport;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -19,6 +21,7 @@ final class ShortlistServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([ShortlistReport::class], ShopReport::REPORT_TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ShortlistHome::class], HomeSource::TAG);
         //

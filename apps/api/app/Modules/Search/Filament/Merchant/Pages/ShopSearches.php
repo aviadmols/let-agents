@@ -14,7 +14,7 @@ final class ShopSearches extends OperatorShopSearches
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'analytics';
+    protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 25;
 }

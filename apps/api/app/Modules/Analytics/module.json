@@ -145,6 +145,15 @@
             "max": 2000,
             "scope": "global",
             "unit": "requests"
+        },
+        {
+            "name": "ip_alert_per_day",
+            "type": "int",
+            "default": 200,
+            "min": 20,
+            "max": 100000,
+            "scope": "shop",
+            "unit": "requests"
         }
     ]
 }

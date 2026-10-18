@@ -71,7 +71,7 @@ final class AnalyticsScreensTest extends TestCase
         }
     }
 
-    public function test_the_merchant_sees_the_charts_but_no_cost_model_or_tokens(): void
+    public function test_the_merchant_sees_the_store_numbers_but_no_cost_model_or_tokens(): void
     {
         $merchant = User::factory()->create();
         $merchant->attachShop($this->shop);
@@ -81,10 +81,9 @@ final class AnalyticsScreensTest extends TestCase
                 ->withHeader('Accept-Language', $locale)
                 ->get("/merchant/{$this->shop->slug}/analytics")
                 ->assertOk()
-                ->assertSee('data-analytics-stats', false)
-                ->assertSee('data-chart="engagement"', false)
-                ->assertSee('data-chart="sections"', false)
-                ->assertSee(__('analytics::analytics.models.complement', [], $locale))
+                // The design's one screen: the store's numbers, then the lists.
+                ->assertSee('data-store-info', false)
+                ->assertSee(__('analytics::report.store.title', [], $locale))
                 ->assertDontSee('data-chart="cost"', false)
                 ->assertDontSee(__('analytics::analytics.charts.cost', [], $locale))
                 ->assertDontSee(__('analytics::analytics.charts.cost_series', [], $locale))
