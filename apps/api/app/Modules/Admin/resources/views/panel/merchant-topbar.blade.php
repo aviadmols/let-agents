@@ -6,7 +6,7 @@
 @php($t = fn (string $key, array $params = []) => __('admin::panels.top.'.$key, $params))
 <div class="lp-topbar" data-merchant-topbar data-shop-banner="{{ $shop->slug }}">
     <div class="lp-top-shop">
-        <span class="lp-top-av" aria-hidden="true">{{ mb_substr($shop->name, 0, 1) }}</span>
+        <span class="lp-mark lp-mark-top" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14a7 7 0 0 1-14 0zM5 21h14a7 7 0 0 0-14 0z" fill="currentColor"/></svg></span>
         @if (count($shops) > 1)
             <div class="lp-drop" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
                 <button type="button" class="lp-top-name" @click="open = !open" :aria-expanded="open.toString()" aria-haspopup="menu">

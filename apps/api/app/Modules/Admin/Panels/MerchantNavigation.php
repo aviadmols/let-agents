@@ -109,12 +109,14 @@ final class MerchantNavigation
         $key = $current === null ? null : self::sectionOf($current);
         $pages = self::pages($key);
 
-        if ($key === null || count($pages) < 2) {
+        if ($key === null) {
             return new HtmlString('');
         }
 
         return new HtmlString(view('admin::panel.merchant-section', [
             'key' => $key,
+            'hint' => __("admin::panels.hints.{$key}"),
+            'tabs' => count($pages) > 1,
             'side' => in_array($key, self::SIDE, true),
             'label' => __("admin::panels.screens.{$key}"),
             'pages' => array_map(fn (string $page): array => [

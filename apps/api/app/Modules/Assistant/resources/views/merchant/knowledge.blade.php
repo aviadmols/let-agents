@@ -11,15 +11,15 @@
             <form wire:submit="addInfo" class="lp-stack">
                 <textarea class="lp-textarea" wire:model="newInfo" rows="3" maxlength="600" placeholder="{{ $t('add.placeholder') }}" aria-label="{{ $t('add.title') }}"></textarea>
                 <div class="lp-actions">
-                    <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary" wire:loading.attr="disabled" wire:target="addInfo">{{ $t('add.button') }}</button>
+                    <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary" wire:loading.attr="disabled" wire:target="addInfo"><svg class="lp-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>{{ $t('add.button') }}</button>
                     <span class="lp-note">{{ $t('add.checked') }}</span>
                 </div>
             </form>
         </section>
 
         <nav class="lp-tabs" role="tablist" aria-label="{{ __('assistant::ui.knowledge.title') }}">
-            @foreach (['general' => $t('tabs.general', ['n' => $counts['general']]), 'posts' => $t('tabs.posts', ['n' => $counts['posts']]), 'found' => $t('tabs.found', ['n' => $counts['found']])] as $key => $label)
-                <button type="button" role="tab" wire:click="show('{{ $key }}')" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $label }}</button>
+            @foreach (['general' => $t('tabs.general_count', ['n' => $counts['general']]), 'posts' => (string) $counts['posts'], 'found' => (string) $counts['found']] as $key => $count)
+                <button type="button" role="tab" wire:click="show('{{ $key }}')" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
             @endforeach
         </nav>
 
@@ -71,6 +71,7 @@
 
                 @forelse (array_slice($pages, 0, $limit) as $page)
                     <div class="lp-row" data-page="{{ $page['id'] }}">
+                        <span class="lp-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
                         <div class="lp-grow">
                             <span class="lp-row-t">@if ($page['url'])<a href="{{ $page['url'] }}" target="_blank" rel="noopener">{{ $page['title'] }}</a>@else{{ $page['title'] }}@endif</span>
                             <span class="lp-row-s">{{ $page['summary'] }}@if ($page['answered'] > 0) · {{ $t('page.answered', ['n' => number_format($page['answered'])]) }}@endif</span>
@@ -95,6 +96,7 @@
                 </form>
                 @forelse (array_slice($posts, 0, $limit) as $post)
                     <div class="lp-row lp-row-wrap" data-post="{{ $post['id'] }}">
+                        <span class="lp-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
                         <div class="lp-grow">
                             <span class="lp-row-t">@if ($post['url'])<a href="{{ $post['url'] }}" target="_blank" rel="noopener">{{ $post['title'] }}</a>@else{{ $post['title'] }}@endif</span>
                             <span class="lp-row-s">

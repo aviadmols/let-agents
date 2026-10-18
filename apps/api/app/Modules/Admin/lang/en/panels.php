@@ -67,4 +67,15 @@ return [
         'scan' => 'Scan summary',
         'settings' => 'Settings',
     ],
+    'close' => 'Close',
+    // A short hint the first time each screen opens (merchant-section).
+    'hints' => [
+        'analytics' => 'Everything shoppers did with Lets. "Full list" opens the whole list, with search and sorting.',
+        'sessions' => 'Each visit is a list of actions. Filter above, and click a session to see what the shopper did, in order.',
+        'timeline' => 'Everything that happened in the account: scans, new products, answers and changes. Click a line for the details.',
+        'inbox' => 'What waits for you. An answer you approve here joins the knowledge, and every next shopper gets it.',
+        'knowledge' => 'What Lets knows about the store. Every line is a possible answer to a shopper. Something not right? Remove it, and it is not read again.',
+        'scan' => 'How Lets understood each product and page. Pick one, and see its tags, spec and what the picture showed.',
+        'settings' => 'Each setting on its own page. Pick from the menu, and shoppers see the change within minutes.',
+    ],
 ];

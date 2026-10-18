@@ -278,9 +278,10 @@ Answer: :answer',
         'added' => 'Added to the knowledge centre',
         'added_body' => 'The assistant uses it from the next question. The check against the site shows beside the line in a moment.',
         'tabs' => [
-            'general' => 'General information · :n pages',
-            'posts' => 'Posts · :n',
-            'found' => 'Found on the site · :n',
+            'general' => 'General information',
+            'general_count' => ':n pages',
+            'posts' => 'Posts',
+            'found' => 'Found on the site',
         ],
         'own' => [
             'pill' => 'Yours',
