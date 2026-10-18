@@ -40,13 +40,19 @@ final class FlowMachine
      * @param  array<string, string>  $given  field key => what they typed
      * @return array{state: string, field: array<string, mixed>|null, done: int, total: int}
      */
-    public static function next(LeadFlow $flow, array $given, bool $declined = false, bool $consented = false): array
+    public static function next(LeadFlow $flow, array $given, bool $declined = false, bool $consented = false, bool $enough = false): array
     {
         $fields = $flow->asked();
         $total = count($fields) + 1;
 
         if ($declined) {
             return ['state' => self::DECLINED, 'field' => null, 'done' => 0, 'total' => $total];
+        }
+
+        // They stopped answering after leaving a way to reach them (as Aviad asked, 2026-10-18: a phone
+        // alone is a lead): the rest is skipped, and the consent is still asked before anything is kept.
+        if ($enough && self::reaches($flow, $given)) {
+            return ['state' => $consented ? self::DONE : self::CONSENT, 'field' => null, 'done' => count($given), 'total' => $total];
         }
 
         foreach ($fields as $field) {
@@ -74,6 +80,22 @@ final class FlowMachine
             'done' => count($fields),
             'total' => $total,
         ];
+    }
+
+    /**
+     * Whether what they gave so far has a phone or an email in it (already checked by check()).
+     *
+     * @param  array<string, string>  $given
+     */
+    public static function reaches(LeadFlow $flow, array $given): bool
+    {
+        foreach ($flow->asked() as $field) {
+            if (in_array($field['type'], ['phone', 'email'], true) && trim((string) ($given[$field['key']] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

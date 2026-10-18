@@ -83,12 +83,19 @@ final class LeadStepController
             $given[$field['key']] = $checked['value'];
         }
 
+        // "No thanks" to a field after a phone or an email was given ("at": the step it was said on) is not a
+        // no to all of it: what they gave is kept if they agree, and the widget sends "enough" from then on.
+        // A no to the consent itself, or from a widget that does not say where, keeps nothing.
         if (($body['declined'] ?? false) === true) {
+            if (($body['at'] ?? null) === FlowMachine::FIELD && FlowMachine::reaches($flow, $given)) {
+                return response()->json(['data' => FlowMachine::next($flow, $given, enough: true) + ['offer' => $flow->offer, 'consent' => $flow->consent, 'enough' => true]]);
+            }
+
             return response()->json(['data' => FlowMachine::next($flow, $given, declined: true)]);
         }
 
         $consented = ($body['consent'] ?? false) === true;
-        $next = FlowMachine::next($flow, $given, consented: $consented);
+        $next = FlowMachine::next($flow, $given, consented: $consented, enough: ($body['enough'] ?? false) === true);
 
         if ($next['state'] !== FlowMachine::DONE) {
             return response()->json(['data' => $next + ['offer' => $flow->offer, 'consent' => $flow->consent]]);

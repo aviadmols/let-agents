@@ -1320,6 +1320,9 @@
   }
   function addTurn(turn) {
     turn.id = turn.id || uid();
+    // once something is asked or searched, "about this product" steps back with the conversation before it
+    // (as Aviad asked, 2026-10-18): the new answer stands alone, the product's block waits behind the line
+    if (turn.kind !== 'about' && turn.kind !== 'note') { S.turns.forEach(function (x) { if (x.kind === 'about' && !x.prev) { x.prev = true; } }); }
     S.turns.push(turn);
     fresh[turn.id] = 1;
     persist(); render();
@@ -1573,9 +1576,11 @@
   function leadStep(turn, extra) {
     var lf = turn.leadFlow;
     lf.busy = true; render();
-    json(API + '/widget/' + SITE + '/lead', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(PAGE.id), type: PAGE.type, vid: visitor(), asked: LEARN.answered, given: lf.given, consent: extra.consent === true, declined: extra.declined === true }) }).then(function (r) {
+    json(API + '/widget/' + SITE + '/lead', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(PAGE.id), type: PAGE.type, vid: visitor(), asked: LEARN.answered, given: lf.given, consent: extra.consent === true, declined: extra.declined === true, at: lf.state || null, enough: !!lf.enough }) }).then(function (r) {
       var d = r.ok && r.body && r.body.data;
       lf.busy = false;
+      // a "no thanks" after a phone or an email: what was given is kept once they agree, the rest is not asked
+      if (d && d.enough) { lf.enough = true; }
       if (!d) { lf.error = bankLabel('lead_error', t('leadError')); render(); return; }
       lf.error = d.error ? bankLabel('lead_error_' + d.error, bankLabel('lead_error', t('leadError'))) : '';
       if (d.state === 'declined') { learn('lead_declined', null, null, { step: lf.step }); lf.state = 'declined'; }
@@ -1927,21 +1932,11 @@
     var b = turn.bank || {};
     head += (b.popularity && b.popularity.popular ? '<span class="ls-pop" title="' + esc(b.popularity.text || '') + '">' + icon('trend', 'ls-icon--sm') + esc(b.popularity.badge || t('popular30')) + '</span>' : '') + '</div></div>';
     var html = head;
-    // under the product, as Aviad asked (2026-10-18): its key specs, what the store promises, the tags that search
-    // for others like it, the products this visitor looked at; then what to ask, and the product's other sections
+    // under the product, as Aviad asked (2026-10-18): its key specs, then what Lets offers to ask, then the
+    // products this visitor looked at, then the rest (what the store promises, the product's other sections).
+    // The product's tags are not shown here: the specs say the same.
     var sections = b.sections || [];
     html += sections.filter(function (s) { return s.model === 'specs'; }).map(function (s) { return sectionHtml(s, turn); }).filter(Boolean).join('');
-    if (b.assurances && b.assurances.length) {
-      html += '<div class="ls-block"><div class="ls-block__title">' + esc(t('promises')) + '</div>' + b.assurances.map(function (a) { return '<div class="ls-promise">' + icon(a.scope === 'shop' ? 'truck' : 'check', 'ls-icon--sm') + '<div>' + esc(a.text) + (a.note ? '<small>' + esc(a.note) + '</small>' : '') + '</div></div>'; }).join('') + '</div>';
-    }
-    // what the product is, from its approved facts, each a search for others like it ("תליון זהב צהוב")
-    var tags = (b.assistant && b.assistant.tags) || [];
-    if (tags.length) {
-      html += '<div class="ls-block"><div class="ls-chips" style="flex-wrap:wrap;overflow:visible;mask-image:none;-webkit-mask-image:none">' + tags.map(function (tg) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(tg.query || tg.label) + '">' + esc(tg.label) + '</button>'; }).join('') + '</div></div>';
-    }
-    var seen = LEARN.recent && LEARN.recent.products;
-    if (seen && seen.length) { html += '<div class="ls-block"><div class="ls-block__title"><span>' + esc(bankLabel('recent_title', t('recentTitle'))) + '</span></div>' + miniRow(seen) + '</div>'; }
-    // suggested next steps next, as the shop's block offers them; the product's other sections follow
     // the comparison only when this shopper viewed a product of the same kind, and named: "להשוות עם X"
     var vb = String(turn.id) === String(PAGE && PAGE.id) ? viewedBefore() : null;
     var qs = ((b.assistant && b.assistant.questions) || []).filter(function (q) { return q.about !== 'compare' || vb; }).slice(0, 5).map(function (q) {
@@ -1952,6 +1947,11 @@
         var act = q.about === 'similar_items' ? 'data-similar="' + esc(turn.id) + '"' : q.about === 'similar' && q.query ? 'data-q="' + esc(q.query) + '"' : q.about === 'compare' ? 'data-cmp-viewed="' + esc(turn.id) + '"' : 'data-ask="' + esc(q.question || q.text) + '"';
         return '<button class="ls-row" ' + act + ' style="background:var(--ls-bg-sunken);min-height:48px">' + mark() + '<span class="ls-row__text">' + esc(q.text) + '</span><span class="ls-row__end" style="opacity:1">' + icon('fwd', 'ls-icon--sm') + '</span></button>';
       }).join('') + '</div>';
+    }
+    var seen = LEARN.recent && LEARN.recent.products;
+    if (seen && seen.length) { html += '<div class="ls-block"><div class="ls-block__title"><span>' + esc(bankLabel('recent_title', t('recentTitle'))) + '</span></div>' + miniRow(seen) + '</div>'; }
+    if (b.assurances && b.assurances.length) {
+      html += '<div class="ls-block"><div class="ls-block__title">' + esc(t('promises')) + '</div>' + b.assurances.map(function (a) { return '<div class="ls-promise">' + icon(a.scope === 'shop' ? 'truck' : 'check', 'ls-icon--sm') + '<div>' + esc(a.text) + (a.note ? '<small>' + esc(a.note) + '</small>' : '') + '</div></div>'; }).join('') + '</div>';
     }
     // the specs' teaser is only their name ("מפרט"), and they are shown above already
     if (b.teaser && b.teaser.text && b.teaser.model !== 'specs') { html += '<p class="ls-teaser">' + esc(b.teaser.text) + '</p>'; }
@@ -2557,7 +2557,8 @@
       var turn = S.turns.filter(function (x) { return x.id === f.dataset.lead; })[0];
       var name = f.name.value.trim(), contact = f.contact.value.trim(), ok = f.consent.checked, digits = contact.replace(/\D/g, '');
       var question = f.question ? f.question.value.trim() : String(turn.q || '');
-      var errs = { question: !question, name: !name, contact: !(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact) || (digits.length >= 9 && digits.length <= 12 && !/[a-z]/i.test(contact))), consent: !ok };
+      // a phone (or an email) is enough: the name is welcome, never a reason to lose the details
+      var errs = { question: !question, name: false, contact: !(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact) || (digits.length >= 9 && digits.length <= 12 && !/[a-z]/i.test(contact))), consent: !ok };
       turn.ln = name; turn.lc = contact; turn.lk = ok; turn.lq = question;
       if (errs.question || errs.name || errs.contact || errs.consent) { turn.errs = errs; render(); var bad = BODY.querySelector('[data-lead="' + turn.id + '"] [aria-invalid="true"]'); if (bad) { bad.focus(); } return; }
       turn.errs = {};

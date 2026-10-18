@@ -107,6 +107,34 @@ final class LeadFlowTest extends TestCase
         $this->assertSame(0, $this->countLeads());
     }
 
+    public function test_a_phone_alone_is_kept_when_they_stop_answering_and_agree(): void
+    {
+        // A flow that also wants a name: they give the phone, then say no to the name.
+        app(TenantContext::class)->run($this->shop->id, fn () => LeadFlow::query()->update(['fields' => [
+            ['type' => 'phone', 'key' => 'phone', 'label' => 'טלפון', 'required' => true],
+            ['type' => 'name', 'key' => 'name', 'label' => 'שם', 'required' => true],
+        ]]));
+
+        $stopped = $this->step(['phone' => '0501234567'], declined: true, extra: ['at' => FlowMachine::FIELD]);
+        $this->assertSame(FlowMachine::CONSENT, $stopped->json('data.state'), 'asked to agree, not dropped');
+        $this->assertTrue($stopped->json('data.enough'));
+        $this->assertSame(0, $this->countLeads(), 'nothing kept before the consent');
+
+        $done = $this->step(['phone' => '0501234567'], consent: true, extra: ['enough' => true]);
+        $this->assertSame(FlowMachine::DONE, $done->json('data.state'));
+        $this->assertSame('972501234567', $this->onlyLead()->contact);
+        $this->assertNull($this->onlyLead()->answers);
+    }
+
+    public function test_no_to_the_consent_or_before_any_contact_keeps_nothing(): void
+    {
+        $this->assertSame(FlowMachine::DECLINED, $this->step(['phone' => '0501234567'], declined: true, extra: ['at' => FlowMachine::CONSENT, 'enough' => true])->json('data.state'));
+        $this->assertSame(FlowMachine::DECLINED, $this->step([], declined: true, extra: ['at' => FlowMachine::FIELD])->json('data.state'));
+        // "enough" without a way to reach them asks for the phone as before
+        $this->assertSame('phone', $this->step([], extra: ['enough' => true])->json('data.field.key'));
+        $this->assertSame(0, $this->countLeads());
+    }
+
     public function test_the_same_person_asking_twice_on_one_page_is_one_lead(): void
     {
         $this->step(['phone' => '0501234567'], consent: true);
@@ -130,8 +158,11 @@ final class LeadFlowTest extends TestCase
         ])->assertStatus(403);
     }
 
-    /** @param array<string, string> $given */
-    private function step(array $given, bool $consent = false, bool $declined = false, int $asked = 0): TestResponse
+    /**
+     * @param  array<string, string>  $given
+     * @param  array<string, mixed>  $extra
+     */
+    private function step(array $given, bool $consent = false, bool $declined = false, int $asked = 0, array $extra = []): TestResponse
     {
         return $this->postJson("/api/v1/widget/{$this->site}/lead", [
             'id' => '10',
@@ -141,7 +172,7 @@ final class LeadFlowTest extends TestCase
             'consent' => $consent,
             'declined' => $declined,
             'asked' => $asked,
-        ], ['Origin' => 'https://store.test']);
+        ] + $extra, ['Origin' => 'https://store.test']);
     }
 
     /** The whole query has to run inside the shop's scope, not just be built there. */
