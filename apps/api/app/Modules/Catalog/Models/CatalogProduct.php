@@ -111,6 +111,25 @@ class CatalogProduct extends Model
     }
 
     /**
+     * The product's measurements as the store gives them: its size ("30 × 20 × 10 cm") and its
+     * weight ("2.5 kg"), each null when the store leaves it empty.
+     *
+     * @return array{size: string|null, weight: string|null}
+     */
+    public function measurements(): array
+    {
+        $d = (array) ($this->payload['dimensions'] ?? []);
+        $value = fn (string $key): string => (string) preg_replace('/^\s+|\s+$/u', '', (string) ($d[$key] ?? ''));
+        $sides = array_values(array_filter([$value('length'), $value('width'), $value('height')], fn (string $v): bool => $v !== '' && (float) $v > 0));
+        $weight = $value('weight');
+
+        return [
+            'size' => $sides === [] ? null : implode(' × ', $sides).($value('dimension_unit') !== '' ? ' '.$value('dimension_unit') : ''),
+            'weight' => $weight === '' || (float) $weight <= 0 ? null : $weight.($value('weight_unit') !== '' ? ' '.$value('weight_unit') : ''),
+        ];
+    }
+
+    /**
      * An option's name as a shopper reads it: its title (Shopify), or what its attributes are
      * (WooCommerce variations come with attributes and no title): "גוון: אלון · אורך: 3.68 מטר".
      * An attribute left open ("any") says only its name.

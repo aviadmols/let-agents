@@ -6,6 +6,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
@@ -14,6 +15,7 @@ use App\Modules\Enrichment\Filament\Merchant\Pages\ScanSummary;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Retrieval\Models\RetrievalImage;
+use App\Modules\Retrieval\Sources\ProductDocuments;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,6 +120,30 @@ final class ScanSummaryTest extends TestCase
             ->assertSee('2 חלקים')
             ->assertSee('Brand: Hunter')
             ->assertSee('החיפוש מכיר פחות ממחצית התיאור שבאתר');
+    }
+
+    public function test_the_product_shows_its_options_measurements_and_variants(): void
+    {
+        $shelf = $this->product('700', 'מדף עץ אורן');
+        $shelf->forceFill(['payload' => [
+            'attributes' => [['key' => 'pa_length', 'name' => 'אורך', 'values' => ['60 ס״מ', '80 ס״מ'], 'used_for_variations' => true]],
+            'dimensions' => ['length' => '80', 'width' => '20', 'height' => '2', 'dimension_unit' => 'cm', 'weight' => '1.5', 'weight_unit' => 'kg'],
+        ]])->save();
+        foreach ([['701', 'מדף עץ אורן - 60 ס״מ', true], ['702', 'מדף עץ אורן - 80 ס״מ', false]] as $i => [$id, $title, $stock]) {
+            CatalogVariant::query()->create(['product_id' => $shelf->id, 'external_id' => $id, 'position' => $i, 'title' => $title, 'sku' => 'S'.$id, 'price' => '49', 'in_stock' => $stock, 'purchasable' => $stock]);
+        }
+
+        Livewire::test(ScanSummary::class)
+            ->call('select', $shelf->id)
+            ->assertSee('וריאנטים ומידות')
+            ->assertSee('80 × 20 × 2 cm')
+            ->assertSee('1.5 kg')
+            ->assertSee('60 ס״מ, 80 ס״מ')
+            ->assertSee('2 וריאנטים')
+            ->assertSee('מדף עץ אורן - 80 ס״מ')
+            ->assertSee('אזל');
+
+        $this->assertStringContainsString("Dimensions: 80 × 20 × 2 cm\nWeight: 1.5 kg", ProductDocuments::text($shelf->fresh()));
     }
 
     private function product(string $external, string $title): CatalogProduct

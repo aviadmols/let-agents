@@ -112,4 +112,10 @@ return [
     'indexed_piece' => 'חלק :n',
     'indexed_more' => 'להציג עוד :n חלקים',
     'indexed_less' => 'להציג פחות',
+    'variants_title' => 'וריאנטים ומידות',
+    'variants_help' => 'לפי אלה אפשר למצוא את המוצר בחיפוש לפי מידה, צבע או אפשרות',
+    'dimensions' => 'מידות',
+    'weight' => 'משקל',
+    'variants_count' => '{1} וריאנט אחד|[2,*] :n וריאנטים',
+    'variants_more' => 'ועוד :n',
 ];

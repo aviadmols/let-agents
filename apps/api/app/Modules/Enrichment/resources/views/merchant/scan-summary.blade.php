@@ -92,6 +92,31 @@
                             @endforelse
                         </div>
 
+                        {{-- what it comes in and how big it is: what a search by size, colour or option finds it by --}}
+                        @php($m = $p['measurements'])
+                        @if ($p['options'] !== [] || $p['variant_rows']['total'] > 0 || $m['size'] || $m['weight'])
+                            <div class="lp-card-t lp-sub-t"><h2>{{ $t('variants_title') }}</h2><span class="lp-note">{{ $t('variants_help') }}</span></div>
+                            <div class="lp-schema" data-options>
+                                @if ($m['size'])<div><span>{{ $t('dimensions') }}</span><span dir="ltr">{{ $m['size'] }}</span></div>@endif
+                                @if ($m['weight'])<div><span>{{ $t('weight') }}</span><span dir="ltr">{{ $m['weight'] }}</span></div>@endif
+                                @foreach ($p['options'] as $option)
+                                    <div><span>{{ $option['name'] }}</span><span>{{ $option['values'] }}</span></div>
+                                @endforeach
+                            </div>
+                            @if ($p['variant_rows']['total'] > 0)
+                                <details class="lp-variants" style="margin-top: 10px">
+                                    <summary class="lp-link">{{ trans_choice('enrichment::scan.variants_count', $p['variant_rows']['total'], ['n' => number_format($p['variant_rows']['total'])]) }}</summary>
+                                    @foreach ($p['variant_rows']['rows'] as $v)
+                                        <div class="lp-row">
+                                            <div class="lp-grow"><span class="lp-row-t">{{ $v['label'] }}</span><span class="lp-row-s">{{ collect([$v['sku'] ? $t('sku', ['sku' => $v['sku']]) : null, $v['price'] !== null ? '₪'.number_format((float) $v['price'], (float) $v['price'] == floor((float) $v['price']) ? 0 : 2) : null])->filter()->implode(' · ') }}</span></div>
+                                            <span class="lp-pill" data-tone="{{ $v['in_stock'] ? 'good' : 'bad' }}"><i></i>{{ $v['in_stock'] ? $t('in_stock') : $t('out_of_stock') }}</span>
+                                        </div>
+                                    @endforeach
+                                    @if ($p['variant_rows']['total'] > count($p['variant_rows']['rows']))<p class="lp-note">{{ $t('variants_more', ['n' => number_format($p['variant_rows']['total'] - count($p['variant_rows']['rows']))]) }}</p>@endif
+                                </details>
+                            @endif
+                        @endif
+
                         <div class="lp-card-t lp-sub-t">
                             <h2>{{ $t('image') }}</h2>
                             @if ($p['image'])

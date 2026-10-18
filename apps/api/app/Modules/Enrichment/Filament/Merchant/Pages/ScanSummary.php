@@ -43,6 +43,9 @@ final class ScanSummary extends Page
 {
     private const PAGE = 40;
 
+    /** Variants listed for the open product. */
+    private const VARIANTS = 50;
+
     /** Fact kinds shown as tags; the spec shows choices, numbers and yes/no details. */
     public const TAG_KINDS = [FactKind::Type, FactKind::Category, FactKind::Brand, FactKind::Tag, FactKind::Use];
 
@@ -277,6 +280,9 @@ final class ScanSummary extends Page
                 'read_at' => $image->captioned_at?->timezone('Asia/Jerusalem')->format('j.n'),
                 'state' => $image->error !== null ? 'error' : ($image->caption !== null ? 'read' : ($image->captioned_at !== null ? 'unread' : 'waiting')),
             ],
+            'measurements' => $product->measurements(),
+            'options' => array_values(array_map(fn (array $a): array => ['name' => (string) $a['name'], 'values' => implode(', ', $a['values'])], $product->storeAttributes())),
+            'variant_rows' => self::variants($product),
             'store_text' => mb_strlen(trim($product->shortDescription().' '.$product->description())),
             'indexed' => self::indexed(ChunkSource::Product, (string) $product->id),
         ];
@@ -465,6 +471,29 @@ final class ScanSummary extends Page
             ])->values()->all(),
             'unfound' => count(array_diff($named, $known)),
             'indexed' => self::indexed(ChunkSource::Content, (string) $content->id),
+        ];
+    }
+
+    /**
+     * The product's variants as the search reads them: what each is (its size, colour and other
+     * options), its code, price and stock. The first VARIANTS; the count says how many there are.
+     *
+     * @return array{rows: list<array{label: string, size: string|null, colour: string|null, sku: string|null, price: string|null, in_stock: bool}>, total: int}
+     */
+    private static function variants(CatalogProduct $product): array
+    {
+        $variants = $product->variants()->limit(self::VARIANTS)->get();
+
+        return [
+            'rows' => $variants->map(fn ($v): array => [
+                'label' => trim((string) $v->title) !== '' ? (string) $v->title : implode(' · ', array_filter([$v->color_label, $v->size_label, ...array_values((array) $v->options)])),
+                'size' => $v->size_label,
+                'colour' => $v->color_label,
+                'sku' => $v->sku,
+                'price' => $v->price,
+                'in_stock' => (bool) $v->in_stock,
+            ])->all(),
+            'total' => $variants->count() < self::VARIANTS ? $variants->count() : $product->variants()->count(),
         ];
     }
 

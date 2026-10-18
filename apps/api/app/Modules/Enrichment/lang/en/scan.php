@@ -112,4 +112,10 @@ return [
     'indexed_piece' => 'Piece :n',
     'indexed_more' => 'Show :n more pieces',
     'indexed_less' => 'Show less',
+    'variants_title' => 'Variants and measurements',
+    'variants_help' => 'Search finds the product by these: size, colour or option',
+    'dimensions' => 'Dimensions',
+    'weight' => 'Weight',
+    'variants_count' => '{1} One variant|[2,*] :n variants',
+    'variants_more' => 'and :n more',
 ];

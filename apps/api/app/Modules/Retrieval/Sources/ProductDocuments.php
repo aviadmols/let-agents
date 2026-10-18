@@ -97,6 +97,11 @@ final class ProductDocuments implements DocumentSource
 
         array_push($lines, ...$product->specFields());
 
+        // Its measurements, found by size: "מדף 80 ס״מ" is near a shelf 80 cm long.
+        $measured = $product->measurements();
+        $lines[] = $measured['size'] === null ? '' : 'Dimensions: '.$measured['size'];
+        $lines[] = $measured['weight'] === null ? '' : 'Weight: '.$measured['weight'];
+
         $tags = array_filter(array_map('strval', (array) ($product->payload['tags'] ?? [])));
 
         if ($tags !== []) {
