@@ -21,6 +21,7 @@ use App\Modules\Ai\Support\Drivers\OpenAiBatches;
 use App\Modules\Ai\Support\Drivers\OpenAiChat;
 use App\Modules\Ai\Support\Drivers\OpenAiEmbeddings;
 use App\Modules\Ai\Support\Drivers\ReplicateImages;
+use App\Modules\Ai\Support\KeyAlert;
 use App\Modules\Ai\Support\MonthlySpendGuard;
 use App\Modules\Ai\Support\ProviderBatchModel;
 use App\Modules\Ai\Support\ProviderChatModel;
@@ -75,6 +76,7 @@ final class AiServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         // The month's allowance above every admin screen: a share for a shop, dollars for the operator.
-        FilamentView::registerRenderHook(PanelsRenderHook::CONTENT_START, fn (): string => app(UsageStrip::class)->render()->toHtml());
+        // Above it, for the operator only: a provider whose key stopped working, until a new key passes its check.
+        FilamentView::registerRenderHook(PanelsRenderHook::CONTENT_START, fn (): string => app(KeyAlert::class)->render()->toHtml().app(UsageStrip::class)->render()->toHtml());
     }
 }

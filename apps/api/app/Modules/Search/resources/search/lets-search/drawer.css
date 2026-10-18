@@ -247,6 +247,10 @@
 .ls-faq p { margin: 0 0 12px; font-size: var(--lsp-text-md); color: var(--ls-fg-strong-muted); line-height: 1.6; }
 .ls-promise { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--lsp-r-md); background: var(--ls-bg-sunken); font-size: var(--lsp-text-sm); }
 .ls-promise + .ls-promise { margin-top: 6px; }
+/* the store's own words, quoted when an answer could not be checked */
+.ls-quote { margin: 8px 0 0; padding: 10px 14px; border-inline-start: 3px solid var(--ls-line-strong); border-radius: var(--lsp-r-md); background: var(--ls-bg-sunken); font-size: var(--lsp-text-sm); line-height: 1.55; }
+.ls-quote small { display: flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--ls-fg-muted); font-size: var(--lsp-text-xs); }
+.ls-quote small a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .ls-promise small { display: block; color: var(--ls-fg-muted); font-size: var(--lsp-text-xs); margin-top: 2px; }
 .ls-diff { display: grid; gap: 4px; padding: 14px; border-radius: var(--lsp-r-md); box-shadow: inset 0 0 0 1px var(--ls-line-strong); }
 .ls-diff b { font-weight: 600; }

@@ -8,6 +8,7 @@ return [
     'model_failed' => 'The model did not answer (:reason).',
     'site_answered' => 'A question from the search box was answered from the site pages.',
     'site_no_info' => 'A question from the search box: the site pages do not answer it, or the answer did not pass the check.',
+    'site_unchecked' => 'A question from the search box: the answer could not be checked (:reason), so it was not shown. The shopper saw quotes from the site pages; nothing was kept.',
     'site_nothing_near' => 'A question from the search box: no page of the site is near it. No writing model was asked.',
     'site_same_family' => 'A question from the search box: the checking model is from the same family as the writer (:family). Choose a checker from another family.',
     'review_done' => 'The report on search questions for :day already exists.',

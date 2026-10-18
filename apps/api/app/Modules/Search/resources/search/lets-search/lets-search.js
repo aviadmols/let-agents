@@ -83,7 +83,7 @@
       backToChat: 'חזרה לשיחה', loadMore: 'הצגת עוד', onSite: 'לכל התוצאות בדף החיפוש',
       add: 'הוספה לסל', added: 'נוסף לסל', addFailed: 'לא הצלחנו להוסיף. נסו לפתוח את המוצר.', options: 'בחירת אפשרויות', outStock: 'אזל', similarInStock: 'דומים במלאי', similar: 'דומים',
       onSaleBadge: 'במבצע', outBadge: 'אזל', toCart: 'לעגלה', keepGoing: 'ממשיכים לחפש', goesWith: 'מתאים לקנות יחד', whyShown: 'למה זה מוצג?', whyShownText: 'החנות סימנה את המוצרים האלה כמשלימים למוצר שהוספתם.',
-      thinking: 'מחפש בחנות…', thinkingPhoto: 'מחפש מוצרים שנראים כמו התמונה…', slow: 'לוקח יותר זמן מהרגיל…', from: 'מתוך:', verify: 'רוצים לוודא?', verifyLink: 'הצוות זמין בוואטסאפ',
+      thinking: 'מחפש בחנות…', thinkingPhoto: 'מחפש מוצרים שנראים כמו התמונה…', slow: 'לוקח יותר זמן מהרגיל…', from: 'מתוך:', verify: 'רוצים לוודא?', quotedTitle: 'לא הצלחנו לבדוק תשובה כרגע, אז זה מה שכתוב באתר עצמו:', verifyLink: 'הצוות זמין בוואטסאפ',
       general: 'זו תשובה כללית למוצרים מהסוג הזה. לפרטים מדויקים כדאי לבדוק בהוראות היצרן.',
       noInfo: 'לא מצאתי את זה באתר.', teamNow: 'הצוות זמין עכשיו · עד :t', teamBack: 'הצוות חוזר :when', teamWa: 'לשאול את הצוות בוואטסאפ',
       waText: 'לא מצאתי את זה באתר. הצוות של החנות יכול לענות על זה ישירות.', leadText: 'לא מצאתי את זה באתר. להשאיר פרטים, והצוות יחזור אליך עם תשובה?', meanwhile: 'בינתיים, אולי זה יעזור',
@@ -133,7 +133,7 @@
       backToChat: 'Back to chat', loadMore: 'Show more', onSite: 'All results on the search page',
       add: 'Add to cart', added: 'Added', addFailed: 'Couldn\'t add it. Try opening the product.', options: 'Choose options', outStock: 'Sold out', similarInStock: 'Similar in stock', similar: 'Similar',
       onSaleBadge: 'Sale', outBadge: 'Sold out', toCart: 'View cart', keepGoing: 'Keep searching', goesWith: 'Goes well with', whyShown: 'Why am I seeing this?', whyShownText: 'The store marked these as going with what you added.',
-      thinking: 'Looking through the store…', thinkingPhoto: 'Looking for products like your photo…', slow: 'Taking longer than usual…', from: 'From:', verify: 'Want to be sure?', verifyLink: 'The team is on WhatsApp',
+      thinking: 'Looking through the store…', thinkingPhoto: 'Looking for products like your photo…', slow: 'Taking longer than usual…', from: 'From:', verify: 'Want to be sure?', quotedTitle: 'We could not check an answer right now, so this is what the site itself says:', verifyLink: 'The team is on WhatsApp',
       general: 'This is a general answer for products of this kind. Check the maker\'s instructions for exact details.',
       noInfo: 'I couldn\'t find that on the site.', teamNow: 'The team is available now · until :t', teamBack: 'The team is back :when', teamWa: 'Ask the team on WhatsApp',
       waText: 'I couldn\'t find that on the site. The store\'s team can answer it directly.', leadText: 'I couldn\'t find that on the site. Leave your details and the team will get back to you?', meanwhile: 'Meanwhile, this might help',
@@ -1506,9 +1506,12 @@
           // a shopper who got an answer is worth asking, once a page, and only where the shop set it up
           var lead = LEARN.bank && LEARN.bank.lead && !LEARN.offered ? { given: {}, step: 0, state: null, busy: true } : null;
           if (lead) { LEARN.offered = true; }
-          update(turn, { loading: false, answer: d.answer, picks: [], sources: [], general: d.source === 'general', follow: [], leadFlow: lead });
+          update(turn, { loading: false, answer: d.answer, picks: [], sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead });
           announce(t('announceReady') + ': ' + d.answer);
           if (lead) { learn('lead_start', null, null, {}); leadStep(turn, {}); }
+        } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
+          update(turn, { loading: false, quoted: d.quotes });
+          announce(t('quotedTitle'));
         } else {
           update(turn, { loading: false, noInfo: true, rel: related(q), h: hours() });
           announce(t('noInfo'));
@@ -1532,6 +1535,10 @@
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], general: d.from === 'general', follow: d.follow || [] });
           announce(t('announceReady') + ': ' + d.answer);
+        } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
+          // the answer could not be checked: never shown; the store's own words, said to be that
+          update(turn, { loading: false, quoted: d.quotes });
+          announce(t('quotedTitle'));
         } else {
           var rel = related(q);
           update(turn, { loading: false, noInfo: true, rel: rel, h: hours() });
@@ -1587,6 +1594,7 @@
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
     if (turn.noInfo) { return kitsHtml(turn) + noInfoHtml(turn) + myAi(turn); }
+    if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
     var n = String(turn.answer || '').split(' ').length;
     var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '"><p>' + (anim ? words(turn.answer) : esc(turn.answer)) + '</p></div>';
@@ -1620,6 +1628,16 @@
       '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(t('consent')) + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
       (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
       '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary">' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
+  }
+  // an answer that could not be checked is never shown: what the store's pages say, quoted as they are, each
+  // with its page, under a line that says so; and the team, for anyone who wants to be sure
+  function quotedHtml(turn) {
+    var html = '<p class="ls-noanswer__text">' + esc(t('quotedTitle')) + '</p>' + turn.quoted.map(function (qt) {
+      return '<blockquote class="ls-quote" dir="auto">' + esc(qt.text) + (qt.title ? '<small>' + icon('doc', 'ls-icon--sm') + (qt.url ? '<a href="' + esc(qt.url) + '">' + esc(qt.title) + '</a>' : esc(qt.title)) + '</small>' : '') + '</blockquote>';
+    }).join('');
+    var h = hours(), link = h.open && wa(t('verify') + ' ' + turn.q);
+    if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
+    return html;
   }
   function noInfoHtml(turn) {
     var h = hours(), link = wa((S.config.whatsappMessage || ':question').replace(':question', turn.q)), html = '';

@@ -12,6 +12,8 @@ use App\Modules\Ai\Contracts\WebAnswer;
 use App\Modules\Ai\Contracts\WebSearchDriver;
 use App\Modules\Ai\Contracts\WebSearchModel;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Ai\Enums\ProviderStatus;
+use App\Modules\Ai\Models\AiProvider;
 use App\Modules\Runs\Contracts\CallJournal;
 use Throwable;
 
@@ -84,6 +86,15 @@ final class ProviderChatModel implements ChatModel, VisionModel, WebSearchModel
             $answer = $call();
         } catch (Throwable $e) {
             $this->journal?->record($kind, $provider->value, $model, $system, $sent, null, class_basename($e).': '.$e->getMessage(), 0, 0, self::ms($clock));
+
+            // A key that does not work (refused, not allowed, out of credit) is marked so at once: it is not
+            // tried again on every shopper's question, and the operator panel says so on every page until
+            // someone saves a key that passes its check.
+            $failure = KeyFailure::of($e);
+            if ($failure !== null) {
+                AiProvider::query()->where('provider', $provider)->where('status', ProviderStatus::Connected)
+                    ->update(['status' => ProviderStatus::Failed, 'last_error_code' => $failure, 'last_checked_at' => now()]);
+            }
 
             throw $e;
         }

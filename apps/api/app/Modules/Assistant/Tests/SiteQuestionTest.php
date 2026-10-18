@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
+use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
@@ -75,8 +76,14 @@ final class SiteQuestionTest extends TestCase
             public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
                 $this->test->calls[] = ['provider' => $provider, 'model' => $model, 'user' => $user, 'max' => $maxOutputTokens];
+                $reply = array_shift($this->test->replies) ?? [];
 
-                return new ModelReply(array_shift($this->test->replies) ?? [], 700, 120);
+                // A provider that refuses the call, as Anthropic did when its key ran out.
+                if (isset($reply['__fails'])) {
+                    throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, new \RuntimeException((string) $reply['__fails']));
+                }
+
+                return new ModelReply($reply, 700, 120);
             }
         });
         $this->app->instance(Passages::class, new class($test) implements Passages
@@ -231,6 +238,24 @@ final class SiteQuestionTest extends TestCase
             content: json_encode(['question' => 'שאלה', 'vid' => self::VID]))->assertForbidden();
         $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: ['HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain'],
             content: json_encode(['question' => 'שאלה', 'vid' => 'nobody']))->assertStatus(422);
+    }
+
+    public function test_an_answer_that_could_not_be_checked_is_never_shown_the_stores_own_words_are(): void
+    {
+        $this->passages = [['source' => 'content', 'source_id' => $this->inShop(fn () => CatalogContent::query()->value('id')), 'external_id' => '600', 'title' => 'מדיניות החזרות',
+            'text' => "ברוכים הבאים לחנות.\nניתן להחזיר מוצר תוך 14 יום מיום הקנייה, בתנאי שלא נעשה בו שינוי.\nהחלפה אפשרית תוך חודש.", 'similarity' => 0.8]];
+        // The writer answers; the checker's provider refuses (its key ran out).
+        $this->replies = [['found' => true, 'answer' => 'בטח, אפשר להחזיר תוך שנה!', 'refs' => ['s1']], ['__fails' => 'Anthropic Authentication Exception: invalid x-api-key']];
+
+        $data = $this->ask('אפשר להחזיר מוצר?')->assertOk()->json('data');
+
+        $this->assertSame('quoted', $data['outcome']);
+        $this->assertSame('', $data['answer'], 'the unchecked words are never shown');
+        $this->assertSame([['title' => 'כמה ברגים צריך למטר דק', 'url' => 'https://store.test/?p=600', 'text' => 'ניתן להחזיר מוצר תוך 14 יום מיום הקנייה, בתנאי שלא נעשה בו שינוי. החלפה אפשרית תוך חודש.']], $data['quotes'],
+            'the store\'s own sentences about it, as they are, with its page; not its greeting');
+        $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'nothing kept for the next shopper');
+        $run = Run::query()->where('agent', AnswerSiteQuestion::AGENT)->latest()->first();
+        $this->assertSame('assistant::runs.site_unchecked', $run->summary_key);
     }
 
     public function test_a_store_question_asked_on_a_product_page_is_answered_from_the_stores_pages(): void

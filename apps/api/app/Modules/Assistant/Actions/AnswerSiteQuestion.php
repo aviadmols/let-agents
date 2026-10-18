@@ -107,6 +107,11 @@ final class AnswerSiteQuestion
 
     private const MAX_SOURCES = 3;
 
+    /** A page quoted when an answer could not be checked: its best sentences, at most this long. */
+    private const QUOTE_SENTENCES = 2;
+
+    private const QUOTE_CHARS = 320;
+
     private const MAX_PICKS = 3;
 
     public function __construct(
@@ -647,7 +652,22 @@ final class AnswerSiteQuestion
                         $checked['skipped'] = $refusal;
                     } else {
                         $started = hrtime(true);
-                        $check = $this->call($run, $checker, 'verify_site', $this->checkInput($question, $answer, $cited, $picks, $prepared), $checkOutput, null, 'site_check');
+
+                        try {
+                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($question, $answer, $cited, $picks, $prepared), $checkOutput, null, 'site_check');
+                        } catch (ModelCallFailed $e) {
+                            // The check could not be made (its provider refused, a key, an outage): the writer's
+                            // words are never shown unchecked. What the store's own pages say, quoted as they
+                            // are with where, is shown instead, said to be unchecked; nothing is kept or shared.
+                            $quotes = self::quotes($question, array_map(fn (string $ref): array => $byRef[$ref], $cited), fn (array $passages): array => $this->sources($passages));
+                            $trace += ['writer' => $wrote, 'check' => $checked + ['failed' => $e->reason], 'quoted' => count($quotes)];
+                            $result = $quotes === [] ? $this->fixed('unavailable', $locale) : ['outcome' => 'quoted', 'answer' => '', 'from' => 'page', 'quotes' => $quotes];
+                            $run->output(['outcome' => $quotes === [] ? 'unavailable' : 'quoted', 'check_failed' => $e->reason, 'error' => mb_substr($e->getMessage(), 0, 300), 'quotes' => count($quotes),
+                                'checker' => $checker['name'].' · '.$checker['model'], 'writer' => $wrote, 'context' => $trace['context']])
+                                ->summary('assistant::runs.site_unchecked', ['reason' => $e->reason]);
+
+                            return;
+                        }
                         $replies[] = [$check, 'site_check'];
                         $checked += [
                             'model' => $checker['model'],
@@ -1244,6 +1264,55 @@ final class AnswerSiteQuestion
      * @param  list<array{source: string, source_id: string, title: string}>  $cited
      * @return list<array{title: string, url: string|null, type: string}>
      */
+    /**
+     * The store's own words for a question, quoted from the pages the writer cited, when its answer
+     * could not be checked: from each page, the sentences that share the most words with the question
+     * (a word of 3 letters or more, its Hebrew prefix and final letters aside), in the page's order, as
+     * they are. Code only. A page none of whose sentences shares a word is not quoted.
+     *
+     * @param  list<array<string, mixed>>  $passages
+     * @param  callable(list<array<string, mixed>>): list<array{title: string, url: string|null, type: string}>  $sources
+     * @return list<array{title: string, url: string|null, text: string}>
+     */
+    public static function quotes(string $question, array $passages, callable $sources): array
+    {
+        $plain = fn (string $text): string => strtr(mb_strtolower($text), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
+        $words = [];
+        foreach (preg_split('/[^\p{L}\p{N}]+/u', $plain($question), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            $word = mb_strlen($word) > 3 ? (string) preg_replace('/^[והבלשמכ]/u', '', $word) : $word;
+            if (mb_strlen($word) >= 3) {
+                $words[$word] = true;
+            }
+        }
+
+        $out = [];
+        foreach ($passages as $passage) {
+            $sentences = preg_split('/(?<=[.!?])\s+|\n+/u', trim((string) ($passage['text'] ?? ''))) ?: [];
+            $scored = [];
+            foreach ($sentences as $at => $sentence) {
+                $sentence = trim($sentence);
+                $score = count(array_filter(array_keys($words), fn (string $w): bool => mb_strpos($plain($sentence), $w) !== false));
+                if ($score > 0 && $sentence !== '') {
+                    $scored[$at] = [$score, $sentence];
+                }
+            }
+            if ($scored === []) {
+                continue;
+            }
+            uasort($scored, fn (array $a, array $b): int => $b[0] <=> $a[0]);
+            $best = array_slice($scored, 0, self::QUOTE_SENTENCES, true);
+            ksort($best);
+            $source = $sources([$passage])[0] ?? ['title' => (string) ($passage['title'] ?? ''), 'url' => null];
+            $out[] = ['title' => (string) $source['title'], 'url' => $source['url'] ?? null, 'text' => mb_substr(implode(' ', array_column($best, 1)), 0, self::QUOTE_CHARS)];
+
+            if (count($out) >= self::MAX_SOURCES) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
     private function sources(array $cited): array
     {
         $out = [];

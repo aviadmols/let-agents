@@ -97,7 +97,7 @@ final class AnswerQuestion
             // goes to the site's answerer, which reads the store's pages; its barrier, saved answers and
             // limits apply there. One this product already has an answer to (the team's) stays here.
             if (! $onArticle && self::aboutTheStore($question) && Features::enabled('assistant.on_search', $shopId) && ! $this->answeredHere($externalId, $question)) {
-                return $this->bySite($shopId, $externalId, $question, $visitorHash, $locale);
+                return $this->bySite($shopId, $question, $visitorHash, $locale);
             }
 
             if (($stop = $this->guarded($shopId, $question, $visitorHash, $locale)) !== null) {
@@ -357,7 +357,6 @@ final class AnswerQuestion
         return (string) file_get_contents(__DIR__.'/../Prompts/'.$name.'.v'.self::PROMPT_VERSION.'.md');
     }
 
-    /** @return array{outcome: string, answer: string, from: string} */
     /** Whether a question on a product's page is about the store (STORE_WORDS). */
     public static function aboutTheStore(string $question): bool
     {
@@ -376,23 +375,28 @@ final class AnswerQuestion
     }
 
     /**
-     * The site's answer to a store question asked on a product's page, with the product as the one looked at,
-     * in this answerer's shape.
+     * The site's answer to a store question asked on a product's page, in this answerer's shape. Asked as
+     * the store's question, not bound to the product: delivery and returns are the same on every page, so
+     * the answer is saved and shared like one from the search box. Quotes from the store's pages come with
+     * it when the answer could not be checked.
      *
-     * @return array{outcome: string, answer: string, from: string, source?: string}
+     * @return array{outcome: string, answer: string, from: string, source?: string, sources?: list<array<string, mixed>>, quotes?: list<array<string, mixed>>}
      */
-    private function bySite(string $shopId, string $externalId, string $question, string $visitorHash, string $locale): array
+    private function bySite(string $shopId, string $question, string $visitorHash, string $locale): array
     {
-        $site = app(AnswerSiteQuestion::class)->handle($shopId, $question, $visitorHash, $locale, [$externalId], [], true);
+        $site = app(AnswerSiteQuestion::class)->handle($shopId, $question, $visitorHash, $locale);
 
         return array_filter([
             'outcome' => (string) ($site['outcome'] ?? 'unavailable'),
             'answer' => (string) ($site['answer'] ?? ''),
             'from' => (string) ($site['from'] ?? 'none'),
             'source' => isset($site['source']) ? (string) $site['source'] : null,
+            'sources' => ($site['sources'] ?? []) ?: null,
+            'quotes' => ($site['quotes'] ?? []) ?: null,
         ], fn ($value): bool => $value !== null);
     }
 
+    /** @return array{outcome: string, answer: string, from: string} */
     private function fixed(string $outcome, string $locale, string $from = 'none'): array
     {
         return ['outcome' => $outcome, 'answer' => (string) __('assistant::answers.'.$outcome, [], $locale), 'from' => $from];

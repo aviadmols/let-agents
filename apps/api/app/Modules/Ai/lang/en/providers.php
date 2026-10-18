@@ -38,6 +38,13 @@ return [
         'rate_limited' => 'Rate limited',
         'provider_error' => 'Provider error',
         'unreachable' => 'Unreachable',
+        'no_credit' => 'Out of credit',
+    ],
+    'alert' => [
+        'title' => 'A model provider\'s key is not working',
+        'since' => 'since :time',
+        'meanwhile' => 'Meanwhile, site answers that cannot be checked are not shown: shoppers see quotes from the site\'s pages instead. Night work that depends on this provider waits. This alert goes away once a new key passes its check.',
+        'fix' => 'Update the key',
     ],
     'actions' => [
         'test' => 'Check key',
