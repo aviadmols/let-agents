@@ -631,7 +631,7 @@
   store('local', 'ls_recent', null);
   var S = {
     open: false, tab: 'chat', wide: null, index: null, records: {}, built: null, engine: win.LA_ENGINE || null,
-    config: {}, facets: [], turns: store('session', 'ls_turns') || [], saved: store('local', 'ls_saved') || [],
+    config: {}, facets: [], turns: store('session', 'ls_turns') || lastTurns(), saved: store('local', 'ls_saved') || [],
     recent: [].concat(store('local', 'ls_searches') || []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, RECENT_MAX), products: {}, ctx: CFG.productId ? String(CFG.productId) : null,
     phone: WISH.phoneShown, pick: [], onlyDiff: false, typing: false, active: -1,
     expanded: !!store('local', 'ls_expanded'), live: null, menu: ''
@@ -1011,6 +1011,13 @@
   function persist() {
     var keep = S.turns.filter(function (x) { return x.kind !== 'compare' && x.kind !== 'about'; }).slice(-30).map(function (x) { var c = Object.assign({}, x); delete c.photo; return c; });
     store('session', 'ls_turns', keep);
+    // and for the next tab of this browser: a result opened in a new tab opens the search where it was
+    store('local', 'ls_turns_last', { at: Date.now(), turns: keep });
+  }
+  // the last search of this browser, for a tab that has none of its own; a couple of hours, then a fresh start
+  function lastTurns() {
+    var last = store('local', 'ls_turns_last');
+    return last && last.turns && Date.now() - (last.at || 0) < 2 * 3600e3 ? last.turns : [];
   }
   function chatTurns() {
     // one "about this product", the newest, and only this page's (a new chat and its undo can leave two)

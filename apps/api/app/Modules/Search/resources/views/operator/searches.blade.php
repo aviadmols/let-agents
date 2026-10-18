@@ -169,7 +169,20 @@
                     <tbody>
                         @foreach ($r['empty'] as $row)
                             <tr>
-                                <td style="{{ $cell }};font-weight:600">{{ $row->query }}</td>
+                                @if ($row->query === '[photo]')
+                                    {{-- a photo search that found nothing: the photos themselves, not a word --}}
+                                    @php($photos = app(\App\Core\Tenancy\TenantContext::class)->run((string) $this->shop, fn () => \App\Modules\Search\Models\SearchPhotoAsk::query()->where('total', 0)->whereNotNull('thumb')->latest('created_at')->limit(8)->get(['id', 'thumb', 'object'])))
+                                    <td style="{{ $cell }}">
+                                        <div style="font-weight:600;margin-bottom:6px">{{ __('search::ui.photo_query') }}</div>
+                                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                            @foreach ($photos as $photo)
+                                                <img src="data:image/jpeg;base64,{{ $photo->thumb }}" alt="{{ $photo->object }}" title="{{ $photo->object }}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#f4f4f5">
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                @else
+                                    <td style="{{ $cell }};font-weight:600">{{ $row->query }}</td>
+                                @endif
                                 <td style="{{ $cell }}" dir="ltr">{{ number_format((int) $row->empty) }}</td>
                                 <td style="{{ $cell }}" dir="ltr">{{ number_format((int) $row->searches) }}</td>
                                 <td style="{{ $cell }}"><button type="button" style="{{ $btn }}" wire:click="$set('synonymTerm', @js($row->query))">{{ __('search::ui.empty.make_synonym') }}</button></td>
