@@ -286,7 +286,11 @@ final class ShopSessions extends Page
     {
         $label = __('analytics::sessions.sources.'.$visit->source);
 
-        return $visit->paid ? $label.' · '.__('analytics::sessions.paid') : $label;
+        return match (true) {
+            $visit->paid => $label.' · '.__('analytics::sessions.paid'),
+            $visit->source === 'google' => $label.' · '.__('analytics::sessions.organic'),
+            default => $label,
+        };
     }
 
     public static function deviceLabel(AnalyticsVisit $visit): string

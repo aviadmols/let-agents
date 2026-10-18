@@ -21,7 +21,7 @@
             <div class="lp-filters">
                 <div class="lp-filter-line">
                     <span class="lp-lbl">{{ $t('filters.q') }}</span>
-                    <input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="q" placeholder="{{ $t('filters.q_placeholder') }}" aria-label="{{ $t('filters.q') }}">
+                    <span class="lp-field"><svg aria-hidden="true"><use href="#lp-i-search"/></svg><input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="q" placeholder="{{ $t('filters.q_placeholder') }}" aria-label="{{ $t('filters.q') }}"></span>
                     <span class="lp-lbl">{{ $t('filters.ip') }}</span>
                     <input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="ip" dir="ltr" placeholder="77.127." aria-label="{{ $t('filters.ip') }}">
                     <span class="lp-lbl">{{ $t('filters.min') }}</span>

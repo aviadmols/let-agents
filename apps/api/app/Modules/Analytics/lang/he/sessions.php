@@ -65,6 +65,7 @@ return [
         'direct' => 'ישיר',
         'other' => 'אתר אחר',
     ],
+    'organic' => 'חיפוש אורגני',
     'paid' => 'ממומן',
     'visitor' => 'גולש #:tag',
     'first_visit' => 'ביקור ראשון',

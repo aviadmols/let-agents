@@ -65,6 +65,7 @@ return [
         'direct' => 'Direct',
         'other' => 'Another site',
     ],
+    'organic' => 'organic search',
     'paid' => 'paid',
     'visitor' => 'Shopper #:tag',
     'first_visit' => 'first visit',

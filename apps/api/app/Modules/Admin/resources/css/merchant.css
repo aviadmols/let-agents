@@ -731,3 +731,9 @@ html.dark .fi-panel-merchant {
 @media (max-width: 640px) {
     .fi-panel-merchant .lp-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* a search field, as the design draws it: white, a hairline, the glass at its start */
+.fi-panel-merchant .lp-input-sm { background: var(--la-paper); box-shadow: inset 0 0 0 1px var(--la-line); }
+.fi-panel-merchant .lp-field { position: relative; display: flex; flex: 1; min-width: 180px; max-width: 320px; }
+.fi-panel-merchant .lp-field .lp-input-sm { max-width: none; padding-inline-start: 36px; }
+.fi-panel-merchant .lp-field svg { position: absolute; inset-inline-start: 12px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--la-muted); pointer-events: none; }
