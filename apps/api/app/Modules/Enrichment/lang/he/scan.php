@@ -118,4 +118,7 @@ return [
     'weight' => 'משקל',
     'variants_count' => '{1} וריאנט אחד|[2,*] :n וריאנטים',
     'variants_more' => 'ועוד :n',
+    'summary' => 'תיאור קצר לחיפוש',
+    'summary_in_search' => 'בחיפוש',
+    'summary_checking' => 'בבדיקה',
 ];

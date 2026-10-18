@@ -6,6 +6,7 @@ return [
         'fact_review' => 'Check facts',
         'content_mapping' => 'Read articles',
         'product_highlights' => 'Product highlights',
+        'product_summary' => 'Short description for search',
     ],
     'batch_statuses' => [
         'awaiting_results' => 'Waiting for answers',
@@ -25,6 +26,7 @@ return [
         'shopper_value' => 'Value to shoppers',
         'category' => 'Category',
         'highlight' => 'Highlight',
+        'summary' => 'Short description for search',
         'promise' => 'Store promise',
         'tryon' => 'Try-on',
     ],

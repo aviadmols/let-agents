@@ -9,14 +9,15 @@ use App\Modules\Retrieval\Contracts\DocumentNotes;
 use App\Modules\Retrieval\Enums\ChunkSource;
 
 /**
- * What the scan learned and the team approved, for the meaning vectors: a product's type and use
+ * What the scan learned and the team approved, for the meaning vectors: a product's short description
+ * for search (approved only, after the other family's review), its type and use
  * ("what it is and what it is for", so a look-alike with another use is not near it), its details
  * and tags, its highlights; a post's takeaways. Brand and category are left out (the product's own
  * text already says them). Sorted, so the same facts give the same text and nothing is embedded twice.
  */
 final class FactNotes implements DocumentNotes
 {
-    private const PRODUCT_KINDS = [FactKind::Type, FactKind::Use, FactKind::Tag, FactKind::Spec, FactKind::Choice, FactKind::Flag, FactKind::Highlight];
+    private const PRODUCT_KINDS = [FactKind::Summary, FactKind::Type, FactKind::Use, FactKind::Tag, FactKind::Spec, FactKind::Choice, FactKind::Flag, FactKind::Highlight];
 
     private const CONTENT_KINDS = [FactKind::Highlight];
 
@@ -71,12 +72,15 @@ final class FactNotes implements DocumentNotes
                     FactKind::Use => 'Use: '.$value,
                     FactKind::Tag => 'Tag: '.$value,
                     FactKind::Highlight => 'Highlight: '.$value,
+                    FactKind::Summary => 'Summary: '.$value,
                     default => trim($fact->keyLabel()).': '.$value,
                 };
                 $by[$fact->kind->value][$line] = true;
             }
 
-            ksort($by);
+            // In the order of PRODUCT_KINDS: the short description first, as a reader would want it.
+            $order = array_flip(array_map(fn (FactKind $k): string => $k->value, [...self::PRODUCT_KINDS, ...self::CONTENT_KINDS]));
+            uksort($by, fn (string $a, string $b): int => ($order[$a] ?? 99) <=> ($order[$b] ?? 99));
             $lines = [];
 
             foreach ($by as $kind => $set) {

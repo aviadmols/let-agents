@@ -33,6 +33,10 @@ return [
         'label' => 'Nightly review of waiting details',
         'description' => 'Every night a model of another family checks the details the reader was unsure of: right is approved, wrong rejected, unsure goes to a person.',
     ],
+    'search_summary' => [
+        'label' => 'A short, clear description of every product, for search',
+        'description' => 'In the nightly reading: one to three sentences on what the product is, what it is for and where it fits, only from its description and approved details, resting on quotes. A model of another family reviews it. It joins the search by meaning only; the description on the site does not change.',
+    ],
     'auto_highlights' => [
         'label' => 'The key points of every product description',
         'description' => 'In the nightly reading and the first scan, after the details: up to four practical points from each description (what else is needed, where it fits, how to install, what is included), each resting on a quote, no praise and no numbers the text does not have. A model of another family reviews them.',

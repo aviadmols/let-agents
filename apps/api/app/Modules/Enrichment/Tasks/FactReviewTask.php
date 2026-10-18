@@ -75,12 +75,12 @@ final class FactReviewTask implements AgentTask
             }
 
             // Highlights were written from longer text (see ProductHighlightsTask): the checker reads the same text.
-            $highlights = $facts->contains(fn (EnrichmentFact $f): bool => $f->kind === FactKind::Highlight);
+            $highlights = $facts->contains(fn (EnrichmentFact $f): bool => in_array($f->kind, [FactKind::Highlight, FactKind::Summary], true));
             $request = [
                 'id' => $subjectModel->external_id,
                 'title' => $subjectModel->title,
                 'text' => $highlights
-                    ? $this->text($subjectModel, (int) Settings::get('enrichment.max_highlight_text_chars', $batch->shop_id), $this->boilerplate($facts->first(fn (EnrichmentFact $f): bool => $f->kind === FactKind::Highlight)), true)
+                    ? $this->text($subjectModel, (int) Settings::get('enrichment.max_highlight_text_chars', $batch->shop_id), $this->boilerplate($facts->first(fn (EnrichmentFact $f): bool => in_array($f->kind, [FactKind::Highlight, FactKind::Summary], true))), true)
                     : $this->text($subjectModel, $maxChars, $this->boilerplate($facts->first())),
                 'claims' => $claims,
             ];

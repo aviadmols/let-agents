@@ -38,6 +38,13 @@ enum FactKind: string
     case Highlight = 'highlight';
 
     /**
+     * A short, clear description of what the product is, what it is for and where it fits, written
+     * from its own text and approved facts for search only: it joins the product's meaning vectors
+     * and never replaces or changes what the store wrote. Its quotes say what it rests on.
+     */
+    case Summary = 'summary';
+
+    /**
      * Something that helps a shopper decide, quoted from the store's own words: a refund window
      * or free delivery from the shop's pages, hand work or a material from the product's text.
      * The key says which promise it is and the value holds the detail, exactly as written.

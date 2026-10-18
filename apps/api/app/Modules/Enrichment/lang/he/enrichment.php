@@ -6,6 +6,7 @@ return [
         'fact_review' => 'בדיקת עובדות',
         'content_mapping' => 'קריאת מאמרים',
         'product_highlights' => 'נקודות חשובות למוצרים',
+        'product_summary' => 'תיאור קצר וברור לחיפוש',
     ],
     'batch_statuses' => [
         'awaiting_results' => 'מחכה לתשובות',
@@ -25,6 +26,7 @@ return [
         'shopper_value' => 'ערך לקונה',
         'category' => 'קטגוריה',
         'highlight' => 'נקודה חשובה',
+        'summary' => 'תיאור קצר לחיפוש',
         'promise' => 'הבטחה של החנות',
         'tryon' => 'מדידה על הלקוח',
     ],

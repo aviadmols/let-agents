@@ -17,9 +17,10 @@ final class PromptLibrary
     /** @var array<string, int> task => current version */
     public const CURRENT = [
         'product_extraction' => 3,
-        'fact_review' => 3,
+        'fact_review' => 4,
         'content_mapping' => 2,
         'product_highlights' => 2,
+        'product_summary' => 1,
     ];
 
     public static function version(TaskType $task): int

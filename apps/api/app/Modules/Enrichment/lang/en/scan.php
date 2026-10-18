@@ -118,4 +118,7 @@ return [
     'weight' => 'Weight',
     'variants_count' => '{1} One variant|[2,*] :n variants',
     'variants_more' => 'and :n more',
+    'summary' => 'Short description for search',
+    'summary_in_search' => 'In search',
+    'summary_checking' => 'Being checked',
 ];

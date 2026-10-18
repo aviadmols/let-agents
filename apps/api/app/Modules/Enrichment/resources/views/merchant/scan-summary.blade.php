@@ -140,7 +140,7 @@
                         @else
                             <p class="lp-empty">{{ $t('no_image') }}</p>
                         @endif
-                        @include('enrichment::merchant.scan-indexed', ['indexed' => $p['indexed'], 'store' => $p['store_text']])
+                        @include('enrichment::merchant.scan-indexed', ['indexed' => $p['indexed'], 'store' => $p['store_text'], 'summary' => $p['summary']])
                     @endif
                 </section>
             </div>

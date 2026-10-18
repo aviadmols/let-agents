@@ -103,7 +103,12 @@ final class RunNightlyModelReading
 
                 // The details first; then what a shopper should know from each description (up to
                 // four points, each resting on a quote), which the other family reviews.
-                $tasks = Features::enabled('enrichment.auto_highlights', $shopId) ? [TaskType::ProductExtraction, TaskType::ProductHighlights] : [TaskType::ProductExtraction];
+                $tasks = array_values(array_filter([
+                    TaskType::ProductExtraction,
+                    Features::enabled('enrichment.auto_highlights', $shopId) ? TaskType::ProductHighlights : null,
+                    // A short description of what each product is and is for, for search (FactNotes), after its details.
+                    Features::enabled('enrichment.search_summary', $shopId) ? TaskType::ProductSummary : null,
+                ]));
 
                 for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
                     if ($batch === null) {

@@ -60,7 +60,7 @@ final class CreateTaskFile
     private function build(RunContext $run, string $shopId, TaskType $type, ?string $vocabularyId, int $reviewTier, array $scope, int $limit): ?EnrichmentBatch
     {
         $vocabulary = $vocabularyId === null ? null : EnrichmentVocabulary::query()->find($vocabularyId);
-        $needsVocabulary = $type === TaskType::ProductExtraction || $type === TaskType::ProductHighlights || ($type === TaskType::FactReview && ($scope['subject'] ?? 'product') === 'product');
+        $needsVocabulary = $type === TaskType::ProductExtraction || $type === TaskType::ProductHighlights || $type === TaskType::ProductSummary || ($type === TaskType::FactReview && ($scope['subject'] ?? 'product') === 'product');
 
         if ($needsVocabulary && $vocabulary === null) {
             $run->fail('enrichment::runs.no_vocabulary');

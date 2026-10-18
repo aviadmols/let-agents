@@ -280,6 +280,7 @@ final class ScanSummary extends Page
                 'read_at' => $image->captioned_at?->timezone('Asia/Jerusalem')->format('j.n'),
                 'state' => $image->error !== null ? 'error' : ($image->caption !== null ? 'read' : ($image->captioned_at !== null ? 'unread' : 'waiting')),
             ],
+            'summary' => self::summary((string) $product->id),
             'measurements' => $product->measurements(),
             'options' => array_values(array_map(fn (array $a): array => ['name' => (string) $a['name'], 'values' => implode(', ', $a['values'])], $product->storeAttributes())),
             'variant_rows' => self::variants($product),
@@ -471,6 +472,23 @@ final class ScanSummary extends Page
             ])->values()->all(),
             'unfound' => count(array_diff($named, $known)),
             'indexed' => self::indexed(ChunkSource::Content, (string) $content->id),
+        ];
+    }
+
+    /**
+     * The short description written for search, and whether it is in the search yet (approved) or
+     * waiting for its check. Null when none was written.
+     *
+     * @return array{text: string, state: string}|null
+     */
+    private static function summary(string $productId): ?array
+    {
+        $fact = EnrichmentFact::query()->current()->where('product_id', $productId)->where('kind', FactKind::Summary)
+            ->whereNotIn('status', [FactStatus::Rejected])->latest('id')->first(['value_text', 'status']);
+
+        return $fact === null ? null : [
+            'text' => (string) $fact->value_text,
+            'state' => $fact->status === FactStatus::Approved ? 'in_search' : 'checking',
         ];
     }
 

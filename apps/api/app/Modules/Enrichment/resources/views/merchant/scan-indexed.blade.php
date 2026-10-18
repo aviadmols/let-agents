@@ -8,6 +8,13 @@
         $indexed['at'] ? $t('indexed_at', ['date' => $indexed['at']]) : null,
     ])->filter()->implode(' · ') }}</span>
 </div>
+@if (($summary ?? null) !== null)
+    {{-- the short description written for search: never shown to shoppers, never instead of the store's own text --}}
+    <div class="lp-ask-answer" data-summary>
+        <span class="lp-note">{{ $t('summary') }} · <span class="lp-pill" data-tone="{{ $summary['state'] === 'in_search' ? 'good' : '' }}"><i></i>{{ $t('summary_'.$summary['state']) }}</span></span>
+        <p>{{ $summary['text'] }}</p>
+    </div>
+@endif
 @if ($indexed['pieces'] === [])
     <p class="lp-empty">{{ $t('indexed_empty') }}</p>
 @else
