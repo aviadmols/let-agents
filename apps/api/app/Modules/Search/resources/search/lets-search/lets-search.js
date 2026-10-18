@@ -2919,7 +2919,7 @@
       .then(function (p) { HANDLES[handle] = String(p.id); return HANDLES[handle]; }).catch(function () { return null; });
   }
   function saveFromPage(btn) {
-    (btn.dataset.letsSave ? Promise.resolve(String(btn.dataset.letsSave)) : resolveHandle(btn.dataset.letsHandle)).then(function (id) {
+    (btn.dataset.letsSave ? Promise.resolve(String(btn.dataset.letsSave)) : btn.dataset.letsSlug ? resolveSlug(btn.dataset.letsSlug) : resolveHandle(btn.dataset.letsHandle)).then(function (id) {
       if (!id) { return; }
       btn.dataset.letsSave = id;
       var on = S.saved.indexOf(id) < 0;
@@ -2958,25 +2958,52 @@
     at.insertAdjacentElement('afterend', btn);
     wireSave(btn, String(pid(S.ctx)), false);
   }
-  // a card names its product: WooCommerce by data-product_id or its post-ID class, Shopify by the handle in its link
+  // a card names its product: by a data attribute or a post-ID class (WooCommerce themes), else by its link,
+  // whose Shopify handle or WooCommerce slug becomes the id on the first save (resolveHandle / resolveSlug)
   function cardIdOf(card) {
-    var a = card.querySelector('[data-product_id]');
-    if (a) { return { id: String(a.getAttribute('data-product_id')) }; }
+    var a = card.matches('[data-product_id], [data-product-id], [data-product]') ? card : card.querySelector('[data-product_id], [data-product-id], [data-product]');
+    var v = a && (a.getAttribute('data-product_id') || a.getAttribute('data-product-id') || a.getAttribute('data-product'));
+    if (v && /^\d+$/.test(String(v))) { return { id: String(v) }; }
     var m = String(card.className).match(/(?:^|\s)post-(\d+)(?:\s|$)/);
     if (m) { return { id: m[1] }; }
-    var link = card.querySelector('a[href*="/products/"]');
-    if (link) { var h = String(link.getAttribute('href') || '').split('?')[0].split('#')[0].match(/\/products\/([^\/]+)\/?$/); if (h) { return { handle: decodeURIComponent(h[1]) }; } }
-    return null;
+    var link = card.querySelector('a[href*="/products/"], a[href*="/product/"]');
+    if (!link) { return null; }
+    var path = String(link.getAttribute('href') || '').split('?')[0].split('#')[0];
+    var h = path.match(/\/products\/([^\/]+)\/?$/);
+    if (h) { return { handle: decodeURIComponent(h[1]) }; }
+    var s = path.match(/\/product\/([^\/]+)\/?$/);
+    return s ? { slug: decodeURIComponent(s[1]) } : null;
+  }
+  // WooCommerce names a product by its slug in a card's link; the id comes from the Store API, once, on the first save
+  var SLUGS = {};
+  function resolveSlug(slug) {
+    if (!slug) { return Promise.resolve(null); }
+    if (SLUGS[slug]) { return Promise.resolve(SLUGS[slug]); }
+    var base = STORE || (win.location.origin + '/wp-json/wc/store/v1');
+    return win.fetch(base + '/products?slug=' + encodeURIComponent(slug), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (list) { var p = (list || [])[0]; if (!p || !p.id) { return null; } SLUGS[slug] = String(p.id); return SLUGS[slug]; }).catch(function () { return null; });
+  }
+  // every product card on the page: a known card class, or any link to a product that holds a picture
+  function cards() {
+    var out = [], seen = [];
+    var add = function (card) { if (card && seen.indexOf(card) < 0) { seen.push(card); out.push(card); } };
+    doc.querySelectorAll(CARD_SEL).forEach(add);
+    doc.querySelectorAll('a[href*="/products/"] img, a[href*="/product/"] img').forEach(function (img) {
+      var link = img.closest('a');
+      add(link.closest(CARD_SEL + ', article, li, [data-product], [data-product-id], [data-product_id], product-card') || (link.parentElement && link.parentElement.parentElement) || link);
+    });
+    return out;
   }
   function cardHearts() {
     if (SHORT.heartCards === false) { return; }
-    doc.querySelectorAll(CARD_SEL).forEach(function (card) {
-      if (card.__lsCard || card.querySelector('[data-lets-save], .ls-save')) { return; }
+    cards().forEach(function (card) {
+      if (card.__lsCard || card.querySelector('[data-lets-save], .ls-save') || card.closest('[data-lets-save], .ls-save-host')) { return; }
       var found = cardIdOf(card), img = card.querySelector('img');
       if (!found || !img) { return; }
       card.__lsCard = true;
       var btn = doc.createElement('button'); btn.type = 'button'; btn.className = 'ls-save ls-save--card';
       if (found.handle) { btn.dataset.letsHandle = found.handle; }
+      if (found.slug) { btn.dataset.letsSlug = found.slug; }
       var place = SHORT.heartPlace || 'corner';
       if (place === 'corner') {
         var host = img.closest('a, figure, div') || card; host.classList.add('ls-save-host'); host.appendChild(btn);
