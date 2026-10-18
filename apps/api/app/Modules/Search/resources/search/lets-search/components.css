@@ -249,13 +249,17 @@
 @media (hover: hover) and (pointer: fine) { .ls-card:hover .ls-card__media img { transform: scale(1.04); } }
 /* the second picture: over the first, shown on hover (a mouse only) */
 .ls-pic2 { position: absolute; inset-block-start: 0; inset-inline-start: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; transition: opacity 320ms ease, transform 500ms var(--lsp-ease-out); }
+/* and the first fades out as it comes: a picture shown whole (search.image_fit = frame) leaves the first showing through around it */
+img:not(.ls-pic2):has(+ .ls-pic2) { transition: opacity 320ms ease, transform 500ms var(--lsp-ease-out); }
 @media (hover: hover) and (pointer: fine) { .ls-card:hover .ls-pic2 { opacity: 1; } }
 .ls-card__heart { position: absolute; inset-block-start: 8px; inset-inline-end: 8px; }
 .ls-card__badge { position: absolute; inset-block-start: 10px; inset-inline-start: 10px; height: 24px; padding-inline: 10px; border-radius: 999px; display: inline-flex; align-items: center; background: var(--ls-bg); font-size: var(--lsp-text-xs); font-weight: 500; box-shadow: var(--lsp-shadow-sm); }
 .ls-card__title { font-size: var(--lsp-text-md); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; color: inherit; text-decoration: none; }
 .ls-card__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ls-card__similar { font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 3px; }
-.ls-card.is-out .ls-card__media img { opacity: .45; }
+/* sold out: the picture shown is dimmed, never the second one under it */
+.ls-card.is-out .ls-card__media img:not(.ls-pic2), .ls-card.is-out:hover .ls-pic2 { opacity: .45; }
+@media (hover: hover) and (pointer: fine) { .ls-card:hover .ls-card__media img:has(+ .ls-pic2) { opacity: 0; } }
 .ls-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 14px; }
 
 /* ---------------------------------------------------------------- the drawer */

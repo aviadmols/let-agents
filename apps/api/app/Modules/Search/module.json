@@ -256,6 +256,15 @@
             "unit": "searches"
         },
         {
+            "name": "all_ids",
+            "type": "int",
+            "default": 3000,
+            "min": 100,
+            "max": 20000,
+            "scope": "global",
+            "unit": "products"
+        },
+        {
             "name": "photo_requests_per_minute",
             "type": "int",
             "default": 10,

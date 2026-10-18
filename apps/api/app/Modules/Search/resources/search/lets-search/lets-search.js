@@ -992,19 +992,30 @@
       var d = r.body || {};
       var ids = (d.ids || []).filter(function (id) { return /^p:/.test(id); });
       if (!ids.length) { ids = ((d.groups && d.groups.product) || []).map(function (p) { return p.id; }); }
+      // Nothing by spelling on the server, while the drawer's own index found some: those stay on screen (the
+      // meaning pass may add to them), instead of blinking away
+      var spelled = ids.length;
+      if (!byMeaning && !spelled && (lv.ids || []).length) { ids = lv.ids; }
       lv.ids = ids; lv.server = true; lv.total = d.total || ids.length; lv.focus = d.focus || null;
       lv.single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       lv.content = ((d.groups && d.groups.content) || []).slice(0, 3); lv.cats = ((d.groups && d.groups.category) || []).slice(0, 4);
       lv.actions = d.actions || [];
+      // Nothing by spelling, and the meaning pass still to come: still thinking, not "no results" yet
+      // (it often finds what the store calls by another word). "No results" only once both found nothing.
+      var willMean = !byMeaning && (wordsOf(q).length >= 2 || spelled < 4);
+      lv.pending = willMean && !ids.length;
       readTags(lv);
       renderLive(false);
       if (!byMeaning) {
         clearTimeout(pauseTimer);
         pauseTimer = setTimeout(function () { if (S.live === lv) { countSearch(q, lv.ids.length); } }, PAUSE_MS);
-        if (wordsOf(q).length >= 2 || ids.length < 4) { clearTimeout(meaningTimer); meaningTimer = setTimeout(function () { if (S.live === lv) { liveServer(q, true); } }, 500); }
+        if (willMean) { clearTimeout(meaningTimer); meaningTimer = setTimeout(function () { if (S.live === lv) { liveServer(q, true); } }, 500); }
       }
       return products(filtered(lv).slice(0, 8).map(function (x) { return x.id; })).then(function () { if (S.live === lv) { renderLive(false); } });
-    }).catch(function () { /* the index results stay */ });
+    }).catch(function () {
+      // the index results stay; a thinking mark never stays forever
+      if (S.live && S.live.q === q && S.live.pending) { S.live.pending = false; renderLive(false); }
+    });
   }
   function productSearch(q) { return !isQuestion(q) && q.length >= 3 && hits(q).some(function (r) { return r.t === 'product'; }); }
   // only when opened from the product page's own search row; the header's icon opens the regular search
@@ -1064,7 +1075,7 @@
   // the live view is the results turn itself, as Enter will keep it, with the words still being typed
   function liveHtml(lv) {
     var html = isQuestion(lv.q) ? askRow(lv.q, true) : '';
-    lv.loading = !lv.server && !(lv.ids || []).length;
+    lv.loading = (!lv.server || !!lv.pending) && !(lv.ids || []).length;
     return html + '<section class="ls-turn ls-turn--live"><div class="ls-you"><div class="ls-you__bubble ls-you__bubble--live" dir="auto">' + esc(lv.q) + '<span class="ls-caret" aria-hidden="true"></span></div></div>' + resultsHtml(lv) + '</section>';
   }
   function turnById(id) { return id === 'live' ? S.live : S.turns.filter(function (x) { return x.id === id; })[0]; }
@@ -1077,7 +1088,17 @@
   function says(text, label) {
     var tw = wordsOf(text), lw = wordsOf(label);
     if (!lw.length || lw.join('').length < 2) { return false; }
-    return lw.every(function (w) { return tw.some(function (x) { return x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2); }); });
+    return lw.every(function (w) { return tw.some(function (x) { return x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w); }); });
+  }
+  // The same word as the search engine reads it, through a spelling slip: "לבין" is "לבן", "אדומה" is "אדום"
+  // (its stem, or how it sounds once its look-alike letters are one). Short words must be exact.
+  function alike(x, w) {
+    var E = S.engine;
+    if (!E || !E.normalize || !E.stem || x.length < 3 || w.length < 3) { return false; }
+    try {
+      var a = E.normalize(x), b = E.normalize(w);
+      return E.stem(a) === E.stem(b) || (b.length >= 4 && !!E.sound && E.sound(a) === E.sound(b));
+    } catch (e) { return false; }
   }
   function readTags(turn) {
     var c = C(turn), q = turn.q || '', all = (turn.ids || []).map(rec).filter(Boolean), counts = {}, best = {};

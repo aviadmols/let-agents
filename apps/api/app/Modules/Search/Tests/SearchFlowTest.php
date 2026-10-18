@@ -327,6 +327,21 @@ final class SearchFlowTest extends TestCase
         $this->assertEqualsCanonicalizing(['103', '104'], array_column($result['groups']['product'], 'external_id'));
     }
 
+    public function test_a_search_that_finds_hundreds_hands_the_drawer_every_one_to_filter_and_count(): void
+    {
+        // Rocks: "טבעת זהב לבן" found more than 600 rings, and the drawer counted and filtered 600.
+        $this->inShop(function (): void {
+            for ($i = 1; $i <= 700; $i++) {
+                $this->product((string) (5000 + $i), "טבעת זהב לבן דגם {$i}");
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $ids = $this->getJson("/api/v1/search/{$this->site}?q=".urlencode('טבעת זהב לבן').'&typing=1', ['Origin' => 'https://www.store.test'])->assertOk()->json('ids');
+
+        $this->assertCount(700, array_filter($ids, fn (string $id): bool => (int) substr($id, 2) > 5000));
+    }
+
     public function test_a_shoppers_battery_is_the_stores_battery_while_typing(): void
     {
         // as at the hardware store: one drill shares "עם" with the words, the one with batteries says "סוללות"

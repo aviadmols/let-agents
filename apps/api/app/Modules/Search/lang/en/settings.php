@@ -294,4 +294,8 @@ return [
         'label' => 'Days an IP and a session are kept',
         'description' => 'Then the IP address and the session of searches and photo searches are deleted. The searches stay.',
     ],
+    'all_ids' => [
+        'label' => 'Products a search returns for filtering',
+        'description' => 'Every product found, up to this many, goes to the drawer: its filters, order and count work on them. A search that finds more shows this many.',
+    ],
 ];
