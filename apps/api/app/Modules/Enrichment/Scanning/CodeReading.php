@@ -12,6 +12,7 @@ use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
  *   family       the same product in other sizes (title without sizes, same category)
  *   type         the product type the store category stands for, when the vocabulary maps it
  *   category_choices  choice values the category stands for ("מוקצע לא מחוטא" is untreated)
+ *   variant_choices   every colour and pattern the product's variants come in (catalog_variants)
  *   specs        sizes the vocabulary reads from the title ("20X45 מ"מ" is 20 thick, 45 wide)
  *   pack_count   "100 יח'" in the title
  *   choices      what a shopper must choose on the product page (a length, a volume)
@@ -30,7 +31,12 @@ final class CodeReading
      * How sure each source is: the store's own fields (its type, tags, attributes), then the
      * title, then the start of the description, then what a model saw in the picture.
      */
-    public const CONFIDENCE = ['category' => 0.95, 'field' => 0.95, 'title' => 0.9, 'description' => 0.8, 'image' => 0.7];
+    public const CONFIDENCE = ['category' => 0.95, 'variant' => 0.95, 'field' => 0.95, 'title' => 0.9, 'description' => 0.8, 'image' => 0.7];
+
+    /** The vocabulary attributes the variants answer: the colour a product is sold in, and its pattern. */
+    private const VARIANT_COLOUR_KEYS = ['color', 'colour', 'colors', 'colours'];
+
+    private const VARIANT_PATTERN_KEYS = ['pattern', 'patterns', 'print', 'prints'];
 
     /** The start of the description read for choices, specs and flags: where stores state them. */
     private const HEAD = 600;
@@ -76,6 +82,7 @@ final class CodeReading
         }
 
         $specs = $vocabulary?->titleSpecs($product->title, $type) ?: null;
+        $variantChoices = $vocabulary === null ? [] : self::variantChoices($product, $vocabulary, $type);
 
         return array_filter([
             'version' => self::VERSION,
@@ -86,7 +93,9 @@ final class CodeReading
             'tryon' => TryOnEligibility::decide($vocabulary, $type, $product->title),
             'category_choices' => $vocabulary?->choicesForCategories($categories) ?: null,
             'specs' => $specs,
-            'text_choices' => $text === null ? null : (self::textChoices($vocabulary, $type, $text, $vocabulary->choicesForCategories($categories)) ?: null),
+            'variant_choices' => $variantChoices ?: null,
+            // What the variants said is not read again from the words (the colour option, listed in the fields, names several).
+            'text_choices' => $text === null ? null : (self::textChoices($vocabulary, $type, $text, $vocabulary->choicesForCategories($categories) + array_map(fn (): string => '', $variantChoices)) ?: null),
             'text_specs' => $text === null ? null : (self::textSpecs($vocabulary, $type, $text, $specs ?? []) ?: null),
             'flags' => $text === null ? null : (self::flags($vocabulary, $type, $text) ?: null),
             'pack_count' => self::packCount($product->title),
@@ -165,6 +174,51 @@ final class CodeReading
                 }
                 $out[$key] = ['values' => array_keys($found), 'source' => $source, 'quote' => implode(' · ', array_unique(array_values($found)))];
                 break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The colours and patterns a product is sold in, from its variants (catalog_variants, read in code from
+     * the store's options): every one it comes in, not refused for being several as a text naming several
+     * is. A variant's colour is the vocabulary's value whose words its name says ("כחול כהה" where the shop
+     * keeps "נייבי"), else the one keyed as its shade (navy), else as its family (blue).
+     *
+     * @return array<string, array{values: list<string>, source: string, quote: string}>
+     */
+    private static function variantChoices(CatalogProduct $product, VocabularyDefinition $vocabulary, ?string $type): array
+    {
+        $variants = $product->variants;
+
+        if ($variants->isEmpty()) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($vocabulary->attributes() as $attribute) {
+            $key = (string) $attribute['key'];
+            $pattern = in_array($key, self::VARIANT_PATTERN_KEYS, true);
+            if (($attribute['type'] ?? null) !== 'enum' || (! $pattern && ! in_array($key, self::VARIANT_COLOUR_KEYS, true)) || ! $vocabulary->appliesTo($key, $type)) {
+                continue;
+            }
+
+            $values = array_map(fn (array $v): string => (string) $v['key'], (array) ($attribute['values'] ?? []));
+            $found = [];
+            foreach ($variants as $variant) {
+                $label = (string) $variant->color_label;
+                $named = array_values(array_filter((array) ($attribute['values'] ?? []), fn (array $v): bool => $label !== '' && self::find($label, (array) ($v['patterns'] ?? [])) !== null));
+                $keyed = $pattern
+                    ? array_values(array_intersect(array_filter([$variant->pattern]), $values))
+                    : (array_values(array_intersect((array) $variant->color_shades, $values)) ?: array_values(array_intersect((array) $variant->color_families, $values)));
+                foreach ($named !== [] ? array_map(fn (array $v): string => (string) $v['key'], $named) : $keyed as $value) {
+                    $found[$value] ??= $label !== '' ? $label : $value;
+                }
+            }
+
+            if ($found !== []) {
+                $out[$key] = ['values' => array_keys($found), 'source' => 'variant', 'quote' => implode(' · ', array_unique(array_values($found)))];
             }
         }
 

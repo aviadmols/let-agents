@@ -109,7 +109,7 @@ final class ReadProductsInCode
         $families = [];
         $samples = [];
 
-        foreach (CatalogProduct::query()->whereNull('removed_at')->lazyById(200) as $product) {
+        foreach (CatalogProduct::query()->whereNull('removed_at')->with('variants')->lazyById(200) as $product) {
             $counts['products']++;
             $vocabulary = $branchOf[$product->id] ?? null;
             $reading = CodeReading::read($product, $brands, $vocabulary?->definition(), $readText, isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : null);
@@ -216,6 +216,13 @@ final class ReadProductsInCode
                     $write(['kind' => FactKind::Spec, 'key' => $key, 'value_number' => $spec['value'], 'unit' => $spec['unit'], 'quote' => $spec['quote'], 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_title']);
                 }
 
+                // Every colour and pattern the product is sold in, from its variants: several, not a choice of one.
+                foreach ((array) ($reading['variant_choices'] ?? []) as $key => $choice) {
+                    foreach ($choice['values'] as $value) {
+                        $write(['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_variant',
+                            'confidence' => CodeReading::CONFIDENCE['variant'], 'evidence' => ['source' => 'variant', 'ref' => mb_substr($choice['quote'], 0, 300)]]);
+                    }
+                }
                 // Read from the store's own words, each with how sure its source is and where it was read.
                 foreach ((array) ($reading['text_choices'] ?? []) as $key => $choice) {
                     foreach ($choice['values'] as $value) {
