@@ -309,15 +309,16 @@ final class AnswerSiteQuestion
 
     /**
      * The shop's pages whose title holds a word of the question (a plural as its singular: ביטולים
-     * finds ביטול), most words first, before the passages the meaning search found. Inside the
-     * shop's tenant.
+     * finds ביטול), most words first, before the passages the meaning search found. A question on a
+     * store topic (PrepareStoreAnswers::TOPICS) also finds its page by the topic's other words, in
+     * either language: "מה מדיניות ההחזרות" finds Shopify's "Refund policy". Inside the shop's tenant.
      *
      * @param  list<array<string, mixed>>  $found
      * @return list<array<string, mixed>>
      */
     private function pagesByWords(string $question, array $found): array
     {
-        $words = $this->words($question);
+        $words = [...$this->words($question), ...self::topicWords($question)];
 
         if ($words === []) {
             return $found;
@@ -325,8 +326,9 @@ final class AnswerSiteQuestion
 
         $scores = [];
 
+        // lower(): Postgres compares case, and Shopify's policies are titled "Refund policy".
         foreach (array_unique($words) as $word) {
-            foreach (CatalogContent::query()->active()->where('type', '!=', CatalogContent::KNOWLEDGE)->where('title', 'like', '%'.$word.'%')->limit(10)->pluck('id') as $id) {
+            foreach (CatalogContent::query()->active()->where('type', '!=', CatalogContent::KNOWLEDGE)->whereRaw('lower(title) like ?', ['%'.$word.'%'])->limit(10)->pluck('id') as $id) {
                 $scores[(string) $id] = ($scores[(string) $id] ?? 0) + 1;
             }
         }
@@ -344,6 +346,30 @@ final class AnswerSiteQuestion
         }
 
         return [...$pages, ...$found];
+    }
+
+    /**
+     * The words of every store topic the question is on (Hebrew final letters read as regular, and
+     * without the י a verb adds: "להחזיר" is on החזר, "להחליף" on החלפ).
+     *
+     * @return list<string>
+     */
+    private static function topicWords(string $question): array
+    {
+        $plain = fn (string $text): string => str_replace('י', '', strtr(mb_strtolower($text), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']));
+        $text = $plain($question);
+        $words = [];
+
+        foreach (PrepareStoreAnswers::TOPICS as $said) {
+            foreach ($said as $word) {
+                if (mb_strpos($text, $plain($word)) !== false) {
+                    array_push($words, ...$said);
+                    break;
+                }
+            }
+        }
+
+        return $words;
     }
 
     /**

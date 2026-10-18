@@ -31,4 +31,36 @@ final class PagesByWordsTest extends TestCase
         $this->assertSame(['ביטול עסקה'], array_column($found, 'title'));
         $this->assertSame('ביטול תוך 14 יום.', $found[0]['text']);
     }
+
+    public function test_a_question_on_returns_finds_the_policy_titled_in_english(): void
+    {
+        $shop = Shop::factory()->create();
+
+        $found = app(TenantContext::class)->run($shop->id, function () use ($shop): array {
+            CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => 'page', 'external_id' => 'p1', 'title' => 'Refund policy', 'body' => 'אפשר להחזיר תוך 14 יום.', 'hash' => 'h1']);
+            CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => 'page', 'external_id' => 'p2', 'title' => 'Shipping', 'body' => 'משלוח עד 5 ימי עסקים.', 'hash' => 'h2']);
+            CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => 'page', 'external_id' => 'p3', 'title' => 'הסיפור שלנו', 'body' => 'מאז 1990.', 'hash' => 'h3']);
+            CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => 'page', 'external_id' => 'p4', 'title' => 'ביטול עסקה', 'body' => 'ביטול תוך 14 יום.', 'hash' => 'h4']);
+
+            $method = new ReflectionMethod(AnswerSiteQuestion::class, 'pagesByWords');
+            $answers = app(AnswerSiteQuestion::class);
+
+            return [
+                'returns' => array_column($method->invoke($answers, 'מה מדיניות ההחזרות', []), 'title'),
+                'verb' => array_column($method->invoke($answers, 'האם אפשר להחזיר מוצר?', []), 'title'),
+                'delivery' => array_column($method->invoke($answers, 'תוך כמה זמן יש משלוח?', []), 'title'),
+                'story' => array_column($method->invoke($answers, 'מאיפה התכשיט?', []), 'title'),
+                // In English the same: a policy in either language.
+                'english' => array_column($method->invoke($answers, 'What is your return policy?', []), 'title'),
+                'cancel' => array_column($method->invoke($answers, 'Can I cancel my order?', []), 'title'),
+            ];
+        });
+
+        $this->assertSame(['Refund policy'], $found['returns']);
+        $this->assertSame(['Refund policy'], $found['verb']);
+        $this->assertSame(['Shipping'], $found['delivery']);
+        $this->assertSame([], $found['story']);
+        $this->assertSame(['Refund policy'], $found['english']);
+        $this->assertSame(['ביטול עסקה'], $found['cancel']);
+    }
 }
