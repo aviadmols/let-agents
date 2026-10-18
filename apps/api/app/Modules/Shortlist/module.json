@@ -51,6 +51,25 @@
             "scope": "shop"
         },
         {
+            "name": "heart_on_product",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "heart_on_cards",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "heart_place",
+            "type": "enum",
+            "options": ["corner", "price", "cart"],
+            "default": "corner",
+            "scope": "shop"
+        },
+        {
             "name": "requests_per_minute",
             "type": "int",
             "default": 60,

@@ -88,8 +88,13 @@ final class ShortlistTest extends TestCase
         Features::override('shortlist.compare', true, $this->shop->id);
         $config = $this->getJson("/api/v1/shortlist/{$this->site}/config?locale=he")->assertOk()->json();
         // What the search drawer reads, and nothing of the old buttons' placement.
-        $this->assertSame(['compare', 'wishlist', 'compareMax', 'wishlistWhatsapp', 'phoneLogin', 'shopName', 'labels'], array_keys($config));
+        $this->assertSame(['compare', 'wishlist', 'compareMax', 'wishlistWhatsapp', 'phoneLogin', 'heartProduct', 'heartCards', 'heartPlace', 'shopName', 'labels'], array_keys($config));
         $this->assertSame([true, false, 5, 'Rocks and Gold', false], [$config['compare'], $config['wishlist'], $config['compareMax'], $config['shopName'], $config['phoneLogin']]);
+        $this->assertSame([false, false, 'corner'], [$config['heartProduct'], $config['heartCards'], $config['heartPlace']], 'no hearts on the store\'s pages while the wishlist is off');
+
+        Features::override('shortlist.wishlist', true, $this->shop->id);
+        $config = $this->getJson("/api/v1/shortlist/{$this->site}/config?locale=he")->assertOk()->json();
+        $this->assertSame([true, true, 'corner'], [$config['heartProduct'], $config['heartCards'], $config['heartPlace']], 'the hearts come with the wishlist');
         $this->assertSame('רשימת המשאלות שלי ב:shop', $config['labels']['share_text']);
         $this->assertSame('התנתקות', $config['labels']['phone_out']);
         $this->assertArrayHasKey('phone_consent', $config['labels']);

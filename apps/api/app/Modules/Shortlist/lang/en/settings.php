@@ -13,6 +13,19 @@ return [
         'label' => 'Sharing the list on WhatsApp',
         'description' => 'A "Send on WhatsApp" button beside "Copy link". Off: the link can only be copied.',
     ],
+    'heart_on_product' => [
+        'label' => 'A save button on the product page',
+        'description' => 'A "Save" heart beside the add-to-cart button. On a save the picture flies to the search icon, the icon turns into a heart for a moment, and a dot stays on it. No number: the cart stays the only counter in the header.',
+    ],
+    'heart_on_cards' => [
+        'label' => 'A heart on product cards',
+        'description' => 'On category pages and product lists, on every card. The same behaviour as on the product page.',
+    ],
+    'heart_place' => [
+        'label' => 'Where the heart sits on a card',
+        'description' => 'In the top corner of the picture, beside the price, or beside the add-to-cart button.',
+        'options' => ['corner' => 'Corner of the picture', 'price' => 'Beside the price', 'cart' => 'Beside add to cart'],
+    ],
     'requests_per_minute' => [
         'label' => 'Requests per minute from one shopper',
         'description' => 'A limit on heart and compare clicks from one address, per site.',

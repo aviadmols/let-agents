@@ -52,6 +52,10 @@ final class ShortlistController
                 'wishlistWhatsapp' => (bool) Settings::get('shortlist.wishlist_whatsapp', $shopId),
                 // Keeping the list by phone, with a code by SMS: only where the shop turned it on and the platform can text.
                 'phoneLogin' => $wishlist && Features::enabled('shortlist.wishlist_phone', $shopId) && app(SendsSms::class)->ready(),
+                // The hearts on the store's own pages: beside add to cart, and on the cards of a category page.
+                'heartProduct' => $wishlist && (bool) Settings::get('shortlist.heart_on_product', $shopId),
+                'heartCards' => $wishlist && (bool) Settings::get('shortlist.heart_on_cards', $shopId),
+                'heartPlace' => (string) Settings::get('shortlist.heart_place', $shopId),
                 // For the share message: "My wishlist at Rocks and Gold".
                 'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
                 // The words the drawer takes from the store: signing in by phone and the share message.

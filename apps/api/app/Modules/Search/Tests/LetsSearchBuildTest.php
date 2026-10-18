@@ -53,4 +53,14 @@ final class LetsSearchBuildTest extends TestCase
         $this->assertStringContainsString('win.LA_ENGINE', $built, 'the drawer reads the engine');
         $this->assertStringNotContainsString('/*@@CSS@@*/', $built, 'the stylesheets are inlined');
     }
+
+    /** Saving from the store's own page: the heart, the flight to the launcher, the turnover, the dot, the first-time hint. */
+    public function test_the_built_file_carries_the_save_from_the_store_page(): void
+    {
+        $built = (string) file_get_contents(self::BUILT);
+
+        foreach (['data-lets-save', 'ls-save--card', 'ls-mini-heart', 'ls-launch__badge', 'is-receiving', 'ls_save_hint_seen', 'ls-fly', 'heartProduct', 'heartCards', 'heartPlace', 'products/\' + handle + \'.js'] as $mark) {
+            $this->assertStringContainsString($mark, $built, $mark);
+        }
+    }
 }

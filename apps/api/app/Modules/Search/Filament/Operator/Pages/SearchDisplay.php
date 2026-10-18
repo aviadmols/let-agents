@@ -109,6 +109,10 @@ class SearchDisplay extends Page
             'images' => (string) Settings::get('search.image_fit', $shop),
             'similar' => Features::enabled('search.similar', $shop),
             'selector' => (string) Settings::get('search.input_selector', $shop),
+            // The hearts on the store's own pages (Shortlist), shown here because they belong to how the search looks.
+            'heart_product' => (bool) Settings::get('shortlist.heart_on_product', $shop),
+            'heart_cards' => (bool) Settings::get('shortlist.heart_on_cards', $shop),
+            'heart_place' => (string) Settings::get('shortlist.heart_place', $shop),
         ];
     }
 
@@ -143,6 +147,9 @@ class SearchDisplay extends Page
             Settings::set('search.show_price', (bool) ($d['price'] ?? true), $shop);
             Settings::set('search.show_cart', (bool) ($d['cart'] ?? true), $shop);
             Settings::set('search.image_fit', ($d['images'] ?? 'cover') === 'frame' ? 'frame' : 'cover', $shop);
+            Settings::set('shortlist.heart_on_product', (bool) ($d['heart_product'] ?? true), $shop);
+            Settings::set('shortlist.heart_on_cards', (bool) ($d['heart_cards'] ?? true), $shop);
+            Settings::set('shortlist.heart_place', in_array($d['heart_place'] ?? '', ['price', 'cart'], true) ? $d['heart_place'] : 'corner', $shop);
 
             $message = trim((string) ($d['whatsapp_message'] ?? ''));
             $message === '' ? Settings::clear('assistant.search_whatsapp_message', $shop) : Settings::set('assistant.search_whatsapp_message', $message, $shop);

@@ -156,6 +156,21 @@
                     </div>
                 </div>
 
+                <div class="lad-opt">
+                    <div style="flex:1 1 240px">
+                        <span class="lad-lbl">{{ $t('look.hearts') }}</span>
+                        <label class="lad-chk"><input type="checkbox" wire:model.live="data.heart_product">{{ $t('look.heart_product') }}</label>
+                        <label class="lad-chk"><input type="checkbox" wire:model.live="data.heart_cards">{{ $t('look.heart_cards') }}</label>
+                        <p class="lad-help">{{ $t('look.hearts_help') }}</p>
+                    </div>
+                    <div style="flex:1 1 240px">
+                        <span class="lad-lbl">{{ $t('look.heart_place') }}</span>
+                        @foreach (['corner', 'price', 'cart'] as $place)
+                            <label class="lad-chk"><input type="radio" name="lad-heart-place" value="{{ $place }}" wire:model.live="data.heart_place">{{ $t('look.heart_place_'.$place) }}</label>
+                        @endforeach
+                    </div>
+                </div>
+
                 <div class="lad-row" style="margin-top:16px;border-top:1px solid var(--lad-line)">
                     <div class="lad-rt">
                         <b id="lad-content-meaning">{{ $t('look.content_meaning.label') }}</b>
