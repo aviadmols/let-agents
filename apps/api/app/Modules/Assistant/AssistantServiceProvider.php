@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\SuggestQuestions;
 use App\Modules\Assistant\Console\AnswerReportCommand;
@@ -21,6 +22,7 @@ use App\Modules\Assistant\Contracts\SuggestsQuestions;
 use App\Modules\Assistant\Listeners\ReadShopKnowledge;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\AssistantHome;
+use App\Modules\Assistant\Support\AssistantTimeline;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -32,6 +34,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([AssistantTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([AssistantHome::class], HomeSource::TAG);
         $this->app->bind(SuggestsQuestions::class, SuggestQuestions::class);

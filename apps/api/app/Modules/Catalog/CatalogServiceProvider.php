@@ -4,6 +4,7 @@ namespace App\Modules\Catalog;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Catalog\Console\BuildVariantsCommand;
 use App\Modules\Catalog\Console\ReadPageChoicesCommand;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
@@ -16,6 +17,7 @@ use App\Modules\Catalog\Listeners\MoveCatalogLinks;
 use App\Modules\Catalog\Listeners\RebuildNamedVariants;
 use App\Modules\Catalog\Support\CatalogProductKinds;
 use App\Modules\Catalog\Support\CatalogScanDetails;
+use App\Modules\Catalog\Support\CatalogTimeline;
 use App\Modules\Connections\Events\StoreAddressMoved;
 use App\Modules\Runs\Enums\RunTrigger;
 use Illuminate\Console\Scheduling\Schedule;
@@ -25,6 +27,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([CatalogTimeline::class], TimelineSource::TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([CatalogScanDetails::class], ScanDetails::TAG);
         $this->app->singleton(ProductKinds::class, CatalogProductKinds::class);

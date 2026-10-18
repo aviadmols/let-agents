@@ -996,7 +996,7 @@
       BODY.scrollTop = newest && first ? Math.max(0, first.offsetTop - 8) : keep;
     } else { BODY.scrollTop = newest ? 0 : keep; }
   }
-  function credit() { return '<div class="ls-credit">' + mark() + '<a href="https://lets.ai" target="_blank" rel="noopener">' + esc(t('powered')) + '</a></div>'; }
+  function credit() { return '<div class="ls-credit">' + mark() + '<a href="https://lets.co.il/" target="_blank" rel="noopener">' + esc(t('powered')) + '</a></div>'; }
   // On a product page the questions go with the product, invisibly: the field says so, nothing else does.
   function renderCtx() {
     var ph = S.askMode && S.ctx && rec(S.ctx) ? t('placeholderProduct') : t('placeholder');

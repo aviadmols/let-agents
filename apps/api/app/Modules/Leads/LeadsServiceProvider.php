@@ -4,9 +4,11 @@ namespace App\Modules\Leads;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Leads\Actions\OfferCallToAction;
 use App\Modules\Leads\Console\LeadsCommand;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
+use App\Modules\Leads\Support\LeadTimeline;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -16,6 +18,7 @@ final class LeadsServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([LeadTimeline::class], TimelineSource::TAG);
         $this->app->bind(OffersCallsToAction::class, OfferCallToAction::class);
     }
 

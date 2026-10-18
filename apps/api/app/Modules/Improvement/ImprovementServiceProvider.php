@@ -4,14 +4,17 @@ namespace App\Modules\Improvement;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Improvement\Console\ImprovementCommand;
 use App\Modules\Improvement\Support\ImprovementHome;
+use App\Modules\Improvement\Support\ImprovementTimeline;
 use Illuminate\Console\Scheduling\Schedule;
 
 final class ImprovementServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([ImprovementTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ImprovementHome::class], HomeSource::TAG);
     }

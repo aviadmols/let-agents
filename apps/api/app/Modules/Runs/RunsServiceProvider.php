@@ -4,6 +4,7 @@ namespace App\Modules\Runs;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Runs\Contracts\CallJournal;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Models\Run;
@@ -11,6 +12,7 @@ use App\Modules\Runs\Models\RunCall;
 use App\Modules\Runs\Support\CallLog;
 use App\Modules\Runs\Support\RunRecorder;
 use App\Modules\Runs\Support\RunStack;
+use App\Modules\Runs\Support\RunTimeline;
 use App\Modules\Runs\Support\ScanHome;
 use Illuminate\Console\Scheduling\Schedule;
 
@@ -18,6 +20,7 @@ final class RunsServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
+        $this->app->tag([RunTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ScanHome::class], HomeSource::TAG);
         $this->app->bind(RecordsRuns::class, RunRecorder::class);
