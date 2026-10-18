@@ -91,7 +91,7 @@
       leadNeedName: 'איך קוראים לך?', leadBadContact: 'צריך טלפון (9–10 ספרות) או כתובת מייל', leadNeedConsent: 'צריך לאשר כדי שנוכל לחזור אליך', leadDone: 'קיבלנו, :name. נחזור אליך :when.', leadDoneSub: 'השאלה והפרטים נשלחו לצוות של :shop.', leadDeclined: 'בסדר גמור. אפשר להמשיך לשאול אותי כל דבר.', leadError: 'משהו השתבש בשליחה. נסו שוב.',
       error: 'משהו השתבש בדרך', errorSub: 'החיבור נקטע לפני שהתשובה הגיעה. השאלה נשמרה.', retry: 'נסו שוב',
       photoTitle: 'חיפוש לפי תמונה', photoDrop: 'גררו לכאן תמונה, או בחרו אחת', photoDropMobile: 'צלמו מוצר או בחרו תמונה מהגלריה', photoChoose: 'בחירת תמונה', photoTake: 'צילום', photoPrivate: 'JPG, PNG או WEBP עד :mb · התמונה משמשת רק לחיפוש הזה ולא נשמרת',
-      photoBig: 'התמונה גדולה מדי. אפשר עד :mb.', photoType: 'אפשר לחפש לפי JPG, PNG או WEBP.', photoSeen: 'זיהינו:', photoBest: 'הכי דומה', photoTagSite: 'לחפש "‎:t‎" בכל האתר', photoUnclear: 'התמונה לא ברורה מספיק כדי לזהות מה יש בה. תמונה קרובה יותר, באור טוב, של פריט אחד, תעזור.', photoAgain: 'נסו תמונה אחרת', photoWords: 'תארו במילים', photoNothing: 'זיהינו :seen, אבל אין משהו דומה בחנות.', photoNothingPlain: 'לא מצאנו בתמונה משהו שנמכר באתר.', photoOnlyTags: 'לא מצאנו מוצר שנראה בדיוק כך. אפשר לחפש לפי מה שבתמונה:', photoFailed: 'לא הצלחנו לחפש לפי התמונה. נסו שוב.', yourPhoto: 'התמונה שלכם',
+      photoBig: 'התמונה גדולה מדי. אפשר עד :mb.', photoType: 'אפשר לחפש לפי JPG, PNG או WEBP.', photoSeen: 'זיהינו:', photoWhich: 'מה לחפש מהתמונה?', photoBest: 'הכי דומה', photoTagSite: 'לחפש "‎:t‎" בכל האתר', photoUnclear: 'התמונה לא ברורה מספיק כדי לזהות מה יש בה. תמונה קרובה יותר, באור טוב, של פריט אחד, תעזור.', photoAgain: 'נסו תמונה אחרת', photoWords: 'תארו במילים', photoNothing: 'זיהינו :seen, אבל אין משהו דומה בחנות.', photoNothingPlain: 'לא מצאנו בתמונה משהו שנמכר באתר.', photoOnlyTags: 'לא מצאנו מוצר שנראה בדיוק כך. אפשר לחפש לפי מה שבתמונה:', photoFailed: 'לא הצלחנו לחפש לפי התמונה. נסו שוב.', yourPhoto: 'התמונה שלכם',
       similarTo: 'דומים ל־', noSimilar: 'לא מצאנו פריטים דומים.',
       about: 'על המוצר הזה', askingAbout: 'שואלים על:', removeContext: 'הסרת ההקשר', popular30: 'פופולרי בחנות', specs: 'מפרט בקצרה', faq: 'שאלות שגולשים שאלו', promises: 'מה החנות מבטיחה', alternatives: 'מוצרים דומים', saleAlt: 'דומים במבצע', seeAll: 'הכול', aboutNote: 'התשובות נכתבות מהמידע על המוצר בלבד.',
       compareViewed: 'השוואה למוצר שראיתם קודם', talkTitle: 'רוצים לדבר עם מישהו שמבין?', talkBtn: 'לשיחה בוואטסאפ',
@@ -141,7 +141,7 @@
       leadNeedName: 'What\'s your name?', leadBadContact: 'Enter a phone number or an email address', leadNeedConsent: 'Please agree so we can get back to you', leadDone: 'Got it, :name. We\'ll get back to you :when.', leadDoneSub: 'Your question and details went to the :shop team.', leadDeclined: 'No problem. Ask me anything else.', leadError: 'Something went wrong. Try again.',
       error: 'Something went wrong', errorSub: 'The connection dropped before the answer arrived. Your question is saved.', retry: 'Try again',
       photoTitle: 'Search by photo', photoDrop: 'Drop a photo here, or choose one', photoDropMobile: 'Take a photo or choose one from your gallery', photoChoose: 'Choose a photo', photoTake: 'Take a photo', photoPrivate: 'JPG, PNG or WEBP up to :mb · used only for this search, never stored',
-      photoBig: 'That photo is too big. Up to :mb.', photoType: 'Use a JPG, PNG or WEBP photo.', photoSeen: 'We see:', photoBest: 'Closest', photoTagSite: 'Search "‎:t‎" across the site', photoUnclear: 'The photo isn\'t clear enough to tell what\'s in it. A closer, well-lit photo of one item helps.', photoAgain: 'Try another photo', photoWords: 'Describe it', photoNothing: 'We see :seen, but nothing like it in the store.', photoNothingPlain: 'Nothing in the photo is sold here.', photoOnlyTags: 'Nothing looks exactly like it. Search by what\'s in the photo:', photoFailed: 'Couldn\'t search by this photo. Try again.', yourPhoto: 'Your photo',
+      photoBig: 'That photo is too big. Up to :mb.', photoType: 'Use a JPG, PNG or WEBP photo.', photoSeen: 'We see:', photoWhich: 'Which one should we look for?', photoBest: 'Closest', photoTagSite: 'Search "‎:t‎" across the site', photoUnclear: 'The photo isn\'t clear enough to tell what\'s in it. A closer, well-lit photo of one item helps.', photoAgain: 'Try another photo', photoWords: 'Describe it', photoNothing: 'We see :seen, but nothing like it in the store.', photoNothingPlain: 'Nothing in the photo is sold here.', photoOnlyTags: 'Nothing looks exactly like it. Search by what\'s in the photo:', photoFailed: 'Couldn\'t search by this photo. Try again.', yourPhoto: 'Your photo',
       similarTo: 'Similar to ', noSimilar: 'No similar items found.',
       about: 'About this product', askingAbout: 'Asking about:', removeContext: 'Remove context', popular30: 'Popular', specs: 'Key specs', faq: 'Questions shoppers asked', promises: 'The store promises', alternatives: 'Similar products', saleAlt: 'Similar on sale', seeAll: 'All', aboutNote: 'Answers come from the product\'s information only.',
       compareViewed: 'Compared with what you viewed', talkTitle: 'Want to talk to someone who knows?', talkBtn: 'Chat on WhatsApp',
@@ -905,6 +905,8 @@
     // "Powered by": always at the drawer's foot, outside the scrolling body
     credit();
   var INPUT = D.querySelector('input'), FIELD = D.querySelector('[data-field]'), SUG = D.querySelector('.ls-suggest'), SUGIN = SUG.firstChild, BODY = D.querySelector('.ls-dbody'), FLOW = D.querySelector('.ls-flow');
+  // the photos of this visit's photo searches, by turn, in memory only: "which of the things in it" sends one again
+  var PHOTOS = {};
   var LAYER = D.querySelector('.ls-layer'), LSCRIM = D.querySelector('.ls-layer-scrim'), TOAST = D.querySelector('.ls-toast'), MENU = D.querySelector('.ls-menu');
   var TABS = D.querySelector('.ls-tabs');
 
@@ -1846,9 +1848,16 @@
     S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; hideLive(); INPUT.value = ''; FIELD.classList.remove('has-text');
     var turn = addTurn({ kind: 'photo', src: src, loading: true });
     BODY.scrollTop = 0;
-    // as SearchPhotoController reads it: the photo, and the visit beside it for the reports
+    // kept in memory (never stored) for "which of the things in the photo": the same photo is sent again
+    PHOTOS[turn.id] = blob;
+    photoFetch(turn, blob, 0);
+  }
+  // the photo, read for one of the things in it (0: the one it saw first); its first reading is remembered
+  // on the server by the photo itself, so choosing another thing asks no model to look again
+  function photoFetch(turn, blob, item) {
     var form = new FormData(), seen = visit();
     form.append('photo', blob, 'photo.jpg');
+    if (item) { form.append('item', String(item)); }
     if (seen.sid) { form.append('sid', seen.sid); }
     form.append('page', seen.page);
     if (seen.ref) { form.append('ref', seen.ref); }
@@ -1861,10 +1870,19 @@
       d = d.data || d;
       var ps = ((d.groups && d.groups.product) || []).map(function (p) { return { id: pid(p.external_id || p.id), match: p.match }; }).filter(function (p) { return rec(p.id); });
       return products(ps.slice(0, 6).map(function (p) { return p.id; })).then(function () {
-        update(turn, { loading: false, ids: ps.map(function (p) { return p.id; }), tags: d.tags || [], seen: d.seen || '', unclear: !!d.unclear, nothing: !!d.nothing, items: d.items || null, off: {} });
+        update(turn, { loading: false, ids: ps.map(function (p) { return p.id; }), tags: d.tags || [], seen: d.seen || '', unclear: !!d.unclear, nothing: !!d.nothing, items: d.items || null, item: d.item || 0, off: {} });
         visitStep('photo', { label: String(d.seen || '').slice(0, 200), n: ps.length });
       });
     }).catch(function () { update(turn, { loading: false, failed: true }); });
+  }
+  // several separate things in the photo (a shirt and jeans, two necklaces): which one to search, the one
+  // shown first chosen; only while the photo is still in memory to send again
+  function photoItems(turn) {
+    if (!turn.items || turn.items.length < 2 || !PHOTOS[turn.id]) { return ''; }
+    return '<div class="ls-which" role="group" aria-label="' + esc(t('photoWhich')) + '"><div class="ls-which__t">' + esc(t('photoWhich')) + '</div><div class="ls-chips">' +
+      turn.items.map(function (name, i) {
+        return '<button class="ls-chip" aria-pressed="' + (i === (turn.item || 0)) + '" data-photo-item="' + esc(turn.id + ':' + i) + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(name) + '</button>';
+      }).join('') + '</div></div>';
   }
   function photoHtml(turn) {
     if (turn.loading) { return thinking(t('thinkingPhoto')); }
@@ -1883,7 +1901,7 @@
     }
     var off = Object.keys(turn.off).filter(function (k) { return turn.off[k]; }).map(Number);
     var list = turn.ids.map(rec).filter(Boolean);
-    var html = (turn.seen ? '<div class="ls-seen"><span class="ls-seen__label">' + esc(t('photoSeen')) + ' <b>' + esc(turn.seen) + '</b></span></div>' : '') + tagRow(false);
+    var html = photoItems(turn) + (turn.seen ? '<div class="ls-seen"><span class="ls-seen__label">' + esc(t('photoSeen')) + ' <b>' + esc(turn.seen) + '</b></span></div>' : '') + tagRow(false);
     if (off.length) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('photoTagSite', { t: (turn.tags || []).filter(function (x, i) { return off.indexOf(i) < 0; }).map(function (x) { return x.title; }).join(' ') })) + ' · <button class="ls-btn ls-btn--link" data-q="' + esc((turn.tags || []).filter(function (x, i) { return off.indexOf(i) < 0; }).map(function (x) { return x.title; }).join(' ')) + '">' + esc(LANG === 'he' ? 'חיפוש' : 'Search') + '</button></span></div>'; }
     html += '<div class="ls-grid" style="margin-top:12px">' + list.slice(0, 6).map(function (r, i) { var c = card(r); return i === 0 ? c.replace('<span class="ls-card__heart">', '<span class="ls-best">' + esc(t('photoBest')) + '</span><span class="ls-card__heart">') : c; }).join('') + '</div>';
     return html;
@@ -2821,6 +2839,11 @@
     if (d.leadFlowNo) { var ln = turnById(d.leadFlowNo); if (ln && ln.leadFlow && !ln.leadFlow.busy) { leadStep(ln, { declined: true }); } return; }
     if (d.leadNo) { var lt2 = S.turns.filter(function (x) { return x.id === d.leadNo; })[0]; update(lt2, { lead: 'no' }); return; }
     if (d.tagOff) { var pr = d.tagOff.split(':'), pt = S.turns.filter(function (x) { return x.id === pr[0]; })[0]; pt.off[pr[1]] = !pt.off[pr[1]]; persist(); render(); return; }
+    if (d.photoItem) {
+      var pi = d.photoItem.split(':'), ptn = S.turns.filter(function (x) { return x.id === pi[0]; })[0], at = Number(pi[1]);
+      if (ptn && PHOTOS[ptn.id] && at !== (ptn.item || 0)) { update(ptn, { loading: true }); photoFetch(ptn, PHOTOS[ptn.id], at); }
+      return;
+    }
     if (d.compare !== undefined) { compare(); return; }
     if (d.copy !== undefined) {
       wishShare(function (link) { link = link || win.location.origin + win.location.pathname + '?lsShared=' + S.saved.join(','); copyText(link, function () { toast(t('copied')); }); });
