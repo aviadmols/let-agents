@@ -6,7 +6,9 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Contracts\ProductKinds;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
@@ -86,6 +88,15 @@ final class SearchCatalog
     /** Reciprocal rank constant: how much a lower rank still counts. */
     private const RRF_K = 60;
 
+    /** The guides by meaning whose products are suggested for a question about a need. */
+    private const GUIDES_FOR_PRODUCTS = 2;
+
+    /** Products taken from each of those guides, in the guide's order. */
+    private const GUIDED_PRODUCTS = 6;
+
+    /** What a guide's products weigh in the merge beside what the words, the meaning and the pictures found. */
+    private const GUIDED_WEIGHT = 0.5;
+
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly SemanticSearch $semantic,
@@ -142,7 +153,12 @@ final class SearchCatalog
             // "מברגה שחורה" is not about black screwdrivers. Products keep their wider net.
             $spelling = array_values(array_filter($spelling, fn (array $hit): bool => ! str_starts_with($hit['id'], 'c:') || $hit['full']));
             $byMeaning = $meaning;
-            $meaning = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : [];
+            $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => []];
+            $meaning = $near['products'];
+            // Guides and pages found by meaning are a group of their own, never a rank among products: an
+            // old article never pushes a product down. What a guide about the need links to may still be
+            // suggested, after what the words and the meaning found themselves (guided()).
+            $guides = $this->guides($shopId, $near['content'], $index['records']);
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
 
             // "טבעת יהלום סוליטר בכסף": when products hold every word, only they are shown, however
@@ -175,7 +191,18 @@ final class SearchCatalog
             $subject = str_contains($query, ' ') && $asks
                 ? $this->subjectProducts($index, $query, $spelling)
                 : [];
-            $ranked = $this->merge($spelling, [$meaning, $pictures], [...$pinned, ...$subject]);
+            // A question about a need ("איך בונים פרגולה?") finds the guide about it: the products the guide
+            // names come as one more list, the last and lightest, so they never beat a product found directly.
+            $guided = $asks && $guides !== [] ? $this->guided($guides, $index['records']) : [];
+            if (isset($whole) && $whole !== []) {
+                $guided = array_values(array_filter($guided, fn (string $id): bool => isset($whole[$id])));
+            }
+            if (isset($held)) {
+                $guided = array_values(array_filter($guided, fn (string $id): bool => isset($held[$id])));
+            }
+            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided], [...$pinned, ...$subject], [1.0, 1.0, self::GUIDED_WEIGHT]);
+            // The guides by meaning after those the words found, each once.
+            $ranked = [...$ranked, ...array_values(array_diff(array_column($guides, 'id'), $ranked))];
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
 
             $groups = array_fill_keys(self::GROUPS, []);
@@ -236,7 +263,7 @@ final class SearchCatalog
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 
@@ -948,30 +975,113 @@ final class SearchCatalog
     }
 
     /**
-     * Record ids found by meaning, nearest first.
+     * Product ids found by meaning, nearest first, and the guides and pages the same one question found
+     * (their own group, see guides()).
      *
      * @param  array<string, array<string, mixed>>  $records
-     * @return list<string>
+     * @return array{products: list<string>, content: list<array{external_id: string, similarity: float}>}
      */
     private function meaning(string $shopId, string $query, array $records): array
     {
         if (! Features::enabled('search.semantic', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
-            return [];
+            return ['products' => [], 'content' => []];
         }
 
         $limit = (int) Settings::get('search.semantic_results');
         $floor = (float) Settings::get('search.semantic_min_similarity');
-        // A guide or a page by meaning only when it is plainly about the words: a page about carts
-        // is a little like anything a hardware store sells.
-        // Only where the shop wants guides by meaning at all; otherwise a guide must hold the words.
-        $contentFloor = Features::enabled('search.content_by_meaning', $shopId) ? max($floor, (float) Settings::get('search.content_min_similarity')) : INF;
-        $ids = [];
+        $out = ['products' => [], 'content' => []];
 
         foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {
-            $id = ($hit['source'] === 'product' ? 'p:' : 'c:').$hit['external_id'];
+            if ($hit['source'] !== 'product') {
+                $out['content'][] = ['external_id' => (string) $hit['external_id'], 'similarity' => (float) $hit['similarity']];
 
-            if ($hit['similarity'] >= ($hit['source'] === 'product' ? $floor : $contentFloor) && isset($records[$id])) {
-                $ids[] = $id;
+                continue;
+            }
+
+            $id = 'p:'.$hit['external_id'];
+
+            if ($hit['similarity'] >= $floor && isset($records[$id])) {
+                $out['products'][] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Guides and pages found by meaning, the nearest first, each a little less near the older it is: a
+     * guide about the words, not one a little like anything the store sells. Only where the shop wants
+     * guides by meaning at all; otherwise a guide must hold the words.
+     *
+     * @param  list<array{external_id: string, similarity: float}>  $near  what meaning() found
+     * @param  array<string, array<string, mixed>>  $records
+     * @return list<array{id: string, similarity: float}>
+     */
+    private function guides(string $shopId, array $near, array $records): array
+    {
+        if ($near === [] || ! Features::enabled('search.content_by_meaning', $shopId)) {
+            return [];
+        }
+
+        $floor = max((float) Settings::get('search.semantic_min_similarity'), (float) Settings::get('search.content_min_similarity'));
+        $hits = [];
+
+        foreach ($near as $hit) {
+            $id = 'c:'.$hit['external_id'];
+
+            if ($hit['similarity'] >= $floor && isset($records[$id])) {
+                $hits[$hit['external_id']] = ['id' => $id, 'similarity' => (float) $hit['similarity']];
+            }
+        }
+
+        if ($hits === []) {
+            return [];
+        }
+
+        // An article of years ago weighs a little less than this year's on the same subject.
+        $perYear = (float) Settings::get('search.content_age_penalty');
+        $dated = CatalogContent::query()->whereIn('external_id', array_map('strval', array_keys($hits)))->pluck('source_updated_at', 'external_id');
+        foreach ($hits as $external => &$hit) {
+            $at = $dated[(string) $external] ?? null;
+            $years = $at === null ? 0.0 : max(0.0, now()->diffInDays($at, true) / 365);
+            $hit['similarity'] -= min(3.0, $years) * $perYear;
+        }
+        unset($hit);
+
+        $hits = array_values($hits);
+        usort($hits, fn (array $a, array $b): int => $b['similarity'] <=> $a['similarity']);
+
+        return $hits;
+    }
+
+    /**
+     * The products the nearest guides name or were matched to (EnrichmentContentProduct), in the guide's
+     * own order: what a shopper asking about the need is likely to want.
+     *
+     * @param  list<array{id: string, similarity: float}>  $guides
+     * @param  array<string, array<string, mixed>>  $records
+     * @return list<string>
+     */
+    private function guided(array $guides, array $records): array
+    {
+        $externals = array_map(fn (array $g): string => substr($g['id'], 2), array_slice($guides, 0, self::GUIDES_FOR_PRODUCTS));
+        $contents = CatalogContent::query()->whereIn('external_id', $externals)->pluck('id', 'external_id');
+        $ids = [];
+
+        foreach ($externals as $external) {
+            if (! isset($contents[$external])) {
+                continue;
+            }
+
+            $linked = EnrichmentContentProduct::query()->where('content_id', $contents[$external])->orderBy('rank')
+                ->with('product:id,external_id,removed_at')->limit(self::GUIDED_PRODUCTS)->get();
+
+            foreach ($linked as $link) {
+                $id = $link->product !== null && $link->product->removed_at === null ? 'p:'.$link->product->external_id : null;
+
+                if ($id !== null && isset($records[$id]) && ! in_array($id, $ids, true)) {
+                    $ids[] = $id;
+                }
             }
         }
 
@@ -1030,11 +1140,12 @@ final class SearchCatalog
 
     /**
      * @param  list<array{id: string, title: string, score: float, exact: bool}>  $spelling
-     * @param  list<list<string>>  $others  ranked ids by meaning, by picture
+     * @param  list<list<string>>  $others  ranked ids by meaning, by picture, by the guides
      * @param  list<string>  $pinned  what the night resolved for this query, first of all
+     * @param  list<float>  $weights  each of $others' weight, 1 when not given
      * @return list<string>
      */
-    private function merge(array $spelling, array $others, array $pinned = []): array
+    private function merge(array $spelling, array $others, array $pinned = [], array $weights = []): array
     {
         $exact = [];
         $scores = [];
@@ -1049,10 +1160,10 @@ final class SearchCatalog
             $scores[$hit['id']] = ($scores[$hit['id']] ?? 0) + 1 / (self::RRF_K + $rank);
         }
 
-        foreach ($others as $list) {
+        foreach ($others as $at => $list) {
             foreach ($list as $rank => $id) {
                 if (! in_array($id, $exact, true)) {
-                    $scores[$id] = ($scores[$id] ?? 0) + 1 / (self::RRF_K + $rank);
+                    $scores[$id] = ($scores[$id] ?? 0) + ($weights[$at] ?? 1.0) / (self::RRF_K + $rank);
                 }
             }
         }

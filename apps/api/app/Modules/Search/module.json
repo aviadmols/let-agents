@@ -140,6 +140,14 @@
             "scope": "global"
         },
         {
+            "name": "content_age_penalty",
+            "type": "float",
+            "default": 0.02,
+            "min": 0,
+            "max": 0.2,
+            "scope": "global"
+        },
+        {
             "name": "picture_min_similarity",
             "type": "float",
             "default": 0.35,

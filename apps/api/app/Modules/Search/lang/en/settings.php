@@ -19,7 +19,11 @@ return [
     ],
     'content_min_similarity' => [
         'label' => 'Minimum similarity for guides and pages',
-        'description' => 'A guide or a page enters the results by meaning only above this, higher than for products, so an unrelated page does not show. By spelling it enters only when it holds every word.',
+        'description' => 'A guide or a page enters the results by meaning only above this, higher than for products, so an unrelated page does not show. By spelling it enters only when it holds every word. Guides are a group of their own in the results and take no place from products; the products the nearest guide names are suggested for a question about a need, after what was found directly.',
+    ],
+    'content_age_penalty' => [
+        'label' => 'What an old guide loses a year',
+        'description' => "Taken off a guide's similarity for each year since it was updated, up to three: an old guide does not beat a new one on the same subject.",
     ],
     'semantic_min_similarity' => [
         'label' => 'Minimum similarity by meaning',

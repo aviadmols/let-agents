@@ -14,6 +14,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchClick;
@@ -246,6 +247,38 @@ final class SearchFlowTest extends TestCase
         Features::override('search.semantic', false, $this->shop->id);
         $this->search('משהו לחבר קרשים')->assertOk()->assertJsonPath('semantic', false);
         $this->assertSame([], $this->meaningAsked);
+    }
+
+    public function test_guides_by_meaning_are_their_own_group_suggest_their_products_for_a_need_and_age(): void
+    {
+        $this->inShop(function (): void {
+            CatalogContent::query()->where('external_id', '500')->update(['source_updated_at' => now()->subMonth()]);
+            CatalogContent::query()->create([
+                'shop_id' => $this->shop->id, 'type' => 'post', 'external_id' => '501', 'title' => 'מדריך ישן לדקים',
+                'url' => 'https://www.store.test/guide/old', 'terms' => [], 'hash' => 'h501', 'source_updated_at' => now()->subYears(3),
+            ]);
+            $guide = CatalogContent::query()->where('external_id', '500')->sole();
+            $pine = CatalogProduct::query()->where('external_id', '104')->sole();
+            EnrichmentContentProduct::query()->create([
+                'shop_id' => $this->shop->id, 'content_id' => $guide->id, 'product_id' => $pine->id,
+                'rank' => 1, 'score' => 9, 'reasons' => ['mentioned' => true], 'computed_at' => now(),
+            ]);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        Features::override('search.content_by_meaning', true, $this->shop->id);
+        $this->meaning = [
+            ['source' => 'content', 'source_id' => 'o', 'external_id' => '501', 'title' => 'מדריך ישן לדקים', 'similarity' => 0.55],
+            ['source' => 'content', 'source_id' => 'x', 'external_id' => '500', 'title' => 'איך מחברים קורות לדק', 'similarity' => 0.52],
+            ['source' => 'product', 'source_id' => 'y', 'external_id' => '102', 'title' => 'בורג איסכורית 6X40', 'similarity' => 0.41],
+        ];
+
+        $result = $this->search('איך מחברים קרשים לדק?')->json();
+
+        $this->assertSame(['500', '501'], array_column($result['groups']['content'], 'external_id'), 'three years take the older guide below the newer one');
+        $this->assertSame(['102', '104'], array_column($result['groups']['product'], 'external_id'), 'what the guide names is suggested, after what was found itself');
+
+        // Not a question about a need: the guide is shown, its products are not suggested.
+        $this->assertSame(['102'], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
     }
 
     public function test_with_a_price_only_what_holds_the_words_is_shown(): void
