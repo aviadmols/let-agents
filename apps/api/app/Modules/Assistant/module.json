@@ -221,7 +221,7 @@
         {
             "name": "share_after_visitors",
             "type": "int",
-            "default": 3,
+            "default": 1,
             "min": 1,
             "max": 50,
             "scope": "shop",

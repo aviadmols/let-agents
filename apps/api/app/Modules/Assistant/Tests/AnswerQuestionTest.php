@@ -61,8 +61,22 @@ final class AnswerQuestionTest extends TestCase
         $this->app->instance(ChatModel::class, $this->model);
     }
 
+    public function test_an_answer_checked_once_is_everyones_from_memory_without_a_model(): void
+    {
+        // By default the first clean, checked answer is the shop's: every shopper after gets it without a model.
+        $this->model->replies = [['about_product' => true], ['answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'source' => 'store'], self::VERIFIED];
+        $this->assertSame('model', $this->ask('האם זה מתאים לחוץ?')->json('data.from'));
+
+        $other = $this->ask('האם זה מתאים לחוץ?', vid: 'anon-visitor2234567890abcd')->json('data');
+        $this->assertSame(['answered', 'bank'], [$other['outcome'], $other['from']], 'another shopper: from the shop\'s answers');
+        $this->assertCount(3, $this->model->calls, 'no model asked the second time');
+        $this->assertNotNull($this->inShop(fn () => AssistantAnswer::query()->sole())->shared_at);
+    }
+
     public function test_a_question_about_the_product_is_answered_once_and_then_from_memory(): void
     {
+        // A shop may wait for more different shoppers before an answer is everyone's.
+        Settings::set('assistant.share_after_visitors', 3, $this->shop->id);
         $this->model->replies = [['about_product' => true], ['answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'source' => 'store'], self::VERIFIED];
 
         $first = $this->ask('האם זה מתאים לחוץ?')->assertOk()->json('data');

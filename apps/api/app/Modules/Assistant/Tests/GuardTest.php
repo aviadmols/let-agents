@@ -244,6 +244,9 @@ final class GuardTest extends TestCase
 
     public function test_one_visitor_cannot_plant_an_answer_for_everyone(): void
     {
+        // A shop that waits for three different visitors before an answer is everyone's (the default is the
+        // first clean, checked answer: see AnswerQuestionTest).
+        Settings::set('assistant.share_after_visitors', 3, $this->shop->id);
         $this->replies = [self::ABOUT_STORE, self::WRITTEN, self::CLEAN];
         $this->assertSame('model', $this->ask('כמה ברגים צריך למטר דק?')->json('data.from'));
 

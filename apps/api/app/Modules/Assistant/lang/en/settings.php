@@ -89,7 +89,7 @@ return [
     ],
     'share_after_visitors' => [
         'label' => 'Visitors before a written answer is shared',
-        'description' => 'A model\'s answer reaches other shoppers (and the search suggestions) only after this many different visitors asked and each got a clean, safe answer; the team\'s approval shares it at once. The same visitor asking again never counts.',
+        'description' => 'An answer that passed its check and was given clean and safe is kept in the shop\'s answers, and from then on every shopper who asks it gets it from there, without a model. 1 (the default): from the first visitor. A higher number waits for this many different visitors before it is shared; the team\'s approval shares it at once. The same visitor asking again never counts.',
     ],
     'questions_per_shop_per_day' => [
         'label' => 'New questions per shop per day',
