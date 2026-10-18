@@ -8,6 +8,12 @@
     @php($bad = 'background:rgba(220,60,60,.15);border-color:transparent')
     @php($reasons = \App\Modules\Assistant\Support\AnswerFailure::REASONS)
 
+    <div style="display:flex;gap:6px">
+        @foreach (['asks', 'cases'] as $tab)
+            <button type="button" wire:click="$set('tab', '{{ $tab }}')" style="{{ $chip }};font-size:13px;{{ $this->tab === $tab ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('tabs.'.$tab) }}</button>
+        @endforeach
+    </div>
+
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <select wire:model.live="shop" style="font-size:13px;border-radius:8px;padding:4px 8px" aria-label="{{ $t('shop') }}">
             <option value="">{{ $t('all_shops') }}</option>
@@ -19,6 +25,43 @@
         <input type="search" wire:model.live.debounce.400ms="find" placeholder="{{ $t('find') }}" style="font-size:13px;border-radius:8px;padding:4px 8px;min-width:200px">
     </div>
 
+    @if ($this->tab === 'cases')
+        @php($cases = $this->cases())
+        <x-filament::section compact>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                <span style="{{ $small }}">{{ $t('cases_help') }}</span>
+                <select wire:model="casesVersion" style="font-size:13px;border-radius:8px;padding:4px 8px" aria-label="{{ $t('prompt_version') }}">
+                    <option value="">{{ $t('current_prompt') }}</option>
+                    @foreach ($this->versions() as $v)<option value="{{ $v }}">answer_site v{{ $v }}</option>@endforeach
+                </select>
+                <button type="button" wire:click="runCases" wire:loading.attr="disabled" wire:target="runCases" wire:confirm="{{ $t('cases_confirm') }}" style="{{ $chip }};font-weight:600">{{ $t('run_cases') }}</button>
+            </div>
+        </x-filament::section>
+        @forelse ($cases as $case)
+            <x-filament::section compact wire:key="case-{{ $case['id'] }}">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                        <strong>{{ $case['shop'] }}</strong>
+                        @if ($case['passed'] === true)<span style="{{ $chip }};cursor:default;background:rgba(40,160,90,.15);border-color:transparent">{{ $t('passed') }}</span>
+                        @elseif ($case['passed'] === false)<span style="{{ $chip }};cursor:default;{{ $bad }}">{{ $t('failed_case') }}</span>
+                        @else<span style="{{ $chip }};cursor:default">{{ $t('not_run') }}</span>@endif
+                        @if ($case['at'])<span style="{{ $small }}" dir="ltr">{{ $case['at'] }} · v{{ $case['prompt'] }} · ${{ number_format((float) $case['cost'], 5) }}</span>@endif
+                    </div>
+                    <button type="button" wire:click="deleteCase('{{ $case['id'] }}')" wire:confirm="{{ $t('delete_confirm') }}" style="font-size:12px;text-decoration:underline">{{ $t('delete') }}</button>
+                </div>
+                <div style="margin-top:8px"><span style="{{ $small }}">{{ $t('question') }}</span> {{ $case['question'] }}</div>
+                <div style="margin-top:4px;{{ $small }}">{{ $t('expects') }}
+                    @if (isset($case['expect']['outcome'])){{ $case['expect']['outcome'] }}@endif
+                    @if (! empty($case['expect']['contains'])) · {{ $t('contains') }} {{ implode(' / ', $case['expect']['contains']) }}@endif
+                    @if (! empty($case['expect']['absent'])) · {{ $t('absent') }} {{ implode(' / ', $case['expect']['absent']) }}@endif
+                </div>
+                @if ($case['answer'])<div style="margin-top:4px"><span style="{{ $small }}">{{ $t('last_answer') }}</span> {{ $case['answer'] }}</div>@endif
+                @if ($case['problems'] !== [])<div style="margin-top:4px;color:rgb(200,60,60);font-size:13px" dir="ltr">{{ implode(' · ', $case['problems']) }}</div>@endif
+            </x-filament::section>
+        @empty
+            <x-filament::section>{{ $t('no_cases') }}</x-filament::section>
+        @endforelse
+    @else
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
         @foreach ([
             'asks' => number_format($counts['asks']),
@@ -84,10 +127,43 @@
                                 <button type="button" wire:click="setFailure('{{ $row['id'] }}', '{{ $row['failure_team'] === $choice ? '' : $choice }}')" style="{{ $chip }};{{ $row['failure_team'] === $choice ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('reasons.'.$choice) }}</button>
                             @endforeach
                         </div>
+
+                        {{-- asked again with another writer prompt: a real call, recorded as an evaluation, nothing saved for shoppers --}}
+                        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                            <span style="{{ $small }}">{{ $t('replay') }}</span>
+                            <select wire:model="replayVersion.{{ $row['id'] }}" style="font-size:13px;border-radius:8px;padding:3px 8px" aria-label="{{ $t('prompt_version') }}">
+                                <option value="">{{ $t('current_prompt') }}</option>
+                                @foreach ($this->versions() as $v)<option value="{{ $v }}">answer_site v{{ $v }}</option>@endforeach
+                            </select>
+                            <button type="button" wire:click="replay('{{ $row['id'] }}')" wire:loading.attr="disabled" wire:target="replay('{{ $row['id'] }}')" wire:confirm="{{ $t('replay_confirm') }}" style="{{ $chip }};font-weight:600">{{ $t('replay_run') }}</button>
+                        </div>
+                        @if (isset($this->replays[$row['id']]))
+                            @php($rp = $this->replays[$row['id']])
+                            <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+                                <div style="padding:10px;border-radius:10px;background:rgba(127,127,127,.08)"><div style="{{ $small }}">{{ $t('before', ['v' => $row['prompt'] ?? '—']) }}</div>{{ $row['answer'] !== '' ? $row['answer'] : $t('no_answer') }}</div>
+                                <div style="padding:10px;border-radius:10px;background:rgba(40,160,90,.08)"><div style="{{ $small }}" dir="ltr">{{ $t('after', ['v' => $rp['prompt'] ?? '—']) }} · {{ $rp['outcome'] }} · {{ $rp['verdict'] ?? '—' }}@if ($rp['cost'] !== null) · ${{ number_format((float) $rp['cost'], 5) }}@endif @if ($rp['failure']) · {{ $t('reasons.'.$rp['failure']) }}@endif</div>{{ $rp['answer'] !== '' ? $rp['answer'] : $t('no_answer') }}@if ($rp['picks'] !== [])<div style="{{ $small }};margin-top:4px">{{ implode(' · ', $rp['picks']) }}</div>@endif</div>
+                            </div>
+                        @endif
+
+                        {{-- kept as a case that must stay fixed: asked again before a change goes out --}}
+                        <details style="margin-top:10px">
+                            <summary style="cursor:pointer;font-size:13px;text-decoration:underline">{{ $t('make_case') }}</summary>
+                            <div style="display:grid;gap:6px;margin-top:8px;max-width:640px">
+                                <select wire:model="caseForm.{{ $row['id'] }}.outcome" style="font-size:13px;border-radius:8px;padding:4px 8px">
+                                    <option value="">{{ $t('expect_any_outcome') }}</option>
+                                    @foreach (['answered', 'no_info', 'no_match', 'out_of_scope'] as $o)<option value="{{ $o }}">{{ $o }}</option>@endforeach
+                                </select>
+                                <input wire:model="caseForm.{{ $row['id'] }}.contains" placeholder="{{ $t('contains_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
+                                <input wire:model="caseForm.{{ $row['id'] }}.absent" placeholder="{{ $t('absent_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
+                                <input wire:model="caseForm.{{ $row['id'] }}.note" placeholder="{{ $t('note_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
+                                <button type="button" wire:click="makeCase('{{ $row['id'] }}')" style="{{ $chip }};font-weight:600;justify-self:start">{{ $t('save_case') }}</button>
+                            </div>
+                        </details>
                     @endif
                 </x-filament::section>
             @endforeach
             @if ($list['more'])<button type="button" wire:click="more" style="text-decoration:underline;justify-self:start">{{ $t('more') }}</button>@endif
         </div>
+    @endif
     @endif
 </x-filament-panels::page>

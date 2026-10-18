@@ -13,6 +13,7 @@ use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\ReviewSearchAsks;
 use App\Modules\Assistant\Filament\Operator\Pages\AnswerQuality;
 use App\Modules\Assistant\Models\AssistantAskReview;
+use App\Modules\Assistant\Models\AssistantQualityCase;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -273,6 +274,52 @@ final class SearchAsksTest extends TestCase
         $merchant = User::factory()->create();
         $merchant->attachShop($this->shop);
         $this->actingAs($merchant)->get('/operator/assistant/answer-quality')->assertForbidden();
+    }
+
+    public function test_the_operator_asks_again_with_another_prompt_and_keeps_fixed_questions_as_regression_cases(): void
+    {
+        $this->replies = [
+            ['found' => false, 'answer' => '', 'refs' => [], 'picks' => []],
+        ];
+        $first = $this->ask('במה מתחילים איטום גג?', ['701', '702'])->json('data');
+        $ask = $this->inShop(fn () => AssistantSearchAsk::query()->findOrFail($first['ask_id']));
+        $versions = AnswerSiteQuestion::promptVersions('answer_site');
+        $this->assertContains(AnswerSiteQuestion::promptVersion('answer_site'), $versions);
+        $this->assertNotContains(5, $versions, 'the bench\'s writer is not a version to replay');
+
+        // Asked again with an older writer prompt: the answer beside the first, nothing logged or saved.
+        $older = min($versions);
+        $this->replies = [
+            ['found' => true, 'answer' => 'מתחילים בפריימר ביטומני ואז יריעה.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'יסוד.']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $operator = User::factory()->operator()->create();
+        $page = Livewire::actingAs($operator)->test(AnswerQuality::class)
+            ->set('failure', '')
+            ->call('toggle', $ask->id)
+            ->set("replayVersion.{$ask->id}", (string) $older)
+            ->call('replay', $ask->id);
+        $replay = $page->get('replays')[$ask->id];
+        $this->assertSame(['answered', $older, 'kept'], [$replay['outcome'], $replay['prompt'], $replay['verdict']]);
+        $this->assertStringContainsString('פריימר', $replay['answer']);
+        $this->assertSame(1, $this->inShop(fn () => AssistantSearchAsk::query()->count()), 'a replay is not a shopper\'s question');
+
+        // Kept as a case: it must say "פריימר" and never "בריכה". Run with the current prompt.
+        $page->set("caseForm.{$ask->id}", ['outcome' => 'answered', 'contains' => 'פריימר, יסוד', 'absent' => 'בריכה'])
+            ->call('makeCase', $ask->id)
+            ->set('shop', $this->shop->id);
+        $this->replies = [
+            ['found' => true, 'answer' => 'מתחילים ביסוד ביטומני, ומתאים גם לבריכה.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'יסוד.']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $page->call('runCases');
+
+        $case = $this->inShop(fn () => AssistantQualityCase::query()->sole());
+        $this->assertSame(['outcome' => 'answered', 'contains' => ['פריימר', 'יסוד'], 'absent' => ['בריכה']], $case->expect);
+        $this->assertFalse($case->last_passed);
+        $this->assertSame(['said:בריכה'], $case->last_problems, 'it said what it must not; "יסוד" was enough of the words to say');
+        $this->assertSame(AnswerSiteQuestion::promptVersion('answer_site'), $case->last_prompt_version);
+        $page->set('tab', 'cases')->assertSee('במה מתחילים איטום גג?')->assertSee(__('assistant::ui.quality.failed_case'));
     }
 
     public function test_a_reviewer_never_checks_its_own_family(): void

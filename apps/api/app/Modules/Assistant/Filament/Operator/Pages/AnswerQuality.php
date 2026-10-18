@@ -3,10 +3,14 @@
 namespace App\Modules\Assistant\Filament\Operator\Pages;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Actions\RunQualityCases;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
+use App\Modules\Assistant\Models\AssistantQualityCase;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerFailure;
+use App\Modules\Assistant\Support\QualityExpect;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -54,6 +58,22 @@ class AnswerQuality extends Page
 
     public ?string $open = null;
 
+    /** asks: what was asked; cases: the regression cases. */
+    #[Url]
+    public string $tab = 'asks';
+
+    /** @var array<string, int|string> ask id => the writer prompt version to replay with ('' the current) */
+    public array $replayVersion = [];
+
+    /** @var array<string, array<string, mixed>> ask id => what its replay came to */
+    public array $replays = [];
+
+    /** @var array<string, array{outcome?: string, contains?: string, absent?: string, note?: string}> ask id => the case being written */
+    public array $caseForm = [];
+
+    /** The writer prompt version to run the cases with ('' the current). */
+    public string $casesVersion = '';
+
     public static function getNavigationLabel(): string
     {
         return __('assistant::ui.quality.title');
@@ -92,6 +112,114 @@ class AnswerQuality extends Page
 
         app(TenantContext::class)->runUnscoped(fn () => AssistantSearchAsk::query()->whereKey($id)->update(['failure_team' => $reason]));
         Notification::make()->success()->title(__('assistant::ui.quality.saved'))->send();
+    }
+
+    /** @return list<int> the writer prompt's versions there are, newest first */
+    public function versions(): array
+    {
+        return AnswerSiteQuestion::promptVersions('answer_site');
+    }
+
+    /**
+     * The question asked again as its shopper asked it, with the chosen writer prompt: a real model call,
+     * recorded as an evaluation, nothing saved for shoppers. Shown beside what it got the first time.
+     */
+    public function replay(string $id): void
+    {
+        $ask = app(TenantContext::class)->runUnscoped(fn () => AssistantSearchAsk::query()->find($id));
+
+        if ($ask === null) {
+            return;
+        }
+
+        $version = (string) ($this->replayVersion[$id] ?? '') === '' ? null : (int) $this->replayVersion[$id];
+        $out = app(AnswerSiteQuestion::class)->replay((string) $ask->shop_id, (string) $ask->question, (array) $ask->products, $version);
+
+        $this->replays[$id] = [
+            'outcome' => (string) ($out['result']['outcome'] ?? ''),
+            'answer' => (string) ($out['result']['answer'] ?? ''),
+            'picks' => array_map(fn ($p): string => (string) (is_array($p) ? ($p['title'] ?? '') : $p), (array) ($out['result']['picks'] ?? [])),
+            'prompt' => $out['answered']['prompt_version'] ?? null,
+            'verdict' => $out['answered']['verdict'] ?? null,
+            'cost' => $out['answered']['cost_usd'] ?? null,
+            'ms' => $out['answered']['duration_ms'] ?? null,
+            'failure' => AnswerFailure::classify((string) ($out['result']['outcome'] ?? ''), $out['result']['reason'] ?? null, $out['answered']['verdict'] ?? null, (array) ($out['answered']['trace'] ?? [])),
+        ];
+    }
+
+    /** The question kept as a regression case, with what the team expects of its answer. */
+    public function makeCase(string $id): void
+    {
+        $form = (array) ($this->caseForm[$id] ?? []);
+        $expect = array_filter([
+            'outcome' => in_array($form['outcome'] ?? '', [AssistantAnswer::ANSWERED, AssistantAnswer::NO_INFO, AssistantAnswer::OUT_OF_SCOPE, 'no_match'], true) ? $form['outcome'] : null,
+            'contains' => QualityExpect::split((string) ($form['contains'] ?? '')),
+            'absent' => QualityExpect::split((string) ($form['absent'] ?? '')),
+        ], fn ($v): bool => $v !== null && $v !== []);
+
+        if ($expect === []) {
+            Notification::make()->warning()->title(__('assistant::ui.quality.case_empty'))->send();
+
+            return;
+        }
+
+        app(TenantContext::class)->runUnscoped(function () use ($id, $expect, $form): void {
+            $ask = AssistantSearchAsk::query()->find($id);
+
+            if ($ask === null) {
+                return;
+            }
+
+            app(TenantContext::class)->run((string) $ask->shop_id, fn () => AssistantQualityCase::query()->updateOrCreate(['ask_id' => $ask->id], [
+                'shop_id' => $ask->shop_id, 'question' => mb_substr((string) $ask->question, 0, 500), 'products' => (array) $ask->products,
+                'expect' => $expect, 'note' => mb_substr((string) ($form['note'] ?? ''), 0, 300) ?: null, 'created_by' => auth()->id(),
+            ]));
+        });
+
+        unset($this->caseForm[$id]);
+        Notification::make()->success()->title(__('assistant::ui.quality.case_saved'))->send();
+    }
+
+    /**
+     * The regression cases, of the chosen shop or every shop, the failing first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function cases(): array
+    {
+        return app(TenantContext::class)->runUnscoped(function (): array {
+            $cases = AssistantQualityCase::query()->when($this->shop !== '', fn (Builder $q) => $q->where('shop_id', $this->shop))
+                ->orderByRaw('case when last_passed = 0 then 0 when last_passed is null then 1 else 2 end')->latest('created_at')->limit(200)->get();
+            $shops = Shop::query()->whereIn('id', $cases->pluck('shop_id')->unique()->values())->pluck('name', 'id');
+
+            return $cases->map(fn (AssistantQualityCase $c): array => [
+                'id' => (string) $c->id, 'shop' => (string) ($shops[$c->shop_id] ?? ''), 'question' => $c->question, 'expect' => (array) $c->expect, 'note' => $c->note,
+                'passed' => $c->last_passed, 'problems' => (array) $c->last_problems, 'answer' => $c->last_answer, 'outcome' => $c->last_outcome,
+                'prompt' => $c->last_prompt_version, 'cost' => $c->last_cost_usd, 'at' => $c->last_run_at?->timezone('Asia/Jerusalem')->format('j.n H:i'),
+            ])->all();
+        });
+    }
+
+    /** The chosen shop's cases asked again with the chosen prompt version, each checked in code. */
+    public function runCases(): void
+    {
+        if ($this->shop === '') {
+            Notification::make()->warning()->title(__('assistant::ui.quality.cases_pick_shop'))->send();
+
+            return;
+        }
+
+        $totals = app(RunQualityCases::class)->handle($this->shop, null, $this->casesVersion === '' ? null : (int) $this->casesVersion);
+
+        Notification::make()->{$totals['failed'] === 0 && $totals['stopped'] === null ? 'success' : 'warning'}()
+            ->title(__('assistant::ui.quality.cases_done', ['passed' => $totals['passed'], 'ran' => $totals['ran']]))
+            ->body(trim(($totals['stopped'] !== null ? __('assistant::ui.quality.cases_stopped.'.$totals['stopped']).' ' : '').'$'.number_format($totals['cost_usd'], 4)))
+            ->send();
+    }
+
+    public function deleteCase(string $id): void
+    {
+        app(TenantContext::class)->runUnscoped(fn () => AssistantQualityCase::query()->whereKey($id)->delete());
     }
 
     /** @return array<string, string> shop id => name */

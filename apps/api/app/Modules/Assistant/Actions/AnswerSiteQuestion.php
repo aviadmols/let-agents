@@ -118,6 +118,9 @@ final class AnswerSiteQuestion
     /** @var array<string, mixed>|null how the question being handled was answered, for its ask (logged()) */
     private ?array $answered = null;
 
+    /** @var array<string, int> prompt name => the version a replay asks with */
+    private array $promptVersions = [];
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -805,7 +808,7 @@ final class AnswerSiteQuestion
         $trace ??= [];
         $this->answered = [
             'run_id' => $run->id,
-            'prompt_version' => self::promptVersion('answer_site'),
+            'prompt_version' => $this->promptVersions['answer_site'] ?? self::promptVersion('answer_site'),
             'writer_model' => isset($trace['writer']['model']) ? mb_substr((string) $trace['writer']['model'], 0, 80) : null,
             'checker_model' => isset($trace['check']['model']) ? mb_substr((string) $trace['check']['model'], 0, 80) : null,
             'verdict' => isset($trace['check']['verdict']) ? (string) $trace['check']['verdict'] : (isset($trace['check']['skipped']) ? 'skipped:'.mb_substr((string) $trace['check']['skipped'], 0, 30) : null),
@@ -823,6 +826,50 @@ final class AnswerSiteQuestion
         ];
 
         return $result;
+    }
+
+    /**
+     * A question asked again as a shopper asked it, with the writer's prompt at the version the operator
+     * chose (null: the current one): the same pipeline as evaluate(), nothing saved, the run recorded as
+     * an evaluation with its real cost. Returns what came of it and how: outcome, answer, picks, verdict,
+     * prompt version, cost and time.
+     *
+     * @param  list<string>  $products  external ids shown, best first
+     * @return array{result: array<string, mixed>, trace: array<string, mixed>, answered: array<string, mixed>|null}
+     */
+    public function replay(string $shopId, string $question, array $products, ?int $answerVersion = null, string $locale = 'he'): array
+    {
+        if ($answerVersion !== null && ! in_array($answerVersion, self::promptVersions('answer_site'), true)) {
+            throw new \InvalidArgumentException("answer_site v{$answerVersion} does not exist.");
+        }
+
+        $this->promptVersions = $answerVersion === null ? [] : ['answer_site' => $answerVersion];
+        $this->answered = null;
+
+        try {
+            $out = $this->evaluate($shopId, $question, $products, (string) Settings::get('assistant.context_mode', $shopId), $locale);
+
+            return $out + ['answered' => $this->answered];
+        } finally {
+            $this->promptVersions = [];
+            $this->answered = null;
+        }
+    }
+
+    /** @return list<int> the writer prompt's versions a replay may ask with, newest first (the bench's v5 aside) */
+    public static function promptVersions(string $name): array
+    {
+        $versions = [];
+
+        foreach (glob(__DIR__.'/../Prompts/'.$name.'.v*.md') ?: [] as $file) {
+            if (preg_match('/\.v(\d+)\.md$/', $file, $m) === 1 && (int) $m[1] !== 5) {
+                $versions[] = (int) $m[1];
+            }
+        }
+
+        rsort($versions);
+
+        return $versions;
     }
 
     /** The version of a prompt prompt() reads: the newest file there is, the bench's v5 aside. */
@@ -1479,7 +1526,9 @@ final class AnswerSiteQuestion
 
     private function call(RunContext $run, array $role, string $prompt, string $input, int $maxOutput, ?string $effort, string $prices): ModelReply
     {
-        $reply = $this->models->json($role['provider'], $role['model'], self::prompt($prompt), $input, $maxOutput, $effort);
+        // A replay asks with the version the operator chose (replay()); everything else with the current one.
+        $text = isset($this->promptVersions[$prompt]) ? (string) @file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v'.$this->promptVersions[$prompt].'.md') : self::prompt($prompt);
+        $reply = $this->models->json($role['provider'], $role['model'], $text, $input, $maxOutput, $effort);
         $run->usage($role['name'], $role['model'], $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
 
         return $reply;
