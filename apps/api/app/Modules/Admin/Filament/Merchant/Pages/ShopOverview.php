@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Core\Filament\HasPeriod;
 use App\Modules\Admin\Contracts\FirstStep;
 use App\Modules\Admin\Contracts\HomeCard;
 use App\Modules\Admin\Contracts\OverviewBlock;
@@ -9,15 +10,12 @@ use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Admin\Support\Home;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
-use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
@@ -29,7 +27,7 @@ use UnitEnum;
  */
 final class ShopOverview extends Page
 {
-    public const PERIODS = [7, 30, 90];
+    use HasPeriod;
 
     /** Hidden once every first step is done and the manager hid the closing line. */
     public const STEPS_HIDDEN = 'steps.hidden';
@@ -46,16 +44,6 @@ final class ShopOverview extends Page
     protected static ?string $slug = 'overview';
 
     protected string $view = 'admin::merchant.home';
-
-    /** 7, 30 or 90; 0 when the manager chose dates. */
-    #[Url]
-    public int $days = 30;
-
-    #[Url]
-    public string $from = '';
-
-    #[Url]
-    public string $to = '';
 
     public static function getNavigationLabel(): string
     {
@@ -87,49 +75,7 @@ final class ShopOverview extends Page
     {
         [$since, $until] = $this->range();
 
-        if ($this->days !== 0) {
-            return __('admin::home.subheading_days', ['shop' => $this->shop()->name, 'days' => $this->days]);
-        }
-
-        $last = $until->copy()->subDay();
-
-        return $since->isSameDay($last)
-            ? __('admin::home.subheading_day', ['shop' => $this->shop()->name, 'from' => $since->format('j.n')])
-            : __('admin::home.subheading_range', ['shop' => $this->shop()->name, 'from' => $since->format('j.n'), 'to' => $last->format('j.n')]);
-    }
-
-    public function setDays(int $days): void
-    {
-        $this->days = in_array($days, self::PERIODS, true) ? $days : 30;
-        $this->from = '';
-        $this->to = '';
-    }
-
-    /** Dates the manager chose: from the first day to the last, both included. */
-    public function setRange(string $from, string $to): void
-    {
-        $a = self::date($from);
-        $b = self::date($to);
-
-        if ($a === null || $b === null || $b->lt($a) || $a->diffInDays($b) > 366) {
-            return;
-        }
-
-        $this->days = 0;
-        $this->from = $a->toDateString();
-        $this->to = $b->toDateString();
-    }
-
-    /** @return array{0: Carbon, 1: Carbon} the period's start, and its end (exclusive) */
-    public function range(): array
-    {
-        if ($this->days === 0 && ($a = self::date($this->from)) !== null && ($b = self::date($this->to)) !== null && $b->gte($a)) {
-            return [$a->startOfDay(), $b->copy()->addDay()->startOfDay()];
-        }
-
-        $days = in_array($this->days, self::PERIODS, true) ? $this->days : 30;
-
-        return [now()->subDays($days)->startOfDay(), now()];
+        return __('admin::home.subheading', ['shop' => $this->shop()->name, 'period' => $this->periodLabel()]);
     }
 
     /** @return list<HomeCard> */
@@ -219,11 +165,6 @@ final class ShopOverview extends Page
     public function getHeaderWidgetsColumns(): int|array
     {
         return 1;
-    }
-
-    private static function date(string $value): ?CarbonInterface
-    {
-        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? Carbon::createFromFormat('Y-m-d', $value)->startOfDay() : null;
     }
 
     private function shop(): Shop

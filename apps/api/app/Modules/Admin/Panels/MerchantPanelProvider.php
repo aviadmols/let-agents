@@ -44,6 +44,7 @@ final class MerchantPanelProvider extends PanelProvider
             ->topbar(false)
             ->tenantMenu(false)
             ->userMenu(false)
+            ->renderHook(PanelsRenderHook::BODY_START, fn (): HtmlString => new HtmlString(view('admin::panel.icons')->render()))
             ->renderHook(PanelsRenderHook::CONTENT_START, fn (): HtmlString => self::topbar())
             // One flat list of screens; a screen's other pages are its tabs, or the settings side menu.
             ->navigation(fn (NavigationBuilder $builder): NavigationBuilder => MerchantNavigation::build($builder))

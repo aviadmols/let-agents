@@ -54,7 +54,7 @@ final class PanelSidebarTest extends TestCase
             $this->assertSame(
                 [__('admin::home.nav', [], $locale), ...array_map(
                     fn (string $key): string => __("admin::panels.screens.{$key}", [], $locale),
-                    ['analytics', 'timeline', 'inbox', 'knowledge', 'scan', 'settings'],
+                    ['analytics', 'sessions', 'timeline', 'inbox', 'knowledge', 'scan', 'settings'],
                 )],
                 $this->itemLabels($html),
             );

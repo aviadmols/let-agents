@@ -642,3 +642,69 @@ html.dark .fi-panel-merchant {
 @media (hover: hover) and (pointer: fine) {
     .fi-panel-merchant .lp-hint button:hover { background: var(--la-sunk); color: var(--la-ink); }
 }
+
+/* ================================================================== sessions: filters, rows, the open visit */
+
+.fi-panel-merchant .lp-filters { display: flex; flex-direction: column; gap: 10px; }
+.fi-panel-merchant .lp-filter-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fi-panel-merchant .lp-lbl { font-size: 12.5px; color: var(--la-muted); min-width: 64px; }
+.fi-panel-merchant .lp-input-sm { min-height: 38px; flex: 1; min-width: 180px; max-width: 320px; border-radius: 999px; padding-inline: 14px; }
+.fi-panel-merchant .lp-ftags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-height: 28px; }
+.fi-panel-merchant .lp-ftag { display: inline-flex; align-items: center; gap: 6px; padding-block: 3px; padding-inline: 10px 4px; border-radius: 999px; background: var(--la-accent); color: var(--la-paper); font-size: 12.5px; }
+.fi-panel-merchant .lp-ftag button { width: 18px; height: 18px; border: 0; border-radius: 50%; background: none; color: inherit; opacity: .75; display: grid; place-items: center; cursor: pointer; }
+.fi-panel-merchant .lp-ftag svg { width: 10px; height: 10px; }
+.fi-panel-merchant .lp-chip-quiet { min-height: 24px; padding: 0 8px; font-size: 12px; margin: 2px 0; margin-inline-start: 4px; cursor: default; }
+.fi-panel-merchant .lp-sess { display: flex; gap: 16px; align-items: center; padding: 14px 12px; border-block-end: 1px solid var(--la-line); cursor: pointer; border-radius: 12px; min-width: 0; }
+.fi-panel-merchant .lp-sess.is-on { background: var(--la-sunk); }
+.fi-panel-merchant .lp-sess-when { flex: none; width: 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; font-size: 13px; }
+.fi-panel-merchant .lp-sess-when b { font-weight: 500; color: var(--la-ink); }
+.fi-panel-merchant .lp-sess-when span { color: var(--la-muted); font-size: 12px; }
+.fi-panel-merchant .lp-sess-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.fi-panel-merchant .lp-sess-l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.fi-panel-merchant .lp-sess-l1 b { font-weight: 500; color: var(--la-ink); }
+.fi-panel-merchant .lp-sess-l2 { font-size: 14px; color: var(--la-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fi-panel-merchant .lp-k { color: var(--la-muted); }
+.fi-panel-merchant .lp-sess-l3 { font-size: 12.5px; color: var(--la-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fi-panel-merchant .lp-sess-end { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.fi-panel-merchant .lp-sess-n { font-size: 12.5px; color: var(--la-muted); white-space: nowrap; }
+.fi-panel-merchant .lp-sess-outs { display: flex; gap: 4px; }
+.fi-panel-merchant .lp-sess-outs span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--la-sunk); color: var(--la-axis); }
+.fi-panel-merchant .lp-sess-outs span.is-on { background: var(--la-accent); color: var(--la-paper); }
+.fi-panel-merchant .lp-sess-outs svg { width: 12px; height: 12px; }
+.fi-panel-merchant .lp-sess-total { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--la-ink); }
+.fi-panel-merchant .lp-sess-go { flex: none; width: 18px; height: 18px; color: var(--la-axis); transform: rotate(90deg); }
+.fi-panel-merchant .lp-more { display: flex; justify-content: center; padding-top: 12px; }
+.fi-panel-merchant .lp-drawer { position: fixed; inset: 0; z-index: 60; }
+.fi-panel-merchant .lp-drawer-scrim { position: absolute; inset: 0; background: rgb(11 11 12 / 35%); animation: lp-fade 200ms ease both; }
+.fi-panel-merchant .lp-drawer-panel { position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: min(680px, 100%); background: var(--la-paper); box-shadow: var(--la-pop); overflow: auto; padding: 0 20px 40px; animation: lp-fade 220ms ease both; }
+.fi-panel-merchant .lp-drawer-head { position: sticky; top: 0; background: var(--la-paper); padding: 18px 0 12px; border-block-end: 1px solid var(--la-line); margin-block-end: 16px; display: flex; align-items: flex-start; gap: 12px; z-index: 1; }
+.fi-panel-merchant .lp-drawer-head h2 { font-size: 20px; font-weight: 600; margin: 0; color: var(--la-ink); }
+.fi-panel-merchant .lp-drawer-close { margin-inline-start: auto; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--la-sunk); color: var(--la-ink); display: grid; place-items: center; flex: none; cursor: pointer; }
+.fi-panel-merchant .lp-drawer-close svg { width: 16px; height: 16px; }
+.fi-panel-merchant .lp-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; font-size: 14px; margin-block-end: 16px; color: var(--la-ink); }
+.fi-panel-merchant .lp-meta-grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fi-panel-merchant .lp-meta-grid > div > span:first-child { color: var(--la-muted); font-size: 12px; }
+.fi-panel-merchant .lp-meta-grid > div > span:last-child { overflow-wrap: anywhere; }
+.fi-panel-merchant .lp-meta-wide { grid-column: 1 / -1; }
+.fi-panel-merchant .lp-evs { position: relative; padding-inline-start: 46px; display: flex; flex-direction: column; gap: 2px; }
+.fi-panel-merchant .lp-evs::before { content: ''; position: absolute; top: 14px; bottom: 14px; inset-inline-start: 17px; width: 2px; background: var(--la-line); }
+.fi-panel-merchant .lp-ev { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; font-size: 14.5px; color: var(--la-ink); }
+.fi-panel-merchant .lp-ev-ic { position: absolute; inset-inline-start: -46px; top: 8px; width: 36px; height: 36px; border-radius: 50%; background: var(--la-sunk); display: grid; place-items: center; color: var(--la-ink-2); box-shadow: 0 0 0 3px var(--la-paper); }
+.fi-panel-merchant .lp-ev-ic svg { width: 15px; height: 15px; }
+.fi-panel-merchant .lp-ev-ic.is-hot { background: var(--la-accent); color: var(--la-paper); }
+.fi-panel-merchant .lp-ev-ic.is-good { background: var(--lp-lime); color: var(--lp-ink); }
+.fi-panel-merchant .lp-ev-body { flex: 1; min-width: 0; }
+.fi-panel-merchant .lp-ev-body small { display: block; color: var(--la-muted); font-size: 13px; margin-top: 2px; }
+.fi-panel-merchant .lp-ev-t { font-variant-numeric: tabular-nums; color: var(--la-muted); font-size: 12px; flex: none; padding-top: 3px; }
+.fi-panel-merchant .lp-ev-gap { padding: 2px 12px; font-size: 12px; color: var(--la-muted); }
+.fi-panel-merchant .lp-drawer-foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--la-line); }
+@keyframes lp-fade { from { opacity: 0; } }
+@media (hover: hover) and (pointer: fine) {
+    .fi-panel-merchant .lp-sess:hover { background: var(--la-plane); }
+    .fi-panel-merchant .lp-ev:hover { background: var(--la-plane); }
+}
+@media (max-width: 640px) {
+    .fi-panel-merchant .lp-sess { flex-wrap: wrap; gap: 10px; }
+    .fi-panel-merchant .lp-sess-end { flex-direction: row; align-items: center; }
+    .fi-panel-merchant .lp-meta-grid { grid-template-columns: minmax(0, 1fr); }
+}

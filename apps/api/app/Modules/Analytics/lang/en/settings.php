@@ -49,4 +49,12 @@ return [
         'label' => 'How many shops make a starting point',
         'description' => 'How many shops of a trade are needed before an average is worth giving a new shop. Fewer than that and one shop\'s habits are not its trade\'s.',
     ],
+    'sessions_keep_days' => [
+        'label' => 'How long sessions are kept',
+        'description' => 'After this the visit and all its steps, the IP address included, are deleted.',
+    ],
+    'visits_per_minute' => [
+        'label' => 'Visit batches a minute, per shopper address',
+        'description' => 'Past this, batches are refused until the minute ends.',
+    ],
 ];

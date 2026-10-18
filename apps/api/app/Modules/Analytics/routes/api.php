@@ -3,6 +3,7 @@
 use App\Modules\Analytics\Http\Controllers\BeaconController;
 use App\Modules\Analytics\Http\Controllers\PixelOrdersController;
 use App\Modules\Analytics\Http\Controllers\PluginOrdersController;
+use App\Modules\Analytics\Http\Controllers\VisitController;
 use Illuminate\Support\Facades\Route;
 
 // Prefixed /api/v1 by the module loader. No session, no CSRF: the widget authenticates by site
@@ -10,6 +11,11 @@ use Illuminate\Support\Facades\Route;
 Route::post('widget/{site}/events', BeaconController::class)
     ->middleware('throttle:widget-beacons')
     ->name('api.widget.events');
+
+// The search window's visit beacon: the steps of a visit, for the sessions screen (RecordVisit).
+Route::post('visit/{site}', VisitController::class)
+    ->middleware('throttle:widget-visits')
+    ->name('api.widget.visit');
 
 // The Shopify web pixel at checkout: reported from the shopper's browser (see PixelOrdersController).
 Route::post('pixel/{site}/orders', PixelOrdersController::class)

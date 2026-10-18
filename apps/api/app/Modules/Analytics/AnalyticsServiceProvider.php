@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\HomeNumbers;
 use App\Modules\Analytics\Console\ComputeScoresCommand;
 use App\Modules\Analytics\Filament\Widgets\ReportChart;
 use App\Modules\Analytics\Models\AnalyticsEvent;
+use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Analytics\Support\AnalyticsHomeNumbers;
 use App\Modules\Analytics\Support\BeaconSchema;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -33,6 +34,9 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
         RateLimiter::for('widget-beacons', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('analytics.beacons_per_minute'))
             ->by('beacon:'.$request->ip().'|'.$request->route('site')));
 
+        RateLimiter::for('widget-visits', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('analytics.visits_per_minute'))
+            ->by('visit:'.$request->ip().'|'.$request->route('site')));
+
         RateLimiter::for('plugin-api', fn (Request $request): Limit => Limit::perMinute(120)
             ->by('plugin:'.$request->route('site')));
 
@@ -41,7 +45,7 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
             ->by('pixel:'.$request->ip().'|'.$request->route('site')));
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
-            $schedule->command('model:prune', ['--model' => [AnalyticsEvent::class]])->dailyAt('03:45')->name('analytics:prune');
+            $schedule->command('model:prune', ['--model' => [AnalyticsEvent::class, AnalyticsVisit::class]])->dailyAt('03:45')->name('analytics:prune');
 
             // What worked yesterday reorders the widget today, after the night's catalog read.
             $schedule->command('analytics:scores')

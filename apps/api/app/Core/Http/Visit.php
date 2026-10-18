@@ -87,7 +87,7 @@ final class Visit
     }
 
     /** "google.com", "instagram.com": where the shopper came from, never the full address. */
-    private static function host(string $url): ?string
+    public static function host(string $url): ?string
     {
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
 

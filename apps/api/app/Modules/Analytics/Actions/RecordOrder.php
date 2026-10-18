@@ -6,6 +6,8 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsOrder;
+use App\Modules\Analytics\Models\AnalyticsVisit;
+use App\Modules\Analytics\Models\AnalyticsVisitStep;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
@@ -114,7 +116,36 @@ final class RecordOrder
                 ],
             );
 
+            if ($order->wasRecentlyCreated && ! $history && $visitor !== null) {
+                self::onVisit($visitor, $order, $windowStart);
+            }
+
             return ['stored' => $order->wasRecentlyCreated, 'problems' => [], 'assisted' => $order->assisted];
         });
+    }
+
+    /** The purchase, as the last step of the visitor's latest visit before it (the sessions screen). */
+    private static function onVisit(string $visitor, AnalyticsOrder $order, Carbon $since): void
+    {
+        $visit = AnalyticsVisit::query()->where('visitor_hash', $visitor)
+            ->where('started_at', '>=', $since)->where('started_at', '<=', $order->ordered_at->copy()->addMinutes(10))
+            ->latest('started_at')->first();
+
+        if ($visit === null) {
+            return;
+        }
+
+        AnalyticsVisitStep::query()->insertOrIgnore([[
+            'shop_id' => $visit->shop_id, 'visit_id' => $visit->id, 'step_id' => 'order-'.substr(hash('sha256', (string) $order->order_ref), 0, 20),
+            'kind' => 'order', 'at' => $order->ordered_at, 'number' => (int) $order->items_count, 'value' => $order->total,
+            'path' => null, 'page_type' => null, 'item' => null, 'label' => null,
+        ]]);
+
+        $visit->forceFill([
+            'did' => array_values(array_unique([...(array) $visit->did, 'order'])),
+            'order_total' => round((float) $visit->order_total + (float) $order->total, 2),
+            'steps' => $visit->steps + 1,
+            'last_at' => $order->ordered_at->gt($visit->last_at) ? $order->ordered_at : $visit->last_at,
+        ])->save();
     }
 }

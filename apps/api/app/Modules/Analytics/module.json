@@ -13,6 +13,10 @@
         {
             "name": "collect",
             "default": true
+        },
+        {
+            "name": "sessions",
+            "default": true
         }
     ],
     "settings": [
@@ -123,6 +127,24 @@
             "max": 50,
             "scope": "global",
             "unit": "shops"
+        },
+        {
+            "name": "sessions_keep_days",
+            "type": "int",
+            "default": 90,
+            "min": 7,
+            "max": 400,
+            "scope": "global",
+            "unit": "days"
+        },
+        {
+            "name": "visits_per_minute",
+            "type": "int",
+            "default": 120,
+            "min": 10,
+            "max": 2000,
+            "scope": "global",
+            "unit": "requests"
         }
     ]
 }

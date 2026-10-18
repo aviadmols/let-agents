@@ -279,6 +279,7 @@
     if (n.length < 2 || isCounted(n)) { return; }
     markCounted(n);
     sendEvents([{ type: 'search', q: n, results: results }]);
+    visitStep('search', { label: String(query).trim().slice(0, 200), n: results });
     rememberSearch(query);
   }
   function countClick(query, item, shown) {
@@ -408,9 +409,60 @@
       if (!sent && win.fetch) { win.fetch(url, { method: 'POST', body: body, keepalive: true, mode: 'no-cors', credentials: 'omit', headers: { 'Content-Type': 'text/plain' } }).catch(function () {}); }
     }
   }
-  setInterval(function () { learnFlush(false); }, 4000);
-  doc.addEventListener('visibilitychange', function () { if (doc.visibilityState === 'hidden') { learnFlush(true); } });
-  win.addEventListener('pagehide', function () { learnFlush(true); });
+  setInterval(function () { learnFlush(false); visitFlush(false); }, 4000);
+  doc.addEventListener('visibilitychange', function () { if (doc.visibilityState === 'hidden') { learnFlush(true); visitFlush(true); } });
+  win.addEventListener('pagehide', function () { learnFlush(true); visitFlush(true); });
+  // ---------------------------------------------------------------- the visit, for the shop's sessions screen
+  // A step for each thing that happened: the page, a search and its results, a photo search, a question, the
+  // window opened, a save, an add to cart, details left. Of the address the visit came in on, only the named
+  // campaign parameters go, once, with the visit's first page (RecordVisit keeps nothing else).
+  var VISIT = { queue: [], first: null };
+  function visitFirst() {
+    try {
+      if (win.sessionStorage.getItem('let_agents_landed')) { return null; }
+      win.sessionStorage.setItem('let_agents_landed', '1');
+    } catch (e) { return null; }
+    var params = {};
+    try {
+      var q = new URLSearchParams(win.location.search);
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid', 'ref'].forEach(function (k) { var v = q.get(k); if (v) { params[k] = v.slice(0, 120); } });
+    } catch (e) { /* old browser */ }
+    return { landing: (win.location.pathname || '/').slice(0, 300), ref: visit().ref, params: params };
+  }
+  function pageKind() {
+    var path = win.location.pathname || '/', cls = String(doc.body && doc.body.className || '');
+    if (PAGE) { return PAGE.type; }
+    if (path === '/' || /(?:^|\s)home(?:\s|$)/.test(cls)) { return 'home'; }
+    if (/\/(cart|checkout)(\/|$)/.test(path)) { return /checkout/.test(path) ? 'checkout' : 'cart'; }
+    if (/\/(search)(\/|$)/.test(path) || /[?&]s=/.test(win.location.search) || /(?:^|\s)search-results(?:\s|$)/.test(cls)) { return 'search'; }
+    if (/\/(collections|product-category|category)\//.test(path) || /(?:^|\s)(tax-product_cat|archive)(?:\s|$)/.test(cls)) { return 'category'; }
+    if (/(?:^|\s)single-post(?:\s|$)/.test(cls) || /\/(blogs|blog)\//.test(path)) { return 'content'; }
+    return 'other';
+  }
+  function visitStep(kind, extra) {
+    if (!CFG.api || !CFG.site) { return; }
+    var s = { id: rid(16), kind: kind, ts: Date.now(), path: (win.location.pathname || '/').slice(0, 300) };
+    Object.keys(extra || {}).forEach(function (k) { var v = extra[k]; if (v !== undefined && v !== null && v !== '') { s[k] = v; } });
+    VISIT.queue.push(s);
+    if (VISIT.queue.length >= 20) { visitFlush(false); }
+  }
+  function visitFlush(leaving) {
+    if (!VISIT.queue.length || !CFG.api || !CFG.site) { return; }
+    var v = visit();
+    if (!v.sid) { VISIT.queue = []; return; }
+    while (VISIT.queue.length) {
+      var payload = { v: 1, sid: v.sid, vid: visitor(), preview: !!CFG.preview, steps: VISIT.queue.splice(0, 30) };
+      if (VISIT.first) { payload.first = VISIT.first; VISIT.first = null; }
+      var body = JSON.stringify(payload), url = API + '/visit/' + SITE, sent = false;
+      if (leaving && win.navigator.sendBeacon) { try { sent = win.navigator.sendBeacon(url, new Blob([body], { type: 'text/plain' })); } catch (e) { sent = false; } }
+      if (!sent && win.fetch) { win.fetch(url, { method: 'POST', body: body, keepalive: true, mode: 'no-cors', credentials: 'omit', headers: { 'Content-Type': 'text/plain' } }).catch(function () {}); }
+    }
+  }
+  function visitPage() {
+    VISIT.first = visitFirst();
+    visitStep('view', { type: pageKind(), item: PAGE && PAGE.type === 'product' ? String(PAGE.id) : undefined });
+    setTimeout(function () { visitFlush(false); }, 1200);
+  }
   // the store's own add to cart on a product page, counted once whichever of its signals fired
   var lastStoreAdd = 0;
   function storeAdded(quantity) {
@@ -418,6 +470,7 @@
     if (!PAGE || PAGE.type !== 'product' || now - lastStoreAdd < 1500) { return; }
     lastStoreAdd = now;
     learn('add_to_cart', null, null, { source: 'page', product_id: String(PAGE.id), quantity: quantity, result: 'added' });
+    visitStep('cart', { item: String(PAGE.id), n: quantity });
     learnFlush(true);
   }
   function watchStoreAdds() {
@@ -879,6 +932,7 @@
     if (!S.open) {
       lastFocus = doc.activeElement;
       S.open = true;
+      visitStep('open');
       clearTimeout(closeTimer);
       if (!doc.body.contains(host)) { doc.body.appendChild(host); }
       R.classList.add('is-open');
@@ -1520,6 +1574,7 @@
     // about this product: the product page's own ask, so the answer is kept with the product (its questions,
     // "questions shoppers asked", the suggestions, and the gaps the daily review learns from)
     if (turn.ctx) {
+      visitStep('ask', { label: String(q).slice(0, 200), item: String(pid(turn.ctx)) });
       json(API + '/widget/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(pid(turn.ctx)), type: 'product', question: q, vid: visitor(), locale: LANG }) }).then(function (r) {
         clearTimeout(slow);
         if (!r.ok) { throw new Error('ask'); }
@@ -1549,6 +1604,7 @@
     var body = { question: q, vid: visitor(), locale: LANG, products: S.ctx && turn.ctx ? [pid(S.ctx)] : shown };
     if (S.ctx && turn.ctx) { body.page = 1; }
     if (S.ctx && turn.ctx && shown.length) { body.previous = shown; }
+    visitStep('ask', { label: String(q).slice(0, 200) });
     json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})) }).then(function (r) {
       clearTimeout(slow);
       if (!r.ok) { throw new Error('ask'); }
@@ -1781,6 +1837,7 @@
       var ps = ((d.groups && d.groups.product) || []).map(function (p) { return { id: pid(p.external_id || p.id), match: p.match }; }).filter(function (p) { return rec(p.id); });
       return products(ps.slice(0, 6).map(function (p) { return p.id; })).then(function () {
         update(turn, { loading: false, ids: ps.map(function (p) { return p.id; }), tags: d.tags || [], seen: d.seen || '', unclear: !!d.unclear, nothing: !!d.nothing, items: d.items || null, off: {} });
+        visitStep('photo', { label: String(d.seen || '').slice(0, 200), n: ps.length });
       });
     }).catch(function () { update(turn, { loading: false, failed: true }); });
   }
@@ -2091,6 +2148,7 @@
     if (at >= 0) { S.saved.splice(at, 1); S.pick = S.pick.filter(function (x) { return x !== id; }); } else { S.saved.unshift(id); }
     store('local', 'ls_saved', S.saved);
     var on = at < 0;
+    if (on) { visitStep('heart', { item: String(pid(id)) }); }
     WISH.wish = S.saved.slice();
     WISH.pending = on ? [id].concat(WISH.pending.filter(function (w) { return w !== id; })) : WISH.pending.filter(function (w) { return w !== id; });
     wishSave();
@@ -2115,6 +2173,7 @@
       announce(t('announceAdded'));
       cartChanged(id, sections);
       if (q) { countAdd(q, itemOf(parent || id)); }
+      visitStep('cart', { item: String(pid(parent || id)), n: 1 });
       if (typeof onAdded === 'function') { try { onAdded(); } catch (e) { /* theirs */ } }
       afterAdd(parent || id, btn);
     };
@@ -2568,6 +2627,7 @@
         var status = r.body && r.body.data ? r.body.data.status : null;
         if (status === 'invalid_contact') { turn.errs = { contact: true }; render(); return; }
         if (status !== 'saved' && status !== 'code_sent') { throw new Error('lead'); }
+        visitStep('lead');
         update(turn, { lead: 'done', leadName: name, leadErr: false });
       }).catch(function () { update(turn, { leadErr: true }); });
       return;
@@ -3383,7 +3443,7 @@
         if (sfound && CFG.pageType !== 'content') { S.ctx = sfound; }
       }
       PAGE = CFG.pageId && CFG.pageType === 'content' ? { type: 'content', id: String(CFG.pageId) } : S.ctx ? { type: 'product', id: String(pid(S.ctx)) } : null;
-      keepVisitor(); watchStoreAdds(); watchFoundProduct();
+      keepVisitor(); watchStoreAdds(); watchFoundProduct(); visitPage();
       if (PAGE) { bankFor(PAGE.id); }
       return;
     }
@@ -3405,6 +3465,7 @@
     keepVisitor();
     watchStoreAdds();
     watchFoundProduct();
+    visitPage();
     if (PAGE) { bankFor(PAGE.id); }
     sizeHelp();
     // the shop's own way in to the list: any link to "#wishlist", or its shortcode's [data-let-agents-wishlist]
