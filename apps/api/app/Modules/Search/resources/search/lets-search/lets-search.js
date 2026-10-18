@@ -1988,7 +1988,7 @@
     if (s.model === 'specs') {
       var rows = s.specs && s.specs.length ? s.specs.map(function (x) { return [x.label, x.value]; }) : (LEARN.bank && LEARN.bank.compare && LEARN.bank.compare.rows || []).map(function (x) { return [x[1], x[2]]; });
       if (!rows.length) { return ''; }
-      return '<details class="ls-block ls-faq ls-specs-box" style="border:0" data-cand="' + esc(s.candidate) + '"><summary style="padding:0;min-height:36px"><span class="ls-block__title" style="margin:0">' + esc(s.title || t('specs')) + '</span>' + icon('down', 'ls-icon--sm') + '</summary><table class="ls-specs">' + rows.map(function (x) { return '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>'; }).join('') + '</table></details>';
+      return '<details open class="ls-block ls-faq ls-specs-box" style="border:0" data-cand="' + esc(s.candidate) + '"><summary style="padding:0;min-height:36px"><span class="ls-block__title" style="margin:0">' + esc(s.title || t('specs')) + '</span>' + icon('down', 'ls-icon--sm') + '</summary><table class="ls-specs">' + rows.map(function (x) { return '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>'; }).join('') + '</table></details>';
     }
     if (s.products && s.products.length) {
       var end = s.model === 'complement' ? '<button class="ls-why" data-why>' + esc(t('whyShown')) + '</button>' : s.model === 'alternative' ? '<button data-similar="' + esc(turn.id) + '">' + esc(t('seeAll')) + '</button>' : '';
