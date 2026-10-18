@@ -15,9 +15,9 @@ final class Wishlist extends OperatorShortlists
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHeart;
 
-    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+    protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'wishlist';
 

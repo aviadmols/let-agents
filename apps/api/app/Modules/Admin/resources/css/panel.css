@@ -408,28 +408,6 @@ html.dark {
 .fi-wi-chart .fi-wi-chart-tooltip-text-color { color: var(--la-paper); }
 .fi-wi-chart .fi-wi-chart-tooltip-border-color { color: var(--la-ink); }
 
-/* ------------------------------------------------------------------ merchant panel: whose shop this is */
-
-.fi-section[data-shop-banner]:not(.fi-section-not-contained):not(.fi-aside),
-[data-shop-banner] {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-block-end: 16px;
-    padding: 10px 16px;
-    border-radius: var(--la-r);
-    font-size: 13px;
-    background: var(--la-soft);
-    color: var(--la-accent-ink);
-    box-shadow: none;
-}
-
-[data-shop-banner] svg {
-    width: 20px;
-    height: 20px;
-    flex: none;
-}
-
 /* ------------------------------------------------------------------ the monthly usage strip (both panels) */
 
 .la-usage {

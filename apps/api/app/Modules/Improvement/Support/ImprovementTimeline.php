@@ -29,7 +29,7 @@ final class ImprovementTimeline implements TimelineSource
                 kind: TimelineEntry::USER,
                 at: $proposal->decided_at,
                 title: __('improvement::timeline.decided.'.$proposal->status, ['title' => mb_substr((string) $proposal->title, 0, 120)]),
-                url: SiteSuggestions::getUrl(['shop' => $shop->id]),
+                url: SiteSuggestions::getUrl(['shop' => $shop->id], panel: 'operator'),
                 who: $proposal->decided_by === null ? null : $names[$proposal->decided_by] ?? null,
             );
         }

@@ -4,6 +4,7 @@ namespace App\Modules\Admin\Support;
 
 use App\Modules\Admin\Contracts\TimelineEntry;
 use App\Modules\Admin\Contracts\TimelineSource;
+use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
@@ -24,7 +25,7 @@ final class AdminTimeline implements TimelineSource
                 key: 'admin.user.'.$user->id,
                 kind: TimelineEntry::USER,
                 at: Carbon::parse($pivot?->created_at ?? $user->created_at),
-                title: __('admin::timeline.user_joined', ['name' => $user->name, 'role' => (string) ($pivot?->role ?? '')]),
+                title: __('admin::timeline.user_joined', ['name' => $user->name, 'role' => ShopRole::tryFrom((string) $pivot?->role)?->label() ?? (string) $pivot?->role]),
                 who: $user->name,
             );
         }

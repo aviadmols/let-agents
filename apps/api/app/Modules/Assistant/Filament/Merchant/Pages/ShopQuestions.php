@@ -14,7 +14,7 @@ final class ShopQuestions extends OperatorShopQuestions
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+    protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
     protected static ?int $navigationSort = 10;
 }

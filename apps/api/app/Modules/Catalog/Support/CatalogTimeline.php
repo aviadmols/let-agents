@@ -24,8 +24,8 @@ final class CatalogTimeline implements TimelineSource
     public function entries(Shop $shop, CarbonInterface $since): array
     {
         $entries = [];
-        $products = CatalogProductResource::getUrl();
-        $content = CatalogContentResource::getUrl();
+        $products = CatalogProductResource::getUrl(panel: 'operator');
+        $content = CatalogContentResource::getUrl(panel: 'operator');
 
         $this->daily($entries, CatalogProduct::query()->where('created_at', '>=', $since)->orderByDesc('created_at')->get(['id', 'title', 'created_at']),
             'created_at', 'catalog.products_in', 'catalog::timeline.products_in', TimelineEntry::CATALOG, $products);

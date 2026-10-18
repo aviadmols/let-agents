@@ -25,7 +25,7 @@ final class LeadTimeline implements TimelineSource
                 at: $lead->created_at,
                 title: __('leads::timeline.lead', ['contact' => $lead->contact_masked]),
                 lines: array_values(array_map(fn ($v): string => mb_substr((string) $v, 0, 200), array_filter((array) ($lead->answers ?? [])))),
-                url: LeadList::getUrl(),
+                url: LeadList::getUrl(panel: 'operator'),
             );
         }
 

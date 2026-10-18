@@ -27,9 +27,9 @@ final class DisplaySettings extends OperatorConfiguration
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSwatch;
 
-    protected static string|UnitEnum|null $navigationGroup = 'on_page';
+    protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'display';
 

@@ -21,4 +21,15 @@ return [
     'open' => 'Open where it belongs',
     'none' => 'Nothing happened in this period.',
     'user_joined' => 'A user joined the shop: :name (:role)',
+    'shop_subheading' => 'Everything that happened in the account in the last :days days: scans, new products, what joined the knowledge, what the team answered and decided. Click a line for the details.',
+    'filter' => 'Filter by kind',
+    'more' => 'Load 30 more days',
+    'go' => [
+        'scan' => 'To the scan summary',
+        'catalog' => 'To the scan summary',
+        'knowledge' => 'To the knowledge centre',
+        'user' => 'To notices and insights',
+        'insight' => 'To notices and insights',
+        'lead' => 'To site enquiries',
+    ],
 ];

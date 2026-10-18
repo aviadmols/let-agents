@@ -14,9 +14,9 @@ final class ScanHistory extends OperatorScanHistory
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'search';
+    protected static string|UnitEnum|null $navigationGroup = 'scan';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 10;
 
     /** The shop opens on the pictures, as a gallery. */
     public string $display = 'gallery';

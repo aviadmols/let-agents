@@ -14,7 +14,7 @@ final class MissingInfo extends OperatorMissingInfo
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'search';
+    protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 20;
 }

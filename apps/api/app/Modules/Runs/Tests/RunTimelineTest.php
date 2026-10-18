@@ -37,4 +37,27 @@ final class RunTimelineTest extends TestCase
             ->assertSee('2 תשובות לגולשים')
             ->assertDontSee('data-timeline-entry="run.'.$run->id.'"', false);
     }
+
+    public function test_the_shops_own_timeline_shows_the_scan_and_never_a_model_a_cost_or_a_failure(): void
+    {
+        $shop = Shop::factory()->create();
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        $sync = Run::query()->create(['shop_id' => $shop->id, 'agent' => 'catalog.sync', 'action' => 'catalog.sync', 'status' => 'succeeded', 'trigger' => 'schedule',
+            'started_at' => now()->subHours(3), 'summary_key' => 'catalog::runs.synced', 'summary_params' => ['products' => 1191, 'created' => 12, 'updated' => 2, 'removed' => 0, 'categories' => 126, 'content' => 45], 'cost_usd' => '0.0000']);
+        $review = Run::query()->create(['shop_id' => $shop->id, 'agent' => 'improvement.reviewer', 'action' => 'improvement.daily_review', 'status' => 'succeeded', 'trigger' => 'schedule',
+            'started_at' => now()->subHours(2), 'summary_key' => 'improvement::runs.quiet', 'cost_usd' => '0.4200']);
+        $failed = Run::query()->create(['shop_id' => $shop->id, 'agent' => 'catalog.sync', 'action' => 'catalog.sync', 'status' => 'failed', 'trigger' => 'schedule',
+            'started_at' => now()->subHour(), 'error' => 'cURL error 28 from the store', 'cost_usd' => '0.0000']);
+
+        $this->actingAs($merchant)->withHeader('Accept-Language', 'he')
+            ->get("/merchant/{$shop->slug}/timeline")
+            ->assertOk()
+            ->assertSee('data-timeline-entry="run.'.$sync->id.'"', false)
+            ->assertSee('מוצרים: 12 חדשים')
+            ->assertDontSee('data-timeline-entry="run.'.$review->id.'"', false)
+            ->assertDontSee('data-timeline-entry="run.'.$failed->id.'"', false)
+            ->assertDontSee('cURL')
+            ->assertDontSee('$0.42');
+    }
 }

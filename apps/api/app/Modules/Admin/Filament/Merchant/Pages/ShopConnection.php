@@ -17,7 +17,7 @@ final class ShopConnection extends Page
 {
     protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 70;
 
     protected static ?string $slug = 'connection';
 

@@ -130,7 +130,7 @@ final class MerchantPanelTest extends TestCase
         // The panel wears the shop's name, and says plainly that this store is theirs.
         $mine = $this->followingRedirects()->get('/merchant/'.$this->mine->slug)->assertOk();
         $mine->assertSee('החנות שלי');
-        $mine->assertSee(__('admin::panels.account.viewing'));
+        $mine->assertDontSee('data-operator-shortcut', false);
         $mine->assertSee('data-shop-banner="'.$this->mine->slug.'"', false);
         $mine->assertDontSee(__('admin::panels.account.as_operator', ['shop' => 'החנות שלי']));
 

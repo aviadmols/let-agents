@@ -15,10 +15,9 @@ final class ShopSignUps extends OperatorShopSignUps
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+    protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
     protected static ?int $navigationSort = 30;
 
     /** Off the menu: reached from where it belongs (the analytics tabs, or the operator). */
-    protected static bool $shouldRegisterNavigation = false;
 }

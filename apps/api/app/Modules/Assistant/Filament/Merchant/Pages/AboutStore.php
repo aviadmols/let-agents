@@ -11,9 +11,9 @@ final class AboutStore extends OperatorAboutStore
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'search';
+    protected static string|UnitEnum|null $navigationGroup = 'knowledge';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     public function mount(): void
     {

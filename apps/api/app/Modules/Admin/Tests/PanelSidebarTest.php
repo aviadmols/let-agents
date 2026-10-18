@@ -36,7 +36,7 @@ final class PanelSidebarTest extends TestCase
         }
     }
 
-    public function test_the_merchant_sidebar_opens_with_home_and_analytics_then_its_groups_in_order(): void
+    public function test_the_merchant_sidebar_is_one_list_of_screens_as_the_design_lays_it_out(): void
     {
         $shop = Shop::factory()->create();
         $merchant = User::factory()->create();
@@ -49,9 +49,14 @@ final class PanelSidebarTest extends TestCase
                 ->assertOk()
                 ->getContent();
 
+            // No groups: the home, then each screen once; a screen's other pages are its tabs.
+            $this->assertSame([''], array_values(array_unique($this->groupLabels($html))));
             $this->assertSame(
-                ['', ...array_map(fn (string $key): string => __("admin::panels.nav.{$key}", [], $locale), PanelNavigation::MERCHANT)],
-                $this->groupLabels($html),
+                [__('admin::home.nav', [], $locale), ...array_map(
+                    fn (string $key): string => __("admin::panels.screens.{$key}", [], $locale),
+                    ['analytics', 'timeline', 'inbox', 'knowledge', 'scan', 'settings'],
+                )],
+                $this->itemLabels($html),
             );
         }
     }
@@ -65,6 +70,14 @@ final class PanelSidebarTest extends TestCase
                 ->assertSee('family=Heebo', false)
                 ->assertSee('--la-accent: #3b5bdb', false);
         }
+    }
+
+    /** @return list<string> every sidebar item's label, top to bottom */
+    private function itemLabels(string $html): array
+    {
+        preg_match_all('/<span[^>]*class="fi-sidebar-item-label"[^>]*>\s*(.*?)\s*<\/span>/su', $html, $found);
+
+        return array_map(fn (string $label): string => html_entity_decode(trim(strip_tags($label)), ENT_QUOTES), $found[1]);
     }
 
     /** @return list<string> every sidebar group's label, top to bottom; an empty one is a loose item */

@@ -21,9 +21,9 @@ final class ShopNotices extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBell;
 
-    protected static string|UnitEnum|null $navigationGroup = null;
+    protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'notices';
 

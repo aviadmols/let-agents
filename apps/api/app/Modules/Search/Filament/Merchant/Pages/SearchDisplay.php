@@ -11,9 +11,9 @@ final class SearchDisplay extends OperatorSearchDisplay
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'search';
+    protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 20;
 
     public function mount(): void
     {

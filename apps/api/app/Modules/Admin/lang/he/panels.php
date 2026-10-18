@@ -42,4 +42,29 @@ return [
         'settings' => 'הגדרות',
     ],
     'view_as_shop' => 'לראות כמו מנהל החנות',
+    'top' => [
+        'live' => 'פועל בחנות',
+        'preview' => 'בתצוגה מקדימה',
+        'as_operator' => 'צפייה כמפעיל · חזרה',
+        'operator' => 'מפעיל המערכת',
+        'open_store' => 'לפתוח את החנות',
+        'theme' => 'מצב תצוגה',
+        'logout' => 'יציאה',
+        'themes' => [
+            'light' => 'בהיר',
+            'dark' => 'כהה',
+            'system' => 'כמו המערכת',
+        ],
+        'brand' => 'הפאנל לחנות',
+    ],
+    // The shop's screens, top to bottom (MerchantNavigation::SECTIONS).
+    'screens' => [
+        'analytics' => 'אנליטיקס',
+        'sessions' => 'סשנים',
+        'timeline' => 'ציר זמן',
+        'inbox' => 'הודעות ותובנות',
+        'knowledge' => 'מרכז הידע',
+        'scan' => 'סיכום סריקה',
+        'settings' => 'הגדרות',
+    ],
 ];

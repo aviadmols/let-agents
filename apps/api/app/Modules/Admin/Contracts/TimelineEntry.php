@@ -32,6 +32,8 @@ final readonly class TimelineEntry
      * @param  string|null  $url  where the operator goes for the whole thing
      * @param  string|null  $who  who did it: a user's name, or how it was triggered
      * @param  string  $tone  '' or 'bad' (something failed)
+     * @param  bool  $forShop  shown on the shop's own timeline too (no mechanics, no model, no failure detail)
+     * @param  string|null  $shopTitle  the title as the shop reads it, when the operator's has more
      */
     public function __construct(
         public string $key,
@@ -43,5 +45,7 @@ final readonly class TimelineEntry
         public ?string $who = null,
         public ?float $costUsd = null,
         public string $tone = '',
+        public bool $forShop = true,
+        public ?string $shopTitle = null,
     ) {}
 }

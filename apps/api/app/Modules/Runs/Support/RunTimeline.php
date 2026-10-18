@@ -20,6 +20,9 @@ final class RunTimeline implements TimelineSource
 {
     private const MAX = 400;
 
+    /** The runs the shop sees on its own timeline: the store's scan. The rest is mechanics, the operator's. */
+    private const FOR_SHOP = ['catalog.sync'];
+
     /** The kind an action's runs are shown as, by the longest matching prefix. */
     private const KINDS = [
         'improvement.' => TimelineEntry::INSIGHT,
@@ -55,10 +58,12 @@ final class RunTimeline implements TimelineSource
                 at: $run->started_at,
                 title: $run->agentLabel().': '.($summary ?? $run->status->label()),
                 lines: array_values(array_filter([$failed && $run->error !== null ? mb_substr($run->error, 0, 300) : null, $run->durationForHumans()])),
-                url: ProcessLog::getUrl(['step' => $run->action, 'run' => $run->id]),
+                url: ProcessLog::getUrl(['step' => $run->action, 'run' => $run->id], panel: 'operator'),
                 who: $run->trigger->label(),
                 costUsd: $run->cost_usd === null ? null : (float) $run->cost_usd,
                 tone: $failed ? 'bad' : '',
+                forShop: ! $failed && in_array($run->action, self::FOR_SHOP, true),
+                shopTitle: $summary,
             );
         }
 
@@ -71,8 +76,9 @@ final class RunTimeline implements TimelineSource
                 kind: TimelineEntry::SYSTEM,
                 at: Carbon::parse((string) $day->day)->endOfDay(),
                 title: __('runs::timeline.live', ['n' => (int) $day->n]),
-                url: ProcessLog::getUrl(['step' => 'assistant.answer']),
+                url: ProcessLog::getUrl(['step' => 'assistant.answer'], panel: 'operator'),
                 costUsd: (float) $day->cost,
+                forShop: false,
             );
         }
 

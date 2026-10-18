@@ -136,14 +136,6 @@ html.dark .fi-panel-merchant {
     font-weight: 500;
 }
 
-/* a count that needs the merchant: coral with ink, as on the tabs */
-.fi-panel-merchant .fi-sidebar-item-badge-ctn .fi-badge,
-.fi-panel-merchant .fi-sidebar-item-badge-ctn .fi-badge.fi-color-danger {
-    background: var(--lp-coral);
-    color: var(--lp-ink);
-    font-weight: 500;
-}
-
 .fi-panel-merchant .fi-sidebar-group-label,
 .fi-panel-merchant .fi-sidebar-group-label:where(.dark, .dark *) {
     font-size: 11px;
@@ -499,4 +491,114 @@ html.dark .fi-panel-merchant {
     .fi-panel-merchant .lp-grid-4 { grid-template-columns: minmax(0, 1fr); }
     .fi-panel-merchant .lp-win { grid-template-columns: 30px minmax(0, 1fr); }
     .fi-panel-merchant .lp-win > .lp-btn { grid-column: 2; justify-self: start; }
+}
+
+/* ================================================================== the shell, as the design draws it */
+
+/* the side: the brand on top, one flat list, no icons, the current screen in ink */
+.fi-panel-merchant .fi-sidebar { background: var(--la-paper); border-inline-start: 1px solid var(--la-line); box-shadow: none; }
+.fi-panel-merchant .fi-sidebar-header { height: auto; padding: 20px 16px 18px; background: transparent; box-shadow: none; border: 0; }
+.fi-panel-merchant .fi-sidebar-item-icon,
+.fi-panel-merchant .fi-sidebar-group-icon { display: none; }
+.fi-panel-merchant .fi-sidebar-nav { padding: 4px 12px 20px; gap: 0; }
+.fi-panel-merchant .fi-sidebar-nav-groups { gap: 2px; }
+.fi-panel-merchant .fi-sidebar-group-btn { padding: 14px 12px 4px; }
+.fi-panel-merchant .fi-sidebar-group-label { font-size: 12px; font-weight: 500; color: var(--la-muted); }
+.fi-panel-merchant .fi-sidebar-item-btn { padding: 9px 12px; border-radius: 12px; gap: 8px; }
+.fi-panel-merchant .fi-sidebar-item-label { font-size: 14px; color: var(--la-ink-2); font-weight: 400; }
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn { background: var(--la-accent); }
+.fi-panel-merchant .fi-sidebar-item.fi-active .fi-sidebar-item-label { color: var(--la-paper); font-weight: 500; }
+.fi-panel-merchant .fi-sidebar-item .fi-badge, .fi-panel-merchant .fi-sidebar-item .fi-badge.fi-color { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 12px; background: var(--la-sunk); color: var(--la-ink-2); box-shadow: none; }
+.fi-panel-merchant .fi-sidebar-item.fi-active .fi-badge, .fi-panel-merchant .fi-sidebar-item.fi-active .fi-badge.fi-color { background: rgb(255 255 255 / 18%); color: var(--la-paper); }
+.fi-panel-merchant .lp-brand small { display: block; font-size: 12px; font-weight: 400; color: var(--la-muted); line-height: 1.2; }
+
+/* the top bar: the store and its state, then the language, the store, the person */
+.fi-panel-merchant .lp-topbar { margin-block-start: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-block-end: 22px; padding-block-end: 14px; border-block-end: 1px solid var(--la-line); }
+.fi-panel-merchant .lp-top-shop { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.fi-panel-merchant .lp-top-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; color: var(--la-ink); background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer; }
+.fi-panel-merchant b.lp-top-name { cursor: default; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fi-panel-merchant .lp-top-name svg,
+.fi-panel-merchant .lp-user-btn > svg { width: 14px; height: 14px; color: var(--la-muted); flex: none; }
+.fi-panel-merchant .lp-top-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 600; background: var(--la-sunk); color: var(--la-ink); }
+.fi-panel-merchant .lp-top-av-ink { background: var(--la-accent); color: var(--la-paper); }
+.fi-panel-merchant a.lp-pill { text-decoration: none; }
+.fi-panel-merchant .lp-top-end { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fi-panel-merchant .lp-lang { display: flex; padding: 3px; background: var(--la-sunk); border-radius: 999px; }
+.fi-panel-merchant .lp-lang > * { padding: 5px 12px; border-radius: 999px; font-size: 13px; color: var(--la-muted); text-decoration: none; }
+.fi-panel-merchant .lp-lang > [aria-current] { background: var(--la-paper); color: var(--la-ink); font-weight: 500; box-shadow: var(--la-shadow); }
+.fi-panel-merchant .lp-top-store { background: transparent; box-shadow: inset 0 0 0 1px var(--la-line); }
+.fi-panel-merchant .lp-top-store svg { width: 15px; height: 15px; }
+.fi-panel-merchant .lp-drop { position: relative; }
+.fi-panel-merchant .lp-user-btn { display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 6px; border: 0; border-radius: 999px; background: var(--la-paper); box-shadow: inset 0 0 0 1px var(--la-line); font: inherit; color: inherit; cursor: pointer; text-align: start; }
+.fi-panel-merchant .lp-user-who { display: flex; flex-direction: column; line-height: 1.2; }
+.fi-panel-merchant .lp-user-who b { font-size: 13.5px; font-weight: 500; color: var(--la-ink); }
+.fi-panel-merchant .lp-user-who span { font-size: 11.5px; color: var(--la-muted); }
+.fi-panel-merchant .lp-menu { position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 30; min-width: 240px; background: var(--la-paper); border-radius: 16px; box-shadow: var(--la-pop); padding: 8px; }
+.fi-panel-merchant .lp-menu-start { inset-inline-end: auto; inset-inline-start: 0; }
+.fi-panel-merchant .lp-menu a,
+.fi-panel-merchant .lp-menu .lp-menu-item { display: flex; justify-content: space-between; width: 100%; padding: 9px 12px; border: 0; border-radius: 10px; background: none; font: inherit; font-size: 14px; color: var(--la-ink-2); text-align: start; text-decoration: none; cursor: pointer; }
+.fi-panel-merchant .lp-menu a[aria-current] { font-weight: 600; color: var(--la-ink); }
+.fi-panel-merchant .lp-menu hr { border: 0; border-top: 1px solid var(--la-line); margin: 6px 0; }
+.fi-panel-merchant .lp-menu-head { padding: 8px 12px 10px; font-size: 12.5px; color: var(--la-muted); }
+.fi-panel-merchant .lp-menu-head b { display: block; color: var(--la-ink); font-size: 14px; font-weight: 500; }
+.fi-panel-merchant .lp-menu-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 12px; font-size: 14px; color: var(--la-ink-2); }
+.fi-panel-merchant .lp-tabs-sm > button { padding: 4px 9px; font-size: 12px; }
+@media (hover: hover) and (pointer: fine) {
+    .fi-panel-merchant .lp-menu a:hover, .fi-panel-merchant .lp-menu .lp-menu-item:hover { background: var(--la-sunk); }
+    .fi-panel-merchant .fi-sidebar-item:not(.fi-active) > .fi-sidebar-item-btn:hover { background: var(--la-sunk); }
+}
+
+/* a phone: the side becomes a row of screens above the page, as in the design */
+@media (max-width: 1023px) {
+    .fi-panel-merchant .lp-top-shop { flex-basis: 100%; }
+    .fi-panel-merchant .lp-top-end { width: 100%; justify-content: space-between; flex-wrap: nowrap; }
+    .fi-panel-merchant .lp-top-store { width: 40px; padding: 0; }
+    .fi-panel-merchant .lp-top-store span,
+    .fi-panel-merchant .lp-user-who { display: none; }
+}
+
+/* ================================================================== a screen's pages: tabs, or the settings side menu */
+
+.fi-panel-merchant .lp-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 12px; display: inline-grid; place-items: center; background: var(--la-sunk); color: var(--la-ink-2); font-variant-numeric: tabular-nums; }
+.fi-panel-merchant .lp-section-tabs { display: flex; gap: 4px; padding: 4px; background: var(--la-sunk); border-radius: 999px; width: max-content; max-width: 100%; overflow-x: auto; margin-block-end: 20px; scrollbar-width: none; }
+.fi-panel-merchant .lp-section-tabs > a { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--la-ink-2); white-space: nowrap; text-decoration: none; }
+.fi-panel-merchant .lp-section-tabs > a.is-on { background: var(--la-paper); color: var(--la-ink); font-weight: 500; box-shadow: var(--la-shadow); }
+.fi-panel-merchant .lp-section-tabs > a.is-on .lp-count { background: var(--la-accent); color: var(--la-paper); }
+
+/* settings: the side menu beside the page, like Shopify's */
+.fi-panel-merchant .fi-page-content:has(> .lp-section-side) { display: grid; grid-template-columns: 220px minmax(0, 1fr); column-gap: 24px; align-items: start; }
+.fi-panel-merchant .fi-page-content:has(> .lp-section-side) > * { grid-column: 2; min-width: 0; }
+.fi-panel-merchant .fi-page-content > .lp-section-side { grid-column: 1; grid-row: 1 / span 20; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 2px; background: var(--la-paper); border-radius: var(--la-r); padding: 8px; box-shadow: var(--la-shadow); }
+.fi-panel-merchant .lp-section-side > a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 12px; font-size: 14px; color: var(--la-ink-2); text-decoration: none; }
+.fi-panel-merchant .lp-section-side > a.is-on { background: var(--la-sunk); color: var(--la-ink); font-weight: 500; }
+@media (hover: hover) and (pointer: fine) {
+    .fi-panel-merchant .lp-section-side > a:not(.is-on):hover { background: var(--la-plane); }
+}
+@media (max-width: 900px) {
+    .fi-panel-merchant .fi-page-content:has(> .lp-section-side) { display: block; }
+    .fi-panel-merchant .fi-page-content > .lp-section-side { position: static; flex-direction: row; overflow-x: auto; margin-block-end: 16px; border-radius: 999px; padding: 4px; }
+    .fi-panel-merchant .lp-section-side > a { white-space: nowrap; border-radius: 999px; padding: 7px 14px; font-size: 13.5px; }
+}
+
+/* ================================================================== the timeline */
+
+.fi-panel-merchant .lp-tl { display: flex; flex-direction: column; gap: 6px; border-inline-start: 2px solid var(--la-line); padding-inline-start: 18px; margin-inline-start: 6px; }
+.fi-panel-merchant .lp-tl-day { font-size: 12.5px; color: var(--la-muted); margin: 14px 0 4px; font-weight: 500; }
+.fi-panel-merchant .lp-tl-day:first-child { margin-top: 0; }
+.fi-panel-merchant .lp-tl-item { position: relative; background: var(--la-paper); border-radius: 14px; box-shadow: var(--la-shadow); }
+.fi-panel-merchant .lp-tl-item::before { content: ''; position: absolute; inset-inline-start: -25px; top: 17px; width: 10px; height: 10px; border-radius: 50%; background: var(--la-axis); box-shadow: 0 0 0 3px var(--la-plane); }
+.fi-panel-merchant .lp-tl-item[data-kind='scan']::before,
+.fi-panel-merchant .lp-tl-item[data-kind='catalog']::before { background: var(--la-ink); }
+.fi-panel-merchant .lp-tl-item[data-kind='knowledge']::before { background: var(--lp-lime); box-shadow: 0 0 0 3px var(--la-plane), inset 0 0 0 1px var(--la-ink); }
+.fi-panel-merchant .lp-tl-item[data-kind='user']::before { background: var(--lp-sun); }
+.fi-panel-merchant .lp-tl-item[data-kind='lead']::before { background: var(--lp-coral); }
+.fi-panel-merchant .lp-tl-head { display: flex; align-items: baseline; gap: 12px; padding: 11px 14px; }
+.fi-panel-merchant .lp-tl-head[role='button'] { cursor: pointer; }
+.fi-panel-merchant .lp-tl-time { font-size: 12.5px; color: var(--la-muted); font-variant-numeric: tabular-nums; min-width: 38px; }
+.fi-panel-merchant .lp-tl-t { flex: 1; min-width: 0; font-size: 14px; color: var(--la-ink); }
+.fi-panel-merchant .lp-tl-who { font-size: 12.5px; color: var(--la-muted); white-space: nowrap; }
+.fi-panel-merchant .lp-tl-more { padding: 0 14px 12px 14px; padding-inline-start: 64px; font-size: 13.5px; color: var(--la-ink-2); }
+.fi-panel-merchant .lp-tl-more ul { margin: 0 0 6px; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 640px) {
+    .fi-panel-merchant .lp-tl-more { padding-inline-start: 14px; }
 }

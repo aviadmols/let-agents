@@ -42,4 +42,29 @@ return [
         'settings' => 'Settings',
     ],
     'view_as_shop' => 'View as the shop manager',
+    'top' => [
+        'live' => 'Live in the store',
+        'preview' => 'In preview',
+        'as_operator' => 'Viewing as operator · back',
+        'operator' => 'System operator',
+        'open_store' => 'Open the store',
+        'theme' => 'Appearance',
+        'logout' => 'Sign out',
+        'themes' => [
+            'light' => 'Light',
+            'dark' => 'Dark',
+            'system' => 'System',
+        ],
+        'brand' => 'Store panel',
+    ],
+    // The shop's screens, top to bottom (MerchantNavigation::SECTIONS).
+    'screens' => [
+        'analytics' => 'Analytics',
+        'sessions' => 'Sessions',
+        'timeline' => 'Timeline',
+        'inbox' => 'Notices and insights',
+        'knowledge' => 'Knowledge centre',
+        'scan' => 'Scan summary',
+        'settings' => 'Settings',
+    ],
 ];

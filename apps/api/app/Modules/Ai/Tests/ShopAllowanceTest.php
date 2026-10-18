@@ -74,18 +74,28 @@ final class ShopAllowanceTest extends TestCase
         $merchant->attachShop($shop);
         $this->spend($shop, 12.6, '2026-10-03 08:00:00');
 
+        // Below the warning line the strip stays away; the home's card shows the share.
+        $this->actingAs($merchant)->withHeader('Accept-Language', 'he')
+            ->get("/merchant/{$shop->slug}/overview")
+            ->assertOk()
+            ->assertDontSee('data-usage-strip', false)
+            ->assertSee('data-card="ai"', false)
+            ->assertSee('42%');
+
+        $this->spend($shop, 15.0, '2026-10-04 08:00:00');
+
         $html = $this->actingAs($merchant)
             ->withHeader('Accept-Language', 'he')
             ->get("/merchant/{$shop->slug}/overview")
             ->assertOk()
             ->assertSee('data-usage-strip', false)
-            ->assertSee('42% מהמכסה החודשית')
+            ->assertSee('92% מהמכסה החודשית')
             ->assertSee('מתחדש ב־1 בנובמבר')
             ->getContent();
 
         preg_match('/<div class="la-usage".*?<\/div>/s', $html, $strip);
         $this->assertStringNotContainsString('$', $strip[0], 'no dollars on a merchant screen');
-        $this->assertStringNotContainsString('12.6', $strip[0]);
+        $this->assertStringNotContainsString('27.6', $strip[0]);
     }
 
     public function test_the_operator_sees_dollars_and_changes_a_shops_allowance(): void

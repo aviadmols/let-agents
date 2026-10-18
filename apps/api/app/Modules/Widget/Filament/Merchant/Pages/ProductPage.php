@@ -22,9 +22,9 @@ final class ProductPage extends OperatorProductPage
 
     private const MERCHANT_RESULTS = 12;
 
-    protected static string|UnitEnum|null $navigationGroup = 'on_page';
+    protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 30;
 
     /**
      * The operator searches every shop at once; a merchant searches their own, through the tenant

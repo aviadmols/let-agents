@@ -14,7 +14,7 @@ final class OpeningHours extends OperatorOpeningHours
 {
     protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 60;
 
     public function shopId(): ?string
     {

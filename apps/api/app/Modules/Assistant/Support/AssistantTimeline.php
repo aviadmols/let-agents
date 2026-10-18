@@ -29,7 +29,7 @@ final class AssistantTimeline implements TimelineSource
                 at: $answer->updated_at,
                 title: __('assistant::timeline.team_answered', ['question' => mb_substr((string) $answer->question, 0, 120)]),
                 lines: array_values(array_filter([mb_substr((string) $answer->answer, 0, 240), $page === null ? null : __('assistant::timeline.on_page', ['page' => $page])])),
-                url: ShopQuestions::getUrl(),
+                url: ShopQuestions::getUrl(panel: 'operator'),
                 who: __('assistant::timeline.team'),
             );
         }

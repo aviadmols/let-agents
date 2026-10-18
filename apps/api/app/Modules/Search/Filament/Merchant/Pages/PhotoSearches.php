@@ -15,7 +15,7 @@ final class PhotoSearches extends OperatorPhotoSearches
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'search';
+    protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
-    protected static ?int $navigationSort = 31;
+    protected static ?int $navigationSort = 40;
 }

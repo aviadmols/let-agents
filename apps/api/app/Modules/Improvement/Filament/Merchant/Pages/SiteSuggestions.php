@@ -14,7 +14,7 @@ final class SiteSuggestions extends OperatorSiteSuggestions
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = 'shoppers';
+    protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 60;
 }

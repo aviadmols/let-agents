@@ -16,9 +16,9 @@ final class ShopAnalytics extends OperatorShopAnalytics
 {
     use LocksShopToPanelTenant;
 
-    protected static string|UnitEnum|null $navigationGroup = null;
+    protected static string|UnitEnum|null $navigationGroup = 'analytics';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     /** A shop owner sees what happened in the store, never what it cost to run the agents. */
     public function showsCosts(): bool

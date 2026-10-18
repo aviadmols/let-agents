@@ -57,6 +57,11 @@ final class UsageStrip
     {
         $usage = $this->usage((string) $shop->id);
 
+        // The shop's home shows the month's use as a card; the strip appears only near the limit or past it.
+        if ($usage['tone'] === '') {
+            return new HtmlString('');
+        }
+
         return new HtmlString(view('ai::usage-strip', [
             'title' => __('ai::budget.strip.title'),
             'percent' => $usage['percent'],
