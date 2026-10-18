@@ -48,4 +48,9 @@ return [
     'schema_proposed' => 'Proposed a vocabulary: :types product types and :attributes attributes. The reviewer dropped :dropped. Waiting for approval.',
     'schema_invalid' => 'The written vocabulary did not pass code\'s check.',
     'schema_same_family' => 'The writer and the reviewer are of the same model family: nothing was written.',
+    'colour_names' => ':asked of the store\'s colour names: :placed placed among the shades, :unknown not a colour on the list, :disputed not accepted by the checker.',
+    'colour_names_none' => 'No new colour names to place.',
+    'colour_names_stopped' => 'Placing colour names stopped: the monthly spending cap was reached. It tries again when there is room.',
+    'colour_names_failed' => 'Placing colour names failed: the model did not answer. It tries again next night.',
+    'colour_names_same_family' => 'The colour names\' placer and checker are from the same model family: nothing was asked.',
 ];

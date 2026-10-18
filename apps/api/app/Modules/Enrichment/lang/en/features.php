@@ -49,4 +49,8 @@ return [
         'label' => 'Publish reading improvements automatically',
         'description' => 'A proposal two models agreed on, with a measured improvement, publishes itself — at most one version a week. An older version can always be put back on the Scan improvements screen.',
     ],
+    'colour_names' => [
+        'label' => 'Placing the store\'s colour names',
+        'description' => 'Colour names code does not know and the store has no swatch for ("Ocean Mist") are placed once among the shades, so the products are found when filtering by colour. One model places them and one of another family checks, in one request a night and only when there are new names.',
+    ],
 ];

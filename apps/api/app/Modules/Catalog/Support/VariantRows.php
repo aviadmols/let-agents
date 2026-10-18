@@ -3,6 +3,8 @@
 namespace App\Modules\Catalog\Support;
 
 use App\Modules\Catalog\Enums\ColorShade;
+use App\Modules\Catalog\Enums\FabricPattern;
+use App\Modules\Catalog\Models\CatalogColourName;
 use App\Modules\Catalog\Models\CatalogProduct;
 
 /**
@@ -33,17 +35,21 @@ final class VariantRows
     /** Share of an option's values that must read as colours (or letter sizes) for an unnamed option to be one. */
     private const BY_VALUES = 0.6;
 
-    /** @return list<array<string, mixed>> the catalog_variants columns of each variant, without ids */
-    public static function for(CatalogProduct $product): array
+    /**
+     * @param  array<string, array{shades: list<string>, pattern: string|null}>  $learned  the shop's own colour names, placed (CatalogColourName::placed)
+     * @return list<array<string, mixed>> the catalog_variants columns of each variant, without ids
+     */
+    public static function for(CatalogProduct $product, array $learned = []): array
     {
-        return self::fromPayload((array) $product->payload);
+        return self::fromPayload((array) $product->payload, $learned);
     }
 
     /**
      * @param  array<string, mixed>  $payload  a product as the feed sends it
+     * @param  array<string, array{shades: list<string>, pattern: string|null}>  $learned  by CatalogColourName::keyOf
      * @return list<array<string, mixed>>
      */
-    public static function fromPayload(array $payload): array
+    public static function fromPayload(array $payload, array $learned = []): array
     {
         $variations = array_values(array_filter((array) ($payload['variations'] ?? []), fn ($v): bool => is_array($v)
             // A variation the store switched off (WooCommerce "private") is not for sale.
@@ -68,8 +74,14 @@ final class VariantRows
             $sizeLabel = $size !== null ? ($options[$size]['value'] ?? '') : '';
             $read = $colorLabel === '' ? ['shades' => [], 'patterns' => []] : ColorWords::read($colorLabel);
             $hex = ColorWords::hex($swatches[$colorLabel] ?? null);
-            $shades = $read['shades'] !== [] ? $read['shades'] : array_filter([$hex === null ? null : ColorWords::nearest($hex)]);
+            // The words first; then the store's own swatch; then the name as it was placed for this shop.
+            $placed = $read['shades'] === [] && $read['patterns'] === [] && $hex === null && $colorLabel !== '' ? ($learned[CatalogColourName::keyOf($colorLabel)] ?? null) : null;
+            $shades = $read['shades'] !== [] ? $read['shades'] : array_values(array_filter([$hex === null ? null : ColorWords::nearest($hex)]));
             $patterns = $read['patterns'];
+            if ($placed !== null) {
+                $shades = array_values(array_filter(array_map(fn (string $s): ?ColorShade => ColorShade::tryFrom($s), $placed['shades'])));
+                $patterns = array_values(array_filter([FabricPattern::tryFrom((string) $placed['pattern'])]));
+            }
 
             if ($patterns === [] && $pattern !== null && ($options[$pattern]['value'] ?? '') !== '') {
                 $patterns = ColorWords::read($options[$pattern]['value'])['patterns'];

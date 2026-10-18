@@ -57,6 +57,10 @@
             "default": true
         },
         {
+            "name": "colour_names",
+            "default": true
+        },
+        {
             "name": "auto_highlights",
             "default": true
         }
@@ -122,6 +126,24 @@
             "default": 900,
             "min": 200,
             "max": 4000,
+            "scope": "shop",
+            "unit": "tokens"
+        },
+        {
+            "name": "colour_names_per_night",
+            "type": "int",
+            "default": 120,
+            "min": 10,
+            "max": 1000,
+            "scope": "shop",
+            "unit": "names"
+        },
+        {
+            "name": "colour_names_max_output_tokens",
+            "type": "int",
+            "default": 6000,
+            "min": 500,
+            "max": 16000,
             "scope": "shop",
             "unit": "tokens"
         },

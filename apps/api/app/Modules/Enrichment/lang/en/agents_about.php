@@ -7,4 +7,5 @@ return [
     'auditor' => 'Once a week: checks a sample of articles, proposes reading rules for what code missed, and a second model reviews the proposal. It only proposes.',
     'schema_discovery' => 'On request: code counts a sample of products (fields, tags, measurements, repeated words), a model writes a vocabulary from the counts, a model of the other family reviews it, and the operator approves.',
     'web_lookup' => 'On request, from the missing details screen: a model that searches the web names sources with the sentence each rests on; code checks the page holds it; a model of the other family checks it is the same product; a person approves.',
+    'colour_namer' => 'Each night, only when there are new names: the store\'s colour names code does not know and that have no swatch are placed among the shades. One model places, a model of another family checks, and only what both agree on goes in. Each name is asked once.',
 ];

@@ -261,4 +261,12 @@ return [
         'label' => 'Related products on a card, per kind',
         'description' => 'How many complements, alternatives and other sizes go on the card, per kind, best first.',
     ],
+    'colour_names_per_night' => [
+        'label' => 'Colour names a night',
+        'description' => 'At most this many new colour names go to be placed in the night\'s one request. The rest wait for the next night.',
+    ],
+    'colour_names_max_output_tokens' => [
+        'label' => 'Longest answer about colour names',
+        'description' => 'How many tokens each model may write in its answer about the night\'s colour names.',
+    ],
 ];

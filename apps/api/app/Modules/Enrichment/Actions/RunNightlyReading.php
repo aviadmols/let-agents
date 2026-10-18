@@ -33,6 +33,9 @@ final class RunNightlyReading
      * @var array<string, class-string>
      */
     public const STEPS = [
+        // First: a shop's own colour names code does not know, placed once each (one small request a
+        // night, only when there are new ones), so the variants and the code reading after it use them.
+        'colours' => PlaceColourNames::class,
         'code' => ReadProductsInCode::class,
         'promises' => ReadPromisesInCode::class,
         'content' => ReadContentInCode::class,

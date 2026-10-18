@@ -10,8 +10,10 @@ use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Events\CatalogSyncRequested;
+use App\Modules\Catalog\Events\ColourNamesPlaced;
 use App\Modules\Catalog\Jobs\SyncCatalogJob;
 use App\Modules\Catalog\Listeners\MoveCatalogLinks;
+use App\Modules\Catalog\Listeners\RebuildNamedVariants;
 use App\Modules\Catalog\Support\CatalogProductKinds;
 use App\Modules\Catalog\Support\CatalogScanDetails;
 use App\Modules\Connections\Events\StoreAddressMoved;
@@ -31,6 +33,8 @@ final class CatalogServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         Event::listen(StoreAddressMoved::class, MoveCatalogLinks::class);
+        // A shop's own colour names placed (Enrichment): the variants named so are read again.
+        Event::listen(ColourNamesPlaced::class, RebuildNamedVariants::class);
         // A read asked for from another screen: the sync job, with the 20 minutes a large store needs.
         Event::listen(CatalogSyncRequested::class, fn (CatalogSyncRequested $event) => SyncCatalogJob::dispatch($event->shopId, RunTrigger::Manual));
 

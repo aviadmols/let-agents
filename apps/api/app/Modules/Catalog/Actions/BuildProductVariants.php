@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalog\Actions;
 
+use App\Modules\Catalog\Models\CatalogColourName;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Catalog\Support\VariantRows;
@@ -15,10 +16,14 @@ use Illuminate\Support\Str;
  */
 final class BuildProductVariants
 {
+    /** @var array<string, array<string, array{shades: list<string>, pattern: string|null}>> each shop's placed colour names, read once */
+    private array $learned = [];
+
     /** @return int the rows the product has now */
     public function product(CatalogProduct $product): int
     {
-        $rows = VariantRows::for($product);
+        $this->learned[$product->shop_id] ??= CatalogColourName::placed();
+        $rows = VariantRows::for($product, $this->learned[$product->shop_id]);
         $now = now();
 
         CatalogVariant::query()->where('product_id', $product->id)->delete();
@@ -43,6 +48,28 @@ final class BuildProductVariants
         ] + $row, $rows));
 
         return count($rows);
+    }
+
+    /**
+     * The products whose variants are named so, built again: their names were just placed.
+     *
+     * @param  list<string>  $names
+     * @return list<string> the external ids of the products built
+     */
+    public function named(array $names): array
+    {
+        $this->learned = [];
+        $built = [];
+
+        CatalogProduct::query()->whereNull('removed_at')
+            ->whereIn('id', CatalogVariant::query()->whereIn('color_label', $names)->select('product_id'))
+            ->lazyById(200)
+            ->each(function (CatalogProduct $product) use (&$built): void {
+                $this->product($product);
+                $built[] = (string) $product->external_id;
+            });
+
+        return $built;
     }
 
     /** @return int the products given rows: those with variants and none yet */
