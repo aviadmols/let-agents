@@ -230,6 +230,12 @@
 .ls-chip__check { width: 0; overflow: hidden; transition: width 200ms var(--lsp-ease-out); display: inline-flex; }
 .ls-chip[aria-pressed="true"] .ls-chip__check { width: 16px; }
 .ls-chip--quiet { box-shadow: none; background: var(--ls-bg-sunken); }
+/* a recent search: the words to search again, and a small x to forget them */
+.ls-recent { padding-inline: 0; gap: 0; }
+.ls-recent__q { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding-inline: 14px 4px; color: inherit; }
+.ls-recent__x { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 100%; padding-inline-end: 4px; color: var(--ls-fg-muted); }
+.ls-recent__x .ls-icon { width: 14px; height: 14px; }
+@media (hover: hover) and (pointer: fine) { .ls-recent__x:hover { color: var(--ls-fg); } }
 .ls-chip__count { color: var(--ls-fg-muted); font-weight: 400; }
 .ls-chip[aria-pressed="true"] .ls-chip__count { color: inherit; opacity: .7; }
 @media (hover: hover) and (pointer: fine) {

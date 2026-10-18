@@ -573,10 +573,13 @@
   function shortWord(key, fallback) { return SHORT && SHORT.labels && SHORT.labels[key] ? SHORT.labels[key] : fallback; }
 
   // ---------------------------------------------------------------- state
+  // the shopper's own recent searches kept (remember); the list before ls_searches also kept chips and questions, so it is dropped
+  var RECENT_MAX = 6;
+  store('local', 'ls_recent', null);
   var S = {
     open: false, tab: 'chat', wide: null, index: null, records: {}, built: null, engine: win.LA_ENGINE || null,
     config: {}, facets: [], turns: store('session', 'ls_turns') || [], saved: store('local', 'ls_saved') || [],
-    recent: store('local', 'ls_recent') || [], products: {}, ctx: CFG.productId ? String(CFG.productId) : null,
+    recent: [].concat(store('local', 'ls_searches') || []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, RECENT_MAX), products: {}, ctx: CFG.productId ? String(CFG.productId) : null,
     phone: WISH.phoneShown, pick: [], onlyDiff: false, typing: false, active: -1,
     expanded: !!store('local', 'ls_expanded'), live: null, menu: ''
   };
@@ -1009,6 +1012,11 @@
       // one row that scrolls (a swipe, or a drag with the mouse); the small button opens them all
       (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + (pop.length > 3 ? '<button class="ls-sec__more" data-pop-all aria-expanded="' + !!S.popAll + '">' + esc(t(S.popAll ? 'popLess' : 'popAll')) + '</button>' : '') + '</div>' +
         '<div class="ls-chips ls-chips--drag' + (S.popAll ? ' is-all' : '') + '" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' : '') +
+      // the shopper's own recent searches, from this browser only (remember): none yet, no section
+      (S.recent.length ? '<div class="ls-sec__title">' + esc(t('recent')) + '</div><div class="ls-chips ls-chips--drag" style="margin-bottom:18px">' + S.recent.map(function (q) {
+        return '<span class="ls-chip ls-chip--quiet ls-recent"><button class="ls-recent__q" data-recent="' + esc(q) + '">' + icon('history', 'ls-icon--sm') + '<span dir="auto">' + esc(q) + '</span></button>' +
+          '<button class="ls-recent__x" data-unrecent="' + esc(q) + '" aria-label="' + esc(t('removeRecent') + ': ' + q) + '">' + icon('x', 'ls-icon--sm') + '</button></span>';
+      }).join('') + '</div>' : '') +
       (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (q) { return '<button class="ls-ask ls-ask--example" data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400">' + esc(q) + '</span></span></button>'; }).join('') +
       '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
@@ -1258,7 +1266,8 @@
   }
 
   // ---------------------------------------------------------------- submitting
-  function submit(raw, kind, about) {
+  // typed: the shopper wrote it (the box, the store's own search page), so it is one of their recent searches
+  function submit(raw, kind, about, typed) {
     var q = String(raw || '').trim();
     if (!q) { return; }
     // what was being looked at live goes with the search: its filters, and its results when they're the server's
@@ -1267,20 +1276,24 @@
     S.pendingC = null;
     INPUT.value = ''; FIELD.classList.remove('has-text'); hideLive();
     S.tab = 'chat'; S.wide = null;
-    remember(q);
     if (kind === 'ask' && off('ask') && !(about || S.askMode)) { kind = 'search'; }
-    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q)))) { askTurn(q, null, about || S.askMode); }
-    else if (lv && lv.server) {
+    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q)))) { askTurn(q, null, about || S.askMode); return blurPhone(); }
+    if (typed) { remember(q); }
+    if (lv && lv.server) {
       addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, focus: lv.focus, single: lv.single, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
       // kept without asking the server again, so it is counted here (once per tab, as a pause would)
       countSearch(q, lv.ids.length);
       announce(t('announceResults', { n: lv.ids.length }));
     } else { searchTurn(q, carried); }
-    if (isPhone()) { INPUT.blur(); }
+    blurPhone();
   }
+  function blurPhone() { if (isPhone()) { INPUT.blur(); } }
+  // The shopper's own recent searches, in this browser only: what they typed and searched, never a chip, a
+  // suggested question, a link someone sent or a question to the assistant. The same words once, the latest first.
   function remember(q) {
-    S.recent = [q].concat(S.recent.filter(function (x) { return x !== q; })).slice(0, 6);
-    store('local', 'ls_recent', S.recent);
+    var key = q.toLowerCase();
+    S.recent = [q].concat(S.recent.filter(function (x) { return String(x).toLowerCase() !== key; })).slice(0, RECENT_MAX);
+    store('local', 'ls_searches', S.recent);
   }
   function addTurn(turn) {
     turn.id = turn.id || uid();
@@ -2466,7 +2479,7 @@
       var o = opts[S.active];
       if (o && o.dataset.ask) { submit(INPUT.value, 'ask'); return; }
       if (o) { o.click(); return; }
-      submit(INPUT.value);
+      submit(INPUT.value, undefined, false, true);
     } else if (e.key === 'Escape') {
       if (SUG.classList.contains('is-on') && INPUT.value) { e.preventDefault(); e.stopPropagation(); INPUT.value = ''; onType(); }
     }
@@ -2606,7 +2619,9 @@
       return;
     }
     if (d.clear !== undefined) { e.preventDefault(); INPUT.value = ''; INPUT.focus(); onType(); return; }
-    if (d.submit !== undefined) { e.preventDefault(); submit(INPUT.value); return; }
+    if (d.submit !== undefined) { e.preventDefault(); submit(INPUT.value, undefined, false, true); return; }
+    // one of the shopper's own recent searches, run again: still theirs, so it comes first
+    if (d.recent) { e.preventDefault(); submit(d.recent, 'search', false, true); return; }
     if (d.photo !== undefined) { e.preventDefault(); photoPick(); return; }
     if (d.focus !== undefined) { INPUT.focus(); return; }
     if (d.q) { e.preventDefault(); submit(d.q, 'search'); return; }
@@ -2618,7 +2633,7 @@
       addTurn({ kind: 'answer', q: a.title, answer: a.ans, picks: [], sources: a.src || [], anim: 1 });
       return;
     }
-    if (d.unrecent) { S.recent = S.recent.filter(function (x) { return x !== d.unrecent; }); store('local', 'ls_recent', S.recent); render(); return; }
+    if (d.unrecent) { e.preventDefault(); S.recent = S.recent.filter(function (x) { return x !== d.unrecent; }); store('local', 'ls_searches', S.recent); render(); return; }
     if (d.orderPick) { var op = d.orderPick.split(':'), ot = turnById(op[0]); if (ot) { ot.pickedAt[op[1]] = ot.pickedAt[op[1]] === Number(op[2]) ? null : Number(op[2]); render(); } return; }
     if (d.orderAdd) { var oa = turnById(d.orderAdd); if (oa && !oa.adding) { orderAdd(oa); } return; }
     if (d.slide) { e.preventDefault(); slide(el); return; }
@@ -2642,7 +2657,7 @@
     }
     if (d.wide) {
       // "show all" from the live results keeps the search first, then opens it large
-      if (d.wide === 'live') { if (!S.live) { return; } submit(S.live.q, 'search'); d = { wide: S.turns[S.turns.length - 1].id }; }
+      if (d.wide === 'live') { if (!S.live) { return; } submit(S.live.q, 'search', false, true); d = { wide: S.turns[S.turns.length - 1].id }; }
       var wt = turnById(d.wide); S.wide = d.wide; wt.limit = 24;
       products(filtered(wt).slice(0, 24).map(function (r) { return r.id; })).then(function () { render(); }); render(); BODY.scrollTop = 0; return;
     }
@@ -3112,7 +3127,7 @@
       var pq = null;
       try { var sp = new URLSearchParams(win.location.search); pq = SHOPIFY ? (/\/search\/?$/.test(win.location.pathname) ? sp.get('q') : null) : sp.get('s'); } catch (e) { pq = null; }
       pq = pq ? String(pq).trim() : '';
-      if (pq && pq.length <= 120) { loadIndex().then(function () { if (S.config.resultsPage) { S.spellingNext = true; open({ focus: false }); submit(pq, 'search'); } }); }
+      if (pq && pq.length <= 120) { loadIndex().then(function () { if (S.config.resultsPage) { S.spellingNext = true; open({ focus: false }); submit(pq, 'search', false, true); } }); }
     }
   }
   win.LetsSearch = { open: open, close: close, search: function (q) { open({ focus: false }); submit(q, 'search'); }, ask: function (q) { open({ focus: false }); submit(q, 'ask'); }, similar: function (id) { open({ focus: false }); similarTurn(String(id)); }, photo: function () { open({ focus: false }); photoPick(); }, state: S, _photoFile: photoFile, _root: root, _learn: LEARN };
