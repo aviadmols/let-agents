@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Feed;
 
+use App\Core\Text\HtmlText;
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
 use App\Modules\Connections\Contracts\ReadsChangedProducts;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
@@ -883,26 +884,12 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
     }
 
     /**
-     * Rich text as clean text, the way the plugin sends it: paragraph and line breaks survive as
-     * newlines; markup, scripts and entities do not.
+     * Rich text as clean text, the way the plugin sends it: paragraphs and line breaks as newlines,
+     * headings, list items and table rows kept as such (HtmlText); markup, scripts and entities not.
      */
     private static function text(mixed $html): string
     {
-        $text = (string) $html;
-
-        if ($text === '') {
-            return '';
-        }
-
-        $text = (string) preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', ' ', $text);
-        $text = (string) preg_replace('#<br\b[^>]*>|</(p|div|li|h[1-6]|tr|blockquote|summary|details|section|article|header|footer|figcaption|dt|dd|ul|ol|table)\s*>#i', "\n", $text);
-        $text = (string) preg_replace('#</(td|th)\s*>#i', ' ', $text);
-        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = (string) preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
-        $text = (string) preg_replace("/ *\n */u", "\n", $text);
-        $text = (string) preg_replace("/\n{3,}/u", "\n\n", $text);
-
-        return (string) preg_replace('/^\s+|\s+$/u', '', $text);
+        return HtmlText::from((string) $html);
     }
 
     private static function excerpt(string $text): string

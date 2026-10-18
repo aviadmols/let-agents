@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.11.0
+Stable tag: 0.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -52,6 +52,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.12.0 =
+* Product and post text keeps its structure: headings, list items and tables (each row with its header) reach Lets as such, so a table of sizes or uses is read row by row and its values never mix.
 
 = 0.11.0 =
 * "Lets Search" in the WordPress admin menu: the store's Lets panel opens inside WordPress, signed in by the store's token. Each opening uses a one-time address that works for a minute; the token never reaches the browser. Only people who manage the store see it.

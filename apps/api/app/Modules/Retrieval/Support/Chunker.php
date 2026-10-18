@@ -51,10 +51,10 @@ final class Chunker
     {
         $units = [];
 
-        foreach (preg_split('/\n+/u', $text) ?: [] as $paragraph) {
-            $paragraph = trim($paragraph);
+        foreach (self::blocks($text) as $paragraph) {
+            if (str_starts_with($paragraph, '|') && mb_strlen($paragraph) > $budget) {
+                array_push($units, ...self::tableParts($paragraph, $budget));
 
-            if ($paragraph === '') {
                 continue;
             }
 
@@ -89,6 +89,75 @@ final class Chunker
         }
 
         return $units;
+    }
+
+    /**
+     * The text's paragraphs, a table's rows ("| a | b |", HtmlText) held together as one: a row read
+     * away from its table's header loses what its values mean.
+     *
+     * @return list<string>
+     */
+    private static function blocks(string $text): array
+    {
+        $blocks = [];
+        $table = [];
+
+        foreach (preg_split('/\n+/u', $text) ?: [] as $line) {
+            $line = trim($line);
+
+            if (str_starts_with($line, '|')) {
+                $table[] = $line;
+
+                continue;
+            }
+
+            if ($table !== []) {
+                $blocks[] = implode("\n", $table);
+                $table = [];
+            }
+
+            if ($line !== '') {
+                $blocks[] = $line;
+            }
+        }
+
+        if ($table !== []) {
+            $blocks[] = implode("\n", $table);
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * A table too long for one piece, cut between rows, each part starting with the header row again.
+     *
+     * @return list<string>
+     */
+    private static function tableParts(string $table, int $budget): array
+    {
+        $rows = explode("\n", $table);
+        $head = isset($rows[1]) && preg_match('/^\|(?:\s*-{3,}\s*\|)+$/u', $rows[1]) === 1 ? array_splice($rows, 0, 2) : [];
+        $prefix = $head === [] ? '' : implode("\n", $head)."\n";
+        $room = max(50, $budget - mb_strlen($prefix));
+        $parts = [];
+        $current = '';
+
+        foreach ($rows as $row) {
+            $row = mb_substr($row, 0, $room);
+
+            if ($current !== '' && mb_strlen($current) + 1 + mb_strlen($row) > $room) {
+                $parts[] = $prefix.$current;
+                $current = '';
+            }
+
+            $current = $current === '' ? $row : $current."\n".$row;
+        }
+
+        if ($current !== '') {
+            $parts[] = $prefix.$current;
+        }
+
+        return $parts;
     }
 
     private static function clean(string $text, bool $keepLines = false): string

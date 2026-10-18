@@ -120,8 +120,8 @@ final class SchemaStats
                 }
             }
 
-            // "key: value" lines, each key once a product.
-            if (preg_match_all('/^\s*([^\n:]{2,30}?)\s*:\s*([^\n]{1,60})$/mu', $head, $lines, PREG_SET_ORDER) > 0) {
+            // "key: value" lines (a list item's "- " is not part of its key), each key once a product.
+            if (preg_match_all('/^\s*(?:[-•*]\s+)?([^\n:|]{2,30}?)\s*:\s*([^\n]{1,60})$/mu', $head, $lines, PREG_SET_ORDER) > 0) {
                 $keys = [];
                 foreach ($lines as [, $key, $value]) {
                     $key = trim($key);
