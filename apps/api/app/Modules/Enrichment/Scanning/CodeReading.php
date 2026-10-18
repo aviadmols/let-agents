@@ -38,6 +38,9 @@ final class CodeReading
 
     private const VARIANT_PATTERN_KEYS = ['pattern', 'patterns', 'print', 'prints'];
 
+    /** A store attribute that lists the colours the product comes in ("צבע", "גוון", "Color"). */
+    private const COLOUR_ATTRIBUTE = '/צבע|גוו?[נן]|colou?r/iu';
+
     /** The start of the description read for choices, specs and flags: where stores state them. */
     private const HEAD = 600;
 
@@ -122,8 +125,12 @@ final class CodeReading
             $names[] = trim((string) $tag);
         }
         $attributes = [];
+        $colours = [];
         foreach ($product->storeAttributes() as $attribute) {
             $attributes[] = $attribute['name'].': '.implode(', ', $attribute['values']);
+            if (preg_match(self::COLOUR_ATTRIBUTE, (string) $attribute['name']) === 1) {
+                array_push($colours, ...array_map('strval', $attribute['values']));
+            }
         }
         $names = array_values(array_filter($names, fn (string $f): bool => $f !== ''));
         $fields = [...$names, ...$attributes];
@@ -135,6 +142,7 @@ final class CodeReading
             'description' => mb_substr(TextNormalizer::clean($description), 0, self::HEAD),
             'names' => $names,
             'attributes' => $attributes,
+            'colours' => $colours === [] ? null : implode(', ', $colours),
         ];
     }
 
@@ -157,6 +165,11 @@ final class CodeReading
                 continue;
             }
 
+            $patterns = [];
+            foreach ((array) ($attribute['values'] ?? []) as $value) {
+                $patterns[(string) $value['key']] = (array) ($value['patterns'] ?? []);
+            }
+
             foreach (self::sources($vocabulary, $key) as $source) {
                 $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
                 $found = [];
@@ -165,6 +178,12 @@ final class CodeReading
                     if ($quote !== null) {
                         $found[(string) $value['key']] = $quote;
                     }
+                }
+                // The store's own colour attribute is the whole list: a colour the title, the description or the
+                // picture names that it does not is not read ("מגיע בצבעים: חום, ירוק, אדום ושחור" on a board sold
+                // in brown and green, as Gueta's MDF taught, 2026-10-18).
+                if (($text['colours'] ?? null) !== null && $source !== 'field' && in_array($key, self::VARIANT_COLOUR_KEYS, true)) {
+                    $found = array_filter($found, fn (string $value): bool => self::find((string) $text['colours'], (array) ($patterns[$value] ?? [])) !== null, ARRAY_FILTER_USE_KEY);
                 }
                 if ($found === []) {
                     continue;

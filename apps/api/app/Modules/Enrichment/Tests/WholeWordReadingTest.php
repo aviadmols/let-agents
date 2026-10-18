@@ -86,4 +86,24 @@ final class WholeWordReadingTest extends TestCase
         $this->assertSame(['stone', 1], [$group['attribute'], $group['products']]);
         $this->assertEqualsCanonicalizing(['sapphire', 'ruby', 'emerald'], $group['values']);
     }
+
+    public function test_the_stores_own_colour_attribute_is_the_whole_list_of_colours(): void
+    {
+        // As Gueta's MDF board taught (2026-10-18): sold in green, its description says "and black".
+        $this->buildShop();
+        [$adhesives] = VocabularyDefinition::parse((array) ImportVocabulary::template('adhesives'));
+        $colours = fn ($product): array => $this->inShop(fn () => CodeReading::read($product->fresh(), new BrandResolver, $adhesives, true)['text_choices']['color']['values'] ?? []);
+        $said = 'מגיע בצבעים: ירוק ושחור';
+        $with = fn (string $name, array $values): array => ['payload' => ['title' => 'פלטת MDF', 'description' => $said, 'attributes' => [['name' => $name, 'values' => $values]]]];
+
+        $board = $this->product('1', 'פלטת MDF', $said, [], $with('צבע', ['ירוק']));
+        $shade = $this->product('2', 'פלטת MDF', $said, [], $with('גוון', ['ירוק', 'שחור מט']));
+        $plain = $this->product('3', 'פלטת MDF', $said, []);
+        $other = $this->product('4', 'פלטת MDF', $said, [], $with('עובי', ['8 מ"מ']));
+
+        $this->assertSame([], $colours($board), 'black is not among the colours it is sold in');
+        $this->assertSame(['black'], $colours($shade), 'its own list names black');
+        $this->assertSame(['black'], $colours($plain), 'no list of its own: the description is read as before');
+        $this->assertSame(['black'], $colours($other), 'an attribute that is not a colour is no list of colours');
+    }
 }
