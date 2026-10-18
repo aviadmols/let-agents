@@ -11,6 +11,8 @@ return [
         'of' => 'מתוך :n',
         'images' => 'תמונות שנקראו',
         'images_note' => ':waiting ממתינות · :unreadable לא קריאות',
+        'images_waiting' => ':n ממתינות',
+        'images_unreadable' => ':n לא קריאות',
         'tags' => 'תגיות שנבנו',
         'per' => ':n לכל מוצר',
         'missing' => 'מוצרים עם פרטים חסרים',

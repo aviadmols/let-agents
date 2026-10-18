@@ -789,3 +789,26 @@ html.dark .fi-panel-merchant {
 [dir='ltr'] .fi-panel-merchant .lp-tip::after, .fi-panel-merchant[dir='ltr'] .lp-tip::after { transform: translateX(-50%); }
 .fi-panel-merchant .lp-tip:hover::after, .fi-panel-merchant .lp-tip:focus::after { opacity: 1; }
 .fi-panel-merchant .lp-tip:focus { outline: 2px solid var(--la-ink); outline-offset: 2px; }
+
+/* ================================================================== a shopper's question, as the design shows it */
+
+.fi-panel-merchant .lp-ask { display: flex; gap: 14px; align-items: flex-start; }
+.fi-panel-merchant .lp-mark.lp-mark-ask { width: 34px; height: 34px; }
+.fi-panel-merchant .lp-mark.lp-mark-ask svg { width: 14px; height: 14px; }
+.fi-panel-merchant .lp-ask-q { font-size: 16px; font-weight: 600; color: var(--la-ink); }
+.fi-panel-merchant .lp-ask-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; font-size: 13px; color: var(--la-muted); }
+.fi-panel-merchant .lp-ask-answer { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--la-plane); }
+.fi-panel-merchant .lp-ask-answer p { margin: 4px 0 0; color: var(--la-ink); line-height: 1.6; white-space: pre-line; }
+
+/* ================================================================== the chart: an axis, points, the number under the pointer */
+
+.fi-panel-merchant .lp-chart { position: relative; padding-bottom: 26px; }
+.fi-panel-merchant .lp-dot { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--la-ink); box-shadow: 0 0 0 2px var(--la-paper); transition: transform 120ms; pointer-events: none; }
+.fi-panel-merchant .lp-dot.is-on { transform: scale(1.8); }
+.fi-panel-merchant .lp-chart-top { position: absolute; top: -2px; inset-inline-end: 0; font-size: 11px; color: var(--la-muted); }
+.fi-panel-merchant .lp-chart-tip { position: absolute; transform: translate(-50%, calc(-100% - 12px)); padding: 6px 10px; border-radius: 10px; background: var(--la-ink); color: var(--la-paper); font-size: 12.5px; white-space: nowrap; pointer-events: none; box-shadow: var(--la-pop); }
+.fi-panel-merchant .lp-chart-axis { position: absolute; inset-inline: 0; bottom: 0; height: 18px; }
+.fi-panel-merchant .lp-chart-axis span { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--la-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fi-panel-merchant .lp-chart { margin-top: 28px; }
+.fi-panel-merchant .lp-chart-plot { position: relative; height: 160px; }
+.fi-panel-merchant .lp-chart-plot .lp-spark { position: absolute; inset: 0; height: 100%; }

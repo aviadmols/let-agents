@@ -183,7 +183,8 @@ final class ScanSummary extends Page
 
         match ($this->filter) {
             'missing' => $query->whereIn('id', array_keys($this->gaps()) ?: ['-']),
-            'image' => $query->whereIn('id', RetrievalImage::query()->where(fn (Builder $q) => $q->whereNotNull('error')->orWhereNull('caption'))->select('product_id')),
+            // The pictures that could not be read: none loaded, or read and nothing could be said of them.
+            'image' => $query->whereIn('id', RetrievalImage::query()->where(fn (Builder $q) => $q->whereNotNull('error')->orWhere(fn (Builder $q) => $q->whereNotNull('captioned_at')->whereNull('caption')))->select('product_id')),
             'manual' => $query->whereIn('id', EnrichmentFact::query()->where('origin', FactOrigin::Person)->whereNotNull('product_id')->select('product_id')),
             default => null,
         };

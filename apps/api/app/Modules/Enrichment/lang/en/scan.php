@@ -11,6 +11,8 @@ return [
         'of' => 'of :n',
         'images' => 'Pictures read',
         'images_note' => ':waiting waiting · :unreadable unreadable',
+        'images_waiting' => ':n waiting',
+        'images_unreadable' => ':n unreadable',
         'tags' => 'Tags built',
         'per' => ':n per product',
         'missing' => 'Products missing details',

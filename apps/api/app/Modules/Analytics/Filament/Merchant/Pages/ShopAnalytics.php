@@ -67,12 +67,12 @@ final class ShopAnalytics extends Page
 
     public function getTitle(): string
     {
-        return $this->list === '' ? __('analytics::report.title') : __('analytics::report.lists.'.$this->list.'.title');
+        return __('analytics::report.title');
     }
 
     public function getSubheading(): ?string
     {
-        return $this->list === '' ? __('analytics::report.subheading') : __('analytics::report.lists.'.$this->list.'.sub', ['period' => $this->periodLabel()]);
+        return __('analytics::report.subheading');
     }
 
     public function getHeader(): ?View
@@ -80,7 +80,7 @@ final class ShopAnalytics extends Page
         return view('analytics::merchant.analytics-head', [
             'title' => $this->getTitle(),
             'subheading' => $this->getSubheading(),
-            'back' => $this->list !== '',
+            'back' => false,
         ]);
     }
 

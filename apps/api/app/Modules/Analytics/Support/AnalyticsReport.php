@@ -94,15 +94,23 @@ final class AnalyticsReport implements ShopReport
     /** @return list<array{day: string, n: int}> adds to the cart each day of the period, empty days included */
     private function daily(CarbonInterface $since, CarbonInterface $until): array
     {
+        $tz = 'Asia/Jerusalem';
+        $span = Carbon::instance($since)->diffInDays($until, true);
+        // The scale the period reads in: hours for a day, days up to four months, months beyond.
+        [$unit, $format, $label] = match (true) {
+            $span <= 1.01 => ['hour', 'Y-m-d H', 'H:00'],
+            $span <= 124 => ['day', 'Y-m-d', 'j.n'],
+            default => ['month', 'Y-m', 'n.Y'],
+        };
         $counts = AnalyticsEvent::query()->where('preview', false)->where('type', 'add_to_cart')->where('result', 'added')
             ->where('occurred_at', '>=', $since)->where('occurred_at', '<', $until)->get(['occurred_at'])
-            ->countBy(fn (AnalyticsEvent $e): string => $e->occurred_at->timezone('Asia/Jerusalem')->toDateString())->all();
-        $days = [];
+            ->countBy(fn (AnalyticsEvent $e): string => $e->occurred_at->timezone($tz)->format($format))->all();
+        $points = [];
 
-        for ($day = Carbon::instance($since)->timezone('Asia/Jerusalem')->startOfDay(); $day->lt($until) && count($days) < 400; $day->addDay()) {
-            $days[] = ['day' => $day->toDateString(), 'n' => (int) ($counts[$day->toDateString()] ?? 0)];
+        for ($at = Carbon::instance($since)->timezone($tz)->startOf($unit); $at->lt($until) && count($points) < 400; $at->add(1, $unit)) {
+            $points[] = ['day' => $at->format($format), 'label' => $at->format($label), 'n' => (int) ($counts[$at->format($format)] ?? 0)];
         }
 
-        return $days;
+        return $points;
     }
 }

@@ -7,7 +7,7 @@
         @if ($this->tab === 'products')
             <section class="lp-grid-4">
                 <div class="lp-stat"><span class="lp-stat-l">{{ $t('stats.products') }}</span><span class="lp-stat-n">{{ number_format($n['products']) }}</span><span class="lp-stat-d">{{ $t('stats.of', ['n' => number_format($n['total'])]) }}</span></div>
-                <div class="lp-stat"><span class="lp-stat-l">{{ $t('stats.images') }}</span><span class="lp-stat-n">{{ number_format($n['images']) }}</span><span class="lp-stat-d">{{ $t('stats.images_note', ['waiting' => number_format($n['waiting']), 'unreadable' => number_format($n['unreadable'])]) }}</span></div>
+                <div class="lp-stat"><span class="lp-stat-l">{{ $t('stats.images') }}</span><span class="lp-stat-n">{{ number_format($n['images']) }}</span><span class="lp-stat-d">{{ $t('stats.images_waiting', ['n' => number_format($n['waiting'])]) }} · <button type="button" class="lp-link" wire:click="pick('image')">{{ $t('stats.images_unreadable', ['n' => number_format($n['unreadable'])]) }}</button></span></div>
                 <div class="lp-stat"><span class="lp-stat-l">{{ $t('stats.tags') }}</span><span class="lp-stat-n">{{ number_format($n['tags']) }}</span><span class="lp-stat-d">{{ $t('stats.per', ['n' => $n['per']]) }}</span></div>
                 <div class="lp-stat"><span class="lp-stat-l">{{ $t('stats.missing') }}</span><span class="lp-stat-n">{{ number_format($n['missing']) }}</span><span class="lp-stat-d"><a class="lp-link" href="{{ \App\Modules\Enrichment\Filament\Merchant\Pages\MissingInfo::getUrl() }}">{{ $t('stats.to_missing') }}</a></span></div>
             </section>
