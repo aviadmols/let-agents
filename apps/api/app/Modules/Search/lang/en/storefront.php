@@ -8,6 +8,8 @@ return [
     'wa_message' => 'A question from the site: :question',
     'similar' => 'Similar items',
     'facet_type' => 'Product type',
+    'facet_colour' => 'Colour',
+    'facet_size' => 'Size',
     'size_gone_banner' => 'Size out of stock? Tap the size to see similar items in it',
     'size_gone_pick' => 'Size out of stock? Pick a size to see similar items in it:',
     'size_gone_badge' => 'Gone. Tap for similar items in this size',

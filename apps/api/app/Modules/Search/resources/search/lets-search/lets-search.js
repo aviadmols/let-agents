@@ -1187,6 +1187,8 @@
   function sortOf(c) { return c.sort || c.autoSort || ''; }
   function codesOn(c) { var o = {}; Object.keys(c.f).concat(Object.keys(c.auto || {})).forEach(function (k) { o[k] = 1; }); return Object.keys(o).map(Number); }
   function valueOf(code) { var f = S.facets[Math.floor(code / 1000)]; return f ? { facet: f, value: f.v[code % 1000] } : null; }
+  // the colour and size filters the index reads from products' variants (BuildSearchIndex::variantFacets)
+  function variantFacet(g) { var f = S.facets && S.facets[g]; return !!(f && (f.k === 'variant_color' || f.k === 'variant_size')); }
 
   // colour values get a circle of their colour
   var SWATCH = {
@@ -1201,7 +1203,8 @@
   };
   function swatch(facet, value) {
     if (!facet || !value || !(/colou?r|coating/i.test(facet.k) || /צבע|גוון/.test(facet.l))) { return ''; }
-    var v = SWATCH[value.l] || SWATCH[value.k];
+    // a colour family read from variants carries its own (h); several colours together, a wheel
+    var v = value.h || SWATCH[value.l] || SWATCH[value.k] || (value.k === 'multi' ? SWATCH.custom_tint : null);
     if (!v) { return ''; }
     return '<span class="ls-swatch' + (v === 'clear' ? ' ls-swatch--clear' : '') + '"' + (v === 'clear' ? '' : ' style="--sw:' + esc(v) + '"') + ' aria-hidden="true"></span>';
   }
@@ -1325,8 +1328,13 @@
       // also matches a product that says it in its name, so reading it never hides what was found.
       var groups = {};
       fcodes.forEach(function (code) { var g = Math.floor(code / 1000); (groups[g] = groups[g] || []).push(code); });
+      // colour and size, read from the variants, are asked of one variant together (and of one in stock when
+      // stock is asked): black in M sold out, but black in L and navy in M there, is not "black, M, in stock"
+      var vgs = Object.keys(groups).filter(variantFacet), stock = onStock(c);
       out = out.filter(function (r) {
+        if (vgs.length && r.v && !r.v.some(function (x) { return (!stock || x[1] === 1) && vgs.every(function (g) { return groups[g].some(function (code) { return x[0].indexOf(code) >= 0; }); }); })) { return false; }
         return Object.keys(groups).every(function (g) {
+          if (r.v && vgs.indexOf(g) >= 0) { return true; }
           return groups[g].some(function (code) { if ((r.f || []).indexOf(code) >= 0) { return true; } var x = c.auto[code] && !c.f[code] && valueOf(code); return !!(x && x.value && says(r.title + ' ' + (r.kw || ''), x.value.l)); });
         });
       });

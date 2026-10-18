@@ -5,9 +5,11 @@ namespace App\Modules\Search\Actions;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Catalog\Enums\ColorFamily;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
@@ -41,6 +43,17 @@ final class BuildSearchIndex
     public const ACTION = 'search.build_index';
 
     public const VERSION = 1;
+
+    /** The filters read from products' variants (variantFacets): the drawer asks them of one variant together. */
+    public const VARIANT_COLOUR = 'variant_color';
+
+    public const VARIANT_SIZE = 'variant_size';
+
+    /** A vocabulary's own colour attribute, left out where the variants say the colours. */
+    private const COLOUR_KEYS = ['color', 'colour', 'colors', 'colours'];
+
+    /** Letter sizes in their order, as VariantRows keys them. */
+    private const LETTER_SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL', 'ONE'];
 
     private const MAX_KEYWORDS = 400;
 
@@ -88,12 +101,19 @@ final class BuildSearchIndex
         // What each product's picture shows, in words, joins its words: found by what it looks like.
         $seen = RetrievalImage::query()->whereNotNull('caption_words')->pluck('caption_words', 'product_id')->map(fn ($w): array => is_array($w) ? $w : (array) json_decode((string) $w, true));
 
-        // What each product is, from the shop's approved facts: the filters beside the results.
+        // What each product is, from the shop's approved facts: the filters beside the results. Then the
+        // colours and sizes its variants come in, two filters of their own.
         $facets = $this->facets($shopId);
+        $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
         $faceted = 0;
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
+            if (isset($variants[$product->id])) {
+                $codes = array_values(array_unique([...($read['f'] ?? []), ...$variants[$product->id]['f']]));
+                sort($codes);
+                $read = ['f' => $codes, 'v' => $variants[$product->id]['v']] + $read;
+            }
             $faceted += isset($read['f']) ? 1 : 0;
             $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
@@ -108,6 +128,9 @@ final class BuildSearchIndex
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
                 'sl' => $product->on_sale ? 1 : null,
                 'f' => $read['f'] ?? null,
+                // Its variants, each as the colour and size codes it has and whether it is in stock: "black,
+                // M, in stock" is asked of one variant, not of a product with black somewhere and M somewhere.
+                'v' => $read['v'] ?? null,
                 'z' => $read['z'] ?? null,
                 'd' => self::added($product),
             ]);
@@ -180,12 +203,17 @@ final class BuildSearchIndex
         $where = [];
         $sizeKey = trim((string) Settings::get('search.size_attribute', $shopId));
         $size = null;
+        // Where the variants say the colours (variantFacets), the vocabulary's own colour is not a second colour filter.
+        $variantColours = CatalogVariant::query()->whereNotNull('color_families')->exists();
 
         foreach (EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get() as $vocabulary) {
             $definition = $vocabulary->definition();
             $lists = [['type', 'type', array_map(fn (array $t): string => (string) $t['key'], $definition->productTypes())]];
             foreach ($definition->attributes() as $attribute) {
                 $kind = $attribute['type'] ?? 'number';
+                if ($variantColours && in_array((string) $attribute['key'], self::COLOUR_KEYS, true)) {
+                    continue;
+                }
                 if ($kind === 'enum') {
                     $lists[] = [(string) $attribute['key'], 'attribute', array_map(fn (array $v): string => (string) $v['key'], (array) $attribute['values'])];
                 } elseif ($kind === 'boolean') {
@@ -243,6 +271,110 @@ final class BuildSearchIndex
         }
 
         return ['facets' => $facets, 'size' => $size, 'products' => $products];
+    }
+
+    /**
+     * Two filters from the products' variants (catalog_variants, read in code): the colour families they
+     * come in ("כחול" holds navy and light blue) and their sizes, in the order sizes go. Appended to the
+     * shop's filters, and for each product the codes its variants have (f, for the chips and counts) and
+     * each distinct variant as [its codes, in stock] (v), so the drawer asks colour, size and stock of
+     * one variant together. Nothing when no product has a colour or a size in its variants.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string, h?: string}>}>  $facets  appended to
+     * @return array<string, array{f: list<int>, v: list<array{0: list<int>, 1: int}>}> by product id
+     */
+    private function variantFacets(array &$facets, string $locale): array
+    {
+        $families = [];
+        $sizes = [];
+        $rows = [];
+
+        CatalogVariant::query()->whereHas('product', fn ($q) => $q->whereNull('removed_at'))
+            ->select(['id', 'product_id', 'color_families', 'size_key', 'size_label', 'in_stock'])
+            ->lazyById(2000)->each(function (CatalogVariant $variant) use (&$families, &$sizes, &$rows): void {
+                foreach ((array) $variant->color_families as $family) {
+                    $families[(string) $family] = true;
+                }
+                if ($variant->size_key !== null) {
+                    $sizes[$variant->size_key] ??= (string) $variant->size_label;
+                }
+                $rows[] = [$variant->product_id, (array) $variant->color_families, $variant->size_key, $variant->in_stock ? 1 : 0];
+            });
+
+        if ($families === [] && $sizes === []) {
+            return [];
+        }
+
+        $code = [];
+        if ($families !== []) {
+            $at = count($facets);
+            $values = [];
+            foreach (ColorFamily::cases() as $family) {
+                if (isset($families[$family->value])) {
+                    $code['c:'.$family->value] = $at * 1000 + count($values);
+                    $values[] = array_filter(['k' => $family->value, 'l' => (string) __('catalog::colors.families.'.$family->value, [], $locale), 'h' => $family->hex()]);
+                }
+            }
+            $facets[] = ['k' => self::VARIANT_COLOUR, 'l' => (string) __('search::storefront.facet_colour', [], $locale), 'v' => $values];
+        }
+        if ($sizes !== []) {
+            $at = count($facets);
+            $values = [];
+            foreach (self::sizeOrder(array_keys($sizes)) as $key) {
+                $code['z:'.$key] = $at * 1000 + count($values);
+                $values[] = ['k' => $key, 'l' => self::sizeLabel($key, $sizes[$key])];
+            }
+            $facets[] = ['k' => self::VARIANT_SIZE, 'l' => (string) __('search::storefront.facet_size', [], $locale), 'v' => $values];
+        }
+
+        $products = [];
+        foreach ($rows as [$productId, $colours, $sizeKey, $inStock]) {
+            $codes = [...array_map(fn (string $f): ?int => $code['c:'.$f] ?? null, array_map('strval', $colours)), $sizeKey === null ? null : ($code['z:'.$sizeKey] ?? null)];
+            $codes = array_values(array_unique(array_filter($codes, fn (?int $c): bool => $c !== null)));
+            sort($codes);
+            $products[$productId]['f'] = [...($products[$productId]['f'] ?? []), ...$codes];
+            // The same colour and size twice (two patterns of one shirt) is one entry, in stock if either is.
+            $key = implode(',', $codes);
+            $products[$productId]['v'][$key] = [$codes, max($inStock, $products[$productId]['v'][$key][1] ?? 0)];
+        }
+
+        foreach ($products as &$product) {
+            $product['f'] = array_values(array_unique($product['f']));
+            sort($product['f']);
+            $product['v'] = array_values($product['v']);
+        }
+        unset($product);
+
+        // Variants that differ only in what is neither a colour nor a size (a length): nothing to ask of them.
+        return array_filter($products, fn (array $product): bool => $product['f'] !== []);
+    }
+
+    /**
+     * Sizes in the order they go: letters (XS before M before XXL), one size, then numbers, then the rest.
+     *
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    public static function sizeOrder(array $keys): array
+    {
+        $rank = function (string $key): array {
+            $letter = array_search($key, self::LETTER_SIZES, true);
+
+            return match (true) {
+                $letter !== false => [0, (float) $letter, $key],
+                is_numeric($key) => [1, (float) $key, $key],
+                default => [2, 0.0, $key],
+            };
+        };
+        usort($keys, fn (string $a, string $b): int => $rank($a) <=> $rank($b));
+
+        return $keys;
+    }
+
+    /** A size as a shopper reads it: letter sizes by their key ("XXL" for "2XL"), others as the store wrote them. */
+    private static function sizeLabel(string $key, string $label): string
+    {
+        return in_array($key, self::LETTER_SIZES, true) && $key !== 'ONE' ? $key : ($label !== '' ? $label : $key);
     }
 
     /**
