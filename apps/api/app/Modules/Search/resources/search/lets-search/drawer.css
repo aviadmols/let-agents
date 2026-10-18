@@ -196,6 +196,8 @@
 @media (hover: hover) and (pointer: fine) { .ls-content-row:hover { background: var(--ls-bg-sunken); } }
 .ls-filter-count { min-width: 18px; height: 18px; padding-inline: 5px; border-radius: 999px; background: var(--ls-fg); color: var(--ls-bg); font-size: 11px; display: inline-grid; place-items: center; }
 .ls-more { display: flex; justify-content: center; margin-top: 18px; }
+.ls-btn--busy { gap: 10px; cursor: progress; }
+.ls-btn--busy .ls-mark { --s: 16px; }
 .ls-empty-filter { padding: 24px 0; text-align: center; color: var(--ls-fg-muted); }
 
 /* wide results */

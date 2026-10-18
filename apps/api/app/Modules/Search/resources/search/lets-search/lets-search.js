@@ -2715,7 +2715,13 @@
       products(filtered(wt).slice(0, 24).map(function (r) { return r.id; })).then(function () { render(); }); render(); BODY.scrollTop = 0; return;
     }
     if (d.narrow !== undefined) { narrow(); render(); return; }
-    if (d.loadmore) { var lt = turnById(d.loadmore); lt.limit = (lt.limit || 24) + 24; products(filtered(lt).slice(0, lt.limit).map(function (r) { return r.id; })).then(render); return; }
+    if (d.loadmore) {
+      // the Lets mark turns over in the button until the next products arrive; a second press waits
+      if (el.getAttribute('aria-busy') === 'true') { return; }
+      var lt = turnById(d.loadmore); lt.limit = (lt.limit || 24) + 24;
+      el.setAttribute('aria-busy', 'true'); el.classList.add('ls-btn--busy'); el.innerHTML = mark(true) + '<span>' + esc(t('loadMore')) + '</span>';
+      products(filtered(lt).slice(0, lt.limit).map(function (r) { return r.id; })).then(render, render); return;
+    }
     if (d.chip) { var ct = turnById(d.turn); if (ct) { applyChip(ct, d.chip); } return; }
     if (d.filters) { filtersLayer(turnById(d.filters)); return; }
     if (d.sort) { sortLayer(turnById(d.sort)); return; }
