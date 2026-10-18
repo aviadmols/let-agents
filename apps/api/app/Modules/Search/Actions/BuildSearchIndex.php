@@ -165,7 +165,8 @@ final class BuildSearchIndex
         $counts['answer'] = 0;
 
         foreach ($this->answers($shopId) as $answer) {
-            $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources']]);
+            // w: about the store, not one product or guide; the drawer offers those first, answered as they are
+            $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources'], 'w' => $answer['store'] ? 1 : null]);
             $counts['answer']++;
         }
 
@@ -425,7 +426,7 @@ final class BuildSearchIndex
      * typed in the search box finds its answer before anything is asked. A page's answer points to
      * its page; an answer from the search box to the pages it was written from.
      *
-     * @return list<array{id: string, question: string, answer: string, sources: list<array{title: string, url: string|null}>}>
+     * @return list<array{id: string, store: bool, question: string, answer: string, sources: list<array{title: string, url: string|null}>}>
      */
     private function answers(string $shopId): array
     {
@@ -444,6 +445,7 @@ final class BuildSearchIndex
             ->filter(fn (AssistantAnswer $a): bool => $a->product === null || $a->product->removed_at === null)
             ->map(fn (AssistantAnswer $a): array => [
                 'id' => $a->id,
+                'store' => $a->product_id === null && $a->content_id === null,
                 'question' => $a->question,
                 'answer' => mb_substr((string) $a->answer, 0, 400),
                 'sources' => $a->product !== null

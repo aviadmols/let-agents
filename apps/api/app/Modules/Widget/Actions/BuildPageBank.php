@@ -1699,8 +1699,10 @@ final class BuildPageBank
             ...($marks !== [] && Features::enabled('shortlist.compare', $shopId) ? [['text' => (string) __('widget::bank.assistant.compare', [], $this->locale), 'about' => 'compare', 'named' => (string) __('widget::bank.assistant.compare_named', [], $this->locale), 'question' => (string) __('widget::bank.assistant.compare_question', [], $this->locale)]] : []),
             ...$moreOfType,
             ...array_slice($others, 0, 1),
-            ...($policies['returns'] ? [['text' => (string) __('widget::bank.assistant.returns', [], $this->locale), 'about' => 'product']] : []),
-            ...($policies['delivery'] ? [['text' => (string) __('widget::bank.assistant.delivery', [], $this->locale), 'about' => 'product']] : []),
+            // Returns and delivery only where the store says something about them and the question already
+            // got an answer shoppers saw: an example the assistant could not answer is never offered.
+            ...($policies['returns'] && $this->storeAnswered($returns = (string) __('widget::bank.assistant.returns', [], $this->locale)) ? [['text' => $returns, 'about' => 'product']] : []),
+            ...($policies['delivery'] && $this->storeAnswered($delivery = (string) __('widget::bank.assistant.delivery', [], $this->locale)) ? [['text' => $delivery, 'about' => 'product']] : []),
         ] as $question) {
             $questions[$question['text']] ??= $question;
         }
@@ -1725,6 +1727,18 @@ final class BuildPageBank
      *
      * @return array{returns: bool, delivery: bool}
      */
+    /**
+     * Whether a question about the store (asked on any page, answered from the store's pages) already
+     * has an answer that shoppers were shown.
+     */
+    private function storeAnswered(string $question): bool
+    {
+        return AssistantAnswer::query()->whereNull('product_id')->whereNull('content_id')
+            ->where('question_key', AssistantAnswer::keyFor($question))
+            ->where('outcome', AssistantAnswer::ANSWERED)->where('status', AssistantAnswer::SHOWN)
+            ->exists();
+    }
+
     private function policiesKnown(): array
     {
         $promises = EnrichmentFact::query()->where('kind', FactKind::Promise)->where('status', FactStatus::Approved)->whereNull('product_id')->pluck('key')->all();

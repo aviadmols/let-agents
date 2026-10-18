@@ -4,6 +4,7 @@ namespace App\Modules\Widget\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -86,11 +87,17 @@ final class AssistantBlockTest extends TestCase
         $this->assertCount(4, $block['questions'], 'nothing more to offer');
         $this->assertNotContains('אפשר להחזיר או להחליף?', array_column($block['questions'], 'text'), 'the store says nothing about returns: not asked');
 
-        // A refund policy of its own: now the question has an answer.
+        // A refund policy of its own: the store says something, but the question is offered only once it got an
+        // answer shoppers saw. An example the assistant could not answer is never offered.
         app(TenantContext::class)->run($this->shop->id, fn () => CatalogContent::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'policy-1', 'type' => 'page', 'status' => 'publish',
             'title' => 'מדיניות', 'url' => 'https://store.test/policies/refund-policy', 'hash' => 'p1']));
         $again = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
-        $this->assertContains('אפשר להחזיר או להחליף?', array_column($again['questions'], 'text'));
+        $this->assertNotContains('אפשר להחזיר או להחליף?', array_column($again['questions'], 'text'), 'a policy page alone: not yet answered');
+
+        app(TenantContext::class)->run($this->shop->id, fn () => AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'question_key' => AssistantAnswer::keyFor('אפשר להחזיר או להחליף?'),
+            'question' => 'אפשר להחזיר או להחליף?', 'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN, 'answer' => 'כן, תוך 14 יום.', 'prompt_version' => 1, 'last_asked_at' => now()]));
+        $answered = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant'];
+        $this->assertContains('אפשר להחזיר או להחליף?', array_column($answered['questions'], 'text'), 'answered from the store\'s pages: now offered');
 
         // The drawer's next steps and its kinds for a comparison come from it; without questions there is none.
         Features::override('assistant.on_products', false, $this->shop->id);

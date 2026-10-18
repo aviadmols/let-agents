@@ -1007,7 +1007,9 @@
   function welcome() {
     // the shop's own most searched words (the index config), never anyone else's: none yet, no section
     var pop = S.config.popular || [];
-    var asks = off('ask') ? [] : LANG === 'he' ? ['תוך כמה זמן זה מגיע?', 'אפשר להחזיר או להחליף?'] : ['How long does delivery take?', 'Can I return or exchange it?'];
+    // only questions about the store that already have an answer shoppers got (the index's, most asked first),
+    // shown as they are on a click: never an example the assistant may not be able to answer
+    var asks = off('ask') ? [] : Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.w === 1 && r.ans; }).slice(0, 2);
     return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t('welcomeSub')) + '</p>' +
       // one row that scrolls (a swipe, or a drag with the mouse); the small button opens them all
       (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + (pop.length > 3 ? '<button class="ls-sec__more" data-pop-all aria-expanded="' + !!S.popAll + '">' + esc(t(S.popAll ? 'popLess' : 'popAll')) + '</button>' : '') + '</div>' +
@@ -1017,7 +1019,7 @@
         return '<span class="ls-chip ls-chip--quiet ls-recent"><button class="ls-recent__q" data-recent="' + esc(q) + '">' + icon('history', 'ls-icon--sm') + '<span dir="auto">' + esc(q) + '</span></button>' +
           '<button class="ls-recent__x" data-unrecent="' + esc(q) + '" aria-label="' + esc(t('removeRecent') + ': ' + q) + '">' + icon('x', 'ls-icon--sm') + '</button></span>';
       }).join('') + '</div>' : '') +
-      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (q) { return '<button class="ls-ask ls-ask--example" data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400">' + esc(q) + '</span></span></button>'; }).join('') +
+      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (a) { return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span></span></button>'; }).join('') +
       '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
 
