@@ -1,0 +1,409 @@
+/*
+ * The merchant panel in the Lets Search language (the designer's panel, 2026-10-18): the same tokens as
+ * the drawer the shoppers see, ink on white, pill buttons, 20px cards, and three brand colours kept for
+ * what needs the merchant (coral), what deserves attention (sun) and what is done (lime). "Fine" gets no
+ * colour: a hairline ink outline. A bright colour is never text on white; text on a bright ground is ink.
+ *
+ * Inlined after panel.css on the merchant panel only (MerchantPanelProvider); the operator panel keeps
+ * panel.css as it is. Everything is scoped to .fi-panel-merchant, Filament's body class for this panel,
+ * and redefines the --la-* tokens panel.css reads, so its components follow.
+ */
+
+.fi-panel-merchant {
+    --font-family: 'Google Sans', 'Google Sans Text', 'Heebo', 'Segoe UI', system-ui, sans-serif;
+
+    --lp-lime: #e8ff78;
+    --lp-coral: #ff7a5c;
+    --lp-sun: #ffb547;
+    --lp-ink: #0b0b0c;
+
+    --la-plane: #f6f6f7;
+    --la-paper: #ffffff;
+    --la-sunk: #efeff1;
+    --la-ink: #0b0b0c;
+    --la-ink-2: #4d4d54;
+    --la-muted: #64646c;
+    --la-line: #e4e4e7;
+    --la-line-2: #efeff1;
+    --la-axis: #d2d2d7;
+    --la-accent: #0b0b0c;
+    --la-accent-ink: #1d1d20;
+    --la-soft: #efeff1;
+    --la-r: 20px;
+    --la-r2: 12px;
+    --la-shadow: 0 1px 2px rgb(11 11 12 / 6%), 0 1px 1px rgb(11 11 12 / 3%);
+    --la-pop: 0 10px 28px -10px rgb(11 11 12 / 16%), 0 2px 6px rgb(11 11 12 / 5%);
+
+    /* status: "fine" is an outline (good-bg stays the paper), the bright colours carry ink text */
+    --la-good-bg: transparent;
+    --la-good: #0b0b0c;
+    --la-good-dot: #0b0b0c;
+    --la-warn-bg: #ffb547;
+    --la-warn: #0b0b0c;
+    --la-warn-dot: #0b0b0c;
+    --la-warn-line: #ffb547;
+    --la-bad-bg: #ff7a5c;
+    --la-bad: #0b0b0c;
+    --la-bad-dot: #0b0b0c;
+    --la-tip-bg: #e8ff78;
+    --la-tip: #0b0b0c;
+    --la-tip-dot: #0b0b0c;
+    --la-flat-bg: #efeff1;
+    --la-flat: #4d4d54;
+
+    /* charts: ink first, then the greys and the two warm brights */
+    --la-s1: #0b0b0c;
+    --la-s2: #64646c;
+    --la-s3: #ff7a5c;
+    --la-s4: #ffb547;
+    --la-s-prev: #d2d2d7;
+
+    font-size: 15px;
+}
+
+html.dark .fi-panel-merchant {
+    --la-plane: #0b0b0c;
+    --la-paper: #141416;
+    --la-sunk: #1d1d20;
+    --la-ink: #f6f6f7;
+    --la-ink-2: #c9c9cf;
+    --la-muted: #a3a3ab;
+    --la-line: #2a2a2e;
+    --la-line-2: #1d1d20;
+    --la-axis: #3a3a40;
+    --la-accent: #f6f6f7;
+    --la-accent-ink: #e4e4e7;
+    --la-soft: #1d1d20;
+    --la-shadow: 0 1px 2px rgb(0 0 0 / 40%);
+    --la-pop: 0 10px 28px -10px rgb(0 0 0 / 60%);
+    --la-good: #f6f6f7;
+    --la-good-dot: #f6f6f7;
+    --la-flat-bg: #1d1d20;
+    --la-flat: #c9c9cf;
+    --la-s1: #f6f6f7;
+    --la-s2: #a3a3ab;
+    --la-s-prev: #3a3a40;
+}
+
+/* ------------------------------------------------------------------ type */
+
+.fi-panel-merchant,
+.fi-panel-merchant .fi-body {
+    letter-spacing: 0;
+}
+
+.fi-panel-merchant .fi-header-heading {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+.fi-panel-merchant .fi-header-subheading {
+    font-size: 14px;
+    max-width: 65ch;
+}
+
+.fi-panel-merchant :focus-visible {
+    outline: 2px solid var(--la-ink);
+    outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ sidebar: an ink pill for where you are */
+
+.fi-panel-merchant .fi-sidebar-item-btn {
+    min-height: 38px;
+    border-radius: var(--la-r2);
+    padding-inline: 12px;
+}
+
+.fi-panel-merchant .fi-sidebar-item-label,
+.fi-panel-merchant .fi-sidebar-item-label:where(.dark, .dark *) {
+    color: var(--la-ink-2);
+}
+
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn:where(.dark, .dark *),
+.fi-panel-merchant .fi-sidebar-item.fi-active.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover {
+    background-color: var(--la-accent);
+}
+
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label,
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label:where(.dark, .dark *),
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon,
+.fi-panel-merchant .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon:where(.dark, .dark *) {
+    color: var(--la-paper);
+    font-weight: 500;
+}
+
+/* a count that needs the merchant: coral with ink, as on the tabs */
+.fi-panel-merchant .fi-sidebar-item-badge-ctn .fi-badge,
+.fi-panel-merchant .fi-sidebar-item-badge-ctn .fi-badge.fi-color-danger {
+    background: var(--lp-coral);
+    color: var(--lp-ink);
+    font-weight: 500;
+}
+
+.fi-panel-merchant .fi-sidebar-group-label,
+.fi-panel-merchant .fi-sidebar-group-label:where(.dark, .dark *) {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--la-muted);
+}
+
+/* ------------------------------------------------------------------ cards: a soft shadow, no hairline */
+
+.fi-panel-merchant .fi-section:not(.fi-section-not-contained):not(.fi-aside),
+.fi-panel-merchant .fi-ta-ctn,
+.fi-panel-merchant .fi-wi-stats-overview-stat,
+.fi-panel-merchant .la-card {
+    border-radius: var(--la-r);
+    box-shadow: var(--la-shadow);
+}
+
+.fi-panel-merchant .fi-section:not(.fi-section-not-contained):not(.fi-aside):where(.dark, .dark *),
+.fi-panel-merchant .fi-ta-ctn:where(.dark, .dark *) {
+    box-shadow: var(--la-shadow), 0 0 0 1px var(--la-line);
+}
+
+.fi-panel-merchant .fi-section-header-heading {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.fi-panel-merchant .fi-modal-window,
+.fi-panel-merchant .fi-dropdown-panel {
+    border-radius: 16px;
+    box-shadow: var(--la-pop);
+}
+
+/* no coloured rails on cards: the tone lives in the pill inside; what deserves the eye is lifted, not framed */
+.fi-panel-merchant .la-stat[data-money],
+.fi-panel-merchant .la-stat[data-tone],
+.fi-panel-merchant .la-notice[data-tone] {
+    border-inline-start: 0;
+}
+
+.fi-panel-merchant [data-first-scan][style] {
+    box-shadow: var(--la-pop) !important;
+}
+
+/* ------------------------------------------------------------------ buttons: pills, the primary in ink */
+
+.fi-panel-merchant .fi-btn {
+    border-radius: 999px;
+    font-weight: 500;
+    padding-inline: 18px;
+    min-height: 40px;
+}
+
+.fi-panel-merchant .fi-btn.fi-size-sm,
+.fi-panel-merchant .fi-btn.fi-size-xs {
+    min-height: 32px;
+    padding-inline: 12px;
+}
+
+.fi-panel-merchant .fi-btn.fi-color-primary:not(.fi-outlined) {
+    --bg: var(--la-accent);
+    --text: var(--la-paper);
+    --hover-bg: var(--la-accent-ink);
+    --hover-text: var(--la-paper);
+    --dark-bg: var(--la-accent);
+    --dark-text: var(--la-paper);
+    --dark-hover-bg: var(--la-accent-ink);
+    --dark-hover-text: var(--la-paper);
+}
+
+.fi-panel-merchant .fi-btn:active {
+    transform: scale(0.98);
+}
+
+.fi-panel-merchant .la-btn-primary {
+    border-radius: 999px;
+    background: var(--la-accent);
+    color: var(--la-paper);
+}
+
+.fi-panel-merchant .la-btn-primary:hover {
+    background: var(--la-accent-ink);
+}
+
+.fi-panel-merchant .fi-icon-btn {
+    border-radius: 999px;
+}
+
+.fi-panel-merchant .fi-input-wrp {
+    border-radius: 999px;
+}
+
+.fi-panel-merchant textarea,
+.fi-panel-merchant .fi-input-wrp:has(textarea) {
+    border-radius: 16px;
+}
+
+/* ------------------------------------------------------------------ badges and deltas: fine is an outline */
+
+.fi-panel-merchant .la-badge[data-tone='good'],
+.fi-panel-merchant .la-delta[data-tone='good'] {
+    background: transparent;
+    color: var(--la-ink);
+    box-shadow: inset 0 0 0 1px var(--la-ink);
+}
+
+.fi-panel-merchant .la-badge[data-tone='bad'],
+.fi-panel-merchant .la-delta[data-tone='bad'],
+.fi-panel-merchant .la-badge[data-tone='warn'],
+.fi-panel-merchant .la-delta[data-tone='warn'],
+.fi-panel-merchant .la-badge[data-tone='tip'],
+.fi-panel-merchant .la-delta[data-tone='tip'] {
+    color: var(--lp-ink);
+}
+
+.fi-panel-merchant .fi-badge.fi-color-success {
+    background: transparent;
+    color: var(--la-ink);
+    box-shadow: inset 0 0 0 1px var(--la-ink);
+}
+
+.fi-panel-merchant .fi-badge.fi-color-danger {
+    background: var(--lp-coral);
+    color: var(--lp-ink);
+    box-shadow: none;
+}
+
+.fi-panel-merchant .fi-badge.fi-color-warning {
+    background: var(--lp-sun);
+    color: var(--lp-ink);
+    box-shadow: none;
+}
+
+.fi-panel-merchant .fi-badge.fi-color-danger .fi-icon,
+.fi-panel-merchant .fi-badge.fi-color-warning .fi-icon {
+    color: var(--lp-ink);
+}
+
+/* the usage strip: ink bar on a grey track, sun and coral only when it nears or reaches the cap */
+.fi-panel-merchant .la-usage .la-bar > i,
+.fi-panel-merchant .la-bar > i {
+    background: var(--la-ink);
+}
+
+.fi-panel-merchant .la-usage[data-tone='warn'] .la-bar > i {
+    background: var(--lp-sun);
+}
+
+.fi-panel-merchant .la-usage[data-tone='bad'] .la-bar > i {
+    background: var(--lp-coral);
+}
+
+/* ------------------------------------------------------------------ tabs and segmented controls: the drawer's pill tabs */
+
+.fi-panel-merchant .fi-tabs {
+    gap: 4px;
+    padding: 4px;
+    width: max-content;
+    max-width: 100%;
+    border-radius: 999px;
+    background: var(--la-sunk);
+    box-shadow: none;
+    overflow-x: auto;
+}
+
+.fi-panel-merchant .fi-tabs-item {
+    border: 0;
+    border-radius: 999px;
+    padding: 7px 14px;
+}
+
+.fi-panel-merchant .fi-tabs-item .fi-tabs-item-label {
+    color: var(--la-ink-2);
+}
+
+.fi-panel-merchant .fi-tabs-item.fi-active,
+.fi-panel-merchant .fi-tabs-item.fi-active:where(.dark, .dark *) {
+    background: var(--la-paper);
+    box-shadow: var(--la-shadow);
+}
+
+.fi-panel-merchant .fi-tabs-item.fi-active .fi-tabs-item-label,
+.fi-panel-merchant .fi-tabs-item.fi-active .fi-icon {
+    color: var(--la-ink);
+    font-weight: 500;
+}
+
+.fi-panel-merchant .la-seg {
+    border-radius: 999px;
+    background: var(--la-sunk);
+}
+
+.fi-panel-merchant .la-seg > * {
+    border-radius: 999px;
+}
+
+.fi-panel-merchant .la-chip {
+    border-radius: 999px;
+}
+
+.fi-panel-merchant .la-chip[data-on] {
+    background: var(--la-accent);
+    color: var(--la-paper);
+}
+
+/* ------------------------------------------------------------------ the brand: the Lets mark in ink */
+
+.fi-panel-merchant .lp-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--la-ink);
+}
+
+.fi-panel-merchant .lp-brand .lp-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--la-accent);
+    color: var(--la-paper);
+    display: grid;
+    place-items: center;
+    flex: none;
+}
+
+.fi-panel-merchant .lp-brand .lp-mark svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* ------------------------------------------------------------------ motion: the drawer's "into focus" for each page */
+
+@keyframes lp-focus-in {
+    from { opacity: 0; filter: blur(6px); transform: translateY(4px); }
+    to { opacity: 1; filter: none; transform: none; }
+}
+
+.fi-panel-merchant .fi-page-content > * {
+    animation: lp-focus-in 360ms cubic-bezier(.23, 1, .32, 1) backwards;
+}
+
+.fi-panel-merchant .fi-page-content > *:nth-child(2) { animation-delay: 45ms; }
+.fi-panel-merchant .fi-page-content > *:nth-child(3) { animation-delay: 90ms; }
+.fi-panel-merchant .fi-page-content > *:nth-child(n+4) { animation-delay: 135ms; }
+
+@media (prefers-reduced-motion: reduce) {
+    .fi-panel-merchant .fi-page-content > * { animation: none; }
+    .fi-panel-merchant .fi-btn:active { transform: none; }
+}
+
+/* ------------------------------------------------------------------ inputs: iOS does not zoom a 16px field */
+
+@media (pointer: coarse) {
+    .fi-panel-merchant input,
+    .fi-panel-merchant select,
+    .fi-panel-merchant textarea {
+        font-size: 16px;
+    }
+}

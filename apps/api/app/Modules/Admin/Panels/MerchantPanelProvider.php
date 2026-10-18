@@ -46,7 +46,12 @@ final class MerchantPanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::TOPBAR_END, fn (): HtmlString => self::operatorShortcut())
             ->renderHook(PanelsRenderHook::PAGE_START, fn (): HtmlString => self::whoseShop());
 
-        return PanelDefaults::apply($panel, 'Merchant');
+        // The Lets Search look on top of the shared one: the drawer's tokens, the mark in ink (merchant.css).
+        PanelDefaults::apply($panel, 'Merchant');
+
+        return $panel
+            ->brandLogo(fn (): HtmlString => new HtmlString(view('admin::panel.merchant-brand')->render()))
+            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): HtmlString => PanelTheme::merchant());
     }
 
     private static function shopName(): string
