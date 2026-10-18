@@ -166,9 +166,9 @@ final class PostKnowledgeTest extends TestCase
 
         Livewire::test(AboutStore::class)
             ->assertOk()
-            ->assertSee('מה למדנו מהפוסטים והמאמרים')
+            ->call('show', 'found')
             ->assertSee('את מחשבון החיתוך מוצאים מתחת לכפתור ההוספה לסל.')
-            ->assertSee('מתוך: מחשבון חיתוך: איך מזמינים פלטות חתוכות')
+            ->assertSee('מהפוסט')
             ->assertDontSee('gpt-')
             ->call('removePostFact', 'את מחשבון החיתוך מוצאים מתחת לכפתור ההוספה לסל.')
             ->assertDontSee('את מחשבון החיתוך מוצאים מתחת לכפתור ההוספה לסל.')

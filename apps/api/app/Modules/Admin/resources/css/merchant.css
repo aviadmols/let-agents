@@ -602,3 +602,24 @@ html.dark .fi-panel-merchant {
 @media (max-width: 640px) {
     .fi-panel-merchant .lp-tl-more { padding-inline-start: 14px; }
 }
+
+/* ================================================================== forms and lists inside the lp cards */
+
+.fi-panel-merchant .lp-stack { display: flex; flex-direction: column; gap: 10px; }
+.fi-panel-merchant .lp-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fi-panel-merchant .lp-inline { display: flex; gap: 8px; margin: 12px 0 6px; flex-wrap: wrap; }
+.fi-panel-merchant .lp-inline .lp-input { flex: 1 1 260px; }
+.fi-panel-merchant .lp-textarea,
+.fi-panel-merchant .lp-input { width: 100%; border: 0; border-radius: 14px; background: var(--la-sunk); color: var(--la-ink); font: inherit; font-size: 14px; padding: 12px 14px; box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 160ms; }
+.fi-panel-merchant .lp-input { min-height: 44px; padding-block: 0; }
+.fi-panel-merchant .lp-textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+.fi-panel-merchant .lp-textarea:focus,
+.fi-panel-merchant .lp-input:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--la-ink); background: var(--la-paper); }
+.fi-panel-merchant .lp-fact { background: var(--la-plane); border-radius: 14px; padding: 12px 14px; font-size: 13.5px; color: var(--la-ink-2); }
+.fi-panel-merchant .lp-fact b { color: var(--la-ink); }
+.fi-panel-merchant .lp-row-wrap { flex-wrap: wrap; }
+.fi-panel-merchant .lp-row a { color: inherit; text-decoration: none; }
+.fi-panel-merchant .lp-row a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.fi-panel-merchant .lp-notes { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; color: var(--la-ink-2); }
+.fi-panel-merchant .lp-facts { flex-basis: 100%; list-style: none; margin: 4px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--la-plane); display: flex; flex-direction: column; gap: 6px; }
+.fi-panel-merchant .lp-facts li { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; font-size: 13.5px; }

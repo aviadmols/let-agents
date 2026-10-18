@@ -8,6 +8,7 @@ use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -39,6 +40,9 @@ final class BuildShopKnowledge
 
     /** How much of each entry is kept. */
     private const MAX_BODY = 12000;
+
+    /** One line the team adds. */
+    public const MAX_OWN = 600;
 
     /**
      * Reads the shop's product pages and keeps what most of them repeat.
@@ -75,6 +79,10 @@ final class BuildShopKnowledge
         $this->put(self::REPEATED, 'repeated', implode("\n", array_map(fn (array $s): string => '- '.$s['text'], $found)), [
             'hidden' => $hidden,
             'pages' => count($pages),
+            // On how many of the pages read each sentence was, and how many products there were:
+            // the screen tells "on about N product pages" from these, with no reading of its own.
+            'counts' => array_combine(array_map(fn (array $s): string => RepeatedText::key($s['text']), $found), array_column($found, 'pages')) ?: [],
+            'products' => CatalogProduct::query()->active()->count(),
             'read_at' => now()->toIso8601String(),
         ]);
 
@@ -98,10 +106,97 @@ final class BuildShopKnowledge
         $this->put(self::REPEATED, 'repeated', implode("\n", $lines), $terms);
     }
 
-    /** What the team wrote about the store. Empty removes it. */
+    /** What the team wrote about the store, as one text: a row a line. Empty removes it all. */
     public function own(string $text): void
     {
-        $this->put(self::OWN, 'own', trim($text), []);
+        $rows = [];
+
+        foreach (preg_split('/\n+/u', trim($text)) ?: [] as $line) {
+            $line = trim((string) preg_replace('/^[-•*]\s*/u', '', $line));
+
+            if ($line !== '') {
+                $rows[] = ['id' => (string) Str::ulid(), 'text' => mb_substr($line, 0, self::MAX_OWN), 'at' => now()->toIso8601String(), 'check' => null];
+            }
+        }
+
+        $this->putOwn($rows);
+    }
+
+    /**
+     * What the team added, a row each, newest first: its text, when, and what the check against
+     * the site found (null while it waits, or when it was never checked).
+     *
+     * @return list<array{id: string, text: string, at: string|null, check: array{status: string, notes: list<array{title: string, why: string}>, at: string}|null}>
+     */
+    public function ownRows(): array
+    {
+        $row = $this->row(self::OWN);
+
+        if ($row === null || $row->removed_at !== null) {
+            return [];
+        }
+
+        $rows = (array) ($row->terms['rows'] ?? []);
+
+        // Written before rows: the whole text is one row.
+        if ($rows === [] && trim((string) $row->body) !== '') {
+            $rows = [['id' => 'own-'.substr(hash('sha256', (string) $row->body), 0, 12), 'text' => trim((string) $row->body), 'at' => $row->updated_at?->toIso8601String(), 'check' => null]];
+        }
+
+        return array_values(array_map(fn (array $r): array => [
+            'id' => (string) $r['id'], 'text' => (string) $r['text'], 'at' => $r['at'] ?? null, 'check' => $r['check'] ?? null,
+        ], $rows));
+    }
+
+    /** A line the team adds, the newest first. Returns its id. */
+    public function addOwn(string $text): ?string
+    {
+        $text = trim(mb_substr(trim($text), 0, self::MAX_OWN));
+
+        if ($text === '') {
+            return null;
+        }
+
+        $id = (string) Str::ulid();
+        $this->putOwn([['id' => $id, 'text' => $text, 'at' => now()->toIso8601String(), 'check' => null], ...$this->ownRows()]);
+
+        return $id;
+    }
+
+    /** A line the team changed: checked again against the site. Empty removes it. */
+    public function editOwn(string $id, string $text): void
+    {
+        $text = trim(mb_substr(trim($text), 0, self::MAX_OWN));
+
+        if ($text === '') {
+            $this->removeOwn($id);
+
+            return;
+        }
+
+        $this->putOwn(array_map(fn (array $r): array => $r['id'] === $id && $r['text'] !== $text ? [...$r, 'text' => $text, 'check' => null] : $r, $this->ownRows()));
+    }
+
+    public function removeOwn(string $id): void
+    {
+        $this->putOwn(array_values(array_filter($this->ownRows(), fn (array $r): bool => $r['id'] !== $id)));
+    }
+
+    /**
+     * What the check against the site found for one line, kept only while the line is the one checked.
+     *
+     * @param  array{status: string, notes: list<array{title: string, why: string}>}  $check
+     */
+    public function checked(string $id, string $text, array $check): void
+    {
+        $this->putOwn(array_map(fn (array $r): array => $r['id'] === $id && $r['text'] === $text ? [...$r, 'check' => [...$check, 'at' => now()->toIso8601String()]] : $r, $this->ownRows()));
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function putOwn(array $rows): void
+    {
+        // The assistant reads the body: a line each, as the team wrote them.
+        $this->put(self::OWN, 'own', implode("\n", array_map(fn (array $r): string => '- '.$r['text'], $rows)), ['rows' => array_values($rows)]);
     }
 
     /**
@@ -123,7 +218,32 @@ final class BuildShopKnowledge
             }
         }
 
-        $this->put(self::POSTS, 'posts', implode("\n", array_values(array_unique($lines))), ['read' => $read, 'hidden' => $hidden, 'read_at' => now()->toIso8601String()]);
+        // Asked for by the team (a post's link on the knowledge screen): waits until it is read.
+        $wanted = array_values(array_diff(array_map('strval', (array) ($this->row(self::POSTS)?->terms['wanted'] ?? [])), array_map('strval', array_keys($read))));
+
+        $this->put(self::POSTS, 'posts', implode("\n", array_values(array_unique($lines))), ['read' => $read, 'hidden' => $hidden, 'wanted' => $wanted, 'read_at' => now()->toIso8601String()]);
+    }
+
+    /** A page or post the team wants read: first at the next reading, whatever its age. */
+    public function want(string $contentId): void
+    {
+        $row = $this->row(self::POSTS);
+        $terms = (array) ($row?->terms ?? []);
+        $terms['wanted'] = array_values(array_unique([...array_map('strval', (array) ($terms['wanted'] ?? [])), $contentId]));
+
+        if ($row === null) {
+            CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => self::POSTS, 'title' => '', 'body' => '', 'terms' => $terms, 'hash' => hash('sha256', ''), 'removed_at' => now(), 'synced_at' => now()]);
+
+            return;
+        }
+
+        $row->forceFill(['terms' => $terms])->save();
+    }
+
+    /** @return list<string> the pages and posts the team asked to read, not read yet */
+    public function wanted(): array
+    {
+        return array_values(array_map('strval', (array) ($this->row(self::POSTS)?->terms['wanted'] ?? [])));
     }
 
     /** A fact from a post the team does not want told: left out now and at every later reading. */

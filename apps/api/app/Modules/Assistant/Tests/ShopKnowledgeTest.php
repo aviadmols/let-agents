@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -122,16 +123,17 @@ final class ShopKnowledgeTest extends TestCase
         $this->actingAs($merchant);
         Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
         Filament::setTenant($this->shop);
+        Queue::fake();
         $this->inShop(fn () => CatalogContent::query()->create(['type' => 'page', 'external_id' => 'policy-1', 'title' => 'מדיניות החזרות', 'url' => 'https://rings.test/policies/refund', 'body' => 'החזרה תוך 14 יום.', 'hash' => 'p1']));
 
         Livewire::test(AboutStore::class)
             ->assertOk()
             ->assertSee('מדיניות החזרות')
-            ->set('own', 'משלוח עד הבית תוך 3 ימי עסקים.')
-            ->call('saveOwn');
+            ->set('newInfo', 'משלוח עד הבית תוך 3 ימי עסקים.')
+            ->call('addInfo');
 
-        $this->assertSame('משלוח עד הבית תוך 3 ימי עסקים.', $this->inShop(fn () => app(BuildShopKnowledge::class)->entries())[BuildShopKnowledge::OWN]->body);
-        Livewire::test(AboutStore::class)->assertSet('own', 'משלוח עד הבית תוך 3 ימי עסקים.');
+        $this->assertSame('- משלוח עד הבית תוך 3 ימי עסקים.', $this->inShop(fn () => app(BuildShopKnowledge::class)->entries())[BuildShopKnowledge::OWN]->body);
+        Livewire::test(AboutStore::class)->assertSet('own', 'משלוח עד הבית תוך 3 ימי עסקים.')->assertSee('משלוח עד הבית תוך 3 ימי עסקים.');
     }
 
     private function inShop(callable $callback): mixed

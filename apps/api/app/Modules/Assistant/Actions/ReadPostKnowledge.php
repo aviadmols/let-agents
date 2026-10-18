@@ -96,6 +96,13 @@ final class ReadPostKnowledge
             ->orderByDesc('updated_at')->orderBy('id')
             ->limit((int) Settings::get('assistant.post_knowledge_posts', $shopId))
             ->get(['id', 'type', 'external_id', 'title', 'body']))->values();
+        // What the team asked for on the knowledge screen comes first, however old it is.
+        $wanted = $this->knowledge->wanted();
+        if ($wanted !== []) {
+            $first = CatalogContent::query()->active()->whereIn('id', $wanted)->whereIn('type', [CatalogContent::PAGE, CatalogContent::POST])
+                ->get(['id', 'type', 'external_id', 'title', 'body']);
+            $posts = $first->concat($posts->reject(fn (CatalogContent $post): bool => in_array((string) $post->id, $wanted, true)))->values();
+        }
         $budget = (int) Settings::get('assistant.post_knowledge_per_run', $shopId);
         $shop = (string) (Shop::query()->whereKey($shopId)->value('name') ?? '');
         $read = [];
@@ -137,7 +144,7 @@ final class ReadPostKnowledge
                 return;
             }
 
-            $read[$id] = ['fingerprint' => $fingerprint, 'title' => $title, 'facts' => $facts];
+            $read[$id] = ['fingerprint' => $fingerprint, 'title' => $title, 'facts' => $facts, 'read_at' => now()->toIso8601String()];
             $counts['read']++;
             $counts['facts'] += count($facts);
         }

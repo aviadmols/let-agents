@@ -792,6 +792,28 @@
                     ]
                 }
             ]
+        },
+        {
+            "name": "knowledge_checker",
+            "action": "check_own_knowledge",
+            "when": "on_request",
+            "features": [
+                "knowledge"
+            ],
+            "roles": [
+                {
+                    "role": "checker",
+                    "provider": "post_check_provider",
+                    "model": "post_check_model",
+                    "prices": [
+                        "post_check_input_usd_per_million",
+                        "post_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "own_fact_check"
+                    ]
+                }
+            ]
         }
     ]
 }

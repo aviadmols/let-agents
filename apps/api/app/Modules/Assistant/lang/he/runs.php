@@ -22,5 +22,6 @@ return [
     'team_draft_same_family' => 'הכותב והבודק מאותה משפחה (:family). צריך בודק ממשפחה אחרת.',
     'team_draft_empty' => 'המודל לא החזיר טיוטה.',
     'team_drafted' => 'נוסחה טיוטת תשובה לצוות. :problems דברים לבדוק.',
+    'own_checked' => 'שורה שהצוות הוסיף נבדקה מול האתר. :conflicts סתירות.',
     'prepared' => 'תשובות מוכנות: :questions שאלות על החנות, :answered נענו ועברו בדיקה, :skipped כבר מוכנות ודפיהן לא השתנו.',
 ];
