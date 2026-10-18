@@ -14,7 +14,7 @@ return new class extends Migration
     {
         Schema::create('analytics_blocked_ips', function (Blueprint $table): void {
             $table->id();
-            $table->foreignUuid('shop_id')->constrained('shops')->cascadeOnDelete();
+            $table->foreignUlid('shop_id')->constrained('shops')->cascadeOnDelete();
             $table->string('ip', 45);
             $table->foreignId('blocked_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('analytics_visits', function (Blueprint $table): void {
             $table->id();
-            $table->foreignUuid('shop_id')->constrained('shops')->cascadeOnDelete();
+            $table->foreignUlid('shop_id')->constrained('shops')->cascadeOnDelete();
             $table->string('session_id', 64);
             $table->string('visitor_hash', 64)->nullable();
             // The visitor's how-manieth visit to this store: 1 is the first.
@@ -54,7 +54,7 @@ return new class extends Migration
 
         Schema::create('analytics_visit_steps', function (Blueprint $table): void {
             $table->id();
-            $table->foreignUuid('shop_id')->constrained('shops')->cascadeOnDelete();
+            $table->foreignUlid('shop_id')->constrained('shops')->cascadeOnDelete();
             $table->foreignId('visit_id')->constrained('analytics_visits')->cascadeOnDelete();
             $table->string('step_id', 32);
             // view, search, photo, ask, open, heart, cart, order, lead
