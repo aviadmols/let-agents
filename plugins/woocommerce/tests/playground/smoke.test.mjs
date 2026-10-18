@@ -166,6 +166,8 @@ test('a variable product lists its variations with readable attribute values', a
   assert.equal(v.price.min_price, '299');
   assert.equal(v.price.max_price, '319');
   assert.ok(v.attributes.some((a) => a.key === 'pa_color' && a.used_for_variations));
+  // a swatch plugin's colour for a term goes with it, by the term's name; a term without one has none
+  assert.deepEqual(v.attributes.find((a) => a.key === 'pa_color').swatches, { 'אדום': '#d81e05' });
 });
 
 test('a variation or a missing ID is not a product', async () => {

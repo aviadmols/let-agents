@@ -7,6 +7,7 @@ use LetAgents\Support\Records;
 use LetAgents\Support\SensitiveFields;
 use WC_Product;
 use WC_Product_Attribute;
+use WP_Term;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -260,7 +261,7 @@ final class ProductExporter {
 	}
 
 	/**
-	 * @return list<array{name: string, key: string, taxonomy: bool, values: list<string>, used_for_variations: bool, visible: bool}>
+	 * @return list<array{name: string, key: string, taxonomy: bool, values: list<string>, used_for_variations: bool, visible: bool, swatches?: array<string, string>}>
 	 */
 	private function attributes( WC_Product $product ): array {
 		$attributes = array();
@@ -270,23 +271,62 @@ final class ProductExporter {
 				continue;
 			}
 
-			$key = $attribute->get_name();
+			$key   = $attribute->get_name();
+			$terms = $attribute->is_taxonomy() ? wc_get_product_terms( $product->get_id(), $key, array( 'fields' => 'all' ) ) : array();
 
 			$values = $attribute->is_taxonomy()
-				? wc_get_product_terms( $product->get_id(), $key, array( 'fields' => 'names' ) )
+				? array_map( static fn ( $term ): string => $term instanceof WP_Term ? $term->name : '', $terms )
 				: $attribute->get_options();
 
-			$attributes[] = array(
+			$record = array(
 				'name'                => PlainText::line( wc_attribute_label( $key, $product ) ),
 				'key'                 => $key,
 				'taxonomy'            => $attribute->is_taxonomy(),
-				'values'              => array_values( array_map( array( PlainText::class, 'line' ), array_map( 'strval', (array) $values ) ) ),
+				'values'              => array_values( array_filter( array_map( array( PlainText::class, 'line' ), array_map( 'strval', (array) $values ) ), static fn ( string $v ): bool => '' !== $v ) ),
 				'used_for_variations' => $attribute->get_variation(),
 				'visible'             => $attribute->get_visible(),
 			);
+
+			$swatches = $this->swatches( $terms );
+
+			if ( array() !== $swatches ) {
+				$record['swatches'] = $swatches;
+			}
+
+			$attributes[] = $record;
 		}
 
 		return $attributes;
+	}
+
+	/**
+	 * The colour a swatch plugin or the theme keeps for each term of an attribute ("Ocean Mist" =>
+	 * "#5f8a99"), by the term's name: a hex code in the term's meta under a key that says colour or
+	 * swatch (product_attribute_color, color, swatch_color and their like), so no one plugin is assumed.
+	 * Nothing for terms without one.
+	 *
+	 * @param array<int, mixed> $terms
+	 * @return array<string, string>
+	 */
+	private function swatches( array $terms ): array {
+		$out = array();
+
+		foreach ( $terms as $term ) {
+			if ( ! $term instanceof WP_Term ) {
+				continue;
+			}
+
+			foreach ( (array) get_term_meta( $term->term_id ) as $meta_key => $stored ) {
+				$value = trim( (string) ( is_array( $stored ) ? reset( $stored ) : $stored ) );
+
+				if ( 1 === preg_match( '/colou?r|swatch/i', (string) $meta_key ) && 1 === preg_match( '/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i', $value ) ) {
+					$out[ PlainText::line( $term->name ) ] = '#' . ltrim( $value, '#' );
+					break;
+				}
+			}
+		}
+
+		return $out;
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.9.0
+Stable tag: 0.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -52,6 +52,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 3. Copy the token. It is shown only once.
 
 == Changelog ==
+
+= 0.9.1 =
+* A colour attribute's terms carry the colour a swatch plugin or the theme keeps for them (a hex code in the term's meta), so Let Agents knows a colour by its swatch where its name says nothing ("Ocean Mist").
 
 = 0.9.0 =
 * One script on the store: Lets Search, the drawer, loaded from {api}/search/lets-search.js. The product-page widget, the old search box script and their display modes are removed; everything they did is in the drawer, and page views, searches, add to cart and orders are counted as before.

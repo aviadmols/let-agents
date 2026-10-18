@@ -44,6 +44,8 @@ $term_id = static function ( string $name, string $slug ): int {
 };
 $red_id   = $term_id( 'אדום', 'red' );
 $black_id = $term_id( 'שחור', 'black' );
+// A swatch plugin's colour for a term (Variation Swatches keeps it so); black has none.
+update_term_meta( $red_id, 'product_attribute_color', '#d81e05' );
 
 // Accessory first, so the drill can point to it.
 $bits = new WC_Product_Simple();
