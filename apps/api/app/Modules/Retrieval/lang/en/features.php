@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'refresh_on_change' => [
+        'label' => 'Refresh search by meaning after a change',
+        'description' => 'A product or post changed today is found by its new words today: a few minutes after the sync the index is brought up to date, and only a piece whose text changed goes to the model. The nightly build stays to finish what is left.',
+    ],
     'index' => [
         'label' => 'Index by meaning',
         'description' => 'Every night, products, pages, posts and what the orders say are cut into pieces and given a vector, so they can be found by meaning. Only a piece whose text changed is sent to the model again.',

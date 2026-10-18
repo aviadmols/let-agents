@@ -3,6 +3,8 @@
 namespace App\Modules\Retrieval;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
+use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Retrieval\Actions\CaptionImages;
 use App\Modules\Retrieval\Candidates\BoughtTogether;
 use App\Modules\Retrieval\Candidates\LookAlike;
@@ -15,6 +17,7 @@ use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Listeners\RefreshVectors;
 use App\Modules\Retrieval\Sources\ContentDocuments;
 use App\Modules\Retrieval\Sources\ProductDocuments;
 use App\Modules\Retrieval\Sources\PurchaseDocuments;
@@ -23,6 +26,7 @@ use App\Modules\Retrieval\Support\PassageSearch;
 use App\Modules\Retrieval\Support\RetrievalRunner;
 use App\Modules\Retrieval\Support\VectorSearch;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Event;
 
 final class RetrievalServiceProvider extends ModuleServiceProvider
 {
@@ -50,6 +54,9 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // What changed today is searchable by meaning today: a sync queues one refresh of the vectors.
+        Event::listen([CatalogUpdated::class, CatalogProductsChanged::class], RefreshVectors::class);
+
         // After the catalogue sync (02:30) and before Enrichment's nightly reading (03:10), which
         // turns accepted matches into relations: the index first, then the matching that uses it.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {

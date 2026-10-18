@@ -24,6 +24,10 @@
             "default": false
         },
         {
+            "name": "refresh_on_change",
+            "default": true
+        },
+        {
             "name": "image_captions",
             "default": true
         }
@@ -61,6 +65,15 @@
             "max": 100,
             "scope": "global",
             "unit": "usd"
+        },
+        {
+            "name": "refresh_after_minutes",
+            "type": "int",
+            "default": 3,
+            "min": 0,
+            "max": 120,
+            "scope": "shop",
+            "unit": "minutes"
         },
         {
             "name": "chunk_chars",

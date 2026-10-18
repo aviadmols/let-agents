@@ -17,6 +17,10 @@ return [
         'label' => 'Vector model price, per million tokens',
         'description' => 'From the provider\'s price list. Used to estimate before each call and to record the cost.',
     ],
+    'refresh_after_minutes' => [
+        'label' => 'Minutes after a change before the refresh',
+        'description' => 'Changes within these minutes are brought up to date together, in one run.',
+    ],
     'chunk_chars' => [
         'label' => 'Piece length',
         'description' => 'At most this many characters in one piece, the title at its head included. Changing it cuts everything again.',
