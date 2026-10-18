@@ -78,7 +78,7 @@
         {
             "name": "max_agent_text_chars",
             "type": "int",
-            "default": 1000,
+            "default": 2500,
             "min": 300,
             "max": 8000,
             "scope": "shop",
@@ -153,6 +153,15 @@
             "default": 40,
             "min": 0,
             "max": 500,
+            "scope": "shop",
+            "unit": "requests"
+        },
+        {
+            "name": "nightly_batch_requests",
+            "type": "int",
+            "default": 1500,
+            "min": 0,
+            "max": 5000,
             "scope": "shop",
             "unit": "requests"
         },

@@ -87,6 +87,8 @@ final class BatchReadingTest extends TestCase
             $this->product((string) $i, "מקדחה נטענת {$i} 18V", 'מקדחה חזקה לעבודות בית.', [$this->root]);
         }
         Settings::set('enrichment.nightly_model_requests', 2, $this->shop->id);
+        // No catch-up: the night's own number.
+        Settings::set('enrichment.nightly_batch_requests', 0, $this->shop->id);
 
         $night = app(RunNightlyModelReading::class)->handle($this->shop->id);
 
@@ -131,6 +133,24 @@ final class BatchReadingTest extends TestCase
 
         $this->assertSame(5, $run->output['submitted'], 'all five, past the night\'s one');
         $this->assertSame([2, 2, 1], array_map('count', $this->provider->submitted), 'in batches as large as a task file');
+    }
+
+    public function test_a_night_through_a_batch_catches_up_on_the_catalogue_in_rounds_up_to_its_cap(): void
+    {
+        foreach (range(1, 7) as $i) {
+            $this->product((string) $i, "מקדחה נטענת {$i} 18V", 'מקדחה חזקה לעבודות בית.', [$this->root]);
+        }
+        Settings::set('enrichment.nightly_model_requests', 1, $this->shop->id);
+        Settings::set('enrichment.max_requests_per_task_file', 2, $this->shop->id);
+        Settings::set('enrichment.nightly_batch_requests', 5, $this->shop->id);
+
+        $night = app(RunNightlyModelReading::class)->handle($this->shop->id);
+
+        $this->assertSame(5, $night->output['submitted'], 'past the night\'s one, up to the catch-up cap');
+        $this->assertSame([2, 2, 1], array_map('count', $this->provider->submitted), 'in rounds as large as a task file');
+
+        app(RunNightlyModelReading::class)->handle($this->shop->id);
+        $this->assertSame(7, array_sum(array_map('count', $this->provider->submitted)), 'the next night reads the rest, and nothing twice');
     }
 
     public function test_a_batch_the_provider_lost_goes_back_to_waiting_and_the_night_hands_it_over_again(): void

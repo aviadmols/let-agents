@@ -38,6 +38,13 @@ final class TextCondenser
 
                 $key = TextNormalizer::forMatching($line);
 
+                // A table's "| --- |" line is the same in every table and belongs to each.
+                if (self::isRule($line)) {
+                    $lines[] = $line;
+
+                    continue;
+                }
+
                 if (isset($seen[$key]) || isset($drop[$key]) || $this->containedInEarlier($key, $seen)) {
                     continue;
                 }
@@ -57,19 +64,26 @@ final class TextCondenser
         $keep = [0 => true];
         $used = mb_strlen($lines[0] ?? '');
 
+        $heads = self::tableHeads($lines);
+
         foreach ([true, false] as $informative) {
             foreach ($lines as $i => $line) {
                 if (isset($keep[$i]) || $this->isInformative($line) !== $informative || ($headingsWithContent && self::isHeading($line))) {
                     continue;
                 }
 
-                $length = mb_strlen($line) + 1;
+                // A table row goes with its table's header row and rule, or not at all: "| 9 | חיפוי |"
+                // means nothing without "| עובי | שימוש |".
+                $with = array_values(array_filter($heads[$i] ?? [], fn (int $h): bool => ! isset($keep[$h])));
+                $length = mb_strlen($line) + 1 + array_sum(array_map(fn (int $h): int => mb_strlen($lines[$h]) + 1, $with));
 
                 if ($used + $length > $maxChars) {
                     continue;
                 }
 
-                $keep[$i] = true;
+                foreach ([...$with, $i] as $k) {
+                    $keep[$k] = true;
+                }
                 $used += $length;
             }
         }
@@ -117,15 +131,54 @@ final class TextCondenser
         return (string) preg_replace('/^[\s•·\-*]+|[\s•·\-*]+$/u', '', $line);
     }
 
-    /** A short line that only introduces what follows: "יתרונות המוצר:". */
+    /** A short line that only introduces what follows: "יתרונות המוצר:", "## מפרט טכני". */
     private static function isHeading(string $line): bool
     {
-        return mb_strlen($line) <= 60 && (bool) preg_match('~:\s*$~u', $line);
+        return mb_strlen($line) <= 60 && (bool) preg_match('~:\s*$|^#{2,3}\s~u', $line);
     }
 
+    /** A table row ("| 9 מ״מ | חיפוי קל |") is a detail, as a "label: value" line is. */
     private function isInformative(string $line): bool
     {
-        return (bool) preg_match('~\d|:\s*\S~u', $line) && mb_strlen($line) <= 200;
+        return (str_starts_with($line, '|') || (bool) preg_match('~\d|:\s*\S~u', $line)) && mb_strlen($line) <= 200;
+    }
+
+    private static function isRule(string $line): bool
+    {
+        return preg_match('/^\|(?:\s*-{3,}\s*\|)+$/u', $line) === 1;
+    }
+
+    /**
+     * For each table row past a table's header, the header row and rule it needs (HtmlText writes a
+     * table as "| a | b |" lines, the header row first and a "| --- |" rule under it).
+     *
+     * @param  list<string>  $lines
+     * @return array<int, list<int>>
+     */
+    private static function tableHeads(array $lines): array
+    {
+        $heads = [];
+        $current = null;
+
+        foreach ($lines as $i => $line) {
+            if (! str_starts_with($line, '|')) {
+                $current = null;
+
+                continue;
+            }
+
+            if ($current === null) {
+                $current = isset($lines[$i + 1]) && self::isRule($lines[$i + 1]) ? [$i, $i + 1] : [];
+
+                continue;
+            }
+
+            if (! in_array($i, $current, true)) {
+                $heads[$i] = $current;
+            }
+        }
+
+        return $heads;
     }
 
     /** A short line already said inside a longer earlier one, such as a title repeated in a sentence. */

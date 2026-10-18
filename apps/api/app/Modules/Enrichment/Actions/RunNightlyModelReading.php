@@ -73,8 +73,13 @@ final class RunNightlyModelReading
                 $model = (string) Settings::get('enrichment.reader_model');
                 $provider = AgentModel::provider('enrichment.reader_provider');
                 $viaBatch = Features::enabled('enrichment.batch_reading', $shopId) && $this->provider->supports($provider);
-                // The whole catalogue goes over in batches as large as a task file may be.
-                $limit = $allProducts ? (int) Settings::get('enrichment.max_requests_per_task_file', $shopId) : $limit;
+                // Through a batch API (half the price, nothing waits for it) a night catches up: round after
+                // round of what is unread or changed, up to nightly_batch_requests, so a catalogue is covered
+                // in one night instead of a month of 40; after that only new and changed products are left.
+                $catchUp = $viaBatch && ! $allProducts ? (int) Settings::get('enrichment.nightly_batch_requests', $shopId) : 0;
+                // The whole catalogue (or the catch-up) goes over in batches as large as a task file may be.
+                $perFile = (int) Settings::get('enrichment.max_requests_per_task_file', $shopId);
+                $limit = $allProducts ? $perFile : ($catchUp > 0 ? min($perFile, $catchUp) : $limit);
 
                 // A shop's catalogue is divided between several vocabularies, and a product can
                 // only be read against the one its branch belongs to. Taking the first would mean
@@ -140,8 +145,12 @@ final class RunNightlyModelReading
                         break;
                     }
 
-                    if (! $allProducts) {
+                    if (! $allProducts && ($catchUp === 0 || $totals['submitted'] >= $catchUp)) {
                         break;
+                    }
+
+                    if ($catchUp > 0) {
+                        $limit = min($perFile, $catchUp - $totals['submitted']);
                     }
 
                     // The next round builds the next batch: what was just handed over counts as asked.
