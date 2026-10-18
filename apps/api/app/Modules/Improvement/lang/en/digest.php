@@ -6,6 +6,7 @@ return [
     'new_products' => 'New products that came into the system in the last day: :count (:read of them already read and described). In the catalog: :total.',
     'evidence' => 'Reviewed: :empty searches that found nothing, :unclicked searches nobody clicked, :questions questions the site did not answer.',
     'quiet' => 'Nothing new today.',
+    'waiting' => 'The next review comes after :left more searches (:searches of :needed since the last review).',
     'proposals' => 'Suggestions: :proposed, of which :accepted passed the check and :applied already joined search.',
     'usage' => 'System use this month: :percent% of the monthly allowance.',
     'stopped' => [

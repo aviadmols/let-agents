@@ -53,6 +53,10 @@ return [
         'label' => 'A search with no results counts from',
         'description' => 'How many times a search must find nothing to be reviewed.',
     ],
+    'searches_between_reviews' => [
+        'label' => 'Searches between reviews',
+        'description' => 'The scheduled review waits until this many searches have accumulated since the last one, so it has something to think about. 0: every day. A manual run never waits.',
+    ],
     'digest_email' => [
         'label' => 'Address for the daily summary',
         'description' => 'The summary is sent here every morning. Empty: it is kept in the panel only.',

@@ -30,6 +30,9 @@ class ImprovementReview extends Model
 
     public const QUIET = 'quiet';
 
+    /** Too few searches since the last review to think about: nothing gathered, no model asked. */
+    public const WAITING = 'waiting';
+
     public const REVIEWED = 'reviewed';
 
     public const STOPPED = 'stopped';

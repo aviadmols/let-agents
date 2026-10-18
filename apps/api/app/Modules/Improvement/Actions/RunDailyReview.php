@@ -21,6 +21,7 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
+use App\Modules\Search\Models\SearchTerm;
 
 /**
  * Once a day per shop: what the site did not answer, what to change, and a short report.
@@ -63,12 +64,25 @@ final class RunDailyReview
             action: self::ACTION,
             shopId: $shopId,
             trigger: $trigger,
-            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->review($run, $shopId)),
+            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->review($run, $shopId, $trigger)),
         );
     }
 
-    private function review(RunContext $run, string $shopId): void
+    private function review(RunContext $run, string $shopId, RunTrigger $trigger): void
     {
+        // The scheduled review waits for enough searches since the last one to have something to think
+        // about (improvement.searches_between_reviews), as Aviad asked (2026-10-18). Pressing the button never waits.
+        if ($trigger === RunTrigger::Schedule && ($wait = $this->waiting($shopId)) !== null) {
+            $review = ImprovementReview::query()->updateOrCreate(
+                ['shop_id' => $shopId, 'day' => now()->toDateString()],
+                ['status' => ImprovementReview::WAITING, 'evidence' => [], 'proposed' => 0, 'accepted' => 0, 'applied' => 0, 'run_id' => $run->runId,
+                    'digest' => (string) __('improvement::digest.waiting', $wait + ['left' => $wait['needed'] - $wait['searches']])],
+            );
+            $run->output(['status' => $review->status] + $wait)->summary('improvement::runs.waiting', ['searches' => (string) $wait['searches'], 'needed' => (string) $wait['needed']]);
+
+            return;
+        }
+
         $evidence = Evidence::gather($shopId);
         $review = ImprovementReview::query()->updateOrCreate(
             ['shop_id' => $shopId, 'day' => now()->toDateString()],
@@ -317,6 +331,27 @@ final class RunDailyReview
     private function prompt(string $name): string
     {
         return (string) file_get_contents(self::PROMPTS.$name.'.'.self::PROMPT_VERSION.'.md');
+    }
+
+    /**
+     * How far the shop is from its next review: the searches since the last review that looked at the
+     * evidence (a waiting day does not count as one), against improvement.searches_between_reviews.
+     * Null when there are enough, or when the shop reviews every day (0). Inside the shop's tenant.
+     *
+     * @return array{searches: int, needed: int}|null
+     */
+    private function waiting(string $shopId): ?array
+    {
+        $needed = (int) Settings::get('improvement.searches_between_reviews', $shopId);
+
+        if ($needed < 1) {
+            return null;
+        }
+
+        $last = ImprovementReview::query()->where('status', '!=', ImprovementReview::WAITING)->max('day');
+        $searches = (int) SearchTerm::query()->when($last !== null, fn ($q) => $q->where('day', '>=', $last))->sum('searches');
+
+        return $searches < $needed ? ['searches' => $searches, 'needed' => $needed] : null;
     }
 
     private function stop(RunContext $run, ImprovementReview $review, string $shopId, string $reason): void

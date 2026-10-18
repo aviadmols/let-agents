@@ -20,6 +20,7 @@ use App\Modules\Improvement\Filament\Operator\Pages\SiteSuggestions;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
 use App\Modules\Improvement\Support\Digest;
+use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Models\SearchTerm;
@@ -133,6 +134,35 @@ final class DailyReviewTest extends TestCase
         app(RunDailyReview::class)->handle($this->shop->id);
         $this->assertCount(2, $this->calls);
         $this->assertSame(['קרש'], array_column($this->calls[1]['input']['empty'], 'query'));
+    }
+
+    public function test_a_scheduled_review_waits_for_enough_searches_since_the_last_one(): void
+    {
+        // As Aviad asked (2026-10-18): not every day by what happened, but once there is enough to think about.
+        Settings::set('improvement.searches_between_reviews', 100, $this->shop->id);
+
+        $run = app(RunDailyReview::class)->handle($this->shop->id, RunTrigger::Schedule);
+        $this->assertCount(0, $this->calls, '29 searches so far: nothing gathered, no model asked');
+        $this->assertSame(ImprovementReview::WAITING, $this->inShop(fn () => ImprovementReview::query()->latest('day')->first())->status);
+        $this->assertStringContainsString('29 מתוך 100', (string) $run->summary());
+
+        // Enough searches came in: the review runs.
+        $this->inShop(fn () => SearchTerm::query()->create(['shop_id' => $this->shop->id, 'day' => now()->toDateString(), 'query' => 'לביד', 'searches' => 80, 'clicks' => 10, 'last_results' => 12]));
+        $this->replies = [['proposals' => []]];
+        $this->travel(1)->days();
+        app(RunDailyReview::class)->handle($this->shop->id, RunTrigger::Schedule);
+        $this->assertCount(1, $this->calls, '109 searches: the analyst is asked');
+
+        // The count starts over from that review.
+        $this->travel(1)->days();
+        app(RunDailyReview::class)->handle($this->shop->id, RunTrigger::Schedule);
+        $this->assertCount(1, $this->calls);
+        $this->assertSame(ImprovementReview::WAITING, $this->inShop(fn () => ImprovementReview::query()->latest('day')->first())->status);
+
+        // Someone pressing the button does not wait: the evidence is looked at (and found already seen).
+        $this->travel(1)->days();
+        app(RunDailyReview::class)->handle($this->shop->id, RunTrigger::Manual);
+        $this->assertSame(ImprovementReview::QUIET, $this->inShop(fn () => ImprovementReview::query()->latest('day')->first())->status);
     }
 
     public function test_a_writer_never_checks_its_own_family(): void

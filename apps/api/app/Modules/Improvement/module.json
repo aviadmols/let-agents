@@ -143,6 +143,15 @@
             "unit": "times"
         },
         {
+            "name": "searches_between_reviews",
+            "type": "int",
+            "default": 300,
+            "min": 0,
+            "max": 100000,
+            "scope": "shop",
+            "unit": "times"
+        },
+        {
             "name": "digest_email",
             "type": "string",
             "default": "",
