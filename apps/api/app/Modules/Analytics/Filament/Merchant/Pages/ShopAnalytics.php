@@ -159,6 +159,12 @@ final class ShopAnalytics extends Page
         return ['rows' => [], 'total' => 0];
     }
 
+    /** The sessions that searched a word, over the same period. */
+    public function sessionsFor(string $word): string
+    {
+        return ShopSessions::getUrl(array_filter(['q' => $word, 'days' => $this->days, 'from' => $this->from, 'to' => $this->to]));
+    }
+
     public function has(string $list): bool
     {
         foreach ($this->sources() as $source) {

@@ -59,4 +59,12 @@ return [
     'block' => 'Block',
     'unblock' => 'Unblock',
     'block_confirm' => 'Block :ip? Search and the assistant stop working from this address. The store itself keeps working.',
+    'sessions_of' => 'Sessions that searched ":term"',
+    'answer' => 'Answer',
+    'answer_instead' => 'Write a different answer',
+    'answer_placeholder' => 'Your answer, as you would tell a customer',
+    'answer_label' => 'Answer to :question',
+    'answer_publish' => 'Publish answer',
+    'aside' => 'Not relevant',
+    'aside_confirm' => 'Mark this question as not relevant? It will leave the list.',
 ];

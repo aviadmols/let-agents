@@ -465,6 +465,8 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant a.lp-row[href]:hover .lp-row-t { text-decoration: underline; text-underline-offset: 3px; }
 .fi-panel-merchant .lp-grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .fi-panel-merchant .lp-row-t { font-weight: 500; color: var(--la-ink); }
+.fi-panel-merchant a.lp-row-link { display: inline-block; text-decoration: none; }
+.fi-panel-merchant a.lp-row-link:hover { text-decoration: underline; text-underline-offset: 3px; color: var(--la-accent, var(--la-ink)); }
 .fi-panel-merchant .lp-row-s { font-size: 13px; color: var(--la-muted); }
 
 /* the first steps */

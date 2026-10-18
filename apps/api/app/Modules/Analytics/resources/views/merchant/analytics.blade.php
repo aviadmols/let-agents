@@ -4,8 +4,11 @@
     @php($page = \App\Modules\Analytics\Filament\Merchant\Pages\ShopAnalytics::class)
 
     {{-- one row of any list: a rank or a picture, what it is, a line under it, a pill, its number, its button --}}
-    @php($row = function (string $list, \App\Modules\Admin\Contracts\ReportRow $r, ?int $rank = null) use ($t): string {
-        return view('analytics::merchant.report-row', ['list' => $list, 'r' => $r, 'rank' => $rank, 't' => $t])->render();
+    @php($row = function (string $list, \App\Modules\Admin\Contracts\ReportRow $r, ?int $rank = null, bool $full = false) use ($t): string {
+        // a searched word opens the sessions that searched it, in the same period
+        $link = in_array($list, ['words', 'empty', 'noclick'], true) && ! str_starts_with($r->key, '[') ? $this->sessionsFor($r->key) : null;
+
+        return view('analytics::merchant.report-row', ['list' => $list, 'r' => $r, 'rank' => $rank, 't' => $t, 'link' => $link, 'full' => $full])->render();
     })
 
     @php($f = $this->figures())
@@ -151,7 +154,7 @@
                     <span class="lp-note">{{ $t('shown', ['shown' => number_format(count($found['rows'])), 'all' => number_format($found['total'])]) }}</span>
                 </div>
                 @forelse ($found['rows'] as $i => $r)
-                    {!! $row($this->list, $r, in_array($this->list, ['empty', 'noclick', 'ips'], true) ? $i + 1 : null) !!}
+                    {!! $row($this->list, $r, in_array($this->list, ['empty', 'noclick', 'ips'], true) ? $i + 1 : null, true) !!}
                 @empty
                     <p class="lp-empty">{{ $t('none') }}</p>
                 @endforelse

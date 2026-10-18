@@ -4,7 +4,7 @@ namespace App\Modules\Assistant\Support;
 
 use App\Modules\Admin\Contracts\ReportRow;
 use App\Modules\Admin\Contracts\ShopReport;
-use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Actions\TeamAnswers;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
@@ -22,6 +22,9 @@ final class AssistantReport implements ShopReport
     private const UNANSWERED = ['no_info', 'no_match'];
 
     private const OFF = ['out_of_scope'];
+
+    /** The most asked questions a list reads, before what the team handled is taken out. */
+    private const MOST = 2000;
 
     public function figures(Shop $shop, CarbonInterface $since, CarbonInterface $until): array
     {
@@ -48,32 +51,71 @@ final class AssistantReport implements ShopReport
     public function rows(Shop $shop, string $list, CarbonInterface $since, CarbonInterface $until, int $limit, string $search = '', string $sort = 'value'): array
     {
         $asks = AssistantSearchAsk::query()->where('day', '>=', $since->toDateString())->where('day', '<', $until->copy()->subSecond()->addDay()->toDateString())
-            ->select('question')->selectRaw('count(*) as n, max(outcome) as outcome')->groupBy('question');
+            ->select('question')->selectRaw('count(*) as n')->groupBy('question');
 
         if (($words = trim($search)) !== '') {
             $asks->where('question', 'like', '%'.$words.'%');
         }
 
-        $total = DB::query()->fromSub(clone $asks, 'q')->count();
         $sort === 'name' ? $asks->orderBy('question') : $asks->orderByDesc(DB::raw('count(*)'))->orderBy('question');
 
-        $rows = $asks->limit($limit)->get()->map(function ($q): ReportRow {
-            $outcome = (string) $q->outcome;
+        // What the team already answered or set aside leaves the list.
+        $handled = app(TeamAnswers::class)->handledKeys();
+        $asked = $asks->limit(self::MOST)->get()->reject(fn ($q): bool => isset($handled[Question::key((string) $q->question)]))->values();
+        $shown = $asked->take($limit);
+
+        // Each question with the answer it got last time: the saved one, else what was shown then.
+        $latest = AssistantSearchAsk::query()->with('answer:id,answer')->whereIn('question', $shown->pluck('question')->all())
+            ->latest('created_at')->orderByDesc('id')->get(['id', 'question', 'outcome', 'answer', 'answer_id'])->unique('question')->keyBy('question');
+
+        $rows = $shown->map(function ($q) use ($latest): ReportRow {
+            $last = $latest[(string) $q->question] ?? null;
+            $outcome = (string) $last?->outcome;
             [$pill, $tone] = match (true) {
                 in_array($outcome, self::ANSWERED, true) => [__('assistant::report.answered'), 'good'],
                 in_array($outcome, self::UNANSWERED, true) => [__('assistant::report.unanswered'), 'bad'],
                 in_array($outcome, self::OFF, true) => [__('assistant::report.off'), ''],
                 default => [null, ''],
             };
+            $answer = trim((string) ($last?->getRelation('answer')?->getAttribute('answer') ?? $last?->getAttributes()['answer'] ?? ''));
 
-            return new ReportRow(key: (string) $q->question, title: (string) $q->question, value: (int) $q->n, pill: $pill, tone: $tone);
+            return new ReportRow(
+                key: (string) $q->question, title: (string) $q->question, value: (int) $q->n, pill: $pill, tone: $tone,
+                actions: in_array($outcome, self::OFF, true) ? ['answer'] : ['answer', 'aside'],
+                detail: $answer,
+                detailLabel: $answer === '' ? '' : __(in_array($outcome, self::ANSWERED, true) ? 'assistant::report.answer_given' : 'assistant::report.shown_instead'),
+            );
         })->all();
 
-        return ['rows' => $rows, 'total' => $total];
+        return ['rows' => $rows, 'total' => $asked->count()];
     }
 
+    /** The team answers a question in their own words, or sets it aside; either way it leaves the list. */
     public function act(Shop $shop, string $list, string $key, string $action, string $value = ''): ?string
     {
-        return null;
+        if ($list !== 'questions' || ! in_array($action, ['answer', 'aside'], true)) {
+            return null;
+        }
+
+        $last = AssistantSearchAsk::query()->where('question', $key)->latest('created_at')->first(['question', 'created_at']);
+
+        if ($last === null) {
+            return null;
+        }
+
+        $team = app(TeamAnswers::class);
+        $answer = $team->forSearchQuestion((string) $last->question, AssistantSearchAsk::query()->where('question', $key)->count(), $last->created_at);
+
+        if ($action === 'aside') {
+            $team->setAside($answer);
+
+            return __('assistant::report.set_aside');
+        }
+
+        return match ($team->answer($answer, $value)) {
+            'saved' => __('assistant::report.answer_saved'),
+            'marked' => __('assistant::ui.questions.fill_marked'),
+            default => null,
+        };
     }
 }

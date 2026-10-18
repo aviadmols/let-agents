@@ -9,6 +9,7 @@ use App\Modules\Assistant\Filament\Merchant\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\AssistantReport;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -78,6 +79,29 @@ final class QuestionsInboxTest extends TestCase
 
         $team = AssistantAnswer::query()->where('question_key', Question::key('יש לכם עגילים מזהב לבן?'))->first();
         $this->assertSame(['team', AssistantAnswer::ANSWERED, 'כן, יש לנו עגילי זהב לבן 14K בכמה דגמים.'], [$team->source, $team->outcome, $team->answer], 'it joins what the assistant answers from');
+        $this->assertSame(AssistantAnswer::HIDDEN, AssistantAnswer::query()->where('question_key', Question::key('משלוח לאילת?'))->value('status'));
+    }
+
+    public function test_the_analytics_list_shows_each_answer_and_answers_or_sets_aside_from_there(): void
+    {
+        $this->ask('אפשר להחזיר או להחליף?', 'answered', 'כן, עד 14 יום מהקנייה.');
+        $this->ask('יש לכם עגילים מזהב לבן?', 'no_info', 'לא מצאתי מידע על זה.');
+        $this->ask('משלוח לאילת?', 'no_info');
+        $report = app(AssistantReport::class);
+        $rows = fn (): array => collect($report->rows($this->shop, 'questions', now()->subDays(30), now()->addMinute(), 20)['rows'])->keyBy('title')->all();
+
+        $before = $rows();
+        $this->assertSame('כן, עד 14 יום מהקנייה.', $before['אפשר להחזיר או להחליף?']->detail);
+        $this->assertSame('התשובה שניתנה', $before['אפשר להחזיר או להחליף?']->detailLabel);
+        $this->assertSame('מה הוצג במקום תשובה', $before['יש לכם עגילים מזהב לבן?']->detailLabel);
+        $this->assertSame(['answer', 'aside'], $before['משלוח לאילת?']->actions);
+
+        $this->assertNotNull($report->act($this->shop, 'questions', 'יש לכם עגילים מזהב לבן?', 'answer', 'כן, עגילי זהב לבן 14K בכמה דגמים.'));
+        $this->assertNotNull($report->act($this->shop, 'questions', 'משלוח לאילת?', 'aside'));
+
+        $this->assertSame(['אפשר להחזיר או להחליף?'], array_keys($rows()), 'what the team answered or set aside leaves the list');
+        $team = AssistantAnswer::query()->where('question_key', Question::key('יש לכם עגילים מזהב לבן?'))->first();
+        $this->assertSame(['team', AssistantAnswer::ANSWERED], [$team->source, $team->outcome]);
         $this->assertSame(AssistantAnswer::HIDDEN, AssistantAnswer::query()->where('question_key', Question::key('משלוח לאילת?'))->value('status'));
     }
 

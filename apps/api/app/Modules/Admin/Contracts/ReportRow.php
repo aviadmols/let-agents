@@ -12,7 +12,9 @@ final readonly class ReportRow
      * @param  string  $key  stable within its list, sent back with an action
      * @param  int|float  $value  what the list is sorted by
      * @param  string  $tone  '', good, warn or bad: the pill's
-     * @param  list<string>  $actions  what the row offers: synonym, block, unblock, shown
+     * @param  list<string>  $actions  what the row offers: synonym, block, unblock, shown, answer, aside
+     * @param  string  $detail  a longer text under the row: the answer a question got
+     * @param  string  $detailLabel  what the longer text is ("the answer given")
      */
     public function __construct(
         public string $key,
@@ -24,5 +26,7 @@ final readonly class ReportRow
         public ?string $thumb = null,
         public array $actions = [],
         public bool $ltr = false,
+        public string $detail = '',
+        public string $detailLabel = '',
     ) {}
 }
