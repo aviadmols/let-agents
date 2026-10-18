@@ -6,12 +6,17 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Connections\Console\BundlePluginCommand;
 use App\Modules\Connections\Contracts\StoreBlog;
 use App\Modules\Connections\Contracts\StoreFeed;
+use App\Modules\Connections\Http\Middleware\FrameInsideWordPress;
 use App\Modules\Connections\Support\FollowShopDomain;
 use App\Modules\Connections\Support\PlatformBlogs;
 use App\Modules\Connections\Support\PlatformFeeds;
 use App\Modules\Connections\Support\PluginBlog;
 use App\Modules\Connections\Support\PluginStoreFeed;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 final class ConnectionsServiceProvider extends ModuleServiceProvider
 {
@@ -29,6 +34,11 @@ final class ConnectionsServiceProvider extends ModuleServiceProvider
     {
         // A shop that moved to a new domain is read at the new address from then on.
         Shop::updated(fn (Shop $shop) => FollowShopDomain::handle($shop));
+
+        // The panel inside wp-admin: a sign-in address now and then per store, and the frame that opens it.
+        RateLimiter::for('plugin-panel', fn (Request $request): Limit => Limit::perMinute(30)->by('plugin-panel:'.$request->ip()));
+        // A WooCommerce shop's panel may be framed by the store's own addresses alone.
+        $this->app->make(Kernel::class)->pushMiddleware(FrameInsideWordPress::class);
     }
 
     protected function moduleCommands(): array

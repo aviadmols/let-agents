@@ -86,6 +86,56 @@ final class LetAgentsApi {
 		return $data;
 	}
 
+	/**
+	 * A signed POST whose answer the caller reads: JSON back, or why not.
+	 *
+	 * @param array<string, mixed> $payload
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function ask( string $route, array $payload ) {
+		$site = SiteKeys::site();
+
+		if ( null === $site ) {
+			return new \WP_Error( 'let_agents_no_token', __( 'Create an access token first.', 'let-agents' ) );
+		}
+
+		$url      = Settings::api_url() . '/plugin/' . $site . '/' . ltrim( $route, '/' );
+		$body     = (string) wp_json_encode( $payload );
+		$response = wp_remote_post(
+			$url,
+			array(
+				'timeout' => 10,
+				'headers' => array(
+					'Content-Type' => 'application/json',
+					'Accept'       => 'application/json',
+				) + SiteKeys::signed_headers( 'POST', self::path( $url ), $body ),
+				'body'    => $body,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		$data   = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+		if ( 404 === $status ) {
+			return new \WP_Error( 'let_agents_unknown_site', __( 'Let Agents does not know this store yet. Connect it in Let Agents with the current token.', 'let-agents' ) );
+		}
+
+		if ( 401 === $status ) {
+			return new \WP_Error( 'let_agents_bad_signature', __( 'Let Agents refused the request. Check that the token connected in Let Agents is the current one and that the site clock is correct.', 'let-agents' ) );
+		}
+
+		if ( 200 !== $status || ! is_array( $data ) ) {
+			/* translators: %d: HTTP status code */
+			return new \WP_Error( 'let_agents_api_status', sprintf( __( 'Let Agents answered with status %d.', 'let-agents' ), $status ) );
+		}
+
+		return $data;
+	}
+
 	/** The part of the URL the signature covers: path and query, as the server receives them. */
 	private static function path( string $url ): string {
 		$path  = (string) wp_parse_url( $url, PHP_URL_PATH );

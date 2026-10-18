@@ -321,7 +321,7 @@ final class SettingsPage {
 	/**
 	 * @param array<string, string> $args
 	 */
-	private static function url( array $args = array() ): string {
+	public static function url( array $args = array() ): string {
 		$base = Plugin::woocommerce_active() ? admin_url( 'admin.php' ) : admin_url( 'options-general.php' );
 
 		return add_query_arg( array_merge( array( 'page' => self::SLUG ), $args ), $base );

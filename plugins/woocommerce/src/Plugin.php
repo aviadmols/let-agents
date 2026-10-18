@@ -2,6 +2,7 @@
 
 namespace LetAgents;
 
+use LetAgents\Admin\PanelPage;
 use LetAgents\Admin\ReportsPage;
 use LetAgents\Admin\SettingsPage;
 use LetAgents\Rest\PostRoutes;
@@ -47,6 +48,8 @@ final class Plugin {
 		if ( is_admin() ) {
 			SettingsPage::register();
 			ReportsPage::register();
+			// "Lets Search" in the menu: the shop's Lets panel inside WordPress, signed in by the token.
+			PanelPage::register();
 		}
 	}
 

@@ -108,5 +108,13 @@ return array(
 		'Put [let_agents_wishlist] in a header or a menu for a heart that opens the wishlist, or link to #wishlist.' => 'אפשר לשים [let_agents_wishlist] בכותרת או בתפריט ללב שפותח את רשימת המשאלות, או לקשר אל #wishlist.',
 		'Past orders can be sent only when the store is connected to Let Agents and Lets Search is not off.' => 'אפשר לשלוח הזמנות עבר רק כשהחנות מחוברת ל־Let Agents ו־Lets Search לא כבוי.',
 		'Wishlist' => 'רשימת משאלות',
+		'Connect the store to Lets first' => 'קודם מחברים את החנות ל-Lets',
+		'Create an access token in the plugin settings and connect it in Lets. The panel opens here once the store is connected.' => 'יוצרים טוקן גישה בהגדרות התוסף ומחברים אותו ב-Lets. אחרי החיבור הפאנל נפתח כאן.',
+		'Lets Search panel' => 'הפאנל של Lets Search',
+		'Lets did not answer as expected.' => 'Lets לא ענה כמצופה.',
+		'Plugin settings' => 'הגדרות התוסף',
+		'The panel could not open' => 'הפאנל לא נפתח',
+		'Try again' => 'לנסות שוב',
+		'You do not have permission to view this page.' => 'אין לכם הרשאה לצפות בעמוד הזה.',
 	),
 );
