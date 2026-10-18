@@ -1140,7 +1140,28 @@
     var i = title.toLowerCase().indexOf(q.toLowerCase());
     return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<b>' + esc(title.slice(i, i + q.length)) + '</b>' + esc(title.slice(i + q.length));
   }
+  // A question the store already answered (checked, and kept as the store's): its answer is in the index,
+  // so it starts right here as the shopper types, with no model; Enter or a tap opens it whole. Only the
+  // store's own answers, never one about a product, and only one close enough (the engine's closeAnswer).
+  function savedAnswerFor(q) {
+    var e = win.LA_ENGINE;
+    if (off('ask') || !e || !e.closeAnswer) { return null; }
+    var keys = Object.keys(S.records);
+    for (var i = 0; i < keys.length; i++) {
+      var r = S.records[keys[i]];
+      if (r.t === 'answer' && r.w === 1 && r.ans && e.closeAnswer(q, r.title)) { return r; }
+    }
+    return null;
+  }
   function askRow(q, active) {
+    var saved = savedAnswerFor(q);
+    // written in once, when it first shows; the next keystrokes keep it still
+    var fresh = !!saved && S.savedShown !== saved.id;
+    S.savedShown = saved ? saved.id : null;
+    if (saved) {
+      return '<div style="padding:4px 4px 8px"><button class="ls-ask ls-ask--saved' + (active ? ' is-active' : '') + '" data-opt data-saved-answer="' + esc(saved.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(saved.title) + '</span>' +
+        '<span class="ls-ask__ans' + (fresh ? ' ls-words' : '') + '" dir="auto">' + (fresh ? words(saved.ans) : esc(saved.ans)) + '</span></span><span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
+    }
     return '<div style="padding:4px 4px 8px"><button class="ls-ask' + (active ? ' is-active' : '') + '" data-opt data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q">' + esc(q) + '</span></span><span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
   }
   // the live view is the results turn itself, as Enter will keep it, with the words still being typed
