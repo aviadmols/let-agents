@@ -23,6 +23,7 @@ use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Support\Facades\DB;
 
 /**
  * What a shop's search box searches, as one list: every product the store still publishes,
@@ -55,7 +56,10 @@ final class BuildSearchIndex
     /** Letter sizes in their order, as VariantRows keys them. */
     private const LETTER_SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL', 'ONE'];
 
-    private const MAX_KEYWORDS = 400;
+    private const MAX_KEYWORDS = 600;
+
+    /** The categories the drawer offers as a filter, the most used first. */
+    private const MAX_CATEGORIES = 80;
 
     /** The phrases that are actions, the same in every shop (HebrewSearch::actions). */
     public const ACTIONS = __DIR__.'/../resources/query-actions.json';
@@ -105,17 +109,25 @@ final class BuildSearchIndex
         // colours and sizes its variants come in, two filters of their own.
         $facets = $this->facets($shopId);
         $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
+        // The store's own categories, a filter of their own: the shopper narrows by them.
+        $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
+        // What the scan learned each product is and is for, in words: found by them, before the long lists.
+        $learned = $this->learnedWords($this->locale($shopId));
         $faceted = 0;
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
-            if (isset($variants[$product->id])) {
-                $codes = array_values(array_unique([...($read['f'] ?? []), ...$variants[$product->id]['f']]));
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($categories[$product->id] ?? [])];
+            if ($codes !== []) {
+                $codes = array_values(array_unique($codes));
                 sort($codes);
-                $read = ['f' => $codes, 'v' => $variants[$product->id]['v']] + $read;
+                $read = ['f' => $codes] + $read;
+            }
+            if (isset($variants[$product->id])) {
+                $read['v'] = $variants[$product->id]['v'];
             }
             $faceted += isset($read['f']) ? 1 : 0;
-            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
+            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
                 'i2' => $this->secondPicture($product),
@@ -455,13 +467,98 @@ final class BuildSearchIndex
             ->values()->all();
     }
 
-    private function productWords(CatalogProduct $product): array
+    /**
+     * The store's categories as one more filter, appended to the facets: each category with at least
+     * two products, the most used first, at most MAX_CATEGORIES. A shopper picks it in the filters; it
+     * is never read from the words (the drawer skips the "category" key), so a word still finds
+     * products outside its category.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     * @return array<string, list<int>> the codes of each product's categories, by product id
+     */
+    private function categoryFacet(array &$facets, string $locale): array
+    {
+        $used = DB::table('catalog_category_product as cp')
+            ->join('catalog_products as p', 'p.id', '=', 'cp.product_id')
+            ->where('p.shop_id', $this->tenant->id())->whereNull('p.removed_at')
+            ->select('cp.category_id')->selectRaw('count(*) as n')->groupBy('cp.category_id')
+            ->havingRaw('count(*) >= 2')->orderByRaw('count(*) desc')->orderBy('cp.category_id')->limit(self::MAX_CATEGORIES)
+            ->pluck('n', 'category_id');
+
+        if ($used->count() < 2) {
+            return [];
+        }
+
+        $names = CatalogCategory::query()->whereIn('id', $used->keys()->all())->pluck('name', 'id');
+        $at = count($facets);
+        $values = [];
+        $index = [];
+
+        foreach ($used->keys() as $id) {
+            $name = trim((string) ($names[$id] ?? ''));
+
+            if ($name === '' || isset($index[(string) $id])) {
+                continue;
+            }
+
+            $index[(string) $id] = $at * 1000 + count($values);
+            $values[] = ['k' => (string) $id, 'l' => $name];
+        }
+
+        $facets[] = ['k' => 'category', 'l' => (string) __('search::storefront.facet_category', [], $locale), 'v' => $values];
+        $products = [];
+
+        foreach (DB::table('catalog_category_product')->whereIn('category_id', array_keys($index))->orderBy('product_id')->get(['product_id', 'category_id']) as $row) {
+            $products[(string) $row->product_id][] = $index[(string) $row->category_id];
+        }
+
+        return $products;
+    }
+
+    /**
+     * What the scan learned and approved each product is, is for and is tagged with, as words in the
+     * store's language: a search for what it does finds it even when its name does not say so.
+     *
+     * @return array<string, list<string>> by product id
+     */
+    private function learnedWords(string $locale): array
+    {
+        $words = [];
+        $was = app()->getLocale();
+        app()->setLocale($locale);
+
+        try {
+            EnrichmentFact::query()->current()->where('status', FactStatus::Approved)->whereNotNull('product_id')
+                ->whereIn('kind', [FactKind::Type, FactKind::Use, FactKind::Tag])
+                ->with('vocabulary')
+                ->lazyById(2000)->each(function (EnrichmentFact $fact) use (&$words): void {
+                    if ($fact->kind === FactKind::Tag && str_starts_with((string) $fact->key, 'ask_')) {
+                        return;
+                    }
+
+                    $label = trim($fact->valueLabel());
+
+                    if ($label !== '') {
+                        $words[(string) $fact->product_id][] = $label;
+                    }
+                });
+        } finally {
+            app()->setLocale($was);
+        }
+
+        return $words;
+    }
+
+    /** @param  list<string>  $learned  what the scan learned it is and is for, right after its categories */
+    private function productWords(CatalogProduct $product, array $learned = []): array
     {
         $words = array_filter([(string) $product->brand, (string) $product->sku]);
 
         foreach ($product->categories as $category) {
             $words[] = (string) $category->name;
         }
+
+        array_push($words, ...$learned);
 
         array_push($words, ...array_map('strval', (array) ($product->payload['tags'] ?? [])));
         array_push($words, ...array_map('strval', (array) ($product->payload['brands'] ?? [])));

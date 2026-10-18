@@ -1266,7 +1266,8 @@
     all.forEach(function (r) { (r.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; }); });
     Object.keys(counts).forEach(function (code) {
       var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
-      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l) || !says(q, value.l)) { return; }
+      // a category is chosen by the shopper, never read from the words: "ברגים" finds screws outside the screws category too
+      if (!value || facet.k === 'category' || c.no[code] || /^(אחר|other)$/i.test(value.l) || !says(q, value.l)) { return; }
       // one value name in several attributes ("שחור" as a colour and as a coating): the one most results carry
       var k = value.l.toLowerCase();
       if (!best[k] || counts[code] > counts[best[k]]) { best[k] = code; }

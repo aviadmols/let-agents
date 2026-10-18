@@ -7,7 +7,7 @@ use App\Modules\Retrieval\Contracts\DocumentSource;
 use App\Modules\Retrieval\Contracts\SourceDocument;
 use App\Modules\Retrieval\Enums\ChunkSource;
 
-/** Every page and post the store shares and still publishes: title, terms, excerpt and body. */
+/** Every page and post the store shares and still publishes: title, terms, excerpt, body and its takeaways. */
 final class ContentDocuments implements DocumentSource
 {
     public function key(): string
@@ -17,26 +17,38 @@ final class ContentDocuments implements DocumentSource
 
     public function documents(string $shopId): iterable
     {
-        foreach (CatalogContent::query()->active()->orderBy('id')->lazy(100) as $content) {
-            $lines = [];
+        foreach (CatalogContent::query()->active()->orderBy('id')->lazy(100)->chunk(100) as $batch) {
+            // What the reading took from each post (its takeaways), after its own text.
+            $notes = ProductDocuments::notes(ChunkSource::Content, $batch->map(fn (CatalogContent $c): string => (string) $c->id)->values()->all());
 
-            foreach ((array) $content->terms as $taxonomy => $terms) {
-                $terms = array_filter(array_map('strval', (array) $terms));
-
-                if ($terms !== []) {
-                    $lines[] = ucfirst((string) $taxonomy).': '.implode(', ', $terms);
-                }
+            foreach ($batch as $content) {
+                yield $this->document($content, $notes[(string) $content->id] ?? []);
             }
-
-            $lines[] = (string) $content->excerpt;
-            $lines[] = (string) $content->body;
-
-            yield new SourceDocument(
-                $content->id,
-                $content->external_id,
-                $content->title,
-                implode("\n", array_filter(array_map('trim', $lines), fn (string $line): bool => $line !== '')),
-            );
         }
+    }
+
+    /** @param  list<string>  $notes */
+    private function document(CatalogContent $content, array $notes): SourceDocument
+    {
+        $lines = [];
+
+        foreach ((array) $content->terms as $taxonomy => $terms) {
+            $terms = array_filter(array_map('strval', (array) $terms));
+
+            if ($terms !== []) {
+                $lines[] = ucfirst((string) $taxonomy).': '.implode(', ', $terms);
+            }
+        }
+
+        $lines[] = (string) $content->excerpt;
+        $lines[] = (string) $content->body;
+        array_push($lines, ...$notes);
+
+        return new SourceDocument(
+            $content->id,
+            $content->external_id,
+            $content->title,
+            implode("\n", array_filter(array_map('trim', $lines), fn (string $line): bool => $line !== '')),
+        );
     }
 }

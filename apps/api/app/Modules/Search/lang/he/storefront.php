@@ -8,6 +8,7 @@ return [
     'wa_message' => 'שאלה מהאתר: :question',
     'similar' => 'פריטים דומים',
     'facet_type' => 'סוג מוצר',
+    'facet_category' => 'קטגוריה',
     'facet_colour' => 'צבע',
     'facet_size' => 'מידה',
     'size_gone_banner' => 'המידה לא במלאי? לחצו על המידה להצגת פריטים דומים במידה המבוקשת',

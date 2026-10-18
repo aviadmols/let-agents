@@ -8,6 +8,7 @@ return [
     'wa_message' => 'A question from the site: :question',
     'similar' => 'Similar items',
     'facet_type' => 'Product type',
+    'facet_category' => 'Category',
     'facet_colour' => 'Colour',
     'facet_size' => 'Size',
     'size_gone_banner' => 'Size out of stock? Tap the size to see similar items in it',
