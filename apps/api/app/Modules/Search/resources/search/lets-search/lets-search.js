@@ -1015,6 +1015,11 @@
   var lastFocus = null, closeTimer = null;
   // the search a result was opened from, for half an hour: on the next page, or in another tab
   var BACK_MS = 30 * 60 * 1000;
+  // only a search for products is come back to: a question, its answer or "not found" is done once read,
+  // so the next opening after one starts clean (as Aviad asked, 2026-10-19)
+  function keepBack(q, tid) {
+    store('local', 'ls_back', q && !isQuestion(q) ? { q: q, tid: tid || null, at: Date.now() } : null);
+  }
   function backTo() {
     var b = store('local', 'ls_back');
     return b && b.at && Date.now() - b.at < BACK_MS && (b.q || b.tid) ? b : null;
@@ -1075,7 +1080,7 @@
     S.open = false;
     // words typed and left in the field come back with the next opening, as a search sent does
     var left = INPUT.value.trim();
-    if (left && !S.askMode) { store('local', 'ls_back', { q: left, tid: null, at: Date.now() }); }
+    if (left && !S.askMode) { keepBack(left, null); }
     hideLayer(); MENU.hidden = true;
     SCRIM.classList.remove('is-open'); D.classList.remove('is-open'); D.classList.remove('is-wide'); S.wide = null; S.menu = '';
     D.style.removeProperty('--ls-drag');
@@ -1497,8 +1502,8 @@
     if (turn.kind !== 'about' && turn.kind !== 'note') { S.turns.forEach(function (x) { if (x.kind === 'about' && !x.prev) { x.prev = true; } }); }
     S.turns.push(turn);
     fresh[turn.id] = 1;
-    // the last search or question sent is what the next opening shows (open(), backTo())
-    if ((turn.kind === 'results' || turn.kind === 'answer') && turn.q) { store('local', 'ls_back', { q: turn.q, tid: turn.id, at: Date.now() }); }
+    // the last search for products sent is what the next opening shows (open(), backTo()); after a question, nothing
+    if ((turn.kind === 'results' || turn.kind === 'answer') && turn.q) { keepBack(turn.kind === 'results' ? turn.q : null, turn.id); }
     persist(); render();
     return turn;
   }
@@ -2951,8 +2956,8 @@
     var opening = (el.tagName === 'A' || el.dataset.add || el.dataset.options) && el.dataset.state !== 'done';
     if (turn.kind === 'results' && id && opening && !el.dataset.heart) { countClick(turn.q, itemOf(id), filtered(turn).length); }
     // left the page through one of its results: the next opening, on that page or in another tab, comes back to it
-    if (el.tagName === 'A' && id && opening && (turn === S.live || turn.kind === 'results' || turn.kind === 'answer')) {
-      store('local', 'ls_back', { q: turn.q, tid: turn === S.live ? null : turn.id, at: Date.now() });
+    if (el.tagName === 'A' && id && opening && (turn === S.live || turn.kind === 'results')) {
+      keepBack(turn.q, turn === S.live ? null : turn.id);
     }
     if (turn.kind === 'answer') {
       if (pick && id && opening) { var ev = { type: 'ask_pick', q: turn.q, id: pid(id) }; if (turn.askId) { ev.ask_id = turn.askId; } sendEvents([ev]); }
