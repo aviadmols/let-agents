@@ -84,7 +84,7 @@
     he: {
       open: 'חיפוש חכם', close: 'סגירה', saved: 'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Lets', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
       placeholder: 'חפשו מוצר, או שאלו כל דבר', placeholderProduct: 'שאלו על המוצר הזה, או חפשו כל דבר', clear: 'ניקוי', photo: 'חיפוש לפי תמונה', send: 'שליחה',
-      welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.',
+      welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
       showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name',
@@ -137,7 +137,7 @@
     en: {
       open: 'Smart search', close: 'Close', saved: 'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
       placeholder: 'Search for a product, or ask anything', placeholderProduct: 'Ask about this product, or search anything', clear: 'Clear', photo: 'Search by photo', send: 'Send',
-      welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.',
+      welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
       showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name',
@@ -686,6 +686,8 @@
   // what the shop turned on (the index config): photo search, questions, similar items, the cart, prices,
   // "ask my AI" and sharing. A setting the server did not send stays on.
   function off(key) { return S.config && S.config[key] === false; }
+  // the welcome line offers only what the shop has on: a photo only where photo search is on, a question only where the assistant is
+  function welcomeSub() { return off('photos') ? (off('ask') ? 'welcomeSubSearch' : 'welcomeSubNoPhoto') : (off('ask') ? 'welcomeSubNoAsk' : 'welcomeSub'); }
   function shopSettings() {
     R.classList.toggle('no-photo', off('photos'));
     R.classList.toggle('no-similar', off('similar'));
@@ -1157,7 +1159,7 @@
     // only questions about the store that already have an answer shoppers got (the index's, most asked first),
     // shown as they are on a click: never an example the assistant may not be able to answer
     var asks = off('ask') ? [] : Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.w === 1 && r.ans; }).slice(0, 2);
-    return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t('welcomeSub')) + '</p>' +
+    return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t(welcomeSub())) + '</p>' +
       // one row that scrolls (a swipe, or a drag with the mouse); the small button opens them all
       (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + (pop.length > 3 ? '<button class="ls-sec__more" data-pop-all aria-expanded="' + !!S.popAll + '">' + esc(t(S.popAll ? 'popLess' : 'popAll')) + '</button>' : '') + '</div>' +
         '<div class="ls-chips ls-chips--drag' + (S.popAll ? ' is-all' : '') + '" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' : '') +
