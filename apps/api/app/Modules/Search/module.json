@@ -29,6 +29,10 @@
             "default": true
         },
         {
+            "name": "field_filters",
+            "default": true
+        },
+        {
             "name": "semantic",
             "default": true
         },
@@ -117,6 +121,24 @@
             "min": 0,
             "max": 60,
             "scope": "shop"
+        },
+        {
+            "name": "field_filter_min_percent",
+            "type": "int",
+            "default": 50,
+            "min": 10,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "field_filter_max_values",
+            "type": "int",
+            "default": 300,
+            "min": 10,
+            "max": 999,
+            "scope": "shop",
+            "unit": "values"
         },
         {
             "name": "results_per_group",

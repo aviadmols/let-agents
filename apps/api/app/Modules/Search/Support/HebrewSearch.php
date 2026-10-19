@@ -810,6 +810,18 @@ final class HebrewSearch
         return $text !== '' && mb_strlen($text) <= 40 && preg_match('/\s/u', $text) !== 1 && preg_match_all('/\d/u', $text) >= 4;
     }
 
+    /** @return list<string> the Hebrew words for a number written in digits (7: "שבע", "שבעה"), none past twelve */
+    public static function numberWords(string $digits): array
+    {
+        return array_keys(self::NUMBER_WORDS, $digits, true);
+    }
+
+    /** The digits a Hebrew number word stands for ("שבע", "השבעה": 7), or null. */
+    public static function numberOf(string $word): ?string
+    {
+        return self::NUMBER_WORDS[$word] ?? (mb_strlen($word) > 3 && str_starts_with($word, 'ה') ? self::NUMBER_WORDS[mb_substr($word, 1)] ?? null : null);
+    }
+
     /** Hebrew number words as digits, one to twelve (both genders): "שבע באוקטובר" finds "ה-7 באוקטובר". */
     private const NUMBER_WORDS = [
         'אחד' => '1', 'אחת' => '1', 'שניים' => '2', 'שתיים' => '2', 'שני' => '2', 'שתי' => '2', 'שלוש' => '3', 'שלושה' => '3',

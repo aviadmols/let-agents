@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Actions;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantAnswer;
@@ -70,6 +71,12 @@ final class BuildSearchIndex
 
     /** A category holding this share of the products or more narrows nothing. */
     private const CATEGORY_MAX_SHARE = 0.9;
+
+    /** A store field's value longer than this is a sentence, not a filter value. */
+    private const FIELD_VALUE_CHARS = 60;
+
+    /** A field whose values are this nearly all different (a code, a date) narrows nothing. */
+    private const FIELD_MAX_DISTINCT = 0.9;
 
     /** Words that say a collection is a campaign or a shelf of the moment, not a kind of product. */
     private const CAMPAIGN_WORDS = '~sale|friday|cyber|valentine|summer|winter|edit|black|gift ?guide|new ?arrivals?|best ?sellers?|trending|shop ?all|מבצע|סייל|סוף[- ]?שנה|חג|הגיעו לאחרונה|חדש(ים|ות)? באתר|המלצות|עולות|הכי נמכר|רבי מכר|קולקציית|מתנות ל~iu';
@@ -159,13 +166,15 @@ final class BuildSearchIndex
         $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->all(), $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
+        // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
+        $fields = Features::enabled('search.field_filters', $shopId) ? $this->fieldFacets($facets['facets'], $shopId) : [];
         // What the scan learned each product is and is for, in words: found by them, before the long lists.
         $learned = $this->learnedWords($this->locale($shopId));
         $faceted = 0;
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -548,6 +557,69 @@ final class BuildSearchIndex
                     : ($a->content !== null ? [['title' => $a->content->title, 'url' => $a->content->url]] : array_map(fn (array $s): array => ['title' => $s['title'], 'url' => $s['url'] ?? null], (array) $a->sources)),
             ])
             ->values()->all();
+    }
+
+    /**
+     * The store's own product fields as filters, whatever kind of store it is: a field of its feed
+     * (a custom field, as WordPress keeps a book's "מחבר") that at least field_filter_min_percent of
+     * the products have, with two to field_filter_max_values short values that repeat (a code or a
+     * number each product has its own of narrows nothing). Named as the store names it; the values
+     * the most used first. Read from the words too: "ספרים של תומס סואל" picks his.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     * @return array<string, list<int>> the codes of each product's values, by product id
+     */
+    private function fieldFacets(array &$facets, string $shopId): array
+    {
+        $minShare = (int) Settings::get('search.field_filter_min_percent', $shopId) / 100;
+        $maxValues = min(999, (int) Settings::get('search.field_filter_max_values', $shopId));
+        $named = array_map(fn (array $f): string => mb_strtolower($f['l']), $facets);
+        $fields = [];
+        $total = 0;
+
+        foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
+            $total++;
+
+            foreach ((array) ($product->payload['meta'] ?? []) as $key => $value) {
+                $key = trim((string) $key);
+                $value = is_scalar($value) ? trim(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8')) : '';
+
+                // Not a field of the system ("_price"), nor a value that is a number, an address or a paragraph.
+                if ($key === '' || str_starts_with($key, '_') || mb_strlen($key) > 40 || $value === '' || mb_strlen($value) > self::FIELD_VALUE_CHARS
+                    || preg_match('/^[\d\s.,:\/-]+$/u', $value) === 1 || preg_match('~^https?://~i', $value) === 1) {
+                    continue;
+                }
+
+                $fields[$key][(string) $product->id] = $value;
+            }
+        }
+
+        $products = [];
+
+        foreach ($fields as $key => $byProduct) {
+            $counts = array_count_values($byProduct);
+            arsort($counts);
+
+            if ($total === 0 || count($byProduct) / $total < $minShare || count($counts) < 2 || count($counts) > $maxValues
+                || count($counts) > count($byProduct) * self::FIELD_MAX_DISTINCT || in_array(mb_strtolower($key), $named, true)) {
+                continue;
+            }
+
+            $at = count($facets);
+            $codes = [];
+            $values = [];
+            foreach (array_keys($counts) as $i => $value) {
+                $codes[(string) $value] = $at * 1000 + $i;
+                $values[] = ['k' => (string) $i, 'l' => (string) $value];
+            }
+            $facets[] = ['k' => 'field:'.$key, 'l' => $key, 'v' => $values];
+
+            foreach ($byProduct as $productId => $value) {
+                $products[$productId][] = $codes[$value];
+            }
+        }
+
+        return $products;
     }
 
     /**

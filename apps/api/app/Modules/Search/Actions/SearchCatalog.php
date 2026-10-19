@@ -17,6 +17,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\Colours;
+use App\Modules\Search\Support\DescribedProducts;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\PhotoLook;
@@ -105,6 +106,9 @@ final class SearchCatalog
     /** What a guide's products weigh in the merge beside what the words, the meaning and the pictures found. */
     private const GUIDED_WEIGHT = 0.5;
 
+    /** A product its description names (DescribedProducts) weighs like one found by meaning, a little less. */
+    private const DESCRIBED_WEIGHT = 0.9;
+
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly SemanticSearch $semantic,
@@ -166,6 +170,13 @@ final class SearchCatalog
             if ($code) {
                 $this->missingCode($shopId, $query, $index);
             }
+            // "7 באוקטובר": when the words found few products, those whose description says it too, after them
+            // (the books about the date that only their description names). Not for a product code.
+            $foundByWords = count(array_filter($spelling, fn (array $hit): bool => str_starts_with($hit['id'], 'p:')));
+            $described = ! $code && ($single['by'] ?? null) !== 'sku' && $foundByWords < DescribedProducts::FEW
+                ? array_values(array_filter(DescribedProducts::find($shopId, (string) $index['hash'], $query), fn (string $id): bool => isset($index['records'][$id])))
+                : [];
+            $describedIds = array_flip($described);
             $byMeaning = $meaning && ! $code;
             $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => []];
             $meaning = $near['products'];
@@ -181,7 +192,7 @@ final class SearchCatalog
             if (str_contains($query, ' ') && ($whole = self::whole($spelling)) !== []) {
                 $spelling = array_values(array_filter($spelling, fn (array $hit): bool => isset($whole[$hit['id']]) || ! str_starts_with($hit['id'], 'p:')));
                 $keep = fn (string $id): bool => isset($whole[$id]) || ! str_starts_with($id, 'p:');
-                $meaning = array_values(array_filter($meaning, $keep));
+                $meaning = array_values(array_filter($meaning, fn (string $id): bool => $keep($id) || isset($describedIds[$id])));
                 $pictures = array_values(array_filter($pictures, $keep));
             }
             // "עגילים עד 500": with a price, what the words name is decided before the price, never
@@ -214,7 +225,7 @@ final class SearchCatalog
             if (isset($held)) {
                 $guided = array_values(array_filter($guided, fn (string $id): bool => isset($held[$id])));
             }
-            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided], [...$pinned, ...$subject], [1.0, 1.0, self::GUIDED_WEIGHT]);
+            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided, $described], [...$pinned, ...$subject], [1.0, 1.0, self::GUIDED_WEIGHT, self::DESCRIBED_WEIGHT]);
             // The guides by meaning after those the words found, each once.
             $ranked = [...$ranked, ...array_values(array_diff(array_column($guides, 'id'), $ranked))];
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);

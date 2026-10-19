@@ -9,6 +9,14 @@ return [
         'label' => 'Search boxes on the site',
         'description' => 'CSS selector of the search fields Let Agents search attaches to. Several, separated by commas.',
     ],
+    'field_filter_min_percent' => [
+        'label' => 'A field is a filter from this share of products',
+        'description' => 'A store field becomes a filter only when at least this share of the products have it.',
+    ],
+    'field_filter_max_values' => [
+        'label' => 'Most values in a field\'s filter',
+        'description' => 'A field with more different values than this (a code or a date for each product) does not become a filter.',
+    ],
     'results_per_group' => [
         'label' => 'Results per group',
         'description' => 'How many products, guides or categories show in each group of the full results.',
