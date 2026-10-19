@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Catalog\Support\PageChoices;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\SearchCatalog;
+use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +50,14 @@ final class PageSizeTest extends TestCase
 
         $this->assertSame(['4'], $ids('טבעת רובי במידה גדולה'), 'the largest third of the sizes there are');
         $this->assertSame(['1'], $ids('טבעת רובי במידה קטנה'));
-        $this->assertSame(['2'], $ids('טבעת רובי מידה 54'), 'a size named: the rings of about that size');
+
+        // The sizes the pages say are the size filter: each ring under its own, "מידה 54" chooses it.
+        $index = app(TenantContext::class)->run($shop->id, fn () => LoadedIndex::for($shop->id));
+        $sizes = collect($index['facets'])->firstWhere('k', BuildSearchIndex::VARIANT_SIZE);
+        $this->assertSame(['50', '54', '58', '62'], array_column($sizes['v'], 'l'));
+        $at = array_search($sizes, $index['facets'], true);
+        $this->assertSame([$at * 1000 + 1], array_values(array_filter($index['records']['p:2']['f'] ?? [], fn (int $c): bool => intdiv($c, 1000) === $at)));
+        $this->assertSame([$at * 1000 + 1], array_column(HebrewSearch::facets('טבעת רובי מידה 54', $index['facets']), 'code'));
+        $this->assertSame('טבעת רובי', HebrewSearch::withoutFacetWords($index, 'טבעת רובי מידה 54'), 'searched as the filter, not as words');
     }
 }

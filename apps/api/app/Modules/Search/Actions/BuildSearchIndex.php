@@ -51,6 +51,9 @@ final class BuildSearchIndex
 
     public const VARIANT_SIZE = 'variant_size';
 
+    /** Products with a size on their page before those sizes are a filter. */
+    private const MIN_PAGE_SIZED = 3;
+
     /** A vocabulary's own colour attribute, left out where the variants say the colours. */
     private const COLOUR_KEYS = ['color', 'colour', 'colors', 'colours'];
 
@@ -152,6 +155,8 @@ final class BuildSearchIndex
         $pageSizes = CatalogProductChoice::query()->whereNotNull('size')->pluck('size', 'product_id')->map(fn ($z): float => round((float) $z, 6));
         $sized = false;
         $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
+        // Where no variant has a size, the sizes the product pages say are the size filter (a ring of one size each).
+        $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->all(), $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
         // What the scan learned each product is and is for, in words: found by them, before the long lists.
@@ -160,7 +165,7 @@ final class BuildSearchIndex
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($categories[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -328,6 +333,38 @@ final class BuildSearchIndex
         }
 
         return ['facets' => $facets, 'size' => $size, 'products' => $products];
+    }
+
+    /**
+     * The size filter of a shop whose products each come in one size, said on their pages ("מידה נוכחית:
+     * 54", ReadPageChoices) and not in their variants: the sizes there are, in number order, each product
+     * under its own. Nothing where the variants already make a size filter, or fewer than two sizes or
+     * MIN_PAGE_SIZED products have one.
+     *
+     * @param  list<array{k: string, l: string, v: list<array<string, string>>}>  $facets  appended to
+     * @param  array<string, float>  $sizes  by product id
+     * @return array<string, list<int>> the product's code, by product id
+     */
+    private function pageSizeFacet(array &$facets, array $sizes, string $locale): array
+    {
+        $values = array_values(array_unique(array_map(fn (float $z): string => self::sizeText($z), $sizes)));
+
+        if (in_array(self::VARIANT_SIZE, array_column($facets, 'k'), true) || count($values) < 2 || count($sizes) < self::MIN_PAGE_SIZED) {
+            return [];
+        }
+
+        usort($values, fn (string $a, string $b): int => (float) $a <=> (float) $b);
+        $at = count($facets);
+        $facets[] = ['k' => self::VARIANT_SIZE, 'l' => (string) __('search::storefront.facet_size', [], $locale), 'v' => array_map(fn (string $v): array => ['k' => $v, 'l' => $v], $values)];
+        $code = array_flip($values);
+
+        return array_map(fn (float $z): array => [$at * 1000 + $code[self::sizeText($z)]], $sizes);
+    }
+
+    /** 54.0 is "54", 54.5 is "54.5": a size as a page writes it. */
+    private static function sizeText(float $size): string
+    {
+        return rtrim(rtrim(number_format($size, 2, '.', ''), '0'), '.');
     }
 
     /**
