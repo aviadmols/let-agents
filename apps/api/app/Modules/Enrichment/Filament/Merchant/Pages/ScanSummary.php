@@ -13,6 +13,7 @@ use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Scanning\RequiredGaps;
+use App\Modules\Retrieval\Contracts\RefreshesVectors;
 use App\Modules\Retrieval\Enums\ChunkSource;
 use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Retrieval\Models\RetrievalImage;
@@ -383,6 +384,8 @@ final class ScanSummary extends Page
             app(ReadsContentAgain::class)->readAgain((string) $this->shop()->id, $item['id']);
         }
 
+        // What it was read into reaches the search in minutes, not tonight.
+        app(RefreshesVectors::class)->soon((string) $this->shop()->id);
         Cache::forget($this->gapsKey());
         Notification::make()->success()->title(__('enrichment::scan.rescanned', ['n' => $done['written']]))->body(__('enrichment::scan.rescanned_body'))->send();
     }

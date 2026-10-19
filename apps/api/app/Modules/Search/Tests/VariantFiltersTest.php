@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,6 +70,19 @@ final class VariantFiltersTest extends TestCase
         $this->assertSame([$black, $blue, $s, $m], $shirt['f']);
         $this->assertSame([[[$black, $s], 1], [[$black, $m], 0], [[$blue, $m], 1]], $shirt['v'], 'black in M is sold out though black and M are each there');
         $this->assertArrayNotHasKey('v', collect($data['items'])->firstWhere('id', 'p:2'), 'a product without variants has none');
+    }
+
+    public function test_a_size_said_in_the_search_is_the_size_filter_however_short(): void
+    {
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $index = $this->inShop(fn () => LoadedIndex::for($this->shop->id));
+
+        $named = HebrewSearch::facets('חולצת טריקו מידה M', $index['facets']);
+        $this->assertSame([[2001, 'M']], array_map(fn (array $n): array => [$n['code'], $n['label']], $named), '"M" alone is too short to be meant; after "מידה" it is the size');
+        $this->assertSame('חולצת טריקו', HebrewSearch::withoutFacetWords($index, 'חולצת טריקו מידה M'), 'searched as the filter, not as words');
+        $this->assertSame([2000], array_column(HebrewSearch::facets('חולצה במידה s', $index['facets']), 'code'));
+        $this->assertSame([], HebrewSearch::facets('חולצה M', $index['facets']), 'a lone letter is not a size');
+        $this->assertNotContains('worn_size', array_column($index['actions'], 'id'), '"מידה 52" is the size filter where the variants have sizes');
     }
 
     public function test_sizes_go_in_the_order_sizes_go(): void

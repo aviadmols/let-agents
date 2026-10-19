@@ -32,6 +32,15 @@ final class RefreshVectorsTest extends TestCase
         $this->assertInstanceOf(ShouldBeUnique::class, $job);
     }
 
+    public function test_a_run_that_left_pieces_waiting_is_followed_at_once_not_at_night(): void
+    {
+        $this->assertTrue(RefreshVectorsJob::more(['embedded' => 5000, 'pending' => 1200, 'stopped' => null]), 'a whole catalogue read again: the next run now');
+        $this->assertFalse(RefreshVectorsJob::more(['embedded' => 300, 'pending' => 0, 'stopped' => null]));
+        $this->assertFalse(RefreshVectorsJob::more(['embedded' => 100, 'pending' => 900, 'stopped' => 'spend_cap']), 'the spending cap waits for the night');
+        $this->assertFalse(RefreshVectorsJob::more(['embedded' => 0, 'pending' => 900, 'stopped' => null]), 'nothing went through: no loop');
+        $this->assertNotSame((new RefreshVectorsJob('s'))->uniqueId(), (new RefreshVectorsJob('s', 1))->uniqueId(), 'the next run is not held back by the first');
+    }
+
     public function test_nothing_is_queued_when_the_shop_turned_it_off(): void
     {
         Queue::fake();

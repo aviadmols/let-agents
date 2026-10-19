@@ -11,6 +11,7 @@
     "features": [
         { "name": "daily_sync", "default": true },
         { "name": "site_pages", "default": true },
+        { "name": "page_sizes", "default": true },
         { "name": "live_sync", "default": true },
         { "name": "refresh", "default": true },
         { "name": "page_choices", "default": false }

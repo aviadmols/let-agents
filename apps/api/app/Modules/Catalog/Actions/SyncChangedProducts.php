@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
+use App\Modules\Catalog\Jobs\SyncCatalogJob;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Support\FeedRecord;
@@ -27,7 +28,8 @@ use Illuminate\Support\Facades\Cache;
  * store is asked what changed since the last look (catalog.live_sync, every few minutes), and only
  * that is saved, the same way the nightly read saves it (SyncCatalog::saveProducts). A product
  * taken off the store is marked removed. Nothing is written to the activity log when nothing
- * changed. A platform that cannot say what changed waits for the night.
+ * changed. More than a look takes (a bulk edit) starts a whole read now, not at night. A platform
+ * that cannot say what changed waits for the night.
  *
  * Categories, pages and anything the nightly read decides from the whole store (removed products
  * that left no trace, a store behind a password) stay the nightly read's.
@@ -85,8 +87,10 @@ final class SyncChangedProducts
                 $gone = [...$gone, ...$page['gone']];
 
                 if (count($records) > self::MAX_RECORDS) {
-                    // Too many at once: the nightly read takes them; the next look starts from now.
+                    // Too many at once (a bulk edit, an import): the whole store is read now, in the
+                    // background, not at night; the next look starts from now.
                     Cache::forever(self::key($shopId), $looked->toIso8601String());
+                    SyncCatalogJob::dispatch($shopId, RunTrigger::System);
 
                     return null;
                 }

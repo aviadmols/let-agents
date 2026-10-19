@@ -32,7 +32,7 @@ final class ReadPageChoicesCommand extends Command
                 ->where('status', ConnectionStatus::Connected)
                 ->whereHas('shop', fn ($shop) => $shop->where('status', 'active'))
                 ->pluck('shop_id'))
-                ->filter(fn ($shopId): bool => Features::enabled('catalog.page_choices', (string) $shopId));
+                ->filter(fn ($shopId): bool => Features::enabled('catalog.page_choices', (string) $shopId) || Features::enabled('catalog.page_sizes', (string) $shopId));
 
         foreach ($shopIds as $shopId) {
             try {

@@ -120,6 +120,43 @@ final class PageChoices
         ], fn ($v): bool => $v !== null) + ['price' => null];
     }
 
+    /**
+     * The size the page says the product itself is, when it is one item of one size (a ring "מידה
+     * נוכחית: 54"): a size attribute on the page's size picker (data-current-size="54"), else a size
+     * label with a number in the page's own text ("מידה: 54", "מידת הטבעת 7", "Ring size: 7.5").
+     * Null when the page says none, or only a size table.
+     *
+     * @return array{size: float, label: string}|null
+     */
+    public static function size(string $html): ?array
+    {
+        $number = '(\d{1,3}(?:[.,]\d{1,2})?)';
+
+        if (preg_match('~\bdata-(?:current-|product-|ring-)?size=["\']\s*'.$number.'\s*["\']~iu', $html, $m) === 1) {
+            $label = preg_match('~\bdata-current-size-label=["\']([^"\']{1,40})["\']~u', $html, $l) === 1 ? html_entity_decode($l[1], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
+
+            return self::sized($m[1], $label);
+        }
+
+        $text = html_entity_decode(strip_tags((string) preg_replace('~<(script|style|table)\b.*?</\1>~siu', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = (string) preg_replace('/\s+/u', ' ', $text);
+
+        if (preg_match('/(מידה נוכחית|מידת הטבעת|מידת טבעת|מידה|ring size|current size|size)\s*[:：]\s*'.$number.'(?!\s*(?:ס"מ|ס״מ|מ"מ|מ״מ|cm|mm|%|₪|\d))/iu', $text, $m) === 1) {
+            return self::sized($m[2], trim($m[1]));
+        }
+
+        return null;
+    }
+
+    /** @return array{size: float, label: string}|null */
+    private static function sized(string $value, string $label): ?array
+    {
+        $size = (float) str_replace(',', '.', $value);
+
+        // A size, not a weight, a year or a price.
+        return $size > 0 && $size <= 120 ? ['size' => round($size, 2), 'label' => mb_substr(trim($label), 0, 60)] : null;
+    }
+
     /** "5.40 מטר", "3 m", "2.4 מ'", "300 ס״מ", "120cm": metres; anything else: null. */
     public static function meters(string $label): ?float
     {

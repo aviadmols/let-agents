@@ -9,6 +9,7 @@ use App\Modules\Catalog\Enums\ColorFamily;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
@@ -102,6 +103,22 @@ final class BuildSearchIndex
         );
     }
 
+    /**
+     * A size kept in the product's own fields (a Shopify metafield "custom.ring_size": "54"): a field
+     * named for a size whose value is one number a size can be. Null when none.
+     */
+    private static function metaSize(CatalogProduct $product): ?float
+    {
+        foreach ((array) ($product->payload['meta'] ?? []) as $key => $value) {
+            if (is_string($key) && preg_match('/(^|[._-])(ring_?size|size|current_size|מידה)$/iu', $key) === 1 && is_scalar($value)
+                && preg_match('/^\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*$/u', (string) $value, $m) === 1 && (float) str_replace(',', '.', $m[1]) > 0 && (float) str_replace(',', '.', $m[1]) <= 120) {
+                return round((float) str_replace(',', '.', $m[1]), 6);
+            }
+        }
+
+        return null;
+    }
+
     /** The product's second picture, for the shops that show it on hover; null when it has one. */
     private function secondPicture(CatalogProduct $product): ?string
     {
@@ -130,6 +147,10 @@ final class BuildSearchIndex
         // What each product is, from the shop's approved facts: the filters beside the results. Then the
         // colours and sizes its variants come in, two filters of their own.
         $facets = $this->facets($shopId);
+        // A product's own size where the shop has no size attribute: what its page says (a ring's "מידה
+        // נוכחית: 54", ReadPageChoices), else a size-like custom field of its feed. Sizes from facts come first.
+        $pageSizes = CatalogProductChoice::query()->whereNotNull('size')->pluck('size', 'product_id')->map(fn ($z): float => round((float) $z, 6));
+        $sized = false;
         $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
@@ -165,10 +186,11 @@ final class BuildSearchIndex
                 // Its variants, each as the colour and size codes it has and whether it is in stock: "black,
                 // M, in stock" is asked of one variant, not of a product with black somewhere and M somewhere.
                 'v' => $read['v'] ?? null,
-                'z' => $read['z'] ?? null,
+                'z' => $z = $read['z'] ?? $pageSizes[$product->id] ?? self::metaSize($product),
                 'd' => self::added($product),
             ]);
             $counts['product']++;
+            $sized = $sized || $z !== null;
         }
 
         // What the store says about itself is for the assistant, never a result of its own.
@@ -204,7 +226,7 @@ final class BuildSearchIndex
             $counts['answer']++;
         }
 
-        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'], 'actions' => self::actions($this->locale($shopId), $facets['size'] !== null)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'], 'actions' => self::actions($this->locale($shopId), $facets['size'] !== null || $sized, in_array(self::VARIANT_SIZE, array_column($facets['facets'], 'k'), true))], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
         SearchIndex::query()->updateOrCreate(['shop_id' => $shopId], [
@@ -418,9 +440,11 @@ final class BuildSearchIndex
      *
      * @return list<array{id: string, l: string, patterns: list<string>, do: array<string, string>}>
      */
-    private static function actions(string $locale, bool $hasSize): array
+    private static function actions(string $locale, bool $hasSize, bool $sizeFilter = false): array
     {
-        $registry = array_values(array_filter(self::registry(), fn (array $entry): bool => $hasSize || ($entry['needs'] ?? null) !== 'size'));
+        // "מידה 52" in a shop whose variants have sizes is its size filter (queryFacets), not a number near 52.
+        $registry = array_values(array_filter(self::registry(), fn (array $entry): bool => ($hasSize || ($entry['needs'] ?? null) !== 'size')
+            && ! ($sizeFilter && ($entry['unless'] ?? null) === 'size_filter')));
 
         return array_map(fn (array $entry): array => [
             'id' => (string) $entry['id'],

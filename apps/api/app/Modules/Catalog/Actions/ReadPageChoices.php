@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Catalog\Support\PageChoices;
@@ -27,6 +28,9 @@ use Throwable;
  * read again only when it is due: never read; its product changed; it asks for choices and was
  * read a day ago; it asks for none and was read a week ago. A page whose form did not change is
  * not read into fields again. A run is written only when something changed. Code only.
+ *
+ * On every platform (catalog.page_sizes), the size the page says the product itself is: a ring of one
+ * size kept outside its variants ("מידה נוכחית: 54"), for search to read as the product's size.
  */
 final class ReadPageChoices
 {
@@ -61,13 +65,12 @@ final class ReadPageChoices
     /** The run when something changed; null when nothing did, or the shop does not read its pages. */
     public function handle(string $shopId, ?int $limit = null, RunTrigger $trigger = RunTrigger::Schedule): ?Run
     {
-        if (! Features::enabled('catalog.page_choices', $shopId)) {
-            return null;
-        }
-
         $connection = $this->tenant->run($shopId, fn () => StoreConnection::query()->first());
+        // Add-on forms on WooCommerce (Shopify's options are its variants); a product's own size anywhere.
+        $forms = Features::enabled('catalog.page_choices', $shopId) && $connection !== null && $connection->platform !== 'shopify';
+        $sizes = Features::enabled('catalog.page_sizes', $shopId);
 
-        if ($connection === null || $connection->platform === 'shopify') {
+        if (! $forms && ! $sizes) {
             return null;
         }
 
@@ -76,13 +79,13 @@ final class ReadPageChoices
         $counts = ['read' => 0, 'same' => 0, 'changed' => 0, 'with_choices' => 0, 'failed' => 0];
         $changed = [];
 
-        $this->tenant->run($shopId, function () use ($limit, $delay, &$counts, &$changed): void {
+        $this->tenant->run($shopId, function () use ($limit, $delay, $forms, $sizes, &$counts, &$changed): void {
             foreach ($this->due($limit) as $i => [$product, $row]) {
                 if ($i > 0) {
                     ($this->pause)($delay);
                 }
 
-                $outcome = $this->read($product, $row);
+                $outcome = $this->read($product, $row, $forms, $sizes);
                 $counts[$outcome]++;
                 $counts['read']++;
 
@@ -99,7 +102,7 @@ final class ReadPageChoices
             return null;
         }
 
-        return $this->runs->track(
+        $run = $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
@@ -107,6 +110,11 @@ final class ReadPageChoices
             work: fn (RunContext $run) => $run->output($counts + ['products' => array_slice($changed, 0, 50)])
                 ->summary('catalog::runs.choices_read', ['read' => (string) $counts['read'], 'changed' => (string) $counts['changed'], 'with' => (string) $counts['with_choices']]),
         );
+
+        // A size or a choice a page says reaches the search now, not with the next night's index.
+        event(new CatalogProductsChanged($shopId, $changed));
+
+        return $run;
     }
 
     /**
@@ -144,7 +152,7 @@ final class ReadPageChoices
     }
 
     /** @return 'same'|'changed'|'failed' */
-    private function read(CatalogProduct $product, ?CatalogProductChoice $row): string
+    private function read(CatalogProduct $product, ?CatalogProductChoice $row, bool $forms = true, bool $sizes = false): string
     {
         $row ??= new CatalogProductChoice(['product_id' => $product->id, 'fields' => []]);
 
@@ -161,10 +169,12 @@ final class ReadPageChoices
             return 'failed';
         }
 
-        $form = PageChoices::form((string) $response->body());
-        $hash = $form === null ? null : hash('sha256', $form);
+        $body = (string) $response->body();
+        $form = $forms ? PageChoices::form($body) : null;
+        $size = $sizes ? PageChoices::size($body) : null;
+        $hash = $form === null && $size === null ? null : hash('sha256', ($form ?? '').'|'.json_encode($size));
 
-        // The same form for the same product: nothing to read again.
+        // The same form and size for the same product: nothing to read again.
         if ($row->exists && $row->form_hash === $hash && $row->product_hash === $product->hash) {
             $row->fill(['checked_at' => now(), 'failures' => 0])->save();
 
@@ -172,15 +182,17 @@ final class ReadPageChoices
         }
 
         $fields = $form === null ? [] : PageChoices::read($form, $product->price === null ? null : (float) $product->price);
-        $different = ! $row->exists || $row->fields !== $fields;
+        $different = ! $row->exists || $row->fields !== $fields || (float) $row->size !== (float) ($size['size'] ?? 0);
         $row->fill([
             'fields' => $fields,
+            'size' => $size['size'] ?? null,
+            'size_label' => $size['label'] ?? null,
             'form_hash' => $hash,
             'product_hash' => $product->hash,
             'checked_at' => now(),
             'failures' => 0,
         ] + ($different ? ['changed_at' => now()] : []))->save();
 
-        return $different && ($fields !== [] || $row->wasChanged('fields')) ? 'changed' : 'same';
+        return $different && ($fields !== [] || $size !== null || $row->wasChanged('fields') || $row->wasChanged('size')) ? 'changed' : 'same';
     }
 }

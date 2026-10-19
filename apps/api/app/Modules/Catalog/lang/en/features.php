@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'page_sizes' => [
+        'label' => "The size a product's page says",
+        'description' => 'A product of one size whose size is written on its page, not in its variants ("current size: 54"): read slowly at night, so search understands "size 54" and "in a large size".',
+    ],
     'site_pages' => [
         'label' => 'Site pages the connection did not bring',
         'description' => 'Nightly: the pages in the site map (not products or categories) and, on Shopify, the policy pages. So the assistant answers from wherever the store wrote it, even when the connection does not bring it.',

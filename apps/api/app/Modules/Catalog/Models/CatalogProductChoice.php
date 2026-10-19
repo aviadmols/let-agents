@@ -16,6 +16,8 @@ use Illuminate\Support\Carbon;
  * @property string $shop_id
  * @property string $product_id
  * @property list<array{key: string, label: string, kind: string, required: bool, values: list<array{value: string, label: string, price: float|null, meters?: float}>}> $fields
+ * @property float|null $size the size the page says the product itself is ("מידה נוכחית: 54")
+ * @property string|null $size_label how the page names it
  * @property string|null $form_hash
  * @property string|null $product_hash the product's hash when its page was read
  * @property Carbon|null $checked_at
@@ -36,6 +38,7 @@ class CatalogProductChoice extends Model
             'checked_at' => 'datetime',
             'changed_at' => 'datetime',
             'failures' => 'integer',
+            'size' => 'float',
         ];
     }
 

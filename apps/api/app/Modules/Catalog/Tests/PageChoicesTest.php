@@ -102,7 +102,8 @@ final class PageChoicesTest extends TestCase
             $paused[] = $ms;
         });
 
-        // Off by default: no page is read.
+        // Choices off by default, and sizes turned off: no page is read.
+        Features::override('catalog.page_sizes', false, $shop->id);
         $this->assertNull($read->handle($shop->id));
         Http::assertNothingSent();
 

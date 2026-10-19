@@ -168,6 +168,23 @@
             "needs": "size"
         },
         {
+            "id": "worn_size",
+            "label": {
+                "he": "מידה",
+                "en": "Size"
+            },
+            "patterns": [
+                "(?:ב|של |עם )?מיד(?:ה|ת)(?: טבעת| הטבעת)?(?: מספר)? (\\d+(?:[.,]\\d+)?)",
+                "(?:in |a )?(?:ring )?size (\\d+(?:[.,]\\d+)?)"
+            ],
+            "do": {
+                "near": "size",
+                "within": 1
+            },
+            "needs": "size",
+            "unless": "size_filter"
+        },
+        {
             "id": "size",
             "label": {
                 "he": "בגודל",

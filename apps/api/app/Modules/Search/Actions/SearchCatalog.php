@@ -14,12 +14,14 @@ use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * One search in a shop: by spelling and by meaning, merged, grouped by what was found.
@@ -158,7 +160,13 @@ final class SearchCatalog
             // A guide or a page is a result only when it holds every word: one that shares a word of
             // "מברגה שחורה" is not about black screwdrivers. Products keep their wider net.
             $spelling = array_values(array_filter($spelling, fn (array $hit): bool => ! str_starts_with($hit['id'], 'c:') || $hit['full']));
-            $byMeaning = $meaning;
+            // A code no product of the index has ("53077"): nothing is near it by meaning, so nothing is
+            // shown by meaning. If the catalogue has it and the index not yet, the index is built again now.
+            $code = $single === null && HebrewSearch::looksLikeCode($query);
+            if ($code) {
+                $this->missingCode($shopId, $query, $index);
+            }
+            $byMeaning = $meaning && ! $code;
             $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => []];
             $meaning = $near['products'];
             // Guides and pages found by meaning are a group of their own, never a rank among products: an
@@ -987,6 +995,29 @@ final class SearchCatalog
      * @param  array<string, array<string, mixed>>  $records
      * @return array{products: list<string>, content: list<array{external_id: string, similarity: float}>}
      */
+    /**
+     * A code the store has and the index does not (a product added since it was built): the index is
+     * built again in the background, at most every few minutes, so the next search finds it.
+     *
+     * @param  array<string, mixed>  $index
+     */
+    private function missingCode(string $shopId, string $query, array $index): void
+    {
+        $code = HebrewSearch::code($query);
+
+        if (isset($index['codes'][$code])) {
+            return;
+        }
+
+        $known = CatalogProduct::query()->whereNull('removed_at')
+            ->where(fn ($q) => $q->where('sku', trim($query))->orWhere('title', 'like', '%'.trim($query).'%'))
+            ->limit(20)->pluck('external_id')->map(fn ($id): string => 'p:'.$id);
+
+        if ($known->contains(fn (string $id): bool => ! isset($index['records'][$id])) && Cache::add('search:missing-code:'.$shopId, true, now()->addMinutes(5))) {
+            dispatch(fn () => app(BuildSearchIndex::class)->handle($shopId, RunTrigger::System));
+        }
+    }
+
     private function meaning(string $shopId, string $query, array $records): array
     {
         if (! Features::enabled('search.semantic', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {

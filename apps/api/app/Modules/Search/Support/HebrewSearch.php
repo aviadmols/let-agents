@@ -206,7 +206,7 @@ final class HebrewSearch
     public static function actions(string $query, array $registry): array
     {
         $text = ' '.preg_replace('/[.,!?;:]+(?=\s|$)/u', ' ', mb_strtolower($query)).' ';
-        $found = ['ids' => [], 'sort' => null, 'dir' => null, 'sale' => false, 'stock' => false, 'near' => null, 'min' => null, 'max' => null, 'band' => null];
+        $found = ['ids' => [], 'sort' => null, 'dir' => null, 'sale' => false, 'stock' => false, 'near' => null, 'within' => null, 'min' => null, 'max' => null, 'band' => null];
 
         foreach ($registry as $entry) {
             foreach ((array) ($entry['patterns'] ?? []) as $pattern) {
@@ -230,6 +230,8 @@ final class HebrewSearch
                 foreach (['near', 'min', 'max'] as $bound) {
                     if (isset($do[$bound]) && isset($m[2])) {
                         $found[$bound] = (float) str_replace(',', '.', $m[2]);
+                        // A size one wears ("מידה 54") is that size, give or take a step; a measure ("בגודל 30") is about it.
+                        $found['within'] = $bound === 'near' && isset($do['within']) ? (float) $do['within'] : $found['within'];
                     }
                 }
                 $found['ids'][] = (string) $entry['id'];
@@ -279,7 +281,7 @@ final class HebrewSearch
         }
         if ($actions['near'] !== null && array_filter($records, fn (array $r): bool => isset($r['z'])) !== []) {
             $near = $actions['near'];
-            $records = array_values(array_filter($records, fn (array $r): bool => isset($r['z']) && abs((float) $r['z'] - $near) <= max($near * 0.15, 0.0001)));
+            $records = array_values(array_filter($records, fn (array $r): bool => isset($r['z']) && abs((float) $r['z'] - $near) <= ($actions['within'] ?? max($near * 0.15, 0.0001))));
         }
         // "מידה גדולה": the third of the sizes found that is largest (or smallest), among what has a size.
         if (in_array($actions['band'] ?? null, ['top', 'bottom'], true) && array_filter($records, fn (array $r): bool => isset($r['z'])) !== []) {
@@ -338,6 +340,13 @@ final class HebrewSearch
 
             foreach ((array) ($facet['v'] ?? []) as $i => $value) {
                 $name = self::facetText((string) ($value['l'] ?? ''));
+
+                // "חולצה מידה M", "טבעת במידה 52": a value after the word for size is that size, however short.
+                if ($name !== '' && preg_match('/\s((?:[ובה]?מיד(?:ה|ת)|size)\s?:?\s?'.preg_quote($name, '/').')(?=\s)/u', $text, $m) === 1) {
+                    $found[] = ['code' => $at * 1000 + $i, 'said' => $m[1], 'label' => (string) $value['l'], 'title' => (string) ($facet['l'] ?? '')];
+
+                    continue;
+                }
 
                 if (mb_strlen($name) < 3 && preg_match('/\d/', $name) !== 1) {
                     continue;
@@ -618,6 +627,8 @@ final class HebrewSearch
             $base = self::stem($variant);
             $length = mb_strlen($variant);
             $colour = self::colorOf($variant);
+            // A number is never a typo of another: "53077" is not "53076", "54" is not "45".
+            $digits = (string) preg_replace('/\D+/u', '', $variant);
 
             foreach (self::wordVector($variant) as $piece => $weight) {
                 foreach ($index['postings'][$piece] ?? [] as [$w, $other]) {
@@ -628,6 +639,10 @@ final class HebrewSearch
             foreach ($index['list'] as $w => $candidate) {
                 $candidate = (string) $candidate;
                 $score = $scores[$w] ?? 0;
+
+                if ($digits !== '' && $candidate !== $variant && ! str_starts_with($candidate, $variant) && (string) preg_replace('/\D+/u', '', $candidate) !== $digits) {
+                    continue;
+                }
 
                 if ($candidate === $variant) {
                     $score = 1;
@@ -775,6 +790,17 @@ final class HebrewSearch
         }
 
         return $found;
+    }
+
+    /**
+     * A search that is a product code, not words: one token of at least four digits ("53077",
+     * "DDF-4850"). Its meaning is nothing; only the product of that code, or the words that hold it.
+     */
+    public static function looksLikeCode(?string $text): bool
+    {
+        $text = trim((string) $text);
+
+        return $text !== '' && mb_strlen($text) <= 40 && preg_match('/\s/u', $text) !== 1 && preg_match_all('/\d/u', $text) >= 4;
     }
 
     /** A product code as compared: "DDF-485", "ddf 485" and "DDF485" are one code. */
