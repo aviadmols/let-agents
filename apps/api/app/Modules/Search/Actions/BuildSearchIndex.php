@@ -59,7 +59,29 @@ final class BuildSearchIndex
     private const MAX_KEYWORDS = 600;
 
     /** The categories the drawer offers as a filter, the most used first. */
-    private const MAX_CATEGORIES = 80;
+    private const MAX_CATEGORIES = 12;
+
+    /** A category holding fewer products than this is not worth a filter. */
+    private const CATEGORY_MIN_PRODUCTS = 3;
+
+    /** A category holding this share of the products or more narrows nothing. */
+    private const CATEGORY_MAX_SHARE = 0.9;
+
+    /** Words that say a collection is a campaign or a shelf of the moment, not a kind of product. */
+    private const CAMPAIGN_WORDS = '~sale|friday|cyber|valentine|summer|winter|edit|black|gift ?guide|new ?arrivals?|best ?sellers?|trending|shop ?all|מבצע|סייל|סוף[- ]?שנה|חג|הגיעו לאחרונה|חדש(ים|ות)? באתר|המלצות|עולות|הכי נמכר|רבי מכר|קולקציית|מתנות ל~iu';
+
+    /** Whether a category's name is a kind a shopper narrows by: not an address, not a campaign. */
+    public static function shopperCategory(string $name): bool
+    {
+        $name = trim($name);
+
+        // "the-summer-edit", "shoppingil", "rings, made-by-rocks-and-gold": the store's address of a collection,
+        // lowercase Latin with hyphens or one lowercase word; "עולות-עכשיו", "טו-באב": one word joined by hyphens.
+        $address = (preg_match('/^[a-z0-9&,\s_-]+$/u', $name) === 1 && (str_contains($name, '-') || preg_match('/^[a-z0-9_]+$/u', $name) === 1))
+            || preg_match('/^\S+[-_]\S+$/u', $name) === 1;
+
+        return ! $address && preg_match(self::CAMPAIGN_WORDS, $name) !== 1;
+    }
 
     /** The phrases that are actions, the same in every shop (HebrewSearch::actions). */
     public const ACTIONS = __DIR__.'/../resources/query-actions.json';
@@ -482,27 +504,35 @@ final class BuildSearchIndex
             ->join('catalog_products as p', 'p.id', '=', 'cp.product_id')
             ->where('p.shop_id', $this->tenant->id())->whereNull('p.removed_at')
             ->select('cp.category_id')->selectRaw('count(*) as n')->groupBy('cp.category_id')
-            ->havingRaw('count(*) >= 2')->orderByRaw('count(*) desc')->orderBy('cp.category_id')->limit(self::MAX_CATEGORIES)
+            ->havingRaw('count(*) >= '.self::CATEGORY_MIN_PRODUCTS)->orderByRaw('count(*) desc')->orderBy('cp.category_id')->limit(200)
             ->pluck('n', 'category_id');
-
-        if ($used->count() < 2) {
-            return [];
-        }
+        $total = CatalogProduct::query()->active()->count();
 
         $names = CatalogCategory::query()->whereIn('id', $used->keys()->all())->pluck('name', 'id');
         $at = count($facets);
         $values = [];
         $index = [];
 
-        foreach ($used->keys() as $id) {
+        foreach ($used as $id => $count) {
             $name = trim((string) ($names[$id] ?? ''));
 
-            if ($name === '' || isset($index[(string) $id])) {
+            // A filter of the kinds a shopper narrows by, the most used: never a store's collection kept as
+            // an address ("the-summer-edit"), a campaign ("blackfriday", "סוף-שנה-sale", "הגיעו לאחרונה"), or
+            // one that holds nearly every product and so narrows nothing.
+            if ($name === '' || isset($index[(string) $id]) || ! self::shopperCategory($name) || ($total > 0 && $count / $total >= self::CATEGORY_MAX_SHARE)) {
                 continue;
+            }
+
+            if (count($values) >= self::MAX_CATEGORIES) {
+                break;
             }
 
             $index[(string) $id] = $at * 1000 + count($values);
             $values[] = ['k' => (string) $id, 'l' => $name];
+        }
+
+        if (count($values) < 2) {
+            return [];
         }
 
         $facets[] = ['k' => 'category', 'l' => (string) __('search::storefront.facet_category', [], $locale), 'v' => $values];

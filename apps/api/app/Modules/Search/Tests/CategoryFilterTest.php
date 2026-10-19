@@ -43,7 +43,10 @@ final class CategoryFilterTest extends TestCase
             $screws = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 's', 'name' => 'ברגים', 'path' => ['ברגים'], 'depth' => 0, 'hash' => 's', 'product_count' => 2]);
             $lonely = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'l', 'name' => 'שונות', 'path' => ['שונות'], 'depth' => 0, 'hash' => 'l', 'product_count' => 1]);
 
-            foreach ([['1', 'גוזם גדר חי חשמלי 620W', [$garden]], ['2', 'מזמרה לגיזום', [$garden, $lonely]], ['3', 'בורג עץ 4X40', [$screws]], ['4', 'בורג גבס שחור', [$screws]]] as [$id, $title, $categories]) {
+            $campaign = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'c', 'name' => 'the-summer-edit', 'path' => ['the-summer-edit'], 'depth' => 0, 'hash' => 'c', 'product_count' => 3]);
+
+            foreach ([['1', 'גוזם גדר חי חשמלי 620W', [$garden, $campaign]], ['2', 'מזמרה לגיזום', [$garden, $lonely, $campaign]], ['5', 'מספריים לגיזום', [$garden, $campaign]],
+                ['3', 'בורג עץ 4X40', [$screws]], ['4', 'בורג גבס שחור', [$screws]], ['6', 'בורג קיר', [$screws]]] as [$id, $title, $categories]) {
                 $product = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/$id", 'price' => '20', 'in_stock' => true, 'purchasable' => true, 'hash' => "h$id", 'payload' => ['description' => 'כלי גינון עוצמתי המחובר לחשמל ביתי.']]);
                 $product->categories()->attach(array_map(fn (CatalogCategory $c) => $c->id, $categories));
                 $this->products[$id] = $product;
@@ -69,7 +72,11 @@ final class CategoryFilterTest extends TestCase
         $this->assertNotFalse($at, 'the categories are a filter');
         $facet = $data['facets'][$at];
         $this->assertSame('קטגוריה', $facet['l']);
-        $this->assertEqualsCanonicalizing(['גינון', 'ברגים'], array_column($facet['v'], 'l'), 'a category with one product is not worth a filter');
+        $this->assertEqualsCanonicalizing(['גינון', 'ברגים'], array_column($facet['v'], 'l'), 'a category with one product is not worth a filter, nor a collection kept as an address');
+        $this->assertFalse(BuildSearchIndex::shopperCategory('blackfriday'));
+        $this->assertFalse(BuildSearchIndex::shopperCategory('סוף-שנה-sale'));
+        $this->assertFalse(BuildSearchIndex::shopperCategory('הגיעו לאחרונה'));
+        $this->assertTrue(BuildSearchIndex::shopperCategory('טבעות זהב צהוב'));
 
         $garden = $at * 1000 + array_search('גינון', array_column($facet['v'], 'l'), true);
         $items = collect($data['items'])->keyBy('id');
