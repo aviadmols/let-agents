@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?Vertical $vertical
  * @property int $vertical_confidence
  * @property bool $vertical_locked
+ * @property array{kind?: string, languages?: list<string>, sells?: list<string>}|null $profile what the shop said about itself: a store, a content site or both; its other languages; what it sells
  */
 class Shop extends Model
 {
@@ -42,6 +43,7 @@ class Shop extends Model
 
     protected $fillable = [
         'name',
+        'profile',
         'slug',
         'platform',
         'domain',
@@ -67,6 +69,7 @@ class Shop extends Model
             'status' => ShopStatus::class,
             'vertical' => Vertical::class,
             'vertical_locked' => 'boolean',
+            'profile' => 'array',
         ];
     }
 

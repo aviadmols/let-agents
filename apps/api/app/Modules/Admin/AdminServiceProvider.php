@@ -13,6 +13,7 @@ use App\Modules\Admin\Panels\OperatorPanelProvider;
 use App\Modules\Admin\Support\AdminTimeline;
 use App\Modules\Admin\Support\SessionChosenShop;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
+use Illuminate\Support\Facades\Blade;
 
 final class AdminServiceProvider extends ModuleServiceProvider
 {
@@ -25,6 +26,12 @@ final class AdminServiceProvider extends ModuleServiceProvider
 
         // Replaces Filament's default, which always returns to the panel the login was on.
         $this->app->bind(LoginResponse::class, RoleAwareLoginResponse::class);
+    }
+
+    protected function bootModule(): void
+    {
+        // The settings pages' controls, as the designer's panel draws them: <x-lp::toggle>, <x-lp::chips>…
+        Blade::anonymousComponentPath(__DIR__.'/resources/views/components', 'lp');
     }
 
     protected function moduleCommands(): array

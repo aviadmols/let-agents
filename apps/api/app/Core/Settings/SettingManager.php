@@ -75,6 +75,17 @@ final class SettingManager
         return $normalized;
     }
 
+    /**
+     * The value as the setting keeps it, without keeping it: for checking a whole form before any of it is saved.
+     *
+     * @throws InvalidSettingValue
+     * @throws UnknownSetting
+     */
+    public function normalize(string $key, mixed $value): int|float|bool|string
+    {
+        return $this->registry->get($key)->normalize($value);
+    }
+
     public function clear(string $key, ?string $shopId = null): void
     {
         SettingOverride::query()

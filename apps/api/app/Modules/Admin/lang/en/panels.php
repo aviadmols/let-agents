@@ -67,6 +67,13 @@ return [
         'scan' => 'Scan summary',
         'settings' => 'Settings',
     ],
+    'side_groups' => [
+        'store' => 'The store',
+        'shoppers' => 'What shoppers see',
+        'team' => 'The team and replies',
+        'connect' => 'Connection',
+        'account' => 'The account',
+    ],
     'close' => 'Close',
     // A short hint the first time each screen opens (merchant-section).
     'hints' => [

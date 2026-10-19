@@ -67,6 +67,13 @@ return [
         'scan' => 'סיכום סריקה',
         'settings' => 'הגדרות',
     ],
+    'side_groups' => [
+        'store' => 'החנות',
+        'shoppers' => 'מה הגולשים רואים',
+        'team' => 'הצוות והמענה',
+        'connect' => 'חיבור',
+        'account' => 'החשבון',
+    ],
     'close' => 'סגירה',
     // A short hint the first time each screen opens (merchant-section).
     'hints' => [

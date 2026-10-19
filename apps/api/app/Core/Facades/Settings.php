@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \App\Core\Settings\ValueSource source(string $key, ?string $shopId = null)
  * @method static int|float|bool|string|null overrideFor(string $key, ?string $shopId = null)
  * @method static int|float|bool|string set(string $key, mixed $value, ?string $shopId = null)
+ * @method static int|float|bool|string normalize(string $key, mixed $value)
  * @method static void clear(string $key, ?string $shopId = null)
  * @method static void purgeShop(string $shopId)
  *

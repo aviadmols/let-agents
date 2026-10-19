@@ -12,7 +12,12 @@
 </div>
 @if ($tabs)
     <nav @class(['lp-section', 'lp-section-side' => $side, 'lp-section-tabs' => ! $side]) aria-label="{{ $label }}" data-section="{{ $key }}">
+        @php($group = null)
         @foreach ($pages as $page)
+            @if ($side && $page['group'] !== null && $page['group'] !== $group)
+                @php($group = $page['group'])
+                <div class="lp-side-g">{{ $group }}</div>
+            @endif
             <a href="{{ $page['url'] }}" @class(['is-on' => $page['current']]) @if ($page['current']) aria-current="page" @endif>
                 <span>{{ $page['label'] }}</span>
                 @if ($page['badge'] !== null && $page['badge'] !== '' && $page['badge'] !== 0 && $page['badge'] !== '0')<span class="lp-count">{{ $page['badge'] }}</span>@endif

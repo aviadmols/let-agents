@@ -124,6 +124,8 @@ final class MerchantNavigation
                 'url' => $page::getUrl(),
                 'badge' => $page::getNavigationBadge(),
                 'current' => $page === $current || is_subclass_of($current, $page),
+                // In a side menu, the group a page stands under ("the store", "what shoppers see"), when it says one.
+                'group' => property_exists($page, 'sideGroup') ? __("admin::panels.side_groups.{$page::$sideGroup}") : null,
             ], $pages),
         ])->render());
     }
