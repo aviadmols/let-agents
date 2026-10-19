@@ -13,6 +13,7 @@
         </x-lp::row>
         <x-lp::row :title="$t('ask')" :sub="$t('ask_sub')"><x-lp::toggle model="data.ask" :label="$t('ask')" /></x-lp::row>
         <x-lp::row :title="$t('similar')" :tip="$t('similar_tip')"><x-lp::toggle model="data.similar" :label="$t('similar')" /></x-lp::row>
+        <x-lp::row :title="$t('similar_by')" :sub="$t('similar_by_sub')"><x-lp::chips model="data.similar_by" :options="$t('similar_by_options')" :sm="true" :label="$t('similar_by')" /></x-lp::row>
         <x-lp::row :title="$t('price')"><x-lp::toggle model="data.price" :label="$t('price')" /></x-lp::row>
         <x-lp::row :title="$t('cart')" :sub="$t('cart_sub')"><x-lp::toggle model="data.cart" :label="$t('cart')" /></x-lp::row>
         <x-lp::row :title="$t('per_group')" :tip="$t('per_group_tip')"><x-lp::num model="data.per_group" :min="$bounds['min']" :max="$bounds['max']" :label="$t('per_group')" /></x-lp::row>

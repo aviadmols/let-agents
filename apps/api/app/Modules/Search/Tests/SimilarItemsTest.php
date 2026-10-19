@@ -140,6 +140,18 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame([], $this->similar('302')->json('products'), 'a baby cream has no swaddles for similar items');
     }
 
+    public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void
+    {
+        // A bookshop whose bundles look alike: by content alone, the pictures never asked.
+        Settings::set('search.similar_by', 'meaning', $this->shop->id);
+        $this->similar('301')->assertOk();
+        $this->assertSame(['picture' => 0, 'text' => 1], $this->asked);
+
+        Settings::set('search.similar_by', 'picture', $this->shop->id);
+        $this->similar('302')->assertOk();
+        $this->assertSame(['picture' => 1, 'text' => 1], $this->asked, 'by picture alone: the meaning not asked');
+    }
+
     public function test_without_scanned_pictures_they_come_by_meaning(): void
     {
         $this->pictures = false;

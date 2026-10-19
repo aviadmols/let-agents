@@ -253,6 +253,11 @@ return [
         'label' => 'Add to cart button',
         'description' => 'On every product that can be bought directly. Opens the theme\'s cart.',
     ],
+    'similar_by' => [
+        'label' => '"Similar items" by',
+        'description' => 'By content (name, description and specs), by picture, or both together. Where different products look alike (books, bundles), by content is better.',
+        'options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
+    ],
     'not_sure' => [
         'label' => '"Not sure what fits?" under the results',
         'description' => 'In the chat: the store\'s AI recommends from the products in the results, by the search, with ChatGPT, Claude or Perplexity to go on with below it. Outside: straight to choosing an outside AI, with the search and the products.',

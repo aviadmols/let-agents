@@ -660,6 +660,17 @@
             "scope": "shop"
         },
         {
+            "name": "similar_by",
+            "type": "enum",
+            "options": [
+                "both",
+                "meaning",
+                "picture"
+            ],
+            "default": "both",
+            "scope": "shop"
+        },
+        {
             "name": "not_sure",
             "type": "enum",
             "options": [

@@ -342,8 +342,11 @@ final class SearchCatalog
 
             // Read now, from what the store sells now: the pictures that look alike and the products that
             // mean the same, ranked together. More than shown are read: those of another kind are left out.
-            $looks = array_map('strval', array_column($this->semantic->picturesReady() ? $this->semantic->lookAlike($product->id, $limit * 4) : [], 'external_id'));
-            $means = array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id'));
+            // As the shop chose (search.similar_by): by content, by picture, or both. A store whose covers look
+            // alike (a bundle of books beside another bundle) asks by content alone.
+            $by = (string) Settings::get('search.similar_by', $shopId);
+            $looks = $by === 'meaning' || ! $this->semantic->picturesReady() ? [] : array_map('strval', array_column($this->semantic->lookAlike($product->id, $limit * 4), 'external_id'));
+            $means = $by === 'picture' && $looks !== [] ? [] : array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id'));
             $rank = [];
             foreach ([$looks, $means] as $list) {
                 foreach ($list as $at => $id) {

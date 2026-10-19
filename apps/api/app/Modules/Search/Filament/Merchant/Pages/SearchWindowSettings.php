@@ -58,6 +58,7 @@ class SearchWindowSettings extends Page
             'photos' => 'feature:search.photos',
             'ask' => 'feature:assistant.on_search',
             'similar' => 'feature:search.similar',
+            'similar_by' => 'setting:search.similar_by',
             'price' => 'setting:search.show_price',
             'cart' => 'setting:search.show_cart',
             'per_group' => 'setting:search.results_per_group',
