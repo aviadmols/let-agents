@@ -121,6 +121,9 @@ final class AnswerSiteQuestion
     /** @var array<string, int> prompt name => the version a replay asks with */
     private array $promptVersions = [];
 
+    /** @var array<string, mixed>|null what the writer is given in a replay on frozen data, instead of today's (snapshot()) */
+    private ?array $frozen = null;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -685,7 +688,8 @@ final class AnswerSiteQuestion
                     }
                 }
 
-                $prepared = $this->prepare($shopId, $question, $shown, $mode, $viewing);
+                // A replay on frozen data gives the writer what it was given then; everything else, today's.
+                $prepared = $this->frozen ?? $this->prepare($shopId, $question, $shown, $mode, $viewing);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
                     'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];
@@ -830,14 +834,15 @@ final class AnswerSiteQuestion
 
     /**
      * A question asked again as a shopper asked it, with the writer's prompt at the version the operator
-     * chose (null: the current one): the same pipeline as evaluate(), nothing saved, the run recorded as
+     * chose (null: the current one), on what the writer was given then ($frozen, a snapshot()) or on
+     * today's catalogue and pages: the same pipeline as evaluate(), nothing saved, the run recorded as
      * an evaluation with its real cost. Returns what came of it and how: outcome, answer, picks, verdict,
      * prompt version, cost and time.
      *
      * @param  list<string>  $products  external ids shown, best first
      * @return array{result: array<string, mixed>, trace: array<string, mixed>, answered: array<string, mixed>|null}
      */
-    public function replay(string $shopId, string $question, array $products, ?int $answerVersion = null, string $locale = 'he'): array
+    public function replay(string $shopId, string $question, array $products, ?int $answerVersion = null, string $locale = 'he', ?array $frozen = null): array
     {
         if ($answerVersion !== null && ! in_array($answerVersion, self::promptVersions('answer_site'), true)) {
             throw new \InvalidArgumentException("answer_site v{$answerVersion} does not exist.");
@@ -845,14 +850,16 @@ final class AnswerSiteQuestion
 
         $this->promptVersions = $answerVersion === null ? [] : ['answer_site' => $answerVersion];
         $this->answered = null;
+        $this->frozen = $frozen === null ? null : array_diff_key($frozen, array_flip(['mode', 'question']));
 
         try {
-            $out = $this->evaluate($shopId, $question, $products, (string) Settings::get('assistant.context_mode', $shopId), $locale);
+            $out = $this->evaluate($shopId, $question, $products, (string) ($frozen['mode'] ?? Settings::get('assistant.context_mode', $shopId)), $locale);
 
             return $out + ['answered' => $this->answered];
         } finally {
             $this->promptVersions = [];
             $this->answered = null;
+            $this->frozen = null;
         }
     }
 

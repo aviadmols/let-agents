@@ -10,11 +10,16 @@ namespace App\Modules\Assistant\Support;
 final class QualityExpect
 {
     /**
-     * @param  array{outcome?: string, contains?: list<string>, absent?: list<string>, picks?: list<string>}  $expect
-     * @param  array<string, mixed>  $result  what AnswerSiteQuestion answered (outcome, answer, picks)
+     * Beyond the words: the products it must offer (any of them), the pages it must rest on (any of them,
+     * by address), and whether the checker of the other family found it supported by the store's own
+     * data (its verdict "kept"): words can all be there and the answer still be wrong.
+     *
+     * @param  array{outcome?: string, contains?: list<string>, absent?: list<string>, picks?: list<string>, sources?: list<string>, supported?: bool}  $expect
+     * @param  array<string, mixed>  $result  what AnswerSiteQuestion answered (outcome, answer, picks, sources)
+     * @param  string|null  $verdict  the checker's verdict on it
      * @return list<string> what failed, empty when it passed
      */
-    public static function problems(array $expect, array $result): array
+    public static function problems(array $expect, array $result, ?string $verdict = null): array
     {
         $answer = self::norm((string) ($result['answer'] ?? ''));
         $picks = array_map(fn ($p): string => (string) (is_array($p) ? ($p['external_id'] ?? '') : $p), (array) ($result['picks'] ?? []));
@@ -40,7 +45,26 @@ final class QualityExpect
             $problems[] = 'picks';
         }
 
+        $pages = array_values(array_filter(array_map(fn ($u): string => self::page((string) $u), (array) ($expect['sources'] ?? []))));
+        $cited = array_map(fn ($s): string => self::page((string) (is_array($s) ? ($s['url'] ?? '') : $s)), (array) ($result['sources'] ?? []));
+        if ($pages !== [] && array_intersect($pages, $cited) === []) {
+            $problems[] = 'sources';
+        }
+
+        if (($expect['supported'] ?? false) === true && $verdict !== 'kept') {
+            $problems[] = 'unsupported:'.($verdict ?? 'unchecked');
+        }
+
         return $problems;
+    }
+
+    /** An address as a page: no scheme, no "www.", no query, no trailing slash. */
+    private static function page(string $url): string
+    {
+        $url = mb_strtolower(trim($url));
+        $url = (string) preg_replace('~^https?://(www\.)?|[?#].*$~u', '', $url);
+
+        return rtrim($url, '/');
     }
 
     /**

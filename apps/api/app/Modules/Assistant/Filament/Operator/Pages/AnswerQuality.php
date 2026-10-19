@@ -8,6 +8,7 @@ use App\Modules\Assistant\Actions\RunQualityCases;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantQualityCase;
+use App\Modules\Assistant\Models\AssistantQualityRun;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Assistant\Support\QualityExpect;
@@ -74,6 +75,13 @@ class AnswerQuality extends Page
 
     /** The writer prompt version to run the cases with ('' the current). */
     public string $casesVersion = '';
+
+    /** frozen: each case's own data, to compare a prompt with another; live: today's catalogue and pages. */
+    public string $casesMode = AssistantQualityRun::FROZEN;
+
+    /** regression, baseline, or '' for both: which cases a run asks and the list shows. */
+    #[Url(as: 'kind')]
+    public string $casesKind = '';
 
     public static function getNavigationLabel(): string
     {
@@ -148,14 +156,28 @@ class AnswerQuality extends Page
         ];
     }
 
-    /** The question kept as a regression case, with what the team expects of its answer. */
+    /**
+     * The question kept as a regression case, with what the team expects of its answer: an outcome, words
+     * it says and never says, and beyond the words, the products it offered being right, the pages it
+     * rested on being right, and the checker of the other family finding it supported by the store's data.
+     * It keeps what the writer is given now, so a prompt is compared with another on the same data.
+     */
     public function makeCase(string $id): void
     {
         $form = (array) ($this->caseForm[$id] ?? []);
+        $ask = app(TenantContext::class)->runUnscoped(fn () => AssistantSearchAsk::query()->with('answer:id,sources')->find($id));
+
+        if ($ask === null) {
+            return;
+        }
+
         $expect = array_filter([
             'outcome' => in_array($form['outcome'] ?? '', [AssistantAnswer::ANSWERED, AssistantAnswer::NO_INFO, AssistantAnswer::OUT_OF_SCOPE, 'no_match'], true) ? $form['outcome'] : null,
             'contains' => QualityExpect::split((string) ($form['contains'] ?? '')),
             'absent' => QualityExpect::split((string) ($form['absent'] ?? '')),
+            'picks' => ! empty($form['picks_right']) ? array_values(array_filter(array_map(fn ($p): string => (string) ($p['external_id'] ?? ''), (array) $ask->picks))) : [],
+            'sources' => ! empty($form['sources_right']) ? array_values(array_filter(array_map(fn ($s): string => (string) ($s['url'] ?? ''), (array) ($ask->getRelation('answer')?->getAttribute('sources') ?? [])))) : [],
+            'supported' => ! empty($form['supported']) ? true : null,
         ], fn ($v): bool => $v !== null && $v !== []);
 
         if ($expect === []) {
@@ -164,18 +186,13 @@ class AnswerQuality extends Page
             return;
         }
 
-        app(TenantContext::class)->runUnscoped(function () use ($id, $expect, $form): void {
-            $ask = AssistantSearchAsk::query()->find($id);
+        $snapshot = app(AnswerSiteQuestion::class)->snapshot((string) $ask->shop_id, (string) $ask->question, (array) $ask->products);
 
-            if ($ask === null) {
-                return;
-            }
-
-            app(TenantContext::class)->run((string) $ask->shop_id, fn () => AssistantQualityCase::query()->updateOrCreate(['ask_id' => $ask->id], [
-                'shop_id' => $ask->shop_id, 'question' => mb_substr((string) $ask->question, 0, 500), 'products' => (array) $ask->products,
-                'expect' => $expect, 'note' => mb_substr((string) ($form['note'] ?? ''), 0, 300) ?: null, 'created_by' => auth()->id(),
-            ]));
-        });
+        app(TenantContext::class)->run((string) $ask->shop_id, fn () => AssistantQualityCase::query()->updateOrCreate(['ask_id' => $ask->id], [
+            'shop_id' => $ask->shop_id, 'kind' => AssistantQualityCase::REGRESSION, 'question' => mb_substr((string) $ask->question, 0, 500), 'products' => (array) $ask->products,
+            'expect' => $expect, 'note' => mb_substr((string) ($form['note'] ?? ''), 0, 300) ?: null, 'created_by' => auth()->id(),
+            'snapshot' => $snapshot, 'snapshot_at' => now(),
+        ]));
 
         unset($this->caseForm[$id]);
         Notification::make()->success()->title(__('assistant::ui.quality.case_saved'))->send();
@@ -190,32 +207,60 @@ class AnswerQuality extends Page
     {
         return app(TenantContext::class)->runUnscoped(function (): array {
             $cases = AssistantQualityCase::query()->when($this->shop !== '', fn (Builder $q) => $q->where('shop_id', $this->shop))
+                ->when($this->casesKind !== '', fn (Builder $q) => $q->where('kind', $this->casesKind))
                 ->orderByRaw('case when last_passed = 0 then 0 when last_passed is null then 1 else 2 end')->latest('created_at')->limit(200)->get();
             $shops = Shop::query()->whereIn('id', $cases->pluck('shop_id')->unique()->values())->pluck('name', 'id');
 
             return $cases->map(fn (AssistantQualityCase $c): array => [
-                'id' => (string) $c->id, 'shop' => (string) ($shops[$c->shop_id] ?? ''), 'question' => $c->question, 'expect' => (array) $c->expect, 'note' => $c->note,
+                'id' => (string) $c->id, 'shop' => (string) ($shops[$c->shop_id] ?? ''), 'kind' => $c->kind, 'frozen' => $c->snapshot_at?->timezone('Asia/Jerusalem')->format('j.n'),
+                'question' => $c->question, 'expect' => (array) $c->expect, 'note' => $c->note,
                 'passed' => $c->last_passed, 'problems' => (array) $c->last_problems, 'answer' => $c->last_answer, 'outcome' => $c->last_outcome,
                 'prompt' => $c->last_prompt_version, 'cost' => $c->last_cost_usd, 'at' => $c->last_run_at?->timezone('Asia/Jerusalem')->format('j.n H:i'),
             ])->all();
         });
     }
 
-    /** The chosen shop's cases asked again with the chosen prompt version, each checked in code. */
+    /**
+     * The cases asked again (the chosen shop's, or every shop's), with the chosen prompt version, on their
+     * frozen data or today's, each checked in code; the run is kept with its numbers.
+     */
     public function runCases(): void
     {
-        if ($this->shop === '') {
-            Notification::make()->warning()->title(__('assistant::ui.quality.cases_pick_shop'))->send();
+        $run = app(RunQualityCases::class)->handle($this->shop === '' ? null : $this->shop, null, $this->casesVersion === '' ? null : (int) $this->casesVersion,
+            $this->casesMode, $this->casesKind === '' ? null : $this->casesKind, null, auth()->id());
+        $t = (array) $run->totals;
 
-            return;
-        }
-
-        $totals = app(RunQualityCases::class)->handle($this->shop, null, $this->casesVersion === '' ? null : (int) $this->casesVersion);
-
-        Notification::make()->{$totals['failed'] === 0 && $totals['stopped'] === null ? 'success' : 'warning'}()
-            ->title(__('assistant::ui.quality.cases_done', ['passed' => $totals['passed'], 'ran' => $totals['ran']]))
-            ->body(trim(($totals['stopped'] !== null ? __('assistant::ui.quality.cases_stopped.'.$totals['stopped']).' ' : '').'$'.number_format($totals['cost_usd'], 4)))
+        Notification::make()->{((int) ($t['expected'] ?? 0)) === ((int) ($t['passed'] ?? 0)) && ($t['stopped'] ?? null) === null ? 'success' : 'warning'}()
+            ->title(__('assistant::ui.quality.cases_done', ['passed' => (int) ($t['passed'] ?? 0), 'ran' => (int) ($t['expected'] ?? 0)]))
+            ->body(trim((($t['stopped'] ?? null) !== null ? __('assistant::ui.quality.cases_stopped.'.$t['stopped']).' ' : '').'$'.number_format((float) ($t['cost_usd'] ?? 0), 4)))
             ->send();
+    }
+
+    /**
+     * The last runs, of the chosen shop or every shop, each with the one before it of the same kind and
+     * mode, to say whether a change made answers better, worse, or only more expensive.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function runs(): array
+    {
+        $runs = AssistantQualityRun::query()->whereNotNull('finished_at')
+            ->when($this->shop !== '', fn (Builder $q) => $q->where('shop_id', $this->shop))
+            ->when($this->casesKind !== '', fn (Builder $q) => $q->where('kind', $this->casesKind))
+            ->orderByDesc('id')->limit(12)->get();
+        $shops = app(TenantContext::class)->runUnscoped(fn () => Shop::query()->whereIn('id', $runs->pluck('shop_id')->filter()->unique()->values())->pluck('name', 'id'));
+
+        return $runs->map(function (AssistantQualityRun $run) use ($shops): array {
+            // ULIDs grow with time: the run before is the one with the id before, of the same kind and data.
+            $before = AssistantQualityRun::query()->whereNotNull('finished_at')->where('id', '<', $run->id)
+                ->where('mode', $run->mode)->where('kind', $run->kind)->where('shop_id', $run->shop_id)->orderByDesc('id')->first();
+
+            return [
+                'id' => $run->id, 'label' => $run->label, 'shop' => $run->shop_id === null ? null : (string) ($shops[$run->shop_id] ?? ''),
+                'mode' => $run->mode, 'kind' => $run->kind, 'prompt' => $run->prompt_version, 'at' => $run->finished_at?->timezone('Asia/Jerusalem')->format('j.n H:i'),
+                'now' => (array) $run->totals, 'before' => $before === null ? null : (array) $before->totals + ['prompt' => $before->prompt_version],
+            ];
+        })->all();
     }
 
     public function deleteCase(string $id): void

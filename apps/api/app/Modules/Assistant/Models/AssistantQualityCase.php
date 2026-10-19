@@ -14,6 +14,9 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $shop_id
  * @property string|null $ask_id the ask it was made from
+ * @property string $kind regression (it must stay fixed) or baseline (a real question every change is measured by)
+ * @property array<string, mixed>|null $snapshot what the writer was given when the case was made (AnswerSiteQuestion::snapshot)
+ * @property Carbon|null $snapshot_at
  * @property string $question
  * @property list<string>|null $products external ids shown with it
  * @property array{outcome?: string, contains?: list<string>, absent?: list<string>, picks?: list<string>} $expect
@@ -29,6 +32,10 @@ use Illuminate\Support\Carbon;
  */
 class AssistantQualityCase extends Model
 {
+    public const REGRESSION = 'regression';
+
+    public const BASELINE = 'baseline';
+
     use BelongsToTenant;
     use HasUlids;
 
@@ -44,6 +51,8 @@ class AssistantQualityCase extends Model
             'last_passed' => 'boolean',
             'last_prompt_version' => 'integer',
             'last_cost_usd' => 'float',
+            'snapshot' => 'array',
+            'snapshot_at' => 'datetime',
         ];
     }
 }

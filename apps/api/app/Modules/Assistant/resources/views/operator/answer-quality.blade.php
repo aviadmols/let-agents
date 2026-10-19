@@ -30,18 +30,69 @@
         <x-filament::section compact>
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                 <span style="{{ $small }}">{{ $t('cases_help') }}</span>
+                <select wire:model.live="casesKind" style="font-size:13px;border-radius:8px;padding:4px 8px" aria-label="{{ $t('kind') }}">
+                    <option value="">{{ $t('kinds.all') }}</option>
+                    <option value="regression">{{ $t('kinds.regression') }}</option>
+                    <option value="baseline">{{ $t('kinds.baseline') }}</option>
+                </select>
                 <select wire:model="casesVersion" style="font-size:13px;border-radius:8px;padding:4px 8px" aria-label="{{ $t('prompt_version') }}">
                     <option value="">{{ $t('current_prompt') }}</option>
                     @foreach ($this->versions() as $v)<option value="{{ $v }}">answer_site v{{ $v }}</option>@endforeach
                 </select>
+                <select wire:model="casesMode" style="font-size:13px;border-radius:8px;padding:4px 8px" aria-label="{{ $t('mode') }}" title="{{ $t('modes_help') }}">
+                    <option value="frozen">{{ $t('modes.frozen') }}</option>
+                    <option value="live">{{ $t('modes.live') }}</option>
+                </select>
                 <button type="button" wire:click="runCases" wire:loading.attr="disabled" wire:target="runCases" wire:confirm="{{ $t('cases_confirm') }}" style="{{ $chip }};font-weight:600">{{ $t('run_cases') }}</button>
             </div>
+            <div style="{{ $small }};margin-top:6px">{{ $t('modes_help') }}</div>
         </x-filament::section>
+
+        {{-- every run with its numbers, against the run before of the same kind and data --}}
+        @php($runs = $this->runs())
+        @if ($runs !== [])
+            <x-filament::section compact>
+                <div style="font-weight:600;margin-bottom:6px">{{ $t('runs_title') }}</div>
+                <div style="overflow-x:auto">
+                    <table style="width:100%;font-size:13px;border-collapse:collapse">
+                        <thead><tr style="text-align:start;opacity:.7">
+                            @foreach (['run', 'answered', 'supported', 'unanswered', 'passed', 'cost_per_answer'] as $col)<th style="padding:4px 8px;text-align:start;font-weight:500">{{ $t('runs.'.$col) }}</th>@endforeach
+                        </tr></thead>
+                        <tbody>
+                            @foreach ($runs as $run)
+                                @php($n = $run['now'])
+                                @php($b = $run['before'])
+                                @php($cell = function (string $key, bool $up, bool $money = false) use ($n, $b): string {
+                                    $v = $n[$key] ?? null;
+                                    if ($v === null) { return '—'; }
+                                    $out = $money ? '$'.number_format((float) $v, 5) : number_format((float) $v, 1).'%';
+                                    $was = $b[$key] ?? null;
+                                    if ($was === null || abs((float) $v - (float) $was) < 0.000001) { return e($out); }
+                                    $d = (float) $v - (float) $was;
+                                    $good = ($d > 0) === $up;
+                                    return e($out).' <span style="font-size:11px;color:'.($good ? 'rgb(30,140,80)' : 'rgb(200,60,60)').'">'.($d > 0 ? '+' : '').($money ? number_format($d, 5) : number_format($d, 1)).'</span>';
+                                })
+                                <tr style="border-top:1px solid rgba(127,127,127,.2)">
+                                    <td style="padding:6px 8px" dir="ltr">{{ $run['at'] }} · v{{ $run['prompt'] }} · {{ $t('modes.'.$run['mode']) }}@if ($run['kind']) · {{ $t('kinds.'.$run['kind']) }}@endif @if ($run['shop']) · {{ $run['shop'] }}@endif @if ($run['label']) · {{ $run['label'] }}@endif · {{ $n['ran'] ?? 0 }}</td>
+                                    <td style="padding:6px 8px" dir="ltr">{!! $cell('answered', true) !!}</td>
+                                    <td style="padding:6px 8px" dir="ltr">{!! $cell('supported', true) !!}</td>
+                                    <td style="padding:6px 8px" dir="ltr">{!! $cell('unanswered', false) !!}</td>
+                                    <td style="padding:6px 8px" dir="ltr">{{ ($n['expected'] ?? 0) > 0 ? ($n['passed'] ?? 0).'/'.$n['expected'] : '—' }}</td>
+                                    <td style="padding:6px 8px" dir="ltr">{!! $cell('cost_per_answer', false, true) !!}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </x-filament::section>
+        @endif
         @forelse ($cases as $case)
             <x-filament::section compact wire:key="case-{{ $case['id'] }}">
                 <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
                     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                         <strong>{{ $case['shop'] }}</strong>
+                        <span style="{{ $chip }};cursor:default">{{ $t('kinds.'.$case['kind']) }}</span>
+                        @if ($case['frozen'])<span style="{{ $small }}">{{ $t('frozen_at', ['date' => $case['frozen']]) }}</span>@endif
                         @if ($case['passed'] === true)<span style="{{ $chip }};cursor:default;background:rgba(40,160,90,.15);border-color:transparent">{{ $t('passed') }}</span>
                         @elseif ($case['passed'] === false)<span style="{{ $chip }};cursor:default;{{ $bad }}">{{ $t('failed_case') }}</span>
                         @else<span style="{{ $chip }};cursor:default">{{ $t('not_run') }}</span>@endif
@@ -54,6 +105,10 @@
                     @if (isset($case['expect']['outcome'])){{ $case['expect']['outcome'] }}@endif
                     @if (! empty($case['expect']['contains'])) · {{ $t('contains') }} {{ implode(' / ', $case['expect']['contains']) }}@endif
                     @if (! empty($case['expect']['absent'])) · {{ $t('absent') }} {{ implode(' / ', $case['expect']['absent']) }}@endif
+                    @if (! empty($case['expect']['picks'])) · {{ $t('expect_picks', ['n' => count($case['expect']['picks'])]) }}@endif
+                    @if (! empty($case['expect']['sources'])) · {{ $t('expect_sources', ['n' => count($case['expect']['sources'])]) }}@endif
+                    @if (! empty($case['expect']['supported'])) · {{ $t('supported') }}@endif
+                    @if (empty($case['expect'])){{ $t('measured_only') }}@endif
                 </div>
                 @if ($case['answer'])<div style="margin-top:4px"><span style="{{ $small }}">{{ $t('last_answer') }}</span> {{ $case['answer'] }}</div>@endif
                 @if ($case['problems'] !== [])<div style="margin-top:4px;color:rgb(200,60,60);font-size:13px" dir="ltr">{{ implode(' · ', $case['problems']) }}</div>@endif
@@ -171,6 +226,9 @@
                                 </select>
                                 <input wire:model="caseForm.{{ $row['id'] }}.contains" placeholder="{{ $t('contains_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
                                 <input wire:model="caseForm.{{ $row['id'] }}.absent" placeholder="{{ $t('absent_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
+                                @if ($row['picks'] !== [])<label style="font-size:13px"><input type="checkbox" wire:model="caseForm.{{ $row['id'] }}.picks_right"> {{ $t('picks_right') }}</label>@endif
+                                <label style="font-size:13px"><input type="checkbox" wire:model="caseForm.{{ $row['id'] }}.sources_right"> {{ $t('sources_right') }}</label>
+                                <label style="font-size:13px"><input type="checkbox" wire:model="caseForm.{{ $row['id'] }}.supported"> {{ $t('supported') }}</label>
                                 <input wire:model="caseForm.{{ $row['id'] }}.note" placeholder="{{ $t('note_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
                                 <button type="button" wire:click="makeCase('{{ $row['id'] }}')" style="{{ $chip }};font-weight:600;justify-self:start">{{ $t('save_case') }}</button>
                             </div>

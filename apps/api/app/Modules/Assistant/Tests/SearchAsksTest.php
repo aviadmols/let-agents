@@ -10,11 +10,16 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Actions\BuildQualityBaseline;
 use App\Modules\Assistant\Actions\ReviewSearchAsks;
+use App\Modules\Assistant\Actions\RunQualityCases;
 use App\Modules\Assistant\Filament\Operator\Pages\AnswerQuality;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantQualityCase;
+use App\Modules\Assistant\Models\AssistantQualityResult;
+use App\Modules\Assistant\Models\AssistantQualityRun;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
@@ -320,6 +325,89 @@ final class SearchAsksTest extends TestCase
         $this->assertSame(['said:בריכה'], $case->last_problems, 'it said what it must not; "יסוד" was enough of the words to say');
         $this->assertSame(AnswerSiteQuestion::promptVersion('answer_site'), $case->last_prompt_version);
         $page->set('tab', 'cases')->assertSee('במה מתחילים איטום גג?')->assertSee(__('assistant::ui.quality.failed_case'));
+    }
+
+    public function test_a_case_runs_on_its_frozen_data_or_on_todays_and_is_checked_beyond_its_words(): void
+    {
+        $answer = fn (string $text, array $check = ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true]): array => [
+            ['found' => true, 'answer' => $text, 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'יריעה לגג.']]], $check,
+        ];
+        $this->replies = $answer('יריעה ביטומנית לגג בטון שטוח.');
+        $asked = $this->ask('במה אוטמים גג בטון?', ['701'])->json('data');
+        $ask = $this->inShop(fn () => AssistantSearchAsk::query()->findOrFail($asked['ask_id']));
+
+        $operator = User::factory()->operator()->create();
+        $page = Livewire::actingAs($operator)->test(AnswerQuality::class)->set('failure', '')
+            ->set("caseForm.{$ask->id}", ['outcome' => 'answered', 'picks_right' => true, 'supported' => true])
+            ->call('makeCase', $ask->id);
+        $case = $this->inShop(fn () => AssistantQualityCase::query()->sole());
+        $this->assertSame(['outcome' => 'answered', 'picks' => ['701'], 'supported' => true], $case->expect, 'the products it offered, and the checker\'s word, beyond the words');
+        $this->assertNotNull($case->snapshot_at);
+        $this->assertStringContainsString('יריעה לאיטום גג בטון שטוח.', json_encode($case->snapshot, JSON_UNESCAPED_UNICODE));
+
+        // The catalogue changes after the case was kept.
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '701')->update(['payload' => ['description' => 'יריעה חדשה עם ציפוי אלומיניום.']]));
+
+        $this->calls = [];
+        $this->replies = $answer('יריעה ביטומנית לגג.');
+        $frozen = app(RunQualityCases::class)->handle($this->shop->id, null, null, AssistantQualityRun::FROZEN);
+        $this->assertStringContainsString('יריעה לאיטום גג בטון שטוח.', $this->calls[0]['user'], 'on the data of then: a prompt is compared on the same data');
+        $this->assertStringNotContainsString('ציפוי אלומיניום', $this->calls[0]['user']);
+        $this->assertSame(['ran' => 1, 'passed' => 1, 'expected' => 1], array_intersect_key((array) $frozen->totals, array_flip(['ran', 'passed', 'expected'])));
+
+        // On today's data, and the checker now takes the answer away: the words alone would not see it.
+        $this->calls = [];
+        $this->replies = $answer('יריעה עם ציפוי אלומיניום.', ['supported' => false, 'on_topic' => true, 'safe' => true, 'picks_fit' => true]);
+        $live = app(RunQualityCases::class)->handle($this->shop->id, null, null, AssistantQualityRun::LIVE);
+        $this->assertStringContainsString('ציפוי אלומיניום', $this->calls[0]['user'], 'on today\'s data: the same question against the store as it is now');
+        $result = AssistantQualityResult::query()->where('run_id', $live->id)->sole();
+        $this->assertFalse($result->passed);
+        $this->assertContains('unsupported:answer_removed', $result->problems);
+        $this->assertSame(1, (int) $live->totals['ran']);
+        $page->set('tab', 'cases')->assertSee(__('assistant::ui.quality.modes.live'))->assertSee(__('assistant::ui.quality.runs_title'));
+    }
+
+    public function test_the_baseline_is_real_questions_from_every_shop_and_every_run_is_compared_with_the_one_before(): void
+    {
+        foreach ([['במה אוטמים גג?', 'answered', 4], ['יש לכם גנרטור?', 'no_info', 2], ['מה מזג האוויר?', 'out_of_scope', 1], ['במה אוטמים גג', 'answered', 1]] as [$q, $outcome, $times]) {
+            for ($i = 0; $i < $times; $i++) {
+                $this->inShop(fn () => AssistantSearchAsk::query()->create(['shop_id' => $this->shop->id, 'day' => now()->toDateString(), 'question' => $q, 'products' => ['701'], 'outcome' => $outcome, 'from' => 'model']));
+            }
+        }
+
+        $added = app(BuildQualityBaseline::class)->handle(10);
+        $cases = $this->inShop(fn () => AssistantQualityCase::query()->orderBy('question')->get());
+
+        $this->assertSame([$this->shop->id => 3], $added, 'each question once: "במה אוטמים גג?" and "במה אוטמים גג" are one');
+        $this->assertTrue($cases->every(fn (AssistantQualityCase $c): bool => $c->kind === AssistantQualityCase::BASELINE && $c->snapshot !== null && $c->expect === []));
+        $this->assertSame([], app(BuildQualityBaseline::class)->handle(10), 'built again, nothing is added twice');
+
+        $reply = fn (): array => [['found' => true, 'answer' => 'יריעה ביטומנית.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'לגג.']]], ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true]];
+        // The scope check is off here: each case is a writer and a checker.
+        $this->replies = [...$reply(), ...$reply(), ...$reply()];
+        $first = app(RunQualityCases::class)->handle(null, null, null, AssistantQualityRun::FROZEN, AssistantQualityCase::BASELINE, 'before');
+        $this->replies = [...$reply(), ['found' => false, 'answer' => '', 'refs' => [], 'picks' => []], ...$reply()];
+        $second = app(RunQualityCases::class)->handle(null, null, null, AssistantQualityRun::FROZEN, AssistantQualityCase::BASELINE, 'after');
+
+        $this->assertSame(100.0, (float) $first->totals['answered']);
+        $this->assertLessThan(100.0, (float) $second->totals['answered']);
+        $this->assertSame(0, (int) $first->totals['expected'], 'a baseline case without an expectation is measured, not passed or failed');
+
+        $runs = Livewire::actingAs(User::factory()->operator()->create())->test(AnswerQuality::class)->set('tab', 'cases')->instance()->runs();
+        $this->assertSame('after', $runs[0]['label']);
+        $this->assertSame(100.0, (float) $runs[0]['before']['answered'], 'each run beside the one before it');
+    }
+
+    public function test_cases_are_imported_from_a_file_with_their_data_and_no_model_call(): void
+    {
+        $this->artisan('assistant:quality-cases', ['shop' => $this->shop->slug, '--import' => base_path('app/Modules/Assistant/resources/evals/gueta-hedge-trimmer-620w.json')])
+            ->expectsOutputToContain('5 cases imported')->assertSuccessful();
+
+        $cases = $this->inShop(fn () => AssistantQualityCase::query()->get());
+        $this->assertCount(5, $cases);
+        $this->assertTrue($cases->every(fn (AssistantQualityCase $c): bool => $c->kind === AssistantQualityCase::REGRESSION && $c->snapshot_at !== null));
+        $this->assertSame(['outcome' => 'answered', 'contains' => ['620'], 'supported' => true], $cases->firstWhere('question', 'מה ההספק של גוזם גדר חי חשמלי 620W?')->expect);
+        $this->assertSame([], $this->calls, 'importing asks no model');
     }
 
     public function test_a_reviewer_never_checks_its_own_family(): void

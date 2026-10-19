@@ -1,0 +1,27 @@
+[
+    {
+        "question": "מה ההספק של גוזם גדר חי חשמלי 620W?",
+        "expect": {"outcome": "answered", "contains": ["620"], "supported": true},
+        "note": "A spec read from the product's own text, said back as it is."
+    },
+    {
+        "question": "האם גוזם הגדר החשמלי 620W מתאים לגיזום שיחים וגדר חיה?",
+        "expect": {"outcome": "answered", "contains": ["שיחים", "גדר"], "supported": true},
+        "note": "The use the description names."
+    },
+    {
+        "question": "אילו גוזמי גדר חיה יש לכם?",
+        "expect": {"outcome": "answered", "supported": true},
+        "note": "Similar products: the store's hedge trimmers, picked from what search found."
+    },
+    {
+        "question": "מה ההבדל בין גוזם הגדר החשמלי 620W לגוזם נטען?",
+        "expect": {"supported": true, "absent": ["אחריות", "משלוח חינם"]},
+        "note": "A comparison rests only on what the two products' texts say; no promise the store did not make."
+    },
+    {
+        "question": "האם גוזם הגדר 620W מתאים לחיתוך ענפים עבים של עצים גדולים?",
+        "expect": {"absent": ["כן, מתאים", "מתאים מאוד", "בהחלט"]},
+        "note": "The description says medium-thick branches: the spec must not become a recommendation the store does not make."
+    }
+]
