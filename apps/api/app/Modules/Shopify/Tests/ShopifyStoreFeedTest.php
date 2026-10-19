@@ -366,7 +366,7 @@ final class ShopifyStoreFeedTest extends TestCase
                 ['id' => 'gid://shopify/Page/5001', 'title' => 'אחריות', 'handle' => 'warranty', 'body' => '<p>אחריות לשנתיים.</p><p>על כל&nbsp;כלי.</p>', 'bodySummary' => 'אחריות לשנתיים.', 'isPublished' => true, 'createdAt' => '2026-01-01T00:00:00Z', 'updatedAt' => '2026-02-01T00:00:00Z'],
             ])],
             'Policies' => ['shop' => ['shopPolicies' => [
-                ['id' => 'gid://shopify/ShopPolicy/71', 'type' => 'REFUND_POLICY', 'title' => 'מדיניות החזרות וביטולים', 'body' => '<p>ביטול עסקה תוך 14 יום.</p>', 'url' => 'https://kli.co.il/policies/refund-policy', 'updatedAt' => '2026-02-01T00:00:00Z'],
+                ['id' => 'gid://shopify/ShopPolicy/71', 'type' => 'REFUND_POLICY', 'title' => 'מדיניות החזרות וביטולים', 'body' => '<p>ביטול עסקה תוך 14 יום.</p>', 'url' => 'https://checkout.shopify.com/67879338049/policies/36434247745.html?locale=en', 'updatedAt' => '2026-02-01T00:00:00Z'],
                 ['id' => 'gid://shopify/ShopPolicy/72', 'type' => 'PRIVACY_POLICY', 'title' => 'מדיניות פרטיות', 'body' => '', 'url' => 'https://kli.co.il/policies/privacy-policy', 'updatedAt' => null],
             ]]],
             'Articles' => ['articles' => $this->connection([

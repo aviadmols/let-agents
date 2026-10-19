@@ -278,6 +278,9 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
         }
 
         $records = [];
+        // Shopify gives a policy's address on its checkout domain, in English: the store's own page
+        // (/policies/refund-policy, in the store's language) is the one a shopper is sent to.
+        $base = (string) ($this->shop($install)['base'] ?? '');
 
         foreach ($policies as $policy) {
             $text = self::text($policy['body'] ?? '');
@@ -291,7 +294,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
                 'type' => 'page',
                 'title' => self::line($policy['title'] ?? ''),
                 'slug' => strtolower((string) ($policy['type'] ?? '')),
-                'url' => (string) ($policy['url'] ?? ''),
+                'url' => $base !== '' && ($policy['type'] ?? '') !== '' ? $base.'/policies/'.str_replace('_', '-', strtolower((string) $policy['type'])) : (string) ($policy['url'] ?? ''),
                 'excerpt' => self::excerpt($text),
                 'text' => $text,
                 'image' => '',
