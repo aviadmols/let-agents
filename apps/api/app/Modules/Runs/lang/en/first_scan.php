@@ -27,6 +27,7 @@ return [
         'knowledge' => 'Learning about the store',
         'posts' => 'Reading posts and articles',
         'tags' => 'Tags for pages',
+        'choices' => 'Reading sizes and options from product pages',
     ],
     'nothing_new' => 'Nothing to update in this step.',
     'states' => [

@@ -49,6 +49,9 @@ final class FirstScan
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
+        // Last, being slow (a pause between pages): what each product page says that the feed does not, a
+        // ring's size and the choices before "add to cart". Only pages due; the search index follows by itself.
+        'choices' => ['catalog:read-choices', ['shop' => '{shop}', '--limit' => '5000']],
     ];
 
     /**
@@ -58,7 +61,7 @@ final class FirstScan
      * what the store says about itself, its posts and the page tags are left to the night. The
      * whole chain again is the operator's (start(full: true)).
      */
-    public const CHANGES = ['catalog', 'site', 'pictures', 'products', 'pages', 'search'];
+    public const CHANGES = ['catalog', 'site', 'pictures', 'products', 'pages', 'search', 'choices'];
 
     /** A manager starts it again at most this often; the night runs it anyway. */
     public const AGAIN_AFTER_HOURS = 1;
