@@ -54,6 +54,18 @@ final class LetsSearchBuildTest extends TestCase
         $this->assertStringNotContainsString('/*@@CSS@@*/', $built, 'the stylesheets are inlined');
     }
 
+    /**
+     * No two of the drawer's functions share a name: the later one silently replaces the earlier everywhere
+     * (an answer's paragraphs once named like the answer's turn made every written answer fail to show).
+     */
+    public function test_no_two_drawer_functions_share_a_name(): void
+    {
+        preg_match_all('/^  function ([A-Za-z_$][\w$]*)\(/m', (string) file_get_contents(dirname(self::BUILD).'/lets-search.js'), $m);
+
+        $this->assertGreaterThan(100, count($m[1]));
+        $this->assertSame([], array_values(array_unique(array_diff_assoc($m[1], array_unique($m[1])))));
+    }
+
     /** Saving from the store's own page: the heart, the flight to the launcher, the turnover, the dot, the first-time hint. */
     public function test_the_built_file_carries_the_save_from_the_store_page(): void
     {

@@ -254,7 +254,7 @@
     });
     return blocks;
   }
-  function answerHtml(text, anim) {
+  function answerText(text, anim) {
     var n = 0, out = function (s) { var h = anim ? words(s, n) : esc(s); n += String(s).split(' ').length; return h; };
     return answerBlocks(text).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + out(s) + '</li>'; }).join('') + '</ul>' : '<p>' + out(b.text) + '</p>'; }).join('');
   }
@@ -1851,7 +1851,7 @@
     if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
     var n = String(turn.answer || '').split(' ').length;
-    var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerHtml(turn.answer, anim) + '</div>';
+    var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(turn.answer, anim) + '</div>';
     // the page the question names, which the answer rests on ("מנויים"): a button to it
     if (turn.page && turn.page.url) { html += '<a class="ls-btn ls-btn--secondary ls-btn--sm ls-answer__page" href="' + esc(turn.page.url) + '">' + esc(t('goPage', { t: turn.page.title })) + '</a>'; }
     if (turn.picks && turn.picks.length) {
