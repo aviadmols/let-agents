@@ -90,6 +90,9 @@ final class AnswerSiteQuestion
     /** A fix by code keeps at least this share of the answer, or the answer is refused whole. */
     private const KEPT_SHARE = 0.4;
 
+    /** How much longer than the answer the checker's fix may be: it may correct, not add. */
+    private const REVISED_GROWTH = 2;
+
     /** Products a question may name by their title, at most. */
     private const NAMED_PRODUCTS = 3;
 
@@ -1304,12 +1307,26 @@ final class AnswerSiteQuestion
             return [$answer, null, 0];
         }
 
-        // Sentences and line breaks, kept as they were around what stays.
+        [$left, $out] = self::withoutSentences($answer, fn (string $sentence): bool => $fault($sentence) !== null);
+
+        return $left === '' ? ['', $whole, $out] : [$left, null, $out];
+    }
+
+    /**
+     * The answer without its sentences that $bad marks, the sentences and line breaks around what stays
+     * kept as they were; empty when too little is left to be worth showing (under 20 characters, or under
+     * KEPT_SHARE of the answer).
+     *
+     * @param  callable(string): bool  $bad
+     * @return array{0: string, 1: int} what is left, and how many sentences went
+     */
+    public static function withoutSentences(string $answer, callable $bad): array
+    {
         $parts = preg_split('/(\n+|(?<=[.!?])\s+)/u', $answer, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$answer];
         $left = '';
         $out = 0;
         for ($i = 0; $i < count($parts); $i += 2) {
-            if (trim($parts[$i]) !== '' && $fault($parts[$i]) !== null) {
+            if (trim($parts[$i]) !== '' && $bad($parts[$i])) {
                 $out++;
 
                 continue;
@@ -1318,9 +1335,7 @@ final class AnswerSiteQuestion
         }
         $left = trim($left);
 
-        return $left === '' || mb_strlen($left) < 20 || mb_strlen($left) < mb_strlen($answer) * self::KEPT_SHARE
-            ? ['', $whole, $out]
-            : [$left, null, $out];
+        return [$left === '' || mb_strlen($left) < 20 || mb_strlen($left) < mb_strlen($answer) * self::KEPT_SHARE ? '' : $left, $out];
     }
 
     /**
@@ -1497,12 +1512,25 @@ final class AnswerSiteQuestion
             $picks = [];
         } elseif ($decision === 'revise') {
             $fix = trim((string) ($check['revised'] ?? ''));
-            if ($fix !== '' && mb_strlen($fix) <= mb_strlen($answer) * 1.3 + 40) {
+            // A fix may correct and say what the given facts say instead (code checks its numbers, measures
+            // and contacts again); one far longer than the answer adds what was not asked for: not taken.
+            if ($fix !== '' && mb_strlen($fix) <= mb_strlen($answer) * self::REVISED_GROWTH + 80) {
                 $answer = $fix;
                 $revised = true;
             } elseif (array_diff(array_column($issues, 'severity'), ['minor']) !== []) {
-                // A material issue and no fix to put in its place: the answer goes, the fitting picks stay.
-                $answer = '';
+                // A material issue and no fix to put in its place: only the sentences the issues name go,
+                // the rest stays if enough is left; else the answer goes, the fitting picks stay.
+                $faulty = array_values(array_filter(array_map(fn (array $i): string => $i['severity'] === 'minor' ? '' : mb_strtolower((string) ($i['text'] ?? '')), $issues), fn (string $t): bool => mb_strlen($t) >= 4));
+                $answer = $faulty === [] ? '' : self::withoutSentences($answer, function (string $sentence) use ($faulty): bool {
+                    $sentence = mb_strtolower($sentence);
+                    foreach ($faulty as $text) {
+                        if (str_contains($sentence, $text) || str_contains($text, trim($sentence, " \t\n.!?"))) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                })[0];
             }
         }
 

@@ -139,7 +139,7 @@ final class SiteQuestionTest extends TestCase
         ];
         $this->ask('כמה ברגים צריך למטר דק?');
 
-        $this->assertSame(['claude-haiku-5-5', 1500], [$this->calls[1]['model'], $this->calls[1]['max']], 'its thinking counts as output: 400 tokens would cut it short');
+        $this->assertSame(['claude-haiku-5-5', 3000], [$this->calls[1]['model'], $this->calls[1]['max']], 'its thinking counts as output: a check with its fix and three products comes near 1,500');
         $check = Run::query()->where('agent', AnswerSiteQuestion::AGENT)->sole()->output['check'];
         $this->assertEquals(['ran' => true, 'type' => 'store_info', 'verdict' => 'kept', 'model' => 'claude-haiku-5-5', 'in' => 700, 'out' => 120],
             array_intersect_key($check, array_flip(['ran', 'type', 'verdict', 'model', 'in', 'out'])));

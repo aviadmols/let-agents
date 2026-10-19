@@ -299,7 +299,7 @@
         {
             "name": "site_check_max_output_tokens",
             "type": "int",
-            "default": 1500,
+            "default": 3000,
             "min": 100,
             "max": 4000,
             "scope": "global",

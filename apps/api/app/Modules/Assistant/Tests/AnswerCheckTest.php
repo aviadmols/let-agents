@@ -84,6 +84,25 @@ final class AnswerCheckTest extends TestCase
         $this->assertSame('check_unfixed', $long['refusal'], 'a "fix" much longer than the answer adds what was not there: not taken');
     }
 
+    public function test_a_material_issue_without_a_fix_takes_out_only_its_sentence(): void
+    {
+        // Food: the delivery time is right, "always free" is said nowhere.
+        $answer = 'המשלוח מגיע תוך 2 עד 4 ימי עסקים לכל הארץ. הוא תמיד חינם, בלי מינימום הזמנה.';
+        $out = AnswerSiteQuestion::applyCheck(['decision' => 'revise', 'revised' => '', 'issues' => [['text' => 'הוא תמיד חינם', 'kind' => 'unsupported', 'severity' => 'major']]] + self::SAFE, $answer, []);
+
+        $this->assertSame(['המשלוח מגיע תוך 2 עד 4 ימי עסקים לכל הארץ.', null], [$out['answer'], $out['refusal']]);
+    }
+
+    public function test_a_fix_may_correct_with_what_is_given_though_a_little_longer(): void
+    {
+        // Jewellery: "the first has the biggest stone" corrected to which one has, with its carats.
+        $answer = 'שלוש טבעות סוליטר מתאימות להצעה. לראשונה היהלום הגדול ביותר.';
+        $fixed = 'שלוש טבעות סוליטר מתאימות להצעה. לראשונה יהלום מרכזי של 0.72 קראט, ולשלישית היהלום הגדול מבין השלוש, 1.04 קראט.';
+        $out = AnswerSiteQuestion::applyCheck(['decision' => 'revise', 'revised' => $fixed, 'issues' => [['text' => 'לראשונה היהלום הגדול ביותר', 'kind' => 'numeric', 'severity' => 'major']]] + self::SAFE, $answer, self::picks('p1', 'p3'));
+
+        $this->assertSame([$fixed, 'revised'], [$out['answer'], $out['verdict']]);
+    }
+
     public function test_an_old_reply_without_a_decision_is_read_as_before(): void
     {
         $out = AnswerSiteQuestion::applyCheck(['supported' => false, 'on_topic' => true, 'picks_fit' => true, 'safe' => true], 'תשובה', self::picks('p1'));
