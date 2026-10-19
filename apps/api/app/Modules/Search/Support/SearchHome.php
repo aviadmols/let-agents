@@ -9,12 +9,15 @@ use App\Modules\Admin\Contracts\ModuleFigure;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Analytics\Models\AnalyticsOrder;
 use App\Modules\Search\Filament\Merchant\Pages\PhotoSearches;
-use App\Modules\Search\Filament\Merchant\Pages\SearchDisplay;
+use App\Modules\Search\Filament\Merchant\Pages\SearchWindowSettings;
 use App\Modules\Search\Filament\Merchant\Pages\ShopSearches;
+use App\Modules\Search\Models\SearchAnswerRating;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 /**
  * The search on the shop's home: is it working on the site (shoppers searched this week), search by
@@ -25,11 +28,16 @@ final class SearchHome implements HomeSource
     /** A search that found nothing this many times in a week is worth a card. */
     private const EMPTY_WORTH = 3;
 
+    /** Answers shoppers marked "not helpful" in this many days reach the notices, the latest few. */
+    private const UNHELPFUL_DAYS = 14;
+
+    private const UNHELPFUL_SHOWN = 5;
+
     public function statuses(Shop $shop): array
     {
         $on = Features::enabled('search.storefront', $shop->id);
         $week = (int) SearchTerm::query()->whereDate('day', '>=', now()->subDays(7)->toDateString())->sum('searches');
-        $display = SearchDisplay::getUrl(panel: 'merchant', tenant: $shop);
+        $display = SearchWindowSettings::getUrl(panel: 'merchant', tenant: $shop);
 
         $statuses = [
             new HomeStatus(
@@ -58,6 +66,46 @@ final class SearchHome implements HomeSource
     }
 
     public function notices(Shop $shop): array
+    {
+        return [...$this->unhelpful($shop), ...$this->emptySearches($shop)];
+    }
+
+    /**
+     * Each answer a shopper marked "not helpful" ("Helpful?" under the assistant's answer in the search
+     * drawer), the latest first: the question and what the assistant said, to the shop's questions.
+     *
+     * @return list<ShopNotice>
+     */
+    private function unhelpful(Shop $shop): array
+    {
+        $ratings = SearchAnswerRating::query()->with('ask.answer')
+            ->where('helpful', false)
+            ->where('updated_at', '>=', now()->subDays(self::UNHELPFUL_DAYS))
+            ->latest('updated_at')->limit(self::UNHELPFUL_SHOWN)->get();
+        $route = 'filament.merchant.pages.assistant.questions';
+        $url = Route::has($route) ? route($route, ['tenant' => $shop->slug]) : null;
+
+        return $ratings->filter(fn (SearchAnswerRating $rating): bool => $rating->ask !== null)->map(function (SearchAnswerRating $rating) use ($url): ShopNotice {
+            $ask = $rating->ask;
+            $said = trim((string) ($ask->answer ?? $ask->getRelation('answer')?->answer ?? ''));
+
+            return new ShopNotice(
+                key: 'search.unhelpful.'.$rating->ask_id,
+                kind: ShopNotice::INSIGHT,
+                tone: 'warn',
+                title: __('search::shop_settings.unhelpful.title', ['question' => Str::limit((string) $ask->question, 90)]),
+                body: $said !== '' ? __('search::shop_settings.unhelpful.body', ['answer' => Str::limit($said, 220)]) : __('search::shop_settings.unhelpful.body_none'),
+                source: __('search::shop_settings.unhelpful.source'),
+                at: $rating->updated_at,
+                url: $url,
+                action: $url === null ? null : __('search::shop_settings.unhelpful.action'),
+                weight: 60,
+            );
+        })->values()->all();
+    }
+
+    /** @return list<ShopNotice> the search with no results most worth fixing this week */
+    private function emptySearches(Shop $shop): array
     {
         $empty = SearchTerm::query()
             ->whereDate('day', '>=', now()->subDays(7)->toDateString())

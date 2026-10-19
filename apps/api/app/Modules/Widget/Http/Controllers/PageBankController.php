@@ -5,6 +5,7 @@ namespace App\Modules\Widget\Http\Controllers;
 use App\Core\Facades\Settings;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Widget\Actions\BuildPageBank;
+use App\Modules\Widget\Support\PageCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -45,7 +46,7 @@ final class PageBankController
         $shopId = $connection->shop_id;
         $seconds = (int) Settings::get('widget.page_cache_seconds');
         $bank = $seconds > 0
-            ? Cache::remember("widget:page:{$shopId}:{$type}:{$id}:{$locale}", $seconds, fn (): array => $build->handle($shopId, $type, $id, $locale))
+            ? Cache::remember(PageCache::key($shopId, $type, $id, $locale), $seconds, fn (): array => $build->handle($shopId, $type, $id, $locale))
             : $build->handle($shopId, $type, $id, $locale);
 
         $preview = $request->query('preview');

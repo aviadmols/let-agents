@@ -9,6 +9,10 @@ return [
         'label' => 'How long a lead is kept',
         'description' => 'After this a lead is deleted. A single lead can be deleted at any time too.',
     ],
+    'form_title' => [
+        'label' => 'The heading of leaving details',
+        'description' => 'What the shopper reads above the fields when leaving details. Empty for the usual heading.',
+    ],
     'writer_model' => [
         'label' => 'The model that writes the offers',
         'description' => 'The model that phrases the invitation on each page. Must be a different model from the reviewer.',

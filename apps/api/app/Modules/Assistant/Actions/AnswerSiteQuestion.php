@@ -20,6 +20,7 @@ use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
+use App\Modules\Assistant\Support\NoAnswer;
 use App\Modules\Assistant\Support\Offenders;
 use App\Modules\Assistant\Support\Privacy;
 use App\Modules\Assistant\Support\Question;
@@ -1393,7 +1394,9 @@ final class AnswerSiteQuestion
     private function logged(string $shopId, string $question, array $products, array $result): array
     {
         $whatsapp = $result['outcome'] !== AssistantAnswer::ANSWERED && $result['outcome'] !== 'invalid'
-            && Features::enabled('assistant.search_whatsapp', $shopId);
+            && Features::enabled('assistant.search_whatsapp', $shopId)
+            // The shop may have chosen leaving details, or only "not found", for what the site does not answer.
+            && Settings::get('assistant.no_answer', $shopId) === NoAnswer::TEAM;
 
         if ($result['outcome'] === 'invalid') {
             unset($result['reason']);
@@ -1426,7 +1429,10 @@ final class AnswerSiteQuestion
 
         unset($result['answer_id'], $result['reason']);
 
-        return $result + ['ask_id' => $ask->id, 'whatsapp' => $whatsapp];
+        // What the storefront offers instead of an answer: the team, leaving details, or nothing (NoAnswer).
+        $then = $result['outcome'] === AssistantAnswer::ANSWERED ? [] : ['no_answer' => NoAnswer::offer($shopId)];
+
+        return $result + ['ask_id' => $ask->id, 'whatsapp' => $whatsapp] + $then;
     }
 
     /**

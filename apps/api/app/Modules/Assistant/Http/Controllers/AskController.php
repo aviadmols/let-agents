@@ -3,6 +3,8 @@
 namespace App\Modules\Assistant\Http\Controllers;
 
 use App\Modules\Assistant\Actions\AnswerQuestion;
+use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\NoAnswer;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +48,11 @@ final class AskController
 
         // The visitor only counts toward a daily limit, as a hash salted per shop, like analytics.
         $result = $answer->handle($connection->shop_id, $pageType, $id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale);
+
+        // Not an answer: what the storefront offers instead, as the shop chose it (the team, leaving details, or nothing).
+        if (isset($result['outcome']) && $result['outcome'] !== AssistantAnswer::ANSWERED) {
+            $result['no_answer'] = NoAnswer::offer($connection->shop_id);
+        }
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }

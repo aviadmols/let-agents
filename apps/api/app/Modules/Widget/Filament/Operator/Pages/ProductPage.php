@@ -14,13 +14,13 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Widget\Actions\BuildPageBank;
 use App\Modules\Widget\Models\WidgetCuration;
+use App\Modules\Widget\Support\PageCache;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use UnitEnum;
@@ -363,7 +363,7 @@ class ProductPage extends Page
 
         // The storefront reads a cached page; the team's decision shows on the next load.
         foreach (BuildPageBank::LOCALES as $locale) {
-            Cache::forget("widget:page:{$this->shop}:{$this->type}:{$this->id}:{$locale}");
+            PageCache::forget($this->shop, $this->type, $this->id, $locale);
         }
 
         Notification::make()->success()->title(__('widget::ui.page.saved'))->send();
@@ -399,7 +399,7 @@ class ProductPage extends Page
 
         // The storefront reads the bank from a cache; a rescan is the one time it must not.
         foreach (['he', 'en'] as $locale) {
-            Cache::forget("widget:page:{$this->shop}:{$this->type}:{$this->id}:{$locale}");
+            PageCache::forget($this->shop, $this->type, $this->id, $locale);
         }
 
         $after = $this->shape(app(BuildPageBank::class)->handle($this->shop, $this->type, $this->id, 'he'));

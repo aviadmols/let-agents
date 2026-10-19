@@ -34,6 +34,12 @@ final class DisplaySettings extends OperatorConfiguration
     protected static ?string $slug = 'display';
 
     /**
+     * Out of the settings menu: what it held (where the drawer shows, its panels, the assistant, WhatsApp,
+     * the sign-up) has its own settings page each now. The address stays for links already given.
+     */
+    protected static bool $shouldRegisterNavigation = false;
+
+    /**
      * Which area is open, kept in the component only. The operator's screen writes it into the
      * address; inside the Shopify admin the address belongs to App Bridge, which syncs it with the
      * admin's, and the screen stopped answering. A merchant reopens on the first area.

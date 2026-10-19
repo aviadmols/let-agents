@@ -75,7 +75,7 @@ return [
     ],
     'whatsapp_when_offline' => [
         'label' => 'Outside opening hours',
-        'description' => 'Show the strip with a note, or hide it.',
-        'options' => ['show' => 'Show with a note', 'hide' => 'Hide'],
+        'description' => 'What happens when a shopper reaches WhatsApp outside the answering hours: offer to leave details, show the button with a note, or hide it.',
+        'options' => ['details' => 'Offer to leave details', 'show' => 'Show with a note', 'hide' => 'Hide'],
     ],
 ];

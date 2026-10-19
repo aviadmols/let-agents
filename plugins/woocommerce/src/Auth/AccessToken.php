@@ -43,6 +43,34 @@ final class AccessToken {
 		return $plaintext;
 	}
 
+	/**
+	 * A token made in Lets (Settings > Connection and plan) and pasted here: kept like one made here, by
+	 * its hash only. Lets holds the same token, so the two reach the same keys.
+	 *
+	 * @return bool false when the text is not a token
+	 */
+	public static function adopt( string $plaintext ): bool {
+		$plaintext = trim( $plaintext );
+
+		if ( 1 !== preg_match( '/^' . self::PREFIX . '[A-Za-z0-9]{40,64}$/', $plaintext ) ) {
+			return false;
+		}
+
+		update_option(
+			self::OPTION,
+			array(
+				'hash'         => self::hash( $plaintext ),
+				'prefix'       => substr( $plaintext, 0, 10 ),
+				'created_at'   => gmdate( 'c' ),
+				'created_by'   => get_current_user_id(),
+				'last_used_at' => null,
+			),
+			false
+		);
+
+		return true;
+	}
+
 	public static function revoke(): void {
 		delete_option( self::OPTION );
 	}

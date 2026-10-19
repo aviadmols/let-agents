@@ -56,6 +56,13 @@ final class ShortlistController
                 'heartProduct' => $wishlist && (bool) Settings::get('shortlist.heart_on_product', $shopId),
                 'heartCards' => $wishlist && (bool) Settings::get('shortlist.heart_on_cards', $shopId),
                 'heartPlace' => (string) Settings::get('shortlist.heart_place', $shopId),
+                // The heart on the products of the drawer's own results, and what a click on any heart does:
+                // 'quiet' (the picture flies to the launcher) or 'open' (the saved list opens).
+                'heartResults' => $wishlist && (bool) Settings::get('shortlist.heart_in_results', $shopId),
+                'heartClick' => (string) Settings::get('shortlist.heart_click', $shopId),
+                // The theme's product card, found from one of the shop's category pages (the heart page's
+                // detection), added to the cards the heart script knows. Empty: only those.
+                'cardSelector' => (string) Settings::get('shortlist.card_selector', $shopId),
                 // For the share message: "My wishlist at Rocks and Gold".
                 'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
                 // The words the drawer takes from the store: signing in by phone and the share message.

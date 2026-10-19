@@ -21,6 +21,9 @@ final class Compare extends OperatorShortlists
 
     protected static ?string $slug = 'compare';
 
+    /** Out of the settings menu: compare is switched in "The search window"; what shoppers compared opens from the home figures (ShortlistHome). */
+    protected static bool $shouldRegisterNavigation = false;
+
     public static function getNavigationLabel(): string
     {
         return __('shortlist::ui.compare_title');

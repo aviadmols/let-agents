@@ -891,3 +891,30 @@ html.dark .fi-panel-merchant {
     .fi-panel-merchant .lp-kv dd { margin-bottom: 10px; }
 }
 .fi-panel-merchant .lp-chip-x { border: 0; background: transparent; color: var(--la-muted); cursor: pointer; padding: 0 0 0 2px; font-size: 11px; }
+
+/* the leave-details field bank (Leads LeaveDetails) */
+.fi-panel-merchant .lp-bank { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.fi-panel-merchant .lp-bank-chosen { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-height: 36px; padding: 6px 10px; border-radius: 14px; background: var(--la-sunk); }
+.fi-panel-merchant .lp-bank-chosen .lp-bank-ph { color: var(--la-muted); font-size: 13px; }
+.fi-panel-merchant .lp-bank-tag { display: inline-flex; align-items: center; gap: 8px; padding-block: 4px; padding-inline: 12px 6px; border-radius: 999px; background: var(--la-accent); color: var(--la-paper); font-size: 13px; cursor: grab; }
+.fi-panel-merchant .lp-bank-tag.is-locked { cursor: default; }
+.fi-panel-merchant .lp-bank-tag button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.fi-panel-merchant .lp-bank-req { font-size: 11px !important; padding: 1px 7px !important; border-radius: 999px; background: rgb(255 255 255 / .18) !important; }
+.fi-panel-merchant .lp-bank-req.is-off { opacity: .55; text-decoration: line-through; }
+.fi-panel-merchant .lp-bank-x { opacity: .7; font-size: 12px !important; }
+.fi-panel-merchant .lp-bank-avail { display: flex; gap: 6px; flex-wrap: wrap; }
+.fi-panel-merchant .lp-bank-avail .lp-chip { min-height: 30px; font-size: 13px; }
+.fi-panel-merchant .lp-bank-add { display: flex; gap: 8px; align-items: center; }
+.fi-panel-merchant .lp-bank-add .lp-set-field { min-height: 36px; flex: 1; max-width: 320px; }
+.fi-panel-merchant .lp-set-state { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--la-muted); margin-bottom: 12px; }
+.fi-panel-merchant .lp-fill { display: flex; gap: 8px; align-items: center; }
+.fi-panel-merchant .lp-fill .lp-set-field { flex: 1; }
+
+/* the account pages' two-column form, label above each field (the design's .form) */
+.fi-panel-merchant .lp-acct-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.fi-panel-merchant .lp-acct-form > label, .fi-panel-merchant .lp-acct-full { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--la-muted); min-width: 0; }
+.fi-panel-merchant .lp-acct-form .lp-set-field { max-width: none; }
+.fi-panel-merchant .lp-acct-full { grid-column: 1 / -1; }
+.fi-panel-merchant .lp-acct-full .lp-set-save { margin-top: 4px; flex-wrap: wrap; }
+@media (max-width: 900px) { .fi-panel-merchant .lp-acct-form { grid-template-columns: 1fr; } }
+.fi-panel-merchant .lp-set-grid > .lp-set-card + .lp-set-card { margin-block-start: 0; }

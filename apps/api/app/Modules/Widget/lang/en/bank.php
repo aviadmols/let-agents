@@ -77,8 +77,8 @@ return [
     ],
     // What the shop can rewrite in its settings; these are the defaults.
     'contact' => [
-        'title' => 'Want a video of this product, or to ask us about it?',
-        'button' => 'Chat on WhatsApp',
+        'title' => 'Want to make sure? The team is on WhatsApp',
+        'button' => 'Ask the team',
         'message' => 'Hello, I would like to know more about :product
 :url',
         'offline_note' => 'Outside opening hours. Write now and we will get back to you.',

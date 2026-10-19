@@ -63,7 +63,7 @@
                     <span>{{ $t('theme') }}</span>
                     <span class="lp-tabs lp-tabs-sm" role="group" aria-label="{{ $t('theme') }}">
                         @foreach (['light', 'dark', 'system'] as $mode)
-                            <button type="button" :class="{ 'is-on': theme === '{{ $mode }}' }" @click="theme = '{{ $mode }}'; $dispatch('theme-changed', theme)">{{ $t('themes.'.$mode) }}</button>
+                            <button type="button" :class="{ 'is-on': theme === '{{ $mode }}' }" @click="theme = '{{ $mode }}'; $dispatch('theme-changed', theme); fetch(@js(route('admin.theme', ['theme' => $mode])), { method: 'POST', headers: { 'X-CSRF-TOKEN': @js(csrf_token()), 'Accept': 'application/json' } }).catch(() => {})">{{ $t('themes.'.$mode) }}</button>
                         @endforeach
                     </span>
                 </div>

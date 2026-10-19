@@ -3,11 +3,14 @@
 namespace App\Modules\Connections;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\ConnectionFacts;
+use App\Modules\Admin\Contracts\StorePlugin;
 use App\Modules\Connections\Console\BundlePluginCommand;
 use App\Modules\Connections\Contracts\StoreBlog;
 use App\Modules\Connections\Contracts\StoreFeed;
 use App\Modules\Connections\Http\Middleware\FrameInsideWordPress;
 use App\Modules\Connections\Support\FollowShopDomain;
+use App\Modules\Connections\Support\MerchantStorePlugin;
 use App\Modules\Connections\Support\PlatformBlogs;
 use App\Modules\Connections\Support\PlatformFeeds;
 use App\Modules\Connections\Support\PluginBlog;
@@ -28,6 +31,9 @@ final class ConnectionsServiceProvider extends ModuleServiceProvider
         // And its blog: where a post goes as a draft.
         $this->app->tag([PluginBlog::class], 'connections.store_blogs');
         $this->app->bind(StoreBlog::class, fn ($app) => new PlatformBlogs($app->tagged('connections.store_blogs')));
+        // The plugin from the shop's own panel: its zip, a connection token, what the connection says.
+        $this->app->bind(StorePlugin::class, MerchantStorePlugin::class);
+        $this->app->tag([MerchantStorePlugin::class], ConnectionFacts::TAG);
     }
 
     protected function bootModule(): void

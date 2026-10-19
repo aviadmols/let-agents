@@ -47,7 +47,9 @@ final class MerchantHomeTest extends TestCase
         $this->assertStringNotContainsString('$', strip_tags($page[0]), 'no dollar on the shop manager\'s home');
 
         $this->get("/merchant/{$shop->slug}/notices")->assertOk()->assertSee('הודעות ותובנות');
-        $this->get("/merchant/{$shop->slug}/connection")->assertOk()->assertSee('חיבור החנות');
+        // The old address of the connection opens "Connection and plan" under settings.
+        $this->get("/merchant/{$shop->slug}/connection")->assertRedirect("/merchant/{$shop->slug}/settings/connection");
+        $this->get("/merchant/{$shop->slug}/settings/connection")->assertOk()->assertSee('חיבור ומנוי');
     }
 
     public function test_the_period_is_7_30_or_90_days_or_dates_the_manager_chose(): void

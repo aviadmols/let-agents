@@ -26,6 +26,9 @@ final class ProductPage extends OperatorProductPage
 
     protected static ?int $navigationSort = 30;
 
+    /** Out of the settings menu: opened from "The product page block" (ProductWidgetSettings), "Edit page by page". */
+    protected static bool $shouldRegisterNavigation = false;
+
     /**
      * The operator searches every shop at once; a merchant searches their own, through the tenant
      * scope, so nothing from another shop can come back.

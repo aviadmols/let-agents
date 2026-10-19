@@ -211,6 +211,16 @@
 .ls-verify { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 14px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-verify a { color: var(--ls-fg); font-weight: 500; display: inline-flex; align-items: center; gap: 4px; text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 3px; }
 
+/* "Helpful?" under an answer: two quiet thumbs, the pressed one filled */
+.ls-rate { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 14px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
+.ls-rate__q { margin-inline-end: 2px; }
+.ls-rate__btn { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--ls-r-control); background: transparent; color: var(--ls-fg-muted); cursor: pointer; transition: background .15s, color .15s; }
+.ls-rate__btn:hover { background: var(--ls-bg-hover); color: var(--ls-fg); }
+.ls-rate__btn.is-on { background: var(--ls-bg-pressed); color: var(--ls-fg); }
+.ls-rate__btn.is-on .ls-icon { fill: currentColor; }
+.ls-rate__down { transform: scaleY(-1); }
+.ls-rate__thanks { flex-basis: 100%; margin-top: 2px; }
+
 /* checkbox (consent, compare pick) */
 .ls-check-row { display: flex; gap: 10px; align-items: flex-start; font-size: var(--lsp-text-sm); line-height: 1.45; cursor: pointer; }
 .ls-check-row input { appearance: none; -webkit-appearance: none; flex: none; width: 20px; height: 20px; margin: 0; border-radius: 6px; box-shadow: inset 0 0 0 1.5px var(--ls-line-strong); background: var(--ls-bg) center / 14px no-repeat; transition: background-color 160ms ease, box-shadow 160ms ease; cursor: pointer; }

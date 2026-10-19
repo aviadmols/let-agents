@@ -4,7 +4,8 @@ namespace App\Modules\Admin\Panels;
 
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Enums\ShopRole;
-use App\Modules\Admin\Filament\Merchant\Pages\ShopConnection;
+use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Http\Middleware\SyncTenantFromPanel;
 use App\Modules\Admin\Models\User;
@@ -46,6 +47,8 @@ final class MerchantPanelProvider extends PanelProvider
             ->tenantMenu(false)
             ->userMenu(false)
             ->renderHook(PanelsRenderHook::BODY_START, fn (): HtmlString => new HtmlString(view('admin::panel.icons')->render()))
+            // The display mode the person chose (My profile, or the top bar), before the panel draws itself.
+            ->renderHook(PanelsRenderHook::HEAD_START, fn (): HtmlString => self::theme())
             ->renderHook(PanelsRenderHook::BODY_END, fn (): HtmlString => Tips::script())
             ->renderHook(PanelsRenderHook::CONTENT_START, fn (): HtmlString => self::topbar())
             // One flat list of screens; a screen's other pages are its tabs, or the settings side menu.
@@ -109,10 +112,20 @@ final class MerchantPanelProvider extends PanelProvider
                 ? __('admin::panels.top.operator')
                 : (ShopRole::tryFrom((string) $role) ?? ShopRole::Member)->label().' · '.$shop->name,
             'links' => [
-                ['label' => __('admin::home.connection'), 'url' => ShopConnection::getUrl(tenant: $shop)],
+                ['label' => __('admin::shop_settings.profile.title'), 'url' => ProfileSettings::getUrl(tenant: $shop)],
+                ['label' => __('admin::home.connection'), 'url' => ConnectionSettings::getUrl(tenant: $shop)],
             ],
             'logoutUrl' => filament()->getLogoutUrl(),
         ])->render());
+    }
+
+    /** The person's display mode, set where Filament reads it (localStorage) before its own script runs. */
+    private static function theme(): HtmlString
+    {
+        $user = Auth::user();
+        $theme = $user instanceof User ? $user->preferredTheme() : null;
+
+        return $theme === null ? new HtmlString('') : new HtmlString('<script>try{localStorage.setItem("theme",'.json_encode($theme).')}catch(e){}</script>');
     }
 
     private static function viewerIsOperator(): bool

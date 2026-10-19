@@ -28,6 +28,7 @@ final class SettingsPage {
 		add_action( 'admin_menu', array( self::class, 'menu' ), 99 );
 		add_action( 'admin_post_let_agents_generate_token', array( self::class, 'generate_token' ) );
 		add_action( 'admin_post_let_agents_revoke_token', array( self::class, 'revoke_token' ) );
+		add_action( 'admin_post_let_agents_paste_token', array( self::class, 'paste_token' ) );
 		add_action( 'admin_post_let_agents_save_settings', array( self::class, 'save_settings' ) );
 		add_action( 'admin_post_let_agents_save_mode', array( self::class, 'save_mode' ) );
 		add_action( 'admin_post_let_agents_send_order_history', array( self::class, 'send_order_history' ) );
@@ -68,6 +69,17 @@ final class SettingsPage {
 		set_transient( self::NEW_TOKEN_TRANSIENT . get_current_user_id(), AccessToken::issue(), 2 * MINUTE_IN_SECONDS );
 
 		wp_safe_redirect( self::url( array( 'let_agents_notice' => 'generated' ) ) );
+		exit;
+	}
+
+	/** A token made in Lets, pasted here: the store is connected with it. */
+	public static function paste_token(): void {
+		self::authorize( 'let_agents_paste_token' );
+
+		$token = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- checked against the token pattern.
+		$saved = AccessToken::adopt( $token );
+
+		wp_safe_redirect( self::url( array( 'let_agents_notice' => $saved ? 'pasted' : 'paste_invalid' ) ) );
 		exit;
 	}
 
@@ -209,6 +221,26 @@ final class SettingsPage {
 				</form>
 			<?php endif; ?>
 
+			<h3><?php esc_html_e( 'Have a token from Lets?', 'let-agents' ); ?></h3>
+			<p class="description"><?php esc_html_e( 'In Lets: Settings > Connection and plan > Create a connection token. Paste it here and save; Lets reads the store with it.', 'let-agents' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="let_agents_paste_token" />
+				<?php wp_nonce_field( 'let_agents_paste_token' ); ?>
+				<p>
+					<label for="let-agents-paste-token" class="screen-reader-text"><?php esc_html_e( 'Token from Lets', 'let-agents' ); ?></label>
+					<input type="text" id="let-agents-paste-token" name="token" class="large-text code" dir="ltr" autocomplete="off" placeholder="lat_…" required />
+				</p>
+				<?php
+				submit_button(
+					__( 'Save the token', 'let-agents' ),
+					'secondary',
+					'submit',
+					false,
+					null === $token ? array() : array( 'onclick' => 'return confirm(' . wp_json_encode( __( 'The current token will stop working immediately. Continue?', 'let-agents' ) ) . ');' )
+				);
+				?>
+			</form>
+
 			<h2><?php esc_html_e( 'Lets Search on the store', 'let-agents' ); ?></h2>
 			<p><?php esc_html_e( 'One script from Let Agents: it opens from the store\'s search box and search icons, and on product pages and articles it starts with what matters about the page. Suggestions forgive spelling mistakes, results come with live prices and add to cart, and shoppers can ask questions and keep a wishlist. If Let Agents does not answer, the store\'s own search runs as before.', 'let-agents' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -292,6 +324,8 @@ final class SettingsPage {
 		$messages = array(
 			'revoked' => array( 'warning', __( 'The token was revoked. Let Agents can no longer read this store.', 'let-agents' ) ),
 			'saved'   => array( 'success', __( 'Settings saved.', 'let-agents' ) ),
+			'pasted'  => array( 'success', __( 'The token from Lets was saved. Go back to Lets and check the connection.', 'let-agents' ) ),
+			'paste_invalid' => array( 'error', __( 'That is not a Lets connection token. Copy it again from Lets: Settings > Connection and plan.', 'let-agents' ) ),
 			'history' => array( 'success', __( 'Sending past orders to Let Agents. It runs in the background and can take a while in a large store.', 'let-agents' ) ),
 			'history_unavailable' => array( 'warning', __( 'Past orders can be sent only when the store is connected to Let Agents and Lets Search is not off.', 'let-agents' ) ),
 		);

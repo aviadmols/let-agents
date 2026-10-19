@@ -5,6 +5,7 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
@@ -58,20 +59,28 @@ final class SearchIndexController
             // What the site does not answer goes to the shop's WhatsApp, when the shop has one.
             'whatsapp' => self::whatsapp($shopId),
             'askWhatsapp' => Features::enabled('assistant.search_whatsapp', $shopId),
-            'whatsappMessage' => trim((string) Settings::get('assistant.search_whatsapp_message', $shopId)) ?: (string) __('search::storefront.wa_message', [], $locale),
+            // The shop's words for the search box, else its product page's (widget.whatsapp_message), else ours.
+            'whatsappMessage' => trim((string) Settings::get('assistant.search_whatsapp_message', $shopId))
+                ?: trim((string) Settings::get('widget.whatsapp_message', $shopId))
+                ?: (string) __('search::storefront.wa_message', [], $locale),
             // When the shop answers its WhatsApp, one range a day from Sunday ("09:00-18:00", empty: closed),
             // read in the browser at the shop's time: this answer is cached.
             'hours' => ['timezone' => (string) Settings::get('widget.whatsapp_timezone', $shopId),
                 'days' => array_map(fn (string $day): string => trim((string) Settings::get('widget.hours_'.$day, $shopId)), ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'])],
             // Without a WhatsApp, or after hours: the chat asks for a name and a way back, kept as a callback.
             'callbacks' => Features::enabled('shoppers.callbacks', $shopId),
+            // What a question with no answer is offered (assistant.no_answer as far as the shop can keep it):
+            // team (WhatsApp in the hours, details outside them), details (the form), none ("not found" only).
+            'noAnswer' => self::noAnswer($shopId),
+            // The shop's own "leave details" form: its fields in order, each required or not; null: the plain one.
+            'leadForm' => app(DescribesLeadForm::class)->forShop($shopId, $locale),
             // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
             'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
             // "Popular in the store" on the empty drawer: this shop's own searches, never sample words.
             // Worked out once an hour per shop and index: it reads the index's own words.
             'popular' => Cache::remember('search:popular:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::popular($shopId, (string) $index->items))),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
-            'similar' => Features::enabled('search.similar', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready()),
+            'similar' => Features::enabled('search.similar', $shopId) && self::similarReady($tenant, $shopId),
             // What each product carries, as the shop set it on its search display screen.
             'price' => (bool) Settings::get('search.show_price', $shopId),
             'cart' => (bool) Settings::get('search.show_cart', $shopId),
@@ -85,7 +94,7 @@ final class SearchIndexController
             // where each AI opens with them. Ready here, so the press opens at once with no request.
             'aiAsk' => Features::enabled('search.ai_share', $shopId) && Features::enabled('search.agent_connector', $shopId)
                 ? self::aiAsk((string) (Shop::query()->whereKey($shopId)->value('name') ?? ''), AgentCatalog::publicUrl('c/'.$site).'?format=json', $locale) : null,
-        ];
+        ] + self::lookFor($tenant, $shopId);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale), 0, 24).'"';
         $headers = ['ETag' => $etag, 'Cache-Control' => 'public, max-age=300'];
 
@@ -105,6 +114,81 @@ final class SearchIndexController
             'size' => $data['size'] ?? null,
             'actions' => $data['actions'] ?? [],
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * GET /api/v1/search/{site}/look
+     *
+     * How the drawer looks and where it takes over, read on every page before the index is needed: the
+     * shop's look (Lets or the site's), the widget's language, the assistant's name, whether the theme's
+     * own search box opens the drawer, and the out-of-stock row on a product page. Small and cached.
+     */
+    public function look(Request $request, TenantContext $tenant, string $site): JsonResponse|Response
+    {
+        $connection = StorefrontSite::resolve($request, $site);
+
+        if ($connection instanceof JsonResponse) {
+            return $connection;
+        }
+
+        $shopId = $connection->shop_id;
+        $look = ['enabled' => Features::enabled('search.storefront', $shopId)] + self::lookFor($tenant, $shopId);
+        $etag = '"'.substr(hash('sha256', (string) json_encode($look)), 0, 24).'"';
+        $headers = ['ETag' => $etag, 'Cache-Control' => 'public, max-age=300'];
+
+        if ($request->header('If-None-Match') === $etag) {
+            return response('', 304, $headers);
+        }
+
+        return response()->json($look, 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The shop's choices on its "how it looks" and "search window" settings, as the drawer reads them.
+     *
+     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool}
+     */
+    public static function lookFor(TenantContext $tenant, string $shopId): array
+    {
+        $language = (string) Settings::get('search.widget_language', $shopId);
+        $name = trim((string) Settings::get('search.assistant_name', $shopId));
+
+        return [
+            // "lets": our own look; "store": the theme's font, main colour and corners, checked for contrast in the browser
+            'theme' => Settings::get('search.theme', $shopId) === 'store' ? 'store' : 'lets',
+            // null: as the site (the page's own language)
+            'lang' => in_array($language, ['he', 'en'], true) ? $language : null,
+            // the assistant's name beside its answers: the shop's own, else "<shop> AI"
+            'assistant' => $name !== '' ? $name : trim((string) (Shop::query()->whereKey($shopId)->value('name') ?? 'Lets')).' AI',
+            // the theme's own search box and search buttons open the drawer; off: only Lets' own and what is marked data-lets-*
+            'takeOver' => Features::enabled('search.take_over_field', $shopId),
+            // "Helpful?" under an assistant's answer
+            'rate' => Features::enabled('search.rate_answers', $shopId),
+            // a product or a variant sold out: a row on the product page with similar products in stock, same size
+            'oosSimilar' => Features::enabled('search.out_of_stock_similar', $shopId) && self::similarReady($tenant, $shopId),
+        ];
+    }
+
+    /**
+     * What a question with no answer is offered, read from the same settings the assistant's replies are
+     * (assistant.no_answer): the team only with WhatsApp on, the shop's own number and the offer on; details
+     * only while the shop takes them (shoppers.callbacks); otherwise "not found" only.
+     */
+    private static function noAnswer(string $shopId): string
+    {
+        $chosen = (string) Settings::get('assistant.no_answer', $shopId);
+
+        if ($chosen === 'team' && self::whatsapp($shopId) !== null && Features::enabled('assistant.search_whatsapp', $shopId)) {
+            return 'team';
+        }
+
+        return $chosen !== 'none' && Features::enabled('shoppers.callbacks', $shopId) ? 'details' : 'none';
+    }
+
+    /** Whether the shop's vectors can answer "similar items": pictures or text. */
+    private static function similarReady(TenantContext $tenant, string $shopId): bool
+    {
+        return $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady() || app(SemanticSearch::class)->ready());
     }
 
     /**

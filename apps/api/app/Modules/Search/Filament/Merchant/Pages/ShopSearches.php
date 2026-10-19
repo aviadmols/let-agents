@@ -17,4 +17,10 @@ final class ShopSearches extends OperatorShopSearches
     protected static string|UnitEnum|null $navigationGroup = 'settings';
 
     protected static ?int $navigationSort = 25;
+
+    /** Out of the settings menu: its parts live on the new settings pages; the address still opens it. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }

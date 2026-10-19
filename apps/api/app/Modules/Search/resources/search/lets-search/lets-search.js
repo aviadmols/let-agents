@@ -53,6 +53,19 @@
     return out;
   }
   var CFG = Object.assign({}, DEFAULTS, legacyConfig(), win.LetsSearchConfig || {});
+  // The shop's look, as its team chose it (/search/{site}/look): Lets' look or the site's, the widget's
+  // language, the assistant's name, whether the theme's own search box opens us. The last one this browser
+  // read is used at once, so the page never flashes the wrong language; the fresh one follows (applyLook).
+  // In the team's preview, what the preview page itself set wins.
+  var PAGE_SET = win.LetsSearchConfig || {};
+  var SITE_LOCALE = CFG.locale;
+  var LOOK_KEY = 'ls_look_' + String(CFG.site || '');
+  function lookWins(key) { return !(CFG.preview && PAGE_SET[key] != null); }
+  var LOOK = (function () { try { var l = JSON.parse(win.localStorage.getItem(LOOK_KEY) || 'null'); return l && typeof l === 'object' ? l : {}; } catch (e) { return {}; } })();
+  if (LOOK.lang && lookWins('locale')) { CFG.locale = LOOK.lang; }
+  if (LOOK.theme && lookWins('theme')) { CFG.theme = LOOK.theme; }
+  if (LOOK.assistant && lookWins('assistant')) { CFG.assistant = LOOK.assistant; }
+  CFG.takeOver = LOOK.takeOver !== false;
   if (URLQ.lsTheme) { CFG.theme = URLQ.lsTheme; }
   if (URLQ.lsLang) { CFG.locale = URLQ.lsLang; }
   if (URLQ.lsLauncher) { CFG.launcher = URLQ.lsLauncher; }
@@ -67,7 +80,7 @@
   var DIR = LANG === 'he' ? 'rtl' : 'ltr';
 
   // ---------------------------------------------------------------- words
-  var T = {
+  var WORDS = {
     he: {
       open: 'חיפוש חכם', close: 'סגירה', saved: 'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Lets', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
       placeholder: 'חפשו מוצר, או שאלו כל דבר', placeholderProduct: 'שאלו על המוצר הזה, או חפשו כל דבר', clear: 'ניקוי', photo: 'חיפוש לפי תמונה', send: 'שליחה',
@@ -116,7 +129,10 @@
       aiAsk: 'לשאול את ה-AI שלי', aiHelp: 'החיפוש והמוצרים נשלחים ל-AI שתבחרו, כדי להתייעץ לפני הקנייה.', aiStoreHelp: 'כל החנות נשלחת ל-AI שתבחרו: הוא ימליץ, ישווה ויכין קישור לתשלום עם המוצרים בסל.',
       aiCopy: 'העתקת קישור', aiCopied: 'הקישור הועתק. אפשר להדביק אותו בכל AI.', aiFailed: 'לא הצלחנו להכין את הקישור. נסו שוב.', aiFor: 'נשלח: ":q" · :n מוצרים',
       kitTitle: 'יש בחנות ערכה מוכנה', myAiTitle: 'רוצים לבדוק לעומק עם ה-AI שלכם?', myAiSub: 'הוא יקבל את השאלה ואת כל המידע מהחנות, ויחזיר הזמנה מוכנה לסל כאן.', aiPromptQ: 'השאלה שלי: ":q". אני רוצה לקנות ב:store. ענה/י מהמידע של החנות וסיים/י בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
-      aiPrompt: 'אני רוצה לקנות ב:store. סיים/י תמיד כל המלצה בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url'
+      aiPrompt: 'אני רוצה לקנות ב:store. סיים/י תמיד כל המלצה בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
+      leadRequired: 'צריך למלא את זה', leadBadField: 'משהו כאן לא תקין', helpful: 'עזר?', helpfulYes: 'כן, עזר', helpfulNo: 'לא עזר', helpfulThanks: 'תודה, זה עוזר לנו להשתפר.', helpfulSorry: 'תודה. הצוות של החנות יראה את התשובה הזאת.',
+      oosProduct: 'המוצר אזל · להציג מוצרים דומים שיש במלאי', oosSize: 'המידה :v אזלה · להציג דומים במידה :v שיש במלאי', oosOption: ':v אזל · להציג דומים ב:v שיש במלאי',
+      oosNone: 'אין כרגע דומים ב:v שיש במלאי. אלה דומים שיש במלאי:', oosHead: 'במלאי, דומים ל־'
     },
     en: {
       open: 'Smart search', close: 'Close', saved: 'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
@@ -166,9 +182,13 @@
       aiAsk: 'Ask my AI', aiHelp: 'The search and its products go to the AI you choose, to take advice before buying.', aiStoreHelp: 'The whole store goes to the AI you choose: it recommends, compares and makes a checkout link with the products in the cart.',
       aiCopy: 'Copy link', aiCopied: 'Link copied. Paste it into any AI.', aiFailed: 'We could not prepare the link. Please try again.', aiFor: 'Sending: ":q" · :n products',
       kitTitle: 'The store has a ready-made kit', myAiTitle: 'Want to look deeper with your own AI?', myAiSub: 'It gets the question and all the store\'s information, and brings back an order ready for the cart here.', aiPromptQ: 'My question: ":q". I want to buy from :store. Answer from the store\'s information and end with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
-      aiPrompt: 'I want to buy from :store. Always end every recommendation with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url'
+      aiPrompt: 'I want to buy from :store. Always end every recommendation with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
+      leadRequired: 'Please fill this in', leadBadField: 'Something here is not right', helpful: 'Helpful?', helpfulYes: 'Yes, it helped', helpfulNo: 'No, it didn\'t help', helpfulThanks: 'Thanks, that helps us improve.', helpfulSorry: 'Thanks. The store\'s team will see this answer.',
+      oosProduct: 'Sold out · show similar products in stock', oosSize: 'Size :v is sold out · show similar in size :v in stock', oosOption: ':v is sold out · show similar in :v in stock',
+      oosNone: 'Nothing similar in :v is in stock right now. These similar ones are in stock:', oosHead: 'In stock, like '
     }
-  }[LANG];
+  };
+  var T = WORDS[LANG];
   function t(key, vars) {
     var s = T[key] == null ? key : T[key];
     if (vars) { Object.keys(vars).forEach(function (k) { var v = vars[k]; if (k === 'name' || k === 'shop') { v = '\u2068' + v + '\u2069'; } s = s.split(':' + k).join(v); }); }
@@ -641,6 +661,8 @@
   // what was asked on earlier pages is kept, but hidden on this one until asked for (the dashed line at the bottom)
   S.turns.forEach(function (x) { x.prev = true; });
   var fresh = {}; // turn ids that animate in this render only
+  var BOOTED = false; // the page is hooked: a look that changes after this re-hooks and redraws what is on it
+  var OOS = { host: null, watching: false, state: null, text: null }; // the product page's row for a product sold out
 
   // ---------------------------------------------------------------- index (everything instant comes from here)
   function loadIndex() {
@@ -652,6 +674,8 @@
       if (S.engine && S.engine.build) {
         try { S.built = S.engine.build((d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '' }; })); } catch (e) { S.built = null; }
       }
+      // the index carries the shop's look too (and is all a preview reads): the same choices as /look
+      if (S.config.theme) { applyLook(S.config); }
       if (!CFG.assistant) { CFG.assistant = (S.config.shopName || 'Lets') + ' AI'; }
       shopSettings();
       render();
@@ -669,6 +693,62 @@
     R.classList.toggle('is-frame', S.config.images === 'frame');
     doc.querySelectorAll('.lets-inline').forEach(function (h) { var b = h.shadowRoot && h.shadowRoot.querySelector('[data-photo]'); if (b) { b.hidden = off('photos'); b.previousElementSibling.hidden = off('photos'); } });
     if (S.config.selector && S.config.selector !== CFG.fieldSelector) { CFG.fieldSelector = CFG.fieldSelector + ', ' + S.config.selector; hookFields(); }
+  }
+
+  // ---------------------------------------------------------------- the shop's look (settings · how it looks, search window)
+  // Read once a page, before the index is needed (small, cached by the browser for minutes), and kept for the
+  // next page. Each choice is applied where it shows: the language of every word, Lets' look or the site's,
+  // the assistant's name, the theme's own search box, the product page's row for a product sold out.
+  function fetchLook() {
+    if (!CFG.api || !CFG.site) { return; }
+    json(API + '/search/' + SITE + '/look').then(function (r) { if (r.ok && r.body && r.body.theme) { applyLook(r.body); } }).catch(function () { /* the last look stays */ });
+  }
+  function applyLook(l) {
+    var keep = { theme: l.theme, lang: l.lang || null, assistant: l.assistant || '', takeOver: l.takeOver !== false, rate: l.rate !== false, oosSimilar: l.oosSimilar === true, enabled: l.enabled !== false };
+    if (!CFG.preview) { try { win.localStorage.setItem(LOOK_KEY, JSON.stringify(keep)); } catch (e) { /* storage blocked: read again next page */ } }
+    LOOK = keep;
+    if (keep.assistant && lookWins('assistant')) { CFG.assistant = keep.assistant; }
+    if (lookWins('theme') && !URLQ.lsTheme) { setTheme(keep.theme === 'store' ? 'store' : 'lets'); }
+    if (lookWins('locale') && !URLQ.lsLang) { setLang(/^en/i.test(String(keep.lang || SITE_LOCALE || '')) ? 'en' : 'he'); }
+    if (CFG.takeOver !== keep.takeOver) { CFG.takeOver = keep.takeOver; rehook(); }
+    if (BOOTED) { outOfStockRow(); }
+    if (D) { render(); }
+  }
+  // every host of ours carries the look: the drawer, the launchers, the product page's rows
+  function ourHosts() { return [host].concat([].slice.call(doc.querySelectorAll('.lets-inline, .lets-oos, [data-lets-launcher]'))); }
+  function setTheme(theme) {
+    if (CFG.theme === theme && host.getAttribute('data-ls-theme') === theme) { return; }
+    CFG.theme = theme;
+    ourHosts().forEach(function (h) {
+      h.setAttribute('data-ls-theme', theme);
+      if (theme !== 'store') { ['--store-font', '--store-fg', '--store-bg', '--store-fg-muted', '--store-accent', '--store-radius'].forEach(function (p) { h.style.removeProperty(p); }); }
+    });
+    if (theme === 'store' && BOOTED) { applyStoreTheme(); }
+  }
+  // the widget in another language than the page: every word of ours, the drawer's frame and the rows on the page
+  function setLang(lang) {
+    if (lang === LANG) { return; }
+    LANG = lang; T = WORDS[lang]; DIR = lang === 'he' ? 'rtl' : 'ltr';
+    R.setAttribute('dir', DIR); R.setAttribute('lang', LANG);
+    D.setAttribute('aria-label', t('open'));
+    var label = function (sel, key) { var n = D.querySelector(sel); if (n) { n.setAttribute('aria-label', t(key)); } };
+    label('[data-menu]', 'more'); label('button[data-close]', 'close'); label('[data-clear]', 'clear'); label('[data-photo]', 'photo'); label('[data-submit]', 'send');
+    SUG.setAttribute('aria-label', t('placeholder')); FLOW.setAttribute('aria-label', t('open'));
+    INPUT.placeholder = ''; renderCtx();
+    var saved = D.querySelector('[data-tab="saved"]'); if (saved && saved.firstChild && saved.firstChild.nodeType === 3) { saved.firstChild.nodeValue = t('saved'); }
+    var pv = D.querySelector('.ls-preview'); if (pv) { pv.innerHTML = icon('info', 'ls-icon--sm') + esc(t('preview')); }
+    var cr = D.querySelector('.ls-credit a'); if (cr) { cr.textContent = t('powered'); }
+    doc.querySelectorAll('.lets-inline').forEach(function (h) {
+      var box = h.shadowRoot && h.shadowRoot.querySelector('.ls'), input = box && box.querySelector('input');
+      if (box) { box.setAttribute('dir', DIR); box.setAttribute('lang', LANG); }
+      if (input) { input.placeholder = t('placeholderProduct'); input.setAttribute('aria-label', t('placeholderProduct')); }
+    });
+    LAUNCHERS.forEach(function (b) { b.setAttribute('aria-label', t('open')); });
+    refreshLauncher();
+    // what the server words in the shop's language comes again in this one: the index, the product's bank
+    if (S.indexing) { S.indexing = null; loadIndex(); }
+    if (PAGE) { delete BANKS[String(PAGE.id)]; delete BANK_READY[String(PAGE.id)]; bankFor(PAGE.id); }
+    if (OOS.host) { OOS.text = null; outOfStockRow(); }
   }
   function rec(id) { id = String(id); return S.records[id.indexOf(':') > 0 ? id : 'p:' + id]; }
   function pid(id) { return String(id).replace(/^p:/, ''); }
@@ -863,6 +943,7 @@
     '<symbol id="ls-i-truck" viewBox="0 0 24 24"><path d="M3.5 6.5h10v9h-10zM13.5 9.5h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></symbol>' +
     '<symbol id="ls-i-share" viewBox="0 0 24 24"><path d="M12 14.5V4M8 7.5l4-4 4 4"/><path d="M7.5 10.5h-1A2 2 0 0 0 4.5 12.5v5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-1"/></symbol>' +
     '<symbol id="ls-i-spark" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.4 2.6 6.9 7.5 8.5-4.9 1.6-6.9 4.1-7.5 8.5-.6-4.4-2.6-6.9-7.5-8.5 4.9-1.6 6.9-4.1 7.5-8.5z"/></symbol>' +
+    '<symbol id="ls-i-thumb" viewBox="0 0 24 24"><path d="M7.5 10.5v9H4.8a.8.8 0 0 1-.8-.8v-7.4a.8.8 0 0 1 .8-.8z"/><path d="M7.5 10.5 11 4.2a1.9 1.9 0 0 1 3.5 1.3l-.8 3.9h4.9a2 2 0 0 1 2 2.4l-1.3 6.1a2 2 0 0 1-2 1.6H7.5"/></symbol>' +
     '<symbol id="ls-i-expand" viewBox="0 0 24 24"><path d="M14.5 4.5h5v5M9.5 19.5h-5v-5M19.5 4.5l-6 6M4.5 19.5l6-6"/></symbol>' +
     // the AI services' own marks (simple-icons, CC0), filled
     '<symbol id="ls-i-chatgpt" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></symbol>' +
@@ -1504,7 +1585,7 @@
   }
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
   function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" decoding="async" draggable="false">' : ''; }
-  function heartBtn(id, on, float) { return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
+  function heartBtn(id, on, float) { if (SHORT && SHORT.heartResults === false) { return ''; } return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
   function buyBtn(r, cls) {
     var id = pid(r.id);
     if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--secondary ' + cls + '" href="' + esc(r.url) + '">' + esc(t('orderPage')) + '</a>' : ''; }
@@ -1514,16 +1595,16 @@
   }
   function you(turn) {
     if (turn.kind === 'photo') { return '<div class="ls-you"><img class="ls-you__photo" src="' + esc(turn.src || '') + '" alt="' + esc(t('yourPhoto')) + '"></div>'; }
-    if (turn.kind === 'similar' && turn.of) { return rec(turn.of) ? '<div class="ls-you ls-you--of">' + ofHero(turn.of, turn.size) + '</div>' : ''; }
+    if (turn.kind === 'similar' && turn.of) { return rec(turn.of) ? '<div class="ls-you ls-you--of">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' : ''; }
     return turn.q ? '<div class="ls-you"><div class="ls-you__bubble" dir="auto">' + esc(turn.q) + '</div></div>' : '';
   }
   // the product the similar items are for: big enough to keep, compare against, or buy
-  function ofHero(id, size) {
+  function ofHero(id, size, oos) {
     var r = rec(id);
     if (!r) { return ''; }
     var k = pid(r.id);
     return '<div class="ls-of"><a class="ls-of__media" href="' + esc(r.url) + '" tabindex="-1"><img src="' + esc(r.img || '') + '" alt=""></a>' +
-      '<div class="ls-of__body"><div class="ls-of__label">' + esc(size ? sizeWord('size_similar_title', { size: size.shown }) : t('similarHead')) + '</div><a class="ls-of__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' +
+      '<div class="ls-of__body"><div class="ls-of__label">' + esc(size ? sizeWord('size_similar_title', { size: size.shown }) : oos ? t('oosHead') : t('similarHead')) + '</div><a class="ls-of__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' +
       '<div class="ls-of__price">' + priceHtml(r) + (r.s === 0 ? '<span class="ls-stock">' + esc(t('outStock')) + '</span>' : '') + '</div>' +
       '<div class="ls-of__actions">' + (r.s === 0 ? '' : buyBtn(r, 'ls-btn--sm')) + heartBtn(k, S.saved.indexOf(k) >= 0) + '</div><div data-after="' + esc(k) + '"></div></div></div>';
   }
@@ -1577,11 +1658,11 @@
     // no "back to chat" here: the tab above and the search field lead back
     var back = '';
     var similar = turn.kind === 'similar';
-    if (turn.loading) { return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size) + '</div>' : '') + '</div><div style="padding:12px 0">' + thinking() + '</div>'; }
+    if (turn.loading) { return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' : '') + '</div><div style="padding:12px 0">' + thinking() + '</div>'; }
     if (turn.error) { return '<div class="ls-wide-head">' + back + '</div>' + errorHtml(turn); }
     var list = filtered(turn), shown = list.slice(0, turn.limit || 24);
     var title = similar ? esc(t('productsCount', { n: list.length })) + ' <span>' + esc(t('similar')) + '</span>' : esc(t('productsCount', { n: list.length })) + ' <span>"' + esc(turn.q) + '"</span>';
-    return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size) + '</div>' : '') +
+    return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' + oosNote(turn) : '') +
       '<div class="ls-summary" style="margin-top:' + (similar ? 18 : 8) + 'px"><div class="ls-summary__count ls-num" style="font-size:20px;font-weight:500">' + title + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn) + '</div>' +
       (similar && !(turn.ids || []).length ? '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>' : list.length ? '<div class="ls-grid">' + shown.map(card).join('') + '</div>' : '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '</div>') +
@@ -1614,10 +1695,10 @@
           announce(t('announceReady') + ': ' + d.answer);
           if (lead) { learn('lead_start', null, null, {}); leadStep(turn, {}); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
-          update(turn, { loading: false, quoted: d.quotes });
+          update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
         } else {
-          update(turn, { loading: false, noInfo: true, rel: related(q), h: hours() });
+          update(turn, { loading: false, noInfo: true, rel: related(q), h: hours(), noAnswer: d.no_answer || null });
           announce(t('noInfo'));
         }
       }).catch(function () { clearTimeout(slow); update(turn, { loading: false, error: true }); });
@@ -1642,11 +1723,11 @@
           announce(t('announceReady') + ': ' + d.answer);
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           // the answer could not be checked: never shown; the store's own words, said to be that
-          update(turn, { loading: false, quoted: d.quotes });
+          update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
         } else {
           var rel = related(q);
-          update(turn, { loading: false, noInfo: true, rel: rel, h: hours() });
+          update(turn, { loading: false, noInfo: true, rel: rel, h: hours(), noAnswer: d.no_answer || null });
           announce(t('noInfo'));
         }
       });
@@ -1719,10 +1800,28 @@
     }
     if (turn.general) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('general')) + '</span></div>'; }
     if (turn.follow && turn.follow.length) { html += '<div class="ls-follow">' + turn.follow.map(function (f) { return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(f) + '">' + esc(f) + '</button>'; }).join('') + '</div>'; }
+    html += rateHtml(turn);
     html += leadFlowHtml(turn);
     var h = hours(), link = S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html + myAi(turn);
+  }
+  // "Helpful?" under an answer the assistant wrote for the search box (search.rate_answers): a thumb up or down,
+  // the last press counts, sent with the question's id; one rated down reaches the shop's notices
+  function rateHtml(turn) {
+    if (!turn.askId || off('rate') || LOOK.rate === false) { return ''; }
+    var up = turn.rated === 'up', down = turn.rated === 'down';
+    var thumb = function (kind, on) {
+      return '<button type="button" class="ls-rate__btn' + (on ? ' is-on' : '') + '" data-rate="' + kind + '" data-turn="' + turn.id + '" aria-pressed="' + on + '" aria-label="' + esc(t(kind === 'up' ? 'helpfulYes' : 'helpfulNo')) + '" title="' + esc(t(kind === 'up' ? 'helpfulYes' : 'helpfulNo')) + '">' + icon('thumb', 'ls-icon--sm' + (kind === 'down' ? ' ls-rate__down' : '')) + '</button>';
+    };
+    return '<div class="ls-rate" role="group" aria-label="' + esc(t('helpful')) + '"><span class="ls-rate__q">' + esc(t('helpful')) + '</span>' + thumb('up', up) + thumb('down', down) +
+      (turn.rated ? '<span class="ls-rate__thanks" role="status">' + esc(t(down ? 'helpfulSorry' : 'helpfulThanks')) + '</span>' : '') + '</div>';
+  }
+  function rate(turn, kind) {
+    if (!turn || !turn.askId || turn.rated === kind) { return; }
+    turn.rated = kind;
+    sendEvents([{ type: 'ask_rate', q: norm(turn.q || ''), ask_id: turn.askId, rating: kind }]);
+    persist(); render();
   }
   // leave your details for the store to come back to you: the question first (what was asked, still editable), then
   // a name, a phone or an email and consent. Sent as the shop's callback about this question (shoppers.callbacks).
@@ -1742,22 +1841,83 @@
     var html = '<p class="ls-noanswer__text">' + esc(t('quotedTitle')) + '</p>' + turn.quoted.map(function (qt) {
       return '<blockquote class="ls-quote" dir="auto">' + esc(qt.text) + (qt.title ? '<small>' + icon('doc', 'ls-icon--sm') + (qt.url ? '<a href="' + esc(qt.url) + '">' + esc(qt.title) + '</a>' : esc(qt.title)) + '</small>' : '') + '</blockquote>';
     }).join('');
-    var h = hours(), link = h.open && wa(t('verify') + ' ' + turn.q);
+    // WhatsApp only where the shop offers its team when there is no answer
+    var h = hours(), link = noAnswerOf(turn) === 'team' && h.open && wa(t('verify') + ' ' + turn.q);
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html;
   }
+  // team | details | none: the reply's own word, else the index config's, else as before (the team)
+  // the product a turn is about: a question on it (ctx), or its own block (an about turn is named by the product)
+  function ctxOf(turn) { return turn ? (turn.kind === 'about' ? turn.id : turn.ctx) || null : null; }
+  function bankOf(turn) { var ctx = ctxOf(turn); return ctx ? BANK_READY[String(pid(ctx))] || null : null; }
+  function noAnswerOf(turn) {
+    var bank = bankOf(turn), n = (turn && turn.noAnswer) || (bank && bank.no_answer) || S.config.noAnswer;
+    return n === 'details' || n === 'none' ? n : 'team';
+  }
+  // the shop's own "leave details" form (Leads' DescribesLeadForm): the product page's bank has it for a question
+  // on the product, the index config for the search box; null: the plain form (name, contact) sent to /signup
+  function leadFormOf(turn) {
+    var bank = bankOf(turn), f = (bank && bank.lead_form) || S.config.leadForm;
+    return f && f.fields && f.fields.length ? f : null;
+  }
+  function shopLeadForm(turn, form, q) {
+    var e = turn.lerr || {}, v = turn.lv || {}, id = function (k) { return 'lf-' + turn.id + '-' + String(k).replace(/[^A-Za-z0-9_-]/g, ''); };
+    var fields = form.fields.map(function (f) {
+      var type = f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : 'text', err = e[f.key];
+      var auto = f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : f.type === 'name' ? 'name' : 'off';
+      return '<div class="ls-input"><label for="' + id(f.key) + '">' + esc(f.label) + (f.required ? ' *' : '') + '</label><input id="' + id(f.key) + '" name="f:' + esc(f.key) + '" type="' + type + '" autocomplete="' + auto + '" maxlength="200"' +
+        (type === 'text' ? ' dir="auto"' : ' dir="ltr" style="text-align:' + (DIR === 'rtl' ? 'right' : 'left') + '"') + ' value="' + esc(v[f.key] || '') + '"' + (f.required ? ' aria-required="true"' : '') +
+        (err ? ' aria-invalid="true" aria-describedby="' + id(f.key) + '-e"' : '') + '>' + (err ? '<span class="ls-input__err" id="' + id(f.key) + '-e">' + esc(err) + '</span>' : '') + '</div>';
+    }).join('');
+    return '<form class="ls-form" data-shop-lead="' + turn.id + '" novalidate>' +
+      (form.title ? '<p class="ls-noanswer__text" style="margin:0;font-weight:500">' + esc(form.title) + '</p>' : '') +
+      '<div class="ls-input"><label for="' + id('q') + '">' + esc(t('leadQuestion')) + '</label><textarea id="' + id('q') + '" name="question" rows="2" dir="auto"' + (e.question ? ' aria-invalid="true"' : '') + '>' + esc(turn.lq != null ? turn.lq : q || '') + '</textarea>' + (e.question ? '<span class="ls-input__err">' + esc(t('leadNeedQuestion')) + '</span>' : '') + '</div>' +
+      fields +
+      '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(form.consent || t('consent')) + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
+      (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
+      '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary"' + (turn.leadBusy ? ' disabled' : '') + '>' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
+  }
+  // sent whole to the shop's lead flow (POST /widget/{site}/lead), which checks every field in its order
+  function sendShopLead(turn, f) {
+    var form = leadFormOf(turn);
+    if (!form || turn.leadBusy) { return; }
+    var given = {}, errs = {}, question = f.question ? f.question.value.trim() : String(turn.q || '');
+    form.fields.forEach(function (fd) {
+      var input = f.elements['f:' + fd.key], val = input ? String(input.value || '').trim() : '';
+      if (val !== '') { given[fd.key] = val; } else if (fd.required) { errs[fd.key] = t('leadRequired'); }
+    });
+    if (!question) { errs.question = true; }
+    if (!f.consent.checked) { errs.consent = true; }
+    turn.lv = given; turn.lq = question; turn.lk = f.consent.checked;
+    if (Object.keys(errs).length) { turn.lerr = errs; render(); var bad = BODY.querySelector('[data-shop-lead="' + turn.id + '"] [aria-invalid="true"]'); if (bad) { bad.focus(); } return; }
+    turn.lerr = {}; turn.leadErr = false; turn.leadBusy = true; render();
+    var ctx = ctxOf(turn), page = ctx ? { type: PAGE && PAGE.type === 'content' && String(PAGE.id) === String(pid(ctx)) ? 'content' : 'product', id: String(pid(ctx)) } : { type: 'search', id: turn.askId || 'search' };
+    json(API + '/widget/' + SITE + '/lead', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ question: question, type: page.type, id: page.id, locale: LANG, given: given, consent: true, vid: visitor(), asked: LEARN.answered }) }).then(function (r) {
+      var d = r.body && r.body.data;
+      turn.leadBusy = false;
+      if (d && d.state === 'done') { visitStep('lead'); update(turn, { lead: 'done', leadPromise: d.promise || '', leadName: given.name || '', leadErr: false }); return; }
+      if (d && d.state === 'field' && d.field && d.error) { turn.lerr = {}; turn.lerr[d.field.key] = bankLabel('lead_error_' + d.error, t('leadBadField')); render(); return; }
+      throw new Error('lead');
+    }).catch(function () { turn.leadBusy = false; update(turn, { leadErr: true }); });
+  }
   function noInfoHtml(turn) {
-    var h = hours(), link = wa((S.config.whatsappMessage || ':question').replace(':question', turn.q)), html = '';
+    // what the shop offers when there is no answer (assistant.no_answer, sent with the reply): team (WhatsApp in
+    // the opening hours, details outside them), details (always the form, never WhatsApp), none ("not found" only)
+    var offer = noAnswerOf(turn), h = hours(), link = offer === 'team' ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null, html = '';
+    var form = leadFormOf(turn);
     if (turn.lead === 'done') {
-      html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>';
+      html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>';
     } else if (turn.lead === 'no') {
       html = '<p class="ls-noanswer__text">' + esc(t('leadDeclined')) + '</p>';
-    } else if (h.open && link) {
+    } else if (offer === 'none') {
+      html = '<p class="ls-noanswer__text">' + esc(t('noInfo')) + '</p>';
+    } else if (offer === 'team' && h.open && link) {
       html = '<div class="ls-hours"><span class="ls-dot"></span>' + esc(t('teamNow', { t: h.until || '' })) + '</div><p class="ls-noanswer__text">' + esc(t('waText')) + '</p>' +
         '<a class="ls-btn ls-btn--primary" href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp') + esc(t('teamWa')) + '</a>';
-    } else if (S.config.callbacks !== false) {
-      html = '<div class="ls-hours"><span class="ls-dot ls-dot--off"></span>' + esc(t('teamBack', { when: h.when || '' })) + '</div><p class="ls-noanswer__text">' + esc(t('leadText')) + '</p>' +
-        leadForm(turn, turn.q);
+    } else if (offer === 'details' || S.config.callbacks !== false) {
+      // in the opening hours "the team is back" says nothing: only the question and the form
+      html = (offer === 'team' || !h.open ? '<div class="ls-hours"><span class="ls-dot ls-dot--off"></span>' + esc(t('teamBack', { when: h.when || '' })) + '</div>' : '') +
+        '<p class="ls-noanswer__text">' + esc(t('leadText')) + '</p>' + (form ? shopLeadForm(turn, form, turn.q) : leadForm(turn, turn.q));
     } else {
       html = '<p class="ls-noanswer__text">' + esc(t('noInfo')) + '</p>';
     }
@@ -1769,23 +1929,61 @@
 
   // ---------------------------------------------------------------- similar turn
   // size: { value, shown } from size help: only the similar items that have it in stock now
-  function similarTurn(id, size) {
+  // oos: from the product page's row for a product or a variant sold out ({ whole, want: [{ value, shown, size }], size }):
+  // only the similar ones in stock, and in the option that is gone (the variant filters, asked of one variant in stock)
+  function similarTurn(id, size, oos) {
     // on a desktop the similar items open large, like "show all": the product on top, filters, the full grid
     S.tab = 'chat'; S.wide = null;
     // the similar items stand alone at the top; the search they came from waits behind the dashed line
     S.turns.forEach(function (x) { x.prev = true; });
     S.showPrev = false; hideLive();
-    var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || null });
+    var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
     BODY.scrollTop = 0;
-    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size ? '&limit=24' : '')).then(function (r) {
+    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '')).then(function (r) {
       var ids = ((r.body && r.body.products) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id); });
       return products(ids.slice(0, 24).map(pid)).then(function () {
+        if (oos) { update(turn, oosPatch(turn, ids, oos)); BODY.scrollTop = 0; return; }
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
         update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length) });
         BODY.scrollTop = 0;
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
+  }
+  // the similar ones in stock, in the size (or colour) that is gone here: the index's variant filters turned on for
+  // it, so one variant must have both the value and stock; where the index has no such value, the store's live sizes.
+  // None has it: the similar ones in stock, under a line that says so.
+  function oosPatch(turn, ids, oos) {
+    var c = C(turn), want = oos.want || [], codes = oosCodes(want), shown = want.map(function (w) { return w.shown; }).join(' · ');
+    c.stock = true;
+    turn.ids = ids;
+    codes.forEach(function (code) { c.f[code] = true; });
+    if (codes.length && !filtered(turn).length) { c.f = {}; return { loading: false, ids: ids, oosNone: shown }; }
+    if (!codes.length && oos.size) {
+      var inSize = ids.filter(function (x) { return hasSize(x, oos.size); });
+      return inSize.length ? { loading: false, ids: inSize, oosNone: null } : { loading: false, ids: ids, oosNone: shown };
+    }
+    return { loading: false, ids: ids, oosNone: null };
+  }
+  // the index's variant filter values (colour, size) that name the options chosen on the product page
+  function oosCodes(want) {
+    var out = [], squash = function (v) { return String(v == null ? '' : v).toLowerCase().replace(/[\s"'״׳]+/g, ''); };
+    (S.facets || []).forEach(function (f, g) {
+      if (!variantFacet(g)) { return; }
+      want.forEach(function (w) {
+        if (f.k === 'variant_size' && w.size === false) { return; }
+        (f.v || []).forEach(function (v, i) {
+          var hit = f.k === 'variant_size'
+            ? [w.value, w.shown].some(function (x) { var a = squash(x); return a !== '' && (a === squash(v.k) || a === squash(v.l)); })
+            : [w.value, w.shown].some(function (x) { return String(x || '').length > 1 && (squash(x) === squash(v.k) || says(String(x), v.l)); });
+          if (hit && out.indexOf(g * 1000 + i) === -1) { out.push(g * 1000 + i); }
+        });
+      });
+    });
+    return out;
+  }
+  function oosNote(turn) {
+    return turn && turn.oosNone ? '<p class="ls-noanswer__text" style="margin:12px 0 0">' + esc(t('oosNone', { v: turn.oosNone })) + '</p>' : '';
   }
   function similarHtml(turn) {
     if (turn.loading) { return thinking(); }
@@ -1796,7 +1994,7 @@
     var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(list.length === 1 ? t('oneProduct') : t('productsCount', { n: list.length })) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn);
     if (!list.length) { return head + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
-    return (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
+    return oosNote(turn) + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
       (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '');
   }
 
@@ -2063,16 +2261,21 @@
     }
     // someone who knows: WhatsApp only while the store answers it; otherwise (or with no WhatsApp) the details form,
     // with the last question asked about this product already in it
-    var c = b.contact, h = hours();
-    if (c && c.number && h.open) {
-      html += '<div class="ls-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || t('talkTitle')) + '</div><div class="ls-hours" style="margin:4px 0 0"><span class="ls-dot"></span>' + esc(c.online_label || '') + '</div></div>' +
-        '<a class="ls-btn ls-btn--secondary ls-btn--sm" target="_blank" rel="noopener" href="https://wa.me/' + esc(c.number) + '?text=' + encodeURIComponent(String(c.message || '').replace(':product', decode(r.title)).replace(':url', win.location.href)) + '">' + icon('whatsapp', 'ls-icon--sm') + esc(c.button || t('talkBtn')) + '</a></div>';
+    // Outside the hours, as the shop chose (contact.when_offline): show (the button, with the offline note), details
+    // (the shop's leave-details form), hide (nothing). The message carries the product and the shopper's last question.
+    var c = b.contact, h = hours(), asked = S.turns.filter(function (x) { return x.kind === 'answer' && String(x.ctx) === String(turn.id) && x.q; }).pop();
+    var offline = c && c.number && !h.open ? (c.when_offline || (c.hide_when_offline ? 'hide' : 'details')) : null;
+    if (c && c.number && (h.open || offline === 'show')) {
+      var msg = String(c.message || '').replace(':product', decode(r.title)).replace(':url', win.location.href).replace(':question', asked ? asked.q : '').replace(/[ \t]{2,}/g, ' ').replace(/\s+([.,:;!?])/g, '$1').trim();
+      html += '<div class="ls-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || c.title || t('talkTitle')) + '</div><div class="ls-hours" style="margin:4px 0 0"><span class="ls-dot' + (h.open ? '' : ' ls-dot--off') + '"></span>' + esc(h.open ? c.online_label || '' : c.offline_label || '') + '</div>' +
+        (h.open || !c.offline_note ? '' : '<div style="font-size:13px;color:var(--ls-fg-muted);margin-top:4px">' + esc(c.offline_note) + '</div>') + '</div>' +
+        '<a class="ls-btn ls-btn--secondary ls-btn--sm" target="_blank" rel="noopener" href="https://wa.me/' + esc(c.number) + '?text=' + encodeURIComponent(msg) + '">' + icon('whatsapp', 'ls-icon--sm') + esc(c.button || t('talkBtn')) + '</a></div>';
     }
-    else if (S.config.callbacks !== false) {
-      var asked = S.turns.filter(function (x) { return x.kind === 'answer' && String(x.ctx) === String(turn.id) && x.q; }).pop();
+    else if (offline !== 'hide' && (b.lead_form || S.config.callbacks !== false)) {
+      var lform = leadFormOf(turn);
       html += '<div class="ls-block"><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || t('talkTitle')) + '</div>' +
-        (turn.lead === 'done' ? '<div class="ls-done ls-focus-in" style="margin-top:10px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>'
-          : turn.lead === 'no' ? '' : '<div class="ls-hours" style="margin:4px 0 10px"><span class="ls-dot ls-dot--off"></span>' + esc(h.when ? t('teamBack', { when: h.when }) : t('leadText')) + '</div>' + leadForm(turn, asked ? asked.q : '')) + '</div>';
+        (turn.lead === 'done' ? '<div class="ls-done ls-focus-in" style="margin-top:10px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>'
+          : turn.lead === 'no' ? '' : '<div class="ls-hours" style="margin:4px 0 10px"><span class="ls-dot ls-dot--off"></span>' + esc(h.when ? t('teamBack', { when: h.when }) : t('leadText')) + '</div>' + (lform ? shopLeadForm(turn, lform, asked ? asked.q : '') : leadForm(turn, asked ? asked.q : ''))) + '</div>';
     }
     html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('aboutNote')) + '</span></div>';
     return html;
@@ -2673,6 +2876,7 @@
       }).catch(function () { update(turn, { leadErr: true }); });
       return;
     }
+    if (f.matches('[data-shop-lead]')) { var st = turnById(f.dataset.shopLead); if (st) { sendShopLead(st, f); } return; }
     if (f.matches('[data-lead-flow]')) {
       var lt = turnById(f.dataset.leadFlow), lf = lt && lt.leadFlow;
       if (!lf || lf.busy || lf.state === 'declined' || lf.state === 'done') { return; }
@@ -2798,7 +3002,8 @@
     if (el.closest('.ls-mini-row') && dragged) { e.preventDefault(); dragged = false; return; }
     if (d.earlier !== undefined) { S.showAll = true; render(); return; }
     if (d.prev !== undefined) { S.showPrev = true; render(); return; }
-    if (d.heart) { e.preventDefault(); toggleSaved(d.heart); return; }
+    if (d.heart) { e.preventDefault(); var saving = S.saved.indexOf(d.heart) < 0; toggleSaved(d.heart); if (saving && SHORT && SHORT.heartClick === 'open') { S.tab = 'saved'; S.wide = null; hideLive(); render(); } return; }
+    if (d.rate) { e.preventDefault(); rate(turnById(d.turn), d.rate === 'down' ? 'down' : 'up'); return; }
     if (d.add) { e.preventDefault(); if (el.dataset.state === 'done') { win.location.href = CFG.cartUrl; return; } addToCart(el, d.add, null, S.pressQ); return; }
     if (d.options) { e.preventDefault(); optionsLayer(d.options, S.pressQ); return; }
     if (d.similar) { e.preventDefault(); similarTurn(d.similar); return; }
@@ -2835,7 +3040,7 @@
     if (d.retry) {
       var rt = S.turns.filter(function (x) { return x.id === d.retry; })[0];
       S.turns = S.turns.filter(function (x) { return x !== rt; });
-      if (rt.kind === 'answer') { askTurn(rt.q, null, !!rt.ctx); } else if (rt.kind === 'results') { searchTurn(rt.q); } else if (rt.kind === 'similar') { similarTurn(rt.of); }
+      if (rt.kind === 'answer') { askTurn(rt.q, null, !!rt.ctx); } else if (rt.kind === 'results') { searchTurn(rt.q); } else if (rt.kind === 'similar') { similarTurn(rt.of, rt.oos ? null : rt.size, rt.oos ? { whole: rt.oos.whole, want: rt.oos.want, size: rt.size } : null); }
       return;
     }
     if (d.leadFlowNo) { var ln = turnById(d.leadFlowNo); if (ln && ln.leadFlow && !ln.leadFlow.busy) { leadStep(ln, { declined: true }); } return; }
@@ -2966,6 +3171,13 @@
     '@media (prefers-reduced-motion:reduce){.ls-save svg{animation:none!important}.ls-save-hint{transition:none}}';
   var SAVE_HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.5s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.1a4.1 4.1 0 0 1 7.5 2.2c0 5.6-7.5 10.2-7.5 10.2z"/></svg>';
   var CARD_SEL = 'li.product, .wc-block-grid__product, .wc-block-components-product, .products .product, .card-wrapper, .product-card, .product-item, .grid__item .card, [data-lets-card]';
+  // the cards the shop pointed at (shortlist.card_selector, found on its category page), with the known ones;
+  // a selector the browser cannot read is left out
+  function cardSel() {
+    var own = SHORT && SHORT.cardSelector ? String(SHORT.cardSelector).trim() : '';
+    if (own) { try { doc.querySelector(own); return CARD_SEL + ', ' + own; } catch (e) { /* not a selector */ } }
+    return CARD_SEL;
+  }
   function saveStyles() {
     if (doc.getElementById('let-agents-save')) { return; }
     var s = doc.createElement('style'); s.id = 'let-agents-save'; s.textContent = SAVE_CSS;
@@ -3043,9 +3255,11 @@
       toggleSaved(id);
       announce(t(on ? 'savedToast' : 'removedToast'));
       if (!on) { return; }
+      // the shop chose that a save opens the list (shortlist.heart_click): the Saved tab, instead of the flight
+      if (SHORT && SHORT.heartClick === 'open') { S.tab = 'saved'; S.wide = null; open({ focus: false }); return; }
       // the picture that flies: the one the theme named, else the card's, else the product page's gallery
       var img = btn.dataset.letsImage ? doc.querySelector(btn.dataset.letsImage) : null;
-      if (!img) { var box = btn.closest('[data-lets-product], ' + CARD_SEL + ', article'); img = box && box.querySelector('img'); }
+      if (!img) { var box = btn.closest('[data-lets-product], ' + cardSel() + ', article'); img = box && box.querySelector('img'); }
       if (!img) { img = doc.querySelector('.woocommerce-product-gallery img, .product-gallery img, .product__media img, .product-single__media img, [data-lets-product] img, .product img, main img'); }
       var b = launcherEl();
       flyTo(img, b, function () { receiveOnLauncher(b); saveHint(b); });
@@ -3107,11 +3321,11 @@
   function cards() {
     var out = [], seen = [];
     var add = function (card) { if (card && seen.indexOf(card) < 0) { seen.push(card); out.push(card); } };
-    doc.querySelectorAll(CARD_SEL).forEach(add);
+    doc.querySelectorAll(cardSel()).forEach(add);
     doc.querySelectorAll(SHOPIFY ? 'a[href*="/products/"] img' : 'a[href*="/product/"] img').forEach(function (img) {
       var link = img.closest('a');
       if (/\/products?\/[^\/]+\/.+/.test(String(link.getAttribute('href') || '').split('?')[0].replace(/\/$/, ''))) { return; }   // a deeper path: a category, not a product
-      add(link.closest(CARD_SEL + ', article, li, [data-product], [data-product-id], [data-product_id], product-card') || (link.parentElement && link.parentElement.parentElement) || link);
+      add(link.closest(cardSel() + ', article, li, [data-product], [data-product-id], [data-product_id], product-card') || (link.parentElement && link.parentElement.parentElement) || link);
     });
     return out;
   }
@@ -3171,7 +3385,8 @@
     sr.innerHTML = styles(['tokens.css', 'drawer.css']) +
       '<style>:host{all:initial;display:inline-flex}.ls-launch{font:inherit}</style>' +
       '<button class="ls-launch' + (float ? ' ls-launch--float' : '') + '" type="button" aria-label="' + esc(t('open')) + '" aria-haspopup="dialog">' + launcherHtml() + '</button>';
-    if (CFG.theme === 'store') { h.setAttribute('data-ls-theme', 'store'); }
+    h.setAttribute('data-lets-launcher', '');
+    dressHost(h);
     var btn = sr.querySelector('button');
     btn.addEventListener('click', function () { open(); });
     LAUNCHERS.push(btn);
@@ -3181,8 +3396,11 @@
   var SEARCH_TRIGGERS = 'a[href$="/search"],a[href*="/search?"],[aria-controls*="search" i],.header__search-link,.header__icon--search,' +
     'details-modal.header__search>summary,[data-action*="search" i],button[aria-label*="search" i],a[aria-label*="search" i],' +
     'button[aria-label*="חיפוש"],a[aria-label*="חיפוש"],.search-toggle,.js-search-toggle';
+  // what opens us whatever the shop chose: a button the theme marked for us (data-lets-open), and the store's own
+  // ones named in the config; the theme's own search icons only while we take over its search (search.take_over_field)
+  var OWN_TRIGGERS = '[data-lets-open]';
   function onSearchTrigger(e) {
-    var sel = SEARCH_TRIGGERS + (CFG.openSelectors ? ',' + CFG.openSelectors : '');
+    var sel = (CFG.takeOver !== false ? SEARCH_TRIGGERS + ',' : '') + OWN_TRIGGERS + (CFG.openSelectors ? ',' + CFG.openSelectors : '');
     var node = e.target && e.target.closest ? e.target.closest(sel) : null;
     if (!node || node.closest('form') || e.defaultPrevented || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey) { return; }
     e.preventDefault(); e.stopImmediatePropagation();
@@ -3215,17 +3433,35 @@
     doc.addEventListener('pointerdown', wake, true);
     hookLauncher();
   }
-  // the store's own field opens us, carrying what was typed (again once the index names the shop's own selector)
+  // the store's own field opens us, carrying what was typed (again once the index names the shop's own selector).
+  // A field the theme marked for us (data-lets-search) always does; the theme's own search box only while we take
+  // over its search (search.take_over_field): off, it is let go and searches the site as it did before us.
+  var OWN_FIELDS = 'input[data-lets-search], [data-lets-search] input';
   function hookFields() {
-    doc.querySelectorAll(CFG.fieldSelector).forEach(function (input) {
+    var sel = (CFG.takeOver !== false ? CFG.fieldSelector + ', ' : '') + OWN_FIELDS, hooked = [];
+    try { hooked = [].slice.call(doc.querySelectorAll(sel)); } catch (e) { hooked = [].slice.call(doc.querySelectorAll(OWN_FIELDS)); /* a selector the browser cannot read */ }
+    hooked.forEach(function (input) {
       if (input.__lets) { return; }
-      input.__lets = true;
-      if (SHOPIFY) { quietThemeSearch(input); }
       var go = function (e) { if (e) { e.preventDefault(); } var v = input.value; input.blur(); open({ text: v }); };
+      var key = function (e) { if (e.key === 'Enter') { go(e); } };
+      var form = input.form, sent = function (e) { e.preventDefault(); open({ text: input.value }); };
+      if (SHOPIFY) { quietThemeSearch(input); }
       input.addEventListener('focus', go);
-      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { go(e); } });
-      var form = input.form; if (form) { form.addEventListener('submit', function (e) { e.preventDefault(); open({ text: input.value }); }); }
+      input.addEventListener('keydown', key);
+      if (form) { form.addEventListener('submit', sent); }
+      input.__lets = function () {
+        input.removeEventListener('focus', go); input.removeEventListener('keydown', key);
+        if (form) { form.removeEventListener('submit', sent); form.removeAttribute('data-let-agents-search'); }
+        doc.querySelectorAll('[data-let-agents-search-hidden]').forEach(function (n) { n.removeAttribute('data-let-agents-search-hidden'); });
+        input.__lets = null;
+      };
     });
+  }
+  // the shop turned the theme's search box over to us, or took it back: its fields hooked again by the new choice
+  function rehook() {
+    if (!BOOTED) { return; }
+    doc.querySelectorAll('input').forEach(function (input) { if (typeof input.__lets === 'function' && !(input.matches && input.matches(OWN_FIELDS))) { input.__lets(); } });
+    hookFields();
   }
   // the launcher: in the header when there's room, floating otherwise
   function hookLauncher() {
@@ -3247,7 +3483,7 @@
     at.__letsInline = true;
     var h = doc.createElement('div');
     h.className = 'lets-inline';
-    if (CFG.theme === 'store') { h.setAttribute('data-ls-theme', 'store'); }
+    dressHost(h);
     var sr = h.attachShadow({ mode: 'open' });
     sr.innerHTML = styles(['tokens.css', 'components.css', 'drawer.css']) +
       '<style>:host{all:initial;display:block;margin:18px 0 4px}</style>' + SPRITE +
@@ -3352,6 +3588,7 @@
       var host = doc.createElement('div');
       host.setAttribute('data-la-size-help', '');
       host.style.margin = '0 0 10px';
+      dressHost(host);
       var sr = host.attachShadow({ mode: 'open' });
       sr.innerHTML = styles(['tokens.css', 'components.css']) + '<style>:host{all:initial;display:block}.b{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--ls-bg-sunken);color:var(--ls-fg);font:500 14px/1.45 var(--ls-font)}.b .ls-mark{--s:16px}.b .ls-chips{width:100%;flex-wrap:wrap;overflow:visible;mask-image:none;-webkit-mask-image:none}</style>' +
         '<div class="ls b" dir="' + DIR + '">' + mark() + '<span>' + esc(sizeWord(withChips ? 'size_gone_pick' : 'size_gone_banner')) + '</span>' +
@@ -3409,6 +3646,130 @@
     return (item.attributes || []).some(function (a) { return (a.terms || []).some(function (term) { return sizeValue(term.slug) === want || sizeValue(term.name) === shown; }); });
   }
 
+  // ---------------------------------------------------------------- a product or a variant sold out (search.out_of_stock_similar)
+  // On a product page whose product is sold out, or whose chosen variant is (a size, a colour), a Lets row under
+  // "add to cart", only while it is so: a press opens similar products that are in stock, in the same size.
+  // What is sold out is read from the page as the store draws it: WooCommerce's own stock line and its
+  // variation events; Shopify's product JSON and the variant the page has chosen.
+  var SIZE_NAME = /מידה|מידות|גודל|size/i;
+  function cartForm() {
+    return doc.querySelector('form.variations_form') || doc.querySelector(SHOPIFY ? 'product-form form[action*="/cart/add"], form[action*="/cart/add"]' : 'form.cart') || null;
+  }
+  function outOfStockRow() {
+    var on = LOOK.oosSimilar === true && LOOK.enabled !== false && !CFG.silent && !!PAGE && PAGE.type === 'product';
+    if (!on) { if (OOS.host) { OOS.host.hidden = true; } return; }
+    if (OOS.watching) { showOos(OOS.state); return; }
+    OOS.watching = true;
+    watchStock();
+  }
+  function showOos(state) {
+    OOS.state = state || null;
+    var on = !!state && LOOK.oosSimilar === true && LOOK.enabled !== false;
+    if (!on) { if (OOS.host) { OOS.host.hidden = true; } return; }
+    if (!OOS.host || !doc.body.contains(OOS.host)) { OOS.host = oosHost(); OOS.text = null; if (!OOS.host) { return; } }
+    var text = state.whole ? t('oosProduct') : state.size ? t('oosSize', { v: state.size.shown }) : t('oosOption', { v: state.want.map(function (w) { return w.shown; }).join(' · ') });
+    var box = OOS.host.shadowRoot.querySelector('.ls'), label = OOS.host.shadowRoot.querySelector('.ls-oos__text');
+    box.setAttribute('dir', DIR); box.setAttribute('lang', LANG);
+    if (OOS.text !== text) { OOS.text = text; label.textContent = text; }
+    OOS.host.hidden = false;
+  }
+  // the row, in the look of the product page's search row (.lets-inline), right under the store's add-to-cart form
+  function oosHost() {
+    var at = cartForm() || doc.querySelector('.summary .stock.out-of-stock, .entry-summary .stock.out-of-stock, .product p.stock.out-of-stock');
+    if (!at || !at.parentNode) { return null; }
+    var h = doc.createElement('div');
+    h.className = 'lets-oos';
+    h.hidden = true;
+    dressHost(h);
+    var sr = h.attachShadow({ mode: 'open' });
+    sr.innerHTML = styles(['tokens.css', 'components.css', 'drawer.css']) +
+      '<style>:host{all:initial;display:block;margin:14px 0 4px}:host([hidden]){display:none}.ls-oos{width:100%;cursor:pointer;text-align:start;font:inherit;color:var(--ls-fg);gap:10px}.ls-oos__text{flex:1;min-width:0;font-size:14px;line-height:1.4}.ls-oos .ls-icon{flex:none;opacity:.7}</style>' + SPRITE +
+      '<div class="ls ls-inline" dir="' + DIR + '" lang="' + LANG + '"><button type="button" class="ls-field ls-inline__field ls-oos"><span class="ls-ask__mark ls-inline__mark">' + mark() + '</span><span class="ls-oos__text"></span>' + icon('fwd', 'ls-icon--sm') + '</button></div>';
+    sr.querySelector('button').addEventListener('click', function () {
+      var st = OOS.state;
+      if (!st || !PAGE) { return; }
+      open({ focus: false });
+      loadIndex().then(function () { similarTurn(String(PAGE.id), null, { whole: !!st.whole, want: st.want || [], size: st.size || null }); });
+    });
+    // right under the form: what is gone first, then our question row
+    at.parentNode.insertBefore(h, at.nextSibling);
+    return h;
+  }
+  // the state the row shows, from the options chosen ({ value, shown, size }): a size that is gone is what the
+  // shopper looks for, with the colour they chose when there is one
+  function oosState(options) {
+    var want = options.filter(function (o) { return o.value !== '' && o.value != null; });
+    if (!want.length) { return { whole: true, want: [], size: null }; }
+    var size = want.filter(function (o) { return o.size; })[0] || null;
+    return { whole: false, want: size ? want.filter(function (o) { return o === size || !o.size; }) : want, size: size ? { value: size.value, shown: size.shown } : null };
+  }
+  function watchStock() {
+    if (SHOPIFY) { watchShopifyStock(); return; }
+    var form = doc.querySelector('form.variations_form');
+    // the product sold out as a whole: WooCommerce's own stock line in the summary (not a variation's)
+    var whole = [].slice.call(doc.querySelectorAll('.summary .stock.out-of-stock, .entry-summary .stock.out-of-stock, .product p.stock.out-of-stock')).filter(function (n) { return !n.closest('.woocommerce-variation, .single_variation_wrap'); })[0];
+    if (whole) { showOos({ whole: true, want: [], size: null }); return; }
+    if (!form) { return; }
+    var label = function (key, value) {
+      var select = form.querySelector('[name="' + key + '"]'), option = select && [].slice.call(select.options || []).filter(function (o) { return o.value === value; })[0];
+      var row = select && select.closest('tr'), cap = row && row.querySelector('label, th');
+      return { name: ((select && select.getAttribute('data-attribute_name')) || key) + ' ' + (cap ? cap.textContent : ''), shown: option ? option.textContent.trim() : value };
+    };
+    var found = function (v) {
+      if (!v || v.is_in_stock !== false) { showOos(null); return; }
+      showOos(oosState(Object.keys(v.attributes || {}).map(function (k) {
+        // an attribute the variation leaves open ("any size") is the one the shopper chose on the page
+        var value = String(v.attributes[k] || (form.querySelector('[name="' + k + '"]') || {}).value || ''), l = label(k, value);
+        return { value: value, shown: l.shown, size: SIZE_NAME.test(l.name) };
+      })));
+    };
+    if (win.jQuery) {
+      win.jQuery(form).on('found_variation.lets', function (e, v) { found(v); }).on('reset_data.lets hide_variation.lets', function () { showOos(null); });
+      return;
+    }
+    // without jQuery: the variation's own stock line, as WooCommerce writes it
+    new MutationObserver(function () {
+      var gone = form.querySelector('.woocommerce-variation-availability .stock.out-of-stock');
+      if (!gone) { showOos(null); return; }
+      showOos(oosState([].slice.call(form.querySelectorAll('select[name^="attribute_"]')).map(function (s) {
+        var l = label(s.name, s.value);
+        return { value: s.value, shown: l.shown, size: SIZE_NAME.test(l.name) };
+      })));
+    }).observe(form, { childList: true, subtree: true });
+  }
+  function watchShopifyStock() {
+    var handle = /\/products\/([^\/?#]+)/.exec(win.location.pathname);
+    if (!handle) { return; }
+    win.fetch(ROOT + 'products/' + handle[1] + '.js', { credentials: 'same-origin', headers: { Accept: 'application/json' } }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j || !j.variants) { return; }
+      if (j.available === false) { showOos({ whole: true, want: [], size: null }); return; }
+      var names = (j.options || []).map(function (o) { return typeof o === 'string' ? o : (o && o.name) || ''; });
+      var chosen = function () {
+        var form = cartForm(), field = form && form.querySelector('[name="id"]'), id = field && field.value;
+        if (!id) { try { id = new URLSearchParams(win.location.search).get('variant'); } catch (e) { id = null; } }
+        return j.variants.filter(function (v) { return String(v.id) === String(id); })[0] || null;
+      };
+      var last = null;
+      var check = function () {
+        var v = chosen(), key = v ? String(v.id) : '';
+        if (key === last) { return; }
+        last = key;
+        if (!v || v.available !== false) { showOos(null); return; }
+        showOos(oosState(names.map(function (n, i) {
+          var value = v.options ? v.options[i] : v['option' + (i + 1)];
+          return { value: value == null || value === 'Default Title' ? '' : String(value), shown: value == null ? '' : String(value), size: SIZE_NAME.test(n) };
+        })));
+      };
+      check();
+      // themes change the variant in many ways: the form's own change, their events, the address
+      var soon = function () { setTimeout(check, 200); };
+      doc.addEventListener('change', soon, true);
+      doc.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('variant-radios, variant-selects, variant-picker, .product-form__input, [data-variant], [name^="options"]')) { soon(); } }, true);
+      ['variant:change', 'variant:changed', 'variantChange', 'on:variant:change'].forEach(function (name) { doc.addEventListener(name, soon); });
+      win.addEventListener('popstate', soon);
+    }).catch(function () { /* the page stays as the theme drew it */ });
+  }
+
   // keyboard shortcut: "/" or ⌘K / Ctrl+K
   doc.addEventListener('keydown', function (e) {
     var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((doc.activeElement || {}).tagName || '') || (doc.activeElement && doc.activeElement.isContentEditable);
@@ -3431,19 +3792,35 @@
     function lum(v) { v = v.map(function (x) { x /= 255; return x <= .03928 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4); }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; }
     function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
     function hex(v) { return '#' + v.map(function (x) { return ('0' + Math.round(x).toString(16)).slice(-2); }).join(''); }
-    host.style.setProperty('--store-font', cs.fontFamily);
+    // on every host of ours (the drawer, the launchers, the product page's rows): each has its own shadow root
+    var hosts = ourHosts();
+    function put(name, value) { hosts.forEach(function (h) { h.style.setProperty(name, value); }); }
+    put('--store-font', cs.fontFamily);
     var fg = rgb(cs.color), bg = rgb(cs.backgroundColor);
-    if (fg && bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) && ratio(fg, bg) >= 4.5) { host.style.setProperty('--store-fg', hex(fg)); host.style.setProperty('--store-bg', hex(bg)); }
+    if (fg && bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) && ratio(fg, bg) >= 4.5) {
+      put('--store-fg', hex(fg)); put('--store-bg', hex(bg));
+      // the muted text is the text mixed into the ground (tokens.css): darker until it still reads (AA)
+      var k = .66, mix = function () { return fg.map(function (x, i) { return x * k + bg[i] * (1 - k); }); };
+      while (ratio(mix(), bg) < 4.5 && k < 1) { k = Math.min(1, k + .06); }
+      if (k > .66) { put('--store-fg-muted', hex(mix())); }
+    }
     if (bcs) {
       var a = rgb(bcs.backgroundColor), n = 0;
       if (a && !/rgba\(0, 0, 0, 0\)/.test(bcs.backgroundColor)) {
+        // the theme's main colour under white words: darkened step by step until the pair passes AA
         var white = [255, 255, 255];
         while (ratio(a, white) < 4.5 && n < 20) { a = a.map(function (x) { return x * .94; }); n++; }
-        if (ratio(a, white) >= 4.5) { host.style.setProperty('--store-accent', hex(a)); }
+        if (ratio(a, white) >= 4.5) { put('--store-accent', hex(a)); }
       }
       var r = parseFloat(bcs.borderRadius);
-      if (!isNaN(r)) { host.style.setProperty('--store-radius', Math.min(r, 24) + 'px'); }
+      if (!isNaN(r)) { put('--store-radius', Math.min(r, 24) + 'px'); }
     }
+  }
+  // a host made after the look was read: the same look as the drawer's
+  function dressHost(h) {
+    if (CFG.theme !== 'store') { return; }
+    h.setAttribute('data-ls-theme', 'store');
+    ['--store-font', '--store-fg', '--store-bg', '--store-fg-muted', '--store-accent', '--store-radius'].forEach(function (p) { var v = host.style.getPropertyValue(p); if (v) { h.style.setProperty(p, v); } });
   }
 
   // An AI agent working in the shopper's browser (WebMCP) finds the store's search on the page itself, no link
@@ -3502,10 +3879,12 @@
       var link = doc.createElement('link'); link.id = 'ls-font'; link.rel = 'stylesheet'; link.href = 'https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=swap'; doc.head.appendChild(link);
     }
     doc.body.appendChild(host);
-    applyStoreTheme();
     hook();
     inlineField();
+    applyStoreTheme();
     agentTools();
+    BOOTED = true;
+    fetchLook();
     // the page: a product (from the config, else the store's own markers) or a content page, for its learning
     if (!S.ctx) {
       var meta = win.ShopifyAnalytics && win.ShopifyAnalytics.meta && win.ShopifyAnalytics.meta.product, cls = String(doc.body.className || ''), post = cls.match(/(?:^|\s)postid-([0-9]+)(?:\s|$)/);
@@ -3519,6 +3898,7 @@
     visitPage();
     if (PAGE) { bankFor(PAGE.id); }
     sizeHelp();
+    outOfStockRow();
     // the shop's own way in to the list: any link to "#wishlist", or its shortcode's [data-let-agents-wishlist]
     doc.addEventListener('click', function (e) { var l = e.target && e.target.closest ? e.target.closest('a[href$="#wishlist"], [data-let-agents-wishlist]') : null; if (l) { e.preventDefault(); S.tab = 'saved'; open({ focus: false }); } }, true);
     if (win.location.hash === '#wishlist') { S.tab = 'saved'; open({ focus: false }); }

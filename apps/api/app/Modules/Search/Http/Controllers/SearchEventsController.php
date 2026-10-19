@@ -2,11 +2,13 @@
 
 namespace App\Modules\Search\Http\Controllers;
 
+use App\Core\Facades\Features;
 use App\Core\Http\Visit;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Search\Actions\CountSearch;
 use App\Modules\Search\Http\StorefrontSite;
+use App\Modules\Search\Models\SearchAnswerRating;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -21,6 +23,8 @@ use Illuminate\Http\Response;
  *                                                           the results or the assistant's picks;
  *                                                           "via":"page" from the page of a product
  *                                                           opened from the search, within a week
+ *   {"type":"ask_rate","q":"…","ask_id":"…","rating":"up"|"down"}  "Helpful?" under the assistant's
+ *                                                           answer; the last press counts
  *
  * With them, "vid": the anonymous id the storefront scripts keep, only so an order by the same
  * visitor is attributed to the search; stored as a hash salted per shop. Nothing else about the
@@ -61,6 +65,13 @@ final class SearchEventsController
                             $ask->forceFill(['picked' => array_values(array_unique([...(array) $ask->picked, $id]))])->save();
                         }
                     }),
+                    // "Helpful?": one thumb per question, the last one pressed, while the shop asks for it
+                    'ask_rate' => in_array($event['rating'] ?? null, ['up', 'down'], true) && Features::enabled('search.rate_answers', $connection->shop_id)
+                        ? self::onAsk($event, fn (AssistantSearchAsk $ask) => SearchAnswerRating::query()->updateOrCreate(
+                            ['shop_id' => $ask->shop_id, 'ask_id' => $ask->id],
+                            ['helpful' => $event['rating'] === 'up'],
+                        ))
+                        : null,
                     default => null,
                 };
             }

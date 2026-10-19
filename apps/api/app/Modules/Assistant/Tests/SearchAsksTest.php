@@ -153,6 +153,31 @@ final class SearchAsksTest extends TestCase
         $this->assertFalse($this->ask('יש לכם מעלית לבית?', ['703'])->json('data.whatsapp'));
     }
 
+    public function test_a_reply_that_is_not_an_answer_says_what_the_shop_offers_instead(): void
+    {
+        $notFound = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => []]];
+
+        // No WhatsApp number yet: the team cannot be offered, leaving details can.
+        $this->replies = $notFound;
+        $data = $this->ask('יש לכם מעלית לבית?', ['703'])->json('data');
+        $this->assertSame('details', $data['no_answer']);
+
+        // The shop chose only "not found": no WhatsApp, no details.
+        Settings::set('assistant.no_answer', 'none', $this->shop->id);
+        $this->replies = $notFound;
+        $data = $this->ask('יש לכם גנרטור לבית?', ['703'])->json('data');
+        $this->assertSame('none', $data['no_answer']);
+        $this->assertFalse($data['whatsapp']);
+        $this->assertFalse($this->inShop(fn () => AssistantSearchAsk::query()->findOrFail($data['ask_id'])->whatsapp_shown));
+
+        // An answer carries none of it.
+        $this->replies = [
+            ['found' => true, 'answer' => 'יריעה ביטומנית.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'לגג שטוח.']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->assertArrayNotHasKey('no_answer', $this->ask('במה אוטמים גג שטוח', ['701'])->json('data'));
+    }
+
     public function test_every_morning_the_day_is_scored_by_another_family_and_shown_to_the_shop(): void
     {
         $this->assertSame('succeeded', app(ReviewSearchAsks::class)->handle($this->shop->id)->status->value);

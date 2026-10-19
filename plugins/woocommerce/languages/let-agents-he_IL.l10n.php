@@ -10,6 +10,12 @@ return array(
 	'messages'     => array(
 		'%1$s: %2$d views, %3$d opens, %4$d added to cart, %5$d orders' => '%1$s: %2$d צפיות, %3$d פתיחות, %4$d הוספות לסל, %5$d הזמנות',
 		'A token was created, but it can be shown only right after creation. If you did not copy it, replace it.' => 'נוצר טוקן, אבל אפשר להציג אותו רק מיד אחרי היצירה. אם לא העתקת אותו, צור טוקן חדש במקומו.',
+		'Have a token from Lets?' => 'יש לכם טוקן מ־Lets?',
+		'In Lets: Settings > Connection and plan > Create a connection token. Paste it here and save; Lets reads the store with it.' => 'ב־Lets: הגדרות ← חיבור ומנוי ← ליצור טוקן חיבור. מדביקים אותו כאן ושומרים; Lets קורא את החנות איתו.',
+		'Token from Lets' => 'טוקן מ־Lets',
+		'Save the token' => 'שמירת הטוקן',
+		'The token from Lets was saved. Go back to Lets and check the connection.' => 'הטוקן מ־Lets נשמר. חזרו ל־Lets ובדקו את החיבור.',
+		'That is not a Lets connection token. Copy it again from Lets: Settings > Connection and plan.' => 'זה לא טוקן חיבור של Lets. העתיקו אותו שוב מ־Lets: הגדרות ← חיבור ומנוי.',
 		'API address' => 'כתובת ה־API',
 		'Access token' => 'טוקן גישה',
 		'Active' => 'פעיל',

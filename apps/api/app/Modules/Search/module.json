@@ -11,7 +11,8 @@
         "Admin",
         "Assistant",
         "Analytics",
-        "Enrichment"
+        "Enrichment",
+        "Leads"
     ],
     "provider": "SearchServiceProvider",
     "features": [
@@ -86,6 +87,18 @@
         {
             "name": "photo_rank",
             "default": false
+        },
+        {
+            "name": "take_over_field",
+            "default": true
+        },
+        {
+            "name": "rate_answers",
+            "default": true
+        },
+        {
+            "name": "out_of_stock_similar",
+            "default": true
         }
     ],
     "settings": [
@@ -644,6 +657,35 @@
                 "frame"
             ],
             "default": "cover",
+            "scope": "shop"
+        },
+        {
+            "name": "theme",
+            "type": "enum",
+            "options": [
+                "lets",
+                "store"
+            ],
+            "default": "lets",
+            "scope": "shop"
+        },
+        {
+            "name": "assistant_name",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 60,
+            "scope": "shop"
+        },
+        {
+            "name": "widget_language",
+            "type": "enum",
+            "options": [
+                "site",
+                "he",
+                "en"
+            ],
+            "default": "site",
             "scope": "shop"
         },
         {

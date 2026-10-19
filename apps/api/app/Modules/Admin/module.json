@@ -7,6 +7,7 @@
         { "name": "merchant_panel", "default": true }
     ],
     "settings": [
-        { "name": "default_locale", "type": "enum", "options": ["he", "en"], "default": "he", "scope": "global" }
+        { "name": "default_locale", "type": "enum", "options": ["he", "en"], "default": "he", "scope": "global" },
+        { "name": "invitation_days", "type": "int", "default": 7, "min": 1, "max": 30, "scope": "global", "unit": "days" }
     ]
 }

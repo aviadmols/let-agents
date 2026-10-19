@@ -235,10 +235,11 @@
             "name": "whatsapp_when_offline",
             "type": "enum",
             "options": [
+                "details",
                 "show",
                 "hide"
             ],
-            "default": "show",
+            "default": "details",
             "scope": "shop"
         }
     ]

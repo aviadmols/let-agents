@@ -26,6 +26,19 @@ return [
         'description' => 'In the top corner of the picture, beside the price, or beside the add-to-cart button.',
         'options' => ['corner' => 'Corner of the picture', 'price' => 'Beside the price', 'cart' => 'Beside add to cart'],
     ],
+    'heart_in_results' => [
+        'label' => 'Heart in Lets search results',
+        'description' => 'A heart on every product in the search window. Off: saving only from the store pages.',
+    ],
+    'heart_click' => [
+        'label' => 'What a heart click does',
+        'description' => 'Saved quietly: the picture flies to the search icon and a dot stays on it. Saved and the list opens: the list opens right away.',
+        'options' => ['quiet' => 'Saved quietly', 'open' => 'Saved and the list opens'],
+    ],
+    'card_selector' => [
+        'label' => 'Product card on category pages',
+        'description' => 'The CSS selector of a product card in the theme, found on one of the store category pages. Every such card gets a heart.',
+    ],
     'requests_per_minute' => [
         'label' => 'Requests per minute from one shopper',
         'description' => 'A limit on heart and compare clicks from one address, per site.',

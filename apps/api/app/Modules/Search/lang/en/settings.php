@@ -306,4 +306,18 @@ return [
         'label' => 'Weight of colours in photo search',
         'description' => 'How much the colour of each part (the metal, the stone, the shirt, the pocket) decides the order, beyond how alike the pictures look. 0 turns it off.',
     ],
+    'theme' => [
+        'label' => 'Fonts and colours',
+        'description' => 'Lets: black on white, Google Sans, the same in every store. The site\'s: the theme\'s font, main colour and corners, with a contrast check.',
+        'options' => ['lets' => 'Lets', 'store' => 'The site\'s'],
+    ],
+    'assistant_name' => [
+        'label' => 'Assistant name',
+        'description' => 'The name shoppers see beside the answers. Empty: the store\'s name + AI.',
+    ],
+    'widget_language' => [
+        'label' => 'Widget language',
+        'description' => 'As the site: the page\'s language. Or always Hebrew, or always English.',
+        'options' => ['site' => 'As the site', 'he' => 'עברית', 'en' => 'English'],
+    ],
 ];

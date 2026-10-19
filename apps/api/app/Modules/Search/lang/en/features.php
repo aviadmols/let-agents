@@ -73,4 +73,16 @@ return [
         'label' => 'Size gone: similar items in that size',
         'description' => 'On a product page where a size is out of stock: the sizes that are gone are marked, and a tap opens similar items that have that size in stock. Stock is read from the store itself, live, with no model.',
     ],
+    'take_over_field' => [
+        'label' => 'Smart search in the site\'s search box',
+        'description' => 'Lets takes over the theme\'s search box and search buttons. Off: only the Lets button, the product page row and what is marked data-lets-search or data-lets-open open the search.',
+    ],
+    'rate_answers' => [
+        'label' => 'Ask to rate an answer',
+        'description' => '"Helpful?" with thumbs after an assistant answer in the search drawer. An answer rated low reaches notices and insights.',
+    ],
+    'out_of_stock_similar' => [
+        'label' => 'When a product or a size is sold out',
+        'description' => 'A Lets row on the product page when the product or the chosen variant is sold out: similar products in stock, in the same size. No model.',
+    ],
 ];

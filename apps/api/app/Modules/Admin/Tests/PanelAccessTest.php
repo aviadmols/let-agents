@@ -45,7 +45,7 @@ final class PanelAccessTest extends TestCase
             ->assertSee('Tools IL');
 
         // The connection details live under settings now.
-        $this->get("/merchant/{$shop->slug}/connection")->assertOk()->assertSee($shop->domain);
+        $this->get("/merchant/{$shop->slug}/settings/connection")->assertOk()->assertSee($shop->domain);
     }
 
     public function test_a_merchant_cannot_open_another_shop(): void

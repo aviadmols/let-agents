@@ -1,0 +1,34 @@
+<?php
+
+// Settings · Leaving details (LeaveDetails), as the designer's panel words it.
+return [
+    'title' => 'Leaving details',
+    'help' => 'With no WhatsApp, or outside opening hours: the shopper leaves a way to get in touch. Every request reaches notices and insights, and email.',
+    'fields' => 'What we ask',
+    'fields_tip' => 'The order is the order of the questions. A shopper who left halfway is kept with what they already gave, if there is a phone or an email and they agreed.',
+    'fields_empty' => 'Choose fields from the bank below',
+    'fields_note' => 'The order here is the order of the questions. Clicking "Required" makes a field optional. A phone or an email is always asked first: without a way to get in touch there is no request.',
+    'required' => 'Required',
+    'required_tip' => 'Required or optional',
+    'remove' => 'Remove',
+    'own' => 'A field of your own, e.g. the pallet\'s size',
+    'add' => 'Add',
+    'form_title' => 'Heading',
+    'promise' => 'What we promise',
+    'promise_tip' => 'The sentence the shopper sees after leaving details. Keep it.',
+    'recent' => '"Products you viewed recently"',
+    'recent_tip' => 'A row of products the shopper already saw in this visit, at the bottom of the block.',
+    'too_long' => 'Too long: up to :n characters.',
+    'bank' => [
+        'phone' => 'Phone',
+        'name' => 'Name',
+        'email' => 'Email',
+        'city' => 'City',
+        'project' => 'Kind of project',
+        'budget' => 'Estimated budget',
+        'when' => 'When to call back',
+        'quantity' => 'Quantity',
+        'business' => 'Business name',
+        'note' => 'A free note',
+    ],
+];

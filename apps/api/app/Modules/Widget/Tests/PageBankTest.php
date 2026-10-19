@@ -145,7 +145,7 @@ final class PageBankTest extends TestCase
 
         $this->assertSame('972501234567', $contact['number'], 'digits only, as WhatsApp links need');
         $this->assertSame('רוצה שנשלח לך סרטון של המוצר?', $contact['title']);
-        $this->assertSame('לשיחה בוואטסאפ', $contact['button'], 'what the shop did not write comes from the default');
+        $this->assertSame('לשאול את הצוות', $contact['button'], 'what the shop did not write comes from the default');
         $this->assertStringContainsString(':product', $contact['message'], 'the widget fills in the product and the page');
         $this->assertSame(
             ['09:00-18:00', '09:00-18:00', '09:00-18:00', '09:00-18:00', '', '09:00-13:00', ''],
@@ -154,6 +154,7 @@ final class PageBankTest extends TestCase
         );
         $this->assertSame('Asia/Jerusalem', $contact['timezone']);
         $this->assertTrue($contact['hide_when_offline']);
+        $this->assertSame('hide', $contact['when_offline']);
 
         $this->assertNotNull($this->page('content', '900')->json('contact'), 'articles get the strip too');
     }

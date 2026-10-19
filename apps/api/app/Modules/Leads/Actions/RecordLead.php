@@ -6,6 +6,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadFlow;
 use App\Modules\Leads\Support\FlowMachine;
+use App\Modules\Leads\Support\LeadFields;
 use App\Modules\Shoppers\Contracts\ReadsContacts;
 
 /**
@@ -25,6 +26,7 @@ final class RecordLead
 
     /**
      * @param  array<string, string>  $given  field key => what they typed, already checked
+     * @param  string|null  $question  the question that had no answer, when they left details about it
      * @return array{lead: ?Lead, error: ?string}
      */
     public function handle(
@@ -36,6 +38,7 @@ final class RecordLead
         ?string $ctaId,
         ?string $visitorHash,
         int $questionsAsked,
+        ?string $question = null,
     ): array {
         $contact = $this->contactFrom($flow, $given, $shopId);
 
@@ -47,9 +50,14 @@ final class RecordLead
         $answers = [];
 
         foreach ($flow->asked() as $field) {
-            if (! in_array($field['type'], ['phone', 'email'], true) && isset($given[$field['key']])) {
+            if (! in_array($field['type'], ['phone', 'email'], true) && trim((string) ($given[$field['key']] ?? '')) !== '') {
                 $answers[$field['key']] = (string) $given[$field['key']];
             }
+        }
+
+        // Left about a question the store did not answer: the team needs the question to answer it.
+        if ($question !== null && $question !== '') {
+            $answers[LeadFields::QUESTION] = $question;
         }
 
         $lead = $this->tenant->run($shopId, fn (): Lead => Lead::query()->updateOrCreate(

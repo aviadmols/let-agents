@@ -21,6 +21,13 @@ return [
     ],
     'roles' => [
         'owner' => 'בעלים',
-        'member' => 'חבר צוות',
+        'member' => 'צוות',
+        'viewer' => 'צפייה',
+    ],
+    // What each role may do, as the users page and the invitation say it.
+    'role_text' => [
+        'owner' => 'הכל, כולל מנוי ומשתמשים',
+        'member' => 'עונה לשאלות ופניות, עורך ידע ותגיות',
+        'viewer' => 'רואה אנליטיקס ודוחות בלבד',
     ],
 ];

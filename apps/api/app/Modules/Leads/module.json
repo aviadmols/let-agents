@@ -40,6 +40,14 @@
             "unit": "days"
         },
         {
+            "name": "form_title",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 120,
+            "scope": "shop"
+        },
+        {
             "name": "writer_model",
             "type": "string",
             "default": "gpt-5.4-mini",

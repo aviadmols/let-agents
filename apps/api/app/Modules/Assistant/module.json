@@ -359,6 +359,17 @@
             "scope": "global"
         },
         {
+            "name": "no_answer",
+            "type": "enum",
+            "options": [
+                "team",
+                "details",
+                "none"
+            ],
+            "default": "team",
+            "scope": "shop"
+        },
+        {
             "name": "search_whatsapp_message",
             "type": "string",
             "default": "",

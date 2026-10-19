@@ -3,7 +3,7 @@
     @php($d = $this->data)
     @php($status = $this->status())
     @php($products = $this->previewProducts())
-    @php($hours = rtrim((string) \Filament\Facades\Filament::getUrl(), '/').'/opening-hours')
+    @php($hours = rtrim((string) \Filament\Facades\Filament::getUrl(), '/').'/settings/hours')
 
     <style>
         .lad{--lad-line:#e5e7eb;--lad-soft:#f3f4f6;--lad-card:#fff;--lad-muted:#6b7280;--lad-on:#0f766e;--lad-on-soft:#e6f4f1;--lad-on-ink:#0f5f58;--lad-ink:#111827}

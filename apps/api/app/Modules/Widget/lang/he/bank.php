@@ -77,8 +77,8 @@ return [
     ],
     // What the shop can rewrite in its settings; these are the defaults.
     'contact' => [
-        'title' => 'רוצה שנשלח לך סרטון וידאו של המוצר, או לשאול אותנו עליו?',
-        'button' => 'לשיחה בוואטסאפ',
+        'title' => 'רוצים לוודא? הצוות זמין בוואטסאפ',
+        'button' => 'לשאול את הצוות',
         'message' => 'שלום, אשמח לשמוע עוד על :product
 :url',
         'offline_note' => 'מחוץ לשעות הפעילות. אפשר לכתוב עכשיו ונחזור אליכם.',

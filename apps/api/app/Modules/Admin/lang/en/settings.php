@@ -9,4 +9,8 @@ return [
             'en' => 'English',
         ],
     ],
+    'invitation_days' => [
+        'label' => 'User invitation lifetime',
+        'description' => 'How many days the link in an invitation to a shop\'s panel works. Sending it again starts the count over.',
+    ],
 ];

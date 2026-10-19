@@ -21,6 +21,13 @@ return [
     ],
     'roles' => [
         'owner' => 'Owner',
-        'member' => 'Team member',
+        'member' => 'Team',
+        'viewer' => 'Viewer',
+    ],
+    // What each role may do, as the users page and the invitation say it.
+    'role_text' => [
+        'owner' => 'Everything, the plan and the users included',
+        'member' => 'Answers questions and requests, edits knowledge and tags',
+        'viewer' => 'Sees analytics and reports only',
     ],
 ];

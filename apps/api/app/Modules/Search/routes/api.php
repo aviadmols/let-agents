@@ -25,6 +25,8 @@ Route::get('search/let-agents-search.js', LetsSearchScriptController::class)->na
 
 Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/index', SearchIndexController::class)->name('api.search.index');
+    // How the drawer looks and where it takes over: read on every page, small and cached.
+    Route::get('search/{site}/look', [SearchIndexController::class, 'look'])->name('api.search.look');
     Route::get('search/{site}/similar', SimilarController::class)->name('api.search.similar');
     Route::get('search/{site}/sizes', SizeHelpController::class)->name('api.search.sizes');
     Route::get('search/{site}', SearchController::class)->name('api.search.query');

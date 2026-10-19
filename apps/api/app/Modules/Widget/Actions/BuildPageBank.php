@@ -25,6 +25,7 @@ use App\Modules\Enrichment\Models\EnrichmentProductRelation;
 use App\Modules\Enrichment\Models\EnrichmentRanking;
 use App\Modules\Enrichment\Models\EnrichmentRelationRules;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Contracts\PageTags;
@@ -213,6 +214,12 @@ final class BuildPageBank
         $bank['searched'] = Features::enabled('widget.searched_products', $shopId);
         // Whether a shopper may leave a way to be told an answer the assistant did not have.
         $bank['callbacks'] = Features::enabled('shoppers.callbacks', $shopId);
+        // The shop's leave-details form (Leads): its fields in order, each required or not, heading, consent and
+        // promise; answered to POST /api/v1/widget/{site}/lead. Null when the shop takes no details.
+        $bank['lead_form'] = app(DescribesLeadForm::class)->forShop($shopId, $this->locale);
+        // What a question with no answer on this page offers: team (WhatsApp in the hours, else details),
+        // details (the form, no WhatsApp) or none (only "not found"). The ask replies carry the same.
+        $bank['no_answer'] = self::noAnswer($shopId);
         $bank['signup'] = $this->signUp($shopId);
         // Whether this shop has said what it wants from a reader. The flow itself is asked for
         // step by step, so nothing about it is cached with the page.
@@ -1403,15 +1410,19 @@ final class BuildPageBank
 
         $text = fn (string $name): string => trim((string) Settings::get("widget.whatsapp_{$name}", $shopId))
             ?: (string) __("widget::bank.contact.{$name}", [], $this->locale);
+        $offline = (string) Settings::get('widget.whatsapp_when_offline', $shopId);
 
         return [
             'number' => $number,
             'title' => $text('title'),
             'button' => $text('button'),
-            // :product and :url are filled in by the widget with the page it is on.
+            // :product and :url are filled in by the widget with the page it is on, :question with the shopper's question.
             'message' => $text('message'),
             'offline_note' => $text('offline_note'),
-            'hide_when_offline' => Settings::get('widget.whatsapp_when_offline', $shopId) === 'hide',
+            // Outside the answering hours (widget.whatsapp_when_offline): 'details' offers to leave details instead
+            // of WhatsApp, 'show' keeps the button with the offline note, 'hide' shows nothing.
+            'when_offline' => $offline,
+            'hide_when_offline' => $offline === 'hide',
             'timezone' => (string) Settings::get('widget.whatsapp_timezone', $shopId),
             // One entry per day, Sunday first. "09:00-18:00", or empty on a day the shop is closed.
             'hours' => OpeningHours::fromDays(array_map(
@@ -1421,6 +1432,24 @@ final class BuildPageBank
             'online_label' => (string) __('widget::bank.contact.online', [], $this->locale),
             'offline_label' => (string) __('widget::bank.contact.offline', [], $this->locale),
         ];
+    }
+
+    /**
+     * The shop's no-answer choice (assistant.no_answer) as far as the shop can keep it, the same rule as the
+     * assistant's replies: team needs WhatsApp on with the shop's own number and the offer on, details needs
+     * callbacks; otherwise the next one down.
+     */
+    private static function noAnswer(string $shopId): string
+    {
+        $chosen = (string) Settings::get('assistant.no_answer', $shopId);
+        $number = (string) preg_replace('/\D/', '', (string) Settings::overrideFor('widget.whatsapp_number', $shopId));
+        $whatsapp = strlen($number) >= 8 && Features::enabled('widget.whatsapp', $shopId) && Features::enabled('assistant.search_whatsapp', $shopId);
+
+        return match (true) {
+            $chosen === 'team' && $whatsapp => 'team',
+            $chosen !== 'none' && Features::enabled('shoppers.callbacks', $shopId) => 'details',
+            default => 'none',
+        };
     }
 
     /** How many questions shoppers asked about this product and got an answer to. */

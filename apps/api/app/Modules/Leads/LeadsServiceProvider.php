@@ -5,8 +5,10 @@ namespace App\Modules\Leads;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\TimelineSource;
+use App\Modules\Leads\Actions\DescribeLeadForm;
 use App\Modules\Leads\Actions\OfferCallToAction;
 use App\Modules\Leads\Console\LeadsCommand;
+use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
 use App\Modules\Leads\Support\LeadTimeline;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -20,6 +22,7 @@ final class LeadsServiceProvider extends ModuleServiceProvider
     {
         $this->app->tag([LeadTimeline::class], TimelineSource::TAG);
         $this->app->bind(OffersCallsToAction::class, OfferCallToAction::class);
+        $this->app->bind(DescribesLeadForm::class, DescribeLeadForm::class);
     }
 
     protected function moduleCommands(): array

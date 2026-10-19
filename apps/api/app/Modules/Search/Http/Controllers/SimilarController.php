@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * GET /api/v1/search/{site}/similar?id=<product id>[&limit=1..24]
+ * GET /api/v1/search/{site}/similar?id=<product id>[&limit=1..24][&for=oos]
  *
  * Products like one in the results, for its "similar items" button. From stored vectors only:
  * no model is asked, so the same answer is cached for a few minutes.
@@ -29,7 +29,10 @@ final class SimilarController
 
         $shopId = $connection->shop_id;
 
-        if (! Features::enabled('search.storefront', $shopId) || ! Features::enabled('search.similar', $shopId)) {
+        // The "similar items" button, or (for=oos) the product page's row for a product or a size sold out.
+        $wanted = $request->query('for') === 'oos' ? 'search.out_of_stock_similar' : 'search.similar';
+
+        if (! Features::enabled('search.storefront', $shopId) || ! Features::enabled($wanted, $shopId)) {
             return response()->json(['error' => 'similar_off'], 404);
         }
 

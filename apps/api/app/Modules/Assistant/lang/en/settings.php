@@ -143,6 +143,15 @@ return [
         'label' => 'Provider of the small checking model',
         'description' => 'Checks the question is about the page and the answer rests on it. Best from another family than the answering model.',
     ],
+    'no_answer' => [
+        'label' => 'When the site has no answer',
+        'description' => 'What the shopper sees when nothing was found: the team on WhatsApp (in opening hours, leaving details outside them), leaving details only, or just "not found".',
+        'options' => [
+            'team' => 'The team + WhatsApp',
+            'details' => 'Leave details',
+            'none' => 'Just "not found"',
+        ],
+    ],
     'search_whatsapp_message' => [
         'label' => 'The message WhatsApp opens with from the search',
         'description' => 'Empty for the usual message. :question becomes the shopper\'s question.',

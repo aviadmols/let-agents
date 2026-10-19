@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -30,6 +31,8 @@ use Illuminate\Support\Collection;
  * @property string $email
  * @property bool $is_operator
  * @property string|null $locale admin UI language; null follows the browser
+ * @property string|null $theme light, dark or system; null follows what this browser chose last
+ * @property Carbon|null $last_login_at
  */
 class User extends Authenticatable implements FilamentUser, HasTenants
 {
@@ -45,6 +48,9 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /** One rule for every place a password is set: the admin form and the operator command. */
     public const MIN_PASSWORD_LENGTH = 8;
 
+    /** How the panel is drawn: as the device is set, or always light or dark. */
+    public const THEMES = ['system', 'light', 'dark'];
+
     protected $table = 'users';
 
     protected $fillable = [
@@ -52,6 +58,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'email',
         'password',
         'locale',
+        'theme',
         'is_operator',
     ];
 
@@ -66,6 +73,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_operator' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -126,5 +134,30 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     public function attachShop(Shop $shop, ShopRole $role = ShopRole::Member): void
     {
         $this->shops()->syncWithoutDetaching([$shop->getKey() => ['role' => $role->value]]);
+    }
+
+    /** This person's role in the shop; null when they are not one of its people (an operator looking in). */
+    public function roleIn(Shop|string $shop): ?ShopRole
+    {
+        $role = $this->shops()->whereKey($shop instanceof Shop ? $shop->getKey() : $shop)->first()?->pivot?->role;
+
+        return $role === null ? null : (ShopRole::tryFrom((string) $role) ?? ShopRole::Member);
+    }
+
+    /** May change the shop's settings and data: everyone but a viewer. An operator always may. */
+    public function canEditShop(Shop|string $shop): bool
+    {
+        return $this->is_operator || ($this->roleIn($shop)?->canEdit() ?? false);
+    }
+
+    /** May invite and remove people and change the connection: an owner, or an operator. */
+    public function managesShop(Shop|string $shop): bool
+    {
+        return $this->is_operator || ($this->roleIn($shop)?->managesAccount() ?? false);
+    }
+
+    public function preferredTheme(): ?string
+    {
+        return in_array($this->theme, self::THEMES, true) ? $this->theme : null;
     }
 }

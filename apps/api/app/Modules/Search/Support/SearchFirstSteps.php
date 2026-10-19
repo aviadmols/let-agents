@@ -7,7 +7,7 @@ use App\Modules\Admin\Contracts\FirstStep;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Connections\Models\StoreConnection;
-use App\Modules\Search\Filament\Merchant\Pages\SearchDisplay;
+use App\Modules\Search\Filament\Merchant\Pages\ManualConnectSettings;
 use App\Modules\Search\Models\SearchLog;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
@@ -44,7 +44,7 @@ final class SearchFirstSteps implements FirstSteps
                 title: __('search::home.step.on.title'),
                 body: __($shop->platform === ShopPlatform::Shopify ? 'search::home.step.on.body_shopify' : 'search::home.step.on.body_woocommerce'),
                 button: __('search::home.step.on.button'),
-                url: SearchDisplay::getUrl(panel: 'merchant', tenant: $shop),
+                url: ManualConnectSettings::getUrl(panel: 'merchant', tenant: $shop),
                 done: $live,
             ),
             new FirstStep(

@@ -21,6 +21,9 @@ final class Wishlist extends OperatorShortlists
 
     protected static ?string $slug = 'wishlist';
 
+    /** Out of the settings menu: opened from "The heart and the wishlist" (HeartSettings), "The shoppers' lists". */
+    protected static bool $shouldRegisterNavigation = false;
+
     public static function getNavigationLabel(): string
     {
         return __('shortlist::ui.wishlist_title');

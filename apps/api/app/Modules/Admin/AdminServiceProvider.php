@@ -8,12 +8,18 @@ use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Admin\Http\Responses\RoleAwareLoginResponse;
+use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Panels\MerchantPanelProvider;
 use App\Modules\Admin\Panels\OperatorPanelProvider;
 use App\Modules\Admin\Support\AdminTimeline;
 use App\Modules\Admin\Support\SessionChosenShop;
+use App\Modules\Admin\Support\ViewerGuard;
+use App\Modules\Tenancy\Models\Shop;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 
 final class AdminServiceProvider extends ModuleServiceProvider
 {
@@ -32,6 +38,20 @@ final class AdminServiceProvider extends ModuleServiceProvider
     {
         // The settings pages' controls, as the designer's panel draws them: <x-lp::toggle>, <x-lp::chips>…
         Blade::anonymousComponentPath(__DIR__.'/resources/views/components', 'lp');
+
+        // What a person may do in a shop: change it (everyone but a viewer), manage its people and connection (an owner).
+        Gate::define('edit-shop', fn (User $user, Shop|string $shop): bool => $user->canEditShop($shop));
+        Gate::define('manage-shop', fn (User $user, Shop|string $shop): bool => $user->managesShop($shop));
+
+        // A viewer reads the panel and changes nothing: every button press passes the guard first.
+        \Livewire\on('call', ViewerGuard::call(...));
+
+        // When each person last came in, for "who signs in to the account".
+        Event::listen(Login::class, function (Login $event): void {
+            if ($event->user instanceof User) {
+                $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+            }
+        });
     }
 
     protected function moduleCommands(): array
