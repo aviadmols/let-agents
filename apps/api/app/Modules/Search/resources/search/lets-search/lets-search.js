@@ -1420,7 +1420,8 @@
   function sortOf(c) { return c.sort || c.autoSort || ''; }
   function codesOn(c) { var o = {}; Object.keys(c.f).concat(Object.keys(c.auto || {})).forEach(function (k) { o[k] = 1; }); return Object.keys(o).map(Number); }
   // a size alone on a chip is a bare number ("59"): it says what it is ("מידה 59"); a letter size or a colour says itself
-  function chipText(facet, value) { return facet && facet.k === 'variant_size' && /^\d/.test(String(value.l)) ? facet.l + ' ' + value.l : value.l; }
+  // a size number says it is a size ("מידה 59"); a store field says which ("מחבר: סלע מאיר", not the category of that name)
+  function chipText(facet, value) { return facet && facet.k === 'variant_size' && /^\d/.test(String(value.l)) ? facet.l + ' ' + value.l : facet && /^field:/.test(facet.k) ? facet.l + ': ' + value.l : value.l; }
   function valueOf(code) { var f = S.facets[Math.floor(code / 1000)]; return f ? { facet: f, value: f.v[code % 1000] } : null; }
   // the colour and size filters the index reads from products' variants (BuildSearchIndex::variantFacets)
   function variantFacet(g) { var f = S.facets && S.facets[g]; return !!(f && (f.k === 'variant_color' || f.k === 'variant_size')); }
