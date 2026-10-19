@@ -1106,6 +1106,7 @@
   function close(fromHistory) {
     if (!S.open) { return; }
     S.open = false;
+    S.closedAt = Date.now();
     // words typed and left in the field come back with the next opening, as a search sent does
     var left = INPUT.value.trim();
     if (left && !S.askMode) { keepBack(left, null); }
@@ -1271,7 +1272,9 @@
     var words = String(q || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
     return words.some(function (w) { return ABOUT_WORDS.indexOf(w) !== -1; });
   }
-  function aboutProduct(q) { return !!(S.askMode && S.ctx && rec(S.ctx) && !productSearch(q) && asksAboutIt(q) && !(LEARN.bank && LEARN.bank.ask === false)); }
+  // opened from the product page's row: the words are about this product, and its information stays, until they
+  // plainly search for other products ("טבעת זהב"); a letter or two, or a question, never switch to results
+  function aboutProduct(q) { return !!(S.askMode && S.ctx && rec(S.ctx) && (asksAboutIt(q) || !productSearch(q)) && !(LEARN.bank && LEARN.bank.ask === false)); }
   function askOnly(q) {
     clearTimeout(liveTimer);
     S.live = null;
@@ -3565,6 +3568,9 @@
       open({ text: text, about: true, from: text ? { left: from.left, top: from.top, width: from.width, height: from.height } : null });
     };
     input.addEventListener('input', function () { if (input.value.trim()) { go(input.value); } });
+    // a press on the row opens the product's own view at once: its details, its common questions and actions
+    // (not the focus the page gives back as the drawer closes)
+    input.addEventListener('focus', function () { if (!S.open && Date.now() - (S.closedAt || 0) > 600) { go(''); } });
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(input.value); } });
     sr.querySelector('[data-photo]').addEventListener('click', function (e) { e.preventDefault(); open({ focus: false }); photoPick(); });
     at.parentNode.insertBefore(h, at.nextSibling);
