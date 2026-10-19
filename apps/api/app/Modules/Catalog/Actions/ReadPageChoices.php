@@ -9,6 +9,7 @@ use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Catalog\Support\PageChoices;
+use App\Modules\Catalog\Support\StoreRest;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -71,7 +72,8 @@ final class ReadPageChoices
         $forms = Features::enabled('catalog.page_choices', $shopId) && $connection !== null && $connection->platform !== 'shopify';
         $sizes = Features::enabled('catalog.page_sizes', $shopId);
 
-        if (! $forms && ! $sizes) {
+        // A site that struggled a moment ago is left alone a while (StoreRest).
+        if ((! $forms && ! $sizes) || StoreRest::resting($shopId)) {
             return null;
         }
 
@@ -80,7 +82,9 @@ final class ReadPageChoices
         $counts = ['read' => 0, 'same' => 0, 'changed' => 0, 'with_choices' => 0, 'failed' => 0];
         $changed = [];
 
-        $this->tenant->run($shopId, function () use ($limit, $delay, $forms, $sizes, $until, &$counts, &$changed): void {
+        $this->tenant->run($shopId, function () use ($shopId, $limit, $delay, $forms, $sizes, $until, &$counts, &$changed): void {
+            $down = 0;
+
             foreach ($this->due($limit) as $i => [$product, $row]) {
                 // A part of a reading (ReadPageChoicesJob): what is left, the next part reads.
                 if ($until !== null && now()->gte($until)) {
@@ -92,6 +96,18 @@ final class ReadPageChoices
                 }
 
                 $outcome = $this->read($product, $row, $forms, $sizes);
+
+                // The site answers with errors, or not at all, again and again: it struggles; stop and let it be.
+                $down = $outcome === 'down' ? $down + 1 : 0;
+                if ($down >= StoreRest::TIMES) {
+                    StoreRest::rest($shopId);
+                    $counts['failed']++;
+                    $counts['read']++;
+
+                    break;
+                }
+
+                $outcome = $outcome === 'down' ? 'failed' : $outcome;
                 $counts[$outcome]++;
                 $counts['read']++;
 
@@ -163,7 +179,7 @@ final class ReadPageChoices
         return array_map(fn (array $one): array => [$one[1], $one[2]], array_slice($due, 0, max(0, $limit)));
     }
 
-    /** @return 'same'|'changed'|'failed' */
+    /** @return 'same'|'changed'|'failed'|'down' down: the site struggles (StoreRest), not this page */
     private function read(CatalogProduct $product, ?CatalogProductChoice $row, bool $forms = true, bool $sizes = false): string
     {
         $row ??= new CatalogProductChoice(['product_id' => $product->id, 'fields' => []]);
@@ -178,7 +194,7 @@ final class ReadPageChoices
         if ($response === null || ! $response->successful()) {
             $row->fill(['failures' => $row->failures + 1, 'checked_at' => now()])->save();
 
-            return 'failed';
+            return StoreRest::struggling($response) ? 'down' : 'failed';
         }
 
         $body = (string) $response->body();

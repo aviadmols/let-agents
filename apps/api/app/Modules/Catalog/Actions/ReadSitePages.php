@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Core\Text\HtmlText;
 use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Catalog\Support\StoreRest;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -57,7 +58,8 @@ final class ReadSitePages
 
     public function handle(string $shopId, RunTrigger $trigger = RunTrigger::System): ?Run
     {
-        if (! Features::enabled('catalog.site_pages', $shopId)) {
+        // A site that struggled a moment ago is left alone a while (StoreRest).
+        if (! Features::enabled('catalog.site_pages', $shopId) || StoreRest::resting($shopId)) {
             return null;
         }
 
@@ -99,6 +101,8 @@ final class ReadSitePages
         $limit = (int) Settings::get('catalog.site_pages_per_run', $shopId);
         $seen = [];
 
+        $down = 0;
+
         foreach (array_keys($urls) as $url) {
             $id = self::PREFIX.substr(hash('sha256', self::norm($url)), 0, 24);
             $seen[$id] = true;
@@ -119,9 +123,17 @@ final class ReadSitePages
 
             if ($page === null) {
                 $counts['failed']++;
+                // The site struggles, again and again: stop reading it and let it be (StoreRest).
+                $down = $this->down ? $down + 1 : 0;
+                if ($down >= StoreRest::TIMES) {
+                    StoreRest::rest($shopId);
+
+                    break;
+                }
 
                 continue;
             }
+            $down = 0;
 
             $hash = hash('sha256', $page['title'].'|'.$page['text']);
             $had = $mine->get($id);
@@ -226,8 +238,13 @@ final class ReadSitePages
         return mb_strlen($text) < self::MIN_CHARS || $title === '' ? null : ['title' => $title, 'text' => mb_substr($text, 0, 60_000)];
     }
 
+    /** The last fetch found the site struggling (StoreRest): no answer, a server error, or "too many requests". */
+    private bool $down = false;
+
     private function fetch(string $url, string $host): ?string
     {
+        $this->down = false;
+
         try {
             $response = Http::timeout(15)->withHeaders(['Accept' => 'text/html,application/xml', 'User-Agent' => 'LetAgents/1.0 (+site pages)'])
                 ->withOptions(['allow_redirects' => ['max' => 3, 'on_redirect' => function ($request, $response, $uri) use ($host): void {
@@ -237,10 +254,14 @@ final class ReadSitePages
                     }
                 }]])->get($url);
         } catch (Throwable) {
+            $this->down = true;
+
             return null;
         }
 
         if (! $response->successful() || strlen($response->body()) > self::MAX_BYTES) {
+            $this->down = StoreRest::struggling($response);
+
             return null;
         }
 

@@ -6,6 +6,7 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Runs\Console\FullScanCommand;
+use App\Modules\Runs\Console\ResumeScansCommand;
 use App\Modules\Runs\Contracts\CallJournal;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\ScansShops;
@@ -40,11 +41,13 @@ final class RunsServiceProvider extends ModuleServiceProvider
             $schedule->command('model:prune', ['--model' => [Run::class]])->dailyAt('03:30')->name('runs:prune');
             // Prompts and replies are kept runs.call_log_days, shorter than the runs.
             $schedule->command('model:prune', ['--model' => [RunCall::class]])->dailyAt('03:35')->name('runs:prune-calls');
+            // A scan that stopped on the way (a deploy cut its worker off) carries on by itself.
+            $schedule->command('scan:resume')->everyFiveMinutes()->name('scan:resume')->withoutOverlapping(10)->onOneServer();
         });
     }
 
     protected function moduleCommands(): array
     {
-        return [FullScanCommand::class];
+        return [FullScanCommand::class, ResumeScansCommand::class];
     }
 }

@@ -83,6 +83,12 @@ final class FirstScan
         'choices' => ['catalog.read_choices'],
     ];
 
+    /** A step "running" this long has stopped: past any step's longest (FirstScanStep::$timeout, 28 minutes). */
+    public const STALLED_MINUTES = 40;
+
+    /** The next step not begun this long after the one before ended: the chain is gone. */
+    public const WAITING_MINUTES = 10;
+
     /** A manager starts it again at most this often; the night runs it anyway. */
     public const AGAIN_AFTER_HOURS = 1;
 
@@ -124,14 +130,68 @@ final class FirstScan
             self::mark($shop->id, $step, self::WAITING);
         }
 
+        self::dispatch($shop, array_keys($steps));
+
+        return true;
+    }
+
+    /**
+     * A scan whose chain stopped carried on from where it stopped: a worker cut off by a deploy, a
+     * step that never said it ended, or a chain that failed. Checked every few minutes (scan:resume).
+     * Stopped means the step under way says "running" past any step's longest (STALLED_MINUTES), or
+     * the next step has not begun WAITING_MINUTES after the one before ended. At most once a quarter
+     * hour a shop. Returns the step it carried on from, or null.
+     */
+    public static function resume(Shop $shop): ?string
+    {
+        $state = self::state($shop);
+
+        if ($state === null || $state['finished']) {
+            return null;
+        }
+
+        $from = null;
+        $last = (string) Cache::get(self::key($shop->id, 'started'));
+        foreach ($state['steps'] as $step => $is) {
+            if ($is === self::RUNNING || $is === self::WAITING) {
+                $from = $step;
+                break;
+            }
+            $last = (string) (Cache::get(self::key($shop->id, 'ended:'.$step)) ?? $last);
+        }
+
+        if ($from === null) {
+            return null;
+        }
+
+        $began = Cache::get(self::key($shop->id, 'began:'.$from));
+        $stalled = $state['steps'][$from] === self::RUNNING
+            ? $began !== null && Carbon::parse($began)->lt(now()->subMinutes(self::STALLED_MINUTES))
+            : $last !== '' && Carbon::parse($last)->lt(now()->subMinutes(self::WAITING_MINUTES));
+
+        if (! $stalled || ! Cache::add(self::key($shop->id, 'resumed'), true, now()->addMinutes(15))) {
+            return null;
+        }
+
+        $rest = array_slice(array_keys($state['steps']), (int) array_search($from, array_keys($state['steps']), true));
+        foreach ($rest as $step) {
+            self::mark($shop->id, $step, self::WAITING);
+        }
+        self::dispatch($shop, $rest);
+
+        return $from;
+    }
+
+    /** @param  list<string>  $steps  in order, each a key of STEPS */
+    private static function dispatch(Shop $shop, array $steps): void
+    {
         $jobs = [];
-        foreach ($steps as $step => [$command, $parameters]) {
+        foreach ($steps as $step) {
+            [$command, $parameters] = self::STEPS[$step];
             $jobs[] = new FirstScanStep($shop->id, $step, $command, array_map(fn (string|bool $value): string|bool => is_string($value) ? str_replace('{shop}', (string) $shop->slug, $value) : $value, $parameters));
         }
 
         Bus::chain($jobs)->onQueue('long')->dispatch();
-
-        return true;
     }
 
     public static function mark(string $shopId, string $step, string $state): void
