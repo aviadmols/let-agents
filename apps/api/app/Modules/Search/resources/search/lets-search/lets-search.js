@@ -1648,7 +1648,7 @@
     if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--secondary ' + cls + '" href="' + esc(r.url) + '">' + esc(t('orderPage')) + '</a>' : ''; }
     if (r.s === 0) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-similar="' + esc(id) + '">' + esc(t('similarInStock')) + '</button>'; }
     if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + esc(t('options')) + '</button>'; }
-    return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
+    return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
   }
   function you(turn) {
     if (turn.kind === 'photo') { return '<div class="ls-you"><img class="ls-you__photo" src="' + esc(turn.src || '') + '" alt="' + esc(t('yourPhoto')) + '"></div>'; }
@@ -1822,7 +1822,7 @@
     var lf = turn.leadFlow;
     if (!lf) { return ''; }
     if (lf.state === 'declined') { return '<p class="ls-noanswer__text" style="margin-top:14px">' + esc(bankLabel('lead_declined', t('leadDeclined'))) + '</p>'; }
-    if (lf.state === 'done') { return '<div class="ls-done ls-focus-in" style="margin-top:14px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div style="font-weight:500">' + esc(lf.promise || bankLabel('lead_thanks', t('leadDone', { name: '', when: '' }))) + '</div></div>'; }
+    if (lf.state === 'done') { return '<div class="ls-done ls-focus-in" style="margin-top:14px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div style="font-weight:500">' + esc(lf.promise || bankLabel('lead_thanks', t('leadDone', { name: '', when: '' }))) + '</div></div>'; }
     if (!lf.state) { return '<div style="margin-top:14px">' + thinking() + '</div>'; }
     var said = lf.error || (lf.state === 'consent' ? bankLabel('lead_consent_ask', '') : (lf.offer ? lf.offer + ' — ' : '') + bankLabel('lead_ask_field', ':field', { field: lf.field && lf.field.label || '' }));
     var type = lf.field ? (lf.field.type === 'email' ? 'email' : lf.field.type === 'phone' ? 'tel' : 'text') : 'text';
@@ -1976,7 +1976,7 @@
     var offer = noAnswerOf(turn), h = hours(), link = offer === 'team' ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null, html = '';
     var form = leadFormOf(turn);
     if (turn.lead === 'done') {
-      html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>';
+      html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>';
     } else if (turn.lead === 'no') {
       html = '<p class="ls-noanswer__text">' + esc(t('leadDeclined')) + '</p>';
     } else if (offer === 'none') {
@@ -2344,7 +2344,7 @@
     else if (offline !== 'hide' && (b.lead_form || S.config.callbacks !== false)) {
       var lform = leadFormOf(turn);
       html += '<div class="ls-block"><div style="font-weight:500;font-size:14px">' + esc(b.cta && b.cta.headline || t('talkTitle')) + '</div>' +
-        (turn.lead === 'done' ? '<div class="ls-done ls-focus-in" style="margin-top:10px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>'
+        (turn.lead === 'done' ? '<div class="ls-done ls-focus-in" style="margin-top:10px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>'
           : turn.lead === 'no' ? '' : '<div class="ls-hours" style="margin:4px 0 10px"><span class="ls-dot ls-dot--off"></span>' + esc(h.when ? t('teamBack', { when: h.when }) : t('leadText')) + '</div>' + (lform ? shopLeadForm(turn, lform, asked ? asked.q : '') : leadForm(turn, asked ? asked.q : ''))) + '</div>';
     }
     html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('aboutNote')) + '</span></div>';
@@ -2613,7 +2613,7 @@
               return '<button class="ls-chip" aria-pressed="' + !!on + '"' + (ok ? '' : ' disabled style="opacity:.4;text-decoration:line-through"') + ' data-var="' + esc(a.name) + '|' + esc(term.slug) + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(term.name) + '</button>';
             }).join('') + '</div></div>';
         }).join('');
-        var foot = '<button class="ls-btn ls-btn--primary ls-btn--lg ls-add" data-var-add' + (missing.length ? ' disabled' : '') + '><span class="ls-add__label">' + esc(missing.length ? t('choose', { a: missing[0].name }) : t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
+        var foot = '<button class="ls-btn ls-btn--primary ls-btn--lg ls-add" data-var-add' + (missing.length ? ' disabled' : '') + '><span class="ls-add__label">' + esc(missing.length ? t('choose', { a: missing[0].name }) : t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
         LAYER.querySelector('.ls-layer__body').innerHTML = head + groups;
         LAYER.querySelector('.ls-layer__foot').innerHTML = foot;
       }
