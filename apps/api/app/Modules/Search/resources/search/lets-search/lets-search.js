@@ -686,8 +686,12 @@
     // engine reads questions alike on the server; this is the drawer's own)
     if (buildAsk(q)) { return true; }
     if (S.engine && S.engine.isQuestion) { try { if (S.engine.isQuestion(q)) { return true; } } catch (e) { /* none */ } }
-    return /\?\s*$/.test(q) || /^(איזה|איזו|אילו|איך|כמה|האם|מה|למה|מתי|אפשר|יש לכם|יש לך|which|what|how|can|does|is|do|why)\b/i.test(q.trim()) || q.trim().split(/\s+/).length >= 5;
+    // A long text is a question only when it asks for something ("תמליצו לי…", "מה ההבדל…"): a long
+    // description of a product ("טבעת זהב צהוב עם שתי רצועות דקות…") is searched, by its words and its meaning.
+    return /\?\s*$/.test(q) || /^(איזה|איזו|אילו|איך|כמה|האם|מה|למה|מתי|אפשר|יש לכם|יש לך|which|what|how|can|does|is|do|why)\b/i.test(q.trim())
+      || (q.trim().split(/\s+/).length >= 5 && ASKS_FOR.test(q));
   }
+  var ASKS_FOR = /(תמליצ|תמליץ|המליצ|ממליצ|המלצה|תסביר|תסבירו|הסבר|ספר(ו)? לי|תגיד(ו)? לי|השוו|ההבדל|הבדל בין|כדאי לי|מה עדיף|עדיף|צריך לדעת|אני מתלבט|מתלבטת|recommend|explain|compare|difference|should i|which is better)/i;
 
   // store products (regular price, variations) for the cards on screen
   // live from the store, once a page view: the price and stock of today, not of last night's index
@@ -988,6 +992,9 @@
   function close(fromHistory) {
     if (!S.open) { return; }
     S.open = false;
+    // words typed and left in the field come back with the next opening, as a search sent does
+    var left = INPUT.value.trim();
+    if (left && !S.askMode) { store('local', 'ls_back', { q: left, tid: null, at: Date.now() }); }
     hideLayer(); MENU.hidden = true;
     SCRIM.classList.remove('is-open'); D.classList.remove('is-open'); D.classList.remove('is-wide'); S.wide = null; S.menu = '';
     D.style.removeProperty('--ls-drag');
@@ -1421,6 +1428,8 @@
     if (turn.kind !== 'about' && turn.kind !== 'note') { S.turns.forEach(function (x) { if (x.kind === 'about' && !x.prev) { x.prev = true; } }); }
     S.turns.push(turn);
     fresh[turn.id] = 1;
+    // the last search or question sent is what the next opening shows (open(), backTo())
+    if ((turn.kind === 'results' || turn.kind === 'answer') && turn.q) { store('local', 'ls_back', { q: turn.q, tid: turn.id, at: Date.now() }); }
     persist(); render();
     return turn;
   }
@@ -2789,7 +2798,7 @@
     if (d.share && el.closest('.ls-menu')) { shareGo(d.share); return; }
     if (d.expand !== undefined) { hideMenu(); toggleExpand(); return; }
     if (d.new !== undefined) {
-      var old = S.turns; hideMenu(); S.turns = []; S.wide = null; S.tab = 'chat'; persist(); render();
+      var old = S.turns; hideMenu(); S.turns = []; S.wide = null; S.tab = 'chat'; store('local', 'ls_back', null); persist(); render();
       toast(t('chatCleared'), function () { S.turns = old; persist(); render(); });
       return;
     }
