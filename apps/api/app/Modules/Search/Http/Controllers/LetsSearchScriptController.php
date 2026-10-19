@@ -22,9 +22,10 @@ final class LetsSearchScriptController
 
         $headers = [
             'Content-Type' => 'application/javascript; charset=utf-8',
-            // Five minutes fresh; after that the browser uses what it has at once and checks in the background,
-            // so a returning shopper never waits on the script.
-            'Cache-Control' => 'public, max-age=300, stale-while-revalidate=86400',
+            // Five minutes fresh; for ten more the browser uses what it has at once and checks in the background.
+            // Later it asks first (a 304 by the ETag when unchanged): a day of stale copies once kept a fix away
+            // from the store team who had seen the bug.
+            'Cache-Control' => 'public, max-age=300, stale-while-revalidate=600',
             'ETag' => $etag,
             // The store's own speed tools may see how long it took.
             'Timing-Allow-Origin' => '*',

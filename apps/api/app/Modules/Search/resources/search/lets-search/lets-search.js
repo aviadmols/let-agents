@@ -1354,7 +1354,8 @@
   function liveHtml(lv) {
     var html = isQuestion(lv.q) ? askRow(lv.q, true) : '';
     lv.loading = (!lv.server || !!lv.pending) && !(lv.ids || []).length;
-    return html + '<section class="ls-turn ls-turn--live"><div class="ls-you"><div class="ls-you__bubble ls-you__bubble--live" dir="auto">' + esc(lv.q) + '<span class="ls-caret" aria-hidden="true"></span></div></div>' + resultsHtml(lv) + '</section>';
+    // no bubble repeating what is being typed: the search line above already says it
+    return html + '<section class="ls-turn ls-turn--live">' + resultsHtml(lv) + '</section>';
   }
   function turnById(id) { return id === 'live' ? S.live : S.turns.filter(function (x) { return x.id === id; })[0]; }
 

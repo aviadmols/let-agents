@@ -78,9 +78,6 @@
 .ls-suggest.is-on + .ls-flow .ls-welcome { display: none; }
 .ls-suggest.is-on + .ls-flow .ls-turns > .ls-turn:first-child { border-top: 1px solid var(--ls-line); }
 .ls-suggest .ls-ask { margin-top: 12px; }
-.ls-you__bubble--live { display: inline-flex; align-items: center; gap: 2px; }
-.ls-caret { width: 1.5px; height: 1.1em; background: currentColor; margin-inline-start: 2px; animation: ls-caret 1s steps(1) infinite; }
-@keyframes ls-caret { 50% { opacity: 0; } }
 
 /* the active filters, under the chips: a dark pill each, with its × */
 .ls-chips--bar { margin-bottom: 12px; }
