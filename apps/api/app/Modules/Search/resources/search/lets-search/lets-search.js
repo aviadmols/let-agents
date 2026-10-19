@@ -954,7 +954,8 @@
       S.showPrev = false;
       // except the search the shopper left through one of its results: opened again, it is there as it was
       // (a search sent stays its turn; one only typed comes back in the field, its live results with it)
-      var back = !opts.about && opts.text == null ? backTo() : null;
+      // (the theme's own field opens us with what it holds, often nothing: "" is no words of its own)
+      var back = !opts.about && !opts.text ? backTo() : null;
       if (back) {
         var bt = back.tid ? turnById(back.tid) : null;
         if (bt) { bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt; }).concat([bt]); S.tab = 'chat'; S.wide = null; }
