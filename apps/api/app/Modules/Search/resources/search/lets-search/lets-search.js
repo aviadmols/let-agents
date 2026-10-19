@@ -949,7 +949,7 @@
       if (!doc.body.contains(host)) { doc.body.appendChild(host); }
       R.classList.add('is-open');
       fitViewport();
-      if (opts.from && opts.text) { fly(opts.from, opts.text); }
+      // (typed on the page: no flight of the field into the drawer, the drawer opens and the words go on there)
       requestAnimationFrame(function () { R.classList.add('is-open'); SCRIM.classList.add('is-open'); D.classList.add('is-open'); placePill(); });
       doc.documentElement.style.overflow = 'hidden';
       try { win.history.pushState({ lets: 1 }, ''); } catch (e) { /* file:// */ }
@@ -1005,30 +1005,6 @@
     if (lastFocus && lastFocus.focus) { try { lastFocus.focus({ preventScroll: true }); } catch (e) { /* gone */ } }
   }
   win.addEventListener('popstate', function () { if (S.ownBack) { S.ownBack = false; return; } if (S.open) { close(true); } });
-
-  // The words typed on the product page travel into the drawer's field while it slides in: a copy of the
-  // field flies from where it was typed to where it lands, and the real field shows the words on arrival.
-  function fly(from, text) {
-    try { if (win.matchMedia('(prefers-reduced-motion: reduce)').matches || !D.animate) { return; } } catch (e) { return; }
-    var tr = getComputedStyle(D).transform, m = { e: 0, f: 0 };
-    try { if (tr && tr !== 'none') { var mx = new DOMMatrixReadOnly(tr); m = { e: mx.m41, f: mx.m42 }; } } catch (e) { /* no matrix: lands where it is */ }
-    var to = FIELD.getBoundingClientRect();
-    var end = { left: to.left - m.e, top: to.top - m.f, width: to.width, height: to.height };
-    var g = doc.createElement('div');
-    g.className = 'ls-ghost';
-    g.innerHTML = icon('search') + '<span class="ls-ghost__t" dir="auto">' + esc(text) + '</span>';
-    R.appendChild(g);
-    FIELD.classList.add('is-arriving');
-    var px = function (r) { return { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }; };
-    var a = g.animate([Object.assign(px(from), { opacity: 1, boxShadow: '0 0 0 rgb(0 0 0 / 0)' }), Object.assign(px({ left: (from.left + end.left) / 2, top: Math.min(from.top, end.top) - 24, width: (from.width + end.width) / 2, height: end.height }), { opacity: 1, boxShadow: '0 18px 40px -12px rgb(11 11 12 / .28)', offset: 0.55 }), Object.assign(px(end), { opacity: 1, boxShadow: '0 0 0 rgb(0 0 0 / 0)' })],
-      { duration: 620, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
-    var done = function () {
-      FIELD.classList.remove('is-arriving');
-      var out = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: 'forwards' });
-      out.onfinish = function () { g.remove(); };
-    };
-    a.onfinish = done; a.oncancel = done;
-  }
 
   // ---------------------------------------------------------------- render
   // "about this product" belongs to the page it was opened on: it is never kept, and never shown on another page
@@ -1116,8 +1092,6 @@
   function onType() {
     var q = INPUT.value.trim();
     FIELD.classList.toggle('has-text', !!q);
-    var flying = R.querySelector('.ls-ghost__t');
-    if (flying) { flying.textContent = INPUT.value; }
     if (!q) { hideLive(); return; }
     if (!S.open) { return; }
     if (!S.index) { loadIndex().then(onType); return; }

@@ -342,11 +342,6 @@
 .ls-inline__field input { font-size: 16px; }
 
 /* the words flying from the product page into the drawer's field */
-.ls-ghost { position: fixed; z-index: 5; display: flex; align-items: center; gap: 10px; padding-inline: 16px; border-radius: var(--ls-r-control); background: var(--ls-bg); color: var(--ls-fg); box-shadow: inset 0 0 0 1.5px var(--ls-fg); font-size: 16px; pointer-events: none; overflow: hidden; white-space: nowrap; }
-.ls-ghost .ls-icon { color: var(--ls-fg-muted); }
-.ls-ghost__t { overflow: hidden; text-overflow: ellipsis; }
-.ls-field.is-arriving input { color: transparent; }
-.ls-field.is-arriving input::placeholder { color: transparent; }
 
 /* toast */
 .ls-toast { position: absolute; z-index: 12; inset-inline: 16px; inset-block-end: 16px; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; padding-inline-start: 16px; border-radius: 16px; background: var(--ls-fg); color: var(--ls-bg); font-size: var(--lsp-text-md); box-shadow: var(--lsp-shadow-md); animation: ls-toast-in 260ms var(--lsp-ease-out); }
