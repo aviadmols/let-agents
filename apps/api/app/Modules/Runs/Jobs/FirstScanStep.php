@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Artisan;
+use Throwable;
 
 /**
  * One step of a shop's scan, started from its overview: the same command the night runs, for this
@@ -17,11 +18,15 @@ final class FirstScanStep implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
-    /** The longest step (pictures of a large catalogue) runs past the default. */
-    public int $timeout = 3600;
+    /**
+     * Below the queue's retry_after (30 minutes): a step still running then would be handed to a
+     * second worker while the first goes on. The long steps keep within it (pictures) or go on as
+     * jobs of their own (the product pages).
+     */
+    public int $timeout = 1700;
 
-    /** A step that failed is not repeated: the night runs it again anyway. */
-    public int $tries = 1;
+    /** Once more when a restart (a deploy) cut it off: each step reads only what changed, so again is safe. */
+    public int $tries = 2;
 
     /** @param array<string, string|bool> $parameters */
     public function __construct(
@@ -34,7 +39,15 @@ final class FirstScanStep implements ShouldQueue
     public function handle(): void
     {
         FirstScan::mark($this->shopId, $this->step, FirstScan::RUNNING);
-        $code = Artisan::call($this->command, $this->parameters);
+
+        try {
+            $code = Artisan::call($this->command, $this->parameters);
+        } catch (Throwable $e) {
+            // One step's trouble is that step's: marked failed, and the scan goes on to the next.
+            report($e);
+            $code = 1;
+        }
+
         FirstScan::mark($this->shopId, $this->step, $code === 0 ? FirstScan::DONE : FirstScan::FAILED);
     }
 

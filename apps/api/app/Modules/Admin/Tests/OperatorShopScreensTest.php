@@ -83,6 +83,13 @@ final class OperatorShopScreensTest extends TestCase
         $this->assertSame(1, $shop->apiKeys()->active()->count());
     }
 
+    public function test_the_shop_switch_opened_again_is_the_panel_not_an_error(): void
+    {
+        // A form's address, reloaded or restored with the tab: back to the panel, never "405 Method Not Allowed".
+        $this->get('/admin/shop')->assertRedirect('/');
+        $this->get('/admin/theme/dark')->assertRedirect('/');
+    }
+
     public function test_a_merchant_user_cannot_open_the_operator_panel(): void
     {
         $this->actingAs(User::factory()->create());

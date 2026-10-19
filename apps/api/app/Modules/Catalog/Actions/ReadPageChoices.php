@@ -14,6 +14,7 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
+use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -63,7 +64,7 @@ final class ReadPageChoices
     }
 
     /** The run when something changed; null when nothing did, or the shop does not read its pages. */
-    public function handle(string $shopId, ?int $limit = null, RunTrigger $trigger = RunTrigger::Schedule): ?Run
+    public function handle(string $shopId, ?int $limit = null, RunTrigger $trigger = RunTrigger::Schedule, ?CarbonInterface $until = null): ?Run
     {
         $connection = $this->tenant->run($shopId, fn () => StoreConnection::query()->first());
         // Add-on forms on WooCommerce (Shopify's options are its variants); a product's own size anywhere.
@@ -79,8 +80,13 @@ final class ReadPageChoices
         $counts = ['read' => 0, 'same' => 0, 'changed' => 0, 'with_choices' => 0, 'failed' => 0];
         $changed = [];
 
-        $this->tenant->run($shopId, function () use ($limit, $delay, $forms, $sizes, &$counts, &$changed): void {
+        $this->tenant->run($shopId, function () use ($limit, $delay, $forms, $sizes, $until, &$counts, &$changed): void {
             foreach ($this->due($limit) as $i => [$product, $row]) {
+                // A part of a reading (ReadPageChoicesJob): what is left, the next part reads.
+                if ($until !== null && now()->gte($until)) {
+                    break;
+                }
+
                 if ($i > 0) {
                     ($this->pause)($delay);
                 }
@@ -115,6 +121,12 @@ final class ReadPageChoices
         event(new CatalogProductsChanged($shopId, $changed));
 
         return $run;
+    }
+
+    /** Whether any of the shop's product pages is due to be read. */
+    public function anyDue(string $shopId): bool
+    {
+        return $this->tenant->run($shopId, fn (): bool => $this->due(1) !== []);
     }
 
     /**

@@ -34,7 +34,8 @@ final class RetrievalCommand extends Command
     protected $signature = 'retrieval
         {step : index, images, pictures, match or nightly}
         {target? : shop slug or ID}
-        {--all : every active shop}';
+        {--all : every active shop}
+        {--minutes= : the pictures step\'s time, at most (the scan keeps it under the queue\'s retry_after)}';
 
     protected $description = 'Index what a shop says, and match its products with a model.';
 
@@ -69,7 +70,7 @@ final class RetrievalCommand extends Command
             return [];
         }
 
-        $until = now()->addMinutes(self::PICTURE_MINUTES);
+        $until = now()->addMinutes($this->option('minutes') !== null ? max(1, (int) $this->option('minutes')) : self::PICTURE_MINUTES);
         $runs = [];
 
         $busy = 0;

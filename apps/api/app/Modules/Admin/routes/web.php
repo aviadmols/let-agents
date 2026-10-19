@@ -17,6 +17,10 @@ Route::post('admin/shop', SwitchShopController::class)->middleware(['web', 'auth
 // The display mode chosen in the top bar, kept on the person.
 Route::post('admin/theme/{theme}', SwitchThemeController::class)->middleware(['web', 'auth'])->name('admin.theme');
 
+// Those two are forms; their address opened again (a reload, back, a restored tab) is the panel, never "405".
+Route::get('admin/shop', fn () => redirect()->to('/'))->middleware('web');
+Route::get('admin/theme/{theme}', fn () => redirect()->to('/'))->middleware('web');
+
 // An invitation to a shop's panel: the signed link in the email (checked in the controller, which says why a link
 // no longer works), and the password it sets.
 Route::middleware(['throttle:20,1'])->group(function (): void {

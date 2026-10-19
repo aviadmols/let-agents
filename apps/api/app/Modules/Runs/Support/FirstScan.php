@@ -42,7 +42,9 @@ final class FirstScan
         'posts' => ['assistant:read-posts', ['shop' => '{shop}']],
         // How every product looks, before the catalog is divided: the vocabulary writer counts what
         // the pictures show, and the products step reads it as the last source of a product's looks.
-        'pictures' => ['retrieval', ['step' => 'pictures', 'target' => '{shop}']],
+        // At most 25 minutes, under the queue's retry_after (30): a step still running then would be
+        // handed to a second worker, which finds the pictures held and stops the scan. The night goes on.
+        'pictures' => ['retrieval', ['step' => 'pictures', 'target' => '{shop}', '--minutes' => '25']],
         'structure' => ['enrichment', ['step' => 'structure', 'target' => '{shop}']],
         // Every product a model has not read, in batches, not only a night's share.
         'products' => ['enrichment', ['step' => 'nightly', 'target' => '{shop}', '--all-products' => true]],
@@ -51,7 +53,7 @@ final class FirstScan
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
         // Last, being slow (a pause between pages): what each product page says that the feed does not, a
         // ring's size and the choices before "add to cart". Only pages due; the search index follows by itself.
-        'choices' => ['catalog:read-choices', ['shop' => '{shop}', '--limit' => '5000']],
+        'choices' => ['catalog:read-choices', ['shop' => '{shop}', '--continue' => true]],
     ];
 
     /**
@@ -62,6 +64,24 @@ final class FirstScan
      * whole chain again is the operator's (start(full: true)).
      */
     public const CHANGES = ['catalog', 'site', 'pictures', 'products', 'pages', 'search', 'choices'];
+
+    /**
+     * The runs each step writes, by action: what a step says is its own, never what ran beside it
+     * (the change sync every ten minutes, a shopper's question, the vectors refreshed after a change).
+     */
+    public const STEP_ACTIONS = [
+        'catalog' => ['catalog.sync'],
+        'site' => ['catalog.read_site_pages'],
+        'knowledge' => ['enrichment.read_promises', 'enrichment.read_content', 'assistant.check_own_knowledge'],
+        'posts' => ['assistant.read_posts', 'enrichment.match_article_products', 'enrichment.audit_content'],
+        'pictures' => ['retrieval.build_image_index', 'retrieval.caption_images'],
+        'structure' => ['enrichment.build_structure', 'enrichment.propose_schema', 'enrichment.discover_schema', 'enrichment.score_schema', 'enrichment.import_vocabulary'],
+        'products' => ['enrichment.nightly', 'enrichment.nightly_model', 'enrichment.nightly_review', 'enrichment.read_in_code', 'enrichment.build_cards', 'enrichment.collect_batches'],
+        'pages' => ['retrieval.build_index', 'retrieval.match_products'],
+        'search' => ['search.build_index'],
+        'tags' => ['search.write_tags'],
+        'choices' => ['catalog.read_choices'],
+    ];
 
     /** A manager starts it again at most this often; the night runs it anyway. */
     public const AGAIN_AFTER_HOURS = 1;
@@ -151,6 +171,7 @@ final class FirstScan
             $notes[$step] = Run::query()
                 ->where('shop_id', $shop->id)
                 ->whereBetween('created_at', [Carbon::parse($began)->subSecond(), $until])
+                ->when(isset(self::STEP_ACTIONS[$step]), fn ($q) => $q->whereIn('action', self::STEP_ACTIONS[$step]))
                 ->whereNotNull('summary_key')
                 ->orderBy('created_at')
                 ->get()
