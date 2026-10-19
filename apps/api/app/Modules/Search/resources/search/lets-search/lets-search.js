@@ -226,6 +226,11 @@
       return r.json().catch(function () { return {}; }).then(function (body) { return { ok: r.ok, status: r.status, body: body }; });
     });
   }
+  // A question's request cut off on the way (a network blip, the server switching to a new version): asked once
+  // more a moment later. The answer, if it was written meanwhile, is kept there and comes back at once.
+  function again(send) {
+    return send().catch(function () { return new Promise(function (go) { setTimeout(go, 1500); }).then(send); });
+  }
   function post(url, body) { return json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
   var API = String(CFG.api).replace(/\/$/, '');
   var SITE = encodeURIComponent(CFG.site);
@@ -1727,7 +1732,7 @@
     // "questions shoppers asked", the suggestions, and the gaps the daily review learns from)
     if (turn.ctx) {
       visitStep('ask', { label: String(q).slice(0, 200), item: String(pid(turn.ctx)) });
-      json(API + '/widget/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(pid(turn.ctx)), type: 'product', question: q, vid: visitor(), locale: LANG }) }).then(function (r) {
+      again(function () { return json(API + '/widget/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(pid(turn.ctx)), type: 'product', question: q, vid: visitor(), locale: LANG }) }); }).then(function (r) {
         clearTimeout(slow);
         if (!r.ok) { throw new Error('ask'); }
         var d = (r.body && r.body.data) || {};
@@ -1757,7 +1762,7 @@
     if (S.ctx && turn.ctx) { body.page = 1; }
     if (S.ctx && turn.ctx && shown.length) { body.previous = shown; }
     visitStep('ask', { label: String(q).slice(0, 200) });
-    json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})) }).then(function (r) {
+    again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})) }); }).then(function (r) {
       clearTimeout(slow);
       if (!r.ok) { throw new Error('ask'); }
       var d = (r.body && r.body.data) || r.body || {};
