@@ -73,15 +73,13 @@ final class ApiKeysRelationManager extends RelationManager
                             return;
                         }
 
-                        Notification::make()
-                            ->success()
-                            ->persistent()
-                            ->title(__('tenancy::api_keys.issued.title'))
-                            ->body(__('tenancy::api_keys.issued.body', ['key' => $issued->plaintext]))
-                            ->send();
+                        // Shown once, in a window that stays until it is closed, with a button that copies it:
+                        // a notification could close (or never show) before the key was copied.
+                        $this->replaceMountedAction('showKey', ['key' => $issued->plaintext]);
                     }),
             ])
             ->recordActions([
+                // (the issued key's window, opened by "issue": showKeyAction())
                 Action::make('revoke')
                     ->label(__('tenancy::api_keys.actions.revoke'))
                     ->icon(Heroicon::OutlinedNoSymbol)
@@ -91,5 +89,23 @@ final class ApiKeysRelationManager extends RelationManager
                     ->visible(fn (ShopApiKey $record): bool => ! $record->isRevoked())
                     ->action(fn (ShopApiKey $record, RevokeApiKey $revoke) => $revoke->handle($record)),
             ]);
+    }
+
+    /** The key just issued, the only time it is shown: read-only, with a button that copies it. */
+    public function showKeyAction(): Action
+    {
+        return Action::make('showKey')
+            ->modalHeading(__('tenancy::api_keys.issued.title'))
+            ->modalDescription(__('tenancy::api_keys.issued.only_now'))
+            ->fillForm(fn (array $arguments): array => ['key' => (string) ($arguments['key'] ?? '')])
+            ->schema([
+                TextInput::make('key')
+                    ->label(__('tenancy::api_keys.issued.key'))
+                    ->readOnly()
+                    ->copyable(copyMessage: __('tenancy::api_keys.issued.copied'))
+                    ->extraInputAttributes(['dir' => 'ltr', 'style' => 'font-family: monospace']),
+            ])
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('tenancy::api_keys.issued.close'));
     }
 }

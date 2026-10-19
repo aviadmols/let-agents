@@ -24,6 +24,10 @@ return [
     'issued' => [
         'title' => 'Key created. Copy it now',
         'body' => 'This is the only time the key is shown. Paste it into the plugin settings: :key',
+        'only_now' => 'This is the only time the key is shown. Copy it and paste it in the plugin settings before closing this window.',
+        'key' => 'The key',
+        'copied' => 'Key copied',
+        'close' => 'Copied, close',
     ],
     'errors' => [
         'limit_reached' => 'This shop already has :limit active keys, the maximum allowed. Revoke an old key or raise the cap in settings.',

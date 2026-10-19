@@ -73,10 +73,12 @@ final class OperatorShopScreensTest extends TestCase
     {
         $shop = Shop::factory()->create();
 
-        Livewire::test(ApiKeysRelationManager::class, ['ownerRecord' => $shop, 'pageClass' => EditShop::class])
+        $page = Livewire::test(ApiKeysRelationManager::class, ['ownerRecord' => $shop, 'pageClass' => EditShop::class])
             ->callTableAction('issue', data: ['name' => 'Main site'])
             ->assertHasNoTableActionErrors()
-            ->assertNotified();
+            // shown once, in a window that stays until closed, to copy: not a notification that may vanish
+            ->assertActionMounted('showKey');
+        $this->assertMatchesRegularExpression('/^usk_[a-z0-9]{8}_[A-Za-z0-9]{40}$/', (string) ($page->instance()->mountedActions[0]['data']['key'] ?? ''));
 
         $this->assertSame(1, $shop->apiKeys()->active()->count());
     }
