@@ -20,5 +20,27 @@
         "certificate": ["תעודה", "תעודת", "גמולוג", "certificate", "certified", "appraisal"],
         "gift": ["מתנה", "אריזת מתנה", "גיפט קארד", "שובר", "gift"],
         "terms": ["תקנון", "תנאי שימוש", "תנאי רכישה", "terms", "conditions"]
+    },
+    "_asks": "The same topics as a shopper asks about them, and as a store writes it: what a question of the topic is searched with again when its own words found no answer (stage 2 of the assistant).",
+    "asks": {
+        "returns": {"he": ["מדיניות החזרות", "החזרת מוצר וקבלת זיכוי או החזר כספי", "תוך כמה ימים אפשר להחזיר"], "en": ["return policy", "returning a product for a refund", "how many days to return"]},
+        "exchange": {"he": ["מדיניות החלפות", "החלפת מוצר במידה או בדגם אחר"], "en": ["exchange policy", "exchanging for another size or model"]},
+        "cancellation": {"he": ["ביטול עסקה", "דמי ביטול והחזר כספי"], "en": ["cancelling an order", "cancellation fee and refund"]},
+        "shipping": {"he": ["מדיניות משלוחים", "זמני אספקה ומחיר משלוח", "משלוח חינם"], "en": ["shipping policy", "delivery times and shipping cost", "free shipping"]},
+        "pickup": {"he": ["איסוף עצמי מהחנות", "כתובת ושעות לאיסוף"], "en": ["pickup from the store", "pickup address and hours"]},
+        "warranty": {"he": ["אחריות על המוצרים", "מה כוללת האחריות ולכמה זמן"], "en": ["product warranty", "what the warranty covers and for how long"]},
+        "repair": {"he": ["תיקון מוצר", "שירות תיקונים ומעבדה"], "en": ["product repair", "repair service"]},
+        "payment": {"he": ["אמצעי תשלום", "תשלום בכרטיס אשראי, ביט או העברה"], "en": ["payment methods", "paying by card or transfer"]},
+        "installments": {"he": ["תשלומים ללא ריבית", "כמה תשלומים אפשר"], "en": ["installments without interest", "how many installments"]},
+        "sizing": {"he": ["מדריך מידות", "הגדלה או הקטנה של מידה", "איך יודעים איזו מידה"], "en": ["size guide", "resizing", "how to find my size"]},
+        "care": {"he": ["הוראות ניקוי ותחזוקה", "איך שומרים על המוצר"], "en": ["cleaning and care instructions", "how to look after it"]},
+        "contact": {"he": ["יצירת קשר עם החנות", "טלפון, וואטסאפ ומייל"], "en": ["contacting the store", "phone, WhatsApp and email"]},
+        "hours": {"he": ["שעות פתיחה", "ימים ושעות פעילות"], "en": ["opening hours", "days and hours open"]},
+        "location": {"he": ["כתובת החנות", "איך מגיעים לחנות"], "en": ["store address", "how to get to the store"]},
+        "privacy": {"he": ["מדיניות פרטיות", "שמירה על מידע אישי"], "en": ["privacy policy", "personal data"]},
+        "custom": {"he": ["הזמנה בהתאמה אישית", "חריטה ועיצוב אישי"], "en": ["custom orders", "engraving and personal design"]},
+        "certificate": {"he": ["תעודת אחריות או תעודה גמולוגית", "הערכת שווי"], "en": ["certificate of authenticity", "appraisal"]},
+        "gift": {"he": ["אריזת מתנה", "גיפט קארד ושוברים"], "en": ["gift wrapping", "gift cards"]},
+        "terms": {"he": ["תקנון האתר", "תנאי רכישה"], "en": ["terms of the site", "terms of purchase"]}
     }
 }

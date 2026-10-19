@@ -29,12 +29,14 @@ use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\Passages;
+use App\Modules\Retrieval\Contracts\TopicQuestions;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Answers a question typed in the store's search box, about the whole site rather than one page,
@@ -69,6 +71,17 @@ final class AnswerSiteQuestion
      * 5 is the facts-only writer the bench tries, never released here).
      */
     public const PROMPT_VERSION = 7;
+
+    /** The run of the second look's other wordings of a question, by the small model. */
+    public const SIMILAR_ACTION = 'assistant.similar_questions';
+
+    /** Other wordings a question is searched with again, at most. */
+    private const MAX_SIMILAR = 6;
+
+    private const SIMILAR_OUTPUT_TOKENS = 200;
+
+    /** Wordings from code that make the model's unneeded. */
+    private const ENOUGH_FROM_CODE = 2;
 
     /** Who wrote a knowledge entry, as the writer is told. */
     private const WRITTEN_BY = [
@@ -125,6 +138,12 @@ final class AnswerSiteQuestion
     /** @var array<string, mixed>|null what the writer is given in a replay on frozen data, instead of today's (snapshot()) */
     private ?array $frozen = null;
 
+    /** @var list<string> in the second look, the other wordings the pages are searched with too (prepare()) */
+    private array $widenWith = [];
+
+    /** True in the second look: the question was already found to be the store's. */
+    private bool $scoped = false;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -132,6 +151,7 @@ final class AnswerSiteQuestion
         private readonly SpendGuard $spend,
         private readonly Passages $passages,
         private readonly AnswerContext $context,
+        private readonly TopicQuestions $topicQuestions,
     ) {}
 
     /**
@@ -538,6 +558,13 @@ final class AnswerSiteQuestion
             $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
             fn (array $p): bool => $p['similarity'] >= $floor,
         ));
+        // The second look: what the question's other wordings find too, at the same floor, the nearest kept.
+        foreach ($this->widenWith as $wording) {
+            $found = self::merged($found, array_values(array_filter(
+                $this->passages->near($shopId, $wording, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
+                fn (array $p): bool => $p['similarity'] >= $floor,
+            )), (int) Settings::get('assistant.site_passages', $shopId) + 4);
+        }
         // Code before model: the pages whose title holds the question's words ("ביטול עסקה" for
         // "מה מדיניות הביטולים") are read first, whatever the meaning search found.
         $found = $this->pagesByWords($question, $found);
@@ -601,6 +628,160 @@ final class AnswerSiteQuestion
      */
     private function ask(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true, ?string $viewing = null, bool $forShopper = true): array
     {
+        $result = $this->askOnce($shopId, $question, $locale, $shown, $mode, $remember, $trace, $visitorHash, $keep, $viewing, $forShopper);
+
+        if (! $this->wantsSecondLook($shopId, $result)) {
+            return $result;
+        }
+
+        // The second look: no answer from the question's own words, so it is asked in other ways
+        // and the pages are searched with each; the writer and the checker of the other family are
+        // asked once more on what that found. The first answer stands when this one finds none.
+        $similar = $this->similarQuestions($shopId, $question, $locale, $forShopper);
+
+        if ($similar === []) {
+            return $result;
+        }
+
+        [$this->widenWith, $this->scoped] = [$similar, true];
+
+        try {
+            $again = $this->askOnce($shopId, $question, $locale, $shown, $mode, $remember, $trace, $visitorHash, $keep, $viewing, $forShopper);
+        } finally {
+            [$this->widenWith, $this->scoped] = [[], false];
+        }
+
+        return in_array($again['outcome'] ?? null, [AssistantAnswer::ANSWERED, 'quoted'], true) ? $again : $result;
+    }
+
+    /**
+     * No answer from the pages the question's own words found, and the shop looks again (assistant.second_look).
+     * Only when nothing was found: an answer code or the checker refused (a number the pages do not have)
+     * is not looked for elsewhere.
+     */
+    private function wantsSecondLook(string $shopId, array $result): bool
+    {
+        return $this->frozen === null
+            && in_array($result['outcome'] ?? null, [AssistantAnswer::NO_INFO, 'no_match'], true)
+            && ($result['from'] ?? null) === 'model'
+            && in_array($result['reason'] ?? 'not_found', ['not_found', 'no_answer', 'cites_nothing'], true)
+            && Features::enabled('assistant.second_look', $shopId);
+    }
+
+    /**
+     * The question asked in other ways, to search the pages with again. Code first: its parts, when it
+     * asks more than one thing, and its topics as stores write them ("מה מדיניות ההחזרים?" is also
+     * "מדיניות החזרות", TopicQuestions). Only when code has too few, up to three from a small model,
+     * once a question: kept, never asked twice.
+     *
+     * @return list<string>
+     */
+    public function similarQuestions(string $shopId, string $question, string $locale, bool $forShopper = true): array
+    {
+        $similar = [...self::parts($question), ...$this->topicQuestions->questions($question, $locale)];
+
+        if (count($similar) < self::ENOUGH_FROM_CODE) {
+            $similar = [...$similar, ...$this->rephrased($shopId, $question, $locale, $forShopper)];
+        }
+
+        $out = [Question::key($question) => null];
+        foreach ($similar as $line) {
+            $line = trim((string) preg_replace('/\s+/u', ' ', (string) $line));
+            $out[Question::key($line)] ??= $line === '' ? null : $line;
+        }
+
+        return array_slice(array_values(array_filter($out)), 0, self::MAX_SIMILAR);
+    }
+
+    /** @return list<string> the parts of a question that asks more than one thing, each of two words or more */
+    public static function parts(string $question): array
+    {
+        $whole = trim($question, " \t?!.");
+        $parts = array_map('trim', preg_split('/\s*(?:[?!;,]|\s(?:וגם|או|and|or)\s)\s*/u', $question) ?: []);
+
+        return array_values(array_filter($parts, fn (string $part): bool => $part !== $whole && count(preg_split('/\s+/u', $part) ?: []) >= 2));
+    }
+
+    /** @return list<string> up to three other wordings from the small model, kept a month by the question and the prompt's version */
+    private function rephrased(string $shopId, string $question, string $locale, bool $forShopper): array
+    {
+        $key = 'assistant:similar:'.$shopId.':v'.self::promptVersion('similar_questions').':'.Question::key($question);
+        $kept = Cache::get($key);
+
+        if (is_array($kept)) {
+            return $kept;
+        }
+
+        $role = AgentModel::from('assistant.scope_provider', 'assistant.scope_model');
+        $role = ['provider' => $role->provider, 'name' => $role->provider->value, 'model' => $role->model];
+        $lines = null;
+
+        $this->runs->track(
+            agent: self::AGENT,
+            action: self::SIMILAR_ACTION,
+            shopId: $shopId,
+            trigger: RunTrigger::Webhook,
+            input: ['question' => $question],
+            work: function (RunContext $run) use ($shopId, $question, $locale, $forShopper, $role, &$lines): void {
+                try {
+                    $this->spend->assertCanSpend(forShopper: $forShopper, estimatedUsd: (600 * $this->price('scope_input') + self::SIMILAR_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
+                    $reply = $this->call($run, $role, 'similar_questions', (string) json_encode([
+                        'store' => $this->storeBrief($shopId),
+                        'question' => $question,
+                        'language' => $locale,
+                    ], JSON_UNESCAPED_UNICODE), self::SIMILAR_OUTPUT_TOKENS, null, 'scope');
+                } catch (SpendCapReached|ModelCallFailed $e) {
+                    $run->fail('assistant::runs.similar_failed', [], $e->getMessage());
+
+                    return;
+                }
+
+                $lines = self::checkedSimilar((array) ($reply->data['questions'] ?? []), $question);
+                $run->output(['questions' => count($lines)])->summary('assistant::runs.similar_written', ['n' => (string) count($lines)]);
+            },
+        );
+
+        if ($lines === null) {
+            return [];
+        }
+
+        Cache::put($key, $lines, now()->addDays(30));
+
+        return $lines;
+    }
+
+    /**
+     * Code's gate on the model's wordings: at most three, each a short line, none with contact
+     * details, a link or a price, none the question itself.
+     *
+     * @param  array<int|string, mixed>  $questions
+     * @return list<string>
+     */
+    public static function checkedSimilar(array $questions, string $question): array
+    {
+        $out = [];
+
+        foreach ($questions as $line) {
+            $line = trim((string) preg_replace('/\s+/u', ' ', is_string($line) ? $line : ''));
+            $length = mb_strlen($line);
+
+            if ($length < 4 || $length > 160 || Question::hasContactDetails($line) || preg_match('~https?://|www\.|₪|ש"ח|ש״ח~u', $line) === 1 || Question::key($line) === Question::key($question)) {
+                continue;
+            }
+
+            $out[Question::key($line)] = $line;
+        }
+
+        return array_slice(array_values($out), 0, 3);
+    }
+
+    /**
+     * @param  list<string>  $shown
+     * @param  array<string, mixed>|null  $trace
+     * @return array<string, mixed>
+     */
+    private function askOnce(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true, ?string $viewing = null, bool $forShopper = true): array
+    {
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
 
@@ -630,7 +811,7 @@ final class AnswerSiteQuestion
                 // Whether the question is the store's to answer at all, and whether it asks for harm or
                 // tries to instruct the assistant: a small model, before any page is read. A sensitive
                 // subject the store deals in is the store's.
-                if (Features::enabled('assistant.site_scope', $shopId)) {
+                if (Features::enabled('assistant.site_scope', $shopId) && ! $this->scoped) {
                     $scoper = AgentModel::from('assistant.scope_provider', 'assistant.scope_model');
                     $scoper = ['provider' => $scoper->provider, 'name' => $scoper->provider->value, 'model' => $scoper->model];
 
@@ -1621,6 +1802,30 @@ final class AnswerSiteQuestion
             'name' => (string) Shop::query()->whereKey($shopId)->value('name'),
             'categories' => CatalogCategory::query()->whereNull('removed_at')->orderByDesc('product_count')->limit(40)->pluck('name')->all(),
         ];
+    }
+
+    /**
+     * Two lists of passages as one: a piece found twice is one, at its best nearness; nearest first, at most $limit.
+     *
+     * @param  list<array<string, mixed>>  $found
+     * @param  list<array<string, mixed>>  $more
+     * @return list<array<string, mixed>>
+     */
+    private static function merged(array $found, array $more, int $limit): array
+    {
+        $by = [];
+
+        foreach ([...$found, ...$more] as $passage) {
+            $key = $passage['source'].'|'.$passage['source_id'].'|'.md5((string) $passage['text']);
+            if (! isset($by[$key]) || $by[$key]['similarity'] < $passage['similarity']) {
+                $by[$key] = $passage;
+            }
+        }
+
+        $by = array_values($by);
+        usort($by, fn (array $a, array $b): int => [$b['similarity'], $a['source_id']] <=> [$a['similarity'], $b['source_id']]);
+
+        return array_slice($by, 0, max($limit, count($found)));
     }
 
     private function price(string $name): float

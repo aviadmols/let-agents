@@ -13,11 +13,11 @@ use Illuminate\Console\Command;
  * again (FirstScan::STEPS), on the long queue, each step reading only what changed in it.
  *
  *   scan:full rocks-and-gold
- *   scan:full --all
+ *   scan:full --all --skip=pictures
  */
 final class FullScanCommand extends Command
 {
-    protected $signature = 'scan:full {shop? : shop slug or ID} {--all : every active shop}';
+    protected $signature = 'scan:full {shop? : shop slug or ID} {--all : every active shop} {--skip=* : steps to leave out, e.g. pictures}';
 
     protected $description = 'Scan a shop again from its catalogue to its search index, as the operator\'s full scan does.';
 
@@ -37,7 +37,7 @@ final class FullScanCommand extends Command
             ->get());
 
         foreach ($shops as $shop) {
-            FirstScan::start($shop, full: true);
+            FirstScan::start($shop, full: true, skip: array_values(array_intersect((array) $this->option('skip'), array_keys(FirstScan::STEPS))));
             $this->line($shop->slug);
         }
 

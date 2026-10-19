@@ -73,9 +73,12 @@ final class FirstScan
 
     /**
      * The whole chain for a new shop, or when an operator asks for it; otherwise the changes only.
-     * An operator's full scan goes ahead even while a manager's is locked.
+     * An operator's full scan goes ahead even while a manager's is locked. Steps in $skip are left out
+     * (scan:full --skip=pictures: the pictures, when nothing about them changed).
+     *
+     * @param  list<string>  $skip
      */
-    public static function start(Shop $shop, bool $full = false): bool
+    public static function start(Shop $shop, bool $full = false, array $skip = []): bool
     {
         // Only an operator's full scan passes the lock; a new shop's manager scans it all, once.
         if (! Cache::add(self::key($shop->id, 'lock'), true, now()->addHours(self::AGAIN_AFTER_HOURS)) && ! $full) {
@@ -84,7 +87,7 @@ final class FirstScan
 
         $full = $full || self::isNew($shop);
 
-        $steps = $full ? self::STEPS : array_intersect_key(self::STEPS, array_flip(self::CHANGES));
+        $steps = array_diff_key($full ? self::STEPS : array_intersect_key(self::STEPS, array_flip(self::CHANGES)), array_flip($skip));
         Cache::put(self::key($shop->id, 'started'), now()->toIso8601String(), now()->addDays(self::KEEP_DAYS));
         Cache::put(self::key($shop->id, 'steps'), array_keys($steps), now()->addDays(self::KEEP_DAYS));
 

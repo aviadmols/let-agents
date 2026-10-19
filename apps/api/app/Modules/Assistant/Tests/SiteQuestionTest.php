@@ -48,6 +48,12 @@ final class SiteQuestionTest extends TestCase
     /** @var list<array<string, mixed>> what the fake passage search answers */
     public array $passages = [];
 
+    /** @var array<string, list<array<string, mixed>>> what it answers for one wording, instead */
+    public array $byText = [];
+
+    /** @var list<string> the wordings it was asked with */
+    public array $searched = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -92,7 +98,9 @@ final class SiteQuestionTest extends TestCase
 
             public function near(string $shopId, string $text, array $sources, int $limit): array
             {
-                return array_slice($this->test->passages, 0, $limit);
+                $this->test->searched[] = $text;
+
+                return array_slice($this->test->byText[$text] ?? $this->test->passages, 0, $limit);
             }
         });
     }
@@ -202,6 +210,48 @@ final class SiteQuestionTest extends TestCase
         // Model numbers and sizes are not refs.
         $this->assertSame('ביט PH2 של WERA, 25 מ"מ, למברגה 12V', AnswerSiteQuestion::withoutRefs('ביט PH2 של WERA, 25 מ"מ, למברגה 12V'));
         $this->assertFalse(AnswerSiteQuestion::hasRef('ביט PH2 של WERA 12V'));
+    }
+
+    public function test_no_answer_from_its_own_words_the_question_is_asked_in_other_ways_and_answered(): void
+    {
+        $policy = $this->article('700', 'תנאי רכישה', 'ניתן להחזיר מוצר תוך 14 יום מיום הקבלה ולקבל זיכוי מלא.');
+        $this->byText['מדיניות החזרות'] = [['source' => 'content', 'source_id' => $policy->id, 'external_id' => '700', 'title' => 'תנאי רכישה', 'text' => 'ניתן להחזיר מוצר תוך 14 יום מיום הקבלה ולקבל זיכוי מלא.', 'similarity' => 0.82]];
+        $this->replies = [
+            ['found' => false, 'answer' => '', 'refs' => []],
+            ['found' => true, 'answer' => 'אפשר להחזיר מוצר תוך 14 יום מיום הקבלה ולקבל זיכוי מלא.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $data = $this->ask('מה מדיניות ההחזרים?')->assertOk()->json('data');
+
+        $this->assertSame('answered', $data['outcome'], 'the second look found the policy');
+        $this->assertSame('תנאי רכישה', $data['sources'][0]['title']);
+        $this->assertContains('מדיניות החזרות', $this->searched, 'its topic as stores write it, from code');
+        $this->assertCount(3, $this->calls, 'no model was needed for the other wordings: the writer twice and the checker');
+        $this->assertStringNotContainsString('ניתן להחזיר', $this->calls[0]['user'], 'the first look had not found it');
+        $this->assertSame(AssistantAnswer::ANSWERED, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->sole()->outcome), 'kept as answered for the next shopper');
+    }
+
+    public function test_when_code_has_no_other_wording_a_small_model_writes_them_once(): void
+    {
+        $this->replies = [
+            ['found' => false, 'answer' => '', 'refs' => []],
+            ['questions' => ['איזה צבע מתאים לי', 'https://evil.test/x', 'מה הכי מתאים לעור בהיר']],
+            ['found' => false, 'answer' => '', 'refs' => []],
+        ];
+
+        $this->assertSame('no_info', $this->ask('מה יתאים לי?')->json('data.outcome'), 'still nothing: the first answer stands');
+        $this->assertContains('מה הכי מתאים לעור בהיר', $this->searched);
+        $this->assertNotContains('https://evil.test/x', $this->searched, 'a link is never searched with');
+        $this->assertSame(1, Run::query()->where('action', AnswerSiteQuestion::SIMILAR_ACTION)->count(), 'its own run, with its cost');
+
+        $this->assertSame(['איזה צבע מתאים לי', 'מה הכי מתאים לעור בהיר'], $this->inShop(fn () => app(AnswerSiteQuestion::class)->similarQuestions($this->shop->id, 'מה יתאים לי?', 'he')), 'kept: never asked twice');
+        $this->assertCount(3, $this->calls);
+
+        Features::override('assistant.second_look', false);
+        $this->replies = [['found' => false, 'answer' => '', 'refs' => []]];
+        $this->ask('ומה עם צבע?');
+        $this->assertCount(4, $this->calls, 'turned off: one look');
     }
 
     public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_later(): void

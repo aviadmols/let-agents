@@ -46,6 +46,10 @@
             "default": true
         },
         {
+            "name": "second_look",
+            "default": true
+        },
+        {
             "name": "team_drafts",
             "default": true
         }

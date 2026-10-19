@@ -25,6 +25,10 @@ return [
         'label' => 'What the store says about itself',
         'description' => 'What every product page repeats (returns, warranty, payments, shipping), what the team wrote, and the team\'s answers: the assistant reads them before any other page. Read by code, no model.',
     ],
+    'second_look' => [
+        'label' => 'A wider search when no answer was found',
+        'description' => 'When the assistant found no answer in the pages the question\'s own words brought, it asks the question in other ways (its parts, its topic as stores write it, and if needed up to three wordings from a small model), searches with each and tries again. So "what is the returns policy?" finds the returns page too.',
+    ],
     'site_scope' => [
         'label' => 'Check that a search box question is about the store',
         'description' => 'Before an answer is written, a small model decides whether the question is about the store, its products, services, policies or pages, and whether it asks for something harmful. A sensitive subject the store sells is still the store\'s. About $0.0002 a new question.',
