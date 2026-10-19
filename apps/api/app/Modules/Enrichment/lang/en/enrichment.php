@@ -7,6 +7,7 @@ return [
         'content_mapping' => 'Read articles',
         'product_highlights' => 'Product highlights',
         'product_summary' => 'Short description for search',
+        'section_questions' => 'Questions each page section answers',
     ],
     'batch_statuses' => [
         'awaiting_results' => 'Waiting for answers',

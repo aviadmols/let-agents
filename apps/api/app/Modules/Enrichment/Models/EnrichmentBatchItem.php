@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $batch_id
  * @property string $shop_id
  * @property string $custom_id
- * @property string $subject_type product or content
+ * @property string $subject_type product, content or section (a section of a page or post)
  * @property string $subject_id
  * @property string $input_hash
  * @property array<string, mixed> $request

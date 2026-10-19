@@ -23,6 +23,9 @@ enum TaskType: string
     /** Writes a short description of what a product is and is for, for search, resting on quotes from its text. */
     case ProductSummary = 'product_summary';
 
+    /** Writes the questions a shopper might ask that one section of a page or post answers, for search only. */
+    case SectionQuestions = 'section_questions';
+
     public function label(): string
     {
         return __("enrichment::enrichment.tasks.{$this->value}");
@@ -34,7 +37,7 @@ enum TaskType: string
             self::ProductExtraction => 'enrichment.extractor',
             self::FactReview => 'enrichment.reviewer',
             self::ContentMapping => 'enrichment.content_mapper',
-            self::ProductHighlights, self::ProductSummary => 'enrichment.writer',
+            self::ProductHighlights, self::ProductSummary, self::SectionQuestions => 'enrichment.writer',
         };
     }
 

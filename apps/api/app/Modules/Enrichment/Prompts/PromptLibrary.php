@@ -21,6 +21,7 @@ final class PromptLibrary
         'content_mapping' => 2,
         'product_highlights' => 2,
         'product_summary' => 1,
+        'section_questions' => 1,
     ];
 
     public static function version(TaskType $task): int

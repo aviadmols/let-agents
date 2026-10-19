@@ -108,13 +108,25 @@ final class RunNightlyModelReading
                     Features::enabled('enrichment.auto_highlights', $shopId) ? TaskType::ProductHighlights : null,
                     // A short description of what each product is and is for, for search (FactNotes), after its details.
                     Features::enabled('enrichment.search_summary', $shopId) ? TaskType::ProductSummary : null,
+                    // Then the questions each section of a page or post answers, for search (SectionQuestions),
+                    // up to the night's own number of sections.
+                    Features::enabled('enrichment.section_questions', $shopId) ? TaskType::SectionQuestions : null,
                 ]));
+                $sectionCap = (int) Settings::get('enrichment.section_questions_per_night', $shopId);
+                $sections = 0;
 
                 for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
                     if ($batch === null) {
                         foreach ($tasks as $task) {
-                            foreach ($vocabularies as $vocabulary) {
-                                $batch = $this->batches->handle($shopId, $task, $vocabulary->id, limit: $limit)['batch'] ?? null;
+                            $isSections = $task === TaskType::SectionQuestions;
+
+                            if ($isSections && $sections >= $sectionCap) {
+                                continue;
+                            }
+
+                            // Sections are not read against a vocabulary: one batch for the shop, not one per branch.
+                            foreach ($isSections ? [null] : $vocabularies as $vocabulary) {
+                                $batch = $this->batches->handle($shopId, $task, $vocabulary?->id, limit: $isSections ? min($limit, $sectionCap - $sections) : $limit)['batch'] ?? null;
 
                                 if ($batch !== null) {
                                     break 2;
@@ -130,6 +142,7 @@ final class RunNightlyModelReading
 
                     $totals['batches']++;
                     $totals['batch'] ??= $batch->id;
+                    $sections += $batch->task === TaskType::SectionQuestions ? (int) $batch->request_count : 0;
 
                     if ($viaBatch) {
                         $sent = $this->tenant->run($shopId, fn (): array => $this->submit->handle($run, $batch, $model, $provider));

@@ -7,6 +7,7 @@ return [
         'content_mapping' => 'קריאת מאמרים',
         'product_highlights' => 'נקודות חשובות למוצרים',
         'product_summary' => 'תיאור קצר וברור לחיפוש',
+        'section_questions' => 'שאלות שכל קטע בעמוד עונה עליהן',
     ],
     'batch_statuses' => [
         'awaiting_results' => 'מחכה לתשובות',

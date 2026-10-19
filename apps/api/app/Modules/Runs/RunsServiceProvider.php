@@ -5,6 +5,7 @@ namespace App\Modules\Runs;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
+use App\Modules\Runs\Console\FullScanCommand;
 use App\Modules\Runs\Contracts\CallJournal;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\ScansShops;
@@ -40,5 +41,10 @@ final class RunsServiceProvider extends ModuleServiceProvider
             // Prompts and replies are kept runs.call_log_days, shorter than the runs.
             $schedule->command('model:prune', ['--model' => [RunCall::class]])->dailyAt('03:35')->name('runs:prune-calls');
         });
+    }
+
+    protected function moduleCommands(): array
+    {
+        return [FullScanCommand::class];
     }
 }

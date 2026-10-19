@@ -67,6 +67,10 @@
         {
             "name": "search_summary",
             "default": true
+        },
+        {
+            "name": "section_questions",
+            "default": true
         }
     ],
     "settings": [
@@ -168,6 +172,15 @@
             "max": 5000,
             "scope": "shop",
             "unit": "requests"
+        },
+        {
+            "name": "section_questions_per_night",
+            "type": "int",
+            "default": 300,
+            "min": 1,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "chunks"
         },
         {
             "name": "copurchase_window_days",
@@ -710,7 +723,8 @@
                     "prompts": [
                         "product_extraction",
                         "content_mapping",
-                        "product_highlights"
+                        "product_highlights",
+                        "section_questions"
                     ]
                 },
                 {

@@ -71,6 +71,6 @@ final class RefreshVectorsJob implements ShouldBeUnique, ShouldQueue
     /** @param  array<string, mixed>  $embedding  BuildIndex's output: pieces still waiting, though this run went well */
     public static function more(array $embedding): bool
     {
-        return (int) ($embedding['pending'] ?? 0) > 0 && (int) ($embedding['embedded'] ?? 0) > 0 && ($embedding['stopped'] ?? null) === null;
+        return (int) ($embedding['pending'] ?? 0) > 0 && (int) ($embedding['embedded'] ?? 0) + (int) ($embedding['asked'] ?? 0) > 0 && ($embedding['stopped'] ?? null) === null;
     }
 }

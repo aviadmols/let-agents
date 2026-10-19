@@ -14,6 +14,7 @@ final class TaskRegistry
             TaskType::ContentMapping => ContentMappingTask::class,
             TaskType::ProductHighlights => ProductHighlightsTask::class,
             TaskType::ProductSummary => ProductSummaryTask::class,
+            TaskType::SectionQuestions => SectionQuestionsTask::class,
         });
     }
 }

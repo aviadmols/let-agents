@@ -37,6 +37,10 @@ return [
         'label' => 'A short, clear description of every product, for search',
         'description' => 'In the nightly reading: one to three sentences on what the product is, what it is for and where it fits, only from its description and approved details, resting on quotes. A model of another family reviews it. It joins the search by meaning only; the description on the site does not change.',
     ],
+    'section_questions' => [
+        'label' => 'The questions each section of a page answers, for search',
+        'description' => 'In the nightly reading: three to six questions a shopper might ask that a section of a page or post answers ("can a resized ring be returned?"), so search finds the section when the question uses other words. Checked in code; never shown and never quoted, the answer always rests on the page itself. Each text is asked about once.',
+    ],
     'auto_highlights' => [
         'label' => 'The key points of every product description',
         'description' => 'In the nightly reading and the first scan, after the details: up to four practical points from each description (what else is needed, where it fits, how to install, what is included), each resting on a quote, no praise and no numbers the text does not have. A model of another family reviews them.',

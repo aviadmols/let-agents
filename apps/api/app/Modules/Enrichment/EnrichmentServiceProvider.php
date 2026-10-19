@@ -17,7 +17,9 @@ use App\Modules\Enrichment\Support\EnrichmentHome;
 use App\Modules\Enrichment\Support\EnrichmentScanDetails;
 use App\Modules\Enrichment\Support\FactNotes;
 use App\Modules\Enrichment\Support\StoredCards;
+use App\Modules\Enrichment\Support\WrittenSectionQuestions;
 use App\Modules\Retrieval\Contracts\DocumentNotes;
+use App\Modules\Retrieval\Contracts\SectionQuestions;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 
@@ -31,6 +33,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
         $this->app->tag([EnrichmentScanDetails::class], ScanDetails::TAG);
         // What the scan learned and approved joins the meaning vectors of products and posts.
         $this->app->tag([FactNotes::class], DocumentNotes::NOTES_TAG);
+        // The questions each section of a page or post answers, for the section's second vector.
+        $this->app->tag([WrittenSectionQuestions::class], SectionQuestions::TAG);
         // Another module may ask for one page to be read again; it gets the code readers only.
         $this->app->bind(RereadsPages::class, RereadPage::class);
         // The cards every model reads: one product, page or post, or the store, as one JSON.

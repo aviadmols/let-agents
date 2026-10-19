@@ -23,6 +23,9 @@ use Illuminate\Support\Carbon;
  * @property int|null $dimensions
  * @property string|null $embedding "[0.1,0.2,...]", pgvector's text form; read it with vector()
  * @property Carbon|null $embedded_at
+ * @property string|null $topics what a section of a page or post is about, " returns shipping " (Topics)
+ * @property string|null $ask_embedding the vector of the questions the section answers, same model as embedding
+ * @property string|null $asks_hash the model and the questions ask_embedding was made from
  */
 class RetrievalChunk extends Model
 {
@@ -31,7 +34,7 @@ class RetrievalChunk extends Model
 
     protected $guarded = ['id'];
 
-    protected $hidden = ['embedding'];
+    protected $hidden = ['embedding', 'ask_embedding'];
 
     protected function casts(): array
     {
@@ -46,6 +49,14 @@ class RetrievalChunk extends Model
     public function vector(): ?array
     {
         $vector = $this->embedding === null ? null : json_decode((string) $this->embedding, true);
+
+        return is_array($vector) ? array_map('floatval', $vector) : null;
+    }
+
+    /** @return list<float>|null the vector of the questions the section answers */
+    public function askVector(): ?array
+    {
+        $vector = $this->ask_embedding === null ? null : json_decode((string) $this->ask_embedding, true);
 
         return is_array($vector) ? array_map('floatval', $vector) : null;
     }

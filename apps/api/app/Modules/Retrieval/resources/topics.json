@@ -1,0 +1,24 @@
+{
+    "_about": "What a shopper asks a store about, beyond its products: each topic with the beginnings of the words that name it, in Hebrew (a prefix letter like ו, ה, ב, ל, מ, ש before it is still the word) and in English. A section of a page or post is about a topic its heading names once or its text names twice; a question, once. Read in code only (Topics). Add a topic or a word here, never in code.",
+    "topics": {
+        "returns": ["החזר", "להחזיר", "מחזיר", "החזיר", "זיכוי", "החזרה כספית", "refund", "return"],
+        "exchange": ["החלפ", "להחליף", "מחליפ", "exchange"],
+        "cancellation": ["ביטול", "לבטל", "מבטל", "דמי ביטול", "cancel"],
+        "shipping": ["משלוח", "שליח", "אספקה", "זמן אספקה", "דואר", "מגיע תוך", "deliver", "shipping", "ship "],
+        "pickup": ["איסוף עצמי", "לאסוף", "איסוף מ", "pickup", "pick up", "collect in store"],
+        "warranty": ["אחריות", "warranty", "guarantee"],
+        "repair": ["תיקון", "תיקונים", "לתקן", "מעבדה", "repair", "fix"],
+        "payment": ["תשלום", "לשלם", "כרטיס אשראי", "אשראי", "ביט ", "פייפאל", "העברה בנקאית", "payment", "pay ", "paypal", "credit card"],
+        "installments": ["תשלומים", "פריסה", "ללא ריבית", "installment"],
+        "sizing": ["מידה", "מידות", "מדריך מידות", "הגדלה", "הקטנה", "להגדיל", "להקטין", "היקף אצבע", "size", "resiz", "fitting"],
+        "care": ["ניקוי", "לנקות", "תחזוקה", "שמירה על", "טיפול ב", "clean", "care for", "maintenance"],
+        "contact": ["צור קשר", "צרו קשר", "טלפון", "וואטסאפ", "ווטסאפ", "מייל", "דוא\"ל", "contact", "phone", "whatsapp", "email"],
+        "hours": ["שעות פתיחה", "שעות פעילות", "פתוחים", "סגורים", "opening hours", "open on", "business hours"],
+        "location": ["כתובת", "סניף", "חנות פיזית", "אולם תצוגה", "להגיע אל", "address", "showroom", "branch", "visit us"],
+        "privacy": ["פרטיות", "מידע אישי", "עוגיות", "privacy", "personal data", "cookies"],
+        "custom": ["הזמנה אישית", "התאמה אישית", "בהתאמה אישית", "עיצוב אישי", "חריטה", "לחרוט", "בהזמנה", "custom", "bespoke", "engrav", "made to order"],
+        "certificate": ["תעודה", "תעודת", "גמולוג", "certificate", "certified", "appraisal"],
+        "gift": ["מתנה", "אריזת מתנה", "גיפט קארד", "שובר", "gift"],
+        "terms": ["תקנון", "תנאי שימוש", "תנאי רכישה", "terms", "conditions"]
+    }
+}
