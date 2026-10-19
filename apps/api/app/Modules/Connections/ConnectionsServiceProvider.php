@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\StorePlugin;
 use App\Modules\Connections\Console\BundlePluginCommand;
 use App\Modules\Connections\Contracts\StoreBlog;
 use App\Modules\Connections\Contracts\StoreFeed;
+use App\Modules\Connections\Http\Middleware\FramedSession;
 use App\Modules\Connections\Http\Middleware\FrameInsideWordPress;
 use App\Modules\Connections\Support\FollowShopDomain;
 use App\Modules\Connections\Support\MerchantStorePlugin;
@@ -45,6 +46,8 @@ final class ConnectionsServiceProvider extends ModuleServiceProvider
         RateLimiter::for('plugin-panel', fn (Request $request): Limit => Limit::perMinute(30)->by('plugin-panel:'.$request->ip()));
         // A WooCommerce shop's panel may be framed by the store's own addresses alone.
         $this->app->make(Kernel::class)->pushMiddleware(FrameInsideWordPress::class);
+        // And it stays signed in there: in a frame, the session is its own cookie the browser keeps (FramedSession).
+        $this->app->make(Kernel::class)->prependMiddleware(FramedSession::class);
     }
 
     protected function moduleCommands(): array

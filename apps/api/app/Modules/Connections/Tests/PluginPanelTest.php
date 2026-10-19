@@ -67,6 +67,27 @@ final class PluginPanelTest extends TestCase
         $this->assertNull(auth()->user());
     }
 
+    public function test_in_the_wp_admin_frame_the_sign_in_is_a_cookie_the_browser_keeps_there(): void
+    {
+        $url = (string) parse_url($this->ask()->json('url'), PHP_URL_PATH);
+        $name = config('session.cookie');
+
+        // Inside wp-admin's frame: its own cookie, SameSite=None, Secure and Partitioned, so the browser keeps
+        // and sends it on the store's site (a Lax cookie it would drop, and the panel fell back to the login).
+        $cookie = $this->withHeader('Sec-Fetch-Dest', 'iframe')->get($url)->assertRedirect()->getCookie($name.'_framed', false);
+        $this->assertNotNull($cookie, 'the frame\'s own session cookie');
+        $this->assertSame('none', strtolower((string) $cookie->getSameSite()));
+        $this->assertTrue($cookie->isSecure());
+        $this->assertTrue($cookie->isPartitioned());
+        $this->assertSame($name, config('session.cookie'), 'put back for the next request');
+
+        // The panel on its own, outside the frame, keeps its usual cookie.
+        $this->flushHeaders();
+        $plain = $this->get(route('filament.merchant.pages.overview', ['tenant' => $this->shop->slug]));
+        $this->assertNotNull($plain->getCookie($name, false));
+        $this->assertNull($plain->getCookie($name.'_framed', false));
+    }
+
     public function test_a_second_opening_reuses_the_stores_account(): void
     {
         foreach ([1, 2] as $_) {
