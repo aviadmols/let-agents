@@ -57,8 +57,23 @@ final class PluginPanelController
         $locale = is_array($body) && in_array($body['locale'] ?? null, ['he', 'en'], true) ? $body['locale'] : null;
         Cache::put('connections.panel_login.'.$code, ['shop' => $connection->shop_id, 'site' => $site, 'locale' => $locale], self::SECONDS);
 
-        return response()->json(['url' => route('connections.panel_login', ['code' => $code]), 'expires_in' => self::SECONDS])
+        return response()->json(['url' => self::address($connection, $code), 'expires_in' => self::SECONDS])
             ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The sign-in address on the host the shop's panel lives on (gueta.agents.lets.co.il, where the
+     * platform gives each shop its own): the session it opens is the panel's. Signed in on another
+     * host, the frame's cookie (partitioned, one per host) never reached the panel, and it fell back
+     * to the login page.
+     */
+    private static function address(StoreConnection $connection, string $code): string
+    {
+        $url = route('connections.panel_login', ['code' => $code]);
+        $domain = trim((string) config('upsell.shop_domain'));
+        $slug = (string) $connection->shop?->slug;
+
+        return $domain === '' || $slug === '' ? $url : 'https://'.$slug.'.'.$domain.parse_url($url, PHP_URL_PATH);
     }
 
     public function open(Request $request, TenantContext $tenant, StoreAccount $accounts, string $code): RedirectResponse|Response

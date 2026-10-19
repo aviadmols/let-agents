@@ -88,6 +88,18 @@ final class PluginPanelTest extends TestCase
         $this->assertNull($plain->getCookie($name.'_framed', false));
     }
 
+    public function test_the_sign_in_is_on_the_shops_own_panel_host(): void
+    {
+        // Each shop's panel on its own address (gueta.agents.lets.co.il): signed in there, not on another host,
+        // or the frame's cookie (one per host) never reaches the panel and it falls back to the login page.
+        config(['upsell.shop_domain' => 'agents.lets.co.il']);
+
+        $url = (string) $this->ask()->assertOk()->json('url');
+
+        $this->assertSame($this->shop->slug.'.agents.lets.co.il', parse_url($url, PHP_URL_HOST));
+        $this->assertStringStartsWith('/plugin-login/', (string) parse_url($url, PHP_URL_PATH));
+    }
+
     public function test_a_second_opening_reuses_the_stores_account(): void
     {
         foreach ([1, 2] as $_) {
