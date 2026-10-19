@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -92,6 +93,8 @@ final class PluginPanelController
             $user->forceFill(['locale' => $ticket['locale']])->save();
         }
 
+        Log::info('framed panel signed in', ['shop' => $shop->slug, 'host' => $request->getHost(), 'cookies' => array_keys($request->cookies->all()),
+            'dest' => $request->headers->get('Sec-Fetch-Dest'), 'site' => $request->headers->get('Sec-Fetch-Site')]);
         Auth::login($user);
         $request->session()->regenerate();
         $request->session()->put(FrameInsideWordPress::SESSION, $shop->id);

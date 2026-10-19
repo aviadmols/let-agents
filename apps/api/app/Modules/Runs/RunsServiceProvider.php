@@ -7,6 +7,7 @@ use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Runs\Console\FullScanCommand;
 use App\Modules\Runs\Console\ResumeScansCommand;
+use App\Modules\Runs\Console\ScanStatusCommand;
 use App\Modules\Runs\Contracts\CallJournal;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\ScansShops;
@@ -48,6 +49,6 @@ final class RunsServiceProvider extends ModuleServiceProvider
 
     protected function moduleCommands(): array
     {
-        return [FullScanCommand::class, ResumeScansCommand::class];
+        return [FullScanCommand::class, ResumeScansCommand::class, ScanStatusCommand::class];
     }
 }

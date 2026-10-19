@@ -85,7 +85,7 @@ final class AnswerSiteQuestion
      * How a "not on the site" was looked for: the wider look, and the code checks an answer passes. A "not
      * found" kept by an older way (before a fee the policy states could be quoted) is looked for again.
      */
-    public const LOOK_VERSION = 2;
+    public const LOOK_VERSION = 3;
 
     /** Products a question may name by their title before none is meant ("ספר" names every book). */
     private const NAMED_PRODUCTS = 3;

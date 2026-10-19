@@ -4,6 +4,7 @@ namespace App\Modules\Connections\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -40,7 +41,19 @@ final class FramedSession
         app('session')->forgetDrivers();
 
         try {
-            return $next($request);
+            $response = $next($request);
+
+            // Sent to the login page inside wp-admin's frame: which cookies came (names only) and how the browser
+            // framed it, to tell why the sign-in did not hold.
+            if ($response->isRedirect() && str_contains((string) $response->headers->get('Location'), '/login')) {
+                Log::warning('framed panel sent to login', [
+                    'host' => $request->getHost(), 'path' => $request->path(), 'cookies' => array_keys($request->cookies->all()),
+                    'dest' => $request->headers->get('Sec-Fetch-Dest'), 'site' => $request->headers->get('Sec-Fetch-Site'),
+                    'storage' => $request->headers->get('Sec-Fetch-Storage-Access'),
+                ]);
+            }
+
+            return $response;
         } finally {
             config($before);
             app('session')->forgetDrivers();
