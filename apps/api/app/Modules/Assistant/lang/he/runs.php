@@ -26,4 +26,5 @@ return [
     'team_drafted' => 'נוסחה טיוטת תשובה לצוות. :problems דברים לבדוק.',
     'own_checked' => 'שורה שהצוות הוסיף נבדקה מול האתר. :conflicts סתירות.',
     'prepared' => 'תשובות מוכנות: :questions שאלות על החנות, :answered נענו ועברו בדיקה, :skipped כבר מוכנות ודפיהן לא השתנו.',
+    'checker_compared' => 'השוואת בודק התשובות על :cases מקרים קבועים.',
 ];

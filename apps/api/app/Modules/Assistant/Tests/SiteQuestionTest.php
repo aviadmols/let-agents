@@ -159,7 +159,7 @@ final class SiteQuestionTest extends TestCase
 
         $checks = Run::query()->where('agent', AnswerSiteQuestion::AGENT)->orderBy('id')->get()->map(fn (Run $r): array => $r->output['check'])->all();
         $this->assertSame('rejected', $checks[1]['verdict']);
-        $this->assertSame(['ran' => false, 'type' => 'store_info', 'skipped' => 'number_not_in_the_pages'], $checks[2]);
+        $this->assertSame(['ran' => false, 'trimmed' => 1, 'type' => 'store_info', 'skipped' => 'number_not_in_the_pages'], $checks[2]);
 
         $this->assertSame(0, Artisan::call('assistant:checker-report'));
         $report = Artisan::output();

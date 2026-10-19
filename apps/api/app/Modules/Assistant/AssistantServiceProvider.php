@@ -15,6 +15,7 @@ use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\SuggestQuestions;
 use App\Modules\Assistant\Console\AnswerReportCommand;
+use App\Modules\Assistant\Console\CheckerCompareCommand;
 use App\Modules\Assistant\Console\CheckerReportCommand;
 use App\Modules\Assistant\Console\ContextEvalCommand;
 use App\Modules\Assistant\Console\KnowledgeCommand;
@@ -107,6 +108,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
             KnowledgeCommand::class,
             ReadPostsCommand::class,
             CheckerReportCommand::class,
+            CheckerCompareCommand::class,
             AnswerReportCommand::class,
             ContextEvalCommand::class,
             WriterBenchCommand::class,

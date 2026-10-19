@@ -87,6 +87,9 @@ final class AnswerSiteQuestion
      */
     public const LOOK_VERSION = 3;
 
+    /** A fix by code keeps at least this share of the answer, or the answer is refused whole. */
+    private const KEPT_SHARE = 0.4;
+
     /** Products a question may name by their title, at most. */
     private const NAMED_PRODUCTS = 3;
 
@@ -1038,7 +1041,10 @@ final class AnswerSiteQuestion
                     $wrote = ['model' => $writer['model'], 'ms' => (int) round((hrtime(true) - $started) / 1e6), 'in' => $reply->inputTokens, 'out' => $reply->outputTokens,
                         'cost_usd' => round($reply->costUsd($this->price('answer_input'), $this->price('answer_output')), 6)];
 
-                    ['answer' => $answer, 'cited' => $cited, 'picks' => $picks, 'refusal' => $answerRefusal] = $this->screen($reply->data, $prepared, $question, $mode);
+                    $screened = $this->screen($reply->data, $prepared, $question, $mode);
+                    ['answer' => $answer, 'cited' => $cited, 'picks' => $picks, 'refusal' => $answerRefusal] = $screened;
+                    // Sentences code took out (a number the pages do not have), the rest kept.
+                    $checked['trimmed'] = $screened['trimmed'];
                     $flags['personal'] = $answerRefusal === 'contact_details';
 
                     $checked['type'] = self::questionType($analysis['asks'] ?? null, $cited, $picks);
@@ -1078,6 +1084,14 @@ final class AnswerSiteQuestion
                         $applied = self::applyCheck($check->data, $answer, $picks);
                         ['answer' => $answer, 'picks' => $picks, 'refusal' => $refusal] = $applied;
                         $checked['verdict'] = $applied['verdict'];
+                        // Why, for the record: the decision and each issue's kind and severity (never the shopper's words).
+                        $checked['decision'] = $applied['decision'] ?? null;
+                        $checked['issues'] = array_map(fn (array $i): string => $i['severity'].':'.$i['kind'], $applied['issues'] ?? []);
+                        // The checker's focused fix passes code's checks too, once: no loop, no new model call.
+                        if (($applied['revised'] ?? false) && $answer !== '') {
+                            [$answer, $fixRefusal] = self::gate($answer, $screened['known'], $screened['pages']);
+                            $refusal = $answer === '' && $picks === [] ? ($fixRefusal ?? 'check_unfixed') : null;
+                        }
                         // An attempt to instruct the assistant counts against the visitor.
                         $flags['safe'] = $applied['safe'];
                         $flags['injection'] = $flags['injection'] || $applied['injection'];
@@ -1251,18 +1265,97 @@ final class AnswerSiteQuestion
         // 100 ₪") and how to reach it; quoted from there, that is the store's word, not one made up.
         $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited));
 
-        // Code's checks on the answer; the picks stand or fall on their own.
+        // Code's checks on the answer, sentence by sentence (gate()); the picks stand or fall on their own.
+        $trimmed = 0;
         $refusal = match (true) {
             $answer === '' => 'no_answer',
             $cited === [] && $picks === [] => 'cites_nothing',
-            (Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== []) && ! self::contactsFrom($answer, $pages) => 'contact_details',
-            preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 && ! self::amountsFrom($answer, $pages) => 'price',
-            self::hasRef($answer) => 'internal_ref',
-            self::hasNumberNotIn($answer, $known) => 'number_not_in_the_pages',
+            default => null,
+        };
+        if ($refusal === null) {
+            [$answer, $refusal, $trimmed] = self::gate($answer, $known, $pages);
+        }
+
+        return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed];
+    }
+
+    /**
+     * Code's checks on an answer's text, a sentence at a time, before and after any model's check: a
+     * sentence with contact details or a price the cited pages do not write, an internal ref, a number
+     * the pages do not have, or a measure in another unit than theirs (0.72 carats where the pages say
+     * 0.72 grams) is taken out, and the rest stands. A fix, not a new answer: when less than
+     * KEPT_SHARE of it, or nothing worth showing, would be left, the whole is refused as before.
+     *
+     * @return array{0: string, 1: string|null, 2: int} what is left, the refusal when nothing is, sentences taken out
+     */
+    public static function gate(string $answer, string $known, string $pages): array
+    {
+        $fault = fn (string $text): ?string => match (true) {
+            (Question::hasContactDetails($text) || array_diff(Privacy::redact($text)['found'], ['link']) !== []) && ! self::contactsFrom($text, $pages) => 'contact_details',
+            preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $text) === 1 && ! self::amountsFrom($text, $pages) => 'price',
+            self::hasRef($text) => 'internal_ref',
+            self::hasNumberNotIn($text, $known) => 'number_not_in_the_pages',
+            self::hasMeasureNotIn($text, $known) => 'measure_not_in_the_pages',
             default => null,
         };
 
-        return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal];
+        $whole = $fault($answer);
+        if ($whole === null) {
+            return [$answer, null, 0];
+        }
+
+        // Sentences and line breaks, kept as they were around what stays.
+        $parts = preg_split('/(\n+|(?<=[.!?])\s+)/u', $answer, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$answer];
+        $left = '';
+        $out = 0;
+        for ($i = 0; $i < count($parts); $i += 2) {
+            if (trim($parts[$i]) !== '' && $fault($parts[$i]) !== null) {
+                $out++;
+
+                continue;
+            }
+            $left .= $parts[$i].($parts[$i + 1] ?? '');
+        }
+        $left = trim($left);
+
+        return $left === '' || mb_strlen($left) < 20 || mb_strlen($left) < mb_strlen($answer) * self::KEPT_SHARE
+            ? ['', $whole, $out]
+            : [$left, null, $out];
+    }
+
+    /**
+     * Whether the answer gives a measure (a number with its unit) that the pages do not give in the same
+     * unit: "0.72 קראט" where they say "0.72 גרם", or "30 ס\"מ" where they say "30 מ\"מ". A number alone is
+     * hasNumberNotIn's. Like with like only: carats, grams, kilos, centimetres, millimetres, metres,
+     * litres, millilitres, percent, pages.
+     */
+    public static function hasMeasureNotIn(string $answer, string $known): bool
+    {
+        $units = [
+            'carat' => 'קראט|קרט|ct|k(?![a-z])',
+            'gram' => 'גרם|גר[\'׳]|gr?(?![a-z])',
+            'kilo' => 'ק"ג|ק״ג|קילוגרם|קילו|kg',
+            'cm' => 'ס"מ|ס״מ|סנטימטר(?:ים)?|cm',
+            'mm' => 'מ"מ|מ״מ|מילימטר(?:ים)?|mm',
+            'metre' => 'מטר(?:ים)?|m(?![a-z])',
+            'litre' => 'ליטר(?:ים)?|l(?![a-z])',
+            'ml' => 'מ"ל|מ״ל|ml',
+            'percent' => '%|אחוז(?:ים)?',
+            'pages' => 'עמודים|עמ[\'׳]',
+        ];
+        $plain = fn (string $text): string => str_replace(',', '.', mb_strtolower($text));
+        $known = $plain($known);
+
+        foreach ($units as $family => $pattern) {
+            preg_match_all('/(\d+(?:\.\d+)?)\s?(?:'.$pattern.')/u', $plain($answer), $found);
+            foreach (array_unique($found[1]) as $number) {
+                if (preg_match('/(?<![\d.])'.preg_quote($number, '/').'\s?(?:'.$pattern.')/u', $known) !== 1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1302,7 +1395,7 @@ final class AnswerSiteQuestion
             'question' => $question,
             'answer' => $answer,
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
-            'picks' => array_map(fn (array $pick): array => ['title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
+            'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
             'analysis' => $analysis,
         ], JSON_UNESCAPED_UNICODE);
     }
@@ -1318,6 +1411,10 @@ final class AnswerSiteQuestion
      */
     public static function applyCheck(array $check, string $answer, array $picks): array
     {
+        if (isset($check['decision'])) {
+            return self::applyDecision($check, $answer, $picks);
+        }
+
         $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
         $verdict = [];
 
@@ -1344,6 +1441,78 @@ final class AnswerSiteQuestion
             $refusal !== null => 'rejected',
             $before['answer'] && $answer === '' => 'answer_removed',
             $before['picks'] && $picks === [] => 'picks_removed',
+            default => 'kept',
+        }];
+    }
+
+    /**
+     * What a checker's decision leaves (verify_site v6 on): approve keeps the answer; revise puts its
+     * focused fix in its place (no longer than the answer and a little, or the answer stays when every
+     * issue is minor); reject leaves nothing. A pick that does not fit goes alone, and a wrong reason is
+     * replaced by the checker's from the product's description: the products are judged apart from the
+     * reasons. Unsafe or an injection leaves nothing, as before. The issues come back for the record.
+     *
+     * @param  array<string, mixed>  $check
+     * @param  list<array<string, mixed>>  $picks
+     * @return array{answer: string, picks: list<array<string, mixed>>, safe: bool, injection: bool, refusal: string|null, verdict: string, decision: string, issues: list<array{text: string, kind: string, severity: string, pick?: string}>, revised: bool}
+     */
+    private static function applyDecision(array $check, string $answer, array $picks): array
+    {
+        $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
+        $decision = in_array($check['decision'], ['approve', 'revise', 'reject'], true) ? (string) $check['decision'] : 'reject';
+        $safe = ($check['safe'] ?? null) === true;
+        $injection = ($check['injection'] ?? false) === true;
+        $issues = array_values(array_map(fn (array $i): array => array_filter([
+            'text' => mb_substr(trim((string) ($i['text'] ?? '')), 0, 200),
+            'kind' => in_array($i['kind'] ?? null, ['unsupported', 'contradiction', 'numeric', 'unfit_pick', 'wrong_reason', 'off_topic', 'safety'], true) ? (string) $i['kind'] : 'unsupported',
+            'severity' => in_array($i['severity'] ?? null, ['minor', 'major', 'critical'], true) ? (string) $i['severity'] : 'major',
+            'pick' => isset($i['pick']) ? mb_substr((string) $i['pick'], 0, 8) : null,
+        ], fn ($v): bool => $v !== null && $v !== ''), array_slice(array_filter((array) ($check['issues'] ?? []), 'is_array'), 0, 6)));
+
+        if (! $safe || $injection || in_array('critical', array_column($issues, 'severity'), true) && in_array('safety', array_column($issues, 'kind'), true)) {
+            return ['answer' => '', 'picks' => [], 'safe' => $safe && ! $injection, 'injection' => $injection, 'refusal' => 'check_'.($injection ? 'injection' : 'unsafe'), 'verdict' => 'rejected', 'decision' => 'reject', 'issues' => $issues, 'revised' => false];
+        }
+
+        // Each pick judged apart: one that does not fit goes, a wrong reason is the checker's from its description.
+        $verdicts = [];
+        foreach ((array) ($check['picks'] ?? []) as $p) {
+            if (is_array($p) && isset($p['ref'])) {
+                $verdicts[(string) $p['ref']] = $p;
+            }
+        }
+        $kept = [];
+        foreach ($picks as $pick) {
+            $said = $verdicts[(string) ($pick['ref'] ?? '')] ?? null;
+            if (($said !== null && ($said['fits'] ?? true) === false) || ($said === null && $verdicts === [] && ($check['picks_fit'] ?? true) === false)) {
+                continue;
+            }
+            $why = trim((string) ($said['why'] ?? ''));
+            $kept[] = $why === '' ? $pick : ['why' => mb_substr($why, 0, 300)] + $pick;
+        }
+        $picks = $kept;
+
+        $revised = false;
+        if ($decision === 'reject') {
+            $answer = '';
+            $picks = [];
+        } elseif ($decision === 'revise') {
+            $fix = trim((string) ($check['revised'] ?? ''));
+            if ($fix !== '' && mb_strlen($fix) <= mb_strlen($answer) * 1.3 + 40) {
+                $answer = $fix;
+                $revised = true;
+            } elseif (array_diff(array_column($issues, 'severity'), ['minor']) !== []) {
+                // A material issue and no fix to put in its place: the answer goes, the fitting picks stay.
+                $answer = '';
+            }
+        }
+
+        $refusal = $answer === '' && $picks === [] ? 'check_'.($decision === 'reject' ? (($check['on_topic'] ?? true) === false ? 'off_topic' : 'rejected') : 'unfixed') : null;
+
+        return ['answer' => $answer, 'picks' => $picks, 'safe' => true, 'injection' => false, 'refusal' => $refusal, 'decision' => $decision, 'issues' => $issues, 'revised' => $revised, 'verdict' => match (true) {
+            $refusal !== null => 'rejected',
+            $revised => 'revised',
+            $before['answer'] && $answer === '' => 'answer_removed',
+            $before['picks'] && count($picks) < count($verdicts === [] ? $picks : $verdicts) => 'picks_removed',
             default => 'kept',
         }];
     }

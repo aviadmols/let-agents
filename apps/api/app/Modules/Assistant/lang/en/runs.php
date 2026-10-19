@@ -26,4 +26,5 @@ return [
     'team_drafted' => 'An answer draft was written for the team. :problems things to check.',
     'own_checked' => 'A line the team added was checked against the site. :conflicts conflicts.',
     'prepared' => 'Ready answers: :questions questions about the store, :answered answered and checked, :skipped already ready with their pages unchanged.',
+    'checker_compared' => 'The answer check compared on :cases fixed cases.',
 ];
