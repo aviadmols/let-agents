@@ -33,7 +33,8 @@ final class ContentDocuments implements DocumentSource
         $lines = [];
 
         foreach ((array) $content->terms as $taxonomy => $terms) {
-            $terms = array_filter(array_map('strval', (array) $terms));
+            // A term as a word, or as the store sends it whole ({id, name}): its name.
+            $terms = array_filter(array_map(fn ($term): string => is_array($term) ? (string) ($term['name'] ?? $term['title'] ?? '') : (is_scalar($term) ? (string) $term : ''), (array) $terms));
 
             if ($terms !== []) {
                 $lines[] = ucfirst((string) $taxonomy).': '.implode(', ', $terms);
