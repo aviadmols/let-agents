@@ -55,6 +55,14 @@
 .ls-field.has-text .ls-field__send { display: inline-grid; }
 .ls-dmain { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ls-dbody { flex: 1; min-height: 0; }
+/* The scrollbar's room is kept whether the results fill the drawer or not: a bar that came and went as an article
+   moved above the products narrowed every result by its width, and the whole list jumped sideways. On a touch
+   screen there is no bar at all: a finger scrolls it. */
+.ls-dbody { scrollbar-gutter: stable; }
+@media (hover: none) and (pointer: coarse) {
+  .ls-dbody { scrollbar-width: none; scrollbar-gutter: auto; }
+  .ls-dbody::-webkit-scrollbar { display: none; }
+}
 .ls-credit { flex: none; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--ls-line); background: var(--ls-bg); font-size: 11px; color: var(--ls-fg-muted); letter-spacing: .01em; }
 .ls-credit .ls-mark { --s: 10px; color: var(--ls-fg); }
 .ls-credit a { color: inherit; text-decoration: none; }
