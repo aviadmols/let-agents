@@ -103,6 +103,9 @@ final class BuildPageBank
 
     private const MAX_HIGHLIGHTS = 4;
 
+    /** A product's own text this long or longer is worth a summary on its panel. */
+    private const SUMMARY_CHARS = 400;
+
     /** Questions the banner may turn through, most asked first. */
     private const MAX_ASKED_SHOWN = 3;
 
@@ -1717,10 +1720,18 @@ final class BuildPageBank
         }
         $series = $kinds->series($product);
 
+        // A summary of what its own page says, first, where it says enough to summarise (a book's back cover):
+        // "תקציר קצר: על מה הספר?" by its type when the scan named it in one word, else "על מה זה?".
+        $said = mb_strlen(trim((string) preg_replace('/\s+/u', ' ', strip_tags($product->shortDescription().' '.$product->description()))));
+        $summary = $said < self::SUMMARY_CHARS ? [] : [['text' => $typeLabel !== '' && ! str_contains($typeLabel, ' ')
+            ? (string) __('widget::bank.assistant.summary_type', ['type' => $typeLabel], $this->locale)
+            : (string) __('widget::bank.assistant.summary', [], $this->locale), 'about' => 'product']];
+
         // A question about this product goes with it; one about others like it is searched for;
         // similar items and the comparison are actions the browser takes.
         $questions = [];
         foreach ([
+            ...$summary,
             ...array_map(fn (string $q): array => ['text' => $q, 'about' => 'product'], array_slice($asked, 0, 2)),
             ...($hasLike ? [['text' => (string) __('widget::bank.assistant.similar_items', [], $this->locale), 'about' => 'similar_items']] : []),
             ...($series !== null ? [['text' => (string) __('widget::bank.assistant.same_series', ['series' => $series['tag']], $this->locale), 'about' => 'similar', 'query' => $series['tag']]] : []),

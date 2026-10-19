@@ -287,5 +287,7 @@ return [
         'more_of_type' => ':count more :type',
         'model' => 'model',
         'same_series' => 'More from ":series"',
+        'summary' => 'A short summary: what is it about?',
+        'summary_type' => 'A short summary: what is this :type about?',
     ],
 ];

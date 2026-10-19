@@ -287,5 +287,7 @@ return [
         'more_of_type' => 'עוד :count :type',
         'model' => 'דגם',
         'same_series' => 'עוד מוצרים מ":series"',
+        'summary' => 'תקציר קצר: על מה זה?',
+        'summary_type' => 'תקציר קצר: על מה ה:type?',
     ],
 ];

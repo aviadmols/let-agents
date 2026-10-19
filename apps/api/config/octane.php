@@ -219,7 +219,9 @@ return [
     |
     */
 
-    'max_execution_time' => 30,
+    // A question to the assistant writes, checks and may look a second time: tens of seconds. Cut off
+    // sooner, its answer was written and kept but never reached the shopper ("something went wrong").
+    'max_execution_time' => (int) env('OCTANE_MAX_EXECUTION_TIME', 120),
 
     /*
     |--------------------------------------------------------------------------

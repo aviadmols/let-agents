@@ -55,6 +55,16 @@ final class AssistantBlockTest extends TestCase
         Features::override('shortlist.compare', true, $this->shop->id);
     }
 
+    public function test_a_product_whose_page_says_enough_offers_a_short_summary_first(): void
+    {
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', '1')->firstOrFail()
+            ->forceFill(['payload' => ['description' => str_repeat('תליון בעבודת יד, עם סיפור של אבן ושל הדרך שעשתה עד אליכם. ', 10)]])->save());
+
+        $questions = app(BuildPageBank::class)->handle($this->shop->id, 'product', '1', 'he')['assistant']['questions'];
+
+        $this->assertSame(['text' => 'תקציר קצר: על מה התליון?', 'about' => 'product'], $questions[0], 'by its type, first, to ask about it');
+    }
+
     public function test_the_block_carries_the_products_tags_and_questions_wherever_the_shop_takes_questions(): void
     {
         // Two rings in rose gold: the most common other metal in the store, but no pendant has it,
