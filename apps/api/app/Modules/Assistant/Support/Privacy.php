@@ -24,7 +24,8 @@ final class Privacy
     private const ID = '/(?<![\d])\d{8}[\s-]?\d(?![\d])/u';
 
     /** A street with its number: "רחוב הרצל 12", "רח' בן יהודה 4", "שדרות רוטשילד 10", "12 Main St". */
-    private const ADDRESS = '/(?:רחוב|רח[\'׳]|שד[\'׳]|שדרות|דרך|סמטת|כיכר)\s+[\p{Hebrew}\s"\'׳״-]{2,30}?\s\d{1,4}\b|\b\d{1,5}\s+[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s(?:St|Street|Ave|Avenue|Rd|Road|Blvd)\b\.?/u';
+    /** The street word begins a word ("ברחוב" too); "דרך" only alone: "שבדרך", "בדרך לירושלים 1948" are no address. */
+    private const ADDRESS = '/(?:(?<![\p{L}])[ובלה]?(?:רחוב|רח[\'׳]|שד[\'׳]|שדרות|סמטת|כיכר)|(?<![\p{L}])דרך)\s+[\p{Hebrew}\s"\'׳״-]{2,30}?\s\d{1,4}\b|\b\d{1,5}\s+[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s(?:St|Street|Ave|Avenue|Rd|Road|Blvd)\b\.?/u';
 
     /**
      * @return array{text: string, found: list<string>} the text with each detail replaced by its kind, and the kinds found

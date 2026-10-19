@@ -87,8 +87,17 @@ final class AnswerSiteQuestion
      */
     public const LOOK_VERSION = 3;
 
-    /** Products a question may name by their title before none is meant ("ספר" names every book). */
+    /** Products a question may name by their title, at most. */
     private const NAMED_PRODUCTS = 3;
+
+    /** A word this many titles begin a word with names none of them ("ספר" in a bookshop). */
+    private const NAMED_COMMON = 6;
+
+    /** The least a title must score to be named: one word only it and one other hold. */
+    private const NAMED_FLOOR = 0.5;
+
+    /** Titles within this share of the best score are named with it. */
+    private const NAMED_NEAR = 0.75;
 
     /** Wordings from code that make the model's unneeded. */
     private const ENOUGH_FROM_CODE = 2;
@@ -150,6 +159,9 @@ final class AnswerSiteQuestion
 
     /** @var list<string> in the second look, the other wordings the pages are searched with too (prepare()) */
     private array $widenWith = [];
+
+    /** @var list<string> the named products' titles, as text that speaks of them must hold (prepare()) */
+    private array $namedTitles = [];
 
     /** True in the second look: the question was already found to be the store's. */
     private bool $scoped = false;
@@ -353,45 +365,84 @@ final class AnswerSiteQuestion
     }
 
     /**
-     * The products a question names by their title, from the whole catalogue: a word of the question
-     * that the titles of one to NAMED_PRODUCTS products begin a word with ("חטוף" in "על מה הספר
-     * החטוף?" for "חטוף - אלי שרעבי") names them; a word many titles hold ("ספר", "טבעת") names none.
-     * Their own descriptions then reach the writer, not only what the search before the question showed.
-     * Code only.
+     * The products a question names by their title, from the whole catalogue, the best named alone.
+     * Each word of the question weighs by how few titles begin a word with it (1 for one title, ½ for
+     * two; none past NAMED_COMMON titles: "ספר" names every book), half again when it is only in the
+     * title's subtitle ("הביוגרפיה" in "אשת הברזל - הביוגרפיה של…"); and a title whose name itself the
+     * question says whole ("ביבי" of "ביבי: סיפור חיי", "המדינה שבדרך") scores one more. Only the
+     * titles near the best score are named: "על מה הספר הביוגרפיה של ביבי?" names "ביבי: סיפור חיי", not
+     * Thatcher's biography; "המדינה שבדרך" not "המדינה הזאת". Their own descriptions then reach the
+     * writer. Code only.
      *
-     * @return list<string> external ids
+     * @return list<string> external ids, best first
      */
     private function namedProducts(string $question): array
     {
-        $named = [];
+        $tokens = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [], fn (string $t): bool => $t !== ''));
+        $scores = [];
+        $titles = [];
+        $startsWord = fn (string $text, string $word): bool => preg_match('/(?<![\p{L}\p{N}])'.preg_quote($word, '/').'/u', $text) === 1;
 
-        foreach (Question::words($question) as $word) {
-            $ids = CatalogProduct::query()->whereNull('removed_at')
-                ->where(fn ($q) => $q->whereRaw('lower(title) like ?', [$word.'%'])->orWhereRaw('lower(title) like ?', ['% '.$word.'%']))
-                ->limit(self::NAMED_PRODUCTS + 1)->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
+        foreach ($tokens as $token) {
+            $matched = [];
+            foreach (Question::words($token) as $word) {
+                $found = CatalogProduct::query()->whereNull('removed_at')
+                    ->where(fn ($q) => $q->whereRaw('lower(title) like ?', [$word.'%'])->orWhereRaw('lower(title) like ?', ['% '.$word.'%']))
+                    ->limit(self::NAMED_COMMON + 1)->get(['external_id', 'title']);
+                foreach ($found as $product) {
+                    $id = (string) $product->external_id;
+                    $titles[$id] = (string) $product->title;
+                    // In the name itself, or only in its subtitle.
+                    $matched[$id] = max($matched[$id] ?? 0, $startsWord(self::titleCore($titles[$id]), $word) ? 1.0 : 0.5);
+                }
+            }
 
-            if ($ids !== [] && count($ids) <= self::NAMED_PRODUCTS) {
-                array_push($named, ...$ids);
+            // A word many titles hold says nothing of which one is meant.
+            if ($matched === [] || count($matched) > self::NAMED_COMMON) {
+                continue;
+            }
+
+            foreach ($matched as $id => $part) {
+                $scores[$id] = ($scores[$id] ?? 0) + $part / count($matched);
             }
         }
 
-        $named = array_values(array_unique($named));
+        // A title the question names whole: every word of its name is a word of the question (a prefix before it too).
+        $asked = ' '.implode(' ', $tokens).' ';
+        foreach (array_keys($scores) as $id) {
+            $words = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', self::titleCore($titles[$id])) ?: [], fn (string $w): bool => mb_strlen($w) >= 2));
+            if ($words !== [] && array_filter($words, fn (string $w): bool => preg_match('/\s[והבלמשכ]{0,2}'.preg_quote($w, '/').'\s/u', $asked) !== 1) === []) {
+                $scores[$id] += 1;
+            }
+        }
 
-        return count($named) <= self::NAMED_PRODUCTS ? $named : [];
+        if ($scores === [] || max($scores) < self::NAMED_FLOOR) {
+            return [];
+        }
+
+        $best = max($scores);
+        $named = array_keys(array_filter($scores, fn (float $score): bool => $score >= $best * self::NAMED_NEAR));
+        usort($named, fn (string|int $a, string|int $b): int => [$scores[$b], mb_strlen($titles[(string) $a])] <=> [$scores[$a], mb_strlen($titles[(string) $b])]);
+
+        return array_slice(array_map('strval', $named), 0, self::NAMED_PRODUCTS);
     }
 
-    /**
-     * The shop's pages whose title holds a word of the question (a plural as its singular: ביטולים
-     * finds ביטול), most words first, before the passages the meaning search found. A question on a
-     * store topic (PrepareStoreAnswers::TOPICS) also finds its page by the topic's other words, in
-     * either language: "מה מדיניות ההחזרות" finds Shopify's "Refund policy". Inside the shop's tenant.
-     *
-     * @param  list<array<string, mixed>>  $found
-     * @return list<array<string, mixed>>
-     */
+    /** A title as other text names it: before its subtitle or its code ("חטוף - אלי שרעבי" is "חטוף"). */
+    private static function titleCore(string $title): string
+    {
+        $core = trim((string) preg_split('/\s[-–—|:]\s|:\s/u', $title)[0]);
+
+        return mb_strtolower(mb_strlen($core) >= 3 ? $core : trim($title));
+    }
+
     private function pagesByWords(string $question, array $found): array
     {
         $words = [...$this->words($question), ...self::topicWords($question)];
+
+        // A question about a named product reads the pages that name it, never every page sharing a word.
+        if ($this->namedTitles !== []) {
+            $words = $this->namedTitles;
+        }
 
         if ($words === []) {
             return $found;
@@ -463,6 +514,9 @@ final class AnswerSiteQuestion
         $order = array_flip(array_keys(self::WRITTEN_BY));
         $entries = CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->orderBy('external_id')->get(['id', 'external_id', 'title', 'body'])
             ->sortBy(fn (CatalogContent $entry): int => $order[(string) $entry->external_id] ?? count($order));
+        // About a named product: what names it, not every line sharing a word with the question ("מדינה" in
+        // "המדינה הזאת" when "המדינה שבדרך" is asked about).
+        $words = $this->namedTitles !== [] ? $this->namedTitles : $words;
         $speaks = function (string $piece) use ($words): bool {
             foreach ($words as $word) {
                 if (mb_stripos($piece, $word) !== false) {
@@ -506,8 +560,17 @@ final class AnswerSiteQuestion
             return true;
         }
 
+        // An answer stands until a page it was written from, or a product it picked, changes: never for good.
+        if ($saved->outcome === AssistantAnswer::ANSWERED) {
+            $picked = array_values(array_filter(array_map(fn ($p): string => is_array($p) ? (string) ($p['external_id'] ?? '') : '', (array) $saved->picks)));
+            $changed = $picked === [] ? null : CatalogProduct::query()->whereIn('external_id', $picked)->max('updated_at');
+
+            return $this->pagesChangedSince($saved) || ($changed !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($changed)));
+        }
+
+        // "Not ours to answer" is looked at again after the days a "not found" waits.
         if ($saved->outcome !== AssistantAnswer::NO_INFO) {
-            return false;
+            return $saved->updated_at === null || $saved->updated_at->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId)));
         }
 
         // "Not on the site" holds only as long as the site does, and what the search knows of it: a
@@ -602,7 +665,9 @@ final class AnswerSiteQuestion
         // A question about a product it names ("על מה הספר החטוף?"): that product, when the search before it
         // showed none of those it names; a question about what was shown stays about what was shown.
         $named = $viewing === null ? $this->namedProducts($question) : [];
-        $shown = $named !== [] && array_intersect($named, $shown) === [] ? $named : $shown;
+        $shown = $named === [] || array_diff($named, $shown) === [] ? $shown : $named;
+        // What the store's words and pages bring is then about those products, not about every one sharing a word.
+        $this->namedTitles = $named === [] ? [] : CatalogProduct::query()->whereIn('external_id', $named)->pluck('title')->map(fn ($t): string => self::titleCore((string) $t))->filter()->values()->all();
         $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
         $found = array_values(array_filter(
             $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
@@ -840,6 +905,7 @@ final class AnswerSiteQuestion
      */
     private function askOnce(string $shopId, string $question, string $locale, array $shown, ?string $mode = null, bool $remember = true, ?array &$trace = null, ?string $visitorHash = null, bool $keep = true, ?string $viewing = null, bool $forShopper = true): array
     {
+        $this->namedTitles = [];
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
 
@@ -1165,6 +1231,10 @@ final class AnswerSiteQuestion
         $answer = self::withoutRefs(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS));
         $cited = array_values(array_unique(array_filter(array_map('strval', (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
         $picks = $this->picks((array) ($data['picks'] ?? []), $productsByRef);
+        // About the product the question named, from its own description, citing nothing: that product is what it rests on.
+        if ($cited === [] && $picks === [] && $this->namedTitles !== [] && isset($productsByRef['p1']) && trim((string) ($data['answer'] ?? '')) !== '') {
+            $picks = $this->picks([['ref' => 'p1', 'why' => '']], $productsByRef);
+        }
         $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
             ."\n".implode("\n", array_map(fn (array $p): string => $p['title'].' '.$p['about'], $productsByRef))."\n".$question;
 
@@ -1839,8 +1909,13 @@ final class AnswerSiteQuestion
      *
      * @param  array<string, mixed>|null  $flags  what the checks said: safe, injection, harmful, personal
      */
-    private function save(string $question, string $outcome, ?string $answer, array $sources, array $picks, ?string $model, array $replies, RunContext $run, ?array $flags = null): AssistantAnswer
+    private function save(string $question, string $outcome, ?string $answer, array $sources, array $picks, ?string $model, array $replies, RunContext $run, ?array $flags = null): ?AssistantAnswer
     {
+        // A question about a product it named, not answered: never kept, so the next asker is answered afresh.
+        if ($outcome !== AssistantAnswer::ANSWERED && $this->namedTitles !== []) {
+            return null;
+        }
+
         $cost = 0.0;
         $input = 0;
         $output = 0;

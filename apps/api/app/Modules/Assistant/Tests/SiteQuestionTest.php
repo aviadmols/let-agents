@@ -308,6 +308,38 @@ final class SiteQuestionTest extends TestCase
         $this->assertStringNotContainsString('ספר היסטוריה', $this->calls[0]['user'], '"ספר" names every book: none of them');
     }
 
+    public function test_the_book_a_question_names_best_is_the_one_described_never_one_sharing_a_word(): void
+    {
+        $this->product('900', 'חטוף - אלי שרעבי', 'סיפורו של אלי שרעבי, שנחטף לעזה ושב אחרי 491 ימים בשבי.', []);
+        $this->product('910', 'ספר הזוהר', 'פירוש לספר הזוהר.', []);
+        $this->product('911', 'הספרנית', 'רומן על ספרנית בעיר קטנה.', []);
+        $this->product('920', 'המדינה שבדרך', 'חזון לעתידה של ישראל: מהישרדות לתור זהב.', []);
+        $this->product('921', 'המדינה הזאת', 'סוד ההישרדות של קהילות ישראל באלפיים שנות גלות.', []);
+        $answer = ['found' => true, 'answer' => 'תשובה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'הספר']]];
+        $checked = ['supported' => true, 'on_topic' => true, 'safe' => true];
+
+        $this->replies = [$answer, $checked];
+        $this->ask('על מה הספר החטוף?');
+        $this->assertStringContainsString('491 ימים בשבי', $this->calls[0]['user']);
+        $this->assertStringNotContainsString('פירוש לספר הזוהר', $this->calls[0]['user'], '"ספר" names no book');
+
+        $this->calls = [];
+        $this->replies = [$answer, $checked];
+        $this->ask('על מה הספר המדינה שבדרך?');
+        $this->assertStringContainsString('לתור זהב', $this->calls[0]['user'], 'the book both its words name');
+        $this->assertStringNotContainsString('אלפיים שנות גלות', $this->calls[0]['user'], 'not the one sharing only "המדינה"');
+
+        // A word only one title holds, in its subtitle ("הביוגרפיה"), against the name the question says whole ("ביבי").
+        $this->product('930', 'ביבי: סיפור חיי', 'האוטוביוגרפיה של בנימין נתניהו, מילדותו בירושלים ועד ראשות הממשלה.', []);
+        $this->product('931', 'אשת הברזל - הביוגרפיה של מרגרט תאצ\'ר', 'חייה של ראשת ממשלת בריטניה.', []);
+        $this->product('932', 'מארז המנהיגים הגדולים + ביבי', 'מארז של ספרי מנהיגים.', []);
+        $this->calls = [];
+        $this->replies = [$answer, $checked];
+        $this->ask('על מה הספר הביוגרפיה של ביבי?');
+        $this->assertStringContainsString('ועד ראשות הממשלה', $this->calls[0]['user'], 'the book named "ביבי"');
+        $this->assertStringNotContainsString('ראשת ממשלת בריטניה', $this->calls[0]['user'], 'not the biography it only shares a subtitle word with');
+    }
+
     public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_later(): void
     {
         $this->passages = [];

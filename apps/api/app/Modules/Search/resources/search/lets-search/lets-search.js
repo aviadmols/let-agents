@@ -228,6 +228,8 @@
   }
   // A question's request cut off on the way (a network blip, the server switching to a new version): asked once
   // more a moment later. The answer, if it was written meanwhile, is kept there and comes back at once.
+  // what the server said when it is not "not found": the limit of the day, a question not the store's, unavailable
+  function saidOf(d) { return d && d.answer && d.outcome !== 'no_info' && d.outcome !== 'no_match' ? String(d.answer) : null; }
   function again(send) {
     return send().catch(function () { return new Promise(function (go) { setTimeout(go, 1500); }).then(send); });
   }
@@ -1758,7 +1760,7 @@
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
         } else {
-          update(turn, { loading: false, noInfo: true, rel: related(q), h: hours(), noAnswer: d.no_answer || null });
+          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: related(q), h: hours(), noAnswer: d.no_answer || null });
           announce(t('noInfo'));
         }
       }).catch(function () { clearTimeout(slow); update(turn, { loading: false, error: true }); });
@@ -1787,7 +1789,7 @@
           announce(t('quotedTitle'));
         } else {
           var rel = related(q);
-          update(turn, { loading: false, noInfo: true, rel: rel, h: hours(), noAnswer: d.no_answer || null });
+          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: rel, h: hours(), noAnswer: d.no_answer || null });
           announce(t('noInfo'));
         }
       });
@@ -1842,6 +1844,8 @@
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
     // asked for advice among a search's results: with no clear pick, those results to talk over with another AI, not a form
+    // not "not found" but something else (the day's questions used, not the store's to answer, unavailable): said as it is
+    if (turn.noInfo && turn.said) { return '<p class="ls-answer__text">' + esc(turn.said) + '</p>' + myAi(turn); }
     if (turn.noInfo && turn.advice) { return '<p class="ls-answer__text">' + esc(t('adviceNone')) + '</p>' + myAi(turn); }
     if (turn.noInfo) { return kitsHtml(turn) + noInfoHtml(turn) + myAi(turn); }
     if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
