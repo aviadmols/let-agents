@@ -381,13 +381,15 @@ final class AnswerSiteQuestion
         $tokens = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [], fn (string $t): bool => $t !== ''));
         $scores = [];
         $titles = [];
-        $startsWord = fn (string $text, string $word): bool => preg_match('/(?<![\p{L}\p{N}])'.preg_quote($word, '/').'/u', $text) === 1;
+        $startsWord = fn (string $text, string $word): bool => preg_match('/(?<![\p{L}\p{N}])ה?'.preg_quote($word, '/').'/u', $text) === 1;
 
         foreach ($tokens as $token) {
             $matched = [];
             foreach (Question::words($token) as $word) {
                 $found = CatalogProduct::query()->whereNull('removed_at')
-                    ->where(fn ($q) => $q->whereRaw('lower(title) like ?', [$word.'%'])->orWhereRaw('lower(title) like ?', ['% '.$word.'%']))
+                    // The word, or the word with "ה" before it ("העדן" for "עדן"), beginning a word of the title.
+                    ->where(fn ($q) => $q->whereRaw('lower(title) like ?', [$word.'%'])->orWhereRaw('lower(title) like ?', ['% '.$word.'%'])
+                        ->orWhereRaw('lower(title) like ?', ['ה'.$word.'%'])->orWhereRaw('lower(title) like ?', ['% ה'.$word.'%']))
                     ->limit(self::NAMED_COMMON + 1)->get(['external_id', 'title']);
                 foreach ($found as $product) {
                     $id = (string) $product->external_id;
@@ -411,7 +413,9 @@ final class AnswerSiteQuestion
         $asked = ' '.implode(' ', $tokens).' ';
         foreach (array_keys($scores) as $id) {
             $words = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', self::titleCore($titles[$id])) ?: [], fn (string $w): bool => mb_strlen($w) >= 2));
-            if ($words !== [] && array_filter($words, fn (string $w): bool => preg_match('/\s[והבלמשכ]{0,2}'.preg_quote($w, '/').'\s/u', $asked) !== 1) === []) {
+            // ("העדן" is named by "עדן": the title's own "ה" may be left out)
+            if ($words !== [] && array_filter($words, fn (string $w): bool => preg_match('/\s[והבלמשכ]{0,2}'.preg_quote($w, '/').'\s/u', $asked) !== 1
+                && ! (mb_strlen($w) > 3 && str_starts_with($w, 'ה') && preg_match('/\s[והבלמשכ]{0,2}'.preg_quote(mb_substr($w, 1), '/').'\s/u', $asked) === 1)) === []) {
                 $scores[$id] += 1;
             }
         }

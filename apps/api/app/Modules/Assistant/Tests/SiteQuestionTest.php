@@ -338,6 +338,13 @@ final class SiteQuestionTest extends TestCase
         $this->ask('על מה הספר הביוגרפיה של ביבי?');
         $this->assertStringContainsString('ועד ראשות הממשלה', $this->calls[0]['user'], 'the book named "ביבי"');
         $this->assertStringNotContainsString('ראשת ממשלת בריטניה', $this->calls[0]['user'], 'not the biography it only shares a subtitle word with');
+
+        // The title's own "ה" left out by the question.
+        $this->product('940', 'העדן', 'רומן על קיבוץ בעמק ועל שלושה דורות.', []);
+        $this->calls = [];
+        $this->replies = [$answer, $checked];
+        $this->ask('על מה הספר עדן?');
+        $this->assertStringContainsString('שלושה דורות', $this->calls[0]['user'], '"עדן" names "העדן"');
     }
 
     public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_later(): void

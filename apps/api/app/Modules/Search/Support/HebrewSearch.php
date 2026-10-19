@@ -640,6 +640,13 @@ final class HebrewSearch
                 $candidate = (string) $candidate;
                 $score = $scores[$w] ?? 0;
 
+                // "שבע" is "7" and "7" is "שבע": a number as a word or as digits.
+                if ((self::NUMBER_WORDS[$variant] ?? null) === $candidate || (self::NUMBER_WORDS[$candidate] ?? null) === $variant) {
+                    $found[$candidate] = max($found[$candidate] ?? 0, $position ? 0.9 : 0.95);
+
+                    continue;
+                }
+
                 if ($digits !== '' && $candidate !== $variant && ! str_starts_with($candidate, $variant) && (string) preg_replace('/\D+/u', '', $candidate) !== $digits) {
                     continue;
                 }
@@ -802,6 +809,13 @@ final class HebrewSearch
 
         return $text !== '' && mb_strlen($text) <= 40 && preg_match('/\s/u', $text) !== 1 && preg_match_all('/\d/u', $text) >= 4;
     }
+
+    /** Hebrew number words as digits, one to twelve (both genders): "שבע באוקטובר" finds "ה-7 באוקטובר". */
+    private const NUMBER_WORDS = [
+        'אחד' => '1', 'אחת' => '1', 'שניים' => '2', 'שתיים' => '2', 'שני' => '2', 'שתי' => '2', 'שלוש' => '3', 'שלושה' => '3',
+        'ארבע' => '4', 'ארבעה' => '4', 'חמש' => '5', 'חמישה' => '5', 'שש' => '6', 'שישה' => '6', 'שבע' => '7', 'שבעה' => '7',
+        'שמונה' => '8', 'תשע' => '9', 'תשעה' => '9', 'עשר' => '10', 'עשרה' => '10', 'שתיםעשרה' => '12',
+    ];
 
     /** A product code as compared: "DDF-485", "ddf 485" and "DDF485" are one code. */
     public static function code(?string $text): string

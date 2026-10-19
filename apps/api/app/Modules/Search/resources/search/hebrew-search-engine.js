@@ -144,6 +144,7 @@
   }
 
   /** @return {{words: string[], score: Object}} close catalogue words in the order PHP keeps them */
+  var NUMBER_WORDS = { 'אחד': '1', 'אחת': '1', 'שניים': '2', 'שתיים': '2', 'שני': '2', 'שתי': '2', 'שלוש': '3', 'שלושה': '3', 'ארבע': '4', 'ארבעה': '4', 'חמש': '5', 'חמישה': '5', 'שש': '6', 'שישה': '6', 'שבע': '7', 'שבעה': '7', 'שמונה': '8', 'תשע': '9', 'תשעה': '9', 'עשר': '10', 'עשרה': '10', 'שתיםעשרה': '12' };
   function closeWords(index, typed) {
     var found = {};
     var order = [];
@@ -176,6 +177,12 @@
       for (var w = 0; w < index.list.length; w++) {
         var candidate = index.list[w];
         var score = scores[w] || 0;
+        // "שבע" is "7" and "7" is "שבע": a number as a word or as digits (the server's NUMBER_WORDS)
+        if (NUMBER_WORDS[variant] === candidate || NUMBER_WORDS[candidate] === variant) {
+          var nscore = position ? 0.9 : 0.95;
+          if ((found[candidate] || 0) < nscore) { if (!Object.prototype.hasOwnProperty.call(found, candidate)) { order.push(candidate); } found[candidate] = nscore; }
+          continue;
+        }
         if (digits !== '' && candidate !== variant && candidate.indexOf(variant) !== 0 && String(candidate).replace(/\D+/g, '') !== digits) {
           continue;
         }
