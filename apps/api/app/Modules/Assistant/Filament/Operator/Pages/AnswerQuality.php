@@ -13,6 +13,7 @@ use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Assistant\Support\QualityExpect;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
+use Carbon\CarbonInterface;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -255,6 +256,57 @@ class AnswerQuality extends Page
                 'cost' => round($cost, 4),
                 'per_answer' => $answered > 0 ? round($cost / $answered, 5) : null,
                 'ms' => ($ms = (clone $model)->avg('duration_ms')) === null ? null : (int) round((float) $ms),
+            ];
+        });
+    }
+
+    /**
+     * The four numbers that say whether answers are getting better, for this period and the one before
+     * it (the same length): answers without a failure, of those a model wrote; what an answer cost; the
+     * questions left without an answer; and the answers the nightly review found inventing, of those it
+     * reviewed (the same sample every night: every question of the day, or the shop's cap of them).
+     *
+     * @return array<string, array{now: float|null, before: float|null}>
+     */
+    public function headline(): array
+    {
+        $days = max(1, min(90, $this->days));
+        $now = $this->measure(now()->subDays($days), now());
+        $before = $this->measure(now()->subDays(2 * $days), now()->subDays($days));
+
+        return collect($now)->map(fn ($value, string $key): array => ['now' => $value, 'before' => $before[$key]])->all();
+    }
+
+    /** @return array{fine: float|null, cost: float|null, unanswered: float|null, invented: float|null} */
+    private function measure(CarbonInterface $from, CarbonInterface $until): array
+    {
+        return app(TenantContext::class)->runUnscoped(function () use ($from, $until): array {
+            $asks = AssistantSearchAsk::query()->where('created_at', '>=', $from)->where('created_at', '<', $until)
+                ->when($this->shop !== '', fn (Builder $q) => $q->where('shop_id', $this->shop));
+            $all = (clone $asks)->count();
+            $model = (clone $asks)->whereNotNull('run_id');
+            $written = (clone $model)->count();
+            $failed = (clone $model)->where(fn (Builder $q) => $q->where(fn (Builder $q) => $q->whereNotNull('failure')->where(fn (Builder $q) => $q->whereNull('failure_team')->orWhere('failure_team', '!=', 'fine')))
+                ->orWhere(fn (Builder $q) => $q->whereNotNull('failure_team')->where('failure_team', '!=', 'fine')))->count();
+            $answered = (clone $model)->where('outcome', AssistantAnswer::ANSWERED)->count();
+            $unanswered = (clone $asks)->whereIn('outcome', [AssistantAnswer::NO_INFO, 'no_match'])->count();
+
+            $reviewed = 0;
+            $invented = 0;
+            $reviews = AssistantAskReview::query()->whereDate('day', '>=', $from->toDateString())->whereDate('day', '<', $until->toDateString())
+                ->when($this->shop !== '', fn (Builder $q) => $q->where('shop_id', $this->shop))->get(['items']);
+            foreach ($reviews as $review) {
+                foreach ((array) $review->items as $item) {
+                    $reviewed++;
+                    $invented += is_array($item) && ($item['flag'] ?? null) === 'invented' ? 1 : 0;
+                }
+            }
+
+            return [
+                'fine' => $written > 0 ? round(100 * ($written - $failed) / $written, 1) : null,
+                'cost' => $answered > 0 ? round((float) (clone $model)->sum('cost_usd') / $answered, 5) : null,
+                'unanswered' => $all > 0 ? round(100 * $unanswered / $all, 1) : null,
+                'invented' => $reviewed > 0 ? round(100 * $invented / $reviewed, 1) : null,
             ];
         });
     }

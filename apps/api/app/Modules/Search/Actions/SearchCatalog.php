@@ -8,7 +8,10 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentContentProduct;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Models\SearchResolution;
@@ -87,6 +90,9 @@ final class SearchCatalog
 
     /** Reciprocal rank constant: how much a lower rank still counts. */
     private const RRF_K = 60;
+
+    /** The kinds of article that grow old (models, prices, what is new); a how-to guide does not. */
+    private const AGEING_KINDS = ['news', 'product_review', 'buying_guide'];
 
     /** The guides by meaning whose products are suggested for a question about a need. */
     private const GUIDES_FOR_PRODUCTS = 2;
@@ -1038,9 +1044,14 @@ final class SearchCatalog
             return [];
         }
 
-        // An article of years ago weighs a little less than this year's on the same subject.
+        // News, a review or a buying guide of years ago weighs a little less than this year's on the same
+        // subject: models and prices change. How to join boards to a deck does not; nor does a guide whose
+        // kind the reading has not said.
         $perYear = (float) Settings::get('search.content_age_penalty');
-        $dated = CatalogContent::query()->whereIn('external_id', array_map('strval', array_keys($hits)))->pluck('source_updated_at', 'external_id');
+        $contents = CatalogContent::query()->whereIn('external_id', array_map('strval', array_keys($hits)))->get(['id', 'external_id', 'source_updated_at']);
+        $kinds = EnrichmentFact::query()->current()->where('status', FactStatus::Approved)->where('kind', FactKind::ContentKind)
+            ->whereIn('content_id', $contents->pluck('id'))->pluck('value_text', 'content_id');
+        $dated = $contents->filter(fn (CatalogContent $c): bool => in_array($kinds[$c->id] ?? null, self::AGEING_KINDS, true))->pluck('source_updated_at', 'external_id');
         foreach ($hits as $external => &$hit) {
             $at = $dated[(string) $external] ?? null;
             $years = $at === null ? 0.0 : max(0.0, now()->diffInDays($at, true) / 365);

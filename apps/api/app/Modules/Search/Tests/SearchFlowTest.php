@@ -14,7 +14,11 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactOrigin;
+use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentContentProduct;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchClick;
@@ -257,6 +261,15 @@ final class SearchFlowTest extends TestCase
                 'shop_id' => $this->shop->id, 'type' => 'post', 'external_id' => '501', 'title' => 'מדריך ישן לדקים',
                 'url' => 'https://www.store.test/guide/old', 'terms' => [], 'hash' => 'h501', 'source_updated_at' => now()->subYears(3),
             ]);
+            // A buying guide of three years ago has aged (models, prices); a how-to of five years has not.
+            CatalogContent::query()->create([
+                'shop_id' => $this->shop->id, 'type' => 'post', 'external_id' => '502', 'title' => 'איך מחברים קרשים',
+                'url' => 'https://www.store.test/guide/howto', 'terms' => [], 'hash' => 'h502', 'source_updated_at' => now()->subYears(5),
+            ]);
+            foreach (['501' => 'buying_guide', '502' => 'how_to'] as $external => $kind) {
+                EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'content_id' => CatalogContent::query()->where('external_id', $external)->value('id'),
+                    'kind' => FactKind::ContentKind, 'key' => 'content_kind', 'value_text' => $kind, 'origin' => FactOrigin::Model, 'status' => FactStatus::Approved, 'input_hash' => 'k'.$external, 'model' => 'm']);
+            }
             $guide = CatalogContent::query()->where('external_id', '500')->sole();
             $pine = CatalogProduct::query()->where('external_id', '104')->sole();
             EnrichmentContentProduct::query()->create([
@@ -267,6 +280,7 @@ final class SearchFlowTest extends TestCase
         app(BuildSearchIndex::class)->handle($this->shop->id);
         Features::override('search.content_by_meaning', true, $this->shop->id);
         $this->meaning = [
+            ['source' => 'content', 'source_id' => 'h', 'external_id' => '502', 'title' => 'איך מחברים קרשים', 'similarity' => 0.56],
             ['source' => 'content', 'source_id' => 'o', 'external_id' => '501', 'title' => 'מדריך ישן לדקים', 'similarity' => 0.55],
             ['source' => 'content', 'source_id' => 'x', 'external_id' => '500', 'title' => 'איך מחברים קורות לדק', 'similarity' => 0.52],
             ['source' => 'product', 'source_id' => 'y', 'external_id' => '102', 'title' => 'בורג איסכורית 6X40', 'similarity' => 0.41],
@@ -274,8 +288,9 @@ final class SearchFlowTest extends TestCase
 
         $result = $this->search('איך מחברים קרשים לדק?')->json();
 
-        $this->assertSame(['500', '501'], array_column($result['groups']['content'], 'external_id'), 'three years take the older guide below the newer one');
-        $this->assertSame(['102', '104'], array_column($result['groups']['product'], 'external_id'), 'what the guide names is suggested, after what was found itself');
+        $this->assertSame(['502', '500', '501'], array_column($result['groups']['content'], 'external_id'), 'three years take the old buying guide below the newer one; a how-to does not age');
+        $this->assertContains('104', array_column($result['groups']['product'], 'external_id'), 'what the nearest guides name is suggested');
+        $this->assertSame('102', $result['groups']['product'][0]['external_id'], 'after what was found itself');
 
         // Not a question about a need: the guide is shown, its products are not suggested.
         $this->assertSame(['102'], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));

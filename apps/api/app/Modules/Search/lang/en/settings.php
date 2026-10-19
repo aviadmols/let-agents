@@ -23,7 +23,7 @@ return [
     ],
     'content_age_penalty' => [
         'label' => 'What an old guide loses a year',
-        'description' => "Taken off a guide's similarity for each year since it was updated, up to three: an old guide does not beat a new one on the same subject.",
+        'description' => 'Taken off the similarity of news, a product review or a buying guide for each year since it was updated, up to three: models and prices change. A how-to, a project idea or a material guide does not age.',
     ],
     'semantic_min_similarity' => [
         'label' => 'Minimum similarity by meaning',

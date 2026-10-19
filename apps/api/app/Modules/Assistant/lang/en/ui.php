@@ -467,5 +467,13 @@ Answer: :answer',
             'spend_cap' => 'Stopped at the spending cap.',
             'error' => 'Stopped by an error.',
         ],
+        'headline' => [
+            'fine' => 'Answers without a failure',
+            'cost' => 'Average cost per answer',
+            'unanswered' => 'Questions left unanswered',
+            'invented' => 'Answers with invented information',
+            'vs_before' => 'vs the period before',
+            'no_before' => 'No period before to compare',
+        ],
     ],
 ];

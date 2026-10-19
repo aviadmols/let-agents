@@ -62,6 +62,22 @@
             <x-filament::section>{{ $t('no_cases') }}</x-filament::section>
         @endforelse
     @else
+    {{-- the four numbers that say whether answers get better, against the period before --}}
+    @php($head = $this->headline())
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px" data-headline>
+        @foreach (['fine' => true, 'cost' => false, 'unanswered' => false, 'invented' => false] as $key => $higherIsBetter)
+            @php($m = $head[$key])
+            @php($delta = $m['now'] !== null && $m['before'] !== null ? $m['now'] - $m['before'] : null)
+            @php($better = $delta === null || abs($delta) < 0.00001 ? null : ($delta > 0) === $higherIsBetter)
+            <x-filament::section compact>
+                <div style="{{ $small }}">{{ $t('headline.'.$key) }}</div>
+                <div style="font-size:26px;font-weight:700" dir="ltr">{{ $m['now'] === null ? '—' : ($key === 'cost' ? '$'.number_format($m['now'], 4) : number_format($m['now'], 1).'%') }}</div>
+                <div style="font-size:12px;color:{{ $better === null ? 'inherit' : ($better ? 'rgb(30,140,80)' : 'rgb(200,60,60)') }}" dir="ltr">
+                    @if ($delta === null){{ $t('headline.no_before') }}@else{{ ($delta > 0 ? '+' : '').($key === 'cost' ? number_format($delta, 4) : number_format($delta, 1).'pp') }} · {{ $t('headline.vs_before') }}@endif
+                </div>
+            </x-filament::section>
+        @endforeach
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
         @foreach ([
             'asks' => number_format($counts['asks']),
