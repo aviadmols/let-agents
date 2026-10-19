@@ -104,7 +104,7 @@
       leadNeedName: 'איך קוראים לך?', leadBadContact: 'צריך טלפון (9–10 ספרות) או כתובת מייל', leadNeedConsent: 'צריך לאשר כדי שנוכל לחזור אליך', leadDone: 'קיבלנו, :name. נחזור אליך :when.', leadDoneSub: 'השאלה והפרטים נשלחו לצוות של :shop.', leadDeclined: 'בסדר גמור. אפשר להמשיך לשאול אותי כל דבר.', leadError: 'משהו השתבש בשליחה. נסו שוב.',
       error: 'משהו השתבש בדרך', errorSub: 'החיבור נקטע לפני שהתשובה הגיעה. השאלה נשמרה.', retry: 'נסו שוב',
       photoTitle: 'חיפוש לפי תמונה', photoDrop: 'גררו לכאן תמונה, או בחרו אחת', photoDropMobile: 'צלמו מוצר או בחרו תמונה מהגלריה', photoChoose: 'בחירת תמונה', photoTake: 'צילום', photoPrivate: 'JPG, PNG או WEBP עד :mb · התמונה משמשת רק לחיפוש הזה ולא נשמרת',
-      photoBig: 'התמונה גדולה מדי. אפשר עד :mb.', photoType: 'אפשר לחפש לפי JPG, PNG או WEBP.', photoSeen: 'זיהינו:', photoWhich: 'מה לחפש מהתמונה?', photoBest: 'הכי דומה', photoTagSite: 'לחפש "‎:t‎" בכל האתר', photoUnclear: 'התמונה לא ברורה מספיק כדי לזהות מה יש בה. תמונה קרובה יותר, באור טוב, של פריט אחד, תעזור.', photoAgain: 'נסו תמונה אחרת', photoWords: 'תארו במילים', photoNothing: 'זיהינו :seen, אבל אין משהו דומה בחנות.', photoNothingPlain: 'לא מצאנו בתמונה משהו שנמכר באתר.', photoOnlyTags: 'לא מצאנו מוצר שנראה בדיוק כך. אפשר לחפש לפי מה שבתמונה:', photoFailed: 'לא הצלחנו לחפש לפי התמונה. נסו שוב.', yourPhoto: 'התמונה שלכם',
+      photoBig: 'התמונה גדולה מדי. אפשר עד :mb.', photoType: 'אפשר לחפש לפי JPG, PNG או WEBP.', photoSeen: 'זיהינו:', photoWhich: 'מה לחפש מהתמונה?', sizeUnknown: 'המידות לא מופיעות באתר למוצרים האלה, אז הן לא סוננו.', photoBest: 'הכי דומה', photoTagSite: 'לחפש "‎:t‎" בכל האתר', photoUnclear: 'התמונה לא ברורה מספיק כדי לזהות מה יש בה. תמונה קרובה יותר, באור טוב, של פריט אחד, תעזור.', photoAgain: 'נסו תמונה אחרת', photoWords: 'תארו במילים', photoNothing: 'זיהינו :seen, אבל אין משהו דומה בחנות.', photoNothingPlain: 'לא מצאנו בתמונה משהו שנמכר באתר.', photoOnlyTags: 'לא מצאנו מוצר שנראה בדיוק כך. אפשר לחפש לפי מה שבתמונה:', photoFailed: 'לא הצלחנו לחפש לפי התמונה. נסו שוב.', yourPhoto: 'התמונה שלכם',
       similarTo: 'דומים ל־', noSimilar: 'לא מצאנו פריטים דומים.',
       about: 'על המוצר הזה', askingAbout: 'שואלים על:', removeContext: 'הסרת ההקשר', popular30: 'פופולרי בחנות', specs: 'מפרט בקצרה', faq: 'שאלות שגולשים שאלו', promises: 'מה החנות מבטיחה', alternatives: 'מוצרים דומים', saleAlt: 'דומים במבצע', seeAll: 'הכול', aboutNote: 'התשובות נכתבות מהמידע על המוצר בלבד.',
       compareViewed: 'השוואה למוצר שראיתם קודם', talkTitle: 'רוצים לדבר עם מישהו שמבין?', talkBtn: 'לשיחה בוואטסאפ',
@@ -157,7 +157,7 @@
       leadNeedName: 'What\'s your name?', leadBadContact: 'Enter a phone number or an email address', leadNeedConsent: 'Please agree so we can get back to you', leadDone: 'Got it, :name. We\'ll get back to you :when.', leadDoneSub: 'Your question and details went to the :shop team.', leadDeclined: 'No problem. Ask me anything else.', leadError: 'Something went wrong. Try again.',
       error: 'Something went wrong', errorSub: 'The connection dropped before the answer arrived. Your question is saved.', retry: 'Try again',
       photoTitle: 'Search by photo', photoDrop: 'Drop a photo here, or choose one', photoDropMobile: 'Take a photo or choose one from your gallery', photoChoose: 'Choose a photo', photoTake: 'Take a photo', photoPrivate: 'JPG, PNG or WEBP up to :mb · used only for this search, never stored',
-      photoBig: 'That photo is too big. Up to :mb.', photoType: 'Use a JPG, PNG or WEBP photo.', photoSeen: 'We see:', photoWhich: 'Which one should we look for?', photoBest: 'Closest', photoTagSite: 'Search "‎:t‎" across the site', photoUnclear: 'The photo isn\'t clear enough to tell what\'s in it. A closer, well-lit photo of one item helps.', photoAgain: 'Try another photo', photoWords: 'Describe it', photoNothing: 'We see :seen, but nothing like it in the store.', photoNothingPlain: 'Nothing in the photo is sold here.', photoOnlyTags: 'Nothing looks exactly like it. Search by what\'s in the photo:', photoFailed: 'Couldn\'t search by this photo. Try again.', yourPhoto: 'Your photo',
+      photoBig: 'That photo is too big. Up to :mb.', photoType: 'Use a JPG, PNG or WEBP photo.', photoSeen: 'We see:', photoWhich: 'Which one should we look for?', sizeUnknown: 'Sizes are not listed on the site for these products, so they were not filtered.', photoBest: 'Closest', photoTagSite: 'Search "‎:t‎" across the site', photoUnclear: 'The photo isn\'t clear enough to tell what\'s in it. A closer, well-lit photo of one item helps.', photoAgain: 'Try another photo', photoWords: 'Describe it', photoNothing: 'We see :seen, but nothing like it in the store.', photoNothingPlain: 'Nothing in the photo is sold here.', photoOnlyTags: 'Nothing looks exactly like it. Search by what\'s in the photo:', photoFailed: 'Couldn\'t search by this photo. Try again.', yourPhoto: 'Your photo',
       similarTo: 'Similar to ', noSimilar: 'No similar items found.',
       about: 'About this product', askingAbout: 'Asking about:', removeContext: 'Remove context', popular30: 'Popular', specs: 'Key specs', faq: 'Questions shoppers asked', promises: 'The store promises', alternatives: 'Similar products', saleAlt: 'Similar on sale', seeAll: 'All', aboutNote: 'Answers come from the product\'s information only.',
       compareViewed: 'Compared with what you viewed', talkTitle: 'Want to talk to someone who knows?', talkBtn: 'Chat on WhatsApp',
@@ -1360,7 +1360,21 @@
     c.autoStock = !c.no.stock && (c.saidStock || all.some(function (r) { return r.s === 1; }));
     c.autoSale = !c.no.sale && (/(^|\s)(ב?מבצע|on sale)(\s|$)/i.test(q) || acts.indexOf('on_sale') >= 0);
     c.autoSort = c.no.sort ? '' : acts.indexOf('cheapest') >= 0 ? 'asc' : acts.indexOf('dearest') >= 0 ? 'desc' : acts.indexOf('newest') >= 0 ? 'new' : '';
+    // "טבעת רובי במידה גדולה": the largest third of the sizes these results come in. A size on the product itself
+    // was already applied (the "band" action, as on the server); sizes as variants are chosen here, in stock
+    // together with the size; with no size anywhere, the shopper is told so instead of the size being ignored.
+    var band = acts.indexOf('large_sizes') >= 0 ? 'top' : acts.indexOf('small_sizes') >= 0 ? 'bottom' : (SIZE_BAND.top.test(q) ? 'top' : SIZE_BAND.bottom.test(q) ? 'bottom' : '');
+    turn.sizeUnknown = false;
+    if (band && !all.some(function (r) { return typeof r.z === 'number'; })) {
+      var sg = S.facets.map(function (f) { return f.k; }).indexOf('variant_size');
+      var sizes = sg < 0 ? [] : Object.keys(counts).map(Number).filter(function (code) { return Math.floor(code / 1000) === sg && !c.no[code]; }).sort(function (a, b) { return a - b; });
+      if (sizes.length) {
+        var take = Math.max(1, Math.round(sizes.length / 3));
+        (band === 'top' ? sizes.slice(sizes.length - take) : sizes.slice(0, take)).forEach(function (code) { c.auto[code] = true; });
+      } else { turn.sizeUnknown = true; }
+    }
   }
+  var SIZE_BAND = { top: /(^|\s)(ב?מיד(ה|ות)\s+(גדול|רחב)|large\s+sizes?|big\s+sizes?|plus\s+sizes?)/i, bottom: /(^|\s)(ב?מיד(ה|ות)\s+(קטנ|צר)|small\s+sizes?|petite)/i };
   function onCode(c, code) { return !!(c.f[code] || (c.auto && c.auto[code])); }
   function onStock(c) { return !!(c.stock || c.autoStock); }
   function onSale(c) { return !!(c.sale || c.autoSale); }
@@ -1642,6 +1656,10 @@
     html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(list.length === 1 ? t('oneProduct') : t('productsCount', { n: list.length })) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>';
     html += chipRow(turn);
+    // a size asked for that no product here says: told, with the team one press away, never silently ignored
+    if (turn.sizeUnknown) {
+      html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('sizeUnknown')) + ' · <button class="ls-btn ls-btn--link" data-ask="' + esc(turn.q) + '">' + esc(t('askWho', { name: CFG.assistant })) + '</button></span></div>';
+    }
     if (!list.length) { return html + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
     var n = gridN(turn);
     html += '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>';

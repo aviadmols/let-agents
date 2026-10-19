@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'site_pages' => [
+        'label' => 'Site pages the connection did not bring',
+        'description' => 'Nightly: the pages in the site map (not products or categories) and, on Shopify, the policy pages. So the assistant answers from wherever the store wrote it, even when the connection does not bring it.',
+    ],
     'daily_sync' => [
         'label' => 'Nightly catalog sync',
         'description' => 'Reads the whole catalog from the store every night at 02:30, Israel time.',

@@ -9,6 +9,10 @@ return [
         'label' => 'Maximum articles and guides per shop',
         'description' => 'Content beyond this number is not read.',
     ],
+    'site_pages_per_run' => [
+        'label' => 'Site pages read a night',
+        'description' => 'At most. An unchanged page is kept as it is; the rest are read the next night.',
+    ],
     'page_choices_per_run' => [
         'label' => 'Product pages read a night',
         'description' => 'At most. Pages never read, or whose product changed, first.',

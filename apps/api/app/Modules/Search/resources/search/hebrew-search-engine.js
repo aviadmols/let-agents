@@ -522,7 +522,7 @@
    */
   function readActions(raw, registry) {
     var text = ' ' + String(raw == null ? '' : raw).toLowerCase().replace(/[.,!?;:]+(?=\s|$)/g, ' ') + ' ';
-    var found = { ids: [], sort: null, dir: null, sale: false, stock: false, near: null, min: null, max: null };
+    var found = { ids: [], sort: null, dir: null, sale: false, stock: false, near: null, min: null, max: null, band: null };
     (registry || []).forEach(function (entry) {
       var patterns = entry.patterns || [];
       for (var i = 0; i < patterns.length; i++) {
@@ -548,6 +548,9 @@
         }
         if (act.filter === 'stock') {
           found.stock = true;
+        }
+        if ((act.band === 'top' || act.band === 'bottom') && found.band === null) {
+          found.band = act.band;
         }
         ['near', 'min', 'max'].forEach(function (bound) {
           if (act[bound] && m[2] !== undefined) {
@@ -578,6 +581,11 @@
       var near = actions.near;
       out = out.filter(function (r) { return typeof r.z === 'number' && Math.abs(r.z - near) <= Math.max(near * 0.15, 0.0001); });
     }
+    // "מידה גדולה": the third of the sizes found that is largest (or smallest), among what has a size
+    if ((actions.band === 'top' || actions.band === 'bottom') && out.some(function (r) { return typeof r.z === 'number'; })) {
+      var cut = band(out.map(function (r) { return r.z; }), actions.band);
+      out = out.filter(function (r) { return typeof r.z === 'number' && (actions.band === 'top' ? r.z >= cut : r.z <= cut); });
+    }
     [['min', 1], ['max', -1]].forEach(function (pair) {
       var limit = actions[pair[0]];
       if (limit !== null && limit !== undefined && out.some(function (r) { return typeof r.z === 'number'; })) {
@@ -607,6 +615,16 @@
       }
       return at[a.id] - at[b.id];
     });
+  }
+
+  /** Where the largest (top) or smallest (bottom) third of these sizes begins. As on the server (HebrewSearch::band). */
+  function band(values, side) {
+    var sizes = values.filter(function (v) { return typeof v === 'number'; }).sort(function (a, b) { return a - b; });
+    if (!sizes.length) {
+      return side === 'top' ? -Infinity : Infinity;
+    }
+    var third = Math.max(1, Math.round(sizes.length / 3));
+    return side === 'top' ? sizes[sizes.length - third] : sizes[third - 1];
   }
 
   /** "80 על 150", "80X150", "80×150": one size, written one way. */
@@ -814,6 +832,7 @@
     withoutSaid: withoutSaid,
     either: either,
     applyActions: applyActions,
+    band: band,
     handleFromUrl: handleFromUrl,
     formatMoney: formatMoney,
     fromShopifyProduct: fromShopifyProduct

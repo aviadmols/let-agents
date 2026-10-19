@@ -34,6 +34,8 @@ final class FirstScan
     /** step => the command and its arguments; {shop} is the shop's slug, true a flag. */
     public const STEPS = [
         'catalog' => ['catalog:sync', ['shop' => '{shop}']],
+        // The site's own pages the feed did not bring (its sitemap, its policies): what shoppers ask is often there.
+        'site' => ['catalog:site-pages', ['shop' => '{shop}']],
         // What the store says about itself and in its posts is read before its catalog is divided and
         // read: the guides show what its buyers ask, and the page index built after it holds them.
         'knowledge' => ['assistant:knowledge', ['shop' => '{shop}']],
@@ -56,7 +58,7 @@ final class FirstScan
      * what the store says about itself, its posts and the page tags are left to the night. The
      * whole chain again is the operator's (start(full: true)).
      */
-    public const CHANGES = ['catalog', 'pictures', 'products', 'pages', 'search'];
+    public const CHANGES = ['catalog', 'site', 'pictures', 'products', 'pages', 'search'];
 
     /** A manager starts it again at most this often; the night runs it anyway. */
     public const AGAIN_AFTER_HOURS = 1;

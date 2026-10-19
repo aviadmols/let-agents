@@ -117,7 +117,8 @@ final class QueryActionsTest extends TestCase
             ['id' => 'p:1', 'pr' => 900, 's' => 1, 'z' => 18, 'd' => 20260101], ['id' => 'p:2', 'pr' => 500, 's' => 1, 'sl' => 1, 'z' => 22, 'd' => 20260201],
             ['id' => 'p:3', 'pr' => 300, 's' => 0, 'z' => 16], ['id' => 'p:4', 'pr' => 700, 's' => 1, 'sl' => 1], ['id' => 'p:5', 's' => 1, 'z' => 20],
         ];
-        $queries = ['טבעת הכי זולה', 'טבעת יהלום הכי יקרה במבצע', 'עגילים גדולים מ-2,5', 'טבעת שווה ל 20', 'הכי חדש', 'טבעת קטנה', 'או טבעת או עגילים במלאי', 'טבעת גדולה במלאי', 'cheapest ring on sale'];
+        $queries = ['טבעת הכי זולה', 'טבעת יהלום הכי יקרה במבצע', 'עגילים גדולים מ-2,5', 'טבעת שווה ל 20', 'הכי חדש', 'טבעת קטנה', 'או טבעת או עגילים במלאי', 'טבעת גדולה במלאי', 'cheapest ring on sale',
+            'טבעת רובי במידה גדולה', 'טבעת במידות קטנות', 'ring in large sizes'];
 
         $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const reg='.json_encode($registry, JSON_UNESCAPED_UNICODE).';const recs='.json_encode($records).';const out={};'
             .'for(const q of '.json_encode($queries, JSON_UNESCAPED_UNICODE).'){const r=e.readActions(q,reg);out[q]={query:r.query,actions:r.actions,either:e.either(r.query),order:e.applyActions(recs,r.actions).map(x=>x.id)};}'
@@ -133,6 +134,22 @@ final class QueryActionsTest extends TestCase
         }
         $this->assertSame(['p:4', 'p:2'], $browser['טבעת יהלום הכי יקרה במבצע']['order'], 'on sale only, the dearest first');
         $this->assertSame(['טבעת', 'עגילים'], $browser['או טבעת או עגילים במלאי']['either']);
+        // "במידה גדולה": a size asked for, not words to find; the largest third of the sizes found (16 18 20 22 → 22).
+        $this->assertSame('טבעת רובי', $browser['טבעת רובי במידה גדולה']['query']);
+        $this->assertSame(['p:2'], $browser['טבעת רובי במידה גדולה']['order']);
+        $this->assertSame(['p:3'], $browser['טבעת במידות קטנות']['order']);
+    }
+
+    public function test_a_size_band_reads_the_sizes_there_are_and_is_said_to_the_drawer_without_them(): void
+    {
+        [$text, $actions] = HebrewSearch::actions('טבעת רובי במידה גדולה', BuildSearchIndex::registry());
+
+        $this->assertSame('טבעת רובי', $text, 'in a shop with no size attribute too: the words are not searched for');
+        $this->assertSame('top', $actions['band']);
+        $this->assertSame(['large_sizes'], $actions['ids'], 'the drawer reads it, to choose variant sizes or to say there are none');
+        $this->assertSame([['id' => 'p:1']], HebrewSearch::applyActions([['id' => 'p:1']], $actions), 'with no size on any product, nothing is dropped');
+        $this->assertSame(22.0, HebrewSearch::band([16, 18, 20, 22], 'top'));
+        $this->assertSame(16.0, HebrewSearch::band([16, 18, 20, 22], 'bottom'));
     }
 
     public function test_words_that_name_a_filter_value_are_read_as_that_filter_in_the_browser_as_on_the_server(): void

@@ -187,6 +187,43 @@
             "needs": "size"
         },
         {
+            "id": "large_sizes",
+            "label": {
+                "he": "מידות גדולות",
+                "en": "Large sizes"
+            },
+            "patterns": [
+                "(?:ב)?מיד(?:ה|ות) גדול(?:ה|ות)?",
+                "גדול(?:ה|ות|ים)? במיד(?:ה|ות)",
+                "(?:ב)?מיד(?:ה|ות) רחב(?:ה|ות)?",
+                "large sizes?",
+                "big sizes?",
+                "plus sizes?",
+                "in a large size"
+            ],
+            "do": {
+                "band": "top"
+            }
+        },
+        {
+            "id": "small_sizes",
+            "label": {
+                "he": "מידות קטנות",
+                "en": "Small sizes"
+            },
+            "patterns": [
+                "(?:ב)?מיד(?:ה|ות) קטנ(?:ה|ות)",
+                "קטנ(?:ה|ות|ים)? במיד(?:ה|ות)",
+                "(?:ב)?מיד(?:ה|ות) צר(?:ה|ות)",
+                "small sizes?",
+                "petite",
+                "in a small size"
+            ],
+            "do": {
+                "band": "bottom"
+            }
+        },
+        {
             "id": "big",
             "label": {
                 "he": "גדול",

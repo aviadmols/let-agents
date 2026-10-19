@@ -206,7 +206,7 @@ final class HebrewSearch
     public static function actions(string $query, array $registry): array
     {
         $text = ' '.preg_replace('/[.,!?;:]+(?=\s|$)/u', ' ', mb_strtolower($query)).' ';
-        $found = ['ids' => [], 'sort' => null, 'dir' => null, 'sale' => false, 'stock' => false, 'near' => null, 'min' => null, 'max' => null];
+        $found = ['ids' => [], 'sort' => null, 'dir' => null, 'sale' => false, 'stock' => false, 'near' => null, 'min' => null, 'max' => null, 'band' => null];
 
         foreach ($registry as $entry) {
             foreach ((array) ($entry['patterns'] ?? []) as $pattern) {
@@ -223,6 +223,9 @@ final class HebrewSearch
                 }
                 if (($do['filter'] ?? null) === 'stock') {
                     $found['stock'] = true;
+                }
+                if (in_array($do['band'] ?? null, ['top', 'bottom'], true) && $found['band'] === null) {
+                    $found['band'] = (string) $do['band'];
                 }
                 foreach (['near', 'min', 'max'] as $bound) {
                     if (isset($do[$bound]) && isset($m[2])) {
@@ -247,6 +250,25 @@ final class HebrewSearch
      * @param  array{sort: string|null, dir: string|null, sale: bool, stock: bool, near: float|null, min?: float|null, max?: float|null}  $actions
      * @return list<array<string, mixed>>
      */
+    /**
+     * Where the largest (top) or smallest (bottom) third of these sizes begins. As in the browser (band).
+     *
+     * @param  list<mixed>  $values
+     */
+    public static function band(array $values, string $side): float
+    {
+        $sizes = array_values(array_map('floatval', array_filter($values, 'is_numeric')));
+        sort($sizes);
+
+        if ($sizes === []) {
+            return $side === 'top' ? -INF : INF;
+        }
+
+        $third = max(1, (int) round(count($sizes) / 3));
+
+        return $side === 'top' ? $sizes[count($sizes) - $third] : $sizes[$third - 1];
+    }
+
     public static function applyActions(array $records, array $actions): array
     {
         if ($actions['sale']) {
@@ -258,6 +280,11 @@ final class HebrewSearch
         if ($actions['near'] !== null && array_filter($records, fn (array $r): bool => isset($r['z'])) !== []) {
             $near = $actions['near'];
             $records = array_values(array_filter($records, fn (array $r): bool => isset($r['z']) && abs((float) $r['z'] - $near) <= max($near * 0.15, 0.0001)));
+        }
+        // "מידה גדולה": the third of the sizes found that is largest (or smallest), among what has a size.
+        if (in_array($actions['band'] ?? null, ['top', 'bottom'], true) && array_filter($records, fn (array $r): bool => isset($r['z'])) !== []) {
+            $cut = self::band(array_column($records, 'z'), (string) $actions['band']);
+            $records = array_values(array_filter($records, fn (array $r): bool => isset($r['z']) && ($actions['band'] === 'top' ? (float) $r['z'] >= $cut : (float) $r['z'] <= $cut)));
         }
         foreach (['min' => 1, 'max' => -1] as $bound => $side) {
             $limit = $actions[$bound] ?? null;

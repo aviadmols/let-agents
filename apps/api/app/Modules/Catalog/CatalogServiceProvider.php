@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Catalog\Console\BuildVariantsCommand;
 use App\Modules\Catalog\Console\ReadPageChoicesCommand;
+use App\Modules\Catalog\Console\ReadSitePagesCommand;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
@@ -62,6 +63,17 @@ final class CatalogServiceProvider extends ModuleServiceProvider
                     ->onOneServer();
             }
 
+            // The pages of the store's own site the feed did not bring (catalog.site_pages): its sitemap
+            // and its policies, after the nightly read and before the night's index (02:45), so what a
+            // shopper asks is answered from wherever the store wrote it.
+            $schedule->command('catalog:site-pages')
+                ->dailyAt('02:38')
+                ->timezone('Asia/Jerusalem')
+                ->name('catalog:site-pages')
+                ->withoutOverlapping(60)
+                ->runInBackground()
+                ->onOneServer();
+
             // The choices product pages ask for (catalog.page_choices): slowly, after the nightly
             // read, in the background so the other schedules are not held up.
             $schedule->command('catalog:read-choices')
@@ -89,6 +101,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
             SyncChangedProductsCommand::class,
             ReadPageChoicesCommand::class,
             BuildVariantsCommand::class,
+            ReadSitePagesCommand::class,
         ];
     }
 }
