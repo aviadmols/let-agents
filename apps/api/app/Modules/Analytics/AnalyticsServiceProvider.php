@@ -47,6 +47,12 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
         RateLimiter::for('plugin-api', fn (Request $request): Limit => Limit::perMinute(120)
             ->by('plugin:'.$request->route('site')));
 
+        // A store's past orders, sent by its plugin page after page as fast as WordPress can: one page every half
+        // minute at most. Faster, the plugin is told "too many" and waits its five minutes: the history arrives
+        // over hours, and the store's own server, which builds every page, is never kept busy by it.
+        RateLimiter::for('plugin-history', fn (Request $request): Limit => Limit::perMinute(2)
+            ->by('plugin-history:'.$request->route('site')));
+
         // A shopper completes a checkout or two, not dozens a minute: the floor under made-up orders.
         RateLimiter::for('pixel-orders', fn (Request $request): Limit => Limit::perMinute(10)
             ->by('pixel:'.$request->ip().'|'.$request->route('site')));

@@ -23,6 +23,9 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 
     private const PER_PAGE = 50;
 
+    /** Seconds between two pages of the feed. */
+    private const BETWEEN_PAGES_SECONDS = 1;
+
     /** A runaway cursor stops here: 2,000 pages is 100,000 records, far above any cap. */
     private const MAX_PAGES = 2000;
 
@@ -107,6 +110,11 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
         $after = 0;
 
         for ($page = 0; $page < self::MAX_PAGES; $page++) {
+            // A breath between pages: the store's own server builds each one, and it is a shop's site first.
+            if ($page > 0) {
+                ($this->sleeper)(self::BETWEEN_PAGES_SECONDS);
+            }
+
             $body = $this->get($connection, $route, $query + ['per_page' => self::PER_PAGE, 'after' => $after]);
             $records = array_values((array) ($body['data'] ?? []));
 

@@ -24,6 +24,6 @@ Route::post('pixel/{site}/orders', PixelOrdersController::class)
 
 Route::middleware('throttle:plugin-api')->group(function (): void {
     Route::post('plugin/{site}/orders', [PluginOrdersController::class, 'store'])->name('api.plugin.orders');
-    Route::post('plugin/{site}/orders/history', [PluginOrdersController::class, 'history'])->name('api.plugin.orders.history');
+    Route::post('plugin/{site}/orders/history', [PluginOrdersController::class, 'history'])->middleware('throttle:plugin-history')->name('api.plugin.orders.history');
     Route::get('plugin/{site}/reports', [PluginOrdersController::class, 'report'])->name('api.plugin.reports');
 });

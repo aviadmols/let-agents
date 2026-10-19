@@ -153,6 +153,11 @@ final class AnalyticsFlowTest extends TestCase
             'last' => true, 'orders' => [$order(2, $recent), $order(3, $recent, ['currency' => 'shekels'])],
         ]))->assertStatus(202)->assertJson(['received' => 2, 'stored' => 0]);
 
+        // Pages faster than two a minute: "too many", and the plugin waits its five minutes; the store's own
+        // server, which builds each page, is never kept busy by the history.
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode(['orders' => [$order(4, $recent)]]))->assertStatus(429);
+
+        $this->travel(61)->seconds();
         $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode(['orders' => [$order(4, $recent)]]), signature: str_repeat('0', 64))->assertStatus(401);
         $this->signed('POST', "/api/v1/plugin/{$this->site}/orders/history", json_encode(['orders' => array_fill(0, 101, $order(5, $recent))]))->assertStatus(422);
 
