@@ -29,4 +29,10 @@ return [
         'details' => 'Leave details',
         'none' => 'Just "not found"',
     ],
+    'not_sure' => '"Not sure what fits?" under the results',
+    'not_sure_sub' => 'In the chat: our AI recommends among the results, with an outside AI to go on with below. Outside: straight to an outside AI',
+    'not_sure_options' => [
+        'inside' => 'In the chat',
+        'outside' => 'Out to an outside AI',
+    ],
 ];

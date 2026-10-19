@@ -87,7 +87,7 @@
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
-      showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name',
+      showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
       productsCount: ':n מוצרים', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
@@ -140,7 +140,7 @@
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
-      showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name',
+      showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
       productsCount: ':n products', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
@@ -1672,7 +1672,7 @@
     html += '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>';
     if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
     html += guidesHtml(turn.content, turn.q);
-    if (!off('ask')) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-ask="' + esc(turn.q) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>';
+    if (!off('ask')) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-not-sure="' + esc(turn.id) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>' + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }
 
@@ -1697,9 +1697,9 @@
 
   // ---------------------------------------------------------------- ask turn
   // about: a question on this product (asked from its page's row, or from its questions): page=1
-  function askTurn(q, extra, about) {
+  function askTurn(q, extra, about, mark) {
     var prev = S.turns.slice().reverse().filter(function (x) { return x.kind === 'results' && x.ids; })[0];
-    var turn = addTurn({ kind: 'answer', q: q, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 });
+    var turn = addTurn(Object.assign({ kind: 'answer', q: q, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
     announce(t('announceSearching'));
     var slow = setTimeout(function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (el) { el.textContent = t('slow'); } }, 8000);
     // about this product: the product page's own ask, so the answer is kept with the product (its questions,
@@ -1806,6 +1806,8 @@
   function answerHtml(turn) {
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
+    // asked for advice among a search's results: with no clear pick, those results to talk over with another AI, not a form
+    if (turn.noInfo && turn.advice) { return '<p class="ls-answer__text">' + esc(t('adviceNone')) + '</p>' + myAi(turn); }
     if (turn.noInfo) { return kitsHtml(turn) + noInfoHtml(turn) + myAi(turn); }
     if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
@@ -2775,15 +2777,24 @@
   }
   function myAi(turn) {
     var ask = S.config.aiAsk;
-    if (!turn || !turn.q || !ask || !ask.open || off('aiShare') || !complexAsk(turn.q)) { return ''; }
+    if (!turn || !turn.q || !ask || !ask.open || off('aiShare') || !(turn.advice || turn.aiOpen || complexAsk(turn.q))) { return ''; }
     return '<div class="ls-myai"><div class="ls-myai__t">' + esc(t('myAiTitle')) + '</div><div class="ls-myai__s">' + esc(t('myAiSub')) + '</div><div class="ls-myai__btns">' +
       ['chatgpt', 'claude', 'perplexity'].filter(function (k) { return ask.open[k]; }).map(function (k) { return '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-ai-ask="' + k + '" data-turn="' + turn.id + '">' + logo(k) + esc({ chatgpt: 'ChatGPT', claude: 'Claude', perplexity: 'Perplexity' }[k]) + '</button>'; }).join('') +
       '</div></div>';
   }
   // the question and the products of its answer, handed to the shopper's own AI
+  // "Not sure what fits?" under a search's results, as the shop set it (search.not_sure): its AI recommends among
+  // them, by the search, with the outside AIs under the answer (inside); or straight to the outside AIs (outside)
+  function notSure(rt) {
+    if (!rt) { return; }
+    var ids = filtered(rt).slice(0, 12).map(function (r) { return pid(r.id); });
+    if (S.config.notSure === 'outside' && S.config.aiAsk && S.config.aiAsk.open) { rt.aiOpen = !rt.aiOpen; render(); return; }
+    askTurn(t('adviceQ', { q: rt.q }), { products: ids }, false, { advice: ids });
+  }
   function askAiAbout(turn, choice) {
     if (!turn) { return; }
-    var ids = (turn.picks || []).map(function (p) { return pid(p.id); }).slice(0, 24);
+    // what the answer picked; else the results it was asked about (advice), or the results themselves
+    var ids = (turn.picks && turn.picks.length ? turn.picks.map(function (p) { return pid(p.id); }) : turn.advice || (turn.kind === 'results' ? filtered(turn).map(function (r) { return pid(r.id); }) : [])).slice(0, 24);
     var tab = win.open('about:blank', '_blank');
     shareFor({ q: turn.q, ids: ids, turn: null, asked: true }).then(function (data) {
       if (tab) { try { tab.opener = null; } catch (e) { /* fine */ } tab.location.href = data.open[choice]; } else { win.location.href = data.open[choice]; }
@@ -2857,6 +2868,7 @@
       // Enter keeps the search: the live results become a turn in the conversation, as they are
       e.preventDefault();
       var o = opts[S.active];
+      if (o && o.dataset.notSure) { notSure(turnById(o.dataset.notSure)); return; }
       if (o && o.dataset.ask) { submit(INPUT.value, 'ask'); return; }
       if (o) { o.click(); return; }
       submit(INPUT.value, undefined, false, true);
@@ -3012,6 +3024,7 @@
     if (d.photo !== undefined) { e.preventDefault(); photoPick(); return; }
     if (d.focus !== undefined) { INPUT.focus(); return; }
     if (d.q) { e.preventDefault(); submit(d.q, 'search'); return; }
+    if (d.notSure) { e.preventDefault(); notSure(turnById(d.notSure)); return; }
     if (d.ask) { e.preventDefault(); submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
     if (d.savedAnswer) {
       e.preventDefault();

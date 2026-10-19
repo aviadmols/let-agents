@@ -67,6 +67,7 @@ class AssistantSettings extends Page
             'per_visitor' => 'setting:assistant.questions_per_visitor_per_day',
             'per_shop' => 'setting:assistant.questions_per_shop_per_day',
             'no_answer' => 'setting:assistant.no_answer',
+            'not_sure' => 'setting:search.not_sure',
         ];
     }
 
@@ -94,6 +95,10 @@ class AssistantSettings extends Page
 
         if (! in_array($this->data['no_answer'] ?? null, NoAnswer::ALL, true)) {
             $this->data['no_answer'] = NoAnswer::TEAM;
+        }
+
+        if (! in_array($this->data['not_sure'] ?? null, ['inside', 'outside'], true)) {
+            $this->data['not_sure'] = 'inside';
         }
     }
 

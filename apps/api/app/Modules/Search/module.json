@@ -660,6 +660,16 @@
             "scope": "shop"
         },
         {
+            "name": "not_sure",
+            "type": "enum",
+            "options": [
+                "inside",
+                "outside"
+            ],
+            "default": "inside",
+            "scope": "shop"
+        },
+        {
             "name": "theme",
             "type": "enum",
             "options": [

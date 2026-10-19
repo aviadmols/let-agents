@@ -253,6 +253,11 @@ return [
         'label' => 'Add to cart button',
         'description' => 'On every product that can be bought directly. Opens the theme\'s cart.',
     ],
+    'not_sure' => [
+        'label' => '"Not sure what fits?" under the results',
+        'description' => 'In the chat: the store\'s AI recommends from the products in the results, by the search, with ChatGPT, Claude or Perplexity to go on with below it. Outside: straight to choosing an outside AI, with the search and the products.',
+        'options' => ['inside' => 'In the chat', 'outside' => 'Out to an outside AI'],
+    ],
     'image_fit' => [
         'label' => 'Product pictures',
         'description' => 'Fill the square and crop the edges, or show whole inside a light frame (suits pictures on a white ground).',

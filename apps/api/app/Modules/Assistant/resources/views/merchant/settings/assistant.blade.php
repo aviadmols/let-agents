@@ -34,6 +34,9 @@
         <x-lp::row :title="$t('no_answer')" :sub="$t('no_answer_sub')">
             <x-lp::chips model="data.no_answer" :options="__('assistant::shop_settings.no_answer_options')" :sm="true" :label="$t('no_answer')" />
         </x-lp::row>
+        <x-lp::row :title="$t('not_sure')" :sub="$t('not_sure_sub')">
+            <x-lp::chips model="data.not_sure" :options="__('assistant::shop_settings.not_sure_options')" :sm="true" :label="$t('not_sure')" />
+        </x-lp::row>
     </x-lp::card>
 
     <x-lp::save />
