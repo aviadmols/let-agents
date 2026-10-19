@@ -291,6 +291,23 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(4, $this->calls, 'turned off: one look');
     }
 
+    public function test_a_question_about_a_product_it_names_reads_that_products_own_description(): void
+    {
+        $this->product('900', 'חטוף - אלי שרעבי', 'סיפורו של אלי שרעבי, שנחטף לעזה ב-7 באוקטובר ושב אחרי 491 ימים בשבי.', []);
+        foreach (['901', '902', '903', '904'] as $id) {
+            $this->product($id, "ספר היסטוריה $id", 'ספר.', []);
+        }
+        $this->replies = [
+            ['found' => true, 'answer' => 'זה סיפורו של אלי שרעבי, שנחטף לעזה ושב אחרי 491 ימים.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'הספר עצמו']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $this->ask('על מה הספר החטוף?');
+
+        $this->assertStringContainsString('491 ימים בשבי', $this->calls[0]['user'], 'the book the question names, with its own description');
+        $this->assertStringNotContainsString('ספר היסטוריה', $this->calls[0]['user'], '"ספר" names every book: none of them');
+    }
+
     public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_later(): void
     {
         $this->passages = [];

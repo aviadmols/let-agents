@@ -87,6 +87,9 @@ final class AnswerSiteQuestion
      */
     public const LOOK_VERSION = 2;
 
+    /** Products a question may name by their title before none is meant ("ספר" names every book). */
+    private const NAMED_PRODUCTS = 3;
+
     /** Wordings from code that make the model's unneeded. */
     private const ENOUGH_FROM_CODE = 2;
 
@@ -350,6 +353,34 @@ final class AnswerSiteQuestion
     }
 
     /**
+     * The products a question names by their title, from the whole catalogue: a word of the question
+     * that the titles of one to NAMED_PRODUCTS products begin a word with ("חטוף" in "על מה הספר
+     * החטוף?" for "חטוף - אלי שרעבי") names them; a word many titles hold ("ספר", "טבעת") names none.
+     * Their own descriptions then reach the writer, not only what the search before the question showed.
+     * Code only.
+     *
+     * @return list<string> external ids
+     */
+    private function namedProducts(string $question): array
+    {
+        $named = [];
+
+        foreach (Question::words($question) as $word) {
+            $ids = CatalogProduct::query()->whereNull('removed_at')
+                ->where(fn ($q) => $q->whereRaw('lower(title) like ?', [$word.'%'])->orWhereRaw('lower(title) like ?', ['% '.$word.'%']))
+                ->limit(self::NAMED_PRODUCTS + 1)->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
+
+            if ($ids !== [] && count($ids) <= self::NAMED_PRODUCTS) {
+                array_push($named, ...$ids);
+            }
+        }
+
+        $named = array_values(array_unique($named));
+
+        return count($named) <= self::NAMED_PRODUCTS ? $named : [];
+    }
+
+    /**
      * The shop's pages whose title holds a word of the question (a plural as its singular: ביטולים
      * finds ביטול), most words first, before the passages the meaning search found. A question on a
      * store topic (PrepareStoreAnswers::TOPICS) also finds its page by the topic's other words, in
@@ -568,6 +599,10 @@ final class AnswerSiteQuestion
      */
     private function prepare(string $shopId, string $question, array $shown, string $mode, ?string $viewing = null): array
     {
+        // A question about a product it names ("על מה הספר החטוף?"): that product, when the search before it
+        // showed none of those it names; a question about what was shown stays about what was shown.
+        $named = $viewing === null ? $this->namedProducts($question) : [];
+        $shown = $named !== [] && array_intersect($named, $shown) === [] ? $named : $shown;
         $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
         $found = array_values(array_filter(
             $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
