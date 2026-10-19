@@ -6,9 +6,9 @@ use Anthropic\Client;
 use Anthropic\Messages\WebSearchResultBlock;
 use Anthropic\Messages\WebSearchTool20250305;
 use Anthropic\RequestOptions;
-use App\Modules\Ai\Contracts\ChatDriver;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\StructuredChatDriver;
 use App\Modules\Ai\Contracts\VisionDriver;
 use App\Modules\Ai\Contracts\WebAnswer;
 use App\Modules\Ai\Contracts\WebSearchDriver;
@@ -22,7 +22,7 @@ use Throwable;
  * Claude has no JSON mode without a schema, so the system prompt asks for one JSON object and
  * the reply is read from its first brace to its last. Reasoning effort is not passed on.
  */
-final class AnthropicChat implements ChatDriver, VisionDriver, WebSearchDriver
+final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSearchDriver
 {
     private const TIMEOUT_SECONDS = 60.0;
 
@@ -39,6 +39,11 @@ final class AnthropicChat implements ChatDriver, VisionDriver, WebSearchDriver
     public function json(string $apiKey, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
     {
         return $this->send($apiKey, $model, $system, $user, $maxOutputTokens);
+    }
+
+    public function structured(string $apiKey, string $model, string $system, string $user, array $schema, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    {
+        return $this->send($apiKey, $model, $system, $user, $maxOutputTokens, $schema);
     }
 
     public function jsonWithImage(string $apiKey, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
@@ -102,8 +107,11 @@ final class AnthropicChat implements ChatDriver, VisionDriver, WebSearchDriver
         );
     }
 
-    /** @param string|list<array<string, mixed>> $content */
-    private function send(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens): ModelReply
+    /**
+     * @param  string|list<array<string, mixed>>  $content
+     * @param  array<string, mixed>|null  $schema  held to it by the API (output_config.format), so it always parses
+     */
+    private function send(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens, ?array $schema = null): ModelReply
     {
         try {
             $message = (new Client(apiKey: $apiKey, requestOptions: RequestOptions::with(timeout: self::TIMEOUT_SECONDS, maxRetries: 1)))
@@ -112,6 +120,7 @@ final class AnthropicChat implements ChatDriver, VisionDriver, WebSearchDriver
                     maxTokens: $maxOutputTokens,
                     messages: [['role' => 'user', 'content' => $content]],
                     model: $model,
+                    outputConfig: $schema === null ? null : ['format' => ['type' => 'json_schema', 'schema' => $schema]],
                     system: $system.self::JSON_ONLY,
                 );
         } catch (Throwable $e) {

@@ -12,6 +12,7 @@ use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ImageModel;
 use App\Modules\Ai\Contracts\ListsProviderModels;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Contracts\WebSearchModel;
 use App\Modules\Ai\Support\AllowanceHome;
@@ -65,6 +66,7 @@ final class AiServiceProvider extends ModuleServiceProvider
         $this->app->tag(self::EMBEDDING_DRIVERS, 'ai.embedding_drivers');
         $this->app->tag(self::IMAGE_EMBEDDING_DRIVERS, 'ai.image_embedding_drivers');
         $this->app->bind(ChatModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
+        $this->app->bind(StructuredChatModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
         $this->app->bind(VisionModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
         $this->app->bind(WebSearchModel::class, fn ($app) => new ProviderChatModel($app->tagged('ai.chat_drivers'), $app->make(CallJournal::class)));
         $this->app->tag(self::BATCH_DRIVERS, 'ai.batch_drivers');

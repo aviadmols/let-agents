@@ -103,6 +103,35 @@ final class AnswerCheckTest extends TestCase
         $this->assertSame([$fixed, 'revised'], [$out['answer'], $out['verdict']]);
     }
 
+    /**
+     * A prompt's schema holds its reply (the checker's once came back as `"why": "", "}` and the question
+     * failed): every object closed and every property required, as both providers' strict mode asks.
+     */
+    public function test_the_checker_reply_is_held_to_a_strict_schema(): void
+    {
+        $schema = AnswerSiteQuestion::schemaFor(AnswerSiteQuestion::promptFile('verify_site'));
+        $this->assertNotNull($schema);
+
+        $walk = function (array $node, string $at) use (&$walk): void {
+            if (($node['type'] ?? null) === 'object') {
+                $this->assertFalse($node['additionalProperties'] ?? true, $at.' is closed');
+                $this->assertEqualsCanonicalizing(array_keys($node['properties']), $node['required'], $at.' requires every property');
+                foreach ($node['properties'] as $key => $child) {
+                    $walk($child, $at.'.'.$key);
+                }
+            }
+            if (isset($node['items'])) {
+                $walk($node['items'], $at.'[]');
+            }
+        };
+        $walk($schema, 'reply');
+
+        foreach (glob(__DIR__.'/../Prompts/*.schema.json') as $file) {
+            $this->assertIsArray(json_decode((string) file_get_contents($file), true), basename($file));
+            $this->assertFileExists(substr($file, 0, -12).'.md', 'a schema belongs to a prompt version');
+        }
+    }
+
     public function test_an_old_reply_without_a_decision_is_read_as_before(): void
     {
         $out = AnswerSiteQuestion::applyCheck(['supported' => false, 'on_topic' => true, 'picks_fit' => true, 'safe' => true], 'תשובה', self::picks('p1'));

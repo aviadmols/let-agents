@@ -7,6 +7,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -60,7 +61,8 @@ final class CheckerCompareCommand extends Command
 
         $runs->track(agent: self::AGENT, action: self::ACTION, shopId: $shop->id, trigger: RunTrigger::Manual, work: function (RunContext $run) use ($models, $spend, $cases, $provider, $model, $prices, $max, $versions, $repeat, &$rows, &$totals): void {
             foreach ($versions as $version) {
-                $prompt = (string) @file_get_contents(__DIR__.'/../Prompts/verify_site.v'.$version.'.md');
+                $prompt = (string) @file_get_contents($file = __DIR__.'/../Prompts/verify_site.v'.$version.'.md');
+                $schema = AnswerSiteQuestion::schemaFor($file);
                 $totals[$version] = ['correct' => 0, 'false_reject' => 0, 'missed' => 0, 'failed' => 0, 'ms' => [], 'cost' => 0.0];
 
                 for ($round = 0; $round < $repeat; $round++) {
@@ -70,7 +72,9 @@ final class CheckerCompareCommand extends Command
                         $started = hrtime(true);
 
                         try {
-                            $reply = $models->json($provider, $model, $prompt, $input, $max, null);
+                            $reply = $schema !== null && $models instanceof StructuredChatModel
+                                ? $models->structured($provider, $model, $prompt, $input, $schema, $max, null)
+                                : $models->json($provider, $model, $prompt, $input, $max, null);
                         } catch (ModelCallFailed $e) {
                             $totals[$version]['failed']++;
                             $rows[] = [$version, $case['id'], (string) $case['expect'], 'failed: '.$e->reason, ''];

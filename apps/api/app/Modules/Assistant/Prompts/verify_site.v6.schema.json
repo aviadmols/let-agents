@@ -1,0 +1,41 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["decision", "issues", "revised", "picks", "supported", "on_topic", "picks_fit", "safe", "injection"],
+    "properties": {
+        "decision": {"type": "string", "enum": ["approve", "revise", "reject"]},
+        "issues": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["text", "kind", "severity", "pick"],
+                "properties": {
+                    "text": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["unsupported", "contradiction", "numeric", "unfit_pick", "wrong_reason", "off_topic", "safety"]},
+                    "severity": {"type": "string", "enum": ["minor", "major", "critical"]},
+                    "pick": {"type": ["string", "null"]}
+                }
+            }
+        },
+        "revised": {"type": "string"},
+        "picks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref", "fits", "why"],
+                "properties": {
+                    "ref": {"type": "string"},
+                    "fits": {"type": "boolean"},
+                    "why": {"type": "string"}
+                }
+            }
+        },
+        "supported": {"type": "boolean"},
+        "on_topic": {"type": "boolean"},
+        "picks_fit": {"type": "boolean"},
+        "safe": {"type": "boolean"},
+        "injection": {"type": "boolean"}
+    }
+}

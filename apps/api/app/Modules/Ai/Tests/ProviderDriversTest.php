@@ -9,6 +9,8 @@ use App\Modules\Ai\Contracts\EmbeddingDriver;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\StructuredChatDriver;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Ai\Enums\ProviderStatus;
 use App\Modules\Ai\Models\AiProvider;
@@ -52,6 +54,42 @@ final class ProviderDriversTest extends TestCase
         $this->assertSame(2, $result->dimensions());
         $this->assertSame([['sk-openai-1111', 'text-embedding-3-small', 2]], $embedded);
         $this->assertSame(0, $embedder->embed(AiProviderName::OpenAi, 'x', [])->inputTokens, 'nothing to embed costs nothing');
+    }
+
+    public function test_a_reply_held_to_a_schema_goes_to_a_driver_that_can_and_as_plain_json_to_one_that_cannot(): void
+    {
+        $this->connected('openai', 'sk-openai-1111');
+        $this->connected('anthropic', 'sk-ant-2222');
+        $calls = [];
+        $structured = new class($calls) implements StructuredChatDriver
+        {
+            public function __construct(private array &$calls) {}
+
+            public function provider(): AiProviderName
+            {
+                return AiProviderName::Anthropic;
+            }
+
+            public function json(string $apiKey, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->calls[] = ['anthropic', 'json'];
+
+                return new ModelReply([], 1, 1);
+            }
+
+            public function structured(string $apiKey, string $model, string $system, string $user, array $schema, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->calls[] = ['anthropic', 'structured', $schema['type']];
+
+                return new ModelReply(['ok' => true], 1, 1);
+            }
+        };
+        $chat = new ProviderChatModel([$structured, $this->chatDriver(AiProviderName::OpenAi, $calls)]);
+
+        $this->assertInstanceOf(StructuredChatModel::class, app(StructuredChatModel::class));
+        $this->assertSame(['ok' => true], $chat->structured(AiProviderName::Anthropic, 'claude-haiku-5-5', 's', 'u', ['type' => 'object'], 100)->data);
+        $this->assertSame(['driver' => 'openai'], $chat->structured(AiProviderName::OpenAi, 'gpt', 's', 'u', ['type' => 'object'], 100)->data);
+        $this->assertSame([['anthropic', 'structured', 'object'], ['openai', 'sk-openai-1111', 'gpt']], $calls);
     }
 
     public function test_a_provider_without_a_driver_or_without_a_key_is_refused(): void

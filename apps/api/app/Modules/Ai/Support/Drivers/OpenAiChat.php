@@ -2,9 +2,9 @@
 
 namespace App\Modules\Ai\Support\Drivers;
 
-use App\Modules\Ai\Contracts\ChatDriver;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\StructuredChatDriver;
 use App\Modules\Ai\Contracts\VisionDriver;
 use App\Modules\Ai\Enums\AiProviderName;
 use GuzzleHttp\Client;
@@ -12,7 +12,7 @@ use OpenAI;
 use Throwable;
 
 /** Chat completions through openai-php/client, asking for a JSON object. */
-final class OpenAiChat implements ChatDriver, VisionDriver
+final class OpenAiChat implements StructuredChatDriver, VisionDriver
 {
     private const TIMEOUT_SECONDS = 45.0;
 
@@ -26,6 +26,11 @@ final class OpenAiChat implements ChatDriver, VisionDriver
         return $this->send($apiKey, $model, $system, $user, $maxOutputTokens, $reasoningEffort);
     }
 
+    public function structured(string $apiKey, string $model, string $system, string $user, array $schema, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    {
+        return $this->send($apiKey, $model, $system, $user, $maxOutputTokens, $reasoningEffort, ['type' => 'json_schema', 'json_schema' => ['name' => 'reply', 'strict' => true, 'schema' => $schema]]);
+    }
+
     public function jsonWithImage(string $apiKey, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
     {
         return $this->send($apiKey, $model, $system, [
@@ -34,8 +39,11 @@ final class OpenAiChat implements ChatDriver, VisionDriver
         ], $maxOutputTokens, $reasoningEffort);
     }
 
-    /** @param string|list<array<string, mixed>> $content */
-    private function send(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens, ?string $reasoningEffort): ModelReply
+    /**
+     * @param  string|list<array<string, mixed>>  $content
+     * @param  array<string, mixed>|null  $format  a strict json_schema; a JSON object otherwise
+     */
+    private function send(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens, ?string $reasoningEffort, ?array $format = null): ModelReply
     {
         try {
             $response = OpenAI::factory()
@@ -49,7 +57,7 @@ final class OpenAiChat implements ChatDriver, VisionDriver
                         ['role' => 'system', 'content' => $system],
                         ['role' => 'user', 'content' => $content],
                     ],
-                    'response_format' => ['type' => 'json_object'],
+                    'response_format' => $format ?? ['type' => 'json_object'],
                     'max_completion_tokens' => $maxOutputTokens,
                     'reasoning_effort' => $reasoningEffort,
                 ], fn ($value): bool => $value !== null && $value !== ''));

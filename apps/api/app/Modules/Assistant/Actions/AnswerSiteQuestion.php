@@ -11,6 +11,7 @@ use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsNamed;
@@ -2086,8 +2087,12 @@ final class AnswerSiteQuestion
     private function call(RunContext $run, array $role, string $prompt, string $input, int $maxOutput, ?string $effort, string $prices): ModelReply
     {
         // A replay asks with the version the operator chose (replay()); everything else with the current one.
-        $text = isset($this->promptVersions[$prompt]) ? (string) @file_get_contents(__DIR__.'/../Prompts/'.$prompt.'.v'.$this->promptVersions[$prompt].'.md') : self::prompt($prompt);
-        $reply = $this->models->json($role['provider'], $role['model'], $text, $input, $maxOutput, $effort);
+        $file = isset($this->promptVersions[$prompt]) ? __DIR__.'/../Prompts/'.$prompt.'.v'.$this->promptVersions[$prompt].'.md' : self::promptFile($prompt);
+        $text = $file === null ? '' : (string) @file_get_contents($file);
+        $schema = self::schemaFor($file);
+        $reply = $schema !== null && $this->models instanceof StructuredChatModel
+            ? $this->models->structured($role['provider'], $role['model'], $text, $input, $schema, $maxOutput, $effort)
+            : $this->models->json($role['provider'], $role['model'], $text, $input, $maxOutput, $effort);
         $run->usage($role['name'], $role['model'], $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
 
         return $reply;
@@ -2254,14 +2259,36 @@ final class AnswerSiteQuestion
      */
     public static function prompt(string $name): string
     {
+        $file = self::promptFile($name);
+
+        return $file === null ? '' : (string) file_get_contents($file);
+    }
+
+    /** The newest released version of a prompt, as its file. */
+    public static function promptFile(string $name): ?string
+    {
         for ($version = self::PROMPT_VERSION; $version > 0; $version--) {
             // 5 is the bench's facts-only writer, never this answerer's.
             if ($version !== 5 && is_file($file = __DIR__.'/../Prompts/'.$name.'.v'.$version.'.md')) {
-                return (string) file_get_contents($file);
+                return $file;
             }
         }
 
-        return '';
+        return null;
+    }
+
+    /**
+     * The JSON Schema a prompt's reply is held to, from the file beside it ({name}.v{n}.schema.json):
+     * the provider then always returns JSON that parses. Null for a prompt without one.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function schemaFor(?string $promptFile): ?array
+    {
+        $file = $promptFile === null ? null : substr($promptFile, 0, -3).'.schema.json';
+        $schema = $file !== null && is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
+
+        return is_array($schema) ? $schema : null;
     }
 
     /** @return array{outcome: string, answer: string, from: string} */

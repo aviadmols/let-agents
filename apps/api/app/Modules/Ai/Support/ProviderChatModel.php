@@ -6,6 +6,8 @@ use App\Modules\Ai\Contracts\ChatDriver;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\StructuredChatDriver;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Contracts\VisionDriver;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Contracts\WebAnswer;
@@ -25,7 +27,7 @@ use Throwable;
  * Every call, answered or failed, is written to the call journal with its prompt and reply, so
  * the operator can open it from the pipeline. A picture sent is noted by type and size only.
  */
-final class ProviderChatModel implements ChatModel, VisionModel, WebSearchModel
+final class ProviderChatModel implements ChatModel, StructuredChatModel, VisionModel, WebSearchModel
 {
     /** @param iterable<ChatDriver> $drivers */
     public function __construct(
@@ -43,6 +45,18 @@ final class ProviderChatModel implements ChatModel, VisionModel, WebSearchModel
         }
 
         throw new ModelCallFailed(ModelCallFailed::UNSUPPORTED);
+    }
+
+    public function structured(AiProviderName $provider, string $model, string $system, string $user, array $schema, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+    {
+        foreach ($this->drivers as $driver) {
+            if ($driver instanceof StructuredChatDriver && $driver->provider() === $provider) {
+                return $this->logged(CallJournal::CHAT, $provider, $model, $system, $user,
+                    fn (): ModelReply => $driver->structured(ProviderKey::for($provider), $model, $system, $user, $schema, $maxOutputTokens, $reasoningEffort));
+            }
+        }
+
+        return $this->json($provider, $model, $system, $user, $maxOutputTokens, $reasoningEffort);
     }
 
     public function research(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, int $maxSearches): WebAnswer
