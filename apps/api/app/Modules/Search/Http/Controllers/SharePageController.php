@@ -2,12 +2,14 @@
 
 namespace App\Modules\Search\Http\Controllers;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Support\AgentCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * GET /s/{token}[?format=json]
@@ -38,7 +40,14 @@ final class SharePageController
         $browse = empty($snapshot['store']['catalog']) ? null : $tenant->run((string) $share->shop_id, fn (): array => AgentCatalog::browse($snapshot['store'], StoreCatalogController::COMPACT_PER_PAGE));
 
         if ($request->query('format') === 'json') {
-            return response()->json(AgentCatalog::forAi($snapshot['store'], $snapshot['products'], (string) $snapshot['as_of'], array_filter(['browse' => $browse, 'query' => $snapshot['query'], 'read' => $snapshot['read'] ?? null, 'policies' => $snapshot['policies'] ?? null])), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+            // The whole store in short, inside this JSON as the store's own JSON has it: an AI's browser
+            // often opens no second link, so a category's products behind one were never seen ("I could
+            // not open the list of the 27 books"). Within the shop's cap (search.ai_catalog_products).
+            $shopId = (string) $share->shop_id;
+            $everything = empty($snapshot['store']['catalog']) ? null : Cache::remember('search:share-everything:'.$shopId, 300, fn (): array => $tenant->run($shopId,
+                fn (): array => AgentCatalog::everything($snapshot['store'], (int) Settings::get('search.ai_catalog_products', $shopId))));
+
+            return response()->json(AgentCatalog::forAi($snapshot['store'], $snapshot['products'], (string) $snapshot['as_of'], array_filter(['browse' => $browse, 'query' => $snapshot['query'], 'read' => $snapshot['read'] ?? null, 'policies' => $snapshot['policies'] ?? null, 'everything' => $everything])), 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         }
 
         // The same search on the store itself, for a person the link was sent to.

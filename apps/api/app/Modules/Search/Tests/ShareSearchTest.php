@@ -126,6 +126,9 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('for_ai', array_key_first($json), 'the instructions come first');
         $this->assertSame(['find', 'visual', 'compare', 'project', 'order', 'missing'], array_keys($json['tasks']), 'then how to do what a shopper asks');
         $this->assertArrayNotHasKey('mcp', $json, 'nothing to connect: the link is all a shopper needs');
+        // The whole store in short, inside it: an AI that opens no second link still sees every product.
+        $lines = implode("\n", array_merge(...array_values(array_map(fn ($g): array => (array) $g, (array) ($json['everything']['by_category'] ?? [])))));
+        $this->assertStringContainsString('טבעת סוליטר', $lines, 'everything.by_category, which its instructions name, is there');
         $this->assertStringContainsString('Never create, draw or bring', implode(' ', $json['for_ai']), 'never a picture of its own');
         $this->assertStringEndsWith($sent['url'].'?format=json', $sent['prompt'], 'a sentence and the JSON link: the JSON holds the rest');
         $this->assertStringContainsString('קישור אחד להזמנה', $sent['prompt'], 'the sentence asks for the order link too');
