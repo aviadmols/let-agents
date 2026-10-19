@@ -196,6 +196,9 @@ final class AnswerSiteQuestion
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
                 ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound, $viewing);
             $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
+            // The page the answer rests on that the question names ("מנויים" for "מה זה תוכנית מנויים?"): a button to it.
+            $page = $result['outcome'] === AssistantAnswer::ANSWERED ? self::namedPage($question, (array) ($result['sources'] ?? [])) : null;
+            $result += $page === null ? [] : ['page' => $page];
 
             return $this->logged($shopId, $question, $products, $result);
         });
@@ -1596,6 +1599,38 @@ final class AnswerSiteQuestion
      * @param  array<string, mixed>  $result
      * @return array<string, mixed>
      */
+    /**
+     * The page an answer rests on that the question itself names: a page of the store (not a product,
+     * not the store's words about itself) every word of whose title is in the question, as Hebrew writes
+     * it (a prefix letter before it, final letters as regular ones): "מנויים" for "מה זה תוכנית מנויים?",
+     * "מדיניות החזרות" for "מה מדיניות ההחזרות?". Null when none is: no button is better than a wrong one.
+     *
+     * @param  list<array{title?: string, url?: string|null, type?: string}>  $sources
+     * @return array{title: string, url: string}|null
+     */
+    public static function namedPage(string $question, array $sources): ?array
+    {
+        $plain = fn (string $text): string => strtr(mb_strtolower((string) preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $text)), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
+        $asked = ' '.(string) preg_replace('/\s+/u', ' ', $plain($question)).' ';
+
+        foreach ($sources as $source) {
+            $url = (string) ($source['url'] ?? '');
+
+            if (($source['type'] ?? '') !== 'content' || ! str_starts_with($url, 'http')) {
+                continue;
+            }
+
+            $words = array_values(array_filter(preg_split('/\s+/u', $plain((string) ($source['title'] ?? ''))) ?: [], fn (string $w): bool => mb_strlen($w) >= 3));
+            $named = $words !== [] && array_filter($words, fn (string $w): bool => preg_match('/\s[והבלמשכ]{0,2}'.preg_quote($w, '/').'/u', $asked) !== 1) === [];
+
+            if ($named) {
+                return ['title' => (string) $source['title'], 'url' => $url];
+            }
+        }
+
+        return null;
+    }
+
     private function logged(string $shopId, string $question, array $products, array $result): array
     {
         $whatsapp = $result['outcome'] !== AssistantAnswer::ANSWERED && $result['outcome'] !== 'invalid'

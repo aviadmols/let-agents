@@ -87,7 +87,7 @@
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
-      showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
+      showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
       productsCount: ':n מוצרים', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
@@ -140,7 +140,7 @@
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
-      showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
+      showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
       productsCount: ':n products', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
@@ -229,7 +229,28 @@
   function post(url, body) { return json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
   var API = String(CFG.api).replace(/\/$/, '');
   var SITE = encodeURIComponent(CFG.site);
-  function words(text) { var i = 0; return esc(text).split(' ').map(function (w) { return '<span class="ls-w" style="--i:' + (i++) + '">' + w + ' </span>'; }).join(''); }
+  function words(text, from) { var i = from || 0; return esc(text).split(' ').map(function (w) { return '<span class="ls-w" style="--i:' + (i++) + '">' + w + ' </span>'; }).join(''); }
+  // An answer as it reads best: its own lines kept (a line that starts with "-", "•" or "1." is a list item);
+  // a long answer in one block, a sentence a line, and a sentence of parts joined by ";" a list of them
+  function answerBlocks(text) {
+    var item = /^(?:[-•*]|\d{1,2}[.)])\s+/;
+    var lines = String(text || '').split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
+    if (lines.length === 1 && lines[0].length > 200) {
+      lines = lines[0].replace(/([.!?])\s+(?=\S)/g, '$1\n').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    }
+    var blocks = [];
+    lines.forEach(function (line) {
+      var parts = line.split(/;\s+/);
+      if (item.test(line)) { var last = blocks[blocks.length - 1]; if (last && last.list) { last.list.push(line.replace(item, '')); } else { blocks.push({ list: [line.replace(item, '')] }); } return; }
+      if (parts.length >= 2 && line.length > 120) { blocks.push({ text: parts[0] }); blocks.push({ list: parts.slice(1) }); return; }
+      blocks.push({ text: line });
+    });
+    return blocks;
+  }
+  function answerHtml(text, anim) {
+    var n = 0, out = function (s) { var h = anim ? words(s, n) : esc(s); n += String(s).split(' ').length; return h; };
+    return answerBlocks(text).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + out(s) + '</li>'; }).join('') + '</ul>' : '<p>' + out(b.text) + '</p>'; }).join('');
+  }
 
   // ---------------------------------------------------------------- counting (as the old search script counted)
   // The same events, keys and payloads the store's reports are built on: /search/{site}/events with
@@ -1744,7 +1765,7 @@
       turn.askId = d.ask_id ? String(d.ask_id) : null;
       return products(picks.map(function (p) { return p.id; })).then(function () {
         if (d.outcome === 'answered') {
-          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], general: d.from === 'general', follow: d.follow || [] });
+          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [] });
           announce(t('announceReady') + ': ' + d.answer);
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           // the answer could not be checked: never shown; the store's own words, said to be that
@@ -1812,7 +1833,9 @@
     if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
     var n = String(turn.answer || '').split(' ').length;
-    var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '"><p>' + (anim ? words(turn.answer) : esc(turn.answer)) + '</p></div>';
+    var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerHtml(turn.answer, anim) + '</div>';
+    // the page the question names, which the answer rests on ("מנויים"): a button to it
+    if (turn.page && turn.page.url) { html += '<a class="ls-btn ls-btn--secondary ls-btn--sm ls-answer__page" href="' + esc(turn.page.url) + '">' + esc(t('goPage', { t: turn.page.title })) + '</a>'; }
     if (turn.picks && turn.picks.length) {
       html += '<ol class="ls-picks"' + (anim ? ' style="--lsp-stagger:110ms"' : '') + '>' + turn.picks.map(function (p, i) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, buy: 0, s: 1 };
