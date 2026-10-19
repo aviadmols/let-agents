@@ -5,6 +5,7 @@ namespace App\Modules\Enrichment\Filament\Merchant\Pages;
 use App\Modules\Admin\Contracts\ReadsContentAgain;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Enrichment\Actions\ApplyTeamValue;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -285,6 +286,9 @@ final class ScanSummary extends Page
             'measurements' => $product->measurements(),
             'options' => array_values(array_map(fn (array $a): array => ['name' => (string) $a['name'], 'values' => implode(', ', $a['values'])], $product->storeAttributes())),
             'variant_rows' => self::variants($product),
+            // The size its own page says (a ring's "מידה נוכחית: 54"), read from the page; null until it is.
+            'page_size' => (fn (?CatalogProductChoice $c): ?array => $c?->size === null ? null : ['size' => rtrim(rtrim(number_format((float) $c->size, 2, '.', ''), '0'), '.'), 'label' => (string) ($c->size_label ?: '')])(
+                CatalogProductChoice::query()->where('product_id', $product->id)->first(['size', 'size_label'])),
             'store_text' => mb_strlen(trim($product->shortDescription().' '.$product->description())),
             'indexed' => self::indexed(ChunkSource::Product, (string) $product->id),
         ];

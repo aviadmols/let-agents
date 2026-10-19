@@ -30,6 +30,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\TopicQuestions;
+use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -469,12 +470,17 @@ final class AnswerSiteQuestion
             return false;
         }
 
-        // "Not on the site" holds only as long as the site does: a page added or changed since
-        // (a cancellation policy synced later) is read before saying so again.
+        // "Not on the site" holds only as long as the site does, and what the search knows of it: a
+        // page added or changed since (a cancellation policy synced later), or the index read again
+        // (the topics and the questions its sections answer), is read before saying so again. And
+        // only once the question was also asked in other ways (the second look), where the shop looks so.
         $changed = CatalogContent::query()->active()->max('updated_at');
+        $indexed = RetrievalChunk::query()->max('updated_at');
+        $after = fn (mixed $at): bool => $at !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($at));
 
         return $saved->updated_at?->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId)))
-            || ($changed !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($changed)));
+            || $after($changed) || $after($indexed)
+            || (! (bool) (((array) $saved->flags)['wider'] ?? false) && Features::enabled('assistant.second_look', $shopId));
     }
 
     /**
@@ -639,19 +645,27 @@ final class AnswerSiteQuestion
         // asked once more on what that found. The first answer stands when this one finds none.
         $similar = $this->similarQuestions($shopId, $question, $locale, $forShopper);
 
-        if ($similar === []) {
-            return $result;
+        $again = null;
+
+        if ($similar !== []) {
+            [$this->widenWith, $this->scoped] = [$similar, true];
+
+            try {
+                $again = $this->askOnce($shopId, $question, $locale, $shown, $mode, $remember, $trace, $visitorHash, $keep, $viewing, $forShopper);
+            } finally {
+                [$this->widenWith, $this->scoped] = [[], false];
+            }
         }
 
-        [$this->widenWith, $this->scoped] = [$similar, true];
-
-        try {
-            $again = $this->askOnce($shopId, $question, $locale, $shown, $mode, $remember, $trace, $visitorHash, $keep, $viewing, $forShopper);
-        } finally {
-            [$this->widenWith, $this->scoped] = [[], false];
+        if (in_array($again['outcome'] ?? null, [AssistantAnswer::ANSWERED, 'quoted'], true)) {
+            return $again;
         }
 
-        return in_array($again['outcome'] ?? null, [AssistantAnswer::ANSWERED, 'quoted'], true) ? $again : $result;
+        // Not found the wider way either: kept so, and not asked again until the site or its index changes.
+        $kept = $remember && $keep ? self::siteAnswers()->where('question_key', Question::key($question))->where('outcome', '!=', AssistantAnswer::ANSWERED)->first() : null;
+        $kept?->forceFill(['flags' => (array) $kept->flags + ['wider' => true]])->save();
+
+        return $result;
     }
 
     /**

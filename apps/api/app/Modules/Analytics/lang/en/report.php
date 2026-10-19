@@ -16,7 +16,14 @@ return [
         'adds' => 'Added to cart',
         'adds_split' => 'from search :search · from the widget :widget · from the page :page',
         'orders' => 'Orders Lets helped',
-        'adds_by_day' => 'Adds to cart by day',
+        'chart' => [
+            'choose' => 'What the chart shows',
+            'searches' => 'Searches through the period',
+            'opens' => 'Openings of Lets through the period',
+            'questions' => 'Questions through the period',
+            'adds' => 'Adds to cart through the period',
+            'tabs' => ['searches' => 'Searches', 'opens' => 'Openings', 'questions' => 'Questions', 'adds' => 'Adds to cart'],
+        ],
     ],
     'wish' => [
         'lists' => 'Lists made',

@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Support;
 
 use App\Modules\Admin\Contracts\ReportRow;
+use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Assistant\Actions\TeamAnswers;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -40,7 +41,20 @@ final class AssistantReport implements ShopReport
             'answered' => $sum(self::ANSWERED),
             'unanswered' => $sum(self::UNANSWERED),
             'off' => $sum(self::OFF),
-        ]];
+        ], 'series' => ['questions' => $this->series($since, $until)]];
+    }
+
+    /**
+     * Questions asked in the search box through the period, at the chart's scale (ReportSeries).
+     *
+     * @return array<string, int>
+     */
+    private function series(CarbonInterface $since, CarbonInterface $until): array
+    {
+        $format = ReportSeries::scale($since, $until)['format'];
+
+        return AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)->get(['created_at'])
+            ->countBy(fn (AssistantSearchAsk $ask): string => ReportSeries::key($ask->created_at, $format))->all();
     }
 
     public function lists(): array

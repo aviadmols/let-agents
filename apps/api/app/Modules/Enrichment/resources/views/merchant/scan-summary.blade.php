@@ -94,9 +94,10 @@
 
                         {{-- what it comes in and how big it is: what a search by size, colour or option finds it by --}}
                         @php($m = $p['measurements'])
-                        @if ($p['options'] !== [] || $p['variant_rows']['total'] > 0 || $m['size'] || $m['weight'])
+                        @if ($p['options'] !== [] || $p['variant_rows']['total'] > 0 || $m['size'] || $m['weight'] || $p['page_size'])
                             <div class="lp-card-t lp-sub-t"><h2>{{ $t('variants_title') }}</h2><span class="lp-note">{{ $t('variants_help') }}</span></div>
                             <div class="lp-schema" data-options>
+                                @if ($p['page_size'])<div><span>{{ $t('page_size') }}</span><span>{{ $p['page_size']['size'] }}</span></div>@endif
                                 @if ($m['size'])<div><span>{{ $t('dimensions') }}</span><span dir="ltr">{{ $m['size'] }}</span></div>@endif
                                 @if ($m['weight'])<div><span>{{ $t('weight') }}</span><span dir="ltr">{{ $m['weight'] }}</span></div>@endif
                                 @foreach ($p['options'] as $option)

@@ -4,6 +4,7 @@ namespace App\Modules\Analytics\Filament\Merchant\Pages;
 
 use App\Core\Filament\HasPeriod;
 use App\Modules\Admin\Contracts\ReportRow;
+use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -28,6 +29,9 @@ final class ShopAnalytics extends Page
     use HasPeriod;
 
     /** How many rows each list shows on the screen; its whole list shows the rest. */
+    /** The chart's measures, each a series a module gives (ReportSeries). */
+    public const MEASURES = ['searches', 'opens', 'questions', 'adds'];
+
     public const SHOWN = ['adds' => 5, 'wish' => 3, 'words' => 6, 'questions' => 5, 'empty' => 5, 'noclick' => 5, 'ips' => 4];
 
     private const PAGE = 50;
@@ -48,6 +52,9 @@ final class ShopAnalytics extends Page
 
     #[Url(as: 'find')]
     public string $search = '';
+
+    /** What the chart shows through the period: searches, openings of Lets, questions or adds to the cart. */
+    public string $measure = 'searches';
 
     #[Url]
     public string $sort = 'value';
@@ -90,6 +97,19 @@ final class ShopAnalytics extends Page
         $this->search = '';
         $this->sort = 'value';
         $this->limit = self::PAGE;
+    }
+
+    public function measure(string $measure): void
+    {
+        $this->measure = in_array($measure, self::MEASURES, true) ? $measure : 'searches';
+    }
+
+    /** @return list<array{day: string, label: string, n: int}> the chart's points for the chosen measure, every step of the period */
+    public function chart(): array
+    {
+        [$since, $until] = $this->range();
+
+        return ReportSeries::points($since, $until, (array) ($this->figures()['series'][$this->measure] ?? []));
     }
 
     public function showFailed(string $which): void

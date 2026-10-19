@@ -3,6 +3,7 @@
 namespace App\Modules\Analytics\Support;
 
 use App\Modules\Admin\Contracts\ReportRow;
+use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsOrder;
@@ -11,7 +12,6 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 /**
  * Analytics' part of the shop's analytics screen: page views and openings of Lets (from the visits),
@@ -44,7 +44,7 @@ final class AnalyticsReport implements ShopReport
                 'revenue' => round((float) (clone $orders)->sum('attributed_total') + (float) (clone $orders)->sum('search_total'), 2),
                 'currency' => (string) (AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->latest('ordered_at')->value('currency') ?? $shop->currency ?? 'ILS'),
             ],
-            'daily_adds' => $this->daily($since, $until),
+            'series' => $this->series($since, $until),
         ];
     }
 
@@ -91,26 +91,21 @@ final class AnalyticsReport implements ShopReport
         return null;
     }
 
-    /** @return list<array{day: string, n: int}> adds to the cart each day of the period, empty days included */
-    private function daily(CarbonInterface $since, CarbonInterface $until): array
+    /**
+     * Openings of Lets and adds to the cart through the period, at the chart's scale (ReportSeries).
+     *
+     * @return array{opens: array<string, int>, adds: array<string, int>}
+     */
+    private function series(CarbonInterface $since, CarbonInterface $until): array
     {
-        $tz = 'Asia/Jerusalem';
-        $span = Carbon::instance($since)->diffInDays($until, true);
-        // The scale the period reads in: hours for a day, days up to four months, months beyond.
-        [$unit, $format, $label] = match (true) {
-            $span <= 1.01 => ['hour', 'Y-m-d H', 'H:00'],
-            $span <= 124 => ['day', 'Y-m-d', 'j.n'],
-            default => ['month', 'Y-m', 'n.Y'],
-        };
-        $counts = AnalyticsEvent::query()->where('preview', false)->where('type', 'add_to_cart')->where('result', 'added')
+        $format = ReportSeries::scale($since, $until)['format'];
+        $adds = AnalyticsEvent::query()->where('preview', false)->where('type', 'add_to_cart')->where('result', 'added')
             ->where('occurred_at', '>=', $since)->where('occurred_at', '<', $until)->get(['occurred_at'])
-            ->countBy(fn (AnalyticsEvent $e): string => $e->occurred_at->timezone($tz)->format($format))->all();
-        $points = [];
+            ->countBy(fn (AnalyticsEvent $e): string => ReportSeries::key($e->occurred_at, $format))->all();
+        $opens = AnalyticsVisitStep::query()->where('kind', 'open')->where('at', '>=', $since)->where('at', '<', $until)
+            ->whereHas('visit', fn (Builder $q) => $q->where('preview', false))->get(['at'])
+            ->countBy(fn (AnalyticsVisitStep $s): string => ReportSeries::key($s->at, $format))->all();
 
-        for ($at = Carbon::instance($since)->timezone($tz)->startOf($unit); $at->lt($until) && count($points) < 400; $at->add(1, $unit)) {
-            $points[] = ['day' => $at->format($format), 'label' => $at->format($label), 'n' => (int) ($counts[$at->format($format)] ?? 0)];
-        }
-
-        return $points;
+        return ['opens' => $opens, 'adds' => $adds];
     }
 }

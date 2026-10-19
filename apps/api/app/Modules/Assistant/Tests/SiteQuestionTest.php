@@ -232,6 +232,25 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(AssistantAnswer::ANSWERED, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->sole()->outcome), 'kept as answered for the next shopper');
     }
 
+    public function test_a_not_found_kept_before_the_second_look_is_asked_again(): void
+    {
+        // Kept "not on the site" by the first look alone, before the second look was there.
+        $this->passages = [];
+        Features::override('assistant.second_look', false);
+        $this->assertSame('no_info', $this->ask('מה מדיניות ההחזרים?')->json('data.outcome'));
+        Features::override('assistant.second_look', true);
+
+        $policy = $this->article('701', 'תנאי רכישה', 'ניתן להחזיר מוצר תוך 14 יום מיום הקבלה ולקבל זיכוי מלא.');
+        $this->byText['מדיניות החזרות'] = [['source' => 'content', 'source_id' => $policy->id, 'external_id' => '701', 'title' => 'תנאי רכישה', 'text' => 'ניתן להחזיר מוצר תוך 14 יום מיום הקבלה ולקבל זיכוי מלא.', 'similarity' => 0.82]];
+        $this->inShop(fn () => CatalogContent::query()->update(['updated_at' => now()->subDay()]));
+        $this->replies = [
+            ['found' => true, 'answer' => 'אפשר להחזיר מוצר תוך 14 יום מיום הקבלה ולקבל זיכוי מלא.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $this->assertSame('answered', $this->ask('מה מדיניות ההחזרים?')->json('data.outcome'), 'not served from memory: looked for again, the wider way');
+    }
+
     public function test_when_code_has_no_other_wording_a_small_model_writes_them_once(): void
     {
         $this->replies = [

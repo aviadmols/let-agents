@@ -16,7 +16,7 @@
     @php($adds = $f['adds'] ?? ['all' => 0, 'search' => 0, 'widget' => 0, 'page' => 0])
     @php($orders = $f['orders'] ?? ['n' => 0, 'revenue' => 0, 'currency' => 'ILS'])
     @php($views = (int) ($f['views'] ?? 0))
-    @php($daily = $f['daily_adds'] ?? [])
+    @php($daily = $this->chart())
     <div class="lp-page" data-analytics>
         <section class="lp-card" data-store-info>
             <div class="lp-card-t"><h2>{{ $t('store.title') }}</h2></div>
@@ -35,11 +35,18 @@
                 @php($xy = collect($daily)->values()->map(fn (array $d, int $i): array => ['x' => round($n > 1 ? 100 - (100 * $i / ($n - 1)) : 50, 3), 'y' => round(100 - 88 * $d['n'] / $top, 2), 'label' => $d['label'], 'n' => $d['n']])->all())
                 @php($points = collect($xy)->map(fn (array $p): string => ($p['x'] * 6).','.($p['y'] * 1.6))->implode(' '))
                 @php($ticks = collect($xy)->filter(fn (array $p, int $i): bool => $n <= 8 || $i % (int) ceil($n / 7) === 0 || $i === $n - 1))
-                <div class="lp-note" style="margin: 18px 0 6px">{{ $t('store.adds_by_day') }}</div>
+                <div class="lp-card-t" style="margin: 18px 0 6px">
+                    <span class="lp-note">{{ $t('store.chart.'.$this->measure) }}</span>
+                    <div class="lp-tabs lp-tabs-sm" role="tablist" aria-label="{{ $t('store.chart.choose') }}">
+                        @foreach ($page::MEASURES as $measure)
+                            <button type="button" role="tab" wire:click="measure('{{ $measure }}')" aria-selected="{{ $this->measure === $measure ? 'true' : 'false' }}" @class(['is-on' => $this->measure === $measure])>{{ $t('store.chart.tabs.'.$measure) }}</button>
+                        @endforeach
+                    </div>
+                </div>
                 <div class="lp-chart" x-data="{ at: null, points: @js($xy) }" @mouseleave="at = null"
                      @mousemove="const r = $el.querySelector('svg').getBoundingClientRect(); const x = (($event.clientX - r.left) / r.width) * 100; at = points.reduce((best, p, i) => Math.abs(p.x - x) < Math.abs(points[best].x - x) ? i : best, 0)">
                     <div class="lp-chart-plot">
-                    <svg class="lp-spark" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="{{ $t('store.adds_by_day') }}">
+                    <svg class="lp-spark" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="{{ $t('store.chart.'.$this->measure) }}">
                         <g stroke="var(--la-line)" stroke-width="1"><line x1="0" y1="19" x2="600" y2="19"/><line x1="0" y1="89" x2="600" y2="89"/><line x1="0" y1="160" x2="600" y2="160"/></g>
                         <polyline points="{{ $points }} 0,160 600,160" fill="currentColor" fill-opacity=".08" stroke="none"/>
                         <polyline points="{{ $points }}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>

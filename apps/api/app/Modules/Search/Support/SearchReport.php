@@ -4,6 +4,7 @@ namespace App\Modules\Search\Support;
 
 use App\Core\Facades\Settings;
 use App\Modules\Admin\Contracts\ReportRow;
+use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Analytics\Models\BlockedIp;
 use App\Modules\Search\Models\SearchLog;
@@ -32,7 +33,32 @@ final class SearchReport implements ShopReport
             'searches' => (int) (clone $terms)->where('query', '!=', self::PHOTO)->sum('searches'),
             'photo_searches' => (int) (clone $terms)->where('query', self::PHOTO)->sum('searches'),
             'ips' => ['over' => (int) Settings::get('analytics.ip_alert_per_day', $shop->id)],
+            'series' => ['searches' => $this->series($since, $until)],
         ];
+    }
+
+    /**
+     * Searches through the period at the chart's scale (ReportSeries), by photo too: by the hour from
+     * each search's own line (search_logs), by the day or the month from the day's counts.
+     *
+     * @return array<string, int>
+     */
+    private function series(CarbonInterface $since, CarbonInterface $until): array
+    {
+        ['unit' => $unit, 'format' => $format] = ReportSeries::scale($since, $until);
+
+        if ($unit === 'hour') {
+            return SearchLog::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)->get(['created_at'])
+                ->countBy(fn (SearchLog $log): string => ReportSeries::key($log->created_at, $format))->all();
+        }
+
+        $counts = [];
+        foreach ((clone $this->terms($since, $until))->reorder()->selectRaw('day, sum(searches) as n')->groupBy('day')->pluck('n', 'day') as $day => $n) {
+            $key = Carbon::parse((string) $day)->format($format);
+            $counts[$key] = ($counts[$key] ?? 0) + (int) $n;
+        }
+
+        return $counts;
     }
 
     public function lists(): array

@@ -69,6 +69,20 @@ final class AnalyticsScreenTest extends TestCase
         $this->assertTrue($this->inShop(fn (): bool => SearchSynonym::query()->where('term', 'מדף עץ מוכן')->where('means', 'מדף')->exists()));
     }
 
+    public function test_the_chart_shows_searches_by_default_and_another_measure_on_request(): void
+    {
+        $page = Livewire::test(ShopAnalytics::class)
+            ->assertSee('חיפושים לאורך התקופה')
+            ->assertSee('פתיחות');
+        $today = collect($page->instance()->chart())->firstWhere('day', now()->timezone('Asia/Jerusalem')->format('Y-m-d'));
+        $this->assertSame(96, $today['n'] ?? null, 'every search of the day, by photo too');
+
+        $page->call('measure', 'adds')->assertSee('הוספות לסל לאורך התקופה');
+        $this->assertSame(0, array_sum(array_column($page->instance()->chart(), 'n')));
+        $page->call('measure', 'nonsense');
+        $this->assertSame('searches', $page->instance()->measure);
+    }
+
     public function test_the_whole_list_is_searched_and_sorted(): void
     {
         Livewire::test(ShopAnalytics::class)

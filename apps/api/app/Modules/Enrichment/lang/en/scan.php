@@ -114,6 +114,7 @@ return [
     'indexed_less' => 'Show less',
     'variants_title' => 'Variants and measurements',
     'variants_help' => 'Search finds the product by these: size, colour or option',
+    'page_size' => 'Size (from the product page)',
     'dimensions' => 'Dimensions',
     'weight' => 'Weight',
     'variants_count' => '{1} One variant|[2,*] :n variants',
