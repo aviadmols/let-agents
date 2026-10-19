@@ -232,6 +232,24 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(AssistantAnswer::ANSWERED, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->sole()->outcome), 'kept as answered for the next shopper');
     }
 
+    public function test_a_fee_or_a_contact_the_cited_policy_states_is_the_stores_word_one_made_up_is_not(): void
+    {
+        $policy = $this->article('702', 'מדיניות החזרות', 'ניתן לבטל תוך 14 יום. דמי ביטול של עד 5% או 100 ₪, לפי הנמוך. לביטול: 03-5551234 או shop@rocks.test.');
+        $this->passages = [['source' => 'content', 'source_id' => $policy->id, 'external_id' => '702', 'title' => 'מדיניות החזרות', 'text' => 'ניתן לבטל תוך 14 יום. דמי ביטול של עד 5% או 100 ₪, לפי הנמוך. לביטול: 03-5551234 או shop@rocks.test.', 'similarity' => 0.8]];
+        $this->replies = [
+            ['found' => true, 'answer' => 'אפשר לבטל תוך 14 יום, בדמי ביטול של עד 5% או 100 ₪. לביטול: 03-5551234 או shop@rocks.test.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $this->assertSame('answered', $this->ask('מה מדיניות הביטולים?')->json('data.outcome'), 'the fee and the contacts are the policy\'s own');
+
+        $prepared = ['byRef' => ['s1' => $this->passages[0]], 'productsByRef' => [], 'forModel' => []];
+        $screen = fn (string $answer): ?string => app(AnswerSiteQuestion::class)->screen(['answer' => $answer, 'refs' => ['s1']], $prepared, 'מה דמי הביטול?', 'fixed')['refusal'];
+        $this->assertSame('price', $screen('דמי הביטול הם 250 ₪.'), 'a sum the page does not have');
+        $this->assertSame('contact_details', $screen('התקשרו ל-054-9998877.'), 'a number the page does not have');
+        $this->assertNull($screen('דמי הביטול עד 100 ₪.'));
+    }
+
     public function test_a_not_found_kept_before_the_second_look_is_asked_again(): void
     {
         // Kept "not on the site" by the first look alone, before the second look was there.

@@ -81,6 +81,12 @@ final class AnswerSiteQuestion
 
     private const SIMILAR_OUTPUT_TOKENS = 200;
 
+    /**
+     * How a "not on the site" was looked for: the wider look, and the code checks an answer passes. A "not
+     * found" kept by an older way (before a fee the policy states could be quoted) is looked for again.
+     */
+    public const LOOK_VERSION = 2;
+
     /** Wordings from code that make the model's unneeded. */
     private const ENOUGH_FROM_CODE = 2;
 
@@ -480,7 +486,7 @@ final class AnswerSiteQuestion
 
         return $saved->updated_at?->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId)))
             || $after($changed) || $after($indexed)
-            || (! (bool) (((array) $saved->flags)['wider'] ?? false) && Features::enabled('assistant.second_look', $shopId));
+            || ((int) (((array) $saved->flags)['looked'] ?? 0) < self::LOOK_VERSION && Features::enabled('assistant.second_look', $shopId));
     }
 
     /**
@@ -663,7 +669,7 @@ final class AnswerSiteQuestion
 
         // Not found the wider way either: kept so, and not asked again until the site or its index changes.
         $kept = $remember && $keep ? self::siteAnswers()->where('question_key', Question::key($question))->where('outcome', '!=', AssistantAnswer::ANSWERED)->first() : null;
-        $kept?->forceFill(['flags' => (array) $kept->flags + ['wider' => true]])->save();
+        $kept?->forceFill(['flags' => ['looked' => self::LOOK_VERSION] + (array) $kept->flags])->save();
 
         return $result;
     }
@@ -1129,12 +1135,16 @@ final class AnswerSiteQuestion
             $known .= "\n".json_encode($forModel, JSON_UNESCAPED_UNICODE);
         }
 
+        // What the cited pages themselves say: a store's policy may name its cancellation fee ("עד 5% או
+        // 100 ₪") and how to reach it; quoted from there, that is the store's word, not one made up.
+        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited));
+
         // Code's checks on the answer; the picks stand or fall on their own.
         $refusal = match (true) {
             $answer === '' => 'no_answer',
             $cited === [] && $picks === [] => 'cites_nothing',
-            Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== [] => 'contact_details',
-            preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 => 'price',
+            (Question::hasContactDetails($answer) || array_diff(Privacy::redact($answer)['found'], ['link']) !== []) && ! self::contactsFrom($answer, $pages) => 'contact_details',
+            preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $answer) === 1 && ! self::amountsFrom($answer, $pages) => 'price',
             self::hasRef($answer) => 'internal_ref',
             self::hasNumberNotIn($answer, $known) => 'number_not_in_the_pages',
             default => null,
@@ -1845,6 +1855,37 @@ final class AnswerSiteQuestion
     private function price(string $name): float
     {
         return (float) Settings::get("assistant.{$name}_usd_per_million");
+    }
+
+    /**
+     * Whether every sum of money the answer names ("100 ₪", "₪100", "100 שקל") is written in the pages it
+     * cites: a fee the store's policy states, never a product's price (the page shows that) or one made up.
+     * An answer naming money without a number of it is not.
+     */
+    public static function amountsFrom(string $answer, string $pages): bool
+    {
+        preg_match_all('~(\d[\d,.]*)\s*(?:₪|ש"ח|ש״ח|שקל)|(?:₪|ש"ח|ש״ח)\s*(\d[\d,.]*)~u', $answer, $m);
+        $amounts = array_values(array_filter([...$m[1], ...$m[2]], fn (string $a): bool => $a !== ''));
+        $plain = fn (string $n): string => rtrim(str_replace(',', '', $n), '.');
+
+        return $amounts !== [] && array_filter($amounts, fn (string $a): bool => ! str_contains(str_replace(',', '', $pages), $plain($a))) === [];
+    }
+
+    /**
+     * Whether every phone number and email address the answer gives is written in the pages it cites:
+     * the store's own, as its policy publishes them for cancelling, never one a shopper or the model wrote.
+     */
+    public static function contactsFrom(string $answer, string $pages): bool
+    {
+        preg_match_all('~[\w.+-]+@[\w-]+(?:\.[\w-]+)+~u', $answer, $emails);
+        preg_match_all('~\+?\d[\d\s-]{7,}\d~u', $answer, $phones);
+        $digits = fn (string $s): string => (string) preg_replace('/\D+/', '', $s);
+        $pagesDigits = (string) preg_replace('/[\s-]+/', '', $pages);
+        $found = [...$emails[0], ...$phones[0]];
+
+        return $found !== []
+            && array_filter($emails[0], fn (string $e): bool => mb_stripos($pages, $e) === false) === []
+            && array_filter($phones[0], fn (string $p): bool => ! str_contains($pagesDigits, $digits($p))) === [];
     }
 
     /** A number the pages, the products and the question do not have is one the model made up. */
