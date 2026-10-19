@@ -15,6 +15,7 @@ use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Contracts\ChunkExperiments;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\PictureContent;
+use App\Modules\Retrieval\Contracts\RefreshesVectors;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Listeners\RefreshVectors;
@@ -23,6 +24,7 @@ use App\Modules\Retrieval\Sources\ProductDocuments;
 use App\Modules\Retrieval\Sources\PurchaseDocuments;
 use App\Modules\Retrieval\Support\InMemoryChunkExperiments;
 use App\Modules\Retrieval\Support\PassageSearch;
+use App\Modules\Retrieval\Support\QueuedVectorRefresh;
 use App\Modules\Retrieval\Support\RetrievalRunner;
 use App\Modules\Retrieval\Support\VectorSearch;
 use Illuminate\Console\Scheduling\Schedule;
@@ -48,6 +50,7 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
         $this->app->bind(RunsRetrieval::class, RetrievalRunner::class);
         $this->app->bind(CaptionsPictures::class, CaptionImages::class);
         $this->app->bind(PictureContent::class, VectorSearch::class);
+        $this->app->bind(RefreshesVectors::class, QueuedVectorRefresh::class);
         $this->app->tag(self::SOURCES, 'retrieval.sources');
         $this->app->tag(self::CANDIDATES, 'retrieval.candidates');
     }

@@ -12,13 +12,17 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Enrichment\Actions\CollectProviderBatches;
 use App\Modules\Enrichment\Actions\RunNightlyModelReading;
+use App\Modules\Enrichment\Actions\RunNightlyReview;
 use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
+use App\Modules\Enrichment\Events\FactsDecided;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
+use App\Modules\Runs\Models\Run;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 /**
@@ -107,9 +111,12 @@ final class BatchReadingTest extends TestCase
         $this->assertCount(1, $this->provider->submitted[1]);
 
         $this->provider->state = BatchState::ENDED;
+        Event::fake([FactsDecided::class]);
         $collected = app(CollectProviderBatches::class)->handle($this->shop->id);
 
         $this->assertSame(2, $collected->output['collected']);
+        Event::assertDispatched(FactsDecided::class, fn (FactsDecided $e): bool => $e->shopId === $this->shop->id);
+        $this->assertTrue(Run::query()->where('shop_id', $this->shop->id)->where('action', RunNightlyReview::ACTION)->exists(), 'the review starts the same day, not the next night');
         $items = $this->inShop(fn () => EnrichmentBatchItem::query()->where('batch_id', $batch->id)->orderBy('custom_id')->get());
         $this->assertEqualsCanonicalizing([ItemStatus::Applied, ItemStatus::Rejected], $items->pluck('status')->all(), 'an answer about another product is refused, as one at a time');
         $this->assertSame(BatchStatus::Completed, $batch->refresh()->status);

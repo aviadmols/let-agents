@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Actions;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\BatchState;
@@ -9,10 +10,13 @@ use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Enrichment\Enums\BatchStatus;
 use App\Modules\Enrichment\Enums\ItemStatus;
+use App\Modules\Enrichment\Enums\TaskType;
+use App\Modules\Enrichment\Events\FactsDecided;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
 use App\Modules\Enrichment\Support\ReadingPrices;
 use App\Modules\Enrichment\Tasks\TaskRegistry;
+use App\Modules\Retrieval\Contracts\RefreshesVectors;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Models\Run;
@@ -50,12 +54,15 @@ final class CollectProviderBatches
             return null;
         }
 
-        return $this->runs->track(
+        $readings = 0;
+        $applied = 0;
+
+        $run = $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
             input: ['batches' => $waiting->count()],
-            work: function (RunContext $run) use ($shopId, $waiting): void {
+            work: function (RunContext $run) use ($shopId, $waiting, &$readings, &$applied): void {
                 $counts = ['collected' => 0, 'running' => 0, 'lost' => 0, 'applied' => 0, 'rejected' => 0, 'stale' => 0, 'errors' => []];
 
                 foreach ($waiting as $batch) {
@@ -84,13 +91,18 @@ final class CollectProviderBatches
                     }
 
                     try {
-                        $this->tenant->run($shopId, fn () => $this->apply($run, $batch, $provider, $counts));
+                        // By reference: an arrow function would count into a copy.
+                        $this->tenant->run($shopId, function () use ($run, $batch, $provider, &$counts): void {
+                            $this->apply($run, $batch, $provider, $counts);
+                        });
                         $counts['collected']++;
+                        $readings += $batch->task === TaskType::FactReview ? 0 : 1;
                     } catch (ModelCallFailed $e) {
                         $counts['errors'][] = $e->reason;
                     }
                 }
 
+                $applied = (int) $counts['applied'];
                 $run->output($counts)->summary('enrichment::runs.batches_collected', [
                     'collected' => (string) $counts['collected'],
                     'applied' => number_format($counts['applied']),
@@ -100,6 +112,20 @@ final class CollectProviderBatches
                 ]);
             },
         );
+
+        // The same day, not the next night: a reading's answers go to the other family's review at once
+        // (one review batch at a time, as the night would), and what was written or decided reaches
+        // search: its index now, its vectors a few minutes later.
+        if ($readings > 0 && Features::enabled('enrichment.auto_review', $shopId)) {
+            app(RunNightlyReview::class)->handle($shopId);
+        }
+
+        if ($applied > 0) {
+            event(new FactsDecided($shopId));
+            app(RefreshesVectors::class)->soon($shopId);
+        }
+
+        return $run;
     }
 
     /** @param array<string, mixed> $counts */
