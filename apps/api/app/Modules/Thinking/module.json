@@ -1,0 +1,72 @@
+{
+    "name": "Thinking",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Runs",
+        "Ai",
+        "Catalog",
+        "Assistant",
+        "Retrieval",
+        "Enrichment"
+    ],
+    "provider": "ThinkingServiceProvider",
+    "features": [
+        { "name": "sets", "default": true },
+        { "name": "sets_by_meaning", "default": true }
+    ],
+    "settings": [
+        { "name": "picker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
+        { "name": "picker_model", "type": "string", "default": "gpt-5.4-mini", "min": 1, "max": 120, "scope": "global" },
+        { "name": "picker_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "picker_output_usd_per_million", "type": "float", "default": 8, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "checker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
+        { "name": "checker_model", "type": "string", "default": "claude-haiku-4-5", "min": 1, "max": 120, "scope": "global" },
+        { "name": "checker_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "checker_output_usd_per_million", "type": "float", "default": 5, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "max_output_tokens", "type": "int", "default": 1500, "min": 300, "max": 8000, "scope": "global", "unit": "tokens" },
+        { "name": "max_candidates", "type": "int", "default": 40, "min": 5, "max": 120, "scope": "shop", "unit": "products" },
+        { "name": "candidate_chars", "type": "int", "default": 400, "min": 100, "max": 1500, "scope": "global", "unit": "characters" },
+        { "name": "max_set", "type": "int", "default": 120, "min": 10, "max": 500, "scope": "shop", "unit": "products" },
+        { "name": "generic_percent", "type": "int", "default": 40, "min": 10, "max": 90, "scope": "global", "unit": "percent" },
+        { "name": "whole_catalog_max", "type": "int", "default": 300, "min": 0, "max": 1000, "scope": "shop", "unit": "products" },
+        { "name": "whole_catalog_chars", "type": "int", "default": 160, "min": 0, "max": 600, "scope": "global", "unit": "characters" },
+        { "name": "focus_over", "type": "int", "default": 24, "min": 6, "max": 500, "scope": "shop", "unit": "products" }
+    ],
+    "agents": [
+        {
+            "name": "set_finder",
+            "action": "find_set",
+            "when": "live",
+            "features": [
+                "sets_by_meaning"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "picker_provider",
+                    "model": "picker_model",
+                    "prices": [
+                        "picker_input_usd_per_million",
+                        "picker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "find_set"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "checker_provider",
+                    "model": "checker_model",
+                    "prices": [
+                        "checker_input_usd_per_million",
+                        "checker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "check_set"
+                    ]
+                }
+            ]
+        }
+    ]
+}

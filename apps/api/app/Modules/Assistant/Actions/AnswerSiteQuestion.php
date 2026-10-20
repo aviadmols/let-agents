@@ -14,6 +14,7 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\PriceRange;
+use App\Modules\Assistant\Contracts\ProductSets;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -175,6 +176,9 @@ final class AnswerSiteQuestion
     /** True in the second look: the question was already found to be the store's. */
     private bool $scoped = false;
 
+    /** Whether the question being handled is within the day's questions, once asked (withinDailyLimits). */
+    private ?bool $allowed = null;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -217,6 +221,7 @@ final class AnswerSiteQuestion
 
         return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp, $bound, $viewing): array {
             $this->answered = null;
+            $this->allowed = null;
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
                 ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound, $viewing);
             $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
@@ -318,6 +323,12 @@ final class AnswerSiteQuestion
             return $this->withinDailyLimits($shopId, $visitorHash)
                 ? $this->ask($shopId, $question, $locale, $products, visitorHash: $visitorHash, keep: false, viewing: $viewing)
                 : $this->fixed('limit', $locale);
+        }
+
+        // "תציג לי את ספריית שיבולת", "תן לי את כל ספרי החטופים": every product of the set, not three
+        // picks (ProductSets, from the Thinking module), before a saved answer that picked three.
+        if ($viewing === null && ($set = $this->set($shopId, $question, $visitorHash, $locale)) !== null) {
+            return $set;
         }
 
         $saved = self::siteAnswers()->where('question_key', Question::key($question))->first();
@@ -2136,8 +2147,38 @@ final class AnswerSiteQuestion
 
     private function withinDailyLimits(string $shopId, string $visitorHash): bool
     {
-        // From a storefront request, its address counts too; from the console there is none.
-        return DailyQuestions::allow($shopId, $visitorHash, app()->runningInConsole() && ! app()->runningUnitTests() ? null : request()->ip());
+        // From a storefront request, its address counts too; from the console there is none. Asked
+        // once a question: a set that found nothing hands the question on without counting it twice.
+        return $this->allowed ??= DailyQuestions::allow($shopId, $visitorHash, app()->runningInConsole() && ! app()->runningUnitTests() ? null : request()->ip());
+    }
+
+    /**
+     * A question that asks to see a whole set of products, answered with all of them: the set's ids
+     * for the storefront to show, a line above them, and the store's page of the set when it has one.
+     * Null when the question asks no set, or none was found: the question is answered as any other.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function set(string $shopId, string $question, string $visitorHash, string $locale): ?array
+    {
+        if (! app()->bound(ProductSets::class)) {
+            return null;
+        }
+
+        $found = app(ProductSets::class)->find($shopId, $question, $locale, fn (): bool => $this->withinDailyLimits($shopId, $visitorHash));
+
+        if ($found === null || $found['ids'] === []) {
+            return null;
+        }
+
+        return [
+            'outcome' => AssistantAnswer::ANSWERED,
+            'answer' => $found['answer'],
+            'from' => $found['from'],
+            'sources' => [],
+            'picks' => [],
+            'set' => ['ids' => $found['ids'], 'title' => $found['title'], 'near' => $found['near'], 'ask' => $found['ask'], 'search' => $found['search']],
+        ] + ($found['page'] !== null ? ['page' => $found['page']] : []);
     }
 
     /**

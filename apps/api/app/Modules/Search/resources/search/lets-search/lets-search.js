@@ -87,7 +87,7 @@
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
-      showAll: 'הצגת כל :n התוצאות', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
+      showAll: 'הצגת כל :n התוצאות', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
       productsCount: ':n מוצרים', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
@@ -140,7 +140,7 @@
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
-      showAll: 'Show all :n results', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
+      showAll: 'Show all :n results', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
       productsCount: ':n products', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
@@ -798,7 +798,9 @@
     if (S.engine && S.engine.isQuestion) { try { if (S.engine.isQuestion(q)) { return true; } } catch (e) { /* none */ } }
     // A long text is a question only when it asks for something ("תמליצו לי…", "מה ההבדל…"): a long
     // description of a product ("טבעת זהב צהוב עם שתי רצועות דקות…") is searched, by its words and its meaning.
+    // "תן לי את כל ספרי החטופים", "תציג לי את ספריית שיבולת": a set asked to see, which the assistant shows whole
     return /\?\s*$/.test(q) || /^(איזה|איזו|אילו|איך|כמה|האם|מה|למה|מתי|אפשר|יש לכם|יש לך|which|what|how|can|does|is|do|why)\b/i.test(q.trim())
+      || /^(תן|תני|תנו|תציג|תציגי|תציגו|הצג|תראה|תראי|תראו|הראה|הראו)\s+(לי|לנו)\s+\S|^(show|list)\s+(me\s+)?(all\s+)?\S/i.test(q.trim())
       || (q.trim().split(/\s+/).length >= 5 && ASKS_FOR.test(q));
   }
   var ASKS_FOR = /(תמליצ|תמליץ|המליצ|ממליצ|המלצה|תסביר|תסבירו|הסבר|ספר(ו)? לי|תגיד(ו)? לי|השוו|ההבדל|הבדל בין|כדאי לי|מה עדיף|עדיף|צריך לדעת|אני מתלבט|מתלבטת|recommend|explain|compare|difference|should i|which is better)/i;
@@ -1852,9 +1854,13 @@
       var d = (r.body && r.body.data) || r.body || {};
       var picks = (d.picks || []).map(function (p) { return { id: pid(p.external_id || p.id), why: p.why, title: p.title, url: p.url, image: p.image }; });
       turn.askId = d.ask_id ? String(d.ask_id) : null;
-      return products(picks.map(function (p) { return p.id; })).then(function () {
+      // a whole set asked to see ("תציג לי את ספריית שיבולת"): every product of it as a grid, a question to narrow it by, and the search for more
+      var set = d.set && d.set.ids && d.set.ids.length ? d.set : null;
+      var setIds = set ? set.ids.map(function (id) { return pid(id); }).filter(function (id) { return !!rec(id); }) : null;
+      return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [])).then(function () {
         if (d.outcome === 'answered') {
-          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [] });
+          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [],
+            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null });
           announce(t('announceReady') + ': ' + d.answer);
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           // the answer could not be checked: never shown; the store's own words, said to be that
@@ -1935,6 +1941,7 @@
           '<div class="ls-pick__row">' + priceHtml(r) + '<span style="display:flex;gap:4px;align-items:center">' + heartBtn(pid(r.id), S.saved.indexOf(pid(r.id)) >= 0) + buyBtn(r, 'ls-btn--sm') + '</span></div><div data-after="' + esc(pid(r.id)) + '"></div></div></li>';
       }).join('') + '</ol>';
     }
+    html += setHtml(turn);
     var src = (turn.sources || []).filter(function (s) { return s && (s.title || s.product); });
     if (src.length) {
       html += '<div class="ls-source">' + icon('doc', 'ls-icon--sm') + esc(t('from')) + ' ' + src.slice(0, 2).map(function (s) { var r = s.product && rec(s.product); return '<a href="' + esc(s.url || (r && r.url) || '#') + '">' + esc(s.title || (r && decode(r.title).split('|')[0]) || '') + '</a>'; }).join(' · ') + '</div>';
@@ -1946,6 +1953,23 @@
     var h = hours(), link = S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html + myAi(turn);
+  }
+  // A set asked to see, under its answer: one question to narrow it by (each option asks again with it, and the server
+  // reads the store's two groups together, or chooses anew), the set as a grid ending on a full row with "show all",
+  // and the store's search for the same words, for more
+  function setHtml(turn) {
+    if (turn.kind !== 'answer' || !turn.ids || !turn.ids.length) { return ''; }
+    var html = '', base = String(turn.q || '').replace(/[?؟.!\s]+$/, '');
+    if (turn.setAsk && turn.setAsk.options && turn.setAsk.options.length) {
+      html += '<div class="ls-follow ls-set__ask"><span class="ls-set__q" dir="auto">' + esc(turn.setAsk.question) + '</span>' + turn.setAsk.options.map(function (o) {
+        return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(base + ' ' + o) + '">' + esc(o) + '</button>';
+      }).join('') + '</div>';
+    }
+    var list = filtered(turn), n = gridN(turn);
+    if (list.length) { html += '<div class="ls-grid ls-set__grid">' + list.slice(0, n).map(card).join('') + '</div>'; }
+    if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
+    if (turn.setSearch) { html += '<div class="ls-set__search"><button class="ls-btn ls-btn--link" data-q="' + esc(turn.setSearch) + '">' + icon('search', 'ls-icon--sm') + esc(t('searchFor', { q: turn.setSearch })) + '</button></div>'; }
+    return html;
   }
   // "Helpful?" under an answer the assistant wrote for the search box (search.rate_answers): a thumb up or down,
   // the last press counts, sent with the question's id; one rated down reaches the shop's notices

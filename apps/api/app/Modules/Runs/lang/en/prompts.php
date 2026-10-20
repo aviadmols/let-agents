@@ -69,4 +69,8 @@ return [
         'tags' => 'Writes "you may also want to see" tags for the store\'s pages',
         'tags_check' => 'Checks the tags and the results they bring',
     ],
+    'thinking' => [
+        'find_set' => 'Chooses which of the products code found belong to the set the shopper asked to see',
+        'check_set' => 'Checks the choice and takes out products that do not belong to the set',
+    ],
 ];

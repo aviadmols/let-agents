@@ -1,0 +1,9 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["wrong", "ask_ok"],
+    "properties": {
+        "wrong": {"type": "array", "items": {"type": "string"}},
+        "ask_ok": {"type": "boolean"}
+    }
+}
