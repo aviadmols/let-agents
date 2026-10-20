@@ -14,7 +14,8 @@ namespace App\Modules\Assistant\Contracts;
 interface ProductSets
 {
     /**
-     * Null when the question asks for no set, or none was found. ids are external ids, best first;
+     * Null when the question asks for no set, or there was nothing to look through. No ids: the store
+     * was looked through and has none of it, nor anything close; the answer says so. ids are external ids, best first;
      * from is "code" (a group the store keeps), "model" (chosen now) or "bank" (chosen before); near:
      * none fit, and these are the closest the store has, the answer says so; ask: one question to
      * narrow a large set by, with its options; search: the words to search the store with for more.

@@ -6,5 +6,6 @@ return [
     'meaning' => ':title (:count):',
     'meaning_one' => ':title:',
     'near' => 'לא מצאתי :subject. הכי קרוב שיש: :title.',
+    'none' => 'לא מצאתי בחנות :subject.',
     'focus' => 'רוצים לצמצם?',
 ];

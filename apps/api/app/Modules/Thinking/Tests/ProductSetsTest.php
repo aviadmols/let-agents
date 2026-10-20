@@ -160,6 +160,20 @@ final class ProductSetsTest extends TestCase
         $this->assertTrue($result['set']['near']);
         $this->assertSame(__('thinking::sets.near', ['subject' => 'ספר מדע בדיוני', 'title' => 'ספרות אימה קלאסית']), $result['answer']);
         $this->assertSame('near', $this->calls[1]['user']['chosen'][0]['as']);
+        $this->assertStringContainsString('טרנסילבניה', $this->calls[1]['user']['chosen'][0]['text'], 'the checker reads it whole');
+    }
+
+    public function test_a_store_with_none_of_it_says_so_and_offers_the_team(): void
+    {
+        $this->books();
+
+        $result = $this->ask('איזה ספרי בישול יש לכם?');
+
+        $this->assertSame('no_info', $result['outcome']);
+        $this->assertSame(__('thinking::sets.none', ['subject' => 'ספרי בישול']), $result['not_found']);
+        $this->assertArrayHasKey('no_answer', $result);
+        $this->assertFalse($this->calls[0]['user']['candidates'][0]['says']);
+        $this->assertCount(1, $this->calls, 'nothing chosen: nothing to check');
     }
 
     public function test_a_broad_request_in_a_jewellery_store_asks_one_question_the_checker_let_through(): void

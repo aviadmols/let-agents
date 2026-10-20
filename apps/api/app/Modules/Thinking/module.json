@@ -30,7 +30,7 @@
         { "name": "max_set", "type": "int", "default": 120, "min": 10, "max": 500, "scope": "shop", "unit": "products" },
         { "name": "generic_percent", "type": "int", "default": 40, "min": 10, "max": 90, "scope": "global", "unit": "percent" },
         { "name": "whole_catalog_max", "type": "int", "default": 300, "min": 0, "max": 1000, "scope": "shop", "unit": "products" },
-        { "name": "whole_catalog_chars", "type": "int", "default": 160, "min": 0, "max": 600, "scope": "global", "unit": "characters" },
+        { "name": "whole_catalog_chars", "type": "int", "default": 80, "min": 0, "max": 600, "scope": "global", "unit": "characters" },
         { "name": "focus_over", "type": "int", "default": 24, "min": 6, "max": 500, "scope": "shop", "unit": "products" }
     ],
     "agents": [

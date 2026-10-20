@@ -2167,8 +2167,14 @@ final class AnswerSiteQuestion
 
         $found = app(ProductSets::class)->find($shopId, $question, $locale, fn (): bool => $this->withinDailyLimits($shopId, $visitorHash));
 
-        if ($found === null || $found['ids'] === []) {
+        if ($found === null) {
             return null;
+        }
+
+        // the store was looked through and has none of it, nor anything close: said so, with what the
+        // store offers instead of an answer (the team, leaving details), as any "not found"
+        if ($found['ids'] === []) {
+            return $this->fixed('no_info', $locale, $found['from']) + ['not_found' => $found['answer']];
         }
 
         return [

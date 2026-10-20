@@ -59,7 +59,7 @@ final class FindProductSet implements ProductSets
     public const ACTION = 'thinking.find_set';
 
     /** find_set and check_set */
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     /** Products a word is looked for in, at most, before code reads them. */
     private const LOOKED_AT = 400;
@@ -87,6 +87,9 @@ final class FindProductSet implements ProductSets
 
     /** @var array<string, array<string, list<string>>> product id => key => values the scan learned (learn()) */
     private array $facts = [];
+
+    /** @var array<string, true> external ids of the candidates whose own words hold the subject's (candidates()) */
+    private array $says = [];
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -320,7 +323,9 @@ final class FindProductSet implements ProductSets
             $title = trim((string) $saved->near_title) !== '' ? (string) $saved->near_title : $subject;
             $answer = __('thinking::sets.near', ['subject' => $subject, 'title' => $title], $locale);
         } else {
-            return null;
+            // looked through and none is what was asked, nor close: said so, with no products
+            $title = $subject;
+            $answer = __('thinking::sets.none', ['subject' => $subject], $locale);
         }
 
         return [
@@ -362,6 +367,7 @@ final class FindProductSet implements ProductSets
 
         $found = $query->orderBy('id')->get()->keyBy('external_id');
         $this->learn($found);
+        $this->says = [];
         $scores = [];
 
         foreach ($found as $id => $product) {
@@ -372,6 +378,9 @@ final class FindProductSet implements ProductSets
             foreach ($meant as $word) {
                 $stems = Words::stems($word);
                 $scores[$id] += Words::has($title, $stems) ? self::TITLE_SCORE : (Words::has($groups, $stems) ? self::GROUP_SCORE : (Words::has($text, $stems) ? self::DESCRIPTION_SCORE : 0));
+            }
+            if ($scores[$id] > 0) {
+                $this->says[(string) $id] = true;
             }
         }
 
@@ -430,12 +439,19 @@ final class FindProductSet implements ProductSets
                     return;
                 }
 
-                $chars = (int) Settings::get($whole ? 'thinking.whole_catalog_chars' : 'thinking.candidate_chars');
+                $chars = (int) Settings::get('thinking.candidate_chars');
                 $byRef = [];
                 $items = [];
+                $full = [];
                 foreach ($candidates->values() as $i => $product) {
                     $byRef[$ref = 'c'.($i + 1)] = $product;
-                    $items[$ref] = ['id' => $ref, 'title' => $product->title, 'groups' => $this->groups($product), 'attributes' => $this->fields($product), 'text' => $this->excerpt($product, $subject, $chars)];
+                    // in a whole store, only those whose words hold the subject carry their description in
+                    // full; the rest its opening (thinking.whole_catalog_chars), so the model reads the store
+                    // by its titles, groups and fields, not a wall of text
+                    $says = isset($this->says[(string) $product->external_id]);
+                    $full[$ref] = $this->excerpt($product, $subject, $chars);
+                    $items[$ref] = ['id' => $ref, 'title' => $product->title, 'groups' => $this->groups($product), 'attributes' => $this->fields($product), 'says' => $says,
+                        'text' => $says || ! $whole ? $full[$ref] : mb_substr($full[$ref], 0, (int) Settings::get('thinking.whole_catalog_chars'))];
                 }
 
                 $picked = $this->call($run, 'find_set', 'picker', $picker, ['request' => $question, 'subject' => $subject, 'candidates' => array_values($items)]);
@@ -446,6 +462,7 @@ final class FindProductSet implements ProductSets
                 $refs = fn (string $field, int $max): array => array_slice(array_values(array_unique(array_filter(array_map('strval', (array) ($picked->data[$field] ?? [])), fn (string $r): bool => isset($byRef[$r])))), 0, $max);
                 $matches = $refs('matches', count($byRef));
                 $near = $matches === [] ? $refs('near', self::MAX_NEAR) : [];
+                $picks = count($matches) + count($near);
                 $title = self::line($picked->data['title'] ?? '', 80);
                 $nearTitle = self::line($picked->data['near_title'] ?? '', 80);
                 $ask = $matches === [] ? null : self::ask((array) ($picked->data['ask'] ?? []));
@@ -454,7 +471,8 @@ final class FindProductSet implements ProductSets
                 if ($matches !== [] || $near !== []) {
                     $chosen = [];
                     foreach ([...array_fill_keys($matches, 'match'), ...array_fill_keys($near, 'near')] as $ref => $as) {
-                        $chosen[] = $items[$ref] + ['as' => $as];
+                        // the checker reads each chosen product's description whole, whatever the picker was shown
+                        $chosen[] = ['text' => $full[$ref], 'as' => $as] + array_diff_key($items[$ref], ['says' => true]);
                     }
                     $checked = $this->call($run, 'check_set', 'checker', $checker, ['request' => $question, 'subject' => $subject, 'chosen' => $chosen, 'near_title' => $nearTitle, 'ask' => $ask ?? ['question' => '', 'options' => []]]);
                     if ($checked === null) {
@@ -480,7 +498,7 @@ final class FindProductSet implements ProductSets
                     'chosen_by' => $picker->provider->value.' · '.$picker->model.' / '.$checker->provider->value.' · '.$checker->model,
                     'run_id' => $run->runId,
                 ]);
-                $run->output(['subject' => $subject, 'candidates' => count($byRef), 'chosen' => count($matches), 'near' => count($near), 'asks' => $ask !== null, 'title' => $title]);
+                $run->output(['subject' => $subject, 'candidates' => count($byRef), 'picked' => $picks, 'chosen' => count($matches), 'near' => count($near), 'asks' => $ask !== null, 'title' => $title]);
             },
         );
 
