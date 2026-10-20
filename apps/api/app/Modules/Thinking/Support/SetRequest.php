@@ -37,25 +37,36 @@ final class SetRequest
     {
         $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(trim($question))) ?: [];
         $words = array_values(array_filter($words, fn (string $w): bool => $w !== ''));
+        // the words around the subject as they are read: a letter typed twice once ("איזזה" is "איזה")
+        $plain = array_map(self::once(...), $words);
 
-        $asks = array_intersect($words, self::SHOW) !== [] || array_intersect($words, self::ALL) !== []
-            || (in_array($words[0] ?? '', self::WHICH, true) && preg_match(self::HAVE, mb_strtolower($question)) === 1);
+        $asks = array_intersect($plain, self::SHOW) !== [] || array_intersect($plain, self::ALL) !== []
+            || (in_array($plain[0] ?? '', self::WHICH, true) && preg_match(self::HAVE, self::once(mb_strtolower($question))) === 1);
 
-        if (! $asks || array_intersect($words, self::OTHER) !== []) {
+        if (! $asks || array_intersect($plain, self::OTHER) !== []) {
             return null;
         }
 
-        $subject = array_values(array_filter($words, fn (string $w): bool => ! in_array($w, self::WRAP, true) && ! in_array($w, self::SHOW, true)));
+        $subject = array_values(array_filter($words, fn (string $w, int $i): bool => ! in_array($plain[$i], self::WRAP, true) && ! in_array($plain[$i], self::SHOW, true), ARRAY_FILTER_USE_BOTH));
 
         return $subject === [] || count($subject) > self::MAX_WORDS ? null : implode(' ', $subject);
     }
 
-    /** The subject as it is kept: its words sorted, so the same words in another order are the same set. */
+    /**
+     * The subject as it is kept: the core of each word, sorted, so the same words in another order or
+     * with the article are the same set ("ספרי החטופים", "ספרי חטופים").
+     */
     public static function key(string $subject): string
     {
-        $words = Words::of($subject);
+        $words = array_map(Words::core(...), Words::of($subject));
         sort($words, SORT_STRING);
 
         return mb_substr(implode(' ', $words), 0, 191);
+    }
+
+    /** A word with a Hebrew letter typed twice in a row typed once (English doubles its letters: "all"). */
+    private static function once(string $text): string
+    {
+        return (string) preg_replace('/(\p{Hebrew})\1+/u', '$1', $text);
     }
 }

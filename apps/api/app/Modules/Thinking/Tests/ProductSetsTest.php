@@ -74,6 +74,8 @@ final class ProductSetsTest extends TestCase
         $this->assertSame('ספרי החטופים', SetRequest::subject('תן לי את כל ספרי החטופים'));
         $this->assertSame('ספריית שיבולת', SetRequest::subject('תציג לי את ספריית שיבולת?'));
         $this->assertSame('ספר מדע בדיוני', SetRequest::subject('איזה ספר מדע בדיוני יש לכם?'));
+        $this->assertSame('ספרי חטופים', SetRequest::subject('איזזה ספרי חטופים יש לכם?'), 'a letter typed twice');
+        $this->assertSame(SetRequest::key('ספרי החטופים'), SetRequest::key('חטופים ספרי'), 'the article and the order aside, one set');
         $this->assertSame('dresses', SetRequest::subject('show me all the dresses'));
         $this->assertSame('linen dresses', SetRequest::subject('which linen dresses do you have?'));
         $this->assertNull(SetRequest::subject('על מה הספר החטוף?'), 'a question about one book');
