@@ -172,9 +172,9 @@ final class BuildSearchIndex
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
         // Their values are words of the products either way: "הספר של עומר שם טוב" finds his book, whose title does not say him.
         $apart = $facets['facets'];
-        $fields = Features::enabled('search.field_filters', $shopId) ? $this->fieldFacets($facets['facets'], $shopId) : [];
+        $fields = Features::enabled('search.field_filters', $shopId) ? $this->fieldFacets($facets['facets'], $shopId, $facets['products']) : [];
         if (! Features::enabled('search.field_filters', $shopId)) {
-            $this->fieldFacets($apart, $shopId);
+            $this->fieldFacets($apart, $shopId, $facets['products']);
         }
         // What the scan learned each product is and is for, in words: found by them, before the long lists.
         $learned = $this->learnedWords($this->locale($shopId));
@@ -575,13 +575,22 @@ final class BuildSearchIndex
      * the most used first. Read from the words too: "ספרים של תומס סואל" picks his.
      *
      * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     *                                                                                           A field named like a filter the scan already made (its "מחבר" from what it read, on 18 books) takes its place
+     *                                                                                           when the field says it for more products (196): that filter is left without values.
+     * @param  array<string, array<string, mixed>>  $read  the scan's facts by product (their codes in "f")
      * @return array<string, list<int>> the codes of each product's values, by product id
      */
-    private function fieldFacets(array &$facets, string $shopId): array
+    private function fieldFacets(array &$facets, string $shopId, array $read = []): array
     {
         $minShare = (int) Settings::get('search.field_filter_min_percent', $shopId) / 100;
         $maxValues = min(999, (int) Settings::get('search.field_filter_max_values', $shopId));
         $named = array_map(fn (array $f): string => mb_strtolower($f['l']), $facets);
+        $covered = [];
+        foreach ($read as $productId => $facts) {
+            foreach ((array) ($facts['f'] ?? []) as $code) {
+                $covered[intdiv((int) $code, 1000)][(string) $productId] = true;
+            }
+        }
         $this->fieldValues = [];
         $fields = [];
         $total = 0;
@@ -613,8 +622,16 @@ final class BuildSearchIndex
             // A yes or no ("true", "כן") says how the store keeps it, not what the shopper chooses between.
             $yesNo = array_diff(array_map('mb_strtolower', array_keys($counts)), ['yes', 'no', 'true', 'false', 'כן', 'לא', 'on', 'off']) === [];
             if ($yesNo || $total === 0 || count($byProduct) / $total < $minShare || count($counts) < 2 || count($counts) > $maxValues
-                || count($counts) > count($byProduct) * self::FIELD_MAX_DISTINCT || in_array(mb_strtolower($key), $named, true)) {
+                || count($counts) > count($byProduct) * self::FIELD_MAX_DISTINCT) {
                 continue;
+            }
+
+            $same = array_search(mb_strtolower($key), $named, true);
+            if ($same !== false) {
+                if (count($covered[$same] ?? []) >= count($byProduct)) {
+                    continue;
+                }
+                $facets[$same]['v'] = [];
             }
 
             $at = count($facets);

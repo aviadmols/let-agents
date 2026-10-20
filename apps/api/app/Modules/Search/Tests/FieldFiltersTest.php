@@ -62,6 +62,30 @@ final class FieldFiltersTest extends TestCase
         $this->assertSame(['3'], $this->found($shop, 'ספר של תומס סואל'), 'off: still words of the book');
     }
 
+    public function test_a_store_field_takes_the_place_of_a_filter_of_its_name_that_says_less(): void
+    {
+        // Sela: the scan's own "מחבר" filter came from what it read, on 18 books; the store's field is on 196.
+        $shop = Shop::factory()->create(['content_locale' => 'he']);
+        $ids = app(TenantContext::class)->run($shop->id, function () use ($shop): array {
+            $ids = [];
+            foreach (['1' => 'תומס סואל', '2' => 'תומס סואל', '3' => 'דאגלס מאריי'] as $id => $author) {
+                $ids[] = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => 'ספר '.$id, 'url' => "https://b.test/p/$id", 'price' => 80, 'in_stock' => true, 'purchasable' => true, 'hash' => "h$id", 'payload' => ['meta' => ['מחבר' => $author]]])->id;
+            }
+
+            return $ids;
+        });
+        $facets = [['k' => 'author', 'l' => 'מחבר', 'v' => [['k' => 'sowell', 'l' => 'תומס סואל']]]];
+        $build = new \ReflectionMethod(BuildSearchIndex::class, 'fieldFacets');
+
+        $codes = app(TenantContext::class)->run($shop->id, function () use ($build, &$facets, $shop, $ids): array {
+            return $build->invokeArgs(app(BuildSearchIndex::class), [&$facets, $shop->id, [$ids[0] => ['f' => [0]]]]);
+        });
+
+        $this->assertSame([], $facets[0]['v'], 'the filter the scan made, on one book, is left without values');
+        $this->assertSame('field:מחבר', $facets[1]['k']);
+        $this->assertSame([1000], $codes[$ids[0]]);
+    }
+
     /** @return list<string> */
     private function found(Shop $shop, string $query): array
     {
