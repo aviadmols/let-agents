@@ -73,8 +73,9 @@ final class Evaluation
         $all = TaxonomyAssignment::query()->get(['subject_type', 'status', 'source', 'checked', 'explicit']);
         $productsTagged = TaxonomySubject::query()->where('subject_type', TaxonomyAssignment::PRODUCT)->count();
         $products = CatalogProduct::query()->whereNull('removed_at')->count();
-        $assignRuns = Run::query()->where('action', AssignTags::ACTION)->where('status', 'succeeded')->get(['output', 'cost_usd']);
-        $bankRuns = Run::query()->whereIn('action', [BuildTagBank::ACTION, MergeTagProposals::ACTION])->get(['cost_usd']);
+        // this shop's runs only, of every kind: one that stopped half way paid for what it did
+        $assignRuns = Run::query()->where('shop_id', $shopId)->where('action', AssignTags::ACTION)->get(['output', 'cost_usd']);
+        $bankRuns = Run::query()->where('shop_id', $shopId)->whereIn('action', [BuildTagBank::ACTION, MergeTagProposals::ACTION])->get(['cost_usd']);
         $dropped = collect(['dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'unquoted'])->mapWithKeys(fn (string $k): array => [$k => (int) $assignRuns->sum(fn (Run $r): int => (int) ($r->output[$k] ?? 0))])->all();
         $given = max(1, $all->count() + array_sum(array_slice($dropped, 0, 3)));
         $assignCost = (float) $assignRuns->sum('cost_usd');
@@ -112,7 +113,9 @@ final class Evaluation
             'cost' => [
                 'bank_usd' => round((float) $bankRuns->sum('cost_usd'), 4),
                 'assign_usd' => round($assignCost, 4),
-                'per_product_usd' => $productsTagged === 0 ? null : round($assignCost / max(1, TaxonomySubject::query()->count()), 5),
+                // what a product or post cost to tag, from the runs that finished: their cost over what they tagged
+                'per_product_usd' => ($tagged = (int) $assignRuns->whereNotNull('cost_usd')->sum(fn (Run $r): int => (int) ($r->output['subjects'] ?? 0))) === 0
+                    ? null : round((float) $assignRuns->whereNotNull('cost_usd')->sum('cost_usd') / $tagged, 5),
             ],
         ];
     }
