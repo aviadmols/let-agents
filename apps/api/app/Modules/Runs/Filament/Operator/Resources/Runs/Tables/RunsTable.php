@@ -17,8 +17,9 @@ final class RunsTable
         return $table
             ->modifyQueryUsing(fn ($query) => $query->with('shop'))
             ->defaultSort('created_at', 'desc')
-            // Live: a run started by a button shows up, then finishes, without reloading.
-            ->poll('5s')
+            // Live: a run started by a button shows up, then finishes, without reloading. Not while a run is open beside
+            // the list: each poll drew it again, and what was opened in it (what was sent, what came back) closed.
+            ->poll(fn ($livewire): ?string => empty($livewire->mountedActions) ? '5s' : null)
             ->columns([
                 TextColumn::make('created_at')
                     ->label(__('runs::runs.fields.started_at'))

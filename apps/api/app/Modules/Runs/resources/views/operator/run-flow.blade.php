@@ -29,15 +29,15 @@
                         @if ($step['prompt'])<span dir="ltr">{{ $step['prompt'] }}</span>@endif
                     </div>
                     @if (filled($step['error']))<div style="color:#dc2626;font-size:12.5px;margin-top:4px" dir="ltr">{{ \Illuminate\Support\Str::limit($step['error'], 300) }}</div>@endif
-                    <details style="margin-top:6px">
+                    <details wire:ignore.self style="margin-top:6px">
                         <summary style="cursor:pointer;font-size:13px">{{ __('runs::flow.sent') }}</summary>
                         <pre style="{{ $box }}" dir="auto">{{ $step['sent'] }}</pre>
                     </details>
-                    <details style="margin-top:4px">
+                    <details wire:ignore.self style="margin-top:4px">
                         <summary style="cursor:pointer;font-size:13px">{{ __('runs::process.received') }}</summary>
                         <pre style="{{ $box }}" dir="auto">{{ $step['received'] ?? '—' }}</pre>
                     </details>
-                    <details style="margin-top:4px">
+                    <details wire:ignore.self style="margin-top:4px">
                         <summary style="cursor:pointer;font-size:13px">{{ __('runs::process.prompt') }}</summary>
                         <pre style="{{ $box }}" dir="ltr">{{ $step['system'] ?? '—' }}</pre>
                     </details>
