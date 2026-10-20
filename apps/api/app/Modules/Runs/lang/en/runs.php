@@ -15,7 +15,6 @@ return [
         'system' => 'Pipeline step',
     ],
     'fields' => [
-        'sent' => 'What the agent was sent',
         'started_at' => 'Started',
         'finished_at' => 'Finished',
         'status' => 'Status',
@@ -37,7 +36,6 @@ return [
         'output' => 'Output',
     ],
     'sections' => [
-        'calls' => 'What the agent was sent and returned',
         'overview' => 'Details',
         'result' => 'Result',
         'usage' => 'Model usage',
@@ -55,5 +53,4 @@ return [
         'heading' => 'No activity yet',
         'description' => 'Every agent action, such as a connection check or a model call, shows up here live.',
     ],
-    'calls_help' => 'Each model call of the run: what it was sent (for a search box answer: the question, the passages the vector search found, and the products), what came back, its instructions, tokens and time.',
 ];

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -46,6 +47,19 @@ final class RunScreensTest extends TestCase
             ->assertSee('gpt-5.4-mini')
             ->assertSee('מפגש עם עצמי בגיהינום')
             ->assertSee('You answer from the store pages.');
+
+        // As a flow: a search answer's code search, then the writer by what it does, with its own price.
+        $files = glob(app_path('Modules/Assistant/Prompts/answer_site.v*.md'));
+        $writer = (string) file_get_contents((string) end($files));
+        $answer = app(RecordsRuns::class)->track(agent: 'assistant.site_answerer', action: 'assistant.answer_site', shopId: $shop->id, input: ['question' => 'על מה הספר?'],
+            work: fn (RunContext $r) => $r->output(['context' => ['passages_found' => 9, 'passages_sent' => 4, 'products_shown' => 12, 'products_sent' => 3]]));
+        RunCall::query()->create(['run_id' => $answer->id, 'shop_id' => $shop->id, 'kind' => 'chat', 'provider' => 'openai', 'model' => 'gpt-5.4-mini', 'system' => $writer, 'sent' => '{}', 'received' => '{}', 'ok' => true, 'input_tokens' => 2251, 'output_tokens' => 226, 'duration_ms' => 2047]);
+        DB::table('ai_usage')->insert(['run_id' => $answer->id, 'shop_id' => $shop->id, 'agent' => 'assistant.site_answerer', 'action' => 'assistant.answer_site', 'provider' => 'openai', 'model' => 'gpt-5.4-mini', 'input_tokens' => 2251, 'output_tokens' => 226, 'cost_usd' => 0.004059, 'day' => now()->toDateString(), 'created_at' => now()]);
+        $this->get("/operator/runs/{$answer->id}")
+            ->assertOk()
+            ->assertSeeInOrder([__('runs::flow.found'), __('runs::prompts.assistant.answer_site')])
+            ->assertSee(__('runs::flow.found_detail', ['passages' => '9', 'passages_sent' => '4', 'products' => '12', 'products_sent' => '3']))
+            ->assertSee('$0.00406', false);
 
         foreach (['he', 'en'] as $locale) {
             $this->withHeader('Accept-Language', $locale)

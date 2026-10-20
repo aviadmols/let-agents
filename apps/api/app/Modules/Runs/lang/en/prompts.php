@@ -1,0 +1,72 @@
+<?php
+
+/*
+ * What each call to a model does, in a line, by the prompt it was sent (Module/Prompts/{name}.v{n}.md).
+ * For the operator's view of a run (RunFlow).
+ */
+return [
+    'assistant' => [
+        'answer' => 'Writes an answer to a question about one product, from its card only',
+        'answer_article' => 'Writes an answer to a question about a guide, from the guide only',
+        'answer_site' => 'Writes the answer to a search box question, from the pages and products the search found',
+        'own_fact_check' => 'Checks a line the store team wrote about the store against the store\'s text',
+        'post_facts' => 'Reads a page or post of the store and notes what it says about the store',
+        'post_facts_check' => 'Checks what was noted from the page or post before the assistant says it',
+        'retrieval_judge' => 'Marks which of the pieces found really answer the question',
+        'review_asks' => 'The daily report: scores each of yesterday\'s questions and writes a summary and improvements',
+        'scope' => 'Decides whether a question on a product page is about that product',
+        'scope_article' => 'Decides whether a question on a guide is about that guide',
+        'scope_site' => 'Decides whether the question is this store\'s to answer, and whether it asks for harm',
+        'similar_questions' => 'Writes other ways to ask the question, to search again when no answer was found',
+        'team_answer' => 'Writes a draft answer for the store team to a shopper\'s question',
+        'team_answer_check' => 'Checks the draft answer before the team reads it',
+        'verify' => 'Checks an answer about a product before the shopper sees it',
+        'verify_article' => 'Checks an answer about a guide before the reader sees it',
+        'verify_site' => 'Checks the answer and the products picked before the shopper sees them: approves, fixes or rejects',
+        'writer_judge' => 'Compares several answers to one question and picks the best',
+    ],
+    'enrichment' => [
+        'audit_article' => 'Checks whether code read an article properly and what it missed',
+        'colour_names' => 'Places the store\'s colour names among fixed shades, for the colour filter',
+        'colour_names_check' => 'Checks where the colour names were placed',
+        'content_mapping' => 'Decides how the assistant may use each of the store\'s articles',
+        'fact_review' => 'Checks claims about a product or article against its own text',
+        'picture_value' => 'Looks at a product photo and picks one detail of how it looks',
+        'product_extraction' => 'Tags products by the store\'s structure, where code could not decide',
+        'product_highlights' => 'Writes what is worth knowing about a product, from its own text',
+        'product_summary' => 'Writes a short description of a product for the search',
+        'propose_rules' => 'Suggests changes to code\'s reading rules from what it missed',
+        'review_rules' => 'Checks whether a proposed change to the reading rules is good',
+        'schema_review' => 'Reviews the store\'s structure (kinds of products and what to know) another model wrote',
+        'schema_revise' => 'Fixes the store\'s structure from what the reviewer found',
+        'schema_writer' => 'Writes the store\'s structure: the kinds of products and what a buyer needs to know of each',
+        'section_questions' => 'Writes the questions a section of a page or post answers, for the search',
+        'web_researcher' => 'Searches the web for what the maker and sellers say about a product',
+        'web_verifier' => 'Checks that what was found on the web is about the very same product',
+    ],
+    'improvement' => [
+        'answer' => 'Writes an answer to a question shoppers keep asking, to publish on the site',
+        'answer_check' => 'Checks the answer before the team reads it',
+        'audit' => 'Checks the proposals to improve the site against what shoppers looked for',
+        'post' => 'Writes a blog guide about something shoppers look for and no page covers',
+        'post_check' => 'Checks the guide before the team sees it',
+        'review' => 'Reviews the store\'s day and proposes changes to the site',
+    ],
+    'leads' => [
+        'review_cta' => 'Scores lines that invite a reader to talk to the store',
+        'write_cta' => 'Writes a line that invites the reader to talk to the store',
+    ],
+    'retrieval' => [
+        'caption' => 'Describes how a product looks in its photo, to find it by search',
+        'match' => 'Chooses which products to show next to a product',
+    ],
+    'search' => [
+        'photo_rank' => 'Compares the shopper\'s photo with the store\'s products and orders them',
+        'photo_second_look' => 'A careful second look at the shopper\'s photo when the first reading was not enough',
+        'photo_tags' => 'Says what the shopper photographed',
+        'resolve' => 'Decides what the shopper looked for when the search found nothing',
+        'resolve_check' => 'Checks the decision of what the shopper looked for',
+        'tags' => 'Writes "you may also want to see" tags for the store\'s pages',
+        'tags_check' => 'Checks the tags and the results they bring',
+    ],
+];
