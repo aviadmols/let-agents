@@ -296,7 +296,9 @@ final class FindProductSet implements ProductSets
         $ids = $candidates->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
         $hashes = $candidates->mapWithKeys(fn (CatalogProduct $p): array => [(string) $p->external_id => $p->hash])->all();
         ksort($hashes, SORT_STRING);
-        $fingerprint = hash('sha256', (string) json_encode([self::PROMPT_VERSION, $key, $hashes]));
+        // what the set was chosen from and by: the products, the prompts' version and the two models
+        $models = [Settings::get('thinking.picker_model'), Settings::get('thinking.checker_model')];
+        $fingerprint = hash('sha256', (string) json_encode([self::PROMPT_VERSION, $models, $key, $hashes]));
         $saved = ProductSet::query()->where('subject_key', $key)->first();
         $from = 'bank';
 

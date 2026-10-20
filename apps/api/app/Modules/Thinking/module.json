@@ -17,9 +17,9 @@
     ],
     "settings": [
         { "name": "picker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
-        { "name": "picker_model", "type": "string", "default": "gpt-5.4-mini", "min": 1, "max": 120, "scope": "global" },
-        { "name": "picker_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
-        { "name": "picker_output_usd_per_million", "type": "float", "default": 8, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "picker_model", "type": "string", "default": "gpt-5.4", "min": 1, "max": 120, "scope": "global" },
+        { "name": "picker_input_usd_per_million", "type": "float", "default": 2.5, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "picker_output_usd_per_million", "type": "float", "default": 15, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
         { "name": "checker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
         { "name": "checker_model", "type": "string", "default": "claude-haiku-4-5", "min": 1, "max": 120, "scope": "global" },
         { "name": "checker_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
