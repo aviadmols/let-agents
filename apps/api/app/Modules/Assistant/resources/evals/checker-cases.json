@@ -2,6 +2,22 @@
     "_about": "Cases for the answer check (assistant:checker-compare): a question, what the answer was written from, the answer, and what should come of it. expect: keep (the answer stands, maybe reworded), fix (it stands without the words in gone), reject (nothing stands); drop: picks that must go; keep_picks: picks that must stay. Across stores: books, jewellery, building, fashion, food, electronics.",
     "cases": [
         {
+            "id": "books-title-names-the-subject",
+            "question": "איזה ספר יש על שכול?",
+            "passages": [{"title": "שמאל ימין שכול", "text": "שמאל ימין שכול הוא מסמך ישראלי יוצא דופן, אמיץ ומרגש. בתקופה בה נדמה שהשסע הפוליטי מאיים להכריע אותנו, הספר מכריח את הקורא משני צידי המפה הפוליטית להטות אוזן, לפתוח את הלב, ולקבל את הנחת היסוד של המחברים: על אף המחלוקות והדרכים השונות – הם ימשיכו לאחוז בהערכה, בכבוד ההדדי ובקשר ביניהם.\nנושא: גבורה ותקומה אחרי 7.10"}],
+            "picks": [],
+            "answer": "הספר שמתאים לשכול הוא \"שמאל ימין שכול\". זהו מסמך ישראלי על השסע הפוליטי ועל הקשר בין המחברים, והוא מוגדר גם כ\"גבורה ותקומה אחרי 7.10\".",
+            "expect": "keep"
+        },
+        {
+            "id": "books-guidance-offer",
+            "question": "איזה ספר הכי מומלץ?",
+            "passages": [{"title": "מנויים", "text": "מנויי שיבולת מקבלים 2 ספרי מופת מתורגמים בכל רבעון, עד הבית, לפני כולם."}],
+            "picks": [],
+            "answer": "אין ספר אחד שהחנות ממליצה עליו מעל כולם. מנויי שיבולת מקבלים שני ספרי מופת מתורגמים בכל רבעון. אפשר לחפש לפי נושא שמעניין אותך, וצוות החנות ישמח לעזור לבחור.",
+            "expect": "keep"
+        },
+        {
             "id": "books-summary-free-words",
             "question": "ספר המדינה שבדרך, על מה הוא?",
             "passages": [
