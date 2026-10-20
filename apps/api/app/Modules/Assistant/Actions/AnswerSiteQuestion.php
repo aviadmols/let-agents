@@ -1313,7 +1313,8 @@ final class AnswerSiteQuestion
     {
         ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'forModel' => $forModel] = $prepared;
         $answer = self::withoutRefs(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS));
-        $cited = array_values(array_unique(array_filter(array_map('strval', (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
+        // a ref as a writer gives it: "s1", or now and then {"ref": "s1"}
+        $cited = array_values(array_unique(array_filter(array_map(fn ($ref): string => is_array($ref) ? (string) ($ref['ref'] ?? $ref['id'] ?? '') : (string) $ref, (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
         $picks = $this->picks((array) ($data['picks'] ?? []), $productsByRef);
         // About the product the question named, from its own description, citing nothing: that product is what it rests on.
         if ($cited === [] && $picks === [] && $this->namedTitles !== [] && isset($productsByRef['p1']) && trim((string) ($data['answer'] ?? '')) !== '') {

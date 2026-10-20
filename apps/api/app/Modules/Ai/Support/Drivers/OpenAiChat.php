@@ -16,6 +16,11 @@ final class OpenAiChat implements StructuredChatDriver, VisionDriver
 {
     private const TIMEOUT_SECONDS = 45.0;
 
+    /** A reply allowed many tokens (a store's tag bank reviewed, products tagged) is given longer: this many tokens a second, up to MAX_TIMEOUT_SECONDS. */
+    private const TOKENS_PER_SECOND = 40;
+
+    private const MAX_TIMEOUT_SECONDS = 300.0;
+
     public function provider(): AiProviderName
     {
         return AiProviderName::OpenAi;
@@ -48,7 +53,8 @@ final class OpenAiChat implements StructuredChatDriver, VisionDriver
         try {
             $response = OpenAI::factory()
                 ->withApiKey($apiKey)
-                ->withHttpClient(new Client(['timeout' => self::TIMEOUT_SECONDS, 'connect_timeout' => 10]))
+                // a short reply (a shopper's answer, up to 1,800 tokens) waits as it did; a long one, background work, longer
+                ->withHttpClient(new Client(['timeout' => min(self::MAX_TIMEOUT_SECONDS, max(self::TIMEOUT_SECONDS, $maxOutputTokens / self::TOKENS_PER_SECOND)), 'connect_timeout' => 10]))
                 ->make()
                 ->chat()
                 ->create(array_filter([
