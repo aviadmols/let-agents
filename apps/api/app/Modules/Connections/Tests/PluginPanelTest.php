@@ -88,6 +88,23 @@ final class PluginPanelTest extends TestCase
         $this->assertNull($plain->getCookie($name.'_framed', false));
     }
 
+    public function test_a_sign_in_in_the_frame_never_reaches_the_next_request(): void
+    {
+        // Under Octane one session store serves every request and is emptied as each begins (FlushSessionState).
+        // A sign-in in the frame once went into a store apart from the one emptied, and every request after it,
+        // anonymous ones too, was signed in as that person.
+        $this->withHeader('Sec-Fetch-Dest', 'iframe')->get((string) parse_url($this->ask()->json('url'), PHP_URL_PATH))->assertRedirect();
+        $this->assertSame(app('session')->driver(), app('session.store'), 'the frame used the shared store, under its own name');
+
+        $this->flushHeaders();
+        app('session')->driver()->flush();
+        app('session')->driver()->regenerate();
+        app('auth')->forgetGuards();
+
+        $this->assertFalse(auth()->check());
+        $this->get(route('filament.merchant.pages.overview', ['tenant' => $this->shop->slug]))->assertRedirect();
+    }
+
     public function test_the_sign_in_is_on_the_shops_own_panel_host(): void
     {
         // Each shop's panel on its own address (gueta.agents.lets.co.il): signed in there, not on another host,
