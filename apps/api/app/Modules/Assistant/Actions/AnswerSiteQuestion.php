@@ -874,7 +874,7 @@ final class AnswerSiteQuestion
         $lines = null;
 
         $this->runs->track(
-            agent: self::AGENT,
+            agent: $forShopper ? self::AGENT : PrepareStoreAnswers::AGENT,
             action: self::SIMILAR_ACTION,
             shopId: $shopId,
             trigger: RunTrigger::Webhook,
@@ -945,7 +945,7 @@ final class AnswerSiteQuestion
         $corrected = null;
 
         $run = $this->runs->track(
-            agent: self::AGENT,
+            agent: $forShopper ? self::AGENT : PrepareStoreAnswers::AGENT,
             action: self::ACTION,
             shopId: $shopId,
             trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,

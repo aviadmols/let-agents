@@ -16,6 +16,13 @@ return [
     'by_model' => 'By model',
     'by_agent' => 'By agent (what it went to)',
     'by_day' => 'Day by day',
+    'by_day_about' => 'Purple is background work, blue is answering shoppers.',
+    'sides' => [
+        'background' => 'Background work',
+        'background_about' => 'Reading the catalog and pictures, tagging, learning and the day\'s conclusions. Runs at night or on request, never in front of a shopper.',
+        'live' => 'Answering shoppers',
+        'live_about' => 'The chat, sets of products, search by photo and search queries: everything that happens when a shopper asks now.',
+    ],
     'tiles' => [
         'cost' => 'Total cost',
         'input' => 'Input tokens',
@@ -31,6 +38,8 @@ return [
         'input' => 'Input',
         'output' => 'Output',
         'cache' => 'Cache',
+        'background' => 'Background',
+        'live' => 'Answering shoppers',
         'tokens' => 'Tokens',
         'cost' => 'Cost',
     ],

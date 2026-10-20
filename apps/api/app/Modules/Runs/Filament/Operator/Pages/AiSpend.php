@@ -3,6 +3,7 @@
 namespace App\Modules\Runs\Filament\Operator\Pages;
 
 use App\Modules\Runs\Models\Run;
+use App\Modules\Runs\Support\LiveAgents;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -17,7 +18,8 @@ use UnitEnum;
 /**
  * What every shop spent on models, for the operator only: tokens and dollars by shop, by model
  * and by agent, day by day, for a month or a range of days. Read from the ledger, where every
- * model call is one row.
+ * model call is one row. Split in two: answering shoppers now (the agents declared "live") and the
+ * work in the background (reading the catalog, tagging, learning, the day's conclusions).
  */
 final class AiSpend extends Page
 {
@@ -112,6 +114,21 @@ final class AiSpend extends Page
         return ['cost' => (float) ($row->cost ?? 0), 'input' => (int) ($row->input ?? 0), 'output' => (int) ($row->output ?? 0), 'cache' => (int) ($row->cache ?? 0), 'calls' => (int) ($row->calls ?? 0)];
     }
 
+    /** @return array<string, array{cost: float, calls: int, tokens: int}> live (answering shoppers) and background */
+    public function split(): array
+    {
+        $out = ['background' => ['cost' => 0.0, 'calls' => 0, 'tokens' => 0], 'live' => ['cost' => 0.0, 'calls' => 0, 'tokens' => 0]];
+
+        foreach ($this->ledger()->selectRaw('agent, count(*) as calls, sum(input_tokens) + sum(output_tokens) as tokens, sum(cost_usd) as cost')->groupBy('agent')->get() as $row) {
+            $side = LiveAgents::is($row->agent) ? 'live' : 'background';
+            $out[$side]['cost'] += (float) $row->cost;
+            $out[$side]['calls'] += (int) $row->calls;
+            $out[$side]['tokens'] += (int) $row->tokens;
+        }
+
+        return $out;
+    }
+
     /** @return Collection<int, object> each shop's spend, the most first, with its models */
     public function byShop(): Collection
     {
@@ -119,11 +136,15 @@ final class AiSpend extends Page
         $models = $this->ledger()
             ->selectRaw('shop_id, provider, model, count(*) as calls, sum(input_tokens) as input, sum(output_tokens) as output, sum(cost_usd) as cost')
             ->groupBy('shop_id', 'provider', 'model')->orderByDesc('cost')->get()->groupBy('shop_id');
+        $live = $this->ledger()->whereIn('agent', LiveAgents::keys())
+            ->selectRaw('shop_id, sum(cost_usd) as cost')->groupBy('shop_id')->get()->keyBy(fn (object $r): string => (string) $r->shop_id);
 
         return $this->ledger()
             ->selectRaw('shop_id, count(*) as calls, sum(input_tokens) as input, sum(output_tokens) as output, sum(cache_read_tokens) as cache, sum(cost_usd) as cost')
             ->groupBy('shop_id')->orderByDesc('cost')->get()
-            ->map(function (object $row) use ($names, $models): object {
+            ->map(function (object $row) use ($names, $models, $live): object {
+                $row->live = (float) ($live[(string) $row->shop_id]->cost ?? 0);
+                $row->background = (float) $row->cost - $row->live;
                 $row->name = $row->shop_id === null ? __('runs::spend.platform') : ($names[$row->shop_id] ?? __('runs::spend.deleted'));
                 $row->models = $models->get($row->shop_id ?? '', collect());
 
@@ -139,7 +160,7 @@ final class AiSpend extends Page
             ->groupBy('provider', 'model')->orderByDesc('cost')->get();
     }
 
-    /** @return Collection<int, object> what the money went to */
+    /** @return Collection<int, object> what the money went to, answering shoppers first, then the background */
     public function byAgent(): Collection
     {
         return $this->ledger()
@@ -147,9 +168,11 @@ final class AiSpend extends Page
             ->groupBy('agent')->orderByDesc('cost')->get()
             ->map(function (object $row): object {
                 $row->label = Run::labelFor('agents', (string) $row->agent);
+                $row->live = LiveAgents::is($row->agent);
 
                 return $row;
-            });
+            })
+            ->sortBy(fn (object $row): int => $row->live ? 0 : 1)->values();
     }
 
     /** @return Collection<int, object> every day in the range, a day without spend at zero */
@@ -159,11 +182,13 @@ final class AiSpend extends Page
         $spent = $this->ledger()
             ->selectRaw('day, sum(input_tokens) + sum(output_tokens) as tokens, sum(cost_usd) as cost')
             ->groupBy('day')->get()->keyBy(fn (object $r): string => substr((string) $r->day, 0, 10));
+        $live = $this->ledger()->whereIn('agent', LiveAgents::keys())
+            ->selectRaw('day, sum(cost_usd) as cost')->groupBy('day')->get()->keyBy(fn (object $r): string => substr((string) $r->day, 0, 10));
         $days = collect();
 
         for ($day = Carbon::parse($from); $day->lte(Carbon::parse($to)); $day->addDay()) {
             $key = $day->toDateString();
-            $days->push((object) ['day' => $key, 'tokens' => (int) ($spent[$key]->tokens ?? 0), 'cost' => (float) ($spent[$key]->cost ?? 0)]);
+            $days->push((object) ['day' => $key, 'tokens' => (int) ($spent[$key]->tokens ?? 0), 'cost' => (float) ($spent[$key]->cost ?? 0), 'live' => (float) ($live[$key]->cost ?? 0)]);
         }
 
         return $days;

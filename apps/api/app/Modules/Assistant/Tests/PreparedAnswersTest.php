@@ -116,7 +116,7 @@ final class PreparedAnswersTest extends TestCase
         $this->replies = [['found' => true, 'answer' => 'כן, תוך 30 יום.', 'refs' => ['s1']], ['supported' => true, 'on_topic' => true, 'safe' => true], ['found' => false], ['found' => false]];
         app(PrepareStoreAnswers::class)->handle($this->shop->id);
         $this->assertSame('כן, תוך 30 יום.', $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->where('question', 'אפשר להחזיר או להחליף?')->sole()->answer));
-        $this->assertSame(1, Run::query()->where('agent', PrepareStoreAnswers::AGENT)->latest('id')->first()->output['answered']);
+        $this->assertSame(1, Run::query()->where('action', PrepareStoreAnswers::ACTION)->latest('id')->first()->output['answered']);
     }
 
     /** @return array<string, mixed> */

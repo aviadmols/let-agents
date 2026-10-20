@@ -67,6 +67,30 @@ final class AiSpendTest extends TestCase
         $this->actingAs($merchant)->get('/operator/ai-spend')->assertForbidden();
     }
 
+    public function test_answering_shoppers_is_counted_apart_from_the_work_in_the_background(): void
+    {
+        $shop = Shop::factory()->create(['name' => 'סלע מאיר']);
+        $row = fn (string $agent, float $cost): array => [
+            'shop_id' => $shop->id, 'agent' => $agent, 'action' => 'x', 'provider' => 'openai',
+            'model' => 'gpt-5.4-mini', 'input_tokens' => 1000, 'output_tokens' => 100, 'cache_read_tokens' => 0, 'cost_usd' => $cost, 'day' => '2026-10-05', 'created_at' => now(),
+        ];
+        DB::table('ai_usage')->insert([
+            $row('assistant.site_answerer', 0.30),
+            $row('thinking.set_finder', 0.20),
+            $row('taxonomy.tagger', 1.25),
+            $row('improvement.reviewer', 0.75),
+        ]);
+
+        $this->actingAs(User::factory()->operator()->create());
+
+        $page = $this->get('/operator/ai-spend?month=2026-10')->assertOk();
+        $html = $page->getContent();
+        $this->assertMatchesRegularExpression('/data-spend-side="background".*?\$2\.00/s', $html, 'tagging and the daily review');
+        $this->assertMatchesRegularExpression('/data-spend-side="live".*?\$0\.5000/s', $html, 'the chat and the sets');
+        $this->assertMatchesRegularExpression('/data-spend-agent="thinking.set_finder" data-spend-agent-side="live"/', $html);
+        $this->assertMatchesRegularExpression('/data-spend-agent="taxonomy.tagger" data-spend-agent-side="background"/', $html);
+    }
+
     public function test_the_operator_reads_every_call_with_its_model_and_cost_the_latest_first(): void
     {
         $gueta = Shop::factory()->create(['name' => 'גואטה']);
