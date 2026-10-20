@@ -45,7 +45,12 @@
         { "name": "keep_min_percent", "type": "int", "default": 60, "min": 0, "max": 100, "scope": "global", "unit": "percent" },
         { "name": "knowledge_min_percent", "type": "int", "default": 75, "min": 0, "max": 100, "scope": "global", "unit": "percent" },
         { "name": "audit_percent", "type": "int", "default": 100, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
-        { "name": "min_support", "type": "int", "default": 2, "min": 1, "max": 50, "scope": "shop", "unit": "items" }
+        { "name": "min_support", "type": "int", "default": 2, "min": 1, "max": 50, "scope": "shop", "unit": "items" },
+        { "name": "trust_inferred_percent", "type": "int", "default": 85, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "trust_picture_percent", "type": "int", "default": 80, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "trust_knowledge_percent", "type": "int", "default": 70, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "store_categories_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" },
+        { "name": "store_tags_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" }
     ],
     "agents": [
         {

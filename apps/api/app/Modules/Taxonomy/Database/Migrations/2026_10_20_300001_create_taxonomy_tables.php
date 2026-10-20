@@ -53,14 +53,20 @@ return new class extends Migration
             $table->json('words')->nullable(); // other words a shopper says for it, in either language
             $table->string('about', 300)->nullable();
             $table->string('status', 12)->default('active'); // active | merged | retired
-            $table->foreignUlid('merged_into')->nullable()->constrained('taxonomy_tags')->nullOnDelete();
+            $table->ulid('merged_into')->nullable();
             // the broader tag of the same group it is part of ("כלכלה התנהגותית" of "כלכלה")
-            $table->foreignUlid('parent_id')->nullable()->constrained('taxonomy_tags')->nullOnDelete();
+            $table->ulid('parent_id')->nullable();
             $table->unsignedInteger('version');
             $table->timestamps();
 
             $table->unique(['group_id', 'key']);
             $table->index(['shop_id', 'status']);
+        });
+
+        // a tag pointing at another tag: once the table and its key stand (Postgres refuses it before)
+        Schema::table('taxonomy_tags', function (Blueprint $table): void {
+            $table->foreign('merged_into')->references('id')->on('taxonomy_tags')->nullOnDelete();
+            $table->foreign('parent_id')->references('id')->on('taxonomy_tags')->nullOnDelete();
         });
 
         Schema::create('taxonomy_assignments', function (Blueprint $table): void {

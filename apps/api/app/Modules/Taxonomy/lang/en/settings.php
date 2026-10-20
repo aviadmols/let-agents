@@ -34,5 +34,10 @@ return [
     'keep_min_percent' => ['label' => 'Least confidence', 'description' => 'A tag the tagger is less sure of than this waits for review and is not used.'],
     'knowledge_min_percent' => ['label' => 'Least confidence from knowledge', 'description' => 'A tag that rests on what is widely known of a well-known product or work, not its text, needs at least this confidence.'],
     'audit_percent' => ['label' => 'Share of tagging checked', 'description' => 'What share of the calls a model of another family checks. In the pilot: all.'],
+    'trust_inferred_percent' => ['label' => 'Weight of a tag inferred from the text', 'description' => 'A tag the text justifies without saying it outright is worth this share of one said outright.'],
+    'trust_picture_percent' => ['label' => 'Weight of a tag from the picture', 'description' => 'A tag read from the picture is worth this share of one said outright.'],
+    'trust_knowledge_percent' => ['label' => 'Weight of a tag from knowledge', 'description' => 'A tag resting on what is known of a well-known work or product is worth this share of one said outright.'],
+    'store_categories_percent' => ['label' => 'Weight of the store\'s categories', 'description' => 'A category of the store counts as a tag of this weight (100 = a central tag said outright). One holding almost everything weighs almost nothing.'],
+    'store_tags_percent' => ['label' => 'Weight of the store\'s own tags', 'description' => 'A tag the store itself gave a product counts at this weight.'],
     'min_support' => ['label' => 'A proposed new tag', 'description' => 'A tag the bank lacks is weighed only once it was proposed for at least this many products.'],
 ];
