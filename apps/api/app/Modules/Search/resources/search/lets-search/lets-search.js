@@ -1446,10 +1446,18 @@
   function C(turn) { if (!turn.c || !turn.c.no) { turn.c = Object.assign(blankC(), turn.c || {}); } return turn.c; }
   function stem(w) { return w.replace(/^[והבלמשכ](?=[א-ת]{2})/, ''); }
   function wordsOf(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean); }
-  function says(text, label) {
-    var tw = wordsOf(text), lw = wordsOf(label);
-    if (!lw.length || lw.join('').length < 2) { return false; }
-    return lw.every(function (w) { return tw.some(function (x) { return x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w); }); });
+  function says(text, label) { return !!saidBy(text, label); }
+  // which typed words name the label, one for each of its words; null when one of them is not said
+  function saidBy(text, label) {
+    var tw = wordsOf(text), lw = wordsOf(label), used = [];
+    if (!lw.length || lw.join('').length < 2) { return null; }
+    var all = lw.every(function (w) {
+      var at = -1;
+      tw.some(function (x, i) { if (x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w)) { at = i; return true; } return false; });
+      if (at >= 0 && used.indexOf(at) === -1) { used.push(at); }
+      return at >= 0;
+    });
+    return all ? used : null;
   }
   // The same word as the search engine reads it, through a spelling slip: "לבין" is "לבן", "אדומה" is "אדום"
   // (its stem, or how it sounds once its look-alike letters are one). Short words must be exact.
@@ -1462,18 +1470,25 @@
     } catch (e) { return false; }
   }
   function readTags(turn) {
-    var c = C(turn), q = turn.q || '', all = (turn.ids || []).map(rec).filter(Boolean), counts = {}, best = {};
+    var c = C(turn), q = turn.q || '', all = (turn.ids || []).map(rec).filter(Boolean), counts = {}, best = {}, said = {};
     all.forEach(function (r) { (r.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; }); });
     Object.keys(counts).forEach(function (code) {
       var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
-      // a category is chosen by the shopper, never read from the words: "ברגים" finds screws outside the screws category too
-      if (!value || facet.k === 'category' || c.no[code] || /^(אחר|other)$/i.test(value.l) || !says(q, value.l)) { return; }
+      // a category of one word is chosen by the shopper, never read from the words: "ברגים" finds screws outside the
+      // screws category too. A name of several words, every one of them typed ("ספרי מופת מתורגמים"), is that category.
+      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l) || (facet.k === 'category' && wordsOf(value.l).length < 2)) { return; }
+      var by = saidBy(q, value.l);
+      if (!by) { return; }
       // one value name in several attributes ("שחור" as a colour and as a coating): the one most results carry
       var k = value.l.toLowerCase();
-      if (!best[k] || counts[code] > counts[best[k]]) { best[k] = code; }
+      if (!best[k] || counts[code] > counts[best[k]]) { best[k] = code; said[k] = by; }
     });
     c.auto = {};
-    Object.keys(best).forEach(function (k) { c.auto[best[k]] = true; });
+    // the most precise name wins: "ספר" is said within "ספרי מופת מתורגמים", so only the category is chosen
+    Object.keys(best).forEach(function (k) {
+      var within = Object.keys(best).some(function (o) { return o !== k && said[o].length > said[k].length && said[k].every(function (i) { return said[o].indexOf(i) >= 0; }); });
+      if (!within) { c.auto[best[k]] = true; }
+    });
     var acts = (turn.actions || []).map(function (a) { return a.id || a; });
     // in stock by default in every search (a pill the shopper can take off, and it stays off), unless nothing found is;
     // marked as read from the words only when the words said it
