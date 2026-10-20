@@ -110,7 +110,8 @@ final class JewelryVocabularyTest extends TestCase
     public function test_each_attribute_has_its_own_bar_for_what_a_picture_says(): void
     {
         $this->assertSame(0.92, $this->jewelry->imageFilterConfidence('stone'), 'a stone named wrong is the costliest mistake');
-        $this->assertSame(0.75, $this->jewelry->imageFilterConfidence('stone_color'));
+        $this->assertSame(0.7, $this->jewelry->imageFilterConfidence('stone_color'), 'a colour the picture shows filters at once');
+        $this->assertSame(VocabularyDefinition::COLOUR_IMAGE_FILTER_CONFIDENCE, VocabularyDefinition::fromTrusted(['attributes' => [['key' => 'color', 'type' => 'enum']]])->imageFilterConfidence('color'), 'any store\x27s colour, without a bar of its own');
         $this->assertSame(0.85, $this->jewelry->imageFilterConfidence(VocabularyDefinition::PRODUCT_TYPE));
         $this->assertSame(0.8, $this->jewelry->imageFilterConfidence('adjustable'), 'the vocabulary\x27s default');
 

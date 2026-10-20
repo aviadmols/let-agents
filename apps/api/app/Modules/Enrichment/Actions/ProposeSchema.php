@@ -364,8 +364,14 @@ final class ProposeSchema
                 $implied[NaturalColours::OF[$stone]] = true;
             }
         }
+        // How a product looks (a colour, a stone, a metal, a shape) the pictures show where the text does not: a
+        // value no title in the sample says is kept, or a red ruby would have no red to be found by.
+        $looks = $vocabulary === [] ? null : VocabularyDefinition::fromTrusted($vocabulary);
         $out = [];
         foreach ($coverage['attributes'] as $key => $attribute) {
+            if ($looks !== null && $looks->readFromImage((string) $key)) {
+                continue;
+            }
             $keeps = (string) $key === NaturalColours::COLOUR ? $implied : [];
             if ((float) $attribute['share'] === 0.0 && $keeps === []) {
                 if (isset($asked[(string) $key])) {

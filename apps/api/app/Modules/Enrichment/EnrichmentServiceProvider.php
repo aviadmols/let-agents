@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Enrichment\Actions\RereadPage;
+use App\Modules\Enrichment\Console\CompleteLooksCommand;
 use App\Modules\Enrichment\Console\EnrichmentCommand;
 use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
@@ -80,6 +81,7 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
     {
         return [
             EnrichmentCommand::class,
+            CompleteLooksCommand::class,
         ];
     }
 }

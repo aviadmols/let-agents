@@ -37,6 +37,12 @@ final class VocabularyDefinition
      */
     public const DEFAULT_IMAGE_FILTER_CONFIDENCE = 0.8;
 
+    /**
+     * A colour, as the picture's description says it ("שתי אבנים בצבע אדום"), filters at once: a colour is
+     * what a picture tells best, and a store's titles rarely say it ("רובי", never "אדום").
+     */
+    public const COLOUR_IMAGE_FILTER_CONFIDENCE = 0.7;
+
     /** The key `image.filter_confidence` uses for the product type, beside attribute keys and `default`. */
     public const PRODUCT_TYPE = 'product_type';
 
@@ -245,6 +251,10 @@ final class VocabularyDefinition
     public function imageFilterConfidence(string $key): float
     {
         $thresholds = (array) ($this->data['image']['filter_confidence'] ?? []);
+
+        if (! isset($thresholds[$key]) && preg_match('/(?:^|_)colou?rs?(?:$|_)/', $key) === 1) {
+            return self::COLOUR_IMAGE_FILTER_CONFIDENCE;
+        }
 
         return (float) ($thresholds[$key] ?? $thresholds['default'] ?? self::DEFAULT_IMAGE_FILTER_CONFIDENCE);
     }
