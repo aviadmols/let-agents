@@ -119,9 +119,11 @@ final class DiscoverSchema
             ? CatalogProduct::query()->active()
             : VocabularyBranch::products(VocabularyDefinition::fromTrusted(['root_category_external_id' => $branch['root'], 'product_types' => [], 'excluded_category_external_ids' => []]));
 
-        $products->select(['id', 'external_id', 'payload'])->orderBy('id')
-            ->chunk(500, function ($products) use (&$groups): void {
+        $marks = [];
+        $products->select(['id', 'external_id', 'type', 'in_stock', 'payload'])->orderBy('id')
+            ->chunk(500, function ($products) use (&$groups, &$marks): void {
                 foreach ($products as $product) {
+                    $marks[(string) $product->id] = [$product->kindMarks(), (bool) $product->in_stock];
                     $kind = trim((string) ($product->payload['product_type'] ?? ''));
                     if ($kind === '') {
                         $paths = $product->categoryPaths();
@@ -137,14 +139,22 @@ final class DiscoverSchema
         }
         unset($group);
 
-        // One from each kind in turn, until the sample is full.
-        $out = [];
+        // First the fewest products that show every kind there is: each category (its whole path, not only
+        // its root), each type and each set of choices. A lone ring among thirty necklaces is read too.
+        $out = CatalogProduct::cover($marks, $size)[0];
+        $taken = array_flip($out);
+
+        // Then one from each kind in turn, until the sample is full.
         for ($round = 0; count($out) < $size; $round++) {
             $added = false;
             foreach ($groups as $group) {
-                if (isset($group[$round])) {
+                if (! isset($group[$round])) {
+                    continue;
+                }
+                $added = true;
+                if (! isset($taken[$group[$round][1]])) {
                     $out[] = $group[$round][1];
-                    $added = true;
+                    $taken[$group[$round][1]] = true;
                     if (count($out) >= $size) {
                         break;
                     }

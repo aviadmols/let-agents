@@ -101,6 +101,24 @@ final class SchemaDiscoveryTest extends TestCase
         $this->assertSame(1, $this->inShop(fn () => EnrichmentSchemaProposal::query()->count()));
     }
 
+    public function test_a_lone_ring_among_many_necklaces_is_in_the_sample(): void
+    {
+        // All under one root ("תכשיטים"), no product type: by the root alone they are one kind, and a
+        // sample of four could be four necklaces. Its own category and its choices make the ring a kind.
+        foreach (range(10, 40) as $id) {
+            $this->product((string) $id, 'שרשרת '.$id, 'שרשרת זהב.', [], ['payload' => ['title' => 'שרשרת '.$id, 'categories' => [['path' => ['תכשיטים', 'שרשראות']]],
+                'attributes' => [['name' => 'אורך', 'values' => ['40', '45'], 'used_for_variations' => true]]]]);
+        }
+        $this->product('99', 'טבעת חותם', 'טבעת זהב.', [], ['payload' => ['title' => 'טבעת חותם', 'categories' => [['path' => ['תכשיטים', 'טבעות']]],
+            'attributes' => [['name' => 'מידת טבעת', 'values' => ['52', '54'], 'used_for_variations' => true]]]]);
+
+        $sample = app(DiscoverSchema::class)->handle($this->shop->id, 4)['proposal']->stats['sample'];
+
+        $ring = $this->inShop(fn () => CatalogProduct::query()->where('external_id', '99')->value('id'));
+        $this->assertContains((string) $ring, $sample);
+        $this->assertCount(4, $sample);
+    }
+
     public function test_the_proposal_is_written_checked_measured_and_reviewed_by_the_other_family(): void
     {
         $proposal = app(DiscoverSchema::class)->handle($this->shop->id)['proposal'];

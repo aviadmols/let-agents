@@ -164,6 +164,78 @@ class CatalogProduct extends Model
     }
 
     /**
+     * What makes this product another kind than its neighbours, for a sample that misses none: each
+     * category it is in (its whole path), its type in the store (simple, variable, a subscription),
+     * its product type (Shopify) and the set of choices it is sold with ("ring size", "length").
+     *
+     * @return list<string>
+     */
+    public function kindMarks(): array
+    {
+        $choices = array_map(fn (array $a): string => mb_strtolower(trim($a['name'])), array_filter($this->storeAttributes(), fn (array $a): bool => $a['for_variations']));
+        sort($choices);
+        $kind = trim((string) ($this->payload['product_type'] ?? ''));
+
+        return array_values(array_unique(array_filter([
+            'type:'.$this->type,
+            'choices:'.implode('+', $choices),
+            $kind === '' ? null : 'kind:'.mb_strtolower($kind),
+            ...array_map(fn (array $path): string => 'category:'.mb_strtolower(implode('/', $path)), $this->categoryPaths()),
+        ])));
+    }
+
+    /**
+     * The fewest products that between them show every kind (kindMarks), at most $max, in stock first
+     * among equals: ten necklaces show nothing of what a ring asks, one of each does.
+     *
+     * @param  iterable<CatalogProduct>  $products
+     * @return array{0: list<CatalogProduct>, 1: int} the products, and how many kinds they show
+     */
+    public static function spread(iterable $products, int $max): array
+    {
+        $marks = [];
+        $byId = [];
+        foreach ($products as $product) {
+            $marks[(string) $product->id] = [$product->kindMarks(), (bool) $product->in_stock];
+            $byId[(string) $product->id] = $product;
+        }
+        [$ids, $shown] = self::cover($marks, $max);
+
+        return [array_map(fn (string $id): CatalogProduct => $byId[$id], $ids), $shown];
+    }
+
+    /**
+     * spread() on the kinds alone, for a catalogue too large to hold: product id => [its kindMarks(), in stock].
+     *
+     * @param  array<string, array{0: list<string>, 1: bool}>  $marks
+     * @return array{0: list<string>, 1: int} the product ids, and how many kinds they show
+     */
+    public static function cover(array $marks, int $max): array
+    {
+        $own = array_map(fn (array $m): array => array_flip($m[0]), $marks);
+        $open = $own === [] ? [] : array_fill_keys(array_keys(array_merge(...array_values($own))), true);
+        $all = count($open);
+        $picked = [];
+
+        while ($open !== [] && count($picked) < $max) {
+            [$best, $bestGain] = [null, 0];
+            foreach ($own as $id => $kinds) {
+                $gain = isset($picked[$id]) ? 0 : count(array_intersect_key($kinds, $open)) * 2 + ($marks[$id][1] ? 1 : 0);
+                if ($gain > $bestGain) {
+                    [$best, $bestGain] = [(string) $id, $gain];
+                }
+            }
+            if ($best === null || $bestGain < 2) {
+                break;
+            }
+            $picked[$best] = true;
+            $open = array_diff_key($open, $own[$best]);
+        }
+
+        return [array_map('strval', array_keys($picked)), $all - count($open)];
+    }
+
+    /**
      * Attributes as the store holds them, one line each: "name: value, value".
      *
      * @return list<array{name: string, values: list<string>, for_variations: bool}>

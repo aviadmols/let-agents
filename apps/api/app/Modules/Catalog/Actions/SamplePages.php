@@ -15,7 +15,6 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Closure;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -61,7 +60,8 @@ final class SamplePages
         return $this->runs->track(agent: self::AGENT, action: self::ACTION, shopId: $shopId, trigger: $trigger, work: function (RunContext $run) use ($shopId): void {
             $this->tenant->run($shopId, function () use ($run, $shopId): void {
                 $shopify = StoreConnection::query()->value('platform') === 'shopify';
-                [$picked, $kinds] = self::pick(CatalogProduct::query()->active()->whereNotNull('url')->with('categories:id')->orderBy('id')->get(), (int) Settings::get('catalog.sample_pages_max', $shopId));
+                [$picked, $kinds] = CatalogProduct::spread(CatalogProduct::query()->active()->whereNotNull('url')->orderBy('id')->get(['id', 'external_id', 'title', 'url', 'type', 'in_stock', 'payload']), (int) Settings::get('catalog.sample_pages_max', $shopId));
+                $picked = collect($picked);
                 $delay = (int) Settings::get('catalog.page_choices_delay_ms', $shopId);
                 $found = ['read' => 0, 'failed' => 0, 'siblings' => [], 'plans' => [], 'apps' => [], 'fields' => []];
                 $down = 0;
@@ -132,54 +132,6 @@ final class SamplePages
                 ]);
             });
         });
-    }
-
-    /**
-     * The pages to read: every kind at least once, the fewest pages that cover them. A product's kinds
-     * are its categories, its type in the store (simple, variable, a subscription), its product type
-     * (Shopify) and the set of choices it is sold with ("מידה", "צבע+מידה"). In stock first among equals.
-     *
-     * @param  Collection<int, CatalogProduct>  $products
-     * @return array{0: Collection<int, CatalogProduct>, 1: int} the products, and how many kinds they cover
-     */
-    public static function pick(Collection $products, int $max): array
-    {
-        $marks = [];
-        foreach ($products as $product) {
-            $choices = array_map(fn (array $a): string => mb_strtolower(trim($a['name'])), array_filter($product->storeAttributes(), fn (array $a): bool => $a['for_variations']));
-            sort($choices);
-            $marks[$product->id] = array_values(array_unique(array_filter([
-                'type:'.$product->type,
-                'choices:'.implode('+', $choices),
-                ($kind = trim((string) ($product->payload['product_type'] ?? ''))) === '' ? null : 'kind:'.mb_strtolower($kind),
-                ...$product->categories->map(fn ($c): string => 'category:'.$c->id)->all(),
-            ])));
-        }
-
-        $all = array_unique(array_merge(...array_values($marks ?: [[]])));
-        $open = array_fill_keys($all, true);
-        $picked = [];
-
-        while ($open !== [] && count($picked) < $max) {
-            $best = null;
-            $bestGain = 0;
-            foreach ($products as $product) {
-                if (isset($picked[$product->id])) {
-                    continue;
-                }
-                $gain = count(array_intersect_key(array_flip($marks[$product->id]), $open)) * 2 + ($product->in_stock ? 1 : 0);
-                if ($gain > $bestGain) {
-                    [$best, $bestGain] = [$product, $gain];
-                }
-            }
-            if ($best === null || $bestGain < 2) {
-                break;
-            }
-            $picked[$best->id] = $best;
-            $open = array_diff_key($open, array_flip($marks[$best->id]));
-        }
-
-        return [collect(array_values($picked)), count($all) - count($open)];
     }
 
     private function get(string $url, string $accept): ?Response
