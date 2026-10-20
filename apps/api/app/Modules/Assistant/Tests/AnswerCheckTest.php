@@ -132,6 +132,17 @@ final class AnswerCheckTest extends TestCase
         }
     }
 
+    public function test_an_answer_saying_what_was_asked_about_is_not_here_is_known(): void
+    {
+        // Sela: both were kept and offered to every later question about Omer Shem Tov's book.
+        $this->assertTrue(AnswerSiteQuestion::saysMissing('נמצא כאן רק הספר **"חטוף" מאת אלי שרעבי**. לפי תיאור המוצר, זהו סיפור בגוף ראשון.'));
+        $this->assertTrue(AnswerSiteQuestion::saysMissing('אם התכוונת לספר של שם טוב, הוא לא מופיע בתוצאות האלה ולכן אי אפשר להשוות.'));
+        $this->assertTrue(AnswerSiteQuestion::saysMissing('That book is not listed here.'));
+
+        $this->assertFalse(AnswerSiteQuestion::saysMissing('הספר עוסק בחזון לעתידה של ישראל.'));
+        $this->assertFalse(AnswerSiteQuestion::saysMissing('הספר לא נמצא במלאי כרגע, ואפשר להזמין אותו מראש.'), 'not in stock is an answer');
+    }
+
     public function test_an_old_reply_without_a_decision_is_read_as_before(): void
     {
         $out = AnswerSiteQuestion::applyCheck(['supported' => false, 'on_topic' => true, 'picks_fit' => true, 'safe' => true], 'תשובה', self::picks('p1'));

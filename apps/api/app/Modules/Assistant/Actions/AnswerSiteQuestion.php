@@ -91,6 +91,9 @@ final class AnswerSiteQuestion
     /** A fix by code keeps at least this share of the answer, or the answer is refused whole. */
     private const KEPT_SHARE = 0.4;
 
+    /** An answer saying what was asked about is not among what it was given ("לא מופיע", "נמצא כאן רק"); not "not in stock". */
+    private const SAYS_MISSING = '/(?<![\p{L}])(?:לא|אינו|אינה|אינם|אינן)\s+(?:מופיע|מופיעה|מופיעים|נמצא|נמצאת|נמצאים)(?!\s+(?:ב|כרגע\s+ב)מלאי)|(?:נמצא|נמצאת|מופיע|מופיעה|יש)\s+כאן\s+רק|אין\s+(?:לי\s+)?מידע\s+על|\bnot\s+(?:listed|found|among|in\s+(?:the|these)\s+results)\b|\bonly\s+(?:found|see|have)\b/iu';
+
     /** How much longer than the answer the checker's fix may be: it may correct, not add. */
     private const REVISED_GROWTH = 2;
 
@@ -1283,6 +1286,12 @@ final class AnswerSiteQuestion
         return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed];
     }
 
+    /** Whether an answer says what was asked about is not here (SAYS_MISSING). */
+    public static function saysMissing(string $answer): bool
+    {
+        return preg_match(self::SAYS_MISSING, $answer) === 1;
+    }
+
     /**
      * Code's checks on an answer's text, a sentence at a time, before and after any model's check: a
      * sentence with contact details or a price the cited pages do not write, an internal ref, a number
@@ -2119,6 +2128,11 @@ final class AnswerSiteQuestion
     {
         // A question about a product it named, not answered: never kept, so the next asker is answered afresh.
         if ($outcome !== AssistantAnswer::ANSWERED && $this->namedTitles !== []) {
+            return null;
+        }
+        // An answer that says what was asked about is not here ("נמצא כאן רק חטוף", "הספר של שם טוב לא מופיע"):
+        // this asker's only. Kept, it answered every later question about that book wrongly, also once it was found.
+        if ($outcome === AssistantAnswer::ANSWERED && self::saysMissing((string) $answer)) {
             return null;
         }
 
