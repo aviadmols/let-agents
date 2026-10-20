@@ -78,4 +78,10 @@ return [
         'resend' => 'לעדכן באתר',
         'retry' => 'לנסות שוב',
     ],
+    'daily' => [
+        'label' => 'הבדיקה היומית של האתר',
+        'headline' => ':proposed הצעות · :applied הוחלו',
+        'waiting' => 'מחכות לאישורך (:count)',
+        'done' => 'כבר באתר (:count)',
+    ],
 ];

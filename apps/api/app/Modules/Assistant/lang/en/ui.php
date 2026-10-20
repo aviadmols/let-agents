@@ -506,4 +506,10 @@ Answer: :answer',
         'expect_sources' => ':n pages',
         'measured_only' => 'Measured only, no expectation',
     ],
+    'daily' => [
+        'label' => 'The questions shoppers asked',
+        'headline' => 'Score :score of 100 · :asks questions',
+        'in' => 'Entered the bank of answers (:count)',
+        'out' => 'Left out, the answer was not good enough (:count)',
+    ],
 ];

@@ -78,4 +78,10 @@ return [
         'resend' => 'Update on the site',
         'retry' => 'Try again',
     ],
+    'daily' => [
+        'label' => 'The site\'s daily check',
+        'headline' => ':proposed proposals · :applied applied',
+        'waiting' => 'Waiting for your approval (:count)',
+        'done' => 'Already on the site (:count)',
+    ],
 ];

@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\DailySummaries;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeSource;
@@ -28,6 +29,7 @@ use App\Modules\Assistant\Console\WriterBenchCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
 use App\Modules\Assistant\Listeners\ReadShopKnowledge;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\AssistantDailySummaries;
 use App\Modules\Assistant\Support\AssistantHome;
 use App\Modules\Assistant\Support\AssistantReport;
 use App\Modules\Assistant\Support\AssistantTimeline;
@@ -49,6 +51,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         // What this module shows on the shop's home and notices.
         $this->app->tag([AssistantHome::class], HomeSource::TAG);
         $this->app->tag([AssistantHome::class], HomeCards::CARDS_TAG);
+        $this->app->tag([AssistantDailySummaries::class], DailySummaries::TAG);
         $this->app->tag([AssistantHome::class], FirstSteps::STEPS_TAG);
         $this->app->bind(SuggestsQuestions::class, SuggestQuestions::class);
         //

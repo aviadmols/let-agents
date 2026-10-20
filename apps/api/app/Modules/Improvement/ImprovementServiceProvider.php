@@ -3,10 +3,12 @@
 namespace App\Modules\Improvement;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\DailySummaries;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Admin\Contracts\WritesPosts;
 use App\Modules\Improvement\Console\ImprovementCommand;
+use App\Modules\Improvement\Support\ImprovementDailySummaries;
 use App\Modules\Improvement\Support\ImprovementHome;
 use App\Modules\Improvement\Support\ImprovementTimeline;
 use App\Modules\Improvement\Support\QuestionPosts;
@@ -20,6 +22,7 @@ final class ImprovementServiceProvider extends ModuleServiceProvider
         $this->app->tag([ImprovementTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ImprovementHome::class], HomeSource::TAG);
+        $this->app->tag([ImprovementDailySummaries::class], DailySummaries::TAG);
     }
 
     protected function bootModule(): void

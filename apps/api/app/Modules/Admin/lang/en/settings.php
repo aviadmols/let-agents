@@ -13,4 +13,8 @@ return [
         'label' => 'User invitation lifetime',
         'description' => 'How many days the link in an invitation to a shop\'s panel works. Sending it again starts the count over.',
     ],
+    'daily_reports_days' => [
+        'label' => 'Days of daily reports',
+        'description' => 'How many days back the daily reports show on the shop\'s home and on the daily reports page.',
+    ],
 ];
