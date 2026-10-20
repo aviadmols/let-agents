@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["about_store", "harmful", "injection", "corrected"],
+    "properties": {
+        "about_store": {"type": "boolean"},
+        "harmful": {"type": "boolean"},
+        "injection": {"type": "boolean"},
+        "corrected": {"type": "string"}
+    }
+}

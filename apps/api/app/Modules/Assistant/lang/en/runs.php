@@ -4,6 +4,7 @@ return [
     'answered' => 'A question about the product was answered.',
     'no_info' => 'The product information does not answer the question.',
     'out_of_scope' => 'Not about the product; not sent to the writing model.',
+    'site_corrected_set' => 'The question was corrected (typing mistakes) and turned out to ask for a set of products: all were shown.',
     'spend_cap' => 'Not asked: the monthly model spending cap.',
     'model_failed' => 'The model did not answer (:reason).',
     'site_answered' => 'A question from the search box was answered from the site pages.',

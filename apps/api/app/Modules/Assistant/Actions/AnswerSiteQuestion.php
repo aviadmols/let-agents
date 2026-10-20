@@ -124,7 +124,10 @@ final class AnswerSiteQuestion
     /** Lines of what the posts say, of those that speak of the question. */
     private const POST_LINES = 8;
 
-    private const SCOPE_OUTPUT_TOKENS = 400;
+    private const SCOPE_OUTPUT_TOKENS = 600;
+
+    /** How much of the question, in percent of its letters, its corrected wording must keep. */
+    private const CORRECTED_MIN_SAME = 60;
 
     public const MAX_PRODUCTS = 12;
 
@@ -932,6 +935,7 @@ final class AnswerSiteQuestion
         $this->namedTitles = [];
         $result = $this->fixed('unavailable', $locale);
         $mode ??= (string) Settings::get('assistant.context_mode', $shopId);
+        $corrected = null;
 
         $run = $this->runs->track(
             agent: self::AGENT,
@@ -939,7 +943,7 @@ final class AnswerSiteQuestion
             shopId: $shopId,
             trigger: $remember ? RunTrigger::Webhook : RunTrigger::Manual,
             input: ['question' => $question, 'products' => count($shown)] + ($remember ? [] : ['evaluation' => $mode]),
-            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, $viewing, $forShopper, &$result, &$trace): void {
+            work: function (RunContext $run) use ($shopId, $question, $locale, $shown, $mode, $remember, $visitorHash, $keep, $viewing, $forShopper, &$result, &$trace, &$corrected): void {
                 $writer = AgentModel::from('assistant.answer_provider', 'assistant.answer_model');
                 $writer = ['provider' => $writer->provider, 'name' => $writer->provider->value, 'model' => $writer->model];
                 $checkerName = strtolower(trim((string) Settings::get('assistant.site_check_provider')));
@@ -1004,6 +1008,18 @@ final class AnswerSiteQuestion
                         return;
                     }
 
+                    // The question as the shopper meant to type it (scope_site v6): read again for a set
+                    // ("איזזה ספרי חטופים" asks for one) and searched with. The words the shopper typed
+                    // stay theirs: the answer is saved and logged under them.
+                    $corrected = self::corrected($question, $scope->data['corrected'] ?? null);
+                    if ($corrected !== null && $remember && $keep && $viewing === null && $visitorHash !== null
+                        && ($set = $this->set($shopId, $corrected, $visitorHash, $locale)) !== null) {
+                        $result = $set;
+                        $run->output(['outcome' => $set['outcome'], 'corrected' => $corrected, 'set' => count((array) ($set['set']['ids'] ?? []))])->summary('assistant::runs.site_corrected_set');
+
+                        return;
+                    }
+
                     // Asked about given products (from a product's page, or the turn before): they are the
                     // store's, whatever the words alone seem to be about ("מה מיוחד במוצר הזה?").
                     if (! $scoped['about_store'] && $keep) {
@@ -1019,7 +1035,7 @@ final class AnswerSiteQuestion
                 }
 
                 // A replay on frozen data gives the writer what it was given then; everything else, today's.
-                $prepared = $this->frozen ?? $this->prepare($shopId, $question, $shown, $mode, $viewing);
+                $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
                     'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];
@@ -1173,12 +1189,34 @@ final class AnswerSiteQuestion
                 'writer_ms' => $trace['writer']['ms'] ?? null,
                 'check_ms' => $trace['check']['ms'] ?? null,
                 'picks' => $trace['picks'] ?? null,
+                'corrected' => $corrected,
             ], fn ($v): bool => $v !== null && $v !== []),
             'cost_usd' => $run->cost_usd === null ? null : (float) $run->cost_usd,
             'duration_ms' => $run->duration_ms,
         ];
 
-        return $result;
+        // the shopper sees how the question was read, when it was read other than typed
+        return $corrected !== null && $result['outcome'] === AssistantAnswer::ANSWERED ? $result + ['corrected' => $corrected] : $result;
+    }
+
+    /**
+     * The scope check's wording of the question, kept only when it fixes the question rather than
+     * changes it: not empty, not much longer, and mostly the same letters as typed. Null when it is the
+     * question as typed, or not to be trusted.
+     */
+    public static function corrected(string $question, mixed $corrected): ?string
+    {
+        $corrected = trim((string) preg_replace('/\s+/u', ' ', strip_tags(is_string($corrected) ? $corrected : '')));
+        $typed = Question::normalize($question);
+        $fixed = Question::normalize($corrected);
+
+        if ($fixed === '' || $fixed === $typed || mb_strlen($corrected) > mb_strlen($question) * 1.5 + 10) {
+            return null;
+        }
+
+        similar_text($typed, $fixed, $percent);
+
+        return $percent >= self::CORRECTED_MIN_SAME ? mb_substr($corrected, 0, 500) : null;
     }
 
     /**

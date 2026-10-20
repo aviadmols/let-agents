@@ -87,7 +87,7 @@
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
-      showAll: 'הצגת כל :n התוצאות', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
+      showAll: 'הצגת כל :n התוצאות', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
       productsCount: ':n מוצרים', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
@@ -140,7 +140,7 @@
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
-      showAll: 'Show all :n results', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
+      showAll: 'Show all :n results', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
       productsCount: ':n products', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
@@ -1860,7 +1860,7 @@
       return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [])).then(function () {
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [],
-            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null });
+            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null });
           announce(t('announceReady') + ': ' + d.answer);
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           // the answer could not be checked: never shown; the store's own words, said to be that
@@ -1930,7 +1930,9 @@
     if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
     var n = String(turn.answer || '').split(' ').length;
-    var html = kitsHtml(turn) + '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(turn.answer, anim) + '</div>';
+    // asked with typing mistakes: how the question was read, so the shopper sees what was answered
+    var html = kitsHtml(turn) + (turn.corrected ? '<div class="ls-understood" dir="auto">' + esc(t('understood', { q: turn.corrected })) + '</div>' : '') +
+      '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(turn.answer, anim) + '</div>';
     // the page the question names, which the answer rests on ("מנויים"): a button to it
     if (turn.page && turn.page.url) { html += '<a class="ls-btn ls-btn--secondary ls-btn--sm ls-answer__page" href="' + esc(turn.page.url) + '">' + esc(t('goPage', { t: turn.page.title })) + '</a>'; }
     if (turn.picks && turn.picks.length) {
