@@ -347,7 +347,7 @@ final class SiteQuestionTest extends TestCase
         $this->assertStringContainsString('שלושה דורות', $this->calls[0]['user'], '"עדן" names "העדן"');
     }
 
-    public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_later(): void
+    public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_once_the_store_says_more(): void
     {
         $this->passages = [];
 
@@ -359,7 +359,10 @@ final class SiteQuestionTest extends TestCase
 
         $this->assertSame('no_info', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'the same day: from memory');
         $this->travel((int) Settings::get('assistant.site_retry_days') + 1)->days();
-        $this->assertSame('answered', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'later: asked again, the store may have added the page');
+        $this->assertSame('no_info', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'days passing say nothing new: still from memory, no model');
+        $this->travel(1)->minutes();
+        $this->inShop(fn () => CatalogContent::query()->update(['updated_at' => now()]));
+        $this->assertSame('answered', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'the store wrote the page: asked again');
     }
 
     public function test_a_writer_never_checks_its_own_family_and_a_page_answer_is_not_a_site_answer(): void

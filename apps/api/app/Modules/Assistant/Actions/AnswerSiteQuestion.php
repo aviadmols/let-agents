@@ -31,7 +31,6 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\TopicQuestions;
-use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -72,7 +71,7 @@ final class AnswerSiteQuestion
      * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
      * 5 is the facts-only writer the bench tries, never released here).
      */
-    public const PROMPT_VERSION = 7;
+    public const PROMPT_VERSION = 8;
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
@@ -351,7 +350,8 @@ final class AnswerSiteQuestion
             $saved->forceFill(['last_asked_at' => now()])->save();
             $outcome = $saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : ($products === [] ? 'no_info' : 'no_match');
 
-            return $this->fixed($outcome, $locale, 'bank') + ['answer_id' => $saved->id];
+            return $this->fixed($outcome, $locale, 'bank') + ['answer_id' => $saved->id]
+                + ($saved->outcome === AssistantAnswer::NO_INFO && trim((string) $saved->answer) !== '' ? ['not_found' => (string) $saved->answer] : []);
         }
 
         if (! $this->withinDailyLimits($shopId, $visitorHash)) {
@@ -587,16 +587,15 @@ final class AnswerSiteQuestion
             return $saved->updated_at === null || $saved->updated_at->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId)));
         }
 
-        // "Not on the site" holds only as long as the site does, and what the search knows of it: a
-        // page added or changed since (a cancellation policy synced later), or the index read again
-        // (the topics and the questions its sections answer), is read before saying so again. And
-        // only once the question was also asked in other ways (the second look), where the shop looks so.
-        $changed = CatalogContent::query()->active()->max('updated_at');
-        $indexed = RetrievalChunk::query()->max('updated_at');
+        // "Not on the site" holds until the store says more, and only then is a model asked again: a page
+        // or post added or changed since (a cancellation policy written later), an answer of the team's
+        // own written or changed since, or a product added since. Not a day passing, not the index read
+        // again for the night. And only once the question was also asked in other ways (the second look).
         $after = fn (mixed $at): bool => $at !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($at));
 
-        return $saved->updated_at?->lt(now()->subDays((int) Settings::get('assistant.site_retry_days', $shopId)))
-            || $after($changed) || $after($indexed)
+        return $after(CatalogContent::query()->active()->max('updated_at'))
+            || $after(AssistantAnswer::query()->where('source', 'team')->max('updated_at'))
+            || $after(CatalogProduct::query()->active()->max('created_at'))
             || ((int) (((array) $saved->flags)['looked'] ?? 0) < self::LOOK_VERSION && Features::enabled('assistant.second_look', $shopId));
     }
 
@@ -1059,6 +1058,10 @@ final class AnswerSiteQuestion
                     if (($reply->data['found'] ?? null) !== true || ($answer === '' && $picks === [])) {
                         $refusal = $answerRefusal ?? 'not_found';
                         $checked['skipped'] = $refusal;
+                        // Not found on the site: the shopper is told what was not found, in their words, and that the team
+                        // can help (code checks it says nothing more). An offensive question, or one that instructs, gets nothing.
+                        $unfit = ($reply->data['fine'] ?? true) === false;
+                        $notFound = $refusal === 'not_found' && ! $unfit ? self::notFoundLine((string) ($reply->data['not_found'] ?? ''), $question) : null;
                     } else {
                         $started = hrtime(true);
 
@@ -1119,8 +1122,11 @@ final class AnswerSiteQuestion
 
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
-                $outcome = $refusal === null ? AssistantAnswer::ANSWERED : AssistantAnswer::NO_INFO;
-                $saved = $remember && $keep ? $this->save($question, $outcome, $refusal === null ? $answer : null, $sources, $stored, $writer['model'], $replies, $run, $flags) : null;
+                $unfit ??= false;
+                $notFound ??= null;
+                $outcome = $refusal === null ? AssistantAnswer::ANSWERED : ($unfit ? AssistantAnswer::OUT_OF_SCOPE : AssistantAnswer::NO_INFO);
+                // A "not found" is kept with its line: the next shopper who asks the same is told it without a model.
+                $saved = $remember && $keep ? $this->save($question, $outcome, $refusal === null ? $answer : $notFound, $sources, $stored, $writer['model'], $replies, $run, $flags) : null;
 
                 // This visitor got it clean: checked, safe, no attempt to instruct, nothing personal,
                 // nothing harmful. Counted once; enough different visitors share it with everyone.
@@ -1130,7 +1136,8 @@ final class AnswerSiteQuestion
 
                 $result = $refusal === null
                     ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id]
-                    : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)];
+                    : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
+                        : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
                 $trace += ['writer' => $wrote, 'check' => $checked, 'refused' => $refusal, 'picks' => array_column($stored, 'external_id')];
                 $run->output(['outcome' => $outcome, 'refused' => $refusal, 'cited' => count($cited), 'picks' => count($picks), 'answer' => $answer, 'checker' => $checker['name'].' · '.$checker['model'],
                     'check' => $checked, 'context' => $trace['context'], 'writer' => $wrote])
@@ -1284,6 +1291,26 @@ final class AnswerSiteQuestion
         }
 
         return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed];
+    }
+
+    /** The longest "not found" line shown: a sentence or two, never an answer. */
+    private const NOT_FOUND_CHARS = 240;
+
+    /**
+     * The writer's "not found" line for the shopper, or null: short, no number the question does not
+     * hold, no price, contact or link (gate()), so it can say what was not found and nothing more.
+     */
+    public static function notFoundLine(string $line, string $question): ?string
+    {
+        $line = trim((string) preg_replace('/\s+/u', ' ', $line));
+
+        if ($line === '' || mb_strlen($line) > self::NOT_FOUND_CHARS || preg_match('~https?://|www\.~i', $line) === 1) {
+            return null;
+        }
+
+        [$left, $refusal] = self::gate($line, $question, '');
+
+        return $refusal === null && $left === $line ? $line : null;
     }
 
     /** Whether an answer says what was asked about is not here (SAYS_MISSING). */

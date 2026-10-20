@@ -153,6 +153,19 @@ final class AnswerCheckTest extends TestCase
         $this->assertFalse(AnswerSiteQuestion::saysMissing('הספר לא נמצא במלאי כרגע, ואפשר להזמין אותו מראש.'), 'not in stock is an answer');
     }
 
+    public function test_a_not_found_line_says_what_was_not_found_and_nothing_more(): void
+    {
+        $question = 'יש משלוח לאילת?';
+        $line = 'לא מצאתי באתר פרטים על משלוח לאילת. הצוות של החנות ישמח לעזור בזה.';
+
+        $this->assertSame($line, AnswerSiteQuestion::notFoundLine($line, $question));
+        $this->assertNull(AnswerSiteQuestion::notFoundLine('משלוח לאילת לוקח 3 ימים, אבל זה לא כתוב באתר.', $question), 'a number the question does not hold is a guess');
+        $this->assertNull(AnswerSiteQuestion::notFoundLine('אפשר לבדוק כאן: https://store.test/shipping', $question), 'no link');
+        $this->assertNull(AnswerSiteQuestion::notFoundLine('התקשרו ל-054-9998877 ונעזור.', $question), 'no contact details');
+        $this->assertNull(AnswerSiteQuestion::notFoundLine(str_repeat('לא מצאתי את זה באתר. ', 20), $question), 'a sentence or two, not an answer');
+        $this->assertNull(AnswerSiteQuestion::notFoundLine('   ', $question));
+    }
+
     public function test_an_old_reply_without_a_decision_is_read_as_before(): void
     {
         $out = AnswerSiteQuestion::applyCheck(['supported' => false, 'on_topic' => true, 'picks_fit' => true, 'safe' => true], 'תשובה', self::picks('p1'));

@@ -109,7 +109,7 @@ final class ShopKnowledgeTest extends TestCase
     {
         $prompts = __DIR__.'/../Prompts/';
 
-        $this->assertSame(file_get_contents($prompts.'answer_site.v7.md'), AnswerSiteQuestion::prompt('answer_site'));
+        $this->assertSame(file_get_contents($prompts.'answer_site.v8.md'), AnswerSiteQuestion::prompt('answer_site'));
         $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertSame(file_get_contents($prompts.'verify_site.v6.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version: approve, revise or reject');
         $this->assertSame(file_get_contents($prompts.'scope_site.v4.md'), AnswerSiteQuestion::prompt('scope_site'));
