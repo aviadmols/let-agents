@@ -1088,7 +1088,10 @@ final class AnswerSiteQuestion
                         // Not found on the site: the shopper is told what was not found, in their words, and that the team
                         // can help (code checks it says nothing more). An offensive question, or one that instructs, gets nothing.
                         $unfit = ($reply->data['fine'] ?? true) === false;
-                        $notFound = $refusal === 'not_found' && ! $unfit ? self::notFoundLine((string) ($reply->data['not_found'] ?? ''), $question) : null;
+                        // a writer that found nothing writes no answer, which code reads as "no answer" or "cites
+                        // nothing": its line is the shopper's all the same ("אין באתר המלצה אחת…")
+                        $notFound = in_array($refusal, ['not_found', 'no_answer', 'cites_nothing'], true) && ! $unfit
+                            ? self::notFoundLine((string) ($reply->data['not_found'] ?? ''), $question) : null;
                     } else {
                         $started = hrtime(true);
 

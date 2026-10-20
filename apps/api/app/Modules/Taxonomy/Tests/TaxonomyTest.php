@@ -18,6 +18,7 @@ use App\Modules\Taxonomy\Models\TaxonomySubject;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
 use App\Modules\Taxonomy\Support\Bank;
 use App\Modules\Taxonomy\Support\Evaluation;
+use App\Modules\Taxonomy\Support\Sample;
 use App\Modules\Tenancy\Models\Shop;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,6 +97,23 @@ final class TaxonomyTest extends TestCase
         // asked again: the bank stands
         app(BuildTagBank::class)->handle($this->shop->id);
         $this->assertCount(2, $this->calls);
+    }
+
+    public function test_the_sample_reads_every_narrow_category_of_a_store_whose_categories_stand_side_by_side(): void
+    {
+        // Sela Meir: every book is in "ספרים" too, all at one depth; the sample took its first four
+        foreach (range(1, 12) as $i) {
+            $this->product('e'.$i, 'כלכלה '.$i, 'ספר.', ['ספרים', 'כלכלה']);
+            $this->product('g'.$i, 'ביוגרפיה '.$i, 'ספר.', ['ספרים', 'ביוגרפיות']);
+        }
+        $this->product('h1', 'שירה 1', 'ספר.', ['ספרים', 'שירה']);
+
+        $sample = app(TenantContext::class)->run($this->shop->id, fn () => Sample::products(12, 3)->pluck('title')->all());
+
+        $this->assertCount(12, $sample, 'full, past three of each');
+        $this->assertContains('שירה 1', $sample, 'the smallest category too');
+        $this->assertGreaterThanOrEqual(4, count(array_filter($sample, fn (string $t): bool => str_starts_with($t, 'כלכלה'))));
+        $this->assertContains('כלכלה 7', $sample, 'spread through the category, not its first');
     }
 
     public function test_tags_are_kept_only_with_their_evidence_in_their_scope_and_checked_by_the_other_family(): void

@@ -353,6 +353,7 @@ img:not(.ls-pic2):has(+ .ls-pic2) { transition: opacity 320ms ease, transform 50
 .ls-set__search { margin-top: 12px; }
 .ls-set__search .ls-btn { display: inline-flex; align-items: center; gap: 6px; }
 .ls-understood { margin-bottom: 8px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
+.ls-noanswer__hint { margin: 8px 0 0; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 
 /* after "added": a quiet row under the card */
 .ls-added { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 10px 12px; border-radius: var(--lsp-r-sm); background: var(--ls-bg-sunken); font-size: var(--lsp-text-sm); }

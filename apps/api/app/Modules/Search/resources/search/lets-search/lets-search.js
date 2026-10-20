@@ -87,7 +87,7 @@
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
-      showAll: 'הצגת כל :n התוצאות', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
+      showAll: 'הצגת כל :n התוצאות', askSpecific: 'אפשר לחפש מוצר, או לשאול שאלה מדויקת יותר, למשל לפי נושא, קהל או תקציב, ואעזור למצוא.', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
       productsCount: ':n מוצרים', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
@@ -140,7 +140,7 @@
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
-      showAll: 'Show all :n results', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
+      showAll: 'Show all :n results', askSpecific: 'You can search for a product, or ask a more specific question, for example by topic, audience or budget, and I will help find it.', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
       productsCount: ':n products', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
@@ -2088,6 +2088,8 @@
     } else {
       html = '<p class="ls-noanswer__text">' + esc(own || t('noInfo')) + '</p>';
     }
+    // the search box's own question said why it was not answered ("אין באתר המלצה אחת…"): what to ask instead
+    if (own && !turn.ctx && turn.lead !== 'done') { html += '<p class="ls-noanswer__hint">' + esc(t('askSpecific')) + '</p>'; }
     if (turn.rel && turn.rel.length) {
       html += '<div class="ls-block"><div class="ls-block__title" style="color:var(--ls-fg-muted);font-weight:500">' + esc(t('meanwhile')) + '</div><div class="ls-panel" style="box-shadow:0 0 0 1px var(--ls-line);padding:4px">' + turn.rel.map(function (id) { return prow(rec(id)); }).join('') + '</div></div>';
     }

@@ -131,6 +131,20 @@ final class SiteQuestionTest extends TestCase
         $this->assertNull($saved->content_id);
     }
 
+    public function test_a_writer_that_found_nothing_and_wrote_no_answer_still_says_why_to_the_shopper(): void
+    {
+        // Sela Meir, "איזה ספר הכי מומלץ?": no answer, no refs, its line dropped as "no answer"
+        $line = 'אין באתר המלצה אחת שמסומנת כ"הכי מומלץ" מבין הספרים האלה. אם תרצה, צוות החנות ישמח לעזור לך לבחור ספר לפי נושא או עניין.';
+        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => [], 'not_found' => $line, 'fine' => true]];
+
+        $data = $this->ask('איזה ספר הכי מומלץ?')->json('data');
+        $asked = count($this->calls);
+
+        $this->assertSame($line, $data['not_found']);
+        $this->assertSame($line, $this->ask('איזה ספר הכי מומלץ?')->json('data.not_found'), 'kept with its line: the next one is told it without a model');
+        $this->assertCount($asked, $this->calls);
+    }
+
     public function test_the_checker_is_haiku_5_5_with_room_to_think_and_what_it_did_is_kept(): void
     {
         $this->replies = [
