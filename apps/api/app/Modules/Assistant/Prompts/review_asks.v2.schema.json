@@ -11,9 +11,9 @@
                 "required": ["id", "score", "note", "flag"],
                 "properties": {
                     "id": {"type": "string"},
-                    "score": {"type": "integer", "enum": [1, 2, 3, 4, 5]},
+                    "score": {"type": "integer"},
                     "note": {"type": "string"},
-                    "flag": {"type": ["string", "null"], "enum": ["invented", "refused_answerable", "wrong_products", null]}
+                    "flag": {"anyOf": [{"type": "string", "enum": ["invented", "refused_answerable", "wrong_products"]}, {"type": "null"}]}
                 }
             }
         },

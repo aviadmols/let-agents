@@ -113,6 +113,13 @@ final class AnswerCheckTest extends TestCase
         $this->assertNotNull($schema);
 
         $walk = function (array $node, string $at) use (&$walk): void {
+            // Anthropic refuses a list of values beside a list of types ("invented" for [string, null]): anyOf instead.
+            if (isset($node['enum'])) {
+                $this->assertIsString($node['type'] ?? null, $at.': an enum has one type');
+            }
+            foreach ((array) ($node['anyOf'] ?? []) as $i => $option) {
+                $walk($option, $at.'|'.$i);
+            }
             if (($node['type'] ?? null) === 'object') {
                 $this->assertFalse($node['additionalProperties'] ?? true, $at.' is closed');
                 $this->assertEqualsCanonicalizing(array_keys($node['properties']), $node['required'], $at.' requires every property');
@@ -125,6 +132,9 @@ final class AnswerCheckTest extends TestCase
             }
         };
         $walk($schema, 'reply');
+        foreach (glob(__DIR__.'/../Prompts/*.schema.json') as $file) {
+            $walk((array) json_decode((string) file_get_contents($file), true), basename($file));
+        }
 
         foreach (glob(__DIR__.'/../Prompts/*.schema.json') as $file) {
             $this->assertIsArray(json_decode((string) file_get_contents($file), true), basename($file));
