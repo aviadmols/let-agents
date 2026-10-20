@@ -88,6 +88,7 @@ final class SearchIndexController
             'images' => (string) Settings::get('search.image_fit', $shopId),
             // "Not sure what fits?" under the results: the store's AI recommends among them (inside), or an outside AI (outside).
             'notSure' => (string) Settings::get('search.not_sure', $shopId),
+            'notSureMax' => (int) Settings::get('search.not_sure_max', $shopId),
             // "Ask my AI": the search and its products, handed to the shopper's own AI in a link.
             'aiShare' => Features::enabled('search.ai_share', $shopId),
             // "Share the results": the same link, to a friend.

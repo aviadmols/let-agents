@@ -22,7 +22,8 @@ final class ShareController
     public const OPEN = [
         'chatgpt' => 'https://chatgpt.com/?q={q}',
         'claude' => 'https://claude.ai/new?q={q}',
-        'perplexity' => 'https://www.perplexity.ai/search?q={q}',
+        // Gemini opens empty whatever this says; the drawer copies the words for the shopper to paste
+        'gemini' => 'https://gemini.google.com/app?q={q}',
     ];
 
     /** A question goes into the AI's address with the words: kept short enough for any browser. */

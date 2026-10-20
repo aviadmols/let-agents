@@ -337,7 +337,7 @@
 .ls-logo { flex: none; fill: currentColor; stroke: none; }
 .ls-logo--chatgpt { color: #0b0b0c; }
 .ls-logo--claude { color: #d97757; }
-.ls-logo--perplexity { color: #20808d; }
+.ls-logo--gemini { color: #4285f4; }
 
 /* ---------------------------------------------------------------- large view: the side of the drawer makes it wide */
 .ls-edge { position: absolute; z-index: 11; inset-block: 64px 64px; inset-inline-end: 0; width: 14px; padding: 0; display: grid; place-items: center; cursor: ew-resize; background: transparent; }

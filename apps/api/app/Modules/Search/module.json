@@ -693,6 +693,15 @@
             "scope": "shop"
         },
         {
+            "name": "not_sure_max",
+            "type": "int",
+            "default": 6,
+            "min": 1,
+            "max": 24,
+            "scope": "shop",
+            "unit": "results"
+        },
+        {
             "name": "not_sure",
             "type": "enum",
             "options": [

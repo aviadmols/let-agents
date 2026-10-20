@@ -266,6 +266,10 @@ return [
         'description' => 'By content (name, description and specs), by picture, or both together. Where different products look alike (books, bundles), by content is better.',
         'options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
     ],
+    'not_sure_max' => [
+        'label' => '"Not sure what fits?" up to this many results',
+        'description' => 'The button shows only when the search found a few results (or the shopper narrowed them with the filters), and the AI gets only those: a long list is too much to recommend from well.',
+    ],
     'not_sure' => [
         'label' => '"Not sure what fits?" under the results',
         'description' => 'In the chat: the store\'s AI recommends from the products in the results, by the search, with ChatGPT, Claude or Perplexity to go on with below it. Outside: straight to choosing an outside AI, with the search and the products.',
