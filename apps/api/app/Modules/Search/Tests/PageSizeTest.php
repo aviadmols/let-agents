@@ -32,6 +32,24 @@ final class PageSizeTest extends TestCase
         $this->assertNull(PageChoices::size('<table><tr><td>מידה: 48</td></tr></table>'), 'a size table says no one size');
     }
 
+    public function test_a_product_whose_page_asks_a_choice_opens_its_choices_not_an_add_the_store_refuses(): void
+    {
+        // Gueta: a beam sold in a length chosen on its page; the store refuses an add without it.
+        $shop = Shop::factory()->create(['content_locale' => 'he']);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach (['1' => [['key' => 'addon-1-length-0', 'label' => 'אורך', 'kind' => 'length', 'required' => true, 'values' => [['value' => '2-1', 'label' => '2.1 מטר']]]], '2' => [], '3' => [['key' => 'gift', 'label' => 'עטיפה', 'required' => false, 'values' => []]]] as $id => $fields) {
+                $beam = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => 'קורה '.$id, 'url' => "https://g.test/p/$id", 'price' => 9, 'in_stock' => true, 'purchasable' => true, 'hash' => "h$id", 'payload' => []]);
+                CatalogProductChoice::query()->create(['shop_id' => $shop->id, 'product_id' => $beam->id, 'fields' => $fields]);
+            }
+        });
+
+        app(BuildSearchIndex::class)->handle($shop->id);
+        LoadedIndex::forget();
+        $buy = app(TenantContext::class)->run($shop->id, fn () => collect(LoadedIndex::for($shop->id)['records'])->mapWithKeys(fn (array $r, string $id): array => [$id => $r['buy'] ?? 0])->all());
+
+        $this->assertSame(['p:1' => 0, 'p:2' => 1, 'p:3' => 1], array_intersect_key($buy, array_flip(['p:1', 'p:2', 'p:3'])), 'only a required choice opens the choices');
+    }
+
     public function test_search_reads_a_page_size_as_the_products_size(): void
     {
         LoadedIndex::forget();

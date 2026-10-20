@@ -163,6 +163,11 @@ final class BuildSearchIndex
         // A product's own size where the shop has no size attribute: what its page says (a ring's "מידה
         // נוכחית: 54", ReadPageChoices), else a size-like custom field of its feed. Sizes from facts come first.
         $pageSizes = CatalogProductChoice::query()->whereNotNull('size')->pluck('size', 'product_id')->map(fn ($z): float => round((float) $z, 6));
+        // A product whose page asks a choice before the cart (a length, an add-on: ReadPageChoices) opens its choices
+        // in the drawer, not an add the store refuses. Counted here, not in SQL: a json column.
+        $asks = CatalogProductChoice::query()->get(['product_id', 'fields'])
+            ->filter(fn (CatalogProductChoice $c): bool => collect((array) $c->fields)->contains(fn ($field): bool => is_array($field) && ! empty($field['required'])))
+            ->pluck('product_id')->flip();
         $sized = false;
         $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
         // Where no variant has a size, the sizes the product pages say are the size filter (a ring of one size each).
@@ -199,7 +204,7 @@ final class BuildSearchIndex
                 's' => $product->in_stock ? 1 : 0,
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
                 'pr' => $product->price === null ? null : (int) round((float) $product->price),
-                'buy' => $product->type === 'simple' && $product->purchasable ? 1 : 0,
+                'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
                 // The code as the store writes it: a search for it shows this product alone.
                 'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
