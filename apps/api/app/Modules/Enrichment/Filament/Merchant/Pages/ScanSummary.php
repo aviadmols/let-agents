@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Enrichment\Actions\ApplyTeamValue;
+use App\Modules\Enrichment\Contracts\ProductMeaning;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
@@ -291,6 +292,7 @@ final class ScanSummary extends Page
                 CatalogProductChoice::query()->where('product_id', $product->id)->first(['size', 'size_label'])),
             'store_text' => mb_strlen(trim($product->shortDescription().' '.$product->description())),
             'indexed' => self::indexed(ChunkSource::Product, (string) $product->id),
+            'meaning' => self::meaning('product', (string) $product->id),
         ];
     }
 
@@ -479,7 +481,18 @@ final class ScanSummary extends Page
             ])->values()->all(),
             'unfound' => count(array_diff($named, $known)),
             'indexed' => self::indexed(ChunkSource::Content, (string) $content->id),
+            'meaning' => self::meaning('content', (string) $content->id),
         ];
+    }
+
+    /**
+     * What it was tagged with by meaning, each tag with what it rests on; empty where nothing was.
+     *
+     * @return list<array{group: string, label: string, weight: float, source: string, evidence: string|null, explicit: bool, status: string, note: string|null}>
+     */
+    private static function meaning(string $type, string $id): array
+    {
+        return app()->bound(ProductMeaning::class) ? app(ProductMeaning::class)->of($type, $id, app()->getLocale()) : [];
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogVariant;
+use App\Modules\Enrichment\Contracts\ProductMeaning;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
@@ -144,6 +145,31 @@ final class ScanSummaryTest extends TestCase
             ->assertSee('אזל');
 
         $this->assertStringContainsString("Dimensions: 80 × 20 × 2 cm\nWeight: 1.5 kg", ProductDocuments::text($shelf->fresh()));
+    }
+
+    public function test_what_it_was_understood_to_be_about_is_shown_with_what_each_tag_rests_on(): void
+    {
+        $book = $this->product('1000', 'The Lean Startup');
+        $this->app->instance(ProductMeaning::class, new class implements ProductMeaning
+        {
+            public function of(string $type, string $id, string $locale): array
+            {
+                return [
+                    ['group' => 'נושא', 'label' => 'יזמות ועסקים', 'weight' => 1.0, 'source' => 'catalog', 'evidence' => 'ספר היזמות והניהול החשוב ביותר', 'explicit' => false, 'status' => 'kept', 'note' => null],
+                    ['group' => 'נושא', 'label' => 'מנהיגות וניהול', 'weight' => 0.6, 'source' => 'catalog', 'evidence' => 'יזמים, ממנהלים', 'explicit' => false, 'status' => 'rejected', 'note' => 'הספר לא עוסק במנהיגות'],
+                ];
+            }
+        });
+
+        Livewire::test(ScanSummary::class)
+            ->call('select', $book->id)
+            ->assertSee('מה הבנו עליו')
+            ->assertSeeHtml('<strong>יזמות ועסקים</strong>')
+            ->assertSee('מרכזי')
+            ->assertSee('מטקסט החנות')
+            ->assertSee('מבוסס על: «ספר היזמות והניהול החשוב ביותר»')
+            ->assertSee('תגית אחת נפסלה בבדיקה')
+            ->assertSee('הספר לא עוסק במנהיגות');
     }
 
     private function product(string $external, string $title): CatalogProduct
