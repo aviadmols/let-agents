@@ -119,7 +119,7 @@ final class ProductSetsTest extends TestCase
         Settings::set('thinking.whole_catalog_max', 0, $this->shop->id);
         $this->picker = fn (array $in, Closure $ref): array => ['matches' => array_values(array_filter([$ref('חטוף - אלי שרעבי'), $ref('מפגש עם עצמי בגיהינום'), $ref('תחנות 7'), 'c99'])), 'title' => 'ספרים של חטופים ששבו', 'near' => [], 'near_title' => '', 'ask' => ['question' => '', 'options' => []]];
         // the picker takes the brigade's book too; the checker of the other family takes it out
-        $this->checker = fn (array $in, Closure $ref): array => ['wrong' => array_values(array_filter([$ref('תחנות 7')])), 'ask_ok' => true];
+        $this->checker = fn (array $in, Closure $ref): array => ['wrong' => [['id' => $ref('תחנות 7'), 'why' => 'קרבות החטיבה, לא חטופים'], ['id' => 'c77', 'why' => 'לא נשלח']], 'ask_ok' => true];
 
         $result = $this->ask('תן לי את כל ספרי החטופים');
 
@@ -132,7 +132,9 @@ final class ProductSetsTest extends TestCase
         $titles = array_column($this->calls[0]['user']['candidates'], 'title');
         $this->assertContains('מפגש עם עצמי בגיהינום', $titles, 'found by its description: "נחטף"');
         $this->assertNotContains('חברות ברזל', $titles);
-        $this->assertSame('succeeded', Run::query()->where('action', FindProductSet::ACTION)->sole()->status->value);
+        $run = Run::query()->where('action', FindProductSet::ACTION)->sole();
+        $this->assertSame('succeeded', $run->status->value);
+        $this->assertSame(['תחנות 7 — קרבות החטיבה, לא חטופים'], $run->output['taken_out'], 'why each was taken out, for the operator');
 
         // asked again: the set kept, no model
         $again = $this->ask('תן לי את כל ספרי החטופים');

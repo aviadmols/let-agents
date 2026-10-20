@@ -59,7 +59,7 @@ final class FindProductSet implements ProductSets
     public const ACTION = 'thinking.find_set';
 
     /** find_set and check_set */
-    public const PROMPT_VERSION = 2;
+    public const PROMPT_VERSION = 3;
 
     /** Products a word is looked for in, at most, before code reads them. */
     private const LOOKED_AT = 400;
@@ -480,11 +480,19 @@ final class FindProductSet implements ProductSets
                     if ($checked === null) {
                         return;
                     }
-                    $wrong = array_map('strval', (array) ($checked->data['wrong'] ?? []));
+                    // each taken out with why, for the run: what the operator reads when a product is missed
+                    $why = [];
+                    foreach ((array) ($checked->data['wrong'] ?? []) as $item) {
+                        $ref = (string) (is_array($item) ? ($item['id'] ?? '') : $item);
+                        if (isset($byRef[$ref])) {
+                            $why[$ref] = $byRef[$ref]->title.' — '.self::line(is_array($item) ? ($item['why'] ?? '') : '', 120);
+                        }
+                    }
+                    $wrong = array_keys($why);
                     $matches = array_values(array_diff($matches, $wrong));
                     $near = array_values(array_diff($near, $wrong));
                     $ask = ($checked->data['ask_ok'] ?? false) === true && $matches !== [] ? $ask : null;
-                    $run->summary('thinking::runs.checked', ['dropped' => (string) count(array_intersect($wrong, array_keys($byRef))), 'kept' => (string) (count($matches) + count($near))]);
+                    $run->summary('thinking::runs.checked', ['dropped' => (string) count($wrong), 'kept' => (string) (count($matches) + count($near))]);
                 }
 
                 $external = fn (array $list): array => array_map(fn (string $r): string => (string) $byRef[$r]->external_id, $list);
@@ -500,7 +508,7 @@ final class FindProductSet implements ProductSets
                     'chosen_by' => $picker->provider->value.' · '.$picker->model.' / '.$checker->provider->value.' · '.$checker->model,
                     'run_id' => $run->runId,
                 ]);
-                $run->output(['subject' => $subject, 'candidates' => count($byRef), 'picked' => $picks, 'chosen' => count($matches), 'near' => count($near), 'asks' => $ask !== null, 'title' => $title]);
+                $run->output(['subject' => $subject, 'candidates' => count($byRef), 'picked' => $picks, 'chosen' => count($matches), 'near' => count($near), 'asks' => $ask !== null, 'title' => $title, 'taken_out' => array_values($why ?? [])]);
             },
         );
 

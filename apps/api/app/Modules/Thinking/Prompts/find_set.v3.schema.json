@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["matches", "title", "near", "near_title", "ask"],
+    "properties": {
+        "matches": {"type": "array", "items": {"type": "string"}},
+        "title": {"type": "string"},
+        "near": {"type": "array", "items": {"type": "string"}},
+        "near_title": {"type": "string"},
+        "ask": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["question", "options"],
+            "properties": {
+                "question": {"type": "string"},
+                "options": {"type": "array", "items": {"type": "string"}}
+            }
+        }
+    }
+}
