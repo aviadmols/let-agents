@@ -248,8 +248,10 @@ final class BuildSearchIndex
         $counts['answer'] = 0;
 
         foreach ($this->answers($shopId) as $answer) {
-            // w: about the store, not one product or guide; the drawer offers those first, answered as they are
-            $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources'], 'w' => $answer['store'] ? 1 : null]);
+            // w: about the store, not one product or guide; ak: what it is about (product, content, store), and
+            // an: how many asked it: the drawer's "what people ask here" shows the most asked, then one of each kind
+            $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources'], 'w' => $answer['store'] ? 1 : null,
+                'ak' => $answer['kind'], 'an' => $answer['asked']]);
             $counts['answer']++;
         }
 
@@ -565,6 +567,8 @@ final class BuildSearchIndex
             ->map(fn (AssistantAnswer $a): array => [
                 'id' => $a->id,
                 'store' => $a->product_id === null && $a->content_id === null,
+                'kind' => $a->product_id !== null ? 'product' : ($a->content_id !== null ? 'content' : 'store'),
+                'asked' => (int) $a->asked_count,
                 'question' => $a->question,
                 'answer' => mb_substr((string) $a->answer, 0, 400),
                 'sources' => $a->product !== null

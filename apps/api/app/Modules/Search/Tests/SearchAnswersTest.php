@@ -79,6 +79,10 @@ final class SearchAnswersTest extends TestCase
         $titles = array_column(array_filter($index['items'], fn (array $i): bool => $i['t'] === 'answer'), 'title');
 
         $this->assertEqualsCanonicalizing(['כל כמה זמן צריך לשמן דק?', 'כמה ברגים צריך למטר דק?'], $titles);
+        // what each is about and how many asked it: the drawer's "what people ask here", the most asked and one of each kind
+        $kinds = array_column(array_filter($index['items'], fn (array $i): bool => $i['t'] === 'answer'), 'ak', 'title');
+        $this->assertSame(['כל כמה זמן צריך לשמן דק?' => 'product', 'כמה ברגים צריך למטר דק?' => 'store'], array_intersect_key($kinds, ['כל כמה זמן צריך לשמן דק?' => 1, 'כמה ברגים צריך למטר דק?' => 1]));
+        $this->assertContainsOnly('int', array_column(array_filter($index['items'], fn (array $i): bool => $i['t'] === 'answer'), 'an'));
         $this->assertTrue($index['config']['ask'], 'the box may send a question, on Enter');
         $this->assertNull($index['config']['whatsapp'], 'no WhatsApp until the shop sets one');
 

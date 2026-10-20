@@ -85,7 +85,7 @@
       open: 'חיפוש חכם', close: 'סגירה', saved: 'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Lets', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
       placeholder: 'חפשו מוצר, או שאלו כל דבר', placeholderProduct: 'שאלו על המוצר הזה, או חפשו כל דבר', clear: 'ניקוי', photo: 'חיפוש לפי תמונה', send: 'שליחה',
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
-      recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'אפשר לשאול למשל', removeRecent: 'הסרה',
+      recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'מה אנשים שואלים כאן:', removeRecent: 'הסרה',
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
       showAll: 'הצגת כל :n התוצאות', askSpecific: 'אפשר לחפש מוצר, או לשאול שאלה מדויקת יותר, למשל לפי נושא, קהל או תקציב, ואעזור למצוא.', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
@@ -138,7 +138,7 @@
       open: 'Smart search', close: 'Close', saved: 'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
       placeholder: 'Search for a product, or ask anything', placeholderProduct: 'Ask about this product, or search anything', clear: 'Clear', photo: 'Search by photo', send: 'Send',
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
-      recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'You could ask', removeRecent: 'Remove',
+      recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'What people ask here:', removeRecent: 'Remove',
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
       showAll: 'Show all :n results', askSpecific: 'You can search for a product, or ask a more specific question, for example by topic, audience or budget, and I will help find it.', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
@@ -1243,12 +1243,29 @@
   }
 
   // ---------------------------------------------------------------- welcome (empty drawer)
+  // "What people ask here": only questions with an answer shoppers already got, shared in the store's bank (it
+  // keeps an answer only once the daily review scored it well and flagged nothing), shown as they are on a click.
+  // Those asked most come first (asked at least twice); the rest of the five are of each kind: three about products,
+  // one about the store's service (shipping, returns), one about a guide or post. Never an example the assistant
+  // may not be able to answer.
+  var ASK_SHOWN = 5, ASK_COMMON = 2, ASK_KINDS = { product: 3, store: 1, content: 1 };
+  function peopleAsk() {
+    var all = Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.ans; });
+    // an index from before kinds were kept: its store answers, as before
+    if (!all.some(function (r) { return r.ak; })) { return all.filter(function (r) { return r.w === 1; }).slice(0, 2); }
+    var out = all.filter(function (r) { return (r.an || 0) >= ASK_COMMON; }).sort(function (a, b) { return (b.an || 0) - (a.an || 0); }).slice(0, ASK_SHOWN);
+    var have = {}, left = {};
+    out.forEach(function (r) { have[r.ak] = (have[r.ak] || 0) + 1; });
+    Object.keys(ASK_KINDS).forEach(function (k) { left[k] = Math.max(0, ASK_KINDS[k] - (have[k] || 0)); });
+    all.forEach(function (r) {
+      if (out.length < ASK_SHOWN && left[r.ak] > 0 && out.indexOf(r) < 0) { out.push(r); left[r.ak]--; }
+    });
+    return out;
+  }
   function welcome() {
     // the shop's own most searched words (the index config), never anyone else's: none yet, no section
     var pop = S.config.popular || [];
-    // only questions about the store that already have an answer shoppers got (the index's, most asked first),
-    // shown as they are on a click: never an example the assistant may not be able to answer
-    var asks = off('ask') ? [] : Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.w === 1 && r.ans; }).slice(0, 2);
+    var asks = off('ask') ? [] : peopleAsk();
     return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t(welcomeSub())) + '</p>' +
       // one row that scrolls (a swipe, or a drag with the mouse); the small button opens them all
       (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + (pop.length > 3 ? '<button class="ls-sec__more" data-pop-all aria-expanded="' + !!S.popAll + '">' + esc(t(S.popAll ? 'popLess' : 'popAll')) + '</button>' : '') + '</div>' +
@@ -1258,7 +1275,11 @@
         return '<span class="ls-chip ls-chip--quiet ls-recent"><button class="ls-recent__q" data-recent="' + esc(q) + '">' + icon('history', 'ls-icon--sm') + '<span dir="auto">' + esc(q) + '</span></button>' +
           '<button class="ls-recent__x" data-unrecent="' + esc(q) + '" aria-label="' + esc(t('removeRecent') + ': ' + q) + '">' + icon('x', 'ls-icon--sm') + '</button></span>';
       }).join('') + '</div>' : '') +
-      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (a) { return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span></span></button>'; }).join('') +
+      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (a) {
+        // a question about one product or guide says which: "על מה הספר?" alone says nothing here
+        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(decode(a.src[0].title)) + '</span>' : '';
+        return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span>' + about + '</span></button>';
+      }).join('') +
       '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
 
