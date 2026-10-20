@@ -3,7 +3,9 @@
 namespace App\Modules\Taxonomy;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Taxonomy\Console\TaxonomyCommand;
+use App\Modules\Taxonomy\Support\TagWords;
 
 /**
  * A store's tag bank and its products' tags, for any kind of store (BuildTagBank, AssignTags,
@@ -14,7 +16,7 @@ final class TaxonomyServiceProvider extends ModuleServiceProvider
 {
     protected function registerModule(): void
     {
-        //
+        $this->app->bind(ProductTags::class, TagWords::class);
     }
 
     protected function bootModule(): void

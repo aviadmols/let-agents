@@ -4,6 +4,7 @@ namespace App\Modules\Assistant\Actions;
 
 use App\Core\Facades\Settings;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -71,9 +72,11 @@ final class BuildShopKnowledge
 
         $row = $this->row(self::REPEATED);
         $hidden = (array) ($row?->terms['hidden'] ?? []);
+        // a banner's line of what is still to come on a day already gone ("המשלוח הבא יוצא ב־15.9") is
+        // no longer the store's word: left out, as the team would hide it
         $found = array_values(array_filter(
             RepeatedText::repeated($pages, (float) Settings::get('assistant.knowledge_share')),
-            fn (array $s): bool => ! in_array(RepeatedText::key($s['text']), $hidden, true),
+            fn (array $s): bool => ! in_array(RepeatedText::key($s['text']), $hidden, true) && ! Dated::past($s['text']),
         ));
 
         $this->put(self::REPEATED, 'repeated', implode("\n", array_map(fn (array $s): string => '- '.$s['text'], $found)), [

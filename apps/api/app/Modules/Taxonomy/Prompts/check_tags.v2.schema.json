@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["wrong"],
+    "properties": {
+        "wrong": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "ref", "why"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {"type": "string"},
+                    "why": {"type": "string"}
+                }
+            }
+        }
+    }
+}

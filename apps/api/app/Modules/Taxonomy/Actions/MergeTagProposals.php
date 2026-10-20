@@ -4,6 +4,7 @@ namespace App\Modules\Taxonomy\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -22,7 +23,8 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * The bank grows from what tagging found it lacks, not by itself.
  *
- * 1. Code takes the open proposals made for at least taxonomy.min_support products or posts; the
+ * 1. Code takes the open proposals made for at least taxonomy.min_support products or posts (one, by
+ *    default: how many is no reason a concept is right, its relevance and grounding are); the
  *    same wording in a group was already one proposal (AssignTags), and one the group holds under
  *    those words was never kept.
  * 2. A model of the other family than the tagger's decides each, group by group, against the
@@ -37,10 +39,13 @@ final class MergeTagProposals
 
     public const ACTION = 'taxonomy.merge_proposals';
 
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     /** Products a new tag's words are looked for in, at most. */
     private const RETAG_MAX = 500;
+
+    /** Titles of what a tag was proposed for, sent with it, at most. */
+    private const TITLES = 5;
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -93,7 +98,8 @@ final class MergeTagProposals
             $reply = $this->models->call($run, 'merge_proposals', self::PROMPT_VERSION, 'bank_writer', [
                 'group' => ['key' => $group->key, 'label' => $group->label_he.' / '.$group->label_en, 'kind' => $group->kind,
                     'tags' => $group->tags->map(fn (TaxonomyTag $t): array => ['key' => $t->key, 'label_he' => $t->label_he, 'label_en' => $t->label_en, 'words' => (array) $t->words])->values()->all()],
-                'proposals' => array_map(fn (string $ref, TaxonomyProposal $p): array => ['id' => $ref, 'label_he' => $p->label_he, 'label_en' => $p->label_en, 'why' => (string) $p->why, 'count' => count((array) $p->subjects)], array_keys($byRef), $byRef),
+                'proposals' => array_map(fn (string $ref, TaxonomyProposal $p): array => ['id' => $ref, 'label_he' => $p->label_he, 'label_en' => $p->label_en, 'why' => (string) $p->why,
+                    'count' => count((array) $p->subjects), 'for' => $this->titles((array) $p->subjects)], array_keys($byRef), $byRef),
             ]);
             if ($reply === null) {
                 return;
@@ -148,6 +154,21 @@ final class MergeTagProposals
         $count['retag'] = count($retag);
 
         $run->output($count + ['bank_version' => Bank::version()])->summary('taxonomy::runs.merged', ['added' => (string) $count['added'], 'merged' => (string) $count['merged'], 'rejected' => (string) $count['rejected']]);
+    }
+
+    /**
+     * The titles of some of what a tag was proposed for, so it is judged by what those products are.
+     *
+     * @param  list<array{0: string, 1: string}>  $subjects
+     * @return list<string>
+     */
+    private function titles(array $subjects): array
+    {
+        $ids = array_slice($subjects, 0, self::TITLES);
+        $products = CatalogProduct::query()->whereIn('id', array_column(array_filter($ids, fn (array $s): bool => $s[0] === TaxonomyAssignment::PRODUCT), 1))->pluck('title')->all();
+        $posts = CatalogContent::query()->whereIn('id', array_column(array_filter($ids, fn (array $s): bool => $s[0] === TaxonomyAssignment::CONTENT), 1))->pluck('title')->all();
+
+        return array_values(array_map('strval', [...$products, ...$posts]));
     }
 
     /** @return list<string> catalog ids of the products whose title or description holds the tag's words */

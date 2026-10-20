@@ -42,7 +42,7 @@ final class BuildTagBank
     public const ACTION = 'taxonomy.build_bank';
 
     /** tag_bank and tag_bank_review */
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -112,7 +112,7 @@ final class BuildTagBank
         foreach (array_values($bank) as $position => $g) {
             $group = TaxonomyGroup::query()->create([
                 'shop_id' => $shopId, 'key' => $g['key'], 'label_he' => $g['label_he'], 'label_en' => $g['label_en'], 'kind' => $g['kind'],
-                'multiple' => $g['multiple'], 'searchable' => $g['searchable'], 'filter' => $g['filter'], 'recommend' => $g['recommend'],
+                'multiple' => $g['multiple'], 'searchable' => $g['searchable'], 'filter' => $g['filter'], 'recommend' => $g['recommend'], 'from_picture' => $g['from_picture'],
                 'about' => $g['about'] ?: null, 'scope' => $g['scope'] ?: null, 'position' => $position, 'version' => $version,
             ]);
             $made = [];
@@ -178,6 +178,7 @@ final class BuildTagBank
                 'searchable' => (bool) ($g['searchable'] ?? true),
                 'filter' => (bool) ($g['filter'] ?? false),
                 'recommend' => (bool) ($g['recommend'] ?? false),
+                'from_picture' => (bool) ($g['from_picture'] ?? false),
                 'about' => self::line($g['about'] ?? '', 300),
                 // only the store's own category names
                 'scope' => array_values(array_unique(array_filter(array_map(fn ($c): ?string => $categories[mb_strtolower(trim((string) $c))] ?? null, (array) ($g['scope'] ?? []))))),
@@ -244,7 +245,7 @@ final class BuildTagBank
             $g = (string) ($f['group'] ?? '');
             if (isset($bank[$g])) {
                 $bank[$g]['kind'] = ($f['kind'] ?? '') === TaxonomyGroup::FACTUAL ? TaxonomyGroup::FACTUAL : TaxonomyGroup::INFERRED;
-                foreach (['searchable', 'filter', 'recommend'] as $flag) {
+                foreach (['searchable', 'filter', 'recommend', 'from_picture'] as $flag) {
                     $bank[$g][$flag] = (bool) ($f[$flag] ?? $bank[$g][$flag]);
                 }
                 $bank[$g]['scope'] = array_values(array_unique(array_filter(array_map(fn ($c): ?string => $categories[mb_strtolower(trim((string) $c))] ?? null, (array) ($f['scope'] ?? [])))));

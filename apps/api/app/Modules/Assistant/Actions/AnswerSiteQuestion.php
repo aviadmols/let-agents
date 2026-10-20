@@ -22,6 +22,7 @@ use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
+use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\NoAnswer;
 use App\Modules\Assistant\Support\Offenders;
 use App\Modules\Assistant\Support\Privacy;
@@ -564,6 +565,12 @@ final class AnswerSiteQuestion
 
             if ($entry->external_id === BuildShopKnowledge::POSTS) {
                 $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
+            }
+
+            // what every page repeats, without a banner's line whose day is gone ("המשלוח הבא יוצא ב־15.9"):
+            // read since the pages were, it would be told as the store's word today
+            if ($entry->external_id === BuildShopKnowledge::REPEATED) {
+                $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => ! Dated::past($line)));
             }
 
             if ($text !== '') {
@@ -1389,6 +1396,8 @@ final class AnswerSiteQuestion
             self::hasRef($text) => 'internal_ref',
             self::hasNumberNotIn($text, $known) => 'number_not_in_the_pages',
             self::hasMeasureNotIn($text, $known) => 'measure_not_in_the_pages',
+            // something still to come on a day already gone: a stale banner told as news
+            Dated::past($text) => 'past_date',
             default => null,
         };
 

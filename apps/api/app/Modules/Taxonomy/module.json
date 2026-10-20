@@ -7,7 +7,8 @@
         "Ai",
         "Catalog",
         "Retrieval",
-        "Enrichment"
+        "Enrichment",
+        "Search"
     ],
     "provider": "TaxonomyServiceProvider",
     "features": [
@@ -45,12 +46,15 @@
         { "name": "keep_min_percent", "type": "int", "default": 60, "min": 0, "max": 100, "scope": "global", "unit": "percent" },
         { "name": "knowledge_min_percent", "type": "int", "default": 75, "min": 0, "max": 100, "scope": "global", "unit": "percent" },
         { "name": "audit_percent", "type": "int", "default": 100, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
-        { "name": "min_support", "type": "int", "default": 2, "min": 1, "max": 50, "scope": "shop", "unit": "items" },
+        { "name": "min_support", "type": "int", "default": 1, "min": 1, "max": 50, "scope": "shop", "unit": "items" },
         { "name": "trust_inferred_percent", "type": "int", "default": 85, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
         { "name": "trust_picture_percent", "type": "int", "default": 80, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
         { "name": "trust_knowledge_percent", "type": "int", "default": 70, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
         { "name": "store_categories_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" },
-        { "name": "store_tags_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" }
+        { "name": "store_tags_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" },
+        { "name": "search_min_weight_percent", "type": "int", "default": 50, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "gap_weight_percent", "type": "int", "default": 60, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "gap_products", "type": "int", "default": 60, "min": 5, "max": 300, "scope": "shop", "unit": "products" }
     ],
     "agents": [
         {
@@ -71,7 +75,7 @@
                     "provider": "bank_reviewer_provider",
                     "model": "bank_reviewer_model",
                     "prices": ["bank_reviewer_input_usd_per_million", "bank_reviewer_output_usd_per_million"],
-                    "prompts": ["tag_bank_review"]
+                    "prompts": ["tag_bank_review", "bank_gaps"]
                 }
             ]
         },

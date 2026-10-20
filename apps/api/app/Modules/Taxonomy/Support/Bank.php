@@ -33,6 +33,7 @@ final class Bank
             'name' => $g->label_he.' / '.$g->label_en,
             'kind' => $g->kind,
             'multiple' => $g->multiple,
+            'picture' => $g->from_picture,
             'scope' => array_values((array) $g->scope),
             'tags' => $g->tags->map(fn (TaxonomyTag $t): array => array_filter([
                 'tag' => $t->key,

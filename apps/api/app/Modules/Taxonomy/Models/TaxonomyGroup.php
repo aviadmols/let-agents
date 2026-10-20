@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $recommend its tags help choose what to show next to a product
  * @property string|null $about
  * @property list<string>|null $scope the store's categories it applies to (genre to books, size to clothes); empty: all
+ * @property bool $from_picture its tags may be read from a product's picture: a colour, a shape, a style; never a stone, a karat or a material
  * @property int $position
  * @property int $version the bank's version it came in with
  */
@@ -38,7 +39,7 @@ class TaxonomyGroup extends Model
 
     protected function casts(): array
     {
-        return ['multiple' => 'boolean', 'searchable' => 'boolean', 'filter' => 'boolean', 'recommend' => 'boolean', 'scope' => 'array', 'position' => 'integer', 'version' => 'integer'];
+        return ['multiple' => 'boolean', 'searchable' => 'boolean', 'filter' => 'boolean', 'recommend' => 'boolean', 'from_picture' => 'boolean', 'scope' => 'array', 'position' => 'integer', 'version' => 'integer'];
     }
 
     /**

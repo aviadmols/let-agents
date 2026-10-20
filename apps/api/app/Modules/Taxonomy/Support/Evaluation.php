@@ -62,12 +62,19 @@ final class Evaluation
             $top = $product === null ? [] : $like->to($product->id, (int) ($case['within'] ?? 3));
             $titles = CatalogProduct::query()->whereIn('id', array_column($top, 'id'))->pluck('title', 'id');
             $shown = array_map(fn (array $r): string => (string) ($titles[$r['id']] ?? $r['id']).' ('.$r['score'].': '.implode(', ', array_slice($r['shared'], 0, 3)).')', $top);
+            // what may rightly come up: a pattern any of several titles meets ("רובי": any ruby ring), at least
+            // min of the first `within` of them; or titles named one by one
+            if (isset($case['match'])) {
+                $hits[1]++;
+                $meet = count(array_filter($titles->all(), fn (string $t): bool => preg_match('/'.$case['match'].'/u', $t) === 1));
+                $hits[0] += $meet >= (int) ($case['min'] ?? 1) ? 1 : 0;
+            }
             foreach ((array) ($case['expect'] ?? []) as $title) {
                 $hits[1]++;
                 $found = in_array($title, $titles->all(), true);
                 $hits[0] += $found ? 1 : 0;
             }
-            $related[] = ['title' => $case['title'], 'top' => $shown, 'expect' => (array) ($case['expect'] ?? [])];
+            $related[] = ['title' => $case['title'], 'top' => $shown, 'expect' => $case['match'] ?? (array) ($case['expect'] ?? [])];
         }
 
         $all = TaxonomyAssignment::query()->get(['subject_type', 'status', 'source', 'checked', 'explicit']);
@@ -76,8 +83,8 @@ final class Evaluation
         // this shop's runs only, of every kind: one that stopped half way paid for what it did
         $assignRuns = Run::query()->where('shop_id', $shopId)->where('action', AssignTags::ACTION)->get(['output', 'cost_usd']);
         $bankRuns = Run::query()->where('shop_id', $shopId)->whereIn('action', [BuildTagBank::ACTION, MergeTagProposals::ACTION])->get(['cost_usd']);
-        $dropped = collect(['dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'unquoted'])->mapWithKeys(fn (string $k): array => [$k => (int) $assignRuns->sum(fn (Run $r): int => (int) ($r->output[$k] ?? 0))])->all();
-        $given = max(1, $all->count() + array_sum(array_slice($dropped, 0, 3)));
+        $dropped = collect(['dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'dropped_picture', 'unquoted'])->mapWithKeys(fn (string $k): array => [$k => (int) $assignRuns->sum(fn (Run $r): int => (int) ($r->output[$k] ?? 0))])->all();
+        $given = max(1, $all->count() + array_sum(array_slice($dropped, 0, 4)));
         $assignCost = (float) $assignRuns->sum('cost_usd');
 
         return [

@@ -79,5 +79,6 @@ return [
         'assign_tags' => 'Gives products and posts tags of the bank, each with its source and evidence',
         'check_tags' => 'Checks the tags given and takes out what does not fit',
         'merge_proposals' => 'Decides on proposed tags: add to the bank, merge into one it has, or reject',
+        'bank_gaps' => 'Reads products the bank does not describe well and proposes the concepts it lacks',
     ],
 ];

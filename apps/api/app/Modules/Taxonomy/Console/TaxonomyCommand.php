@@ -6,6 +6,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Taxonomy\Actions\AssignTags;
 use App\Modules\Taxonomy\Actions\BuildTagBank;
 use App\Modules\Taxonomy\Actions\MergeTagProposals;
+use App\Modules\Taxonomy\Actions\ScanBankGaps;
 use App\Modules\Taxonomy\Models\TaxonomyGroup;
 use App\Modules\Taxonomy\Support\Bank;
 use App\Modules\Taxonomy\Support\Evaluation;
@@ -17,13 +18,14 @@ use Illuminate\Console\Command;
  *
  *   taxonomy bank sellameir [--fresh]        the bank, from a sample of the store
  *   taxonomy assign sellameir [--limit=40]   tags what changed since it was tagged [--all: everything]
- *   taxonomy merge sellameir                 the proposals made often enough: add, merge or reject
+ *   taxonomy gaps sellameir                  what the bank lacks, read from the products it does not describe
+ *   taxonomy merge sellameir                 the proposals: add, merge or reject
  *   taxonomy eval sellameir [--sample=15]    against the reviewed cases (resources/evals/{slug}.json), and the cost
  *   taxonomy show sellameir                  the bank
  */
 final class TaxonomyCommand extends Command
 {
-    protected $signature = 'taxonomy {action : bank|assign|merge|eval|show} {shop : the shop\'s slug or id}
+    protected $signature = 'taxonomy {action : bank|assign|gaps|merge|eval|show} {shop : the shop\'s slug or id}
         {--fresh : bank: start the bank afresh, taking its tags off every product}
         {--limit= : assign: at most this many products and posts}
         {--all : assign: every one, not only what changed}
@@ -47,6 +49,7 @@ final class TaxonomyCommand extends Command
             'bank' => app(BuildTagBank::class)->handle($shop->id, (bool) $this->option('fresh')),
             'assign' => app(AssignTags::class)->handle($shop->id, $this->option('limit') === null ? null : (int) $this->option('limit'), (bool) $this->option('all'), ! $this->option('no-posts')),
             'merge' => app(MergeTagProposals::class)->handle($shop->id),
+            'gaps' => app(ScanBankGaps::class)->handle($shop->id),
             default => null,
         };
 

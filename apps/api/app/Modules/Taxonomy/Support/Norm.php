@@ -31,6 +31,40 @@ final class Norm
         return mb_strlen($quote) >= 3 && str_contains(' '.implode(' ', self::words($text)).' ', $quote);
     }
 
+    /**
+     * Whether a passage given as evidence stands in the text, as a reader would say it does: word for
+     * word, or with most of its words there in about its order (a model that rephrases a few words of a
+     * real sentence has not made it up; one whose words the text does not hold has). The tag's own name
+     * is never asked for: a book on leadership that never writes "leadership" is justified by what it says.
+     */
+    public static function grounded(string $evidence, string $text, float $share = 0.8): bool
+    {
+        if (self::quoted($evidence, $text)) {
+            return true;
+        }
+
+        $quote = array_values(array_filter(self::words($evidence), fn (string $w): bool => mb_strlen($w) >= 2));
+        if (count($quote) < 3) {
+            return false;
+        }
+
+        // each word found after the one before it, a word or two of the passage allowed to be missing
+        $words = self::words($text);
+        $at = 0;
+        $found = 0;
+        foreach ($quote as $word) {
+            for ($i = $at; $i < count($words); $i++) {
+                if ($words[$i] === $word || (mb_strlen($word) > 3 && str_contains($words[$i], $word))) {
+                    $found++;
+                    $at = $i + 1;
+                    break;
+                }
+            }
+        }
+
+        return $found / count($quote) >= $share;
+    }
+
     /** @return list<string> */
     public static function words(string $text): array
     {

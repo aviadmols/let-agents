@@ -39,5 +39,8 @@ return [
     'trust_knowledge_percent' => ['label' => 'Weight of a tag from knowledge', 'description' => 'A tag resting on what is known of a well-known work or product is worth this share of one said outright.'],
     'store_categories_percent' => ['label' => 'Weight of the store\'s categories', 'description' => 'A category of the store counts as a tag of this weight (100 = a central tag said outright). One holding almost everything weighs almost nothing.'],
     'store_tags_percent' => ['label' => 'Weight of the store\'s own tags', 'description' => 'A tag the store itself gave a product counts at this weight.'],
-    'min_support' => ['label' => 'A proposed new tag', 'description' => 'A tag the bank lacks is weighed only once it was proposed for at least this many products.'],
+    'min_support' => ['label' => 'A proposed new tag', 'description' => 'A tag the bank lacks is weighed once it was proposed for at least this many products (1: every proposal is weighed by its relevance, not by how many).'],
+    'search_min_weight_percent' => ['label' => 'A tag in search', 'description' => 'Only a tag at least this central to a product enters the words the search finds it by. One in its background (Israel in a book on economics) does not.'],
+    'gap_weight_percent' => ['label' => 'A product the bank does not describe', 'description' => 'A product with no tag at least this central in the inferred groups is read by the gap scan.'],
+    'gap_products' => ['label' => 'Products in a gap scan', 'description' => 'At most this many products are read in each gap scan, spread through the catalogue.'],
 ];

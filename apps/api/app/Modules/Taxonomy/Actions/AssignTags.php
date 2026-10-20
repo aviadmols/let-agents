@@ -48,7 +48,7 @@ final class AssignTags
     public const ACTION = 'taxonomy.assign';
 
     /** assign_tags and check_tags */
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     /** @var array<string, int> */
     private array $count = [];
@@ -80,7 +80,7 @@ final class AssignTags
 
     private function assign(RunContext $run, string $shopId, ?int $limit, bool $all, bool $posts, ?array $productIds): void
     {
-        $this->count = array_fill_keys(['subjects', 'calls', 'kept', 'review', 'rejected', 'dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'unquoted', 'catalog', 'picture', 'knowledge', 'proposed', 'proposals_known', 'audited'], 0);
+        $this->count = array_fill_keys(['subjects', 'calls', 'kept', 'review', 'rejected', 'dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'dropped_picture', 'unquoted', 'catalog', 'picture', 'knowledge', 'proposed', 'proposals_known', 'audited'], 0);
         $groups = Bank::groups();
 
         if ($groups->isEmpty()) {
@@ -233,13 +233,20 @@ final class AssignTags
                 continue;
             }
 
-            $quoted = match ($source) {
-                'catalog' => Norm::quoted($evidence, $catalog),
-                'picture' => $item['picture'] !== '' && Norm::quoted($evidence, $item['picture']),
-                default => false,
-            };
+            // what a picture may say is the group's to allow: a colour, a shape, a style it shows; never what a
+            // stone is, a metal's karat or what a thing is made of, which only the store's own words say
+            if ($source === 'picture' && ! $group->from_picture) {
+                $this->count['dropped_picture']++;
+                $dropped++;
 
-            // a factual tag only on the store's words or the picture, as they are
+                continue;
+            }
+
+            $seen = $source === 'picture' ? $item['picture'] : $catalog;
+            // a factual tag on the store's words or the picture, as they are; an inferred one on a passage that
+            // stands in them, most of its words in about their order, the tag's own name never asked for
+            $quoted = $source !== 'knowledge' && $seen !== '' && ($group->kind === TaxonomyGroup::FACTUAL ? Norm::quoted($evidence, $seen) : Norm::grounded($evidence, $seen));
+
             if ($group->kind === TaxonomyGroup::FACTUAL && ! $quoted) {
                 $this->count['dropped_unsupported']++;
                 $dropped++;

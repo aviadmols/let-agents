@@ -1,5 +1,5 @@
 {
-    "about": "Rocks and Gold (jewellery). Each case: a product by its title, patterns one of its kept tags must match (expect) and patterns none may match (reject: the negative cases, such as an emerald cut read as an emerald, or a yellow sapphire read as blue). Patterns are matched against the tag's group and tag names (\"אבן חן: רובי\"), its English name, key and other words. Facts taken from the titles alone. Reviewed by hand, 20.10.2026.",
+    "about": "Rocks and Gold (jewellery). Related: any of several right answers, as a pattern the first few titles must meet at least min times. Each case: a product by its title, patterns one of its kept tags must match (expect) and patterns none may match (reject: the negative cases, such as an emerald cut read as an emerald, or a yellow sapphire read as blue). Patterns are matched against the tag's group and tag names (\"אבן חן: רובי\"), its English name, key and other words. Facts taken from the titles alone. Reviewed by hand, 20.10.2026.",
     "cases": [
         {"title": "טבעת וינטאג משובצת אבני רובי, ציטרין ויהלומים - מק\"ט 50568, זהב 18K", "expect": ["אבן חן: רובי", "18 קארט", "צבע האבן: אדום"], "reject": ["14 קארט"]},
         {"title": "טבעת וינטאג משובצת אבני ספיר ויהלומים בחיתוך פרינסס - מק\"ט 13651, זהב 14K", "expect": ["אבן חן: ספיר", "פרינסס", "14 קארט"], "reject": ["18 קארט", "אבן חן: רובי"]},
@@ -15,6 +15,8 @@
         {"title": "טבעת וינטג' משובצת פנינה - מק\"ט 15105, זהב 14K", "expect": ["אבן חן: פנינה"], "reject": ["אבן חן: יהלום"]}
     ],
     "related": [
-        {"title": "טבעת וינטאג משובצת אבני רובי, ציטרין ויהלומים - מק\"ט 50568, זהב 18K", "expect": ["טבעת אבזם משובצת אבני רובי - מק\"ט 14855, זהב 18K", "טבעת וינטג' פרחים משובצים יהלום ורובי - מק\"ט 33452, זהב 14K"], "within": 5}
+        {"title": "טבעת וינטאג משובצת אבני רובי, ציטרין ויהלומים - מק\"ט 50568, זהב 18K", "match": "רובי", "min": 3, "within": 5},
+        {"title": "טבעת וינטאג משובצת אבני ספיר ויהלומים בחיתוך פרינסס - מק\"ט 13651, זהב 14K", "match": "ספיר", "min": 2, "within": 5},
+        {"title": "טבעת וינטג' משובצת פנינה - מק\"ט 15105, זהב 14K", "match": "פנינ", "min": 2, "within": 5}
     ]
 }

@@ -2,15 +2,20 @@
 
 namespace App\Modules\Taxonomy\Tests;
 
+use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Taxonomy\Actions\AssignTags;
 use App\Modules\Taxonomy\Actions\BuildTagBank;
 use App\Modules\Taxonomy\Actions\MergeTagProposals;
+use App\Modules\Taxonomy\Actions\ScanBankGaps;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
 use App\Modules\Taxonomy\Models\TaxonomyGroup;
 use App\Modules\Taxonomy\Models\TaxonomyProposal;
@@ -18,6 +23,7 @@ use App\Modules\Taxonomy\Models\TaxonomySubject;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
 use App\Modules\Taxonomy\Support\Bank;
 use App\Modules\Taxonomy\Support\Evaluation;
+use App\Modules\Taxonomy\Support\Norm;
 use App\Modules\Taxonomy\Support\Sample;
 use App\Modules\Tenancy\Models\Shop;
 use Closure;
@@ -132,6 +138,8 @@ final class TaxonomyTest extends TestCase
         $this->assertSame(1, $out['dropped_unsupported'], 'a factual tag with no quote');
         $this->assertSame(1, $out['dropped_scope'], 'a genre for a shirt');
         $this->assertSame(1, $out['dropped_unknown'], 'a tag the bank does not have');
+        $this->assertSame(1, $out['dropped_picture'], 'a fabric read from a picture');
+        $this->assertSame(0, $out['unquoted'], 'a passage reworded a little still stands in the text');
 
         $tags = $this->tagsOf();
         $this->assertSame(['topic:hostages' => 'kept', 'genre:thriller' => 'rejected'], $tags['b1'], 'the checker took the thriller out');
@@ -168,7 +176,9 @@ final class TaxonomyTest extends TestCase
         app(AssignTags::class)->handle($this->shop->id, posts: false);
         $this->replies['You decide which proposed tags'] = fn (array $in): array => ['decisions' => [['id' => 'p1', 'action' => 'add', 'into' => '', 'key' => 'october_7', 'label_he' => 'שבעה באוקטובר', 'label_en' => 'October 7', 'words' => ['7.10'], 'why' => 'נשאל הרבה']]];
 
-        // proposed for one product: not yet
+        // a shop that asks two products of a proposal (one, by default: a concept is weighed by its relevance, not its count)
+        $this->assertSame(1, Settings::get('taxonomy.min_support', $this->shop->id));
+        Settings::set('taxonomy.min_support', 2, $this->shop->id);
         app(MergeTagProposals::class)->handle($this->shop->id);
         $this->assertSame(0, app(TenantContext::class)->run($this->shop->id, fn () => TaxonomyTag::query()->where('key', 'october_7')->count()));
 
@@ -185,6 +195,51 @@ final class TaxonomyTest extends TestCase
             $this->assertSame('added', TaxonomyProposal::query()->sole()->status);
             $this->assertSame(['s1'], CatalogProduct::query()->whereIn('id', TaxonomySubject::query()->pluck('subject_id'))->pluck('external_id')->all(), 'the two it was proposed for wait to be tagged again; the shirt does not');
         });
+    }
+
+    public function test_where_tags_are_in_search_a_product_is_found_by_its_central_tags_and_only_there(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->tagging();
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+        $kw = function (): string {
+            app(BuildSearchIndex::class)->handle($this->shop->id);
+            $index = (array) json_decode((string) app(TenantContext::class)->run($this->shop->id, fn () => SearchIndex::query()->sole()->items), true);
+            $items = $index['items'] ?? $index;
+
+            return (string) collect($items)->firstWhere('title', 'חטוף - אלי שרעבי')['kw'];
+        };
+
+        $this->assertStringNotContainsString('Hostages', $kw(), 'off: the search as it was');
+
+        Features::override('taxonomy.in_search', true, $this->shop->id);
+        $words = $kw();
+        $this->assertStringContainsString('חטופים', $words);
+        $this->assertStringContainsString('Hostages', $words);
+        $this->assertStringNotContainsString('Thriller', $words, 'a tag the checker took out is no word of it');
+    }
+
+    public function test_the_gap_scan_reads_the_products_the_bank_does_not_describe_and_proposes_what_it_lacks(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->tagging();
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+        $this->calls = [];
+        $this->replies['You find what one online store'] = fn (array $in): array => ['proposals' => [
+            ['group' => 'fabric', 'label_he' => 'פשתן מכובס', 'label_en' => 'Washed linen', 'words' => [], 'why' => 'what it is', 'items' => [collect($in['items'])->firstWhere('title', 'חולצת פשתן לבנה')['id'] ?? 'x']],
+            ['group' => 'genre', 'label_he' => 'אימה', 'label_en' => 'Horror', 'words' => [], 'why' => 'dup', 'items' => ['i1']],
+            ['group' => 'nope', 'label_he' => 'משהו', 'label_en' => 'x', 'words' => [], 'why' => '', 'items' => ['i1']],
+        ]];
+
+        $run = app(ScanBankGaps::class)->handle($this->shop->id);
+
+        $titles = array_column($this->calls[0]['user']['items'], 'title');
+        $this->assertContains('חולצת פשתן לבנה', $titles, 'no inferred tag central to it');
+        $this->assertNotContains('חטוף - אלי שרעבי', $titles, 'its topic is central to it');
+        $this->assertSame(['proposed' => 1, 'known' => 1], array_intersect_key($run->output, ['proposed' => 1, 'known' => 1]));
+        $this->assertSame('פשתן מכובס', app(TenantContext::class)->run($this->shop->id, fn () => TaxonomyProposal::query()->where('norm', Norm::label('פשתן מכובס'))->value('label_he')));
     }
 
     public function test_the_tagging_is_measured_against_cases_a_person_reviewed(): void
@@ -248,7 +303,8 @@ final class TaxonomyTest extends TestCase
             }
             if (collect($in['items'])->contains('title', 'חטוף - אלי שרעבי')) {
                 $items[$ref('חטוף - אלי שרעבי')]['tags'] = [
-                    ['group' => 'topic', 'tag' => 'hostages', 'source' => 'catalog', 'evidence' => 'שרד אלי שרעבי בשבי החמאס', 'confidence' => 0.95, 'weight' => 1],
+                    // the passage a little reworded ("של" added): it stands in the text all the same
+                    ['group' => 'topic', 'tag' => 'hostages', 'source' => 'catalog', 'evidence' => 'שרד אלי שרעבי בשבי של החמאס', 'confidence' => 0.95, 'weight' => 1],
                     ['group' => 'genre', 'tag' => 'thriller', 'source' => 'knowledge', 'evidence' => 'מותחן', 'confidence' => 0.8, 'weight' => 0.5],
                     ['group' => 'genre', 'tag' => 'cyberpunk', 'source' => 'knowledge', 'evidence' => '', 'confidence' => 0.9, 'weight' => 0.9],
                 ];
@@ -265,6 +321,8 @@ final class TaxonomyTest extends TestCase
                 $items[$ref('חולצת פשתן לבנה')]['tags'] = [
                     ['group' => 'fabric', 'tag' => 'linen', 'source' => 'catalog', 'evidence' => 'מבד פשתן', 'confidence' => 0.95, 'weight' => 1],
                     ['group' => 'fabric', 'tag' => 'cotton', 'source' => 'knowledge', 'evidence' => 'shirts are often cotton', 'confidence' => 0.9, 'weight' => 0.9],
+                    // what a thing is made of is never read from its picture
+                    ['group' => 'fabric', 'tag' => 'cotton', 'source' => 'picture', 'evidence' => 'בד כותנה', 'confidence' => 0.9, 'weight' => 0.9],
                     ['group' => 'genre', 'tag' => 'thriller', 'source' => 'catalog', 'evidence' => 'חולצה', 'confidence' => 0.9, 'weight' => 0.9],
                 ];
             }
