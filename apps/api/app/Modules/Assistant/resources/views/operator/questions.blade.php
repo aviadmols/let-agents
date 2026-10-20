@@ -59,6 +59,18 @@
                                     </ul>
                                 </div>
                             @endif
+                            @foreach (['in', 'out'] as $side)
+                                @if ($a['bank'][$side] !== [])
+                                    <details @if ($side === 'out') open @endif>
+                                        <summary style="cursor:pointer;font-size:13px;font-weight:600">{{ __('assistant::ui.asks.bank_'.$side, ['count' => count($a['bank'][$side])]) }}</summary>
+                                        <ul style="margin:4px 0 0;padding-inline-start:20px;display:grid;gap:4px">
+                                            @foreach ($a['bank'][$side] as $item)
+                                                <li><span dir="auto">{{ $item['question'] }}</span> <span style="{{ $small }}" dir="ltr">· {{ $item['score'] }}/5</span>@if ($item['flag']) <span style="{{ $small }}">· {{ __('assistant::ui.weak.flags.'.$item['flag']) }}</span>@endif @if ($item['note'])<div style="{{ $small }}">{{ $item['note'] }}</div>@endif</li>
+                                            @endforeach
+                                        </ul>
+                                    </details>
+                                @endif
+                            @endforeach
                             @if (count($a['trend']) > 1)
                                 <div style="{{ $small }}">{{ __('assistant::ui.asks.trend') }}: @foreach ($a['trend'] as $point)<span dir="ltr">{{ $point['day'] }} · {{ $point['score'] ?? '—' }}</span>@if (! $loop->last) &nbsp;|&nbsp; @endif @endforeach</div>
                             @endif

@@ -172,6 +172,10 @@ return [
         'label' => 'Output price of the daily reviewer, per million tokens',
         'description' => 'From the price list of the provider.',
     ],
+    'bank_min_score' => [
+        'label' => 'Lowest score kept in the question bank',
+        'description' => 'The daily review scores each question 1 to 5. An answer scored lower, or flagged as inventing or picking the wrong products, leaves the bank of answers offered to the next asker. Answers the team wrote are never touched.',
+    ],
     'review_max_output_tokens' => [
         'label' => 'Token cap for the daily report',
         'description' => 'Including thinking.',

@@ -27,4 +27,5 @@ return [
     'own_checked' => 'שורה שהצוות הוסיף נבדקה מול האתר. :conflicts סתירות.',
     'prepared' => 'תשובות מוכנות: :questions שאלות על החנות, :answered נענו ועברו בדיקה, :skipped כבר מוכנות ודפיהן לא השתנו.',
     'checker_compared' => 'השוואת בודק התשובות על :cases מקרים קבועים.',
+    'review_done_bank' => 'הדוח היומי ל־:day: :asks שאלות, ציון :score. נכנסו למאגר השאלות: :in, יצאו בגלל ציון נמוך: :out.',
 ];

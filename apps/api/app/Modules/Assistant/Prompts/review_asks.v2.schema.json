@@ -1,0 +1,23 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["items", "summary", "improvements"],
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "score", "note", "flag"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "score": {"type": "integer", "enum": [1, 2, 3, 4, 5]},
+                    "note": {"type": "string"},
+                    "flag": {"type": ["string", "null"], "enum": ["invented", "refused_answerable", "wrong_products", null]}
+                }
+            }
+        },
+        "summary": {"type": "string"},
+        "improvements": {"type": "array", "items": {"type": "string"}}
+    }
+}

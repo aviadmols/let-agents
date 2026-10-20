@@ -14,11 +14,13 @@ use App\Modules\Assistant\Actions\BuildQualityBaseline;
 use App\Modules\Assistant\Actions\ReviewSearchAsks;
 use App\Modules\Assistant\Actions\RunQualityCases;
 use App\Modules\Assistant\Filament\Operator\Pages\AnswerQuality;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantQualityCase;
 use App\Modules\Assistant\Models\AssistantQualityResult;
 use App\Modules\Assistant\Models\AssistantQualityRun;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -221,6 +223,53 @@ final class SearchAsksTest extends TestCase
         $page->assertSee('להוסיף גנרטורים לקטלוג.');
         $page->assertDontSee('reviewNow', false);
         $page->assertDontSee('$0.', false);
+    }
+
+    public function test_the_daily_review_keeps_the_answers_that_scored_well_in_the_bank_and_reports_both(): void
+    {
+        $this->travel(1)->days();
+        $yesterday = now()->subDay();
+        $answers = $this->inShop(function () use ($yesterday): array {
+            $ids = [];
+            foreach ([['על מה הספר חטוף?', null], ['על מה הספר של עומר שם טוב?', null], ['איזה דבק לאריחים?', null], ['מה מדיניות ההחזרות?', 'team']] as $i => [$q, $source]) {
+                $answer = AssistantAnswer::query()->create([
+                    'shop_id' => $this->shop->id, 'question_key' => Question::key($q), 'question' => $q, 'answer' => 'תשובה '.$i,
+                    'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN, 'source' => $source ?? 'store', 'prompt_version' => 7, 'last_asked_at' => $yesterday,
+                ]);
+                AssistantSearchAsk::query()->create([
+                    'shop_id' => $this->shop->id, 'day' => $yesterday->toDateString(), 'question' => $q, 'products' => [], 'answer_id' => $answer->id,
+                    'outcome' => 'answered', 'from' => 'model', 'whatsapp_shown' => false, 'whatsapp_clicked' => false, 'created_at' => $yesterday->copy()->addMinutes($i), 'updated_at' => $yesterday,
+                ]);
+                $ids[] = $answer->id;
+            }
+
+            return $ids;
+        });
+        $this->replies = [[
+            'items' => [
+                ['id' => 'a1', 'score' => 5, 'note' => 'מדויק.', 'flag' => null],
+                ['id' => 'a2', 'score' => 2, 'note' => 'אמר שהספר לא נמצא.', 'flag' => 'refused_answerable'],
+                ['id' => 'a3', 'score' => 4, 'note' => 'הוסיף זמן ייבוש.', 'flag' => 'invented'],
+                ['id' => 'a4', 'score' => 1, 'note' => 'קצר מדי.', 'flag' => null],
+            ],
+            'summary' => 'יום מעורב.',
+            'improvements' => [],
+        ]];
+
+        $run = app(ReviewSearchAsks::class)->handle($this->shop->id);
+
+        $status = $this->inShop(fn () => AssistantAnswer::query()->whereIn('id', $answers)->pluck('status', 'id'));
+        $this->assertSame(['shown', 'hidden', 'hidden', 'shown'], [$status[$answers[0]], $status[$answers[1]], $status[$answers[2]], $status[$answers[3]]], 'a low score or an invention leaves the bank; the team\'s own answer is never touched');
+        $this->assertSame([1, 2], [$run->output['bank_in'], $run->output['bank_out']]);
+        $items = collect($this->inShop(fn () => AssistantAskReview::query()->where('status', AssistantAskReview::REVIEWED)->sole()->items))->keyBy('note');
+        $this->assertSame(['in', 'out', 'out'], [$items['מדויק.']['bank'], $items['אמר שהספר לא נמצא.']['bank'], $items['הוסיף זמן ייבוש.']['bank']]);
+        $this->assertArrayNotHasKey('bank', $items['קצר מדי.']);
+
+        $this->actingAs(User::factory()->operator()->create())->get('/operator/assistant/questions?shop='.$this->shop->id)->assertOk()
+            ->assertSee(__('assistant::ui.asks.bank_in', ['count' => 1]))
+            ->assertSee(__('assistant::ui.asks.bank_out', ['count' => 2]))
+            ->assertSee('על מה הספר של עומר שם טוב?')
+            ->assertSee(__('assistant::ui.weak.flags.invented'));
     }
 
     public function test_an_answer_that_invents_or_scores_low_reaches_the_operators_list_of_every_shop(): void

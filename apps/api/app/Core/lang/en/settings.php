@@ -28,6 +28,8 @@ return [
         'questions' => 'questions',
         'hours' => 'hours',
         'visitors' => 'visitors',
+        'values' => 'values',
+        'points' => 'points',
     ],
     'errors' => [
         'not_integer' => 'Enter a whole number.',

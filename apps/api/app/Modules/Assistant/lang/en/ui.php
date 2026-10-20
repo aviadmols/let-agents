@@ -71,6 +71,8 @@ return [
         'open_shop' => 'The shop\'s questions',
     ],
     'asks' => [
+        'bank_in' => 'Entered the store\'s question bank (:count)',
+        'bank_out' => 'Left out: a low score or a flag (:count)',
         'heading' => 'Questions in the search box: the daily report',
         'description' => 'Every morning yesterday\'s questions are checked: what the assistant answered and picked, and what shoppers did next. A score for the day, and what to improve.',
         'out_of' => 'out of 100',

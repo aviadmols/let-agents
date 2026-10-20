@@ -120,8 +120,17 @@ class ShopQuestions extends Page
                 }
             }
 
+            // The latest report's questions by what the review did with their answers: in the bank, or left out.
+            $bank = ['in' => [], 'out' => []];
+            $banked = array_values(array_filter((array) ($latest?->items ?? []), fn (array $item): bool => isset($item['bank'])));
+            $questions = AssistantSearchAsk::query()->whereIn('id', array_column($banked, 'ask_id'))->pluck('question', 'id');
+            foreach ($banked as $item) {
+                $bank[$item['bank']][] = ['question' => (string) ($questions[$item['ask_id']] ?? ''), 'score' => (int) $item['score'], 'note' => (string) ($item['note'] ?? ''), 'flag' => $item['flag'] ?? null];
+            }
+
             return [
                 'latest' => $latest,
+                'bank' => $bank,
                 'trend' => $reviews->where('status', AssistantAskReview::REVIEWED)->sortBy('day')->map(fn (AssistantAskReview $r): array => ['day' => $r->day->format('d/m'), 'score' => $r->score])->values()->all(),
                 'asks' => AssistantSearchAsk::query()->with('answer:id,answer')->latest('created_at')->orderByDesc('id')->limit(40)->get(),
                 'notes' => $notes,

@@ -9,6 +9,7 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -126,14 +127,18 @@ final class ReviewSearchAsks
 
         $shopName = (string) (Shop::query()->whereKey($shopId)->value('name') ?? '');
         $user = (string) json_encode(['shop' => $shopName, 'items' => $items], JSON_UNESCAPED_UNICODE);
-        $system = (string) file_get_contents(__DIR__.'/../Prompts/review_asks.v'.self::PROMPT_VERSION.'.md');
+        $system = (string) file_get_contents($prompt = __DIR__.'/../Prompts/review_asks.v'.self::PROMPT_VERSION.'.md');
+        $schema = AnswerSiteQuestion::schemaFor($prompt);
         $maxOutput = (int) Settings::get('assistant.review_max_output_tokens');
         $in = (float) Settings::get('assistant.review_input_usd_per_million');
         $out = (float) Settings::get('assistant.review_output_usd_per_million');
 
         try {
             $this->spend->assertCanSpend(((mb_strlen($system) + mb_strlen($user)) / 2 * $in + $maxOutput * $out) / 1_000_000);
-            $reply = $this->models->json($reviewer->provider, $reviewer->model, $system, $user, $maxOutput);
+            // Held to its schema where the provider can: a reply that did not parse once failed the whole day.
+            $reply = $schema !== null && $this->models instanceof StructuredChatModel
+                ? $this->models->structured($reviewer->provider, $reviewer->model, $system, $user, $schema, $maxOutput)
+                : $this->models->json($reviewer->provider, $reviewer->model, $system, $user, $maxOutput);
             $run->usage($reviewer->provider->value, $reviewer->model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($in, $out));
         } catch (SpendCapReached $e) {
             $run->fail('assistant::runs.spend_cap', [], $e->getMessage());
@@ -160,6 +165,7 @@ final class ReviewSearchAsks
         }
 
         $score = $scored === [] ? null : (int) round(array_sum(array_column($scored, 'score')) / count($scored) / 5 * 100);
+        $bank = $this->bank($shopId, $scored, $byRef);
         $improvements = array_slice(array_values(array_filter(array_map(fn ($line): string => mb_substr(trim((string) $line), 0, 200), (array) ($reply->data['improvements'] ?? [])))), 0, self::MAX_IMPROVEMENTS);
         $summary = mb_substr(trim((string) ($reply->data['summary'] ?? '')), 0, 1200);
 
@@ -175,8 +181,45 @@ final class ReviewSearchAsks
                 $ask->forceFill(['failure' => $failure])->save();
             }
         }
-        $run->output(['day' => $day, 'asks' => $counts['asks'], 'scored' => count($scored), 'score' => $score])
-            ->summary('assistant::runs.review_done_score', ['day' => $day, 'asks' => (string) $counts['asks'], 'score' => (string) ($score ?? '—')]);
+        $run->output(['day' => $day, 'asks' => $counts['asks'], 'scored' => count($scored), 'score' => $score, 'bank_in' => $bank['in'], 'bank_out' => $bank['out']])
+            ->summary('assistant::runs.review_done_bank', ['day' => $day, 'asks' => (string) $counts['asks'], 'score' => (string) ($score ?? '—'), 'in' => (string) $bank['in'], 'out' => (string) $bank['out']]);
+    }
+
+    /**
+     * The store's bank of answers (what the search box offers the next shopper who asks the same) after
+     * the review: an answer scored under assistant.bank_min_score, or flagged as inventing or as picking
+     * the wrong products, leaves it; the others stay. The team's own answers are never touched. Each
+     * scored item says which ("bank": in or out), for the day's report. Code only.
+     *
+     * @param  array<string, array<string, mixed>>  $scored  by ref, changed in place
+     * @param  array<string, AssistantSearchAsk>  $byRef
+     * @return array{in: int, out: int}
+     */
+    private function bank(string $shopId, array &$scored, array $byRef): array
+    {
+        $min = (int) Settings::get('assistant.bank_min_score', $shopId);
+        $ids = array_values(array_filter(array_map(fn (string $ref) => $byRef[$ref]->answer_id, array_keys($scored))));
+        $answers = AssistantAnswer::query()->whereIn('id', $ids)->get(['id', 'outcome', 'status', 'source'])->keyBy('id');
+        $count = ['in' => 0, 'out' => 0];
+
+        foreach ($scored as $ref => $item) {
+            $answer = $answers->get((string) $byRef[$ref]->answer_id);
+
+            if ($answer === null || $answer->outcome !== AssistantAnswer::ANSWERED || $answer->source === 'team') {
+                continue;
+            }
+
+            $out = $item['score'] < $min || in_array($item['flag'] ?? null, ['invented', 'wrong_products'], true);
+
+            if ($out && $answer->status === AssistantAnswer::SHOWN) {
+                $answer->forceFill(['status' => AssistantAnswer::HIDDEN])->save();
+            }
+
+            $scored[$ref]['bank'] = $out || $answer->status !== AssistantAnswer::SHOWN ? 'out' : 'in';
+            $count[$scored[$ref]['bank']]++;
+        }
+
+        return $count;
     }
 
     /**

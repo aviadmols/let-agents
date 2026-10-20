@@ -28,6 +28,8 @@ return [
         'questions' => 'שאלות',
         'hours' => 'שעות',
         'visitors' => 'גולשים',
+        'values' => 'ערכים',
+        'points' => 'נקודות',
     ],
     'errors' => [
         'not_integer' => 'יש להזין מספר שלם.',
