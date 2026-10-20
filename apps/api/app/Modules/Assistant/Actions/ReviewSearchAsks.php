@@ -38,7 +38,7 @@ final class ReviewSearchAsks
 
     public const ACTION = 'assistant.review_asks';
 
-    public const PROMPT_VERSION = 2;
+    public const PROMPT_VERSION = 3;
 
     /** What the reviewer may mark an item for the operator: an answer that invents, a refusal with the answer at hand, picks off the question. */
     public const FLAGS = ['invented', 'refused_answerable', 'wrong_products'];

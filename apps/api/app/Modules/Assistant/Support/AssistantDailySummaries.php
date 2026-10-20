@@ -44,19 +44,21 @@ final class AssistantDailySummaries implements DailySummaries
             $shops = Shop::query()->whereIn('id', $reviews->pluck('shop_id')->unique())->get()->keyBy('id');
 
             return $reviews->map(function (AssistantAskReview $review) use ($questions, $shops, $operator): DailySummary {
-                $in = [];
-                $out = [];
+                // Each question once, with how many asked it. The shop reads what entered its answers and what will
+                // be looked at again; why one was left out (the reviewer's note: "it invented a book") is the operator's.
+                $lists = ['in' => [], 'out' => []];
                 foreach ((array) $review->items as $item) {
                     $question = trim((string) ($questions[$item['ask_id']] ?? ''));
                     if ($question === '' || ! isset($item['bank'])) {
                         continue;
                     }
-                    if ($item['bank'] === 'in') {
-                        $in[] = $question;
-                    } else {
-                        $out[] = $question.(trim((string) ($item['note'] ?? '')) === '' ? '' : ' — '.trim((string) $item['note']));
-                    }
+                    $key = mb_strtolower((string) preg_replace('/[\s?!.,]+/u', ' ', $question));
+                    $lists[$item['bank']][$key] ??= ['q' => $question, 'n' => 0, 'note' => trim((string) ($item['note'] ?? ''))];
+                    $lists[$item['bank']][$key]['n']++;
                 }
+                $line = fn (array $q, bool $note): string => $q['q'].($q['n'] > 1 ? ' ×'.$q['n'] : '').($note && $q['note'] !== '' ? ' — '.$q['note'] : '');
+                $in = array_map(fn (array $q): string => $line($q, false), array_values($lists['in']));
+                $out = array_map(fn (array $q): string => $line($q, $operator), array_values($lists['out']));
                 $shop = $shops->get($review->shop_id);
 
                 return new DailySummary(
@@ -64,10 +66,10 @@ final class AssistantDailySummaries implements DailySummaries
                     shopId: (string) $review->shop_id,
                     day: $review->day,
                     headline: __('assistant::ui.daily.headline', ['score' => (string) ($review->score ?? '—'), 'asks' => number_format((int) ($review->counts['asks'] ?? 0))]),
-                    summary: $review->summary,
+                    summary: $operator ? $review->summary : ReviewWords::forMerchant($review->summary),
                     lists: array_values(array_filter([
                         $in === [] ? null : ['label' => __('assistant::ui.daily.in', ['count' => count($in)]), 'items' => array_slice($in, 0, self::ITEMS), 'tone' => 'good'],
-                        $out === [] ? null : ['label' => __('assistant::ui.daily.out', ['count' => count($out)]), 'items' => array_slice($out, 0, self::ITEMS), 'tone' => 'warn'],
+                        $out === [] ? null : ['label' => __($operator ? 'assistant::ui.daily.out' : 'assistant::ui.daily.out_shop', ['count' => count($out)]), 'items' => array_slice($out, 0, self::ITEMS), 'tone' => 'warn'],
                     ])),
                     url: $shop === null ? null : ($operator ? OperatorQuestions::getUrl(['shop' => $shop->id], panel: 'operator') : MerchantQuestions::getUrl(panel: 'merchant', tenant: $shop)),
                     tone: $review->score === null ? '' : ($review->score >= 80 ? 'good' : ($review->score >= 60 ? 'warn' : 'bad')),

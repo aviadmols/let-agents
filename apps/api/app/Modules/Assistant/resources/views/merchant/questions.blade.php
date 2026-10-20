@@ -10,12 +10,14 @@
     <div class="lp-page" data-questions>
         {{-- the daily check of the questions: what went well and what to improve --}}
         @php($review = $this->searchAsks()['latest'] ?? null)
-        @if ($review && ($review->summary || $review->improvements))
+        @php($said = $review ? \App\Modules\Assistant\Support\ReviewWords::forMerchant($review->summary) : null)
+        @php($better = $review ? \App\Modules\Assistant\Support\ReviewWords::improvements((array) $review->improvements) : [])
+        @if ($review && ($said || $better))
             <section class="lp-card" data-review>
                 <div class="lp-card-t"><h2>{{ $t('review_title') }}</h2><span class="lp-note">{{ $review->day->format('j.n') }}</span></div>
-                @if ($review->summary)<p style="margin: 0; color: var(--la-ink)">{{ $review->summary }}</p>@endif
-                @if ($review->improvements)
-                    <ul class="lp-notes">@foreach ((array) $review->improvements as $improvement)<li>{{ $improvement }}</li>@endforeach</ul>
+                @if ($said)<p style="margin: 0; color: var(--la-ink)">{{ $said }}</p>@endif
+                @if ($better)
+                    <ul class="lp-notes">@foreach ($better as $improvement)<li>{{ $improvement }}</li>@endforeach</ul>
                 @endif
             </section>
         @endif
@@ -39,11 +41,11 @@
                         <span>{{ trans_choice('assistant::ui.inbox.asked', $row['asked'], ['n' => number_format($row['asked'])]) }}</span>
                         @if ($row['last'])<span>· {{ $t('last', ['when' => $page::ago($row['last'])]) }}</span>@endif
                         <span>· {{ $row['where'] }}</span>
-                        @if ($row['score'] !== null)<span class="lp-pill" data-tone="{{ $row['score'] >= 80 ? 'good' : ($row['score'] >= 50 ? 'warn' : 'bad') }}" title="{{ $row['note'] }}">{{ $t('score', ['n' => $row['score']]) }}</span>@endif
+                        @if ($row['score'] !== null)<span class="lp-pill" data-tone="{{ $row['score'] >= 80 ? 'good' : ($row['score'] >= 50 ? 'warn' : 'bad') }}">{{ $t('score', ['n' => $row['score']]) }}</span>@endif
                     </div>
 
                     @if ($row['answer'] !== '' && $row['state'] !== 'open')
-                        <div class="lp-ask-answer"><span class="lp-note">{{ $t('answer_given') }}</span><p>{{ $row['answer'] }}</p>@if ($row['note'])<p class="lp-note">{{ $t('review_note', ['note' => $row['note']]) }}</p>@endif</div>
+                        <div class="lp-ask-answer"><span class="lp-note">{{ $t('answer_given') }}</span><p>{{ $row['answer'] }}</p></div>
                     @elseif ($row['answer'] !== '')
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('shown_instead') }}</span><p>{{ $row['answer'] }}</p></div>
                     @endif

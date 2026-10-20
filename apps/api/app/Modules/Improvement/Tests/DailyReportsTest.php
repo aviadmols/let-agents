@@ -31,7 +31,8 @@ final class DailyReportsTest extends TestCase
         $this->actingAs($merchant)->get("/merchant/{$shop->slug}/overview")->assertOk()
             ->assertSee(__('assistant::ui.daily.label'))
             ->assertSee(__('assistant::ui.daily.headline', ['score' => '64', 'asks' => '67']))
-            ->assertSeeInOrder([__('assistant::ui.daily.in', ['count' => 1]), 'על מה הספר חטוף?', __('assistant::ui.daily.out', ['count' => 1]), 'הספר של עומר שם טוב או החטוף?'])
+            ->assertSeeInOrder([__('assistant::ui.daily.in', ['count' => 1]), 'על מה הספר חטוף?', __('assistant::ui.daily.out_shop', ['count' => 1]), 'הספר של עומר שם טוב או החטוף?'])
+            ->assertDontSee('אמר שהספר לא נמצא.', false)
             ->assertSee(__('improvement::ui.daily.label'))
             ->assertSeeInOrder([__('improvement::ui.daily.waiting', ['count' => 1]), 'להוסיף מילה נרדפת: ספרי ילדים', __('improvement::ui.daily.done', ['count' => 1]), 'תשובה: מדיניות החזרות'])
             ->assertSee('גולשים חיפשו ספרי ילדים ולא מצאו.')
@@ -49,7 +50,8 @@ final class DailyReportsTest extends TestCase
             ->assertSee(__('admin::daily.title'))
             ->assertSee('סלע מאיר')
             ->assertSee(__('assistant::ui.daily.headline', ['score' => '64', 'asks' => '67']))
-            ->assertSee(__('improvement::ui.daily.headline', ['proposed' => 2, 'applied' => 1]));
+            ->assertSee(__('improvement::ui.daily.headline', ['proposed' => 2, 'applied' => 1]))
+            ->assertSee('הספר של עומר שם טוב או החטוף? — אמר שהספר לא נמצא.', false);
     }
 
     private function reports(): Shop
