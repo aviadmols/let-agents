@@ -220,6 +220,53 @@ final class TaxonomyTest extends TestCase
         $this->assertStringNotContainsString('Thriller', $words, 'a tag the checker took out is no word of it');
     }
 
+    public function test_only_tags_sure_enough_to_narrow_by_become_a_filter_beside_the_results(): void
+    {
+        foreach (range(1, 8) as $n) {
+            $this->product('f'.$n, 'ספר '.$n, 'ספר', $n <= 3 ? ['מתח'] : ($n <= 6 ? ['קלאסיקה'] : []));
+        }
+        $ids = app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->orderBy('external_id')->pluck('id', 'external_id'));
+        app(TenantContext::class)->run($this->shop->id, function () use ($ids): void {
+            $group = TaxonomyGroup::query()->create(['shop_id' => $this->shop->id, 'key' => 'genre', 'label_he' => 'ז\'אנר', 'label_en' => 'Genre', 'kind' => 'inferred', 'filter' => true, 'version' => 1]);
+            $tag = fn (string $key, string $he): TaxonomyTag => TaxonomyTag::query()->create(['shop_id' => $this->shop->id, 'group_id' => $group->id, 'key' => $key, 'label_he' => $he, 'label_en' => $key, 'version' => 1]);
+            [$scifi, $horror, $thriller, $fantasy] = [$tag('scifi', 'מדע בדיוני'), $tag('horror', 'אימה'), $tag('thriller', 'מתח'), $tag('fantasy', 'פנטזיה')];
+            $give = fn (TaxonomyTag $t, string $p, array $o = []) => TaxonomyAssignment::query()->create($o + [
+                'shop_id' => $this->shop->id, 'subject_type' => 'product', 'subject_id' => $ids[$p], 'tag_id' => $t->id, 'source' => 'catalog',
+                'confidence' => 0.9, 'weight' => 0.9, 'status' => 'kept', 'checked' => 'held', 'input_hash' => 'h', 'bank_version' => 1,
+            ]);
+            foreach (['f1', 'f2', 'f3'] as $p) {
+                $give($scifi, $p);
+                $give($thriller, $p);
+            }
+            foreach (['f4', 'f5', 'f6'] as $p) {
+                $give($horror, $p);
+            }
+            $give($horror, 'f7', ['weight' => 0.4]);
+            $give($horror, 'f8', ['checked' => null]);
+            foreach (['f6', 'f7', 'f8'] as $p) {
+                $give($fantasy, $p, ['source' => 'knowledge']);
+            }
+        });
+        $facets = function (): array {
+            app(BuildSearchIndex::class)->handle($this->shop->id);
+
+            return (array) json_decode((string) app(TenantContext::class)->run($this->shop->id, fn () => SearchIndex::query()->sole()->items), true);
+        };
+
+        $this->assertNotContains('tag:genre', array_column($facets()['facets'], 'k'), 'off: the filters as they were');
+
+        Features::override('taxonomy.in_filters', true, $this->shop->id);
+        $index = $facets();
+        $at = array_search('tag:genre', array_column($index['facets'], 'k'), true);
+        $this->assertNotFalse($at);
+        $this->assertSame(['אימה', 'מדע בדיוני'], array_column($index['facets'][$at]['v'], 'l'),
+            'not "מתח", the store\'s own category; not "פנטזיה", known of the work but not said by the store; "אימה" on the three held and central');
+        $f1 = collect($index['items'])->firstWhere('title', 'ספר 1')['f'];
+        $f7 = collect($index['items'])->firstWhere('title', 'ספר 7')['f'] ?? [];
+        $this->assertContains($at * 1000 + 1, $f1);
+        $this->assertNotContains($at * 1000, $f7, 'a tag in its background narrows nothing');
+    }
+
     public function test_the_gap_scan_reads_the_products_the_bank_does_not_describe_and_proposes_what_it_lacks(): void
     {
         $this->bank();

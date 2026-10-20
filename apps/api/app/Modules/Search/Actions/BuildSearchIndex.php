@@ -175,6 +175,8 @@ final class BuildSearchIndex
         $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->all(), $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
+        // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
+        $tagFilters = $this->tagFacets($facets['facets'], $shopId, $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
         // Their values are words of the products either way: "הספר של עומר שם טוב" finds his book, whose title does not say him.
         $apart = $facets['facets'];
@@ -191,7 +193,7 @@ final class BuildSearchIndex
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($fields[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -668,10 +670,52 @@ final class BuildSearchIndex
     }
 
     /**
+     * The tags sure enough to narrow by (the Taxonomy module, where the shop has them as filters), a
+     * filter for each group, after the store's own. A value the store already offers under the same
+     * name (its category "ביוגרפיות" and the tag "ביוגרפיות") is the store's: not shown twice.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     * @return array<string, list<int>> the codes of each product's tags, by product id
+     */
+    private function tagFacets(array &$facets, string $shopId, string $locale): array
+    {
+        if (! app()->bound(ProductTags::class)) {
+            return [];
+        }
+
+        $offered = [];
+        foreach ($facets as $facet) {
+            foreach ($facet['v'] ?? [] as $value) {
+                $offered[mb_strtolower(trim((string) $value['l']))] = true;
+            }
+        }
+
+        $products = [];
+
+        foreach (app(ProductTags::class)->filters($shopId, $locale) as $group) {
+            $values = array_values(array_filter($group['values'], fn (array $v): bool => ! isset($offered[mb_strtolower(trim($v['label']))])));
+            if (count($values) < 2) {
+                continue;
+            }
+
+            $at = count($facets);
+            $facets[] = ['k' => 'tag:'.$group['key'], 'l' => $group['label'], 'v' => array_map(fn (array $v): array => ['k' => $v['key'], 'l' => $v['label']], $values)];
+
+            foreach ($values as $i => $value) {
+                foreach ($value['products'] as $id) {
+                    $products[$id][] = $at * 1000 + $i;
+                }
+            }
+        }
+
+        return $products;
+    }
+
+    /**
      * The store's categories as one more filter, appended to the facets: each category with at least
-     * two products, the most used first, at most MAX_CATEGORIES. A shopper picks it in the filters; it
-     * is never read from the words (the drawer skips the "category" key), so a word still finds
-     * products outside its category.
+     * two products, the most used first, at most MAX_CATEGORIES. A shopper picks it in the filters; one
+     * of a single word is never read from the words ("ברגים" still finds screws outside its category),
+     * one of several words, all typed, is ("ספרי מופת מתורגמים").
      *
      * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
      * @return array<string, list<int>> the codes of each product's categories, by product id

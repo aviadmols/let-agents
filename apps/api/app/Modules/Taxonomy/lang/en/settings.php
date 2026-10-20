@@ -41,6 +41,10 @@ return [
     'store_tags_percent' => ['label' => 'Weight of the store\'s own tags', 'description' => 'A tag the store itself gave a product counts at this weight.'],
     'min_support' => ['label' => 'A proposed new tag', 'description' => 'A tag the bank lacks is weighed once it was proposed for at least this many products (1: every proposal is weighed by its relevance, not by how many).'],
     'search_min_weight_percent' => ['label' => 'A tag in search', 'description' => 'Only a tag at least this central to a product enters the words the search finds it by. One in its background (Israel in a book on economics) does not.'],
+    'filter_min_weight_percent' => ['label' => 'A tag as a filter: centrality', 'description' => 'Only a tag at least this central to a product puts it under the filter value. A filter hides what it does not hold, so the bar is higher than for search.'],
+    'filter_min_confidence_percent' => ['label' => 'A tag as a filter: certainty', 'description' => 'Only a tag the tagger is at least this sure of enters a filter.'],
+    'filter_min_products' => ['label' => 'A filter value: fewest products', 'description' => 'A tag on fewer products than this is not shown as a filter value.'],
+    'filter_max_values' => ['label' => 'Values in each filter', 'description' => 'At most this many values in each group of tags, the most held first.'],
     'gap_weight_percent' => ['label' => 'A product the bank does not describe', 'description' => 'A product with no tag at least this central in the inferred groups is read by the gap scan.'],
     'gap_products' => ['label' => 'Products in a gap scan', 'description' => 'At most this many products are read in each gap scan, spread through the catalogue.'],
 ];

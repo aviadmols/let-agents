@@ -13,7 +13,8 @@
     "provider": "TaxonomyServiceProvider",
     "features": [
         { "name": "tagging", "default": false },
-        { "name": "in_search", "default": false }
+        { "name": "in_search", "default": false },
+        { "name": "in_filters", "default": false }
     ],
     "settings": [
         { "name": "bank_writer_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
@@ -53,6 +54,10 @@
         { "name": "store_categories_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" },
         { "name": "store_tags_percent", "type": "int", "default": 100, "min": 0, "max": 200, "scope": "shop", "unit": "percent" },
         { "name": "search_min_weight_percent", "type": "int", "default": 50, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "filter_min_weight_percent", "type": "int", "default": 70, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "filter_min_confidence_percent", "type": "int", "default": 80, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "filter_min_products", "type": "int", "default": 3, "min": 2, "max": 100, "scope": "shop", "unit": "products" },
+        { "name": "filter_max_values", "type": "int", "default": 20, "min": 2, "max": 60, "scope": "shop", "unit": "values" },
         { "name": "gap_weight_percent", "type": "int", "default": 60, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
         { "name": "gap_products", "type": "int", "default": 60, "min": 5, "max": 300, "scope": "shop", "unit": "products" }
     ],
