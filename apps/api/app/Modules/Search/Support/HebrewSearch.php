@@ -672,7 +672,8 @@ final class HebrewSearch
 
                 if ($candidate === $variant) {
                     $score = 1;
-                } elseif ($length >= 2 && str_starts_with($candidate, $variant)) {
+                    // "מק" while typing is "מקדחה"; "לב", a word the catalogue has, is a heart, never "לבן"
+                } elseif ($length >= 2 && str_starts_with($candidate, $variant) && ($length >= 3 || ! isset($index['holders'][$variant]))) {
                     $score = max($score, 0.9 - 0.02 * (mb_strlen($candidate) - $length));
                 } elseif ($length >= 3 && self::stem($candidate) === $base) {
                     $score = max($score, 0.85);
@@ -699,11 +700,17 @@ final class HebrewSearch
         return array_filter($found, static fn ($score): bool => $score >= $floor);
     }
 
+    /** A word of three letters or more anywhere in the words ("פרגולה" in "פרגולות"); a shorter one only as a word of its own, maybe after a prefix letter ("לב", "בלב", never "לבן"). */
+    private static function holdsToken(string $hay, string $token): bool
+    {
+        return mb_strlen($token) >= 3 ? str_contains($hay, $token) : preg_match('/(?:^| )[והבלמשכ]?'.preg_quote($token, '/').'(?: |$)/u', $hay) === 1;
+    }
+
     /** 0 (best) to 5 when the record holds every word as typed; -1 when it does not. */
     public static function exactTier(array $record, string $query, array $tokens): int
     {
         foreach ($tokens as $token) {
-            if (! str_contains($record['hay'], $token)) {
+            if (! self::holdsToken($record['hay'], $token)) {
                 return -1;
             }
         }

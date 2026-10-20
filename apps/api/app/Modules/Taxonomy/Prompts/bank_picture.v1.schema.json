@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["groups"],
+    "properties": {
+        "groups": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["group", "from_picture", "why"],
+                "properties": {
+                    "group": {"type": "string"},
+                    "from_picture": {"type": "boolean"},
+                    "why": {"type": "string"}
+                }
+            }
+        }
+    }
+}

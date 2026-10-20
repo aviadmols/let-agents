@@ -81,6 +81,8 @@ final class QueryActionsTest extends TestCase
         $this->assertSame(['k' => 'diameter', 'l' => 'קוטר'], $data['size']);
         $ring = collect($data['items'])->firstWhere('id', 'p:2');
         $this->assertSame([0, 1001], $ring['f'], 'ring (type 0), white gold (metal 1)');
+        // its title never says "זהב לבן": the name of what its facts say it is finds it all the same
+        $this->assertStringContainsString('זהב לבן', $ring['kw']);
         $this->assertEquals(22, $ring['z']);
         $this->assertSame(1, $ring['sl']);
         $this->assertSame(20260201, $ring['d']);

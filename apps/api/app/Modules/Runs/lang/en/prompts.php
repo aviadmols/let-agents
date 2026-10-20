@@ -80,5 +80,6 @@ return [
         'check_tags' => 'Checks the tags given and takes out what does not fit',
         'merge_proposals' => 'Decides on proposed tags: add to the bank, merge into one it has, or reject',
         'bank_gaps' => 'Reads products the bank does not describe well and proposes the concepts it lacks',
+        'bank_picture' => 'Decides of each group of tags whether a product\'s picture may be its evidence',
     ],
 ];

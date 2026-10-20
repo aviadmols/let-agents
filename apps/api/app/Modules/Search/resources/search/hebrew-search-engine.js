@@ -197,7 +197,8 @@
         }
         if (candidate === variant) {
           score = 1;
-        } else if (length >= 2 && candidate.indexOf(variant) === 0) {
+        // "מק" while typing is "מקדחה"; "לב", a word the catalogue has, is a heart, never "לבן"
+        } else if (length >= 2 && candidate.indexOf(variant) === 0 && (length >= 3 || !Object.prototype.hasOwnProperty.call(index.holders, variant))) {
           score = Math.max(score, 0.9 - 0.02 * (candidate.length - length));
         } else if (length >= 3 && stem(candidate) === base) {
           score = Math.max(score, 0.85);
@@ -233,10 +234,17 @@
     return { words: kept, score: found };
   }
 
+  // a word of three letters or more anywhere in the words; a shorter one only as a word of its own, maybe after a
+  // prefix letter ("לב", "בלב", never "לבן"). The server's holdsToken.
+  function holdsToken(hay, token) {
+    if (token.length >= 3) { return hay.indexOf(token) !== -1; }
+    return new RegExp('(?:^| )[והבלמשכ]?' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?: |$)').test(hay);
+  }
+
   function exactTier(record, query, tokens) {
     var i;
     for (i = 0; i < tokens.length; i++) {
-      if (record.hay.indexOf(tokens[i]) === -1) {
+      if (!holdsToken(record.hay, tokens[i])) {
         return -1;
       }
     }

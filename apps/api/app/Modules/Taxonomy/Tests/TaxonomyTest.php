@@ -15,6 +15,7 @@ use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Taxonomy\Actions\AssignTags;
 use App\Modules\Taxonomy\Actions\BuildTagBank;
 use App\Modules\Taxonomy\Actions\MergeTagProposals;
+use App\Modules\Taxonomy\Actions\ReviewPictureGroups;
 use App\Modules\Taxonomy\Actions\ScanBankGaps;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
 use App\Modules\Taxonomy\Models\TaxonomyGroup;
@@ -78,6 +79,37 @@ final class TaxonomyTest extends TestCase
         $this->product('b1', 'חטוף - אלי שרעבי', '491 יום שרד אלי שרעבי בשבי החמאס.', ['ספרים']);
         $this->product('b2', 'דרקולה', 'עורך דין בריטי מגיע לטרנסילבניה. ספר האימה הקלאסי.', ['ספרים']);
         $this->product('s1', 'חולצת פשתן לבנה', 'חולצה מבד פשתן מכובס, קלה לקיץ.', ['חולצות'], [['name' => 'בד', 'values' => ['פשתן']]]);
+    }
+
+    public function test_a_bank_from_before_the_picture_rule_is_told_its_groups_and_what_no_longer_holds_is_taken_out(): void
+    {
+        // Rocks: a bank of tag_bank v1, every group "no picture", and a picture's word on a metal kept all the same
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        [$linen, $calm, $shirt] = app(TenantContext::class)->run($this->shop->id, function (): array {
+            TaxonomyGroup::query()->update(['from_picture' => true]);
+            $tag = fn (string $he): TaxonomyTag => TaxonomyTag::query()->where('label_he', $he)->sole();
+            $shirt = CatalogProduct::query()->where('external_id', 's1')->value('id');
+            $give = fn (TaxonomyTag $t) => TaxonomyAssignment::query()->create(['shop_id' => $this->shop->id, 'subject_type' => 'product', 'subject_id' => $shirt, 'tag_id' => $t->id,
+                'source' => 'picture', 'evidence' => 'נראה כך', 'confidence' => 0.9, 'weight' => 0.8, 'status' => 'kept', 'checked' => 'held', 'input_hash' => 'h', 'bank_version' => 1]);
+
+            return [$give($tag('פשתן')), $give($tag('אימה')), $shirt];
+        });
+        $this->replies['You decide, for each group'] = fn (array $in): array => ['groups' => array_map(fn (array $g): array => [
+            'group' => $g['group'], 'from_picture' => in_array($g['group'], ['mood', 'genre'], true), 'why' => 'x'], $in['groups'])];
+
+        $run = app(ReviewPictureGroups::class)->handle($this->shop->id);
+
+        $this->assertSame(1, $run->output['removed'], 'what a fabric is, only the product says');
+        app(TenantContext::class)->run($this->shop->id, function () use ($linen, $calm): void {
+            $this->assertSame(['rejected', 'rule'], [$linen->fresh()->status, $linen->fresh()->checked]);
+            $this->assertSame('kept', $calm->fresh()->status, 'a group the reviewer allows a picture for keeps it');
+            $this->assertFalse(TaxonomyGroup::query()->where('key', 'fabric')->value('from_picture'));
+        });
+
+        $asked = count($this->calls);
+        app(ReviewPictureGroups::class)->handle($this->shop->id);
+        $this->assertCount($asked, $this->calls, 'the same bank is never asked twice');
     }
 
     public function test_the_bank_is_designed_from_a_sample_and_reviewed_by_the_other_family(): void

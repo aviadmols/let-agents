@@ -193,6 +193,9 @@ final class BuildSearchIndex
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
+            // The names of what the store's approved facts say it is ("אמרלד קאט", "קרנליאן", "ספר מודפס") are words it
+            // is found by, whatever its own text calls them ("קרנליון"): a filter's name finds what the filter holds.
+            $named = array_map(fn (int $code): string => (string) ($facets['facets'][intdiv($code, 1000)]['v'][$code % 1000]['l'] ?? ''), $read['f'] ?? []);
             $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
@@ -203,7 +206,7 @@ final class BuildSearchIndex
                 $read['v'] = $variants[$product->id]['v'];
             }
             $faceted += isset($read['f']) ? 1 : 0;
-            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...($this->fieldValues[(string) $product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
+            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...$named, ...($this->fieldValues[(string) $product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
                 // its tags by meaning, apart from its words: weighed by how central each is ([[words, weight], …])
