@@ -152,6 +152,22 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['picture' => 1, 'text' => 1], $this->asked, 'by picture alone: the meaning not asked');
     }
 
+    public function test_a_cover_colour_does_not_reorder_them_where_the_shop_filters_by_no_colour(): void
+    {
+        // Sela: "חטוף" has a black cover and the nearest book a green one; the jewellery rule (yellow gold first)
+        // pushed it past the twelve shown. Without a colour among the shop's filters the order is the nearness.
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach (['301' => 'כריכה שחורה', '302' => 'כריכה ירוקה', '303' => 'כריכה שחורה'] as $id => $cover) {
+                CatalogProduct::query()->where('external_id', $id)->update(['in_stock' => true, 'title' => 'ספר '.$id.' '.$cover]);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        Settings::set('search.similar_by', 'picture', $this->shop->id);
+
+        $this->assertSame(['302', '303'], array_column($this->similar('301')->json('products'), 'external_id'));
+    }
+
     public function test_without_scanned_pictures_they_come_by_meaning(): void
     {
         $this->pictures = false;

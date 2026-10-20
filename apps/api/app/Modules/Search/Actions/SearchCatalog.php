@@ -381,9 +381,11 @@ final class SearchCatalog
             }
 
             usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
-            // Its own colours (the metal, the stone): a yellow-gold ring's alike are yellow gold first.
+            // Its own colours (the metal, the stone): a yellow-gold ring's alike are yellow gold first. Only where the
+            // shop filters by colour: a bookshop's covers are not a kind, and a black cover's alike are not black first.
             $own = $index['records']['p:'.$externalId] ?? null;
-            $records = $own === null ? $records : self::byColour($records, Colours::parts([trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''))]));
+            $colours = Colours::mentions(implode(' ', array_merge(...array_map(fn (array $f): array => array_column((array) ($f['v'] ?? []), 'l'), (array) ($index['facets'] ?? []))))) !== [];
+            $records = $own === null || ! $colours ? $records : self::byColour($records, Colours::parts([trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''))]));
 
             return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
         });

@@ -78,6 +78,9 @@ final class BuildSearchIndex
     /** A field whose values are this nearly all different (a code, a date) narrows nothing. */
     private const FIELD_MAX_DISTINCT = 0.9;
 
+    /** @var array<string, list<string>> the store-field values each product has (fieldFacets), words of it */
+    private array $fieldValues = [];
+
     /** Words that say a collection is a campaign or a shelf of the moment, not a kind of product. */
     private const CAMPAIGN_WORDS = '~sale|friday|cyber|valentine|summer|winter|edit|black|gift ?guide|new ?arrivals?|best ?sellers?|trending|shop ?all|מבצע|סייל|סוף[- ]?שנה|חג|הגיעו לאחרונה|חדש(ים|ות)? באתר|המלצות|עולות|הכי נמכר|רבי מכר|קולקציית|מתנות ל~iu';
 
@@ -167,7 +170,12 @@ final class BuildSearchIndex
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
+        // Their values are words of the products either way: "הספר של עומר שם טוב" finds his book, whose title does not say him.
+        $apart = $facets['facets'];
         $fields = Features::enabled('search.field_filters', $shopId) ? $this->fieldFacets($facets['facets'], $shopId) : [];
+        if (! Features::enabled('search.field_filters', $shopId)) {
+            $this->fieldFacets($apart, $shopId);
+        }
         // What the scan learned each product is and is for, in words: found by them, before the long lists.
         $learned = $this->learnedWords($this->locale($shopId));
         $faceted = 0;
@@ -184,7 +192,7 @@ final class BuildSearchIndex
                 $read['v'] = $variants[$product->id]['v'];
             }
             $faceted += isset($read['f']) ? 1 : 0;
-            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
+            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...($this->fieldValues[(string) $product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
                 'i2' => $this->secondPicture($product),
@@ -574,6 +582,7 @@ final class BuildSearchIndex
         $minShare = (int) Settings::get('search.field_filter_min_percent', $shopId) / 100;
         $maxValues = min(999, (int) Settings::get('search.field_filter_max_values', $shopId));
         $named = array_map(fn (array $f): string => mb_strtolower($f['l']), $facets);
+        $this->fieldValues = [];
         $fields = [];
         $total = 0;
 
@@ -616,6 +625,7 @@ final class BuildSearchIndex
 
             foreach ($byProduct as $productId => $value) {
                 $products[$productId][] = $codes[$value];
+                $this->fieldValues[(string) $productId][] = $value;
             }
         }
 

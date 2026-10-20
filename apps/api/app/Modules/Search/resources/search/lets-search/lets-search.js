@@ -894,6 +894,8 @@
     var next = function () {
       if (at >= queue.length) { return null; }
       var id = queue[at++];
+      // not known yet as anything with a page (a search restored before the index came): asked again later, never "none"
+      if (!handleOf(id)) { return next(); }
       return shopifyJson(id).then(function (j) { var e = win.LA_ENGINE; S.products[id] = j && e && e.fromShopifyProduct ? e.fromShopifyProduct(j) : null; if (j) { S.products[id + ':json'] = j; } }).then(next);
     };
     if (queue.length) {
@@ -2513,6 +2515,9 @@
       };
       if (variant) { return add(variant); }
       var choose = function () { if (btn) { btn.dataset.state = ''; btn.removeAttribute('aria-busy'); } optionsLayer(id, q); return null; };
+      // a product read as none before (the page did not answer, or a search restored before the index): read once more
+      // before the shopper is sent to its page instead of adding it
+      if (S.products[pid(id)] === null) { delete S.products[pid(id)]; }
       return products([id]).then(function () {
         var p = S.products[pid(id)];
         if (p && p.variants > 1) { return choose(); }

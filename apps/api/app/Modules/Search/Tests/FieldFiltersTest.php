@@ -6,7 +6,9 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -52,9 +54,20 @@ final class FieldFiltersTest extends TestCase
         $this->assertContains($at * 1000 + 1, $records['p:3']['f']);
         $this->assertArrayNotHasKey('f', $records['p:5']);
 
+        $this->assertSame(['3'], $this->found($shop, 'ספר של תומס סואל'), 'an author finds his book, which the title does not name');
+
         Features::override('search.field_filters', false, $shop->id);
         app(BuildSearchIndex::class)->handle($shop->id);
         $this->assertNull(collect($this->index($shop)['facets'])->firstWhere('k', 'field:מחבר'), 'off: no field filters');
+        $this->assertSame(['3'], $this->found($shop, 'ספר של תומס סואל'), 'off: still words of the book');
+    }
+
+    /** @return list<string> */
+    private function found(Shop $shop, string $query): array
+    {
+        LoadedIndex::forget();
+
+        return array_column(app(SearchCatalog::class)->handle($shop->id, $query, ['product'], false, null, false)['groups']['product'], 'external_id');
     }
 
     /** @return array<string, mixed> */
