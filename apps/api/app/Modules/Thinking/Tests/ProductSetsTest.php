@@ -129,6 +129,7 @@ final class ProductSetsTest extends TestCase
         $this->assertSame(['4001', '4002'], $result['set']['ids'], 'an id not given is dropped');
         $this->assertSame('ספרים של חטופים ששבו (2):', $result['answer']);
         $this->assertFalse($result['set']['near']);
+        $this->assertNull($result['set']['search'], 'chosen from the whole store: the search\'s words would only bring what shares them');
         $this->assertCount(2, $this->calls);
         $this->assertNotSame($this->calls[0]['provider']->family(), $this->calls[1]['provider']->family());
         $titles = array_column($this->calls[0]['user']['candidates'], 'title');

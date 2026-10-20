@@ -18,10 +18,11 @@ interface ProductSets
      * was looked through and has none of it, nor anything close; the answer says so. ids are external ids, best first;
      * from is "code" (a group the store keeps), "model" (chosen now) or "bank" (chosen before); near:
      * none fit, and these are the closest the store has, the answer says so; ask: one question to
-     * narrow a large set by, with its options; search: the words to search the store with for more.
+     * narrow a large set by, with its options; search: the words to search the store with for more,
+     * only for a group the store keeps (a set chosen by meaning has none).
      *
      * @param  callable(): bool  $mayAsk  whether a model may be asked now (the visitor's and the shop's daily questions)
-     * @return array{answer: string, ids: list<string>, title: string, from: string, near: bool, page: array{title: string, url: string}|null, ask: array{question: string, options: list<string>}|null, search: string}|null
+     * @return array{answer: string, ids: list<string>, title: string, from: string, near: bool, page: array{title: string, url: string}|null, ask: array{question: string, options: list<string>}|null, search: string|null}|null
      */
     public function find(string $shopId, string $question, string $locale, callable $mayAsk): ?array;
 }

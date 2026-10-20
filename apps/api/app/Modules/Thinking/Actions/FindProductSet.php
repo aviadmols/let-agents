@@ -118,7 +118,10 @@ final class FindProductSet implements ProductSets
         $found = $this->group($shopId, $subject, $meant, $locale)
             ?? (Features::enabled('thinking.sets_by_meaning', $shopId) ? $this->byMeaning($shopId, $question, $subject, $meant, $locale, $mayAsk) : null);
 
-        return $found === null ? null : $found + ['search' => $subject];
+        // the store's search for more only for a group the store keeps, by its name: for a set chosen by
+        // meaning the whole store was already looked through, and the search's words would bring what
+        // only shares them ("ספר מדע בדיוני" in a store with none: every book of science)
+        return $found === null ? null : $found + ['search' => $found['from'] === 'code' && ! str_contains($found['title'], ' · ') ? $found['title'] : null];
     }
 
     /** A word most of the catalogue holds, in its titles or its categories' names. */
