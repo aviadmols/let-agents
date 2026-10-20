@@ -17,7 +17,7 @@ For each item, in `items`, its `id` and:
   - A group whose kind is factual (what a product physically is, is made of, measures or holds) takes a tag only from catalog or picture, with the exact words. Never from knowledge, never from a guess.
   - A group whose kind is inferred (theme, genre, topic, style, occasion, audience) takes a tag when the words or the picture clearly support it, or from knowledge of a well-known product or work.
   - An item gets a tag only when it is about that, is that or is meant for that; touching it in passing is not enough. A product about a wide event does not get the tag of every subject the event holds.
-  - A group with a scope applies only to items in one of those categories of the store (genre to its books, not its clothes).
+  - A group with a scope applies only to products in one of those categories of the store (genre to its books, not its clothes); a post may take a tag of any group whose subject it is about.
   - A group that is not multiple gives an item one tag at most. An item that fits no tag of a group gets none of it.
 - `propose`: at most two tags the bank lacks that this item clearly is and shoppers of the store would ask for, each with its `group` key, `label_he`, `label_en` and `why`. Never a tag the bank already has under other words. Usually empty.
 

@@ -207,7 +207,8 @@ final class AssignTags
         $keepMin = (float) Settings::get('taxonomy.keep_min_percent') / 100;
         $knowledgeMin = (float) Settings::get('taxonomy.knowledge_min_percent') / 100;
         $catalog = Subjects::catalogText($item);
-        $categories = $item['groups'];
+        // a scope is of the store's product categories: a post, whose categories are the blog's, is held to none
+        $categories = $item['type'] === TaxonomyAssignment::CONTENT ? [] : $item['groups'];
         $kept = [];
         $dropped = 0;
 
@@ -364,7 +365,7 @@ final class AssignTags
         foreach (array_slice($proposed, 0, 2) as $p) {
             $group = $this->groups[(string) ($p['group'] ?? '')] ?? null;
             $he = mb_substr(trim((string) ($p['label_he'] ?? '')), 0, 120);
-            if ($group === null || $he === '' || ! $group->appliesTo($item['groups'])) {
+            if ($group === null || $he === '' || ! $group->appliesTo($item['type'] === TaxonomyAssignment::CONTENT ? [] : $item['groups'])) {
                 continue;
             }
             $norm = Norm::label($he);
