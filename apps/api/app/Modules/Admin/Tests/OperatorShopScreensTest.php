@@ -2,12 +2,14 @@
 
 namespace App\Modules\Admin\Tests;
 
+use App\Core\Facades\Settings;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Filament\Operator\Resources\Shops\Pages\CreateShop;
 use App\Modules\Tenancy\Filament\Operator\Resources\Shops\Pages\EditShop;
 use App\Modules\Tenancy\Filament\Operator\Resources\Shops\Pages\ListShops;
 use App\Modules\Tenancy\Filament\Operator\Resources\Shops\RelationManagers\ApiKeysRelationManager;
 use App\Modules\Tenancy\Models\Shop;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -57,6 +59,29 @@ final class OperatorShopScreensTest extends TestCase
         $this->get('/operator/shops')->assertOk();
 
         Livewire::test(ListShops::class)->assertCanSeeTableRecords($shops);
+    }
+
+    public function test_a_new_shop_may_start_on_a_trial_and_the_list_ends_it(): void
+    {
+        Livewire::test(CreateShop::class)
+            ->fillForm(['name' => 'Trial Shop', 'domain' => 'trial-shop.co.il', 'platform' => 'woocommerce', 'status' => 'active',
+                'content_locale' => 'he', 'currency' => 'ILS', 'timezone' => 'Asia/Jerusalem', 'trial' => true])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $shop = Shop::query()->sole();
+        $this->assertTrue($shop->onTrial());
+        $this->assertSame(2000, Settings::get('catalog.max_products', $shop->id));
+
+        Livewire::test(ListShops::class)
+            ->assertSee(__('tenancy::shops.trial.left', ['days' => 14]))
+            ->callAction(TestAction::make('end_trial')->table($shop));
+
+        $this->assertFalse($shop->refresh()->onTrial());
+        $this->assertNull(Settings::overrideFor('catalog.max_products', $shop->id));
+
+        Livewire::test(ListShops::class)->callAction(TestAction::make('start_trial')->table($shop), ['days' => 30]);
+        $this->assertSame(30, $shop->refresh()->trialDaysLeft());
     }
 
     public function test_a_duplicate_domain_is_a_form_error(): void

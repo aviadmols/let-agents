@@ -4,10 +4,14 @@
     "requires": [],
     "provider": "TenancyServiceProvider",
     "features": [
-        { "name": "api_access", "default": true }
+        { "name": "api_access", "default": true },
+        { "name": "trial_pictures", "default": false }
     ],
     "settings": [
         { "name": "max_active_api_keys", "type": "int", "default": 3, "min": 1, "max": 20, "scope": "shop", "unit": "keys" },
-        { "name": "api_requests_per_minute", "type": "int", "default": 600, "min": 60, "max": 20000, "scope": "shop", "unit": "requests" }
+        { "name": "api_requests_per_minute", "type": "int", "default": 600, "min": 60, "max": 20000, "scope": "shop", "unit": "requests" },
+        { "name": "trial_days", "type": "int", "default": 14, "min": 1, "max": 90, "scope": "global", "unit": "days" },
+        { "name": "trial_max_products", "type": "int", "default": 2000, "min": 100, "max": 20000, "scope": "global", "unit": "products" },
+        { "name": "trial_questions_per_day", "type": "int", "default": 50, "min": 10, "max": 1000, "scope": "global", "unit": "questions" }
     ]
 }

@@ -2,11 +2,18 @@
 
 namespace App\Modules\Tenancy\Filament\Operator\Resources\Shops\Tables;
 
+use App\Core\Facades\Settings;
+use App\Modules\Tenancy\Actions\EndTrial;
+use App\Modules\Tenancy\Actions\StartTrial;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
+use App\Modules\Tenancy\Support\TrialLimits;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -91,6 +98,16 @@ final class ShopsTable
                     })
                     ->formatStateUsing(fn (?string $state): string => __('tenancy::shops.plans.'.($state ?? 'none')))
                     ->placeholder(__('tenancy::shops.plans.none')),
+                // A shop on trial reads fewer products and pictures (TrialLimits) until the trial is ended.
+                TextColumn::make('trial_ends_at')
+                    ->label(__('tenancy::shops.fields.trial'))
+                    ->badge()
+                    ->color(fn (Shop $record): string => $record->trialDaysLeft() > 0 ? 'warning' : 'danger')
+                    ->formatStateUsing(fn (Shop $record): string => $record->trialDaysLeft() > 0
+                        ? __('tenancy::shops.trial.left', ['days' => $record->trialDaysLeft()])
+                        : __('tenancy::shops.trial.ended'))
+                    ->placeholder('—')
+                    ->sortable(),
                 TextColumn::make('products_count')
                     ->label(__('tenancy::shops.fields.products'))
                     ->numeric()
@@ -129,6 +146,36 @@ final class ShopsTable
                     ->visible(fn (): bool => Route::has(self::CONFIGURATION_ROUTE))
                     ->url(fn (Shop $record): string => route(self::CONFIGURATION_ROUTE, ['shop' => $record->id])),
                 EditAction::make(),
+                ActionGroup::make([
+                    Action::make('start_trial')
+                        ->label(fn (Shop $record): string => __($record->onTrial() ? 'tenancy::shops.trial.renew' : 'tenancy::shops.trial.start'))
+                        ->icon(Heroicon::OutlinedClock)
+                        ->modalDescription(fn (): string => __('tenancy::shops.trial.start_body', TrialLimits::words()))
+                        ->schema([
+                            TextInput::make('days')
+                                ->label(__('tenancy::shops.fields.trial_days'))
+                                ->numeric()
+                                ->minValue(1)
+                                ->maxValue(90)
+                                ->default(fn (): int => (int) Settings::get('tenancy.trial_days'))
+                                ->required(),
+                        ])
+                        ->action(function (Shop $record, array $data): void {
+                            app(StartTrial::class)->handle($record, (int) $data['days']);
+                            Notification::make()->success()->title(__('tenancy::shops.trial.started'))->send();
+                        }),
+                    Action::make('end_trial')
+                        ->label(__('tenancy::shops.trial.end'))
+                        ->icon(Heroicon::OutlinedCheckBadge)
+                        ->color('success')
+                        ->visible(fn (Shop $record): bool => $record->onTrial())
+                        ->requiresConfirmation()
+                        ->modalDescription(__('tenancy::shops.trial.end_body'))
+                        ->action(function (Shop $record): void {
+                            app(EndTrial::class)->handle($record);
+                            Notification::make()->success()->title(__('tenancy::shops.trial.ended_done'))->send();
+                        }),
+                ])->label(__('tenancy::shops.fields.trial'))->icon(Heroicon::OutlinedClock),
             ]);
     }
 

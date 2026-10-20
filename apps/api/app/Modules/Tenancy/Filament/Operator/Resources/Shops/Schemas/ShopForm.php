@@ -6,8 +6,10 @@ use App\Core\Localization\Locales;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
+use App\Modules\Tenancy\Support\TrialLimits;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -58,6 +60,12 @@ final class ShopForm
                             ->options(ShopStatus::options())
                             ->default(ShopStatus::Active->value)
                             ->required(),
+                        // A new shop may start on a trial (StartTrial); later, the shops table starts and ends one.
+                        Toggle::make('trial')
+                            ->label(__('tenancy::shops.fields.start_trial'))
+                            ->helperText(fn (): string => __('tenancy::shops.fields.start_trial_help', TrialLimits::words()))
+                            ->visibleOn('create')
+                            ->default(false),
                     ]),
                 Section::make(__('tenancy::shops.sections.locale'))
                     ->columns(3)

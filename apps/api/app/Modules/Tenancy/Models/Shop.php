@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A store connected to the system. The root every other shop-owned record points at.
@@ -30,6 +31,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $vertical_confidence
  * @property bool $vertical_locked
  * @property array{kind?: string, languages?: list<string>, sells?: list<string>}|null $profile what the shop said about itself: a store, a content site or both; its other languages; what it sells
+ * @property Carbon|null $trial_ends_at while set the shop is on trial (StartTrial), and stays limited past the date until the trial is ended
+ * @property array<string, array{0: string, 1: mixed}>|null $trial_saved the shop's own settings from before the trial
  */
 class Shop extends Model
 {
@@ -70,6 +73,8 @@ class Shop extends Model
             'vertical' => Vertical::class,
             'vertical_locked' => 'boolean',
             'profile' => 'array',
+            'trial_ends_at' => 'datetime',
+            'trial_saved' => 'array',
         ];
     }
 
@@ -91,6 +96,18 @@ class Shop extends Model
     public function apiKeys(): HasMany
     {
         return $this->hasMany(ShopApiKey::class);
+    }
+
+    /** On trial: limited by TrialLimits until the trial is ended, also after its last day. */
+    public function onTrial(): bool
+    {
+        return $this->trial_ends_at !== null;
+    }
+
+    /** Days left of the trial; 0 once its last day has passed. */
+    public function trialDaysLeft(): int
+    {
+        return $this->trial_ends_at === null ? 0 : max(0, (int) ceil(now()->diffInHours($this->trial_ends_at, false) / 24));
     }
 
     public function isActive(): bool
