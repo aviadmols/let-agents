@@ -25,4 +25,8 @@ return [
         'label' => 'Choices from product pages (length, size)',
         'description' => 'Once a day, slowly, reads from each product page the fields the store asks for before the cart that the sync does not carry (a length with a price for each, from Product Add-Ons for example). A page that did not change is not processed again. WooCommerce only.',
     ],
+    'sample_pages' => [
+        'label' => 'Sample product pages in a scan',
+        'description' => 'At the start of a scan a few product pages of every kind (category, product type, the choices it is sold with) are read in code to find what the feed does not carry: versions linked as products of their own, subscriptions, choices only on the page. No model, a pause between pages.',
+    ],
 ];

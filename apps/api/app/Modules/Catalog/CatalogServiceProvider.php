@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Catalog\Console\BuildVariantsCommand;
 use App\Modules\Catalog\Console\ReadPageChoicesCommand;
 use App\Modules\Catalog\Console\ReadSitePagesCommand;
+use App\Modules\Catalog\Console\SamplePagesCommand;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
@@ -100,6 +101,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
             SyncCatalogCommand::class,
             SyncChangedProductsCommand::class,
             ReadPageChoicesCommand::class,
+            SamplePagesCommand::class,
             BuildVariantsCommand::class,
             ReadSitePagesCommand::class,
         ];

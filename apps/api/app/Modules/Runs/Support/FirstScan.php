@@ -34,6 +34,9 @@ final class FirstScan
     /** step => the command and its arguments; {shop} is the shop's slug, true a flag. */
     public const STEPS = [
         'catalog' => ['catalog:sync', ['shop' => '{shop}']],
+        // A product page of every kind (category, type, the choices it is sold with), read in code for what the
+        // feed does not carry: its versions linked as products of their own, a subscription, choices on the page.
+        'sample' => ['catalog:sample-pages', ['shop' => '{shop}']],
         // The site's own pages the feed did not bring (its sitemap, its policies): what shoppers ask is often there.
         'site' => ['catalog:site-pages', ['shop' => '{shop}']],
         // What the store says about itself and in its posts is read before its catalog is divided and
@@ -71,6 +74,7 @@ final class FirstScan
      */
     public const STEP_ACTIONS = [
         'catalog' => ['catalog.sync'],
+        'sample' => ['catalog.sample_pages'],
         'site' => ['catalog.read_site_pages'],
         'knowledge' => ['enrichment.read_promises', 'enrichment.read_content', 'assistant.check_own_knowledge'],
         'posts' => ['assistant.read_posts', 'enrichment.match_article_products', 'enrichment.audit_content'],

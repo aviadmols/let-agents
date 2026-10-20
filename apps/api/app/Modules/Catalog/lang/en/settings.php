@@ -21,4 +21,8 @@ return [
         'label' => 'Pause between two pages (milliseconds)',
         'description' => 'So the site is not loaded.',
     ],
+    'sample_pages_max' => [
+        'label' => 'Pages sampled per scan',
+        'description' => 'At most. Chosen so every kind of product is read at least once.',
+    ],
 ];
