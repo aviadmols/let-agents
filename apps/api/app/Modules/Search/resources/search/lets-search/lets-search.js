@@ -1701,13 +1701,22 @@
       // colour and size, read from the variants, are asked of one variant together (and of one in stock when
       // stock is asked): black in M sold out, but black in L and navy in M there, is not "black, M, in stock"
       var vgs = Object.keys(groups).filter(variantFacet), stock = onStock(c);
-      out = out.filter(function (r) {
-        if (vgs.length && r.v && !r.v.some(function (x) { return (!stock || x[1] === 1) && vgs.every(function (g) { return groups[g].some(function (code) { return x[0].indexOf(code) >= 0; }); }); })) { return false; }
-        return Object.keys(groups).every(function (g) {
-          if (r.v && vgs.indexOf(g) >= 0) { return true; }
-          return groups[g].some(function (code) { if ((r.f || []).indexOf(code) >= 0) { return true; } var x = c.auto[code] && !c.f[code] && valueOf(code); return !!(x && x.value && says(r.title + ' ' + (r.kw || ''), x.value.l)); });
+      var holds = function (r, code) { if ((r.f || []).indexOf(code) >= 0) { return true; } var x = c.auto[code] && !c.f[code] && valueOf(code); return !!(x && x.value && says(r.title + ' ' + (r.kw || ''), x.value.l)); };
+      // Values of one attribute read together from the words are asked together: "טבעת טופז עם יהלומים" is a ring
+      // with both stones, not either. Values the shopper picks are any of them; and when nothing holds all that was
+      // read, any of them, so reading never empties the results.
+      var together = Object.keys(groups).filter(function (g) { return vgs.indexOf(g) < 0 && groups[g].length > 1 && groups[g].every(function (code) { return c.auto[code] && !c.f[code]; }); });
+      var pass = function (all) {
+        return out.filter(function (r) {
+          if (vgs.length && r.v && !r.v.some(function (x) { return (!stock || x[1] === 1) && vgs.every(function (g) { return groups[g].some(function (code) { return x[0].indexOf(code) >= 0; }); }); })) { return false; }
+          return Object.keys(groups).every(function (g) {
+            if (r.v && vgs.indexOf(g) >= 0) { return true; }
+            return all && together.indexOf(g) >= 0 ? groups[g].every(function (code) { return holds(r, code); }) : groups[g].some(function (code) { return holds(r, code); });
+          });
         });
-      });
+      };
+      var strict = together.length ? pass(true) : [];
+      out = strict.length ? strict : pass(false);
     }
     if (onStock(c)) { out = out.filter(function (r) { return r.s === 1; }); }
     if (onSale(c)) { out = out.filter(function (r) { return r.sl === 1; }); }

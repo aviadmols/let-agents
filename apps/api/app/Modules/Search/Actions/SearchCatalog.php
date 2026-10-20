@@ -198,6 +198,22 @@ final class SearchCatalog
                 $meaning = array_values(array_filter($meaning, fn (string $id): bool => $keep($id) || isset($describedIds[$id])));
                 $pictures = array_values(array_filter($pictures, $keep));
             }
+            // "טופז": one word that many products hold as typed is what the shopper asked for. The stones only close to
+            // it by meaning or by picture (citrine, a yellow sapphire) are left out. When few hold it ("בטריה" in a store
+            // that says "סוללה"), the meaning fills in as before.
+            if (! str_contains($query, ' ')) {
+                $typed = [];
+                foreach ($spelling as $hit) {
+                    if ($hit['exact'] && str_starts_with($hit['id'], 'p:')) {
+                        $typed[$hit['id']] = true;
+                    }
+                }
+                if (count($typed) >= (int) Settings::get('search.word_enough', $shopId)) {
+                    $spelling = array_values(array_filter($spelling, fn (array $hit): bool => isset($typed[$hit['id']]) || ! str_starts_with($hit['id'], 'p:')));
+                    $meaning = array_values(array_filter($meaning, fn (string $id): bool => isset($typed[$id]) || isset($describedIds[$id]) || ! str_starts_with($id, 'p:')));
+                    $pictures = array_values(array_filter($pictures, fn (string $id): bool => isset($typed[$id]) || ! str_starts_with($id, 'p:')));
+                }
+            }
             // "עגילים עד 500": with a price, what the words name is decided before the price, never
             // after it. Only products that hold the words: by meaning a pendant is close to
             // earrings. And when some hold them as typed (in the title, a category, an attribute or

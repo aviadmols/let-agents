@@ -33,6 +33,10 @@ return [
         'label' => 'What an old guide loses a year',
         'description' => 'Taken off the similarity of news, a product review or a buying guide for each year since it was updated, up to three: models and prices change. A how-to, a project idea or a material guide does not age.',
     ],
+    'word_enough' => [
+        'label' => 'One word many products hold',
+        'description' => 'When at least this many products hold a one-word search as typed ("topaz"), only they are shown, without products found by meaning or picture alone (citrine, yellow sapphire). When few hold it, meaning fills in as usual.',
+    ],
     'semantic_min_similarity' => [
         'label' => 'Minimum similarity by meaning',
         'description' => 'A result by meaning below this is left out. Depends on the embedding model: about 0.3 for text-embedding-3-small.',

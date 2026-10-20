@@ -253,6 +253,19 @@ final class SearchFlowTest extends TestCase
         $this->assertSame([], $this->meaningAsked);
     }
 
+    public function test_one_word_many_products_hold_as_typed_shows_only_them(): void
+    {
+        // Rocks: "טופז" found 93 topaz rings and, by meaning, citrine and yellow sapphire after them.
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->meaning = [['source' => 'product', 'source_id' => 'y', 'external_id' => '102', 'title' => 'בורג איסכורית 6X40', 'similarity' => 0.41]];
+
+        Settings::set('search.word_enough', 3, $this->shop->id);
+        $this->assertContains('102', array_column($this->search('אורן')->json('groups.product'), 'external_id'), 'two pine boards hold the word: few, the meaning fills in');
+
+        Settings::set('search.word_enough', 2, $this->shop->id);
+        $this->assertSame(['104', '103'], array_column($this->search('אורן')->json('groups.product'), 'external_id'), 'enough hold it as typed: only they');
+    }
+
     public function test_guides_by_meaning_are_their_own_group_suggest_their_products_for_a_need_and_age(): void
     {
         $this->inShop(function (): void {
