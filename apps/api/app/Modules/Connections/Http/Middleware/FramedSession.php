@@ -38,7 +38,13 @@ final class FramedSession
             'session.partitioned' => config('session.partitioned'),
         ];
         config(['session.cookie' => $name, 'session.same_site' => 'none', 'session.secure' => true, 'session.partitioned' => true]);
-        app('session')->forgetDrivers();
+        // The same session object under the frame's cookie name, never a new one: under Octane the session
+        // store is shared by every request and emptied at the start of each. A driver made anew here (as
+        // forgetDrivers did) left that shared store apart from the one emptied, holding the last sign-in
+        // for every request after it, anonymous ones too.
+        $store = app('session')->driver();
+        $named = $store->getName();
+        $store->setName($name);
 
         try {
             $response = $next($request);
@@ -56,7 +62,7 @@ final class FramedSession
             return $response;
         } finally {
             config($before);
-            app('session')->forgetDrivers();
+            $store->setName($named);
         }
     }
 }
