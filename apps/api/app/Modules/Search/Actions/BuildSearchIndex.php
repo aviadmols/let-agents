@@ -263,7 +263,9 @@ final class BuildSearchIndex
             'built_at' => now(),
         ]);
 
-        $run->output(['counts' => $counts, 'hash' => $hash, 'bytes' => strlen($json), 'faceted_products' => $faceted, 'facets' => count($facets['facets'])])
+        $run->output(['counts' => $counts, 'hash' => $hash, 'bytes' => strlen($json), 'faceted_products' => $faceted, 'facets' => count($facets['facets']),
+            // what the shopper filters by, each with its values: what this build made, for the run's page
+            'filters' => collect($facets['facets'])->filter(fn (array $f): bool => ($f['v'] ?? []) !== [])->mapWithKeys(fn (array $f): array => [(string) $f['l'] => count($f['v']).': '.implode(', ', array_slice(array_column($f['v'], 'l'), 0, 12))])->all()])
             ->summary('search::runs.indexed', [
                 'products' => (string) $counts['product'],
                 'content' => (string) $counts['content'],

@@ -71,6 +71,21 @@ final class RunScreensTest extends TestCase
         }
     }
 
+    public function test_a_run_of_code_alone_says_what_it_made(): void
+    {
+        // The search index built: no model, so its page says what it made, not "0 model calls" alone.
+        $run = app(RecordsRuns::class)->track(agent: 'search.indexer', action: 'search.build_index',
+            work: fn (RunContext $r) => $r->output(['counts' => ['product' => 2137, 'category' => 46], 'hash' => 'abc123', 'filters' => ['מחבר' => '152: סלע מאיר, תומס סואל']]));
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+
+        $this->get("/operator/runs/{$run->id}")->assertOk()
+            ->assertSee(__('runs::flow.made'))
+            ->assertSee('product 2137')
+            ->assertSee('מחבר 152: סלע מאיר, תומס סואל')
+            ->assertDontSee('hash: abc123');
+    }
+
     public function test_merchants_cannot_open_the_activity_log(): void
     {
         $this->actingAs(User::factory()->create())

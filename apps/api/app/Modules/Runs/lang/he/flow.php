@@ -8,6 +8,7 @@ return [
     'found' => 'חיפוש בקוד: הדפים והמוצרים הקרובים לשאלה',
     'found_detail' => 'נמצאו :passages קטעים מדפי החנות ונשלחו :passages_sent; הוצגו :products מוצרים ונשלחו :products_sent.',
     'call' => 'קריאה למודל (:kind)',
+    'made' => 'מה נוצר',
     'end' => 'הסתיים',
     'seconds' => ':n שנ׳',
     'sent' => 'מה נשלח לסוכן',

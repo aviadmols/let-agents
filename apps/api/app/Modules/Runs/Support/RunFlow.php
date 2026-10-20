@@ -64,6 +64,11 @@ final class RunFlow
             array_splice($steps, 1, 0, [$found]);
         }
 
+        // a run of code alone (an index built, a catalogue read) says what it made, from its output
+        if ($calls->isEmpty() && ($made = self::made((array) $run->output)) !== null) {
+            $steps[] = ['kind' => 'code', 'at' => null, 'title' => __('runs::flow.made'), 'text' => $made];
+        }
+
         $steps[] = [
             'kind' => 'end',
             'at' => $run->duration_ms === null ? null : round($run->duration_ms / 1000, 1),
@@ -132,6 +137,43 @@ final class RunFlow
         }
 
         return null;
+    }
+
+    /**
+     * A run's output as lines to read: each key with its value, a list as its first items, a map as its
+     * first pairs; nothing a person would not read (a hash, a size in bytes).
+     *
+     * @param  array<string, mixed>  $output
+     */
+    private static function made(array $output): ?string
+    {
+        $lines = [];
+        foreach ($output as $key => $value) {
+            if (in_array($key, ['hash', 'bytes', 'built_at'], true) || $value === null || $value === [] || $value === '') {
+                continue;
+            }
+            $lines[] = $key.': '.self::said($value);
+            if (count($lines) >= 14) {
+                break;
+            }
+        }
+
+        return $lines === [] ? null : implode("\n", $lines);
+    }
+
+    private static function said(mixed $value, int $depth = 0): string
+    {
+        if (! is_array($value)) {
+            return is_bool($value) ? ($value ? 'yes' : 'no') : mb_substr((string) $value, 0, 200);
+        }
+        if ($depth > 0) {
+            return mb_substr((string) json_encode($value, JSON_UNESCAPED_UNICODE), 0, 120);
+        }
+        $parts = array_is_list($value)
+            ? array_map(fn ($v): string => self::said($v, 1), array_slice($value, 0, 12))
+            : array_map(fn ($k, $v): string => $k.' '.self::said($v, 1), array_keys(array_slice($value, 0, 12, true)), array_slice($value, 0, 12, true));
+
+        return implode(array_is_list($value) ? ', ' : "\n  · ", array_is_list($value) ? $parts : ['', ...$parts]);
     }
 
     private static function pretty(?string $text): ?string

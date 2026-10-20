@@ -42,7 +42,7 @@
                         <pre style="{{ $box }}" dir="ltr">{{ $step['system'] ?? '—' }}</pre>
                     </details>
                 @elseif (filled($step['text'] ?? null))
-                    <div style="margin-top:3px;{{ $muted }}" dir="auto">{{ $step['text'] }}</div>
+                    <div style="margin-top:3px;white-space:pre-line;{{ $muted }}" dir="auto">{{ $step['text'] }}</div>
                 @endif
                 @if ($step['kind'] === 'end' && filled($step['error'] ?? null))
                     <div style="color:#dc2626;font-size:12.5px;margin-top:4px;white-space:pre-wrap" dir="ltr">{{ \Illuminate\Support\Str::limit($step['error'], 600) }}</div>

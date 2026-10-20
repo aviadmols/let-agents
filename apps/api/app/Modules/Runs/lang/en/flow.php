@@ -8,6 +8,7 @@ return [
     'found' => 'Code search: the pages and products nearest the question',
     'found_detail' => ':passages pieces of the store\'s pages found, :passages_sent sent; :products products shown, :products_sent sent.',
     'call' => 'A model call (:kind)',
+    'made' => 'What it made',
     'end' => 'Ended',
     'seconds' => ':n s',
     'sent' => 'What the agent was sent',
