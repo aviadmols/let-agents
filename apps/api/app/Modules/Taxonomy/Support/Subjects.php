@@ -81,7 +81,15 @@ final class Subjects
         $out = [];
 
         foreach ($posts as $post) {
-            $groups = array_values(array_unique(array_filter(array_merge(...array_values(array_map(fn ($v): array => array_map('strval', (array) $v), (array) $post->terms))) ?: [])));
+            // its categories and tags, as names: a term is a name, or an object with one
+            $groups = [];
+            $terms = (array) $post->terms;
+            array_walk_recursive($terms, function ($value, $key) use (&$groups): void {
+                if (is_string($value) && trim($value) !== '' && (is_int($key) || $key === 'name')) {
+                    $groups[] = trim($value);
+                }
+            });
+            $groups = array_values(array_unique($groups));
             sort($groups, SORT_STRING);
             $item = [
                 'type' => TaxonomyAssignment::CONTENT,
