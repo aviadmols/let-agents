@@ -5,7 +5,8 @@ namespace App\Modules\Search\Contracts;
 /**
  * The words of the tags a product was given by meaning (the Taxonomy module, where the shop has
  * tags in search on): what a shopper may type and find it by, though its title never says it
- * ("ספרי חטופים" finds Omer Shem Tov's book, tagged "חטופים ושבי"). Words a product's own text
+ * ("ספרי חטופים" finds Omer Shem Tov's book, tagged "חטופים ושבי"), each with how central its tag is to the
+ * product, which the search weighs it by (HebrewSearch::TAG_WEIGHT). Words a product's own text
  * holds are found as they always were; these only add. Empty where the shop has none.
  *
  * And the tags sure enough to narrow by (taxonomy.in_filters): each group a filter beside the results,
@@ -16,8 +17,8 @@ namespace App\Modules\Search\Contracts;
  */
 interface ProductTags
 {
-    /** @return array<string, list<string>> by catalog product id */
-    public function wordsByProduct(string $shopId): array;
+    /** @return array<string, list<array{0: string, 1: float}>> [[words, weight], …] by catalog product id */
+    public function tagsByProduct(string $shopId): array;
 
     /**
      * The groups of tags shown as filters, each value with the catalog product ids it holds. Empty where

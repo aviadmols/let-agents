@@ -188,7 +188,7 @@ final class BuildSearchIndex
         $learned = $this->learnedWords($this->locale($shopId));
         // What each product is about by meaning, from its tags, where the shop has tags in search: found by
         // them as by its own words, never instead of them ("ספרי חטופים" finds a book whose text says "נחטף")
-        $tagged = app()->bound(ProductTags::class) ? app(ProductTags::class)->wordsByProduct($shopId) : [];
+        $tagged = app()->bound(ProductTags::class) ? app(ProductTags::class)->tagsByProduct($shopId) : [];
         $faceted = 0;
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
@@ -203,9 +203,11 @@ final class BuildSearchIndex
                 $read['v'] = $variants[$product->id]['v'];
             }
             $faceted += isset($read['f']) ? 1 : 0;
-            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...($tagged[$product->id] ?? []), ...($this->fieldValues[(string) $product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
+            $items[] = $this->record('p:'.$product->external_id, 'product', $product->title, [...$this->productWords($product, $learned[$product->id] ?? []), ...($this->fieldValues[(string) $product->id] ?? []), ...array_map('strval', (array) ($seen[$product->id] ?? []))], $synonyms, [
                 'url' => $product->url,
                 'img' => $product->image_url,
+                // its tags by meaning, apart from its words: weighed by how central each is ([[words, weight], …])
+                'tg' => $tagged[$product->id] ?? null,
                 'i2' => $this->secondPicture($product),
                 's' => $product->in_stock ? 1 : 0,
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.

@@ -110,8 +110,17 @@
     for (var at = 0; at < items.length; at++) {
       var item = items[at];
       var name = normalize(item.title);
-      var hay = normalize(item.title + ' ' + (item.keywords || ''));
-      records.push({ id: String(item.id), title: String(item.title), name: name, named: ' ' + name + ' ', hay: hay });
+      // [[phrase, weight], …]: each word of a tag, at the weight of the most central tag that holds it
+      var tagged = {}, taggedOrder = [];
+      (item.tags || []).forEach(function (pair) {
+        normalize(pair[0]).split(' ').forEach(function (tw) {
+          if (!tw) { return; }
+          if (!Object.prototype.hasOwnProperty.call(tagged, tw)) { taggedOrder.push(tw); tagged[tw] = 0; }
+          if (tagged[tw] < Number(pair[1])) { tagged[tw] = Number(pair[1]); }
+        });
+      });
+      var hay = (normalize(item.title + ' ' + (item.keywords || '')) + ' ' + taggedOrder.join(' ')).trim();
+      records.push({ id: String(item.id), title: String(item.title), name: name, named: ' ' + name + ' ', hay: hay, tagged: tagged });
       var words = hay.split(' ');
       for (var w = 0; w < words.length; w++) {
         var word = words[w];
@@ -325,7 +334,7 @@
         var owners = index.holders[word] || [];
         for (var o = 0; o < owners.length; o++) {
           var at = owners[o];
-          var value = close.score[word] * (index.items[at].named.indexOf(' ' + word + ' ') !== -1 ? 1 : 0.7);
+          var value = close.score[word] * fieldWeight(index.items[at], word);
           if (!Object.prototype.hasOwnProperty.call(best, at)) {
             bestOrder.push(at);
             best[at] = 0;
@@ -371,6 +380,14 @@
       return ((b.full ? 1 : 0) - (a.full ? 1 : 0)) || (b.score - a.score) || (a.title.length - b.title.length);
     });
     return found;
+  }
+
+  // A word in the name counts 1, one of its keywords 0.7, one of its tags between the two by how central the
+  // tag is (the server's KEYWORD_WEIGHT and TAG_WEIGHT).
+  function fieldWeight(record, word) {
+    if (record.named.indexOf(' ' + word + ' ') !== -1) { return 1; }
+    var tag = record.tagged && Object.prototype.hasOwnProperty.call(record.tagged, word) ? record.tagged[word] : 0;
+    return tag > 0 ? 0.7 + 0.3 * Math.min(1, tag) : 0.7;
   }
 
   function search(index, raw) {

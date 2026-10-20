@@ -24,7 +24,7 @@ use App\Modules\Taxonomy\Models\TaxonomyTag;
  */
 final class TagWords implements ProductTags
 {
-    public function wordsByProduct(string $shopId): array
+    public function tagsByProduct(string $shopId): array
     {
         if (! Features::enabled('taxonomy.in_search', $shopId)) {
             return [];
@@ -39,15 +39,29 @@ final class TagWords implements ProductTags
                 if (! $a->tag->group->searchable) {
                     return;
                 }
-                foreach ([$a->tag->label_he, $a->tag->label_en, ...(array) $a->tag->words, $a->tag->parent?->label_he, $a->tag->parent?->label_en] as $word) {
-                    if (is_string($word) && trim($word) !== '') {
-                        $words[$a->subject_id][trim($word)] = true;
+                $weight = (float) $a->weight;
+                // its own names and words at its weight; the broader tag it is part of a little less
+                // a union, not array_merge: a name that is a number ("2024") keeps its key
+                $names = array_fill_keys(array_filter([$a->tag->label_he, $a->tag->label_en, ...(array) $a->tag->words], 'is_string'), $weight)
+                    + array_fill_keys(array_filter([$a->tag->parent?->label_he, $a->tag->parent?->label_en], 'is_string'), $weight * self::BROADER);
+                foreach ($names as $word => $w) {
+                    $word = trim((string) $word);
+                    if ($word !== '' && ($words[$a->subject_id][$word] ?? 0) < $w) {
+                        $words[$a->subject_id][$word] = $w;
                     }
                 }
             });
 
-        return array_map(fn (array $w): array => array_keys($w), $words);
+        // the most central first, the same order every night
+        return array_map(function (array $w): array {
+            uksort($w, fn (string $a, string $b): int => [$w[$b], $a] <=> [$w[$a], $b]);
+
+            return array_map(fn (string $word, float $weight): array => [$word, round($weight, 2)], array_map('strval', array_keys($w)), array_values($w));
+        }, $words);
     }
+
+    /** The broader tag a tag is part of ("כלכלה" of "כלכלה התנהגותית") counts this much of the tag's weight. */
+    private const BROADER = 0.8;
 
     /** A value on nearly every product narrows nothing. */
     private const MAX_SHARE = 0.9;

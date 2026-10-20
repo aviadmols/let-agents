@@ -81,6 +81,16 @@ final class HebrewSearch
     /** How much a generic word counts in a record's score, against 1 for a word that says what. */
     public const GENERIC_WEIGHT = 0.2;
 
+    /** A word in the name counts 1; one of the keywords (the description, the store's fields) less. */
+    public const KEYWORD_WEIGHT = 0.7;
+
+    /**
+     * A word of a tag the product was given by meaning counts between the two, by how central the tag is to
+     * it: a tag it is all about (1) as much as its name, one in its background (.5) little more than a
+     * passing mention. "חטופים" puts the book tagged "חטופים ושבי" at 1 before one whose blurb names them.
+     */
+    public const TAG_WEIGHT = 0.3;
+
     /** Words that only say "things" ("כלים לגינה", "ציוד לגינה", "מוצרים לניקוי"), normalized. */
     private const GENERIC = ['כלימ', 'כלי', 'ציוד', 'מוצרימ', 'מוצר', 'אביזרימ', 'אביזר', 'פריטימ', 'פריט', 'דברימ', 'חפצימ', 'things', 'products', 'items', 'stuff'];
 
@@ -579,8 +589,17 @@ final class HebrewSearch
         foreach ($items as $item) {
             $at = count($records);
             $name = self::normalize($item['title']);
-            $hay = self::normalize($item['title'].' '.($item['keywords'] ?? ''));
-            $records[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'name' => $name, 'named' => ' '.$name.' ', 'hay' => $hay];
+            $tagged = [];
+            // [[phrase, weight], …]: a list, not a map, so a phrase that is a number keeps its place in the browser too
+            foreach ((array) ($item['tags'] ?? []) as [$phrase, $weight]) {
+                foreach (explode(' ', self::normalize((string) $phrase)) as $word) {
+                    if ($word !== '' && ($tagged[$word] ?? 0) < (float) $weight) {
+                        $tagged[$word] = (float) $weight;
+                    }
+                }
+            }
+            $hay = trim(self::normalize($item['title'].' '.($item['keywords'] ?? '')).' '.implode(' ', array_keys($tagged)));
+            $records[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'name' => $name, 'named' => ' '.$name.' ', 'hay' => $hay, 'tagged' => $tagged];
 
             foreach (explode(' ', $hay) as $word) {
                 if ($word === '') {
@@ -730,8 +749,8 @@ final class HebrewSearch
 
             foreach (self::closeWords($index, $token) as $word => $closeness) {
                 foreach ($index['holders'][$word] ?? [] as $at) {
-                    // A word in the name counts for more than one in the keywords.
-                    $value = $closeness * (str_contains($index['items'][$at]['named'], ' '.$word.' ') ? 1 : 0.7);
+                    // A word in the name counts for more than one in the keywords; one of its tags, by how central.
+                    $value = $closeness * self::fieldWeight($index['items'][$at], $word);
 
                     if (($best[$at] ?? 0) < $value) {
                         $best[$at] = $value;
@@ -769,6 +788,18 @@ final class HebrewSearch
         usort($found, static fn (array $a, array $b): int => (int) $b['full'] <=> (int) $a['full'] ?: $b['score'] <=> $a['score'] ?: mb_strlen($a['title']) <=> mb_strlen($b['title']));
 
         return $found;
+    }
+
+    /** How much a word of the record counts: in its name, in a tag of it (by the tag's weight), or among its keywords. */
+    private static function fieldWeight(array $record, string $word): float
+    {
+        if (str_contains($record['named'], ' '.$word.' ')) {
+            return 1.0;
+        }
+
+        $tag = (float) ($record['tagged'][$word] ?? 0);
+
+        return $tag > 0 ? self::KEYWORD_WEIGHT + self::TAG_WEIGHT * min(1.0, $tag) : self::KEYWORD_WEIGHT;
     }
 
     /**

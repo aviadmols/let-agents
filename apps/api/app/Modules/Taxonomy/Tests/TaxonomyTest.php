@@ -208,15 +208,16 @@ final class TaxonomyTest extends TestCase
             $index = (array) json_decode((string) app(TenantContext::class)->run($this->shop->id, fn () => SearchIndex::query()->sole()->items), true);
             $items = $index['items'] ?? $index;
 
-            return (string) collect($items)->firstWhere('title', 'חטוף - אלי שרעבי')['kw'];
+            // its tags, apart from its words, each with how central it is
+            return (string) json_encode(collect($items)->firstWhere('title', 'חטוף - אלי שרעבי')['tg'] ?? [], JSON_UNESCAPED_UNICODE);
         };
 
-        $this->assertStringNotContainsString('Hostages', $kw(), 'off: the search as it was');
+        $this->assertSame('[]', $kw(), 'off: the search as it was');
 
         Features::override('taxonomy.in_search', true, $this->shop->id);
         $words = $kw();
-        $this->assertStringContainsString('חטופים', $words);
-        $this->assertStringContainsString('Hostages', $words);
+        $this->assertStringContainsString('["חטופים",', $words);
+        $this->assertStringContainsString('["Hostages",', $words);
         $this->assertStringNotContainsString('Thriller', $words, 'a tag the checker took out is no word of it');
     }
 

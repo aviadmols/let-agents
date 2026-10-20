@@ -43,7 +43,7 @@ final class LoadedIndex
 
         foreach ($items as $item) {
             $records[(string) $item['id']] = $item;
-            $source[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'keywords' => (string) ($item['kw'] ?? '')];
+            $source[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'keywords' => (string) ($item['kw'] ?? ''), 'tags' => is_array($item['tg'] ?? null) ? $item['tg'] : []];
         }
 
         unset(self::$loaded[$shopId]);

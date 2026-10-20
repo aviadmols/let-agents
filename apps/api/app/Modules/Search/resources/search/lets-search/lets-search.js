@@ -700,7 +700,7 @@
       S.index = d; S.config = d.config || {}; S.facets = d.facets || [];
       (d.items || []).forEach(function (it) { S.records[it.id] = it; });
       if (S.engine && S.engine.build) {
-        try { S.built = S.engine.build((d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '' }; })); } catch (e) { S.built = null; }
+        try { S.built = S.engine.build((d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '', tags: i.tg || null }; })); } catch (e) { S.built = null; }
       }
       // the index carries the shop's look too (and is all a preview reads): the same choices as /look
       if (S.config.theme) { applyLook(S.config); }
@@ -1448,16 +1448,24 @@
   function wordsOf(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean); }
   function says(text, label) { return !!saidBy(text, label); }
   // which typed words name the label, one for each of its words; null when one of them is not said
-  function saidBy(text, label) {
-    var tw = wordsOf(text), lw = wordsOf(label), used = [];
-    if (!lw.length || lw.join('').length < 2) { return null; }
-    var all = lw.every(function (w) {
+  function saidBy(text, label) { var ws = wordsSaid(text, label); return ws.of > 0 && ws.n === ws.of ? ws.at : null; }
+  // how many of the label's words the typed words say (n of of), and which typed words say them (at)
+  function wordsSaid(text, label) {
+    var tw = wordsOf(text), lw = wordsOf(label), used = [], n = 0;
+    if (!lw.length || lw.join('').length < 2) { return { n: 0, of: 0, at: [] }; }
+    lw.forEach(function (w) {
       var at = -1;
       tw.some(function (x, i) { if (x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w)) { at = i; return true; } return false; });
-      if (at >= 0 && used.indexOf(at) === -1) { used.push(at); }
-      return at >= 0;
+      if (at >= 0) { n++; if (used.indexOf(at) === -1) { used.push(at); } }
     });
-    return all ? used : null;
+    return { n: n, of: lw.length, at: used };
+  }
+  // A category (or a tag shown as a filter) is read from the words when its whole name is typed, or, for a name of
+  // three words or more, all of it but one word and at least two: "ספרי מופת" is "ספרי מופת מתורגמים".
+  function namesGroup(text, label) {
+    var ws = wordsSaid(text, label);
+    if (ws.of < 2) { return null; }
+    return ws.n === ws.of || (ws.of >= 3 && ws.n >= 2 && ws.n >= ws.of - 1) ? ws.at : null;
   }
   // The same word as the search engine reads it, through a spelling slip: "לבין" is "לבן", "אדומה" is "אדום"
   // (its stem, or how it sounds once its look-alike letters are one). Short words must be exact.
@@ -1475,9 +1483,9 @@
     Object.keys(counts).forEach(function (code) {
       var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
       // a category (or a tag shown as a filter) of one word is chosen by the shopper, never read from the words: "ברגים"
-      // finds screws outside the screws category too. A name of several words, every one typed ("ספרי מופת מתורגמים"), is it.
-      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l) || ((facet.k === 'category' || /^tag:/.test(facet.k)) && wordsOf(value.l).length < 2)) { return; }
-      var by = saidBy(q, value.l);
+      // finds screws outside the screws category too. One of several words, said enough (namesGroup), is it.
+      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l)) { return; }
+      var by = facet.k === 'category' || /^tag:/.test(facet.k) ? namesGroup(q, value.l) : saidBy(q, value.l);
       if (!by) { return; }
       // one value name in several attributes ("שחור" as a colour and as a coating): the one most results carry
       var k = value.l.toLowerCase();
@@ -1718,7 +1726,13 @@
       var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
       return value && (onCode(c, code) || (counts[code] < n && counts[code] >= (max ? 2 : 1))) && !/^(אחר|other)$/i.test(value.l);
     });
-    codes.sort(function (a, b) { return (onCode(c, b) ? 1 : 0) - (onCode(c, a) ? 1 : 0) || (Math.floor(a / 1000) === typeAt) - (Math.floor(b / 1000) === typeAt) || counts[b] - counts[a]; });
+    // what the words come close to naming first ("ספרי מופת" puts "ספרי מופת מתורגמים" in the row), then the most held
+    var near = {};
+    codes.forEach(function (code) { near[code] = wordsSaid(turn.q || '', S.facets[Math.floor(code / 1000)].v[code % 1000].l).n; });
+    codes.sort(function (a, b) { return (onCode(c, b) ? 1 : 0) - (onCode(c, a) ? 1 : 0) || near[b] - near[a] || (Math.floor(a / 1000) === typeAt) - (Math.floor(b / 1000) === typeAt) || counts[b] - counts[a]; });
+    // one name once: "סלע מאיר" as a category and as a publisher is one chip, the first of them
+    var named = {};
+    codes = codes.filter(function (code) { var l = String(S.facets[Math.floor(code / 1000)].v[code % 1000].l).toLowerCase(); if (named[l] && !onCode(c, code)) { return false; } named[l] = true; return true; });
     return { codes: max ? codes.slice(0, max) : codes, counts: counts, n: n,
       stock: all.some(function (r) { return r.s === 0; }) && all.some(function (r) { return r.s === 1; }),
       sale: all.some(function (r) { return r.sl === 1; }) && all.some(function (r) { return r.sl !== 1; }) };
