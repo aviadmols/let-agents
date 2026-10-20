@@ -5,6 +5,7 @@ namespace App\Modules\Runs\Filament\Operator\Resources\Runs\Tables;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Runs\Models\Run;
 use Filament\Actions\ViewAction;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -50,12 +51,13 @@ final class RunsTable
                 TextColumn::make('input_tokens')
                     ->label(__('runs::runs.fields.tokens'))
                     ->formatStateUsing(fn (Run $record): string => number_format($record->input_tokens).' / '.number_format($record->output_tokens))
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('-')
+                    ->toggleable(),
                 TextColumn::make('cost_usd')
                     ->label(__('runs::runs.fields.cost'))
                     ->money('USD', decimalPlaces: 4)
                     ->placeholder('-')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -73,7 +75,8 @@ final class RunsTable
                     ->preload(),
             ])
             ->recordActions([
-                ViewAction::make(),
+                // Beside the list, not instead of it: what the run did, what each call sent and got back.
+                ViewAction::make()->slideOver()->modalWidth(Width::FourExtraLarge),
             ])
             ->emptyStateHeading(__('runs::runs.empty.heading'))
             ->emptyStateDescription(__('runs::runs.empty.description'));

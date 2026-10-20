@@ -6,7 +6,9 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Filament\Operator\Resources\Runs\Pages\ListRuns;
+use App\Modules\Runs\Models\RunCall;
 use App\Modules\Tenancy\Models\Shop;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -33,6 +35,17 @@ final class RunScreensTest extends TestCase
         Livewire::test(ListRuns::class)
             ->assertCanSeeTableRecords([$run])
             ->assertSee('Gueta Avigdor');
+
+        // Beside the list: the run, and what each call to a model was sent and returned.
+        RunCall::query()->create(['run_id' => $run->id, 'shop_id' => $shop->id, 'kind' => 'chat', 'provider' => 'openai', 'model' => 'gpt-5.4-mini', 'system' => 'You answer from the store pages.', 'sent' => json_encode(['question' => 'על מה הספר?', 'passages' => [['title' => 'מפגש עם עצמי בגיהינום']]], JSON_UNESCAPED_UNICODE), 'received' => '{"found": true}', 'ok' => true, 'input_tokens' => 1200, 'output_tokens' => 80, 'duration_ms' => 900]);
+        $view = Livewire::test(ListRuns::class)->mountAction(TestAction::make('view')->table($run))->instance()->getTable()->getAction('view')->record($run);
+        $this->assertNull($view->getUrl(), 'opens beside the list, not on a page of its own');
+        $this->assertTrue($view->isModalSlideOver());
+        $this->get("/operator/runs/{$run->id}")
+            ->assertOk()
+            ->assertSee('gpt-5.4-mini')
+            ->assertSee('מפגש עם עצמי בגיהינום')
+            ->assertSee('You answer from the store pages.');
 
         foreach (['he', 'en'] as $locale) {
             $this->withHeader('Accept-Language', $locale)
