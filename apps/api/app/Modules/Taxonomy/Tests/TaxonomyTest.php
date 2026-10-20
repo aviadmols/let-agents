@@ -1,0 +1,306 @@
+<?php
+
+namespace App\Modules\Taxonomy\Tests;
+
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\ChatModel;
+use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogCategory;
+use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Taxonomy\Actions\AssignTags;
+use App\Modules\Taxonomy\Actions\BuildTagBank;
+use App\Modules\Taxonomy\Actions\MergeTagProposals;
+use App\Modules\Taxonomy\Models\TaxonomyAssignment;
+use App\Modules\Taxonomy\Models\TaxonomyGroup;
+use App\Modules\Taxonomy\Models\TaxonomyProposal;
+use App\Modules\Taxonomy\Models\TaxonomySubject;
+use App\Modules\Taxonomy\Models\TaxonomyTag;
+use App\Modules\Taxonomy\Support\Bank;
+use App\Modules\Taxonomy\Support\Evaluation;
+use App\Modules\Tenancy\Models\Shop;
+use Closure;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * A store's tag bank and its products' tags, in a store that sells books and shirts: the bank built
+ * from a sample and reviewed by the other family; each tag kept only with its evidence and in its
+ * scope, checked by the other family; only what changed tagged again; the bank grown from what was
+ * proposed often enough; and the tagging measured against cases a person reviewed.
+ */
+final class TaxonomyTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Shop $shop;
+
+    /** @var list<array{system: string, user: array<string, mixed>, provider: AiProviderName}> */
+    public array $calls = [];
+
+    /** @var array<string, Closure(array<string, mixed>): array<string, mixed>> by the prompt's opening words */
+    public array $replies = [];
+
+    /** @var array<string, CatalogCategory> */
+    private array $categories = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->shop = Shop::factory()->create(['name' => 'ספרים וחולצות']);
+        $test = $this;
+        $this->app->instance(ChatModel::class, new class($test) implements ChatModel
+        {
+            public function __construct(private readonly TaxonomyTest $test) {}
+
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $input = (array) json_decode($user, true);
+                $this->test->calls[] = ['system' => $system, 'user' => $input, 'provider' => $provider];
+                foreach ($this->test->replies as $opening => $reply) {
+                    if (str_starts_with($system, $opening)) {
+                        return new ModelReply($reply($input), 1000, 200);
+                    }
+                }
+
+                return new ModelReply([], 0, 0);
+            }
+        });
+
+        $this->product('b1', 'חטוף - אלי שרעבי', '491 יום שרד אלי שרעבי בשבי החמאס.', ['ספרים']);
+        $this->product('b2', 'דרקולה', 'עורך דין בריטי מגיע לטרנסילבניה. ספר האימה הקלאסי.', ['ספרים']);
+        $this->product('s1', 'חולצת פשתן לבנה', 'חולצה מבד פשתן מכובס, קלה לקיץ.', ['חולצות'], [['name' => 'בד', 'values' => ['פשתן']]]);
+    }
+
+    public function test_the_bank_is_designed_from_a_sample_and_reviewed_by_the_other_family(): void
+    {
+        $this->bank();
+
+        app(BuildTagBank::class)->handle($this->shop->id);
+
+        $this->assertSame([AiProviderName::Anthropic, AiProviderName::OpenAi], array_column($this->calls, 'provider'));
+        $this->assertCount(3, $this->calls[0]['user']['products'], 'the sample: every product of a store this small');
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $groups = TaxonomyGroup::query()->orderBy('position')->get()->keyBy('key');
+            $this->assertSame(['genre', 'topic', 'fabric'], $groups->keys()->all(), 'a group of one tag is not kept');
+            $this->assertSame(['ספרים'], $groups['genre']->scope, 'only the store\'s own categories: "מדפים" is not one');
+            $this->assertSame(TaxonomyGroup::FACTUAL, $groups['fabric']->kind);
+            $this->assertFalse($groups['genre']->filter, 'the reviewer set it right');
+            $genre = TaxonomyTag::query()->where('group_id', $groups['genre']->id)->orderBy('key')->get();
+            $this->assertSame(['fantasy', 'horror', 'thriller'], $genre->pluck('key')->all(), 'the duplicate wording kept once, "scary" merged into horror, "misc" removed, fantasy added');
+            $this->assertContains('מפחיד', $genre->firstWhere('key', 'horror')->words);
+            $this->assertSame(1, Bank::version());
+        });
+
+        // asked again: the bank stands
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->assertCount(2, $this->calls);
+    }
+
+    public function test_tags_are_kept_only_with_their_evidence_in_their_scope_and_checked_by_the_other_family(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->calls = [];
+        $this->tagging();
+
+        $run = app(AssignTags::class)->handle($this->shop->id, posts: false);
+
+        $this->assertSame('succeeded', $run->status->value);
+        $this->assertSame([AiProviderName::OpenAi, AiProviderName::Anthropic], array_column($this->calls, 'provider'));
+        $this->assertStringContainsString('# The bank', $this->calls[0]['system'], 'the bank after the instructions, the same every call');
+        $out = $run->output;
+        $this->assertSame(1, $out['dropped_unsupported'], 'a factual tag with no quote');
+        $this->assertSame(1, $out['dropped_scope'], 'a genre for a shirt');
+        $this->assertSame(1, $out['dropped_unknown'], 'a tag the bank does not have');
+
+        $tags = $this->tagsOf();
+        $this->assertSame(['topic:hostages' => 'kept', 'genre:thriller' => 'rejected'], $tags['b1'], 'the checker took the thriller out');
+        $this->assertSame(['genre:horror' => 'kept'], $tags['b2'], 'from knowledge of a well-known work, sure enough; not also fantasy: one genre');
+        $this->assertSame(['fabric:linen' => 'kept'], $tags['s1'], 'a factual tag quoted from the store\'s words');
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $a = TaxonomyAssignment::query()->whereHas('tag', fn ($q) => $q->where('key', 'horror'))->sole();
+            $this->assertSame('knowledge', $a->source);
+            $this->assertSame('held', $a->checked);
+            $this->assertFalse($a->explicit, 'inferred: the store\'s words do not say "אימה" of it');
+            $hostages = TaxonomyAssignment::query()->whereHas('tag', fn ($q) => $q->where('key', 'hostages'))->sole();
+            $this->assertTrue($hostages->explicit, 'its words say "שבי", one of the tag\'s words');
+            $this->assertSame(1.0, $hostages->weight, 'what the book is mainly about');
+            $this->assertSame(1, TaxonomyProposal::query()->count());
+            $this->assertSame(3, TaxonomySubject::query()->count());
+        });
+
+        // nothing changed: nothing asked
+        $this->calls = [];
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+        $this->assertSame([], $this->calls);
+
+        // one product changed: only it
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', 'b2')->first()->forceFill(['title' => 'דרקולה - מהדורה חדשה'])->save());
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+        $this->assertSame(['דרקולה - מהדורה חדשה'], array_column($this->calls[0]['user']['items'], 'title'));
+    }
+
+    public function test_the_bank_grows_from_what_was_proposed_often_enough_and_only_those_are_tagged_again(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->tagging();
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+        $this->replies['You decide which proposed tags'] = fn (array $in): array => ['decisions' => [['id' => 'p1', 'action' => 'add', 'into' => '', 'key' => 'october_7', 'label_he' => 'שבעה באוקטובר', 'label_en' => 'October 7', 'words' => ['7.10'], 'why' => 'נשאל הרבה']]];
+
+        // proposed for one product: not yet
+        app(MergeTagProposals::class)->handle($this->shop->id);
+        $this->assertSame(0, app(TenantContext::class)->run($this->shop->id, fn () => TaxonomyTag::query()->where('key', 'october_7')->count()));
+
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $proposal = TaxonomyProposal::query()->sole();
+            $proposal->subjects = [...$proposal->subjects, ['product', CatalogProduct::query()->where('external_id', 'b2')->value('id')]];
+            $proposal->save();
+        });
+        app(MergeTagProposals::class)->handle($this->shop->id);
+
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $tag = TaxonomyTag::query()->where('key', 'october_7')->sole();
+            $this->assertSame(2, $tag->version, 'it came in with the bank\'s next version');
+            $this->assertSame('added', TaxonomyProposal::query()->sole()->status);
+            $this->assertSame(['s1'], CatalogProduct::query()->whereIn('id', TaxonomySubject::query()->pluck('subject_id'))->pluck('external_id')->all(), 'the two it was proposed for wait to be tagged again; the shirt does not');
+        });
+    }
+
+    public function test_the_tagging_is_measured_against_cases_a_person_reviewed(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->tagging();
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+
+        $eval = app(TenantContext::class)->run($this->shop->id, fn () => Evaluation::of($this->shop->id, ['cases' => [
+            ['title' => 'חטוף - אלי שרעבי', 'expect' => ['חטופ|hostage'], 'reject' => ['מתח|thriller']],
+            ['title' => 'דרקולה', 'expect' => ['אימה|horror'], 'reject' => ['מדע בדיוני|science fiction']],
+            ['title' => 'חולצת פשתן לבנה', 'expect' => ['כותנה|cotton']],
+        ]]));
+
+        $this->assertSame(66.7, $eval['gold']['recall'], 'the shirt is linen, not cotton');
+        $this->assertSame(100.0, $eval['gold']['negative_pass'], 'the thriller the checker took out is not counted against it');
+        $this->assertSame(3, $eval['assigned']['products_tagged']);
+        $this->assertEqualsCanonicalizing(['knowledge' => 1, 'catalog' => 2], $eval['assigned']['source']);
+        $this->assertSame([], $eval['bank']['duplicates']);
+        $this->assertGreaterThan(0, $eval['cost']['per_product_usd']);
+    }
+
+    private function bank(): void
+    {
+        $this->replies['You design the tag bank'] = fn (array $in): array => ['groups' => [
+            ['key' => 'genre', 'label_he' => 'ז\'אנר', 'label_en' => 'Genre', 'kind' => 'inferred', 'multiple' => false, 'searchable' => true, 'filter' => true, 'recommend' => true, 'about' => '', 'scope' => ['ספרים', 'מדפים'], 'tags' => [
+                ['key' => 'horror', 'label_he' => 'אימה', 'label_en' => 'Horror', 'words' => ['horror'], 'about' => ''],
+                ['key' => 'horror_books', 'label_he' => 'האימה', 'label_en' => 'Horror books', 'words' => [], 'about' => ''],
+                ['key' => 'scary', 'label_he' => 'מפחיד', 'label_en' => 'Scary', 'words' => [], 'about' => ''],
+                ['key' => 'thriller', 'label_he' => 'מתח', 'label_en' => 'Thriller', 'words' => [], 'about' => ''],
+                ['key' => 'misc', 'label_he' => 'שונות', 'label_en' => 'Misc', 'words' => [], 'about' => ''],
+            ]],
+            ['key' => 'topic', 'label_he' => 'נושא', 'label_en' => 'Topic', 'kind' => 'inferred', 'multiple' => true, 'searchable' => true, 'filter' => false, 'recommend' => true, 'about' => '', 'scope' => ['ספרים'], 'tags' => [
+                ['key' => 'hostages', 'label_he' => 'חטופים', 'label_en' => 'Hostages', 'words' => ['שבי', 'חטוף'], 'about' => ''],
+                ['key' => 'economics', 'label_he' => 'כלכלה', 'label_en' => 'Economics', 'words' => [], 'about' => ''],
+            ]],
+            ['key' => 'fabric', 'label_he' => 'בד', 'label_en' => 'Fabric', 'kind' => 'factual', 'multiple' => false, 'searchable' => true, 'filter' => true, 'recommend' => false, 'about' => '', 'scope' => ['חולצות'], 'tags' => [
+                ['key' => 'linen', 'label_he' => 'פשתן', 'label_en' => 'Linen', 'words' => [], 'about' => ''],
+                ['key' => 'cotton', 'label_he' => 'כותנה', 'label_en' => 'Cotton', 'words' => [], 'about' => ''],
+            ]],
+            ['key' => 'mood', 'label_he' => 'מצב רוח', 'label_en' => 'Mood', 'kind' => 'inferred', 'multiple' => true, 'searchable' => true, 'filter' => false, 'recommend' => true, 'about' => '', 'scope' => [], 'tags' => [
+                ['key' => 'calm', 'label_he' => 'רגוע', 'label_en' => 'Calm', 'words' => [], 'about' => ''],
+            ]],
+        ]];
+        $this->replies['You review the tag bank'] = fn (array $in): array => [
+            'remove' => [['group' => 'genre', 'tag' => 'misc', 'why' => 'vague'], ['group' => 'nope', 'tag' => 'x', 'why' => '']],
+            'merge' => [['group' => 'genre', 'tag' => 'scary', 'into' => 'horror', 'why' => 'same']],
+            'fix_groups' => [['group' => 'genre', 'kind' => 'inferred', 'searchable' => true, 'filter' => false, 'recommend' => true, 'scope' => ['ספרים'], 'why' => 'few filters']],
+            'add' => [['group' => 'genre', 'label_he' => 'פנטזיה', 'label_en' => 'Fantasy', 'words' => [], 'why' => 'common'], ['group' => 'genre', 'label_he' => 'אימה', 'label_en' => 'Horror', 'words' => [], 'why' => 'dup']],
+        ];
+    }
+
+    private function tagging(): void
+    {
+        $this->replies['You tag one online store'] = function (array $in): array {
+            $ref = fn (string $title): string => collect($in['items'])->firstWhere('title', $title)['id'] ?? collect($in['items'])->first(fn (array $i): bool => str_starts_with($i['title'], $title))['id'];
+            $items = [];
+            foreach ($in['items'] as $item) {
+                $items[$item['id']] = ['id' => $item['id'], 'tags' => [], 'propose' => []];
+            }
+            if (collect($in['items'])->contains('title', 'חטוף - אלי שרעבי')) {
+                $items[$ref('חטוף - אלי שרעבי')]['tags'] = [
+                    ['group' => 'topic', 'tag' => 'hostages', 'source' => 'catalog', 'evidence' => 'שרד אלי שרעבי בשבי החמאס', 'confidence' => 0.95, 'weight' => 1],
+                    ['group' => 'genre', 'tag' => 'thriller', 'source' => 'knowledge', 'evidence' => 'מותחן', 'confidence' => 0.8, 'weight' => 0.5],
+                    ['group' => 'genre', 'tag' => 'cyberpunk', 'source' => 'knowledge', 'evidence' => '', 'confidence' => 0.9, 'weight' => 0.9],
+                ];
+                $items[$ref('חטוף - אלי שרעבי')]['propose'] = [['group' => 'topic', 'label_he' => 'שבעה באוקטובר', 'label_en' => 'October 7', 'why' => 'the day he was taken'], ['group' => 'topic', 'label_he' => 'החטופים', 'label_en' => 'Hostages', 'why' => 'dup']];
+            }
+            $dracula = collect($in['items'])->first(fn (array $i): bool => str_starts_with($i['title'], 'דרקולה'));
+            if ($dracula !== null) {
+                $items[$dracula['id']]['tags'] = [
+                    ['group' => 'genre', 'tag' => 'horror', 'source' => 'knowledge', 'evidence' => 'רומן אימה גותי קלאסי', 'confidence' => 0.9, 'weight' => 0.9],
+                    ['group' => 'genre', 'tag' => 'fantasy', 'source' => 'knowledge', 'evidence' => 'ערפדים', 'confidence' => 0.7, 'weight' => 0.4],
+                ];
+            }
+            if (collect($in['items'])->contains('title', 'חולצת פשתן לבנה')) {
+                $items[$ref('חולצת פשתן לבנה')]['tags'] = [
+                    ['group' => 'fabric', 'tag' => 'linen', 'source' => 'catalog', 'evidence' => 'מבד פשתן', 'confidence' => 0.95, 'weight' => 1],
+                    ['group' => 'fabric', 'tag' => 'cotton', 'source' => 'knowledge', 'evidence' => 'shirts are often cotton', 'confidence' => 0.9, 'weight' => 0.9],
+                    ['group' => 'genre', 'tag' => 'thriller', 'source' => 'catalog', 'evidence' => 'חולצה', 'confidence' => 0.9, 'weight' => 0.9],
+                ];
+            }
+
+            return ['items' => array_values($items)];
+        };
+        $this->replies['You check the tags'] = function (array $in): array {
+            $wrong = [];
+            foreach ($in['items'] as $item) {
+                foreach ($item['tags'] as $tag) {
+                    if (str_contains($tag['tag'], 'מתח')) {
+                        $wrong[] = ['id' => $item['id'], 'ref' => $tag['ref'], 'why' => 'ספר עיון, לא מותחן'];
+                    }
+                }
+            }
+
+            return ['wrong' => $wrong];
+        };
+    }
+
+    /** @return array<string, array<string, string>> external id => group:tag => status */
+    private function tagsOf(): array
+    {
+        return app(TenantContext::class)->run($this->shop->id, function (): array {
+            $ids = CatalogProduct::query()->pluck('external_id', 'id');
+            $out = [];
+            foreach (TaxonomyAssignment::query()->with('tag.group')->orderBy('id')->get() as $a) {
+                $out[$ids[$a->subject_id]][$a->tag->group->key.':'.$a->tag->key] = $a->status;
+            }
+            ksort($out);
+
+            return $out;
+        });
+    }
+
+    /**
+     * @param  list<string>  $categories
+     * @param  list<array{name: string, values: list<string>}>  $attributes
+     */
+    private function product(string $id, string $title, string $description, array $categories, array $attributes = []): void
+    {
+        app(TenantContext::class)->run($this->shop->id, function () use ($id, $title, $description, $categories, $attributes): void {
+            $product = CatalogProduct::query()->create([
+                'shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'price' => '89.00', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => md5($title.$description),
+                'payload' => ['title' => $title, 'short_description' => '', 'description' => '<p>'.$description.'</p>', 'attributes' => $attributes],
+            ]);
+            foreach ($categories as $name) {
+                $this->categories[$name] ??= CatalogCategory::query()->create([
+                    'shop_id' => $this->shop->id, 'external_id' => (string) (count($this->categories) + 1), 'name' => $name, 'path' => [$name], 'depth' => 0,
+                    'product_count' => 1, 'url' => null, 'hash' => md5($name),
+                ]);
+            }
+            $product->categories()->attach(array_map(fn (string $name): string => $this->categories[$name]->id, $categories));
+        });
+    }
+}

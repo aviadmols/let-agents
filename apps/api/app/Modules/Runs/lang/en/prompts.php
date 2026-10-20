@@ -73,4 +73,11 @@ return [
         'find_set' => 'Chooses which of the products code found belong to the set the shopper asked to see',
         'check_set' => 'Checks the choice and takes out products that do not belong to the set',
     ],
+    'taxonomy' => [
+        'tag_bank' => 'Designs the store\'s tag bank from a sample of its products and posts',
+        'tag_bank_review' => 'Reviews the tag bank: what to remove, merge, set right and add',
+        'assign_tags' => 'Gives products and posts tags of the bank, each with its source and evidence',
+        'check_tags' => 'Checks the tags given and takes out what does not fit',
+        'merge_proposals' => 'Decides on proposed tags: add to the bank, merge into one it has, or reject',
+    ],
 ];

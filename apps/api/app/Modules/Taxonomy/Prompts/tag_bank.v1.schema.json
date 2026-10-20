@@ -1,0 +1,43 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["groups"],
+    "properties": {
+        "groups": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "label_he", "label_en", "kind", "multiple", "searchable", "filter", "recommend", "about", "scope", "tags"],
+                "properties": {
+                    "key": {"type": "string"},
+                    "label_he": {"type": "string"},
+                    "label_en": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["inferred", "factual"]},
+                    "multiple": {"type": "boolean"},
+                    "searchable": {"type": "boolean"},
+                    "filter": {"type": "boolean"},
+                    "recommend": {"type": "boolean"},
+                    "about": {"type": "string"},
+                    "scope": {"type": "array", "items": {"type": "string"}},
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["key", "label_he", "label_en", "words", "about", "parent"],
+                            "properties": {
+                                "key": {"type": "string"},
+                                "label_he": {"type": "string"},
+                                "label_en": {"type": "string"},
+                                "words": {"type": "array", "items": {"type": "string"}},
+                                "about": {"type": "string"},
+                                "parent": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

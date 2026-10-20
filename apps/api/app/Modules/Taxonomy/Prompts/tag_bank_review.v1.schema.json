@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["remove", "merge", "fix_groups", "add"],
+    "properties": {
+        "remove": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["group", "tag", "why"], "properties": {"group": {"type": "string"}, "tag": {"type": "string"}, "why": {"type": "string"}}}},
+        "merge": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["group", "tag", "into", "why"], "properties": {"group": {"type": "string"}, "tag": {"type": "string"}, "into": {"type": "string"}, "why": {"type": "string"}}}},
+        "fix_groups": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["group", "kind", "searchable", "filter", "recommend", "scope", "why"], "properties": {"group": {"type": "string"}, "kind": {"type": "string", "enum": ["inferred", "factual"]}, "searchable": {"type": "boolean"}, "filter": {"type": "boolean"}, "recommend": {"type": "boolean"}, "scope": {"type": "array", "items": {"type": "string"}}, "why": {"type": "string"}}}},
+        "add": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["group", "label_he", "label_en", "words", "why"], "properties": {"group": {"type": "string"}, "label_he": {"type": "string"}, "label_en": {"type": "string"}, "words": {"type": "array", "items": {"type": "string"}}, "why": {"type": "string"}}}}
+    }
+}

@@ -1,0 +1,96 @@
+{
+    "name": "Taxonomy",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Runs",
+        "Ai",
+        "Catalog",
+        "Retrieval",
+        "Enrichment"
+    ],
+    "provider": "TaxonomyServiceProvider",
+    "features": [
+        { "name": "tagging", "default": false },
+        { "name": "in_search", "default": false }
+    ],
+    "settings": [
+        { "name": "bank_writer_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
+        { "name": "bank_writer_model", "type": "string", "default": "claude-sonnet-5-5", "min": 1, "max": 120, "scope": "global" },
+        { "name": "bank_writer_input_usd_per_million", "type": "float", "default": 3, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "bank_writer_output_usd_per_million", "type": "float", "default": 15, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "bank_writer_max_output_tokens", "type": "int", "default": 16000, "min": 1000, "max": 32000, "scope": "global", "unit": "tokens" },
+        { "name": "bank_reviewer_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
+        { "name": "bank_reviewer_model", "type": "string", "default": "gpt-5.4", "min": 1, "max": 120, "scope": "global" },
+        { "name": "bank_reviewer_input_usd_per_million", "type": "float", "default": 2.5, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "bank_reviewer_output_usd_per_million", "type": "float", "default": 15, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "bank_reviewer_max_output_tokens", "type": "int", "default": 6000, "min": 1000, "max": 32000, "scope": "global", "unit": "tokens" },
+        { "name": "tagger_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
+        { "name": "tagger_model", "type": "string", "default": "gpt-5.4-mini", "min": 1, "max": 120, "scope": "global" },
+        { "name": "tagger_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "tagger_output_usd_per_million", "type": "float", "default": 8, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "tagger_max_output_tokens", "type": "int", "default": 8000, "min": 1000, "max": 32000, "scope": "global", "unit": "tokens" },
+        { "name": "tag_checker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
+        { "name": "tag_checker_model", "type": "string", "default": "claude-sonnet-5-5", "min": 1, "max": 120, "scope": "global" },
+        { "name": "tag_checker_input_usd_per_million", "type": "float", "default": 3, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "tag_checker_output_usd_per_million", "type": "float", "default": 15, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "tag_checker_max_output_tokens", "type": "int", "default": 3000, "min": 500, "max": 16000, "scope": "global", "unit": "tokens" },
+        { "name": "sample_products", "type": "int", "default": 80, "min": 10, "max": 300, "scope": "shop", "unit": "products" },
+        { "name": "sample_per_group", "type": "int", "default": 3, "min": 1, "max": 20, "scope": "shop", "unit": "products" },
+        { "name": "sample_posts", "type": "int", "default": 20, "min": 0, "max": 100, "scope": "shop", "unit": "items" },
+        { "name": "max_groups", "type": "int", "default": 12, "min": 2, "max": 30, "scope": "shop", "unit": "items" },
+        { "name": "max_tags", "type": "int", "default": 40, "min": 3, "max": 120, "scope": "shop", "unit": "items" },
+        { "name": "batch_size", "type": "int", "default": 8, "min": 1, "max": 30, "scope": "shop", "unit": "items" },
+        { "name": "text_chars", "type": "int", "default": 900, "min": 200, "max": 4000, "scope": "global", "unit": "characters" },
+        { "name": "keep_min_percent", "type": "int", "default": 60, "min": 0, "max": 100, "scope": "global", "unit": "percent" },
+        { "name": "knowledge_min_percent", "type": "int", "default": 75, "min": 0, "max": 100, "scope": "global", "unit": "percent" },
+        { "name": "audit_percent", "type": "int", "default": 100, "min": 0, "max": 100, "scope": "shop", "unit": "percent" },
+        { "name": "min_support", "type": "int", "default": 2, "min": 1, "max": 50, "scope": "shop", "unit": "items" }
+    ],
+    "agents": [
+        {
+            "name": "bank_builder",
+            "action": "build_bank",
+            "when": "on_request",
+            "features": ["tagging"],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "bank_writer_provider",
+                    "model": "bank_writer_model",
+                    "prices": ["bank_writer_input_usd_per_million", "bank_writer_output_usd_per_million"],
+                    "prompts": ["tag_bank", "merge_proposals"]
+                },
+                {
+                    "role": "checker",
+                    "provider": "bank_reviewer_provider",
+                    "model": "bank_reviewer_model",
+                    "prices": ["bank_reviewer_input_usd_per_million", "bank_reviewer_output_usd_per_million"],
+                    "prompts": ["tag_bank_review"]
+                }
+            ]
+        },
+        {
+            "name": "tagger",
+            "action": "assign",
+            "when": "on_request",
+            "features": ["tagging"],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "tagger_provider",
+                    "model": "tagger_model",
+                    "prices": ["tagger_input_usd_per_million", "tagger_output_usd_per_million"],
+                    "prompts": ["assign_tags"]
+                },
+                {
+                    "role": "checker",
+                    "provider": "tag_checker_provider",
+                    "model": "tag_checker_model",
+                    "prices": ["tag_checker_input_usd_per_million", "tag_checker_output_usd_per_million"],
+                    "prompts": ["check_tags"]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "about": "Sela Meir (books). Each case: a product by its title, patterns one of its kept tags must match (expect) and patterns none may match (reject: the negative cases). Patterns are matched against the tag's Hebrew and English names, its key, its group and its other words. Reviewed by hand, 20.10.2026.",
+    "cases": [
+        {"title": "חטוף - אלי שרעבי", "expect": ["חטופ|שבי|hostage|captiv"], "reject": ["מדע בדיוני|science fiction|fantasy|פנטזיה"]},
+        {"title": "מפגש עם עצמי בגיהינום", "expect": ["חטופ|שבי|hostage|captiv"], "reject": ["כלכל|econom"]},
+        {"title": "תחנות 7, פקדה אותנו השעה", "expect": ["מלחמ|war|צבא|military|קרב|combat"], "reject": ["חטופ|hostage|captiv"]},
+        {"title": "חברוּת ברזל", "expect": ["מלחמ|war|צבא|military|מילואים|reserv"], "reject": ["חטופ|hostage|captiv"]},
+        {"title": "דרקולה", "expect": ["אימה|horror|גותי|gothic|על.?טבעי|supernatural"], "reject": ["מדע בדיוני|science fiction|sci.?fi"]},
+        {"title": "לו - היסטוריה חלופית לישראל", "expect": ["היסטוריה חלופית|alternate history|alternative history|ספקולטיב|speculative|בדיונ|fiction|סאטיר|satire"], "reject": ["ביוגרפ|biograph"]},
+        {"title": "אדם סמית", "expect": ["כלכל|econom"], "reject": ["בדיונ|fiction|רומן|novel|אימה|horror"]},
+        {"title": "מילטון פרידמן", "expect": ["כלכל|econom"], "reject": ["בדיונ|fiction|רומן|novel"]},
+        {"title": "הפסיכולוגיה של הכסף", "expect": ["כסף|money|פיננס|financ|השקע|invest|כלכל|econom"], "reject": ["בדיונ|fiction|מלחמ|war"]},
+        {"title": "ביבי: סיפור חיי", "expect": ["ביוגרפ|biograph|זכרונות|memoir|אוטוביוגרפ"], "reject": ["בדיונ|fiction|אימה|horror"]},
+        {"title": "עושה שלום - משנתו המדינית של הרבי מלובביץ׳", "expect": ["יהדות|judaism|jewish|דת|religio|מדינ|politic"], "reject": ["חטופ|hostage|אימה|horror"]},
+        {"title": "תוציאו את הילד מהמסך", "expect": ["הורות|parent|חינוך|educat|ילד|child|משפחה|family"], "reject": ["בדיונ|fiction|מלחמ|war"]},
+        {"title": "The Lean Startup", "expect": ["עסק|business|יזמ|entrepreneur|startup|סטארט"], "reject": ["בדיונ|fiction|ביוגרפ|biograph"]},
+        {"title": "חשבון לרצח", "expect": ["מתח|thriller|פשע|crime|בלש|mystery|רומן|novel|בדיונ|fiction"], "reject": ["ביוגרפ|biograph"]},
+        {"title": "מנוי שיבולת", "expect": ["מנוי|subscription"], "reject": ["אימה|horror|מתח|thriller"]}
+    ],
+    "related": [
+        {"title": "חטוף - אלי שרעבי", "expect": ["מפגש עם עצמי בגיהינום"], "within": 3},
+        {"title": "אדם סמית", "expect": ["מילטון פרידמן", "פרידריך האייק"], "within": 5}
+    ]
+}

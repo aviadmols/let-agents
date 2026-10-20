@@ -1,0 +1,38 @@
+<?php
+
+$price = fn (string $who, string $what): array => ['label' => ucfirst("{$who} {$what} price"), 'description' => 'Dollars per million tokens, for the cost.'];
+$tokens = ['label' => 'Longest model reply', 'description' => 'Tokens per call.'];
+
+return [
+    'bank_writer_provider' => ['label' => 'Bank writer provider', 'description' => 'The model that designs the store\'s tag bank and decides on proposed tags.'],
+    'bank_writer_model' => ['label' => 'Bank writer model', 'description' => 'The model\'s name at the provider.'],
+    'bank_writer_input_usd_per_million' => $price('bank writer', 'input'),
+    'bank_writer_output_usd_per_million' => $price('bank writer', 'output'),
+    'bank_writer_max_output_tokens' => $tokens,
+    'bank_reviewer_provider' => ['label' => 'Bank reviewer provider', 'description' => 'The model that reviews the bank. Must be of another family than the writer.'],
+    'bank_reviewer_model' => ['label' => 'Bank reviewer model', 'description' => 'The model\'s name at the provider.'],
+    'bank_reviewer_input_usd_per_million' => $price('bank reviewer', 'input'),
+    'bank_reviewer_output_usd_per_million' => $price('bank reviewer', 'output'),
+    'bank_reviewer_max_output_tokens' => $tokens,
+    'tagger_provider' => ['label' => 'Tagger provider', 'description' => 'The model that tags products and posts from the bank.'],
+    'tagger_model' => ['label' => 'Tagger model', 'description' => 'The model\'s name at the provider.'],
+    'tagger_input_usd_per_million' => $price('tagger', 'input'),
+    'tagger_output_usd_per_million' => $price('tagger', 'output'),
+    'tagger_max_output_tokens' => $tokens,
+    'tag_checker_provider' => ['label' => 'Tag checker provider', 'description' => 'The model that checks the tagging. Must be of another family than the tagger.'],
+    'tag_checker_model' => ['label' => 'Tag checker model', 'description' => 'The model\'s name at the provider.'],
+    'tag_checker_input_usd_per_million' => $price('tag checker', 'input'),
+    'tag_checker_output_usd_per_million' => $price('tag checker', 'output'),
+    'tag_checker_max_output_tokens' => $tokens,
+    'sample_products' => ['label' => 'Products in the sample', 'description' => 'How many products the bank is built from, across all categories and product types.'],
+    'sample_per_group' => ['label' => 'Products of each category in the sample', 'description' => 'At most this many of each category, spread through it.'],
+    'sample_posts' => ['label' => 'Posts in the sample', 'description' => 'How many posts and guides the bank is built from.'],
+    'max_groups' => ['label' => 'Tag groups', 'description' => 'At most this many kinds of tag in the bank.'],
+    'max_tags' => ['label' => 'Tags in a group', 'description' => 'At most this many tags of each kind.'],
+    'batch_size' => ['label' => 'Products per call', 'description' => 'How many products the tagger reads in each call.'],
+    'text_chars' => ['label' => 'Text per product', 'description' => 'How many characters of each product\'s description the tagger reads.'],
+    'keep_min_percent' => ['label' => 'Least confidence', 'description' => 'A tag the tagger is less sure of than this waits for review and is not used.'],
+    'knowledge_min_percent' => ['label' => 'Least confidence from knowledge', 'description' => 'A tag that rests on what is widely known of a well-known product or work, not its text, needs at least this confidence.'],
+    'audit_percent' => ['label' => 'Share of tagging checked', 'description' => 'What share of the calls a model of another family checks. In the pilot: all.'],
+    'min_support' => ['label' => 'A proposed new tag', 'description' => 'A tag the bank lacks is weighed only once it was proposed for at least this many products.'],
+];

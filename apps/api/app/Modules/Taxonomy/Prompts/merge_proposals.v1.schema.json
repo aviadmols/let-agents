@@ -1,0 +1,25 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["decisions"],
+    "properties": {
+        "decisions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "action", "into", "key", "label_he", "label_en", "words", "why"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "action": {"type": "string", "enum": ["add", "merge", "reject"]},
+                    "into": {"type": "string"},
+                    "key": {"type": "string"},
+                    "label_he": {"type": "string"},
+                    "label_en": {"type": "string"},
+                    "words": {"type": "array", "items": {"type": "string"}},
+                    "why": {"type": "string"}
+                }
+            }
+        }
+    }
+}

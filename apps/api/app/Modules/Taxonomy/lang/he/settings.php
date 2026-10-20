@@ -1,0 +1,38 @@
+<?php
+
+$price = fn (string $who, string $what): array => ['label' => "מחיר {$what} של {$who}", 'description' => 'דולר למיליון טוקנים, לחישוב העלות.'];
+$tokens = ['label' => 'אורך תשובה מרבי', 'description' => 'טוקנים לכל קריאה.'];
+
+return [
+    'bank_writer_provider' => ['label' => 'ספק כותב הבנק', 'description' => 'המודל שמתכנן את בנק התגיות של החנות ומחליט על תגיות שהוצעו.'],
+    'bank_writer_model' => ['label' => 'מודל כותב הבנק', 'description' => 'שם המודל אצל הספק.'],
+    'bank_writer_input_usd_per_million' => $price('כותב הבנק', 'קלט'),
+    'bank_writer_output_usd_per_million' => $price('כותב הבנק', 'פלט'),
+    'bank_writer_max_output_tokens' => $tokens,
+    'bank_reviewer_provider' => ['label' => 'ספק בודק הבנק', 'description' => 'המודל שבודק את הבנק. חייב להיות ממשפחה אחרת מהכותב.'],
+    'bank_reviewer_model' => ['label' => 'מודל בודק הבנק', 'description' => 'שם המודל אצל הספק.'],
+    'bank_reviewer_input_usd_per_million' => $price('בודק הבנק', 'קלט'),
+    'bank_reviewer_output_usd_per_million' => $price('בודק הבנק', 'פלט'),
+    'bank_reviewer_max_output_tokens' => $tokens,
+    'tagger_provider' => ['label' => 'ספק המתייג', 'description' => 'המודל שמתייג את המוצרים והפוסטים מהבנק.'],
+    'tagger_model' => ['label' => 'מודל המתייג', 'description' => 'שם המודל אצל הספק.'],
+    'tagger_input_usd_per_million' => $price('המתייג', 'קלט'),
+    'tagger_output_usd_per_million' => $price('המתייג', 'פלט'),
+    'tagger_max_output_tokens' => $tokens,
+    'tag_checker_provider' => ['label' => 'ספק בודק התגיות', 'description' => 'המודל שבודק את התיוג. חייב להיות ממשפחה אחרת מהמתייג.'],
+    'tag_checker_model' => ['label' => 'מודל בודק התגיות', 'description' => 'שם המודל אצל הספק.'],
+    'tag_checker_input_usd_per_million' => $price('בודק התגיות', 'קלט'),
+    'tag_checker_output_usd_per_million' => $price('בודק התגיות', 'פלט'),
+    'tag_checker_max_output_tokens' => $tokens,
+    'sample_products' => ['label' => 'מוצרים במדגם', 'description' => 'כמה מוצרים הבנק נבנה מהם, מכל הקטגוריות וסוגי המוצרים.'],
+    'sample_per_group' => ['label' => 'מוצרים מכל קטגוריה במדגם', 'description' => 'כמה מוצרים לכל היותר מכל קטגוריה, מפוזרים לאורכה.'],
+    'sample_posts' => ['label' => 'פוסטים במדגם', 'description' => 'כמה פוסטים ומדריכים הבנק נבנה מהם.'],
+    'max_groups' => ['label' => 'קבוצות תגיות', 'description' => 'כמה סוגי תגיות לכל היותר בבנק.'],
+    'max_tags' => ['label' => 'תגיות בקבוצה', 'description' => 'כמה תגיות לכל היותר בכל סוג.'],
+    'batch_size' => ['label' => 'מוצרים בקריאה', 'description' => 'כמה מוצרים המתייג קורא בכל קריאה.'],
+    'text_chars' => ['label' => 'טקסט לכל מוצר', 'description' => 'כמה תווים מהתיאור של כל מוצר המתייג קורא.'],
+    'keep_min_percent' => ['label' => 'ביטחון מינימלי', 'description' => 'תגית שהמתייג פחות בטוח בה מזה ממתינה לבדיקה ולא נכנסת לשימוש.'],
+    'knowledge_min_percent' => ['label' => 'ביטחון מינימלי לידע', 'description' => 'תגית שנשענת על ידע כללי על מוצר או יצירה ידועים, ולא על הטקסט, צריכה ביטחון לפחות כזה.'],
+    'audit_percent' => ['label' => 'כמה מהתיוג נבדק', 'description' => 'איזה אחוז מהקריאות נבדק על ידי מודל ממשפחה אחרת. בפיילוט: הכל.'],
+    'min_support' => ['label' => 'הצעה לתגית חדשה', 'description' => 'תגית שחסרה בבנק נשקלת רק אחרי שהוצעה לכמה מוצרים לפחות.'],
+];
