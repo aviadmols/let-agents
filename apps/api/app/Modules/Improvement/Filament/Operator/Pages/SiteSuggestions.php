@@ -14,6 +14,7 @@ use App\Modules\Improvement\Models\ImprovementPostWrite;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -115,6 +116,90 @@ class SiteSuggestions extends Page
         }
 
         return $s;
+    }
+
+    /** The days before a decision and after it that its searches are compared over. */
+    public const IMPACT_DAYS = 7;
+
+    /**
+     * Every proposal as a row of the list, waiting ones first: its priority among them (the third with
+     * the most searches and questions behind it is high), what it rests on, and its impact once decided.
+     *
+     * @param  array{pending: Collection<int, ImprovementProposal>, decided: Collection<int, ImprovementProposal>, latest: ImprovementReview|null}  $s
+     * @return list<array{p: ImprovementProposal, open: bool, demand: int, priority: string, summary: string, evidence: list<array{text: string, kind: string, count: int, results: int|null}>, impact: array<string, mixed>|null}>
+     */
+    public function rows(array $s): array
+    {
+        $rows = [];
+
+        foreach ([[$s['pending'], true], [$s['decided'], false]] as [$list, $open]) {
+            foreach ($list as $p) {
+                $evidence = array_map(fn (array $e): array => [
+                    'text' => (string) ($e['query'] ?? $e['question'] ?? ''),
+                    'kind' => isset($e['question']) ? 'question' : (array_key_exists('results', $e) ? 'unclicked' : 'empty'),
+                    'count' => (int) ($e['searches'] ?? $e['asked'] ?? 0),
+                    'results' => isset($e['results']) ? (int) $e['results'] : (isset($e['question']) ? null : 0),
+                ], array_values(array_filter((array) $p->evidence, 'is_array')));
+                $rows[] = ['p' => $p, 'open' => $open, 'demand' => array_sum(array_column($evidence, 'count')), 'priority' => 'low', 'summary' => self::summaryOf($p), 'evidence' => $evidence,
+                    'impact' => $open ? null : $this->impact($p, $evidence)];
+            }
+        }
+
+        $demands = array_column($rows, 'demand');
+        rsort($demands);
+        $third = max(1, (int) ceil(count($demands) / 3));
+        $high = $demands[$third - 1] ?? 0;
+        $medium = $demands[min(count($demands), 2 * $third) - 1] ?? 0;
+
+        foreach ($rows as &$row) {
+            $row['priority'] = $row['demand'] >= $high && $row['demand'] > 0 ? 'high' : ($row['demand'] >= $medium && $row['demand'] > 0 ? 'medium' : 'low');
+        }
+
+        return $rows;
+    }
+
+    /** What the proposal says, in a line: the word and what it means, the question, why a topic is missing. */
+    private static function summaryOf(ImprovementProposal $p): string
+    {
+        $d = (array) $p->detail;
+
+        return trim(match ($p->kind) {
+            ImprovementProposal::SYNONYM => __('improvement::ui.list.synonym_summary', ['term' => (string) ($d['term'] ?? ''), 'means' => (string) ($d['means'] ?? '')]),
+            ImprovementProposal::FAQ => (string) ($d['question'] ?? $p->title),
+            default => (string) ($d['why'] ?? $d['topic'] ?? ''),
+        });
+    }
+
+    /**
+     * What happened to the searches behind a decided proposal: the IMPACT_DAYS before it against the days
+     * since (as many, at most), how often they were searched, found nothing, and were clicked. Null for a
+     * proposal resting on questions only, or one decided today.
+     *
+     * @param  list<array{text: string, kind: string, count: int, results: int|null}>  $evidence
+     * @return array{days: int, before: array{searches: int, empty: int, clicks: int}, after: array{searches: int, empty: int, clicks: int}}|null
+     */
+    private function impact(ImprovementProposal $p, array $evidence): ?array
+    {
+        $queries = array_values(array_unique(array_column(array_filter($evidence, fn (array $e): bool => $e['kind'] !== 'question' && $e['text'] !== ''), 'text')));
+        if ($queries === [] || $p->decided_at === null || $this->shop === null) {
+            return null;
+        }
+
+        $decided = $p->decided_at->copy()->startOfDay();
+        $days = min(self::IMPACT_DAYS, (int) $decided->diffInDays(now()->startOfDay()));
+        if ($days < 1) {
+            return null;
+        }
+
+        $sum = fn (string $from, string $to): array => (array) app(TenantContext::class)->run($this->shop, fn () => SearchTerm::query()->whereIn('query', $queries)
+            ->where('day', '>=', $from)->where('day', '<', $to)
+            ->selectRaw('coalesce(sum(searches), 0) as searches, coalesce(sum(empty), 0) as empty, coalesce(sum(clicks), 0) as clicks')->first()?->toArray());
+
+        return [
+            'days' => $days,
+            'before' => array_map('intval', $sum($decided->copy()->subDays($days)->toDateString(), $decided->toDateString()) + ['searches' => 0, 'empty' => 0, 'clicks' => 0]),
+            'after' => array_map('intval', $sum($decided->toDateString(), $decided->copy()->addDays($days)->toDateString()) + ['searches' => 0, 'empty' => 0, 'clicks' => 0]),
+        ];
     }
 
     /** Whether a post is being written for this proposal right now. */
