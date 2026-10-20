@@ -109,6 +109,9 @@ final class SearchCatalog
     /** A product its description names (DescribedProducts) weighs like one found by meaning, a little less. */
     private const DESCRIBED_WEIGHT = 0.9;
 
+    /** A filter about colour or metal ("מתכת", "צבע האבן", variant_color): the shop sorts by it. Not a name that looks like a colour. */
+    private const COLOUR_FILTER = '/colou?r|metal|צבע|מתכת/iu';
+
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly SemanticSearch $semantic,
@@ -384,7 +387,7 @@ final class SearchCatalog
             // Its own colours (the metal, the stone): a yellow-gold ring's alike are yellow gold first. Only where the
             // shop filters by colour: a bookshop's covers are not a kind, and a black cover's alike are not black first.
             $own = $index['records']['p:'.$externalId] ?? null;
-            $colours = Colours::mentions(implode(' ', array_merge(...array_map(fn (array $f): array => array_column((array) ($f['v'] ?? []), 'l'), (array) ($index['facets'] ?? []))))) !== [];
+            $colours = array_filter((array) ($index['facets'] ?? []), fn (array $f): bool => preg_match(self::COLOUR_FILTER, (string) ($f['k'] ?? '').' '.(string) ($f['l'] ?? '')) === 1) !== [];
             $records = $own === null || ! $colours ? $records : self::byColour($records, Colours::parts([trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''))]));
 
             return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));

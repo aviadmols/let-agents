@@ -593,8 +593,9 @@ final class BuildSearchIndex
                 $key = trim((string) $key);
                 $value = is_scalar($value) ? trim(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8')) : '';
 
-                // Not a field of the system ("_price"), nor a value that is a number, an address or a paragraph.
-                if ($key === '' || str_starts_with($key, '_') || mb_strlen($key) > 40 || $value === '' || mb_strlen($value) > self::FIELD_VALUE_CHARS
+                // Not a field of the system ("_price", Shopify's "custom.show_on_website"), nor a value that is a number,
+                // an address or a paragraph. A field named for shoppers has words in it ("מחבר", "Author").
+                if ($key === '' || str_starts_with($key, '_') || preg_match('/[._]/', $key) === 1 || mb_strlen($key) > 40 || $value === '' || mb_strlen($value) > self::FIELD_VALUE_CHARS
                     || preg_match('/^[\d\s.,:\/-]+$/u', $value) === 1 || preg_match('~^https?://~i', $value) === 1) {
                     continue;
                 }
@@ -609,7 +610,9 @@ final class BuildSearchIndex
             $counts = array_count_values($byProduct);
             arsort($counts);
 
-            if ($total === 0 || count($byProduct) / $total < $minShare || count($counts) < 2 || count($counts) > $maxValues
+            // A yes or no ("true", "כן") says how the store keeps it, not what the shopper chooses between.
+            $yesNo = array_diff(array_map('mb_strtolower', array_keys($counts)), ['yes', 'no', 'true', 'false', 'כן', 'לא', 'on', 'off']) === [];
+            if ($yesNo || $total === 0 || count($byProduct) / $total < $minShare || count($counts) < 2 || count($counts) > $maxValues
                 || count($counts) > count($byProduct) * self::FIELD_MAX_DISTINCT || in_array(mb_strtolower($key), $named, true)) {
                 continue;
             }

@@ -26,10 +26,10 @@ final class FieldFiltersTest extends TestCase
     {
         $shop = Shop::factory()->create(['content_locale' => 'he']);
         $books = [
-            '1' => ['מחבר' => 'ג\'ורדן פיטרסון', 'מסת"ב' => 'A-1', '_edit_lock' => 'x', 'עמודים' => '320'],
-            '2' => ['מחבר' => 'ג\'ורדן פיטרסון', 'מסת"ב' => 'A-2', '_edit_lock' => 'x', 'עמודים' => '210'],
-            '3' => ['מחבר' => 'תומס סואל', 'מסת"ב' => 'A-3', '_edit_lock' => 'x', 'עמודים' => '400'],
-            '4' => ['מחבר' => 'דאגלס מאריי', 'מסת"ב' => 'A-4', '_edit_lock' => 'x', 'עמודים' => '288'],
+            '1' => ['מחבר' => 'ג\'ורדן פיטרסון', 'מסת"ב' => 'A-1', '_edit_lock' => 'x', 'עמודים' => '320', 'custom.show_on_website' => 'מוצג', 'זמין לאיסוף' => 'כן'],
+            '2' => ['מחבר' => 'ג\'ורדן פיטרסון', 'מסת"ב' => 'A-2', '_edit_lock' => 'x', 'עמודים' => '210', 'custom.show_on_website' => 'מוסתר', 'זמין לאיסוף' => 'לא'],
+            '3' => ['מחבר' => 'תומס סואל', 'מסת"ב' => 'A-3', '_edit_lock' => 'x', 'עמודים' => '400', 'custom.show_on_website' => 'מוצג', 'זמין לאיסוף' => 'כן'],
+            '4' => ['מחבר' => 'דאגלס מאריי', 'מסת"ב' => 'A-4', '_edit_lock' => 'x', 'עמודים' => '288', 'custom.show_on_website' => 'מוצג', 'זמין לאיסוף' => 'לא'],
             '5' => ['מסת"ב' => 'A-5'],
         ];
         app(TenantContext::class)->run($shop->id, function () use ($shop, $books): void {
@@ -45,7 +45,7 @@ final class FieldFiltersTest extends TestCase
         $this->assertNotNull($facet, 'four of five books have an author');
         $this->assertSame('מחבר', $facet['l']);
         $this->assertSame(['ג\'ורדן פיטרסון', 'תומס סואל', 'דאגלס מאריי'], array_column($facet['v'], 'l'), 'the most used first');
-        $this->assertSame([], collect($index['facets'])->filter(fn (array $f): bool => in_array($f['k'], ['field:מסת"ב', 'field:_edit_lock', 'field:עמודים'], true))->all(), 'a code of each its own, a field of the system and a number are not filters');
+        $this->assertSame([], collect($index['facets'])->filter(fn (array $f): bool => in_array($f['k'], ['field:מסת"ב', 'field:_edit_lock', 'field:עמודים', 'field:custom.show_on_website', 'field:זמין לאיסוף'], true))->all(), 'a code of each its own, a field of the system (Shopify\x27s too), a number and a yes or no are not filters');
 
         $at = array_search('field:מחבר', array_column($index['facets'], 'k'), true);
         $records = collect($index['items'])->keyBy('id');
