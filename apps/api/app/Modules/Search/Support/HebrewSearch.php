@@ -800,6 +800,7 @@ final class HebrewSearch
         $required = $required === [] ? array_keys($tokens) : $required;
         $matched = [];
 
+        $bests = [];
         foreach ($tokens as $position => $token) {
             $best = [];
 
@@ -813,11 +814,15 @@ final class HebrewSearch
                     }
                 }
             }
+            $bests[$position] = $best;
+        }
+        $rarity = self::rarity($bests, count($index['items']), fn (int $p): bool => isset($generic[$p]) || isset($filler[$p]));
 
+        foreach ($bests as $position => $best) {
             foreach ($best as $at => $value) {
                 // A generic word adds a little to the score of what holds it, never to what is found:
-                // "כלים לגינה" puts the garden tools before paint that says "כלים".
-                $score[$at] = ($score[$at] ?? 0) + $value * (isset($generic[$position]) || isset($filler[$position]) ? self::GENERIC_WEIGHT : 1);
+                // "כלים לגינה" puts the garden tools before paint that says "כלים". A rare word more than a common one.
+                $score[$at] = ($score[$at] ?? 0) + $value * (isset($generic[$position]) || isset($filler[$position]) ? self::GENERIC_WEIGHT : $rarity[$position]);
                 $hits[$at] = ($hits[$at] ?? 0) + (isset($generic[$position]) || isset($filler[$position]) ? 0 : 1);
                 $matched[$at][$position] = true;
             }
@@ -844,6 +849,32 @@ final class HebrewSearch
         usort($found, static fn (array $a, array $b): int => (int) $b['full'] <=> (int) $a['full'] ?: $b['score'] <=> $a['score'] ?: mb_strlen($a['title']) <=> mb_strlen($b['title']));
 
         return $found;
+    }
+
+    /**
+     * How much each word of a search counts beside its others, by how rare it is in the catalogue: "פרגולה" (15 products)
+     * says more than "עץ" (hundreds), so what holds the pergola comes before what holds only wood. ln((N+1)/(n+1)) + 1,
+     * as a share of the search's average: one word, or words as rare, count as before. Generic and filler words aside.
+     *
+     * @param  array<int, array<int, float>>  $bests  by the word's position, the records that hold it
+     * @return array<int, float>
+     */
+    public static function rarity(array $bests, int $count, callable $aside): array
+    {
+        $raw = [];
+        foreach ($bests as $position => $best) {
+            if (! $aside($position) && $best !== []) {
+                $raw[$position] = log(($count + 1) / (count($best) + 1)) + 1;
+            }
+        }
+        $mean = $raw === [] ? 1.0 : array_sum($raw) / count($raw);
+
+        $out = [];
+        foreach (array_keys($bests) as $position) {
+            $out[$position] = isset($raw[$position]) ? $raw[$position] / $mean : 1.0;
+        }
+
+        return $out;
     }
 
     /** How much a word of the record counts: in its name, in a tag of it (by the tag's weight), or among its keywords. */

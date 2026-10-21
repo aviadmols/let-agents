@@ -337,8 +337,9 @@
     }
     var matched = {};
 
-    for (var t = 0; t < tokens.length; t++) {
-      var close = closeWords(index, tokens[t]);
+    var bests = [];
+    for (var t0 = 0; t0 < tokens.length; t0++) {
+      var close = closeWords(index, tokens[t0]);
       var best = {};
       var bestOrder = [];
       for (var c = 0; c < close.words.length; c++) {
@@ -356,9 +357,23 @@
           }
         }
       }
+      bests.push({ best: best, order: bestOrder });
+    }
+    // a rare word counts more than a common one, as a share of the search's average (the server's rarity)
+    var raw = {}, rawSum = 0, rawN = 0;
+    for (var t1 = 0; t1 < tokens.length; t1++) {
+      if (!generic[t1] && !filler[t1] && bests[t1].order.length) {
+        raw[t1] = Math.log((index.items.length + 1) / (bests[t1].order.length + 1)) + 1;
+        rawSum += raw[t1]; rawN++;
+      }
+    }
+    var rawMean = rawN ? rawSum / rawN : 1;
+    for (var t = 0; t < tokens.length; t++) {
+      var best = bests[t].best, bestOrder = bests[t].order;
+      var rare = Object.prototype.hasOwnProperty.call(raw, t) ? raw[t] / rawMean : 1;
       for (var b = 0; b < bestOrder.length; b++) {
         // A generic word adds a little to the score of what holds it (the server's GENERIC_WEIGHT).
-        score[bestOrder[b]] = (score[bestOrder[b]] || 0) + best[bestOrder[b]] * (generic[t] || filler[t] ? 0.2 : 1);
+        score[bestOrder[b]] = (score[bestOrder[b]] || 0) + best[bestOrder[b]] * (generic[t] || filler[t] ? 0.2 : rare);
         // ...and never to what is found.
         hits[bestOrder[b]] = (hits[bestOrder[b]] || 0) + (generic[t] || filler[t] ? 0 : 1);
         if (!matched[bestOrder[b]]) {
