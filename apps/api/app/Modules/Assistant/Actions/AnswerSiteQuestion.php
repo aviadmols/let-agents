@@ -2210,7 +2210,9 @@ final class AnswerSiteQuestion
                 ? CatalogProduct::query()->whereKey($passage['source_id'])->first(['title', 'url'])
                 : CatalogContent::query()->whereKey($passage['source_id'])->first(['title', 'url']);
 
-            $out[] = ['title' => (string) ($page->title ?? $passage['title']), 'url' => $page?->url, 'type' => $passage['source'] === 'product' ? 'product' : 'content'];
+            // what the store says about itself (shipping, returns): the drawer shows no products beside such an answer
+            $out[] = ['title' => (string) ($page->title ?? $passage['title']), 'url' => $page?->url, 'type' => $passage['source'] === 'product' ? 'product' : 'content']
+                + (($passage['kind'] ?? null) === 'knowledge' ? ['store' => true] : []);
 
             if (count($out) >= self::MAX_SOURCES) {
                 break;

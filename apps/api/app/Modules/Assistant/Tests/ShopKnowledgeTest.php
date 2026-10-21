@@ -99,6 +99,10 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertSame('דף', $passages[3]['title'], 'the pages the meaning search found come after');
         $this->assertArrayNotHasKey('from', $passages[3]);
         $this->assertStringContainsString('איסוף עצמי', implode(' ', array_column($passages, 'text')));
+        // An answer from what the store says about itself is marked so: the drawer shows no products beside it.
+        $sources = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'sources'))->invoke(app(AnswerSiteQuestion::class), [$passages[0], $passages[3]]));
+        $this->assertTrue($sources[0]['store'] ?? false);
+        $this->assertArrayNotHasKey('store', $sources[1], 'a page the meaning search found is no word of the store about itself');
 
         // Not in another shop, and never a search result of its own.
         $other = Shop::factory()->create();

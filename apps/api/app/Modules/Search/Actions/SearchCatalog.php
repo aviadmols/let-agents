@@ -143,6 +143,15 @@ final class SearchCatalog
             // "הכי זול", "במבצע", "גדול מ-2": actions, not words. The same phrases in every shop, less
             // those its index leaves out (no size: "גדול" stays a word).
             [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);
+            // "אני רוצה לקנות מתנה לאשתי טבעת יהלום": a sentence no product holds is searched by what it asks for ("טבעת
+            // יהלומ"), then read for filters like any search. Words a product holds together are searched as typed. The
+            // meaning reads the whole sentence: "משהו לחבר קרשים" is about joining boards.
+            $sentence = null;
+            if ($index !== null && str_contains(trim($query), ' ') && self::whole(HebrewSearch::search($index['engine'], $query)) === []) {
+                $meant = HebrewSearch::meant($index['engine'], $query);
+                $sentence = $meant !== HebrewSearch::normalize($query) ? HebrewSearch::normalize($query) : null;
+                $query = $meant;
+            }
             // "שטיח כחול 80 על 150": a colour or a size the shop filters by is a filter, not a word (the page shows it as one).
             $worded = $query;
             $query = $index === null ? $query : HebrewSearch::withoutFacetWords($index, $query);
@@ -198,7 +207,7 @@ final class SearchCatalog
             // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
             // a few of them, and the drawer says the word was not found (unknown) rather than showing dozens as if it were.
             $unknown = $byMeaning ? HebrewSearch::unknownWords($index['engine'], $query) : [];
-            $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => [], 'best' => 0.0];
+            $near = $byMeaning ? $this->meaning($shopId, $sentence ?? $query, $index['records']) : ['products' => [], 'content' => [], 'best' => 0.0];
             // "מדע בדיוני" in a store with no science fiction: no product holds the words, and the nearest by meaning is far
             // (.36: books on politics). Nothing is shown as if it were found; the drawer says so, with the AI one press away.
             // How near is near enough is the store's (search.meaning_only_min_similarity).
@@ -312,11 +321,8 @@ final class SearchCatalog
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
             $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
             if ($read !== []) {
-                // a product holds a value read from the words when it carries it, or when its own words say it ("זהב צהוב" in
-                // the title of a ring the scan has not marked), as the drawer reads it
-                $held = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $values): bool => array_intersect(array_keys($values), (array) ($r['f'] ?? [])) !== []
-                    || array_any($values, fn (string $label): bool => HebrewSearch::says((string) ($r['title'] ?? '').' '.(string) ($r['kw'] ?? ''), $label)))));
-                $groups['product'] = $held !== [] ? $held : $groups['product'];
+                // only what holds every value read: nothing else is shown as if it were asked for (the drawer then offers the AI)
+                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $values, int $at): bool => self::holdsRead($r, $at, $values, (array) ($index['facets'] ?? [])))));
             }
 
             // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
@@ -1314,6 +1320,30 @@ final class SearchCatalog
      * @param  list<array{id: string, full?: bool}>  $hits
      * @return array<string, true>
      */
+    /**
+     * Whether a product holds one of the values read from the words for one filter: it carries it, or its own words
+     * say it ("זהב צהוב" in the title of a ring the scan has not marked) while it carries no other value of that filter
+     * (or only a broader one, "זהב" for "זהב צהוב"). A pendant whose clasp is "סגר טבעת" is no ring. As the drawer reads it (filtered).
+     *
+     * @param  array<int, string>  $values  code => label
+     * @param  list<array<string, mixed>>  $facets
+     */
+    private static function holdsRead(array $r, int $at, array $values, array $facets): bool
+    {
+        $carried = array_map('intval', (array) ($r['f'] ?? []));
+
+        if (array_intersect(array_keys($values), $carried) !== []) {
+            return true;
+        }
+
+        $words = fn (string $label): array => explode(' ', HebrewSearch::normalize($label));
+        $text = (string) ($r['title'] ?? '').' '.(string) ($r['kw'] ?? '');
+
+        return array_any($values, fn (string $label): bool => ! array_any($carried, fn (int $code): bool => intdiv($code, 1000) === $at
+                && array_diff($words((string) ($facets[$at]['v'][$code % 1000]['l'] ?? '')), $words($label)) !== [])
+            && HebrewSearch::says($text, $label));
+    }
+
     private static function whole(array $hits): array
     {
         $whole = [];

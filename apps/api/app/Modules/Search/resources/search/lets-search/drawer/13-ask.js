@@ -106,12 +106,16 @@
   // An answer with no products of its own (from the store's pages, or kept from before): what the question is about, from
   // the store's own search for its words (code and the question's vector, never a model): a few, and the search for more.
   // "איזה עץ הכי טוב לבניית פרגולה בחוץ?" answered from a guide shows the wood the store sells for it.
+  // Never beside an answer from what the store says about itself ("איזה שיטות משלוח יש?"), and only products the question's
+  // words found: what is merely near it by meaning (any book, for shipping) is not about it.
   var ALSO_SHOWN = 6;
   function alsoFor(turn) {
     if (!turn || turn.alsoIds) { return; }
     turn.alsoIds = [];
+    if ((turn.sources || []).some(function (s) { return s && s.store; })) { return; }
     json(API + '/search/' + SITE + '?counted=1&q=' + encodeURIComponent(turn.q)).then(function (r) {
       var d = (r && r.body) || {};
+      if (!(d.held > 0 || d.subject)) { return; }
       var ids = (d.ids || []).filter(function (id) { return /^p:/.test(id); }).slice(0, ALSO_SHOWN);
       if (!ids.length) { return; }
       return products(ids.map(pid)).then(function () { update(turn, { alsoIds: ids.filter(function (id) { return !!rec(id); }) }); });

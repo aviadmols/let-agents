@@ -2,14 +2,23 @@
   // As the shopper types, the results come up the way Enter shows them (count, sort, filters, cards,
   // guides), at the top of the conversation: from the index at once, then the server's list a beat
   // later. Filters chosen here stay while typing, and go with the search when it's sent.
-  var liveTimer = null, pauseTimer = null, meaningTimer = null;
+  var liveTimer = null, pauseTimer = null, meaningTimer = null, wordTimer = null;
+  // Words, not letters: the results change when a word is finished (a space) or the typing rests a moment, never on
+  // every letter, so the cards do not flicker under the shopper's fingers (as Aviad asked, 2026-10-21).
+  var WORD_REST_MS = 280;
   function onType() {
     var q = INPUT.value.trim();
     FIELD.classList.toggle('has-text', !!q);
+    clearTimeout(wordTimer);
     if (!q) { S.keptQ = null; hideLive(); return; }
     if (!S.open) { return; }
     // the search on screen, left in the field: nothing new to show until the words change
     if (q === S.keptQ) { hideLive(); return; }
+    if (/\s$/.test(INPUT.value)) { liveFor(q); return; }
+    wordTimer = setTimeout(function () { if (INPUT.value.trim() === q) { liveFor(q); } }, WORD_REST_MS);
+  }
+  function liveFor(q) {
+    if (!S.open || q === S.keptQ) { return; }
     if (!S.index) { loadIndex().then(onType); return; }
     if (S.tab !== 'chat' || S.wide) { S.tab = 'chat'; S.wide = null; render(); }
     // on a product page the words ask about the product, and the product's information stays as it is;
@@ -23,7 +32,7 @@
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
       readTags(S.live);
       clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer);
-      liveTimer = setTimeout(function () { liveServer(q); }, 180);
+      liveTimer = setTimeout(function () { liveServer(q); }, 60);
     }
     renderLive(isNew);
     announce(isQuestion(q) ? t('announceQuestion') : t('announceResults', { n: filtered(S.live).length }));
@@ -90,7 +99,7 @@
   function askOnly(q) {
     clearTimeout(liveTimer);
     S.live = null;
-    SUGIN.innerHTML = askRow(q, true);
+    SUGIN.innerHTML = askRow(q, true); SUGIN.lsHtml = null;
     SUG.classList.add('is-on');
     INPUT.setAttribute('aria-expanded', 'true');
     var o = SUG.querySelector('[data-opt]');
@@ -99,9 +108,9 @@
     mark_active();
   }
   function hideLive() {
-    clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer);
+    clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer); clearTimeout(wordTimer);
     S.live = null; S.active = -1;
-    if (SUG.classList.contains('is-on')) { SUG.classList.remove('is-on'); SUGIN.innerHTML = ''; }
+    if (SUG.classList.contains('is-on')) { SUG.classList.remove('is-on'); SUGIN.innerHTML = ''; SUGIN.lsHtml = null; }
     INPUT.setAttribute('aria-expanded', 'false'); INPUT.removeAttribute('aria-activedescendant');
   }
   function renderLive(isNew) {
@@ -110,8 +119,12 @@
     // a new search starts with nothing highlighted (Enter searches); the highlight never jumps down the list
     var keepOpt = isNew ? -1 : S.active, wasOn = SUG.classList.contains('is-on');
     if (isNew) { BODY.scrollTop = 0; }
+    // the same results drawn again (the server agreeing with the index, the meaning adding nothing): left as they are,
+    // so no card blinks
+    var html = liveHtml(lv);
+    if (!isNew && SUG.classList.contains('is-on') && html === SUGIN.lsHtml) { return; }
     var y0 = FLOW.getBoundingClientRect().top;
-    SUGIN.innerHTML = liveHtml(lv);
+    SUGIN.innerHTML = SUGIN.lsHtml = html;
     if (isNew && wasOn && FLOW.animate) {
       // from the question row on a product page: the product's information slides down, making room for the results
       var dy = FLOW.getBoundingClientRect().top - y0;

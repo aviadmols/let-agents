@@ -91,6 +91,11 @@ final class HebrewSearch
      */
     public const TAG_WEIGHT = 0.3;
 
+    /** Words a shopper wraps a wish in ("אני רוצה", "תראה לי", "במחיר") and the occasion ("מתנה"): never what to search for in a sentence. */
+    private const WISH = ['אני', 'אנחנו', 'רוצה', 'רוצימ', 'רוצות', 'מחפש', 'מחפשת', 'מחפשימ', 'מחפשות', 'תראה', 'תראי', 'תראו', 'הראה', 'תציג', 'תציגי', 'הצג',
+        'אשמח', 'בבקשה', 'במחיר', 'מחיר', 'בערכ', 'שלי', 'שלה', 'שלו', 'עבור', 'לקנייה', 'לרכוש', 'ממליצ', 'תמליצ', 'תמליצי', 'המלצה',
+        'מתנה', 'מתנות', 'למתנה', 'כמתנה', 'want', 'looking', 'show', 'me', 'please', 'price', 'gift', 'present'];
+
     /** Words that only say "things" ("כלים לגינה", "ציוד לגינה", "מוצרים לניקוי"), normalized. */
     private const GENERIC = ['כלימ', 'כלי', 'ציוד', 'מוצרימ', 'מוצר', 'אביזרימ', 'אביזר', 'פריטימ', 'פריט', 'דברימ', 'חפצימ', 'משהו', 'משהי', 'things', 'products', 'items', 'stuff', 'something', 'anything'];
 
@@ -166,6 +171,35 @@ final class HebrewSearch
         $words = array_filter(explode(' ', self::normalize($query)), fn (string $w): bool => $w !== '' && ! in_array($w, self::FILLER, true));
 
         return implode(' ', array_filter($words, fn (string $w): bool => mb_strlen($w) >= 2 && self::closeWords($index, $w) !== []));
+    }
+
+    /**
+     * What a sentence no product holds asks for, in the catalogue's words: "אני רוצה לקנות מתנה לאשתי טבעת יהלום" is
+     * "טבעת יהלומ". Question, filler and wish words go, and so does a word that says whom it is for ("לאשתי", "לאמא")
+     * when the catalogue has nothing near it. A product word the store lacks ("חולצה") stays, so the shopper is told
+     * it is not here. The words as they were when nothing is left.
+     */
+    public static function meant(array $index, string $query): string
+    {
+        $kept = [];
+
+        foreach (explode(' ', self::normalize($query)) as $word) {
+            // "או" stays: "טבעת או עגילים" is searched one side at a time (either())
+            if ($word === '' || ($word !== 'או' && in_array($word, self::FILLER, true)) || in_array($word, self::WISH, true)) {
+                continue;
+            }
+
+            if (mb_substr($word, 0, 1) === 'ל' && mb_strlen($word) >= 3) {
+                $close = self::closeWords($index, $word);
+                if (($close === [] ? 0.0 : (float) max($close)) < self::KNOWN) {
+                    continue;
+                }
+            }
+
+            $kept[] = $word;
+        }
+
+        return $kept === [] ? self::normalize($query) : implode(' ', $kept);
     }
 
     /**

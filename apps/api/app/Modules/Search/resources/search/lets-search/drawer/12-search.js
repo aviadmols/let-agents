@@ -258,8 +258,9 @@
   var WEAK_HELD = 3, WEAK_TOTAL = 8;
   function noteHtml(turn) {
     var E = S.engine, total = (turn.ids || []).length, held = typeof turn.held === 'number' ? turn.held : null;
-    // the words the store has nothing close to: the server's, or the engine's own while typing
-    var words = turn.unknown && turn.unknown.length ? turn.unknown : localUnknown(turn.q);
+    // the words the store has nothing close to: the server's, even none (it read "מתנה לאשתי טבעת יהלום" as "טבעת יהלום",
+    // "לאשתי" is whom it is for), or the engine's own while typing
+    var words = Array.isArray(turn.unknown) ? turn.unknown : localUnknown(turn.q);
     var typed = [], kept = [];
     String(turn.q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(Boolean).forEach(function (w) {
       if (E && E.normalize && words.indexOf(E.normalize(w)) >= 0) { typed.push(w); } else if (!STOP.test(w)) { kept.push(w); }
