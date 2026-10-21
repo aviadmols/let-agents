@@ -47,7 +47,7 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - Superlatives are computed in code only, from approved facts (`ComputeRankings`).
 - Any call to a model with the keys saved in the panel asks `Ai\Contracts\SpendGuard::assertCanSpend()`
   first and records its cost with `RunContext::usage()`. The cap is `ai.monthly_spend_cap_usd`
-  (default 6 USD a month, all shops). Answer files from agents outside the platform cost nothing.
+  (default 50 USD a month, all shops). Answer files from agents outside the platform cost nothing.
 - Shopper behaviour is kept for learning: events (`analytics.retention_days`), searches and clicks
   (`search.keep_days`) default to ten years, and a photo search keeps what it learned forever (only
   its full photo goes after `search.photo_keep_days`). What identifies a person does not stay: IP and
