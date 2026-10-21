@@ -189,11 +189,11 @@ final class SearchDisplayTest extends TestCase
 
         Cache::flush();
         app(TenantContext::class)->run($shop->id, function () use ($shop): void {
-            foreach ([['8', 9, 1, true], ['7', 4, 2, true], ['9', 0, 3, false], ['404', 20, 0, true]] as [$id, $adds, $rank, $popular]) {
+            foreach ([['8', 9, 1, true], ['7', 4, 2, false], ['9', 1, 3, false], ['404', 20, 0, true]] as [$id, $adds, $rank, $popular]) {
                 AnalyticsPopularity::query()->create(['shop_id' => $shop->id, 'product_external_id' => $id, 'adds' => $adds, 'orders' => 0, 'units' => 0, 'score' => $adds, 'rank' => $rank, 'popular' => $popular, 'window_days' => 30, 'computed_at' => now()]);
             }
         });
-        $this->assertSame(['p:8', 'p:7'], $wanted(), 'the most added first; one never added, or not in the search, is not offered');
+        $this->assertSame(['p:8', 'p:7'], $wanted(), 'the most added first, "popular" or not; one added once, or not in the search, is not offered');
     }
 
     /** @param  array<string, mixed>  $overrides */

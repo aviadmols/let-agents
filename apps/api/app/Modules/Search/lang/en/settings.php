@@ -33,6 +33,10 @@ return [
         'label' => 'What an old guide loses a year',
         'description' => 'Taken off the similarity of news, a product review or a buying guide for each year since it was updated, up to three: models and prices change. A how-to, a project idea or a material guide does not age.',
     ],
+    'wanted_min_adds' => [
+        'label' => 'A popular product: adds to the cart',
+        'description' => 'A product is shown as popular on the empty drawer only when it was added to the cart at least this many times lately.',
+    ],
     'wanted_shown' => [
         'label' => 'Popular products on the empty drawer',
         'description' => 'How many of the products added to the cart most lately are shown under "What people ask here". Only products with real activity; with none, no section. 0: not shown.',

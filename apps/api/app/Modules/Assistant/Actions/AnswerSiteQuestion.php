@@ -1163,7 +1163,8 @@ final class AnswerSiteQuestion
                 $notFound ??= null;
                 $outcome = $refusal === null ? AssistantAnswer::ANSWERED : ($unfit ? AssistantAnswer::OUT_OF_SCOPE : AssistantAnswer::NO_INFO);
                 // A "not found" is kept with its line: the next shopper who asks the same is told it without a model.
-                $saved = $remember && $keep ? $this->save($question, $outcome, $refusal === null ? $answer : $notFound, $sources, $stored, $writer['model'], $replies, $run, $flags) : null;
+                // the question as the first model read it, its slips mended ("יש מוצרים בכסף??"): how it is shown to others
+                $saved = $remember && $keep ? $this->save($question, $outcome, $refusal === null ? $answer : $notFound, $sources, $stored, $writer['model'], $replies, $run, $corrected === null ? $flags : (array) $flags + ['corrected' => $corrected]) : null;
 
                 // This visitor got it clean: checked, safe, no attempt to instruct, nothing personal,
                 // nothing harmful. Counted once; enough different visitors share it with everyone.

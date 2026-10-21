@@ -167,6 +167,15 @@
             "scope": "global"
         },
         {
+            "name": "wanted_min_adds",
+            "type": "int",
+            "default": 2,
+            "min": 1,
+            "max": 100,
+            "scope": "shop",
+            "unit": "times"
+        },
+        {
             "name": "wanted_shown",
             "type": "int",
             "default": 6,

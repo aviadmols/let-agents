@@ -25,6 +25,7 @@ use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\HebrewSearch;
+use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\DB;
 
@@ -576,13 +577,14 @@ final class BuildSearchIndex
             ->orderByDesc('asked_count')->orderBy('id')
             ->limit($limit)
             ->get()
-            ->filter(fn (AssistantAnswer $a): bool => $a->product === null || $a->product->removed_at === null)
+            ->filter(fn (AssistantAnswer $a): bool => ($a->product === null || $a->product->removed_at === null) && ShownQuestion::fit(ShownQuestion::text($a)))
             ->map(fn (AssistantAnswer $a): array => [
                 'id' => $a->id,
                 'store' => $a->product_id === null && $a->content_id === null,
                 'kind' => $a->product_id !== null ? 'product' : ($a->content_id !== null ? 'content' : 'store'),
                 'asked' => (int) $a->asked_count,
-                'question' => $a->question,
+                // shown to other shoppers as a question of the store: its slips mended, written cleanly
+                'question' => ShownQuestion::text($a),
                 'answer' => mb_substr((string) $a->answer, 0, 400),
                 'sources' => $a->product !== null
                     ? [['title' => $a->product->title, 'url' => $a->product->url]]

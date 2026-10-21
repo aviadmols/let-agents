@@ -80,8 +80,8 @@ final class SearchIndexController
             // "Popular in the store" on the empty drawer: this shop's own searches, never sample words.
             // Worked out once an hour per shop and index: it reads the index's own words.
             'popular' => Cache::remember('search:popular:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::popular($shopId, (string) $index->items))),
-            // "Popular products" on the empty drawer: the shop's own most added to the cart lately, only those with real
-            // activity (AnalyticsPopularity: popular, added at least once) and in the index; none, no section.
+            // "Popular products" on the empty drawer: the shop's own most added to the cart lately, only those added at least
+            // search.wanted_min_adds times and in the index; none, no section.
             'wanted' => Cache::remember('search:wanted:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::wanted($shopId, (string) $index->items))),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && self::similarReady($tenant, $shopId),
@@ -236,7 +236,10 @@ final class SearchIndexController
             return [];
         }
 
-        $ids = AnalyticsPopularity::query()->where('popular', true)->where('adds', '>', 0)->orderBy('rank')->limit($shown * 3)->pluck('product_external_id')->map(fn ($id): string => 'p:'.$id)->all();
+        // added to the cart at least search.wanted_min_adds times lately, the most added first: a small store's few adds
+        // count, where the "popular" mark (a top share of a large catalogue) would show none
+        $ids = AnalyticsPopularity::query()->where('adds', '>=', max(1, (int) Settings::get('search.wanted_min_adds', $shopId)))
+            ->orderByDesc('adds')->orderBy('rank')->limit($shown * 3)->pluck('product_external_id')->map(fn ($id): string => 'p:'.$id)->all();
         // only what the index holds: a product removed since, or out of the search, is not offered
         $held = array_flip(array_column((array) (json_decode($index, true)['items'] ?? []), 'id'));
 
