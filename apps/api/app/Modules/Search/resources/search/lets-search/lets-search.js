@@ -89,7 +89,7 @@
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
       showAll: 'הצגת כל :n התוצאות', askSpecific: 'אפשר לחפש מוצר, או לשאול שאלה מדויקת יותר, למשל לפי נושא, קהל או תקציב, ואעזור למצוא.', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
-      productsCount: ':n מוצרים', notHere: 'לא מצאנו «:w» באתר. הנה מה שהכי קרוב:', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
+      productsCount: ':n מוצרים', askedAbout: 'שאלה על: :t', notHere: 'לא מצאנו «:w» באתר. הנה מה שהכי קרוב:', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
       didYouMean: 'לא מצאנו בדיוק את "‎:q‎". למה התכוונתם?', category: 'קטגוריה: :t', exactSku: 'נמצא לפי מק״ט :sku', exact: 'התאמה מדויקת',
       noResults: 'לא מצאנו את "‎:q‎"', noResultsSub: 'נסו מילה אחרת, שאלו את :name, או התחילו מקטגוריה.',
@@ -142,7 +142,7 @@
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
       showAll: 'Show all :n results', askSpecific: 'You can search for a product, or ask a more specific question, for example by topic, audience or budget, and I will help find it.', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
-      productsCount: ':n products', notHere: 'We did not find “:w” on the site. Here is what is closest:', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
+      productsCount: ':n products', askedAbout: 'Asked about: :t', notHere: 'We did not find “:w” on the site. Here is what is closest:', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
       didYouMean: 'No exact match for "‎:q‎". Did you mean?', category: 'Category: :t', exactSku: 'Found by SKU :sku', exact: 'Exact match',
       noResults: 'No results for "‎:q‎"', noResultsSub: 'Try another word, ask :name, or start from a category.',
@@ -1248,17 +1248,23 @@
   // Those asked most come first (asked at least twice); the rest of the five are of each kind: three about products,
   // one about the store's service (shipping, returns), one about a guide or post. Never an example the assistant
   // may not be able to answer.
-  var ASK_SHOWN = 5, ASK_COMMON = 2, ASK_KINDS = { product: 3, store: 1, content: 1 };
+  var ASK_SHOWN = 5, ASK_PRODUCT = 1;
+  // What people ask here: questions about the store first (shipping, returns, warranty), the most asked of them first, then
+  // about its guides and pages; a question about one product at most ASK_PRODUCT, and it says which product. Only what reads
+  // as a question: a product's name typed into the box ("טבעת וינטג' משובצת יהלומים…") is not one.
   function peopleAsk() {
-    var all = Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.ans; });
+    var E = S.engine;
+    var asks = function (q) { q = String(q || '').trim(); return /\?\s*$/.test(q) || !!(E && E.isQuestion && E.isQuestion(q)); };
+    var all = Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.ans && asks(r.title); });
     // an index from before kinds were kept: its store answers, as before
     if (!all.some(function (r) { return r.ak; })) { return all.filter(function (r) { return r.w === 1; }).slice(0, 2); }
-    var out = all.filter(function (r) { return (r.an || 0) >= ASK_COMMON; }).sort(function (a, b) { return (b.an || 0) - (a.an || 0); }).slice(0, ASK_SHOWN);
-    var have = {}, left = {};
-    out.forEach(function (r) { have[r.ak] = (have[r.ak] || 0) + 1; });
-    Object.keys(ASK_KINDS).forEach(function (k) { left[k] = Math.max(0, ASK_KINDS[k] - (have[k] || 0)); });
+    var rank = { store: 0, content: 1, product: 2 };
+    all.sort(function (a, b) { return (rank[a.ak] === undefined ? 3 : rank[a.ak]) - (rank[b.ak] === undefined ? 3 : rank[b.ak]) || (b.an || 0) - (a.an || 0); });
+    var out = [], products = 0;
     all.forEach(function (r) {
-      if (out.length < ASK_SHOWN && left[r.ak] > 0 && out.indexOf(r) < 0) { out.push(r); left[r.ak]--; }
+      if (out.length >= ASK_SHOWN) { return; }
+      if (r.ak === 'product') { if (products >= ASK_PRODUCT || !(r.src && r.src[0] && r.src[0].title)) { return; } products++; }
+      out.push(r);
     });
     return out;
   }
@@ -1277,7 +1283,7 @@
       }).join('') + '</div>' : '') +
       (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (a) {
         // a question about one product or guide says which: "על מה הספר?" alone says nothing here
-        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(decode(a.src[0].title)) + '</span>' : '';
+        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(t('askedAbout', { t: decode(a.src[0].title) })) + '</span>' : '';
         return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span>' + about + '</span></button>';
       }).join('') +
       '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
