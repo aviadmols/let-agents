@@ -118,7 +118,9 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   are one algorithm in two languages; change both or neither, `HebrewSearchTest` runs them on one
   fixture and requires identical ids in identical order. The storefront runs one script, the Lets Search
   drawer (`resources/search/lets-search.js`, built from `lets-search/` and the engine with
-  `npm run build:lets-search`; `LetsSearchBuildTest` fails when it is stale), served at
+  `npm run build:lets-search`; `LetsSearchBuildTest` fails when it is stale). Its code is one function
+  split by subject into `lets-search/drawer/NN-*.js` (filters, search, cart…), joined in number order and
+  sharing one scope; edit the part, never the built file. It is served at
   `/api/v1/search/lets-search.js` and at the old `/search/let-agents-search.js` address. The index (`search_indexes`) is rebuilt at
   02:40 and on demand; synonyms are applied at build time, never at query time.
 - `SearchCatalog` merges spelling (exact matches first), meaning (`SemanticSearch::nearText`) and

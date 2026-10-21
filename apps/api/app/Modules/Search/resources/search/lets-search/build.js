@@ -11,8 +11,12 @@
  * The bundle holds, in this order:
  *   1. ../hebrew-search-engine.js, as written. It sets window.LA_ENGINE (unless a page already set
  *      one). It must stay identical to HebrewSearch.php, which is why it is never copied here.
- *   2. lets-search.js (the drawer), with the three stylesheets (tokens, components, drawer) inlined
- *      into its CSS placeholder: no extra requests, no flash.
+ *   2. the drawer: drawer/*.js joined in their numbered order, with the three stylesheets (tokens,
+ *      components, drawer) inlined into its CSS placeholder: no extra requests, no flash.
+ *      The drawer is one function, its parts sharing one scope: 00-open.js opens it and 99-close.js
+ *      closes it; every part between holds whole statements of that function, by subject (the
+ *      filters, the search, the cart…), and each must parse on its own. A new part takes a number
+ *      between its neighbours; what one part names, any other may use.
  *
  * Options: --out <file> writes elsewhere (the test uses it). The output depends only on the sources,
  * never on the date or the machine, so the same sources always build the same bytes.
@@ -84,8 +88,14 @@ STYLESHEETS.forEach((file) => {
   css[file] = read(path.join(HERE, file)).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s*\n\s*/g, '\n').trim();
 });
 
-let drawer = read(path.join(HERE, 'lets-search.js'));
-if (drawer.indexOf('/*@@CSS@@*/') < 0) { fail('lets-search.js has no CSS placeholder'); }
+const PARTS = path.join(HERE, 'drawer');
+const parts = fs.readdirSync(PARTS).filter((file) => /^\d{2}-[a-z0-9-]+\.js$/.test(file)).sort();
+if (parts[0] !== '00-open.js' || parts[parts.length - 1] !== '99-close.js') { fail('drawer/ must begin with 00-open.js and end with 99-close.js'); }
+parts.slice(1, -1).forEach((file) => {
+  try { new vm.Script(read(path.join(PARTS, file)), { filename: file }); } catch (err) { fail('drawer/' + file + ' does not parse on its own: ' + err.message); }
+});
+let drawer = parts.map((file) => read(path.join(PARTS, file))).join('');
+if (drawer.indexOf('/*@@CSS@@*/') < 0) { fail('the drawer has no CSS placeholder'); }
 drawer = drawer.replace('/*@@CSS@@*/', () => 'CSS = ' + JSON.stringify(css) + ';');
 
 // ---------------------------------------------------------------- the bundle

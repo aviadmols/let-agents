@@ -57,10 +57,13 @@ final class LetsSearchBuildTest extends TestCase
     /**
      * No two of the drawer's functions share a name: the later one silently replaces the earlier everywhere
      * (an answer's paragraphs once named like the answer's turn made every written answer fail to show).
+     * Its parts (lets-search/drawer/) share one scope, so a name is checked across all of them.
      */
     public function test_no_two_drawer_functions_share_a_name(): void
     {
-        preg_match_all('/^  function ([A-Za-z_$][\w$]*)\(/m', (string) file_get_contents(dirname(self::BUILD).'/lets-search.js'), $m);
+        $parts = glob(dirname(self::BUILD).'/drawer/*.js') ?: [];
+        sort($parts);
+        preg_match_all('/^  function ([A-Za-z_$][\w$]*)\(/m', implode('', array_map(fn (string $f): string => (string) file_get_contents($f), $parts)), $m);
 
         $this->assertGreaterThan(100, count($m[1]));
         $this->assertSame([], array_values(array_unique(array_diff_assoc($m[1], array_unique($m[1])))));
