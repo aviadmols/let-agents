@@ -198,11 +198,14 @@ final class SearchCatalog
             // "מדע בדיוני" in a store with no science fiction: no product holds the words, and the nearest by meaning is far
             // (.36: books on politics). Nothing is shown as if it were found; the drawer says so, with the AI one press away.
             // How near is near enough is the store's (search.meaning_only_min_similarity).
-            // A picture near enough by its own floor still counts ("קורה בהירה": a pine plank).
+            // A search that says how the thing looks keeps what the pictures find ("קורה בהירה": a pine plank); any other
+            // search leans on the meaning alone, since every cover is about as near to a genre as any other (.6 to .7).
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
-            $weak = $byMeaning && $pictures === [] && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId);
+            $weak = $byMeaning && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)
+                && ($pictures === [] || ! HebrewSearch::visual($query));
             if ($weak) {
                 $near['products'] = [];
+                $pictures = [];
             }
             $meaning = $near['products'];
             // Guides and pages found by meaning are a group of their own, never a rank among products: an

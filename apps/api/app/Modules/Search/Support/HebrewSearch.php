@@ -99,6 +99,24 @@ final class HebrewSearch
      * every word no product or page holds anything close to ("ביתית", "וזולה"). "מה הכי טוב
      * למברגה ביתית וזולה" is "למברגה". Empty when nothing is left.
      */
+    /** Words of how a thing looks besides its colour: a shade. Normalized. */
+    private const SHADES = ['בהיר', 'בהירה', 'בהירימ', 'בהירות', 'כהה', 'כהימ', 'כהות', 'מבריק', 'מבריקה', 'מט', 'שקופ', 'שקופה', 'light', 'dark', 'bright', 'pale', 'shiny', 'matte'];
+
+    /**
+     * Whether a search says how the thing looks: a colour, a shade, "בצבע…". Only such a search is the picture's to
+     * answer alone; a genre or a topic is not seen on a cover ("מדע בדיוני": books on politics, by their covers).
+     */
+    public static function visual(string $query): bool
+    {
+        foreach (explode(' ', self::normalize($query)) as $word) {
+            if ($word !== '' && (self::colorOf($word) !== null || in_array($word, self::SHADES, true) || in_array($word, self::DESCRIBES, true))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** A word is known to the catalogue when one of its words is at least this close to it. */
     public const KNOWN = 0.75;
 
