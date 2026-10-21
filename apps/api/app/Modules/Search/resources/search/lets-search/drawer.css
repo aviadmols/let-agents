@@ -45,6 +45,54 @@
 .ls-launch.is-catch { animation: ls-catch 520ms var(--lsp-ease-out); }
 @keyframes ls-catch { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .ls-launch .ls-halves, .ls-launch .ls-mini-heart, .ls-launch__badge { transition: none; animation: none; } .ls-launch.is-catch { animation: none; } }
+/* the launcher's other icons (launcherIcon): the spark twinkles on hover, the badge turns over. Their top right corner
+   is taken, so the saved dot moves to the top left */
+.ls-launch--corner .ls-launch__badge { inset-inline: auto; left: 6px; }
+.ls-launch .ls-spark { transform-box: fill-box; transform-origin: center; transition: transform 500ms var(--lsp-ease-out); }
+@media (hover: hover) and (pointer: fine) { .ls-launch:hover .ls-spark { transform: rotate(90deg) scale(1.15); } .ls-launch:hover .ls-spark--2 { transform: rotate(-90deg) scale(1.2); } }
+.ls-launch .ls-badge { transform-box: fill-box; transform-origin: center; transition: transform 600ms var(--lsp-ease-in-out); }
+@media (hover: hover) and (pointer: fine) { .ls-launch:hover .ls-badge { transform: rotate(180deg); } }
+@media (prefers-reduced-motion: reduce) { .ls-launch .ls-spark, .ls-launch .ls-badge { transition: none; } }
+
+/* ---------------------------------------------------------------- the invitation beside the launcher ("Try our new search"): one small line */
+.ls-nudge {
+  position: absolute; width: max-content; max-width: min(280px, calc(100vw - 24px));
+  display: flex; align-items: center; gap: 0; padding: 3px;
+  border-radius: 999px; background: var(--ls-fg); color: var(--ls-bg); box-shadow: 0 10px 28px -10px rgb(11 11 12 / .45);
+  font-family: var(--ls-font); -webkit-font-smoothing: antialiased;
+  opacity: 0; visibility: hidden; transform: translateY(-4px) scale(.96); transform-origin: 50% 0;
+  transition: opacity 220ms ease, transform 380ms var(--lsp-ease-out), visibility 0s 380ms;
+}
+.ls-nudge.is-above { transform: translateY(4px) scale(.96); transform-origin: 50% 100%; }
+.ls-nudge.is-in { opacity: 1; visibility: visible; transform: none; transition: opacity 220ms ease, transform 380ms var(--lsp-ease-out); }
+.ls-nudge.is-off { visibility: hidden !important; }
+.ls-nudge__tip { position: absolute; top: -4px; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 2px; background: inherit; transform: rotate(45deg); }
+.ls-nudge.is-above .ls-nudge__tip { top: auto; bottom: -4px; }
+.ls-nudge__go {
+  position: relative; display: flex; align-items: center; gap: 8px; height: 32px; padding-block: 0; padding-inline: 10px 4px;
+  border: 0; border-radius: 999px; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent; transition: background-color var(--lsp-dur-hover) ease;
+}
+@media (hover: hover) and (pointer: fine) { .ls-nudge__go:hover { background: color-mix(in srgb, var(--ls-bg) 10%, transparent); } }
+.ls-nudge__go:focus-visible, .ls-nudge__x:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.ls-nudge .ls-mark { --s: 14px; flex: none; color: #e2ff78; }
+:host([data-ls-theme="store"]) .ls-nudge .ls-mark { color: var(--ls-bg); }
+.ls-nudge.is-in .ls-mark { animation: ls-hourglass 1.8s var(--lsp-ease-in-out) 300ms 2; }
+.ls-nudge.is-in .ls-mark i { animation: ls-sand 1.8s var(--lsp-ease-in-out) 300ms 2; }
+.ls-nudge__t { font-size: 13px; font-weight: 500; line-height: 1; overflow: hidden; text-overflow: ellipsis; }
+.ls-nudge__x {
+  width: 26px; height: 26px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%;
+  background: transparent; color: inherit; opacity: .55; cursor: pointer; transition: opacity var(--lsp-dur-hover) ease, background-color var(--lsp-dur-hover) ease;
+}
+@media (hover: hover) and (pointer: fine) { .ls-nudge__x:hover { opacity: 1; background: color-mix(in srgb, var(--ls-bg) 10%, transparent); } }
+.ls-nudge__x svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+/* the launcher answers with a soft ring while the invitation is up */
+.ls-launch.is-hint::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; animation: ls-ring 1.6s var(--lsp-ease-out) 3; }
+@keyframes ls-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .ls-nudge, .ls-nudge.is-in, .ls-nudge.is-above { transition: none; transform: none; }
+  .ls-nudge.is-in .ls-mark, .ls-nudge.is-in .ls-mark i, .ls-launch.is-hint::after { animation: none; }
+}
 
 /* ---------------------------------------------------------------- drawer anatomy */
 .ls-drawer { overscroll-behavior: contain; }

@@ -109,8 +109,10 @@ final class SearchSettingsPagesTest extends TestCase
             ->assertSee('"עזר?" אחרי תשובה של העוזר')
             ->assertSee('כשמוצר או מידה אזלו')
             ->assertSee('שורת Lets בעמוד המוצר שמציעה מוצרים דומים במלאי, באותה מידה')
+            ->assertSee('הזמנה לנסות את החיפוש')
             ->assertSet('data.storefront', true)
             ->assertSet('data.take_over', true)
+            ->assertSet('data.nudge', true)
             ->assertSet('data.rate', true)
             ->assertSet('data.out_of_stock', true)
             ->assertSet('data.per_group', 12);
@@ -118,6 +120,9 @@ final class SearchSettingsPagesTest extends TestCase
         $config = $this->config();
         $this->assertTrue($config['takeOver']);
         $this->assertTrue($config['rate']);
+        $this->assertTrue($config['nudge']);
+        $this->assertTrue($this->look()['nudge'], 'the invitation is read from the look, before the index is needed');
+        $this->assertSame('', $this->look()['nudgeAt'], 'by default the drawer finds the icon itself');
         // what a question with no answer is offered, and the shop's own form for it (none set up here)
         $this->assertContains($config['noAnswer'], ['team', 'details', 'none']);
         $this->assertArrayHasKey('leadForm', $config);
@@ -133,9 +138,12 @@ final class SearchSettingsPagesTest extends TestCase
             ->set('data.wishlist', true)
             ->set('data.rate', false)
             ->set('data.out_of_stock', false)
+            ->set('data.nudge', false)
+            ->set('data.nudge_at', ' header__search-link  icon ')
             ->call('save');
 
         $this->assertFalse(Features::enabled('search.take_over_field', $this->shop->id));
+        $this->assertFalse(Features::enabled('search.nudge', $this->shop->id));
         $this->assertTrue(Features::enabled('search.photos', $this->shop->id));
         $this->assertTrue(Features::enabled('retrieval.image_index', $this->shop->id), 'photo search on starts the pictures scan');
         $page->assertSee('התמונות עוד נסרקות');
@@ -152,6 +160,11 @@ final class SearchSettingsPagesTest extends TestCase
         $this->assertFalse($config['rate']);
         $this->assertFalse($config['oosSimilar']);
         $this->assertFalse($config['price']);
+        $this->assertFalse($this->look()['nudge']);
+        // the class the team copied from the inspector, whole class attribute and all, is a selector for the drawer
+        $this->assertSame('.header__search-link.icon', $this->look()['nudgeAt']);
+        Settings::set('search.nudge_at', 'header .search-toggle > svg', $this->shop->id);
+        $this->assertSame('header .search-toggle > svg', $this->look()['nudgeAt'], 'a selector stays as written');
 
         // the card's own switch: the search off on the site
         $page->set('data.storefront', false)->call('save');

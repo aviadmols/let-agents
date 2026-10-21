@@ -89,4 +89,8 @@ return [
         'label' => 'When a product or a size is sold out',
         'description' => 'A Lets row on the product page when the product or the chosen variant is sold out: similar products in stock, in the same size. No model.',
     ],
+    'nudge' => [
+        'label' => 'Invite shoppers to try the search',
+        'description' => 'A small line beside the search icon: "Try our new search". It shows once only to each new shopper, on their first visit, and goes away by itself after a few seconds. A shopper who visited before never sees it.',
+    ],
 ];

@@ -56,6 +56,12 @@ return [
         'rate_tip' => '"Helpful?" with thumbs after an answer. An answer rated low reaches you in notices and insights.',
         'oos' => 'When a product or a size is sold out',
         'oos_sub' => 'A Lets row on the product page offering similar products in stock, in the same size',
+        'nudge' => 'Invite shoppers to try the search',
+        'nudge_sub' => '"Try our new search" beside the search icon, once for each new shopper',
+        'nudge_at' => 'Beside which icon',
+        'nudge_at_sub' => 'The class of the site\'s search icon. Empty: Lets finds it',
+        'nudge_at_tip' => 'On the site: right-click the search icon → Inspect, and copy its class (e.g. header__search-link). The invitation sits beside it when it is on the page; if not, it moves to the Lets button or the search box.',
+        'nudge_tip' => 'It shows on a new shopper\'s first visit, a few seconds after the page loads, and goes away by itself after a few seconds or on a tap. It never comes back to the same shopper, and a shopper who visited before never sees it.',
     ],
     'manual' => [
         'nav' => 'Manual theme connection',

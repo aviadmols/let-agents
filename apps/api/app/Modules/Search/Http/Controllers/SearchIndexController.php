@@ -153,7 +153,7 @@ final class SearchIndexController
     /**
      * The shop's choices on its "how it looks" and "search window" settings, as the drawer reads them.
      *
-     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool}
+     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool, nudge: bool, nudgeAt: string}
      */
     public static function lookFor(TenantContext $tenant, string $shopId): array
     {
@@ -173,7 +173,22 @@ final class SearchIndexController
             'rate' => Features::enabled('search.rate_answers', $shopId),
             // a product or a variant sold out: a row on the product page with similar products in stock, same size
             'oosSimilar' => Features::enabled('search.out_of_stock_similar', $shopId) && self::similarReady($tenant, $shopId),
+            // "Try our new search" beside the launcher, once, on a new shopper's first visit
+            'nudge' => Features::enabled('search.nudge', $shopId),
+            // what it points at: the site's own search icon, when the shop named it; '' = the drawer finds it
+            'nudgeAt' => self::nudgeAt((string) Settings::get('search.nudge_at', $shopId)),
         ];
+    }
+
+    /**
+     * The shop's search icon as a selector. The team copies a class from the browser's inspector, so a bare
+     * class ("header__search-link") or the whole class attribute ("header__search-link icon") is read as classes.
+     */
+    private static function nudgeAt(string $value): string
+    {
+        $value = trim((string) preg_replace('/\s+/u', ' ', $value));
+
+        return preg_match('/^-?[A-Za-z_][\w-]*( -?[A-Za-z_][\w-]*)*$/', $value) === 1 ? '.'.str_replace(' ', '.', $value) : $value;
     }
 
     /**

@@ -5,6 +5,10 @@ return [
         'label' => 'What "size" is measured by',
         'description' => 'The key of the store vocabulary attribute (e.g. diamonds_total_carat or diameter) that "biggest", "smallest" and "size X" use. Empty: those phrases do not change results.',
     ],
+    'nudge_at' => [
+        'label' => 'The search invitation points at',
+        'description' => 'The class (or CSS selector) of the site\'s own search icon that the "Try our new search" invitation sits beside. Empty: automatic, the Lets button in the header, then the theme\'s search icon, then the floating button and the search box.',
+    ],
     'input_selector' => [
         'label' => 'Search boxes on the site',
         'description' => 'CSS selector of the search fields Let Agents search attaches to. Several, separated by commas.',

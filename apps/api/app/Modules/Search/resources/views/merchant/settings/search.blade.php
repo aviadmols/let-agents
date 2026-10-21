@@ -5,6 +5,11 @@
 
     <x-lp::card :title="$t('title')" :help="$t('help')" master="data.storefront">
         <x-lp::row :title="$t('field')" :sub="$t('field_sub')" :tip="$t('field_tip')"><x-lp::toggle model="data.take_over" :label="$t('field')" /></x-lp::row>
+        <x-lp::row :title="$t('nudge')" :sub="$t('nudge_sub')" :tip="$t('nudge_tip')"><x-lp::toggle model="data.nudge" :label="$t('nudge')" /></x-lp::row>
+        <x-lp::row :title="$t('nudge_at')" :sub="$t('nudge_at_sub')" :tip="$t('nudge_at_tip')" x-data x-show="$wire.data.nudge">
+            <x-lp::field model="data.nudge_at" :ltr="true" :width="240" placeholder="header__search-link" :aria-label="$t('nudge_at')" />
+            @if ($this->problem('nudge_at'))<span class="lp-set-error" role="alert">{{ $this->problem('nudge_at') }}</span>@endif
+        </x-lp::row>
         <x-lp::row :title="$t('photos')" :tip="$t('photos_tip')">
             {{-- the pictures' state once they matter: ready, or still scanning while photo search is on --}}
             @php($ready = $this->picturesReady())

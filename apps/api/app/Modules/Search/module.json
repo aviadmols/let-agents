@@ -103,6 +103,10 @@
         {
             "name": "out_of_stock_similar",
             "default": true
+        },
+        {
+            "name": "nudge",
+            "default": true
         }
     ],
     "settings": [
@@ -111,6 +115,14 @@
             "type": "string",
             "default": "input[name=\"s\"], input[type=\"search\"]",
             "min": 1,
+            "max": 300,
+            "scope": "shop"
+        },
+        {
+            "name": "nudge_at",
+            "type": "string",
+            "default": "",
+            "min": 0,
             "max": 300,
             "scope": "shop"
         },

@@ -14,8 +14,8 @@ use UnitEnum;
 
 /**
  * Settings · The search window, as the designer's panel lays it out: whether Lets search runs on the
- * site at all (the card's switch), whether it takes over the theme's own search box, and what the drawer
- * offers: photos, questions, similar items, prices, the cart, the wishlist and compare, "Helpful?" under
+ * site at all (the card's switch), whether it takes over the theme's own search box, whether a new shopper is
+ * invited to try it once, and what the drawer offers: photos, questions, similar items, prices, the cart, the wishlist and compare, "Helpful?" under
  * an answer, and the product page's row when a product or a size is sold out. Each is a feature or a
  * setting the drawer reads (SearchIndexController).
  */
@@ -55,6 +55,8 @@ class SearchWindowSettings extends Page
         return [
             'storefront' => 'feature:search.storefront',
             'take_over' => 'feature:search.take_over_field',
+            'nudge' => 'feature:search.nudge',
+            'nudge_at' => 'setting:search.nudge_at',
             'photos' => 'feature:search.photos',
             'ask' => 'feature:assistant.on_search',
             'similar' => 'feature:search.similar',

@@ -8,7 +8,7 @@
  *
  * Talks to the same endpoints as the product scripts (Let Agents API + the store's Store API).
  * Config: window.LetsSearchConfig (see DEFAULTS). Demo switches by URL: ?lsTheme=store, ?lsLang=en,
- * ?lsLauncher=float, ?lsOpen=1, ?lsPreview=1.
+ * ?lsLauncher=float, ?lsOpen=1, ?lsPreview=1, ?lsIcon=mark|spark|…, ?lsNudge=1 (the invitation on every page).
  */
 (function (win, doc) {
   'use strict';
@@ -34,7 +34,10 @@
     openSelectors: '[data-search-open]',     // store buttons that should open us (mobile search icon)
     launcherInto: '',                        // header container for the launcher ('' = auto)
     launcher: 'auto',                        // auto | header | float | none
-    productId: null,                         // set on a product page: the drawer starts with "about this product"
+    launcherIcon: 'spark',                   // mark | spark | sparks | badge | dot | bubble (see LAUNCHER_ICONS)
+    nudgeDelay: 2500,                        // ms after the page is ready before "Try our new search" shows (on/off: search.nudge)
+    nudgeFor: 8000,                          // ms it stays before it steps away on its own
+    productId: null,                        // set on a product page: the drawer starts with "about this product"
     pageType: null, pageId: null,            // the page being viewed (product | content), for its learning; productId implies a product
     platform: 'woocommerce',                 // woocommerce | shopify
     inlineInto: 'auto',                      // product page: the search row goes after this element; auto = the store's add-to-cart form, '' = none
@@ -71,7 +74,12 @@
   if (URLQ.lsLauncher) { CFG.launcher = URLQ.lsLauncher; }
   if (URLQ.lsPreview) { CFG.preview = true; }
   if (URLQ.lsSilent) { CFG.silent = true; }
-  var LANG = /^en/i.test(String(CFG.locale || '')) ? 'en' : 'he';
+  // a visitor the site met before carries our visitor id (cookie or storage), read before this page sets one
+  var NEW_VISITOR = (function () {
+    if (/(?:^|; )(?:let_agents_vid|rega_vid)=/.test(doc.cookie)) { return false; }
+    try { return !win.localStorage.getItem('let_agents_vid'); } catch (e) { return true; }
+  })();
+  var LANG =/^en/i.test(String(CFG.locale || '')) ? 'en' : 'he';
   // the store: WooCommerce's Store API (with the shopper's cookies and its Nonce), or Shopify's own storefront
   var SHOPIFY = CFG.platform === 'shopify';
   var ROOT = String(CFG.root || '/').replace(/\/?$/, '/');
@@ -82,7 +90,7 @@
   // ---------------------------------------------------------------- words
   var WORDS = {
     he: {
-      open: 'חיפוש חכם', close: 'סגירה', saved: 'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Lets', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
+      open: 'חיפוש חכם', close: 'סגירה', nudgeTitle: 'נסו את החיפוש החדש שלנו', nudgeClose: 'לא עכשיו', nudgeLabel: 'הזמנה לחיפוש החכם', saved:'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Lets', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
       placeholder: 'חפשו מוצר, או שאלו כל דבר', placeholderProduct: 'שאלו על המוצר הזה, או חפשו כל דבר', clear: 'ניקוי', photo: 'חיפוש לפי תמונה', send: 'שליחה',
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'מה אנשים שואלים כאן:', removeRecent: 'הסרה',
@@ -135,7 +143,7 @@
       oosNone: 'אין כרגע דומים ב:v שיש במלאי. אלה דומים שיש במלאי:', oosHead: 'במלאי, דומים ל־'
     },
     en: {
-      open: 'Smart search', close: 'Close', saved: 'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
+      open: 'Smart search', close: 'Close', nudgeTitle: 'Try our new search', nudgeClose: 'Not now', nudgeLabel: 'Smart search invitation', saved:'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
       placeholder: 'Search for a product, or ask anything', placeholderProduct: 'Ask about this product, or search anything', clear: 'Clear', photo: 'Search by photo', send: 'Send',
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'What people ask here:', removeRecent: 'Remove',
@@ -729,12 +737,13 @@
   // Read once a page, before the index is needed (small, cached by the browser for minutes), and kept for the
   // next page. Each choice is applied where it shows: the language of every word, Lets' look or the site's,
   // the assistant's name, the theme's own search box, the product page's row for a product sold out.
+  // resolves true once this page read the fresh look (the invitation waits for it: a first visit has no look kept)
   function fetchLook() {
-    if (!CFG.api || !CFG.site) { return; }
-    json(API + '/search/' + SITE + '/look').then(function (r) { if (r.ok && r.body && r.body.theme) { applyLook(r.body); } }).catch(function () { /* the last look stays */ });
+    if (!CFG.api || !CFG.site) { return Promise.resolve(false); }
+    return json(API + '/search/' + SITE + '/look').then(function (r) { if (r.ok && r.body && r.body.theme) { applyLook(r.body); return true; } return false; }).catch(function () { return false; /* the last look stays */ });
   }
   function applyLook(l) {
-    var keep = { theme: l.theme, lang: l.lang || null, assistant: l.assistant || '', takeOver: l.takeOver !== false, rate: l.rate !== false, oosSimilar: l.oosSimilar === true, enabled: l.enabled !== false };
+    var keep = { theme: l.theme, lang: l.lang || null, assistant: l.assistant || '', takeOver: l.takeOver !== false, rate: l.rate !== false, oosSimilar: l.oosSimilar === true, nudge: l.nudge === true, nudgeAt: String(l.nudgeAt || ''), enabled: l.enabled !== false };
     if (!CFG.preview) { try { win.localStorage.setItem(LOOK_KEY, JSON.stringify(keep)); } catch (e) { /* storage blocked: read again next page */ } }
     LOOK = keep;
     if (keep.assistant && lookWins('assistant')) { CFG.assistant = keep.assistant; }
@@ -1116,6 +1125,7 @@
   }
   function open(opts) {
     opts = opts || {};
+    if (nudgeOff) { nudgeOff(); }
     loadIndex();
     if (!S.open) {
       lastFocus = doc.activeElement;
@@ -3783,10 +3793,34 @@
   }
 
   // ---------------------------------------------------------------- hooking into the store page
+  // The launcher's icon (CFG.launcherIcon, or ?lsIcon=): a magnifier, and beside it, never inside, what makes it smart
+  // (shoppers read the mark inside the lens as an X). The heart of a save from the page appears in the lens.
+  var SPARK = 'M18.9.5c.4 3 1.5 4.1 4.5 4.5-3 .4-4.1 1.5-4.5 4.5-.4-3-1.5-4.1-4.5-4.5 3-.4 4.1-1.5 4.5-4.5z';
+  var LENS = '<circle class="ls-lens" cx="9.5" cy="12" r="6.2"/><path class="ls-handle" d="m14.2 16.7 4.6 4.6"/>';
+  var LAUNCHER_ICONS = {
+    // the original: the mark inside the lens
+    mark: '<circle class="ls-lens" cx="10.5" cy="10.5" r="7"/><path class="ls-handle" d="m16 16 4.5 4.5"/>' +
+      '<g class="ls-halves"><path d="M7.4 7.6h6.2a3.1 3.1 0 0 1-6.2 0z" fill="currentColor"/><path d="M7.4 13.4h6.2a3.1 3.1 0 0 0-6.2 0z" fill="currentColor"/></g>',
+    // a magnifier and a spark: "smart search"
+    spark: LENS + '<path class="ls-spark" d="' + SPARK + '" fill="currentColor"/>',
+    // a magnifier and two sparks
+    sparks: LENS + '<path class="ls-spark" d="' + SPARK + '" fill="currentColor"/>' +
+      '<path class="ls-spark ls-spark--2" d="M21.4 9.6c.15 1.1.6 1.55 1.7 1.7-1.1.15-1.55.6-1.7 1.7-.15-1.1-.6-1.55-1.7-1.7 1.1-.15 1.55-.6 1.7-1.7z" fill="currentColor"/>',
+    // a magnifier with the Lets mark on a small badge at its corner
+    badge: LENS + '<g class="ls-badge"><circle cx="18.6" cy="5.4" r="4.6" fill="currentColor"/><path d="M16.6 3.2h4a2 2 0 0 1-4 0zM16.6 7.6h4a2 2 0 0 0-4 0z" fill="var(--ls-bg, #fff)"/></g>',
+    // a magnifier and a lime dot: "something new here"
+    dot: '<circle class="ls-lens" cx="10.5" cy="10.5" r="7"/><path class="ls-handle" d="m16 16 4.5 4.5"/><circle class="ls-dot" cx="18.8" cy="4.6" r="3.2" fill="#e2ff78" stroke="currentColor" stroke-width="1.4"/>',
+    // a lens that is also a speech bubble: "you can ask"
+    bubble: '<path class="ls-lens" d="M9.5 3.6a6.8 6.8 0 1 1-3.9 12.4L2.8 17l.9-2.8A6.8 6.8 0 0 1 9.5 3.6z" stroke-linejoin="round"/><path class="ls-handle" d="m14.8 15.4 5.2 5.2"/><path class="ls-spark" d="' + SPARK + '" fill="currentColor"/>'
+  };
+  function launcherIcon() { return LAUNCHER_ICONS[URLQ.lsIcon] ? URLQ.lsIcon : LAUNCHER_ICONS[CFG.launcherIcon] ? CFG.launcherIcon : 'spark'; }
   function launcherHtml() {
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle class="ls-lens" cx="10.5" cy="10.5" r="7"/><path class="ls-handle" d="m16 16 4.5 4.5"/>' +
-      '<g class="ls-halves"><path d="M7.4 7.6h6.2a3.1 3.1 0 0 1-6.2 0z" fill="currentColor"/><path d="M7.4 13.4h6.2a3.1 3.1 0 0 0-6.2 0z" fill="currentColor"/></g>' +
-      '<path class="ls-mini-heart" d="M10.5 13.6s-3.3-2-3.3-4.4a1.8 1.8 0 0 1 3.3-1 1.8 1.8 0 0 1 3.3 1c0 2.4-3.3 4.4-3.3 4.4z" fill="currentColor"/></svg>' +
+    var key = launcherIcon();
+    var heart = '<path class="ls-mini-heart" d="M10.5 13.6s-3.3-2-3.3-4.4a1.8 1.8 0 0 1 3.3-1 1.8 1.8 0 0 1 3.3 1c0 2.4-3.3 4.4-3.3 4.4z" fill="currentColor"/>';
+    // the heart sits in the lens: the smaller lens of the icons with something beside it is lower and to the left
+    var at = { spark: '-1 1.5', sparks: '-1 1.5', badge: '-1 1.5', bubble: '-1 0' }[key];
+    if (at) { heart = '<g transform="translate(' + at + ')">' + heart + '</g>'; }
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + LAUNCHER_ICONS[key] + heart + '</svg>' +
       '<span class="ls-launch__badge" hidden aria-hidden="true"></span>';
   }
   function makeLauncher(float) {
@@ -3795,7 +3829,7 @@
     var sr = h.attachShadow({ mode: 'open' });
     sr.innerHTML = styles(['tokens.css', 'drawer.css']) +
       '<style>:host{all:initial;display:inline-flex}.ls-launch{font:inherit}</style>' +
-      '<button class="ls-launch' + (float ? ' ls-launch--float' : '') + '" type="button" aria-label="' + esc(t('open')) + '" aria-haspopup="dialog">' + launcherHtml() + '</button>';
+      '<button class="ls-launch' + (float ? ' ls-launch--float' : '') + (launcherIcon() !== 'mark' ? ' ls-launch--corner' : '') + '" type="button" aria-label="' + esc(t('open')) + '" aria-haspopup="dialog">' + launcherHtml() + '</button>';
     h.setAttribute('data-lets-launcher', '');
     dressHost(h);
     var btn = sr.querySelector('button');
@@ -3885,6 +3919,94 @@
     } else {
       doc.body.appendChild(makeLauncher(true));
     }
+  }
+
+  // ---------------------------------------------------------------- the invitation: "Try our new search", beside the launcher
+  // A small dark line that points at the site's search icon (showNudge says which), once in a
+  // visitor's life: on a new visitor's first page with something to point at, a few seconds after it is ready, gone a
+  // few seconds later, and never again, opened or not. A visitor the site knew before never gets it. The shop turns it
+  // off (search.nudge), read from this page's fresh look, so a first page never shows it against the shop's choice.
+  // ?lsNudge=1 shows it on every page, for demos; ?lsNudge=0 never.
+  var NUDGE_KEY = 'ls_nudge', nudgeOff = null;
+  // whether this visitor is still owed it: decided once, on the first page this script meets them, before they can leave
+  function nudgeDue() {
+    var state = store('local', NUDGE_KEY);
+    if (state === null) { state = NEW_VISITOR ? 'due' : 'seen'; store('local', NUDGE_KEY, state); }
+    return state === 'due';
+  }
+  function nudge(looked) {
+    var force = URLQ.lsNudge === '1';
+    if (URLQ.lsNudge === '0' || (!force && (CFG.preview || !nudgeDue()))) { return; }
+    Promise.all([looked, new Promise(function (done) { setTimeout(done, force ? 600 : CFG.nudgeDelay); })]).then(function (r) {
+      if (!force) {
+        if (!r[0]) { return; } // the shop's choice is unknown on this page: still owed on the next one
+        if (LOOK.nudge !== true || LOOK.enabled === false) { store('local', NUDGE_KEY, 'seen'); return; }
+      }
+      showNudge(force);
+    });
+  }
+  function showNudge(force) {
+    if (S.open || nudgeOff) { return; }
+    var shown = function (n) { var r = n && n.getBoundingClientRect(); return !!r && r.width > 0 && r.bottom > 0 && r.top < win.innerHeight; };
+    var pick = function (sel, top) {
+      try { return [].slice.call(doc.querySelectorAll(sel)).filter(function (n) { return shown(n) && (!top || n.getBoundingClientRect().top < win.innerHeight * .3); })[0] || null; } catch (e) { return null; /* a selector the browser cannot read */ }
+    };
+    var ours = LAUNCHERS.filter(shown), inHeader = ours.filter(function (b) { return !b.classList.contains('ls-launch--float'); })[0];
+    var take = CFG.takeOver !== false;
+    // where shoppers look for search: the icon the shop named (search.nudge_at), our launcher in the header, the theme's
+    // own search icon at the top of the page (while we take its search over), our floating launcher, the store's field
+    var anchor = (LOOK.nudgeAt && pick(LOOK.nudgeAt)) || inHeader || (take && pick(SEARCH_TRIGGERS, true)) || ours[0] ||
+      pick((take ? CFG.fieldSelector + ', ' : '') + OWN_FIELDS);
+    if (!anchor) { return; } // nothing on this page to point at: still owed on the next one
+    var lbtn = LAUNCHERS.indexOf(anchor) >= 0 ? anchor : null;
+    var h = doc.createElement('lets-nudge');
+    h.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147482998';
+    dressHost(h);
+    var sr = h.attachShadow({ mode: 'open' });
+    sr.innerHTML = styles(['tokens.css', 'components.css', 'drawer.css']) + '<style>:host{all:initial}</style>' +
+      '<aside class="ls-nudge ls" dir="' + DIR + '" lang="' + LANG + '" aria-label="' + esc(t('nudgeLabel')) + '">' +
+        '<i class="ls-nudge__tip" aria-hidden="true"></i>' +
+        '<button class="ls-nudge__go" type="button">' + mark() + '<span class="ls-nudge__t">' + esc(t('nudgeTitle')) + '</span></button>' +
+        '<button class="ls-nudge__x" type="button" aria-label="' + esc(t('nudgeClose')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>' +
+      '</aside>';
+    var box = sr.querySelector('.ls-nudge'), tip = sr.querySelector('.ls-nudge__tip'), raf = 0, timers = [];
+    function place() {
+      raf = 0;
+      // measured from the drawn icon, not its tap area, so the line sits close to what it points at (a theme's icon
+      // may hold a hidden one too, its "close")
+      var ic = [].filter.call(anchor.querySelectorAll('svg'), function (s) { return s.getBoundingClientRect().width > 0; })[0];
+      var r = (ic || anchor).getBoundingClientRect(), vw = doc.documentElement.clientWidth, vh = win.innerHeight;
+      var off = !r.width || r.bottom < 0 || r.top > vh;
+      box.classList.toggle('is-off', off);
+      if (off) { return; }
+      var w = box.offsetWidth, bh = box.offsetHeight, cx = r.left + r.width / 2, below = r.top < vh * .55;
+      var left = Math.min(Math.max(12, cx - w / 2), vw - w - 12);
+      box.style.left = left + 'px';
+      box.style.top = (below ? r.bottom + 10 : r.top - bh - 10) + 'px';
+      tip.style.left = Math.min(Math.max(18, cx - left), w - 18) + 'px';
+      box.classList.toggle('is-above', !below);
+    }
+    function later() { if (!raf) { raf = requestAnimationFrame(place); } }
+    function key(e) { if (e.key === 'Escape') { gone(); } }
+    function gone() {
+      if (nudgeOff !== gone) { return; }
+      nudgeOff = null;
+      timers.forEach(clearTimeout);
+      win.removeEventListener('scroll', later, true); win.removeEventListener('resize', later); doc.removeEventListener('keydown', key);
+      if (lbtn) { lbtn.classList.remove('is-hint'); }
+      box.classList.remove('is-in');
+      setTimeout(function () { h.remove(); }, REDUCED ? 0 : 320);
+    }
+    nudgeOff = gone;
+    sr.querySelector('.ls-nudge__go').addEventListener('click', function () { gone(); open(); });
+    sr.querySelector('.ls-nudge__x').addEventListener('click', gone);
+    doc.body.appendChild(h);
+    place();
+    win.addEventListener('scroll', later, { passive: true, capture: true }); win.addEventListener('resize', later); doc.addEventListener('keydown', key);
+    requestAnimationFrame(function () { place(); box.classList.add('is-in'); if (lbtn) { lbtn.classList.add('is-hint'); } });
+    // shown once is enough: it never comes back, even if nobody touched it
+    store('local', NUDGE_KEY, 'seen');
+    timers.push(setTimeout(gone, force ? 60000 : CFG.nudgeFor));
   }
   // On a product page: a search row under "add to cart". Typing in it opens the drawer, the words going with it.
   function inlineField() {
@@ -4298,7 +4420,7 @@
     applyStoreTheme();
     agentTools();
     BOOTED = true;
-    fetchLook();
+    nudge(fetchLook());
     // the page: a product (from the config, else the store's own markers) or a content page, for its learning
     if (!S.ctx) {
       var meta = win.ShopifyAnalytics && win.ShopifyAnalytics.meta && win.ShopifyAnalytics.meta.product, cls = String(doc.body.className || ''), post = cls.match(/(?:^|\s)postid-([0-9]+)(?:\s|$)/);
