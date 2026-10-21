@@ -324,7 +324,10 @@ final class SearchFlowTest extends TestCase
         $this->assertContains('104', array_column($result['groups']['product'], 'external_id'), 'what the nearest guides name is suggested');
         $this->assertSame('102', $result['groups']['product'][0]['external_id'], 'after what was found itself');
 
-        // Not a question about a need: the guide is shown, its products are not suggested.
+        // Not a question about a need: the guide is shown, its products are not suggested. No product holds the words and
+        // the meaning is weak (.41): none is shown as if found; a store that wants weaker meaning lowers its threshold.
+        $this->assertSame([], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
+        Settings::set('search.meaning_only_min_similarity', 0.4, $this->shop->id);
         $this->assertSame(['102'], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
     }
 
