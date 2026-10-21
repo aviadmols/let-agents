@@ -94,4 +94,25 @@ class CatalogContent extends Model
     {
         $query->whereNull('removed_at');
     }
+
+    /**
+     * Pages a shopper opens on the store's own site: not those the platform serves at its own address
+     * (a post Lets wrote and the team published, at /g/{shop}/{post}), which take the shopper away
+     * from the store. They stay the store's content for the assistant to answer from.
+     *
+     * @param  Builder<CatalogContent>  $query
+     */
+    public function scopeOnTheSite(Builder $query): void
+    {
+        $app = parse_url((string) config('app.url'));
+        $host = is_array($app) ? (string) ($app['host'] ?? '') : '';
+
+        if ($host === '') {
+            return;
+        }
+
+        // the address as the platform's links carry it: its host, and its port when it has one
+        $ours = $host.(isset($app['port']) ? ':'.$app['port'] : '');
+        $query->where(fn (Builder $q) => $q->whereNull('url')->orWhere('url', 'not like', '%://'.$ours.'/%'));
+    }
 }

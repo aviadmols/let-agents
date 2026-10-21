@@ -234,8 +234,9 @@ final class BuildSearchIndex
             $sized = $sized || $z !== null;
         }
 
-        // What the store says about itself is for the assistant, never a result of its own.
-        foreach (CatalogContent::query()->active()->where('type', '!=', CatalogContent::KNOWLEDGE)->orderBy('id')->lazy(200) as $content) {
+        // What the store says about itself is for the assistant, never a result of its own; nor is a page the
+        // platform serves at its own address, which would take the shopper off the store's site.
+        foreach (CatalogContent::query()->active()->onTheSite()->where('type', '!=', CatalogContent::KNOWLEDGE)->orderBy('id')->lazy(200) as $content) {
             $words = [];
 
             foreach ((array) $content->terms as $terms) {
