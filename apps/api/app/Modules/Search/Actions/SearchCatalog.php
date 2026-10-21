@@ -151,7 +151,7 @@ final class SearchCatalog
             $read = [];
             if ($index !== null && $query !== $worded) {
                 foreach (HebrewSearch::facets($worded, (array) ($index['facets'] ?? [])) as $named) {
-                    $read[intdiv((int) $named['code'], 1000)][] = (int) $named['code'];
+                    $read[intdiv((int) $named['code'], 1000)][(int) $named['code']] = (string) $named['label'];
                 }
             }
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
@@ -312,7 +312,10 @@ final class SearchCatalog
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
             $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
             if ($read !== []) {
-                $held = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $codes): bool => array_intersect($codes, (array) ($r['f'] ?? [])) !== [])));
+                // a product holds a value read from the words when it carries it, or when its own words say it ("זהב צהוב" in
+                // the title of a ring the scan has not marked), as the drawer reads it
+                $held = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $values): bool => array_intersect(array_keys($values), (array) ($r['f'] ?? [])) !== []
+                    || array_any($values, fn (string $label): bool => HebrewSearch::says((string) ($r['title'] ?? '').' '.(string) ($r['kw'] ?? ''), $label)))));
                 $groups['product'] = $held !== [] ? $held : $groups['product'];
             }
 

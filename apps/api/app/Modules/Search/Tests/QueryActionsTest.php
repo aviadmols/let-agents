@@ -106,6 +106,12 @@ final class QueryActionsTest extends TestCase
         $this->assertSame(['3'], $ids('טבעת יהלום קטנה מ-17'));
         $this->assertSame(['2', '1', '3'], $ids('טבעת יהלום גדולה'), 'the biggest first');
         $this->assertEqualsCanonicalizing(['1', '2', '3', '4'], $ids('טבעת או עגילי'));
+
+        // a metal read from the words: the rings that carry it, and one whose own title says it though no fact does
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '5', 'type' => 'simple', 'status' => 'publish',
+            'title' => 'טבעת יהלום בזהב צהוב', 'url' => 'https://store.test/p/5', 'price' => 400, 'in_stock' => true, 'on_sale' => false, 'purchasable' => true, 'hash' => 'h5', 'payload' => []]));
+        $this->build();
+        $this->assertEqualsCanonicalizing(['1', '3', '5'], $ids('טבעת יהלום זהב צהוב'), 'yellow gold by its fact or its own words; never the white gold');
     }
 
     public function test_the_browser_reads_and_applies_the_phrases_as_the_server_does(): void

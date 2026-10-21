@@ -99,6 +99,23 @@ final class HebrewSearch
      * every word no product or page holds anything close to ("ביתית", "וזולה"). "מה הכי טוב
      * למברגה ביתית וזולה" is "למברגה". Empty when nothing is left.
      */
+    /**
+     * Whether words say a label: each of its words as a word of them, maybe after a prefix letter or with a plural or
+     * feminine ending ("טבעת זהב צהוב" says "זהב צהוב"; "זהבים" too). No sound-alikes.
+     */
+    public static function says(string $words, string $label): bool
+    {
+        $hay = ' '.self::normalize($words).' ';
+        $parts = array_filter(explode(' ', self::normalize($label)), fn (string $w): bool => $w !== '');
+        foreach ($parts as $w) {
+            if (preg_match('/ [והבלמשכ]?'.preg_quote($w, '/').'(?:ימ|ות|ה|י|ת)? /u', $hay) !== 1) {
+                return false;
+            }
+        }
+
+        return $parts !== [];
+    }
+
     /** Words of how a thing looks besides its colour: a shade. Normalized. */
     private const SHADES = ['בהיר', 'בהירה', 'בהירימ', 'בהירות', 'כהה', 'כהימ', 'כהות', 'מבריק', 'מבריקה', 'מט', 'שקופ', 'שקופה', 'light', 'dark', 'bright', 'pale', 'shiny', 'matte'];
 
