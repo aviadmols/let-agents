@@ -5,6 +5,7 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Analytics\Models\AnalyticsPopularity;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
@@ -79,6 +80,9 @@ final class SearchIndexController
             // "Popular in the store" on the empty drawer: this shop's own searches, never sample words.
             // Worked out once an hour per shop and index: it reads the index's own words.
             'popular' => Cache::remember('search:popular:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::popular($shopId, (string) $index->items))),
+            // "Popular products" on the empty drawer: the shop's own most added to the cart lately, only those with real
+            // activity (AnalyticsPopularity: popular, added at least once) and in the index; none, no section.
+            'wanted' => Cache::remember('search:wanted:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::wanted($shopId, (string) $index->items))),
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && self::similarReady($tenant, $shopId),
             // What each product carries, as the shop set it on its search display screen.
@@ -224,6 +228,21 @@ final class SearchIndexController
      *
      * @return list<string>
      */
+    /** @return list<string> index ids ("p:12") of the shop's most added to the cart, the most first */
+    private static function wanted(string $shopId, string $index): array
+    {
+        $shown = (int) Settings::get('search.wanted_shown', $shopId);
+        if ($shown <= 0) {
+            return [];
+        }
+
+        $ids = AnalyticsPopularity::query()->where('popular', true)->where('adds', '>', 0)->orderBy('rank')->limit($shown * 3)->pluck('product_external_id')->map(fn ($id): string => 'p:'.$id)->all();
+        // only what the index holds: a product removed since, or out of the search, is not offered
+        $held = array_flip(array_column((array) (json_decode($index, true)['items'] ?? []), 'id'));
+
+        return array_slice(array_values(array_filter($ids, fn (string $id): bool => isset($held[$id]))), 0, $shown);
+    }
+
     private static function popular(string $shopId, string $index): array
     {
         $since = now()->subDays(30)->toDateString();

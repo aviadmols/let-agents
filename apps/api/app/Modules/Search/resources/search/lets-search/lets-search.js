@@ -89,7 +89,7 @@
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
       showAll: 'הצגת כל :n התוצאות', askSpecific: 'אפשר לחפש מוצר, או לשאול שאלה מדויקת יותר, למשל לפי נושא, קהל או תקציב, ואעזור למצוא.', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
-      productsCount: ':n מוצרים', askedAbout: 'שאלה על: :t', notHere: 'לא מצאנו «:w» באתר. אלה הקרובים ביותר לפי משמעות:', meaningOnly: 'אף מוצר לא מכיל את המילים «:q». אלה הקרובים ביותר לפי משמעות:', meaningMostly: 'רק :n מוצרים מכילים את המילים; השאר קרובים לפי משמעות.', askFind: 'לבקש מ־:name למצוא את זה', askFindQ: 'תראה לי :q', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
+      productsCount: ':n מוצרים', askedAbout: 'נשאל על: :t', askedAboutProduct: 'נשאל על מוצר: :t', wanted: 'מוצרים פופולריים', notHere: 'לא מצאנו «:w» באתר. אלה הקרובים ביותר לפי משמעות:', meaningOnly: 'אף מוצר לא מכיל את המילים «:q». אלה הקרובים ביותר לפי משמעות:', meaningMostly: 'רק :n מוצרים מכילים את המילים; השאר קרובים לפי משמעות.', askFind: 'לבקש מ־:name למצוא את זה', askFindQ: 'תראה לי :q', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
       didYouMean: 'לא מצאנו בדיוק את "‎:q‎". למה התכוונתם?', category: 'קטגוריה: :t', exactSku: 'נמצא לפי מק״ט :sku', exact: 'התאמה מדויקת',
       noResults: 'לא מצאנו את "‎:q‎"', noResultsSub: 'נסו מילה אחרת, שאלו את :name, או התחילו מקטגוריה.',
@@ -142,7 +142,7 @@
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
       showAll: 'Show all :n results', askSpecific: 'You can search for a product, or ask a more specific question, for example by topic, audience or budget, and I will help find it.', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
-      productsCount: ':n products', askedAbout: 'Asked about: :t', notHere: 'We did not find “:w” on the site. These are the closest by meaning:', meaningOnly: 'No product holds the words “:q”. These are the closest by meaning:', meaningMostly: 'Only :n products hold the words; the rest are close by meaning.', askFind: 'Ask :name to find it', askFindQ: 'Show me :q', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
+      productsCount: ':n products', askedAbout: 'Asked about: :t', askedAboutProduct: 'Asked about the product: :t', wanted: 'Popular products', notHere: 'We did not find “:w” on the site. These are the closest by meaning:', meaningOnly: 'No product holds the words “:q”. These are the closest by meaning:', meaningMostly: 'Only :n products hold the words; the rest are close by meaning.', askFind: 'Ask :name to find it', askFindQ: 'Show me :q', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
       didYouMean: 'No exact match for "‎:q‎". Did you mean?', category: 'Category: :t', exactSku: 'Found by SKU :sku', exact: 'Exact match',
       noResults: 'No results for "‎:q‎"', noResultsSub: 'Try another word, ask :name, or start from a category.',
@@ -1273,6 +1273,12 @@
     });
     return out;
   }
+  // the shop's most added to the cart lately, under what people ask (the index config's wanted); none, no section
+  function wantedHtml() {
+    var list = (S.config.wanted || []).map(rec).filter(Boolean);
+    if (!list.length) { return ''; }
+    return '<div class="ls-sec__title" style="margin-top:18px">' + esc(t('wanted')) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }));
+  }
   function welcome() {
     // the shop's own most searched words (the index config), never anyone else's: none yet, no section
     var pop = S.config.popular || [];
@@ -1288,10 +1294,10 @@
       }).join('') + '</div>' : '') +
       (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (a) {
         // a question about one product or guide says which: "על מה הספר?" alone says nothing here
-        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(t('askedAbout', { t: decode(a.src[0].title) })) + '</span>' : '';
+        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(t(a.ak === 'product' ? 'askedAboutProduct' : 'askedAbout', { t: decode(a.src[0].title) })) + '</span>' : '';
         return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span>' + about + '</span></button>';
       }).join('') +
-      '<button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
+      '</div>' + wantedHtml() + '<div class="ls-stack"><button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
 
   // ---------------------------------------------------------------- suggestions while typing

@@ -8,6 +8,7 @@ use App\Core\Settings\SettingManager;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
+use App\Modules\Analytics\Models\AnalyticsPopularity;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -168,6 +169,31 @@ final class SearchDisplayTest extends TestCase
         $term($other->id, 'אימפקט', 50);                     // another shop's
 
         $this->assertSame(['טבעת', 'עגילי זהב'], $popular());
+    }
+
+    public function test_the_empty_drawer_offers_the_products_most_added_to_the_cart_and_only_with_activity(): void
+    {
+        LoadedIndex::forget();
+        $shop = $this->shop = Shop::factory()->create();
+        Features::override('search.semantic', false, $shop->id);
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
+            'shop_id' => $shop->id, 'site_url' => 'https://www.rings.test', 'access_token' => self::TOKEN,
+        ]));
+        foreach (['7' => 'טבעת סוליטר', '8' => 'עגילי זהב', '9' => 'צמיד כסף'] as $id => $title) {
+            $this->product((string) $id, $title);
+        }
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $wanted = fn (): array => $this->getJson('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index', ['Origin' => 'https://www.rings.test'])->assertOk()->json('config.wanted');
+
+        $this->assertSame([], $wanted(), 'no adds to the cart yet: no section');
+
+        Cache::flush();
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach ([['8', 9, 1, true], ['7', 4, 2, true], ['9', 0, 3, false], ['404', 20, 0, true]] as [$id, $adds, $rank, $popular]) {
+                AnalyticsPopularity::query()->create(['shop_id' => $shop->id, 'product_external_id' => $id, 'adds' => $adds, 'orders' => 0, 'units' => 0, 'score' => $adds, 'rank' => $rank, 'popular' => $popular, 'window_days' => 30, 'computed_at' => now()]);
+            }
+        });
+        $this->assertSame(['p:8', 'p:7'], $wanted(), 'the most added first; one never added, or not in the search, is not offered');
     }
 
     /** @param  array<string, mixed>  $overrides */

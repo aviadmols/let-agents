@@ -167,6 +167,15 @@
             "scope": "global"
         },
         {
+            "name": "wanted_shown",
+            "type": "int",
+            "default": 6,
+            "min": 0,
+            "max": 12,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
             "name": "meaning_only_min_similarity",
             "type": "float",
             "default": 0.5,

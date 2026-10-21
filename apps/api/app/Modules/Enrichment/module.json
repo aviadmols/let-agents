@@ -75,6 +75,15 @@
     ],
     "settings": [
         {
+            "name": "recently_read",
+            "type": "int",
+            "default": 8,
+            "min": 0,
+            "max": 30,
+            "scope": "shop",
+            "unit": "items"
+        },
+        {
             "name": "max_requests_per_task_file",
             "type": "int",
             "default": 400,

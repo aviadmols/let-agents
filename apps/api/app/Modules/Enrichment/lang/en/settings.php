@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'recently_read' => ['label' => 'Read lately on the home page', 'description' => 'How many products, pages and posts that came in or changed lately the shop\'s home shows. 0: no list.'],
     'schema_rounds' => [
         'label' => 'Revision rounds for the vocabulary',
         'description' => 'When the reviewer says "needs work", the writer fixes what was removed, what is missing and the notes, and the reviewer checks again. 0: no revision.',
