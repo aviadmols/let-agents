@@ -430,3 +430,11 @@ a.ls-pick__media { display: block; }
 /* several things in a photo: which one to look for */
 .ls-which { margin: 0 0 12px; }
 .ls-which__t { font-size: 14px; font-weight: 600; color: var(--ls-fg); margin: 0 0 8px; }
+
+/* the store's AI as the next step where the search found nothing, or only what is near by meaning */
+.ls-askcard { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 14px 0; padding: 16px 18px; border-radius: 18px; border: 1px solid var(--ls-border, rgba(127,127,127,.22)); background: var(--ls-surface-2, rgba(127,127,127,.06)); }
+.ls-askcard__mark { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--ls-accent); color: var(--ls-accent-fg); }
+.ls-askcard__body { flex: 1 1 220px; min-width: 0; }
+.ls-askcard__t { font-weight: 700; font-size: var(--lsp-text-md, 16px); }
+.ls-askcard__s { margin: 2px 0 0; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
+.ls-askcard__go { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
