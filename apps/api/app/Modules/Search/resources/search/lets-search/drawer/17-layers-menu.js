@@ -28,7 +28,8 @@
       var cl = e.target.closest('[data-clear-filters]');
       if (cl) { e.stopPropagation(); clearC(turn, false); draw(); refresh(turn); return; }
       var ch = e.target.closest('[data-chip]');
-      if (ch) { e.stopPropagation(); applyChip(turn, ch.dataset.chip); draw(); }
+      // a filter that took its words with it starts the search again: the sheet closes on the new results
+      if (ch) { e.stopPropagation(); if (applyChip(turn, ch.dataset.chip)) { hideLayer(); } else { draw(); } }
     };
     draw();
   }
@@ -43,15 +44,30 @@
     if (withSort) { n.no.sort = true; } else { n.sort = c.sort; n.autoSort = c.autoSort; }
     turn.c = n;
   }
+  // true when the filter took its words with it and the search runs again (dropWords)
   function applyChip(turn, key) {
-    var c = C(turn);
-    if (key === 'stock') { if (c.autoStock) { c.autoStock = false; c.no.stock = true; } else { c.stock = !c.stock; } }
-    else if (key === 'sale') { if (c.autoSale) { c.autoSale = false; c.no.sale = true; } else { c.sale = !c.sale; } }
-    else {
+    var c = C(turn), words = null;
+    if (key === 'stock') {
+      if (c.autoStock) { c.autoStock = false; c.no.stock = true; if (c.saidStock) { words = saidAt(turn.q, /^במלאי$/, ['in', 'stock']); } } else { c.stock = !c.stock; }
+    } else if (key === 'sale') {
+      if (c.autoSale) { c.autoSale = false; c.no.sale = true; words = saidAt(turn.q, /^ב?מבצע$/, ['on', 'sale']); } else { c.sale = !c.sale; }
+    } else {
       var code = Number(key.split(':')[1]);
+      if (c.auto[code] && !c.f[code] && c.at && c.at[code] && c.at[code].length) { words = c.at[code]; }
       if (c.auto[code] || c.f[code]) { delete c.auto[code]; delete c.f[code]; c.no[code] = true; } else { c.f[code] = true; delete c.no[code]; }
     }
+    if (words && words.length && turn.q && (turn === S.live || turn.kind === 'results')) { dropWords(turn, words); return true; }
     refresh(turn);
+    return false;
+  }
+  // where the words that asked for stock or a sale were typed: one Hebrew word, or an English pair
+  function saidAt(q, one, pair) {
+    var w = wordsOf(q), out = [];
+    w.forEach(function (x, i) {
+      if (one.test(x)) { out.push(i); }
+      if (x === pair[0] && w[i + 1] === pair[1]) { out.push(i, i + 1); }
+    });
+    return out;
   }
   function sortLayer(turn) {
     var so = sortOf(C(turn));
@@ -191,11 +207,35 @@
   // "Not sure what fits?" under a search's results, as the shop set it (search.not_sure): its AI recommends among
   // them, by the search, with the outside AIs under the answer (inside); or straight to the outside AIs (outside)
   function notSureMax() { return Number(S.config.notSureMax) || 6; }
+  // Inside, a step first: what to ask about these results (as Aviad asked, 2026-10-21): about the one product found, by
+  // its name (what it is, who it is for, what to know before buying), or among several (the difference, which suits,
+  // which is worth it), or the shopper's own question, never always "which is best". In any shop: a book, a ring, a shirt.
   function notSure(rt) {
     if (!rt) { return; }
-    var ids = filtered(rt).slice(0, notSureMax()).map(function (r) { return pid(r.id); });
     if (S.config.notSure === 'outside' && S.config.aiAsk && S.config.aiAsk.open) { rt.aiOpen = !rt.aiOpen; render(); return; }
-    askTurn(t('adviceQ', { q: rt.q }), { products: ids }, false, { advice: ids });
+    rt.askOpen = !rt.askOpen;
+    refresh(rt);
+    if (rt.askOpen && !isPhone()) { var input = BODY.querySelector('[data-ask-about-form="' + rt.id + '"] input') || SUGIN.querySelector('[data-ask-about-form="' + rt.id + '"] input'); if (input) { input.focus({ preventScroll: true }); } }
+  }
+  function aboutResults(rt) { return filtered(rt).slice(0, notSureMax()); }
+  // a product's name, short: the part before its code or its details ("ביבי: סיפור חיי", not "… - מק"ט 52220, זהב 14K")
+  function shortName(r) { return decode(r.title || '').split(/\s[-–|]\s|,/)[0].trim().slice(0, 60); }
+  function askAboutHtml(rt) {
+    var list = aboutResults(rt), one = list.length === 1 ? shortName(list[0]) : '';
+    var asks = one ? [t('askOneBrief', { t: one }), t('askOneWho', { t: one }), t('askOneKnow', { t: one })] : [t('askManyDiff'), t('askManyBest'), t('askManyWorth')];
+    return '<div class="ls-askabout ls-focus-in"><div class="ls-follow">' + asks.map(function (q) {
+      return '<button class="ls-chip ls-chip--quiet" data-ask-about="' + esc(rt.id) + '" data-question="' + esc(q) + '">' + esc(q) + '</button>';
+    }).join('') + '</div><form class="ls-askabout__form" data-ask-about-form="' + esc(rt.id) + '"><label class="ls-field ls-field--sm">' +
+      '<input type="text" enterkeyhint="send" maxlength="300" dir="auto" placeholder="' + esc(t('askOwn')) + '" aria-label="' + esc(t('askOwn')) + '">' +
+      '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form></div>';
+  }
+  // the question goes to the store's AI with the products it is about
+  function askAbout(rt, question) {
+    var q = String(question || '').trim();
+    if (!rt || !q) { return; }
+    var ids = aboutResults(rt).map(function (r) { return pid(r.id); });
+    rt.askOpen = false;
+    askTurn(q, { products: ids }, false, { advice: ids });
   }
   // Gemini opens an empty chat whatever its address says, and a page that has just opened another tab may no longer
   // write to the clipboard. So Gemini takes two presses: the first readies the words and says what comes next; the

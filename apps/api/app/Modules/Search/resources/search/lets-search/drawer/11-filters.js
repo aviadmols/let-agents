@@ -14,16 +14,36 @@
   }
   // which typed words name the label, one for each of its words; null when one of them is not said
   function saidBy(text, label) { var ws = wordsSaid(text, label); return ws.of > 0 && ws.n === ws.of ? ws.at : null; }
-  // how many of the label's words the typed words say (n of of), and which typed words say them (at)
+  // How many of the label's words the typed words say (n of of), and which typed words say them (at). A name of several
+  // words is said by words close together, in its order, at most one other word between any two of them, each typed
+  // word naming one of its words: "עגילים בזהב צהוב עם אבן אדומה" says "זהב צהוב" and "אדום", never "זהב אדום", and
+  // "אדומים בזהב" is not "זהב אדום"; "עגילים אדומים בזהב צהוב" still says "עגילים זהב צהוב" (as Aviad asked, 2026-10-21).
+  // Where a word is typed twice, the places that keep the name closest together count.
   function wordsSaid(text, label) {
-    var tw = wordsOf(text), lw = wordsOf(label), used = [], n = 0;
+    var tw = wordsOf(text), lw = wordsOf(label);
     if (!lw.length || lw.join('').length < 2) { return { n: 0, of: 0, at: [] }; }
-    lw.forEach(function (w) {
-      var at = -1;
-      tw.some(function (x, i) { if (x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w)) { at = i; return true; } return false; });
-      if (at >= 0) { n++; if (used.indexOf(at) === -1) { used.push(at); } }
+    var places = lw.map(function (w) {
+      var out = [];
+      tw.forEach(function (x, i) { if (x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w)) { out.push(i); } });
+      return out;
     });
-    return { n: n, of: lw.length, at: used };
+    var best = [];
+    var spread = function (at) { return at.length ? at[at.length - 1] - at[0] : 0; };
+    (function walk(k, at) {
+      if (k === lw.length) {
+        if (at.length > best.length || (at.length === best.length && spread(at) < spread(best))) { best = at.slice(); }
+        return;
+      }
+      walk(k + 1, at); // this word of the name not typed
+      places[k].forEach(function (i) {
+        var last = at.length ? at[at.length - 1] : -1;
+        if (i <= last || (at.length && i - last > 2)) { return; }
+        at.push(i);
+        walk(k + 1, at);
+        at.pop();
+      });
+    })(0, []);
+    return { n: best.length, of: lw.length, at: best };
   }
   // A category (or a tag shown as a filter) is read from the words when its whole name is typed, or, for a name of
   // three words or more, all of it but one word and at least two: "ספרי מופת" is "ספרי מופת מתורגמים".
@@ -67,6 +87,7 @@
       if (partial.length && (whole.length || partial.length > 1)) { partial.forEach(function (k) { delete best[k]; delete said[k]; }); }
     });
     c.auto = {};
+    c.at = {};
     // The most precise name first, and a typed word names one thing: "ספר" is said within "ספרי מופת מתורגמים", so only
     // the category is chosen; in "עגילים אדומים בזהב צהוב" the word "בזהב" belongs to "עגילים זהב צהוב", so "זהב אדום"
     // is not read from "אדומים בזהב", and "אדומים" is left to the stone's colour.
@@ -74,6 +95,7 @@
     Object.keys(best).sort(function (a, b) { return said[b].length - said[a].length || counts[best[b]] - counts[best[a]] || (a < b ? -1 : a > b ? 1 : 0); }).forEach(function (k) {
       if (said[k].some(function (i) { return taken.indexOf(i) >= 0; })) { return; }
       c.auto[best[k]] = true;
+      c.at[best[k]] = said[k].slice();
       precise[best[k]] = said[k].length;
       taken.push.apply(taken, said[k]);
     });
@@ -107,6 +129,23 @@
     while (loose.length && all.length && !filtered(turn).length) { delete c.auto[loose.shift()]; }
     c.autoStock = stocked;
     if (c.autoStock && !c.saidStock && all.length && !filtered(turn).length) { c.autoStock = false; }
+  }
+  // The words the filters read from them did not take: what is searched, while those filters narrow it ("ספרים על חטופים"
+  // is "על חטופים" among books). Null when nothing was taken, or nothing that means anything is left: the words stand whole.
+  // Only where the words read as filters made the search broad: they still hold most of what it found ("ספרים" in a book
+  // shop holds every book). Where the filters narrowed it on their own ("עגילים זהב צהוב" out of rings and pendants), the
+  // search stands as it is, with no second wait.
+  function restWords(turn) {
+    var c = C(turn), taken = [], all = (turn.ids || []).length;
+    if (all < 12 || filtered(turn).length < all / 2) { return null; }
+    Object.keys(c.auto || {}).forEach(function (code) { [].push.apply(taken, (c.at && c.at[code]) || []); });
+    if (c.autoStock && c.saidStock) { [].push.apply(taken, saidAt(turn.q, /^במלאי$/, ['in', 'stock'])); }
+    if (c.autoSale) { [].push.apply(taken, saidAt(turn.q, /^ב?מבצע$/, ['on', 'sale'])); }
+    if (!taken.length) { return null; }
+    // only the words that mean something: a joining word left alone ("עם" of "טבעות עם רובי") would narrow the search to
+    // the products whose names happen to hold it
+    var rest = meantWords(wordsOf(turn.q).filter(function (w, i) { return taken.indexOf(i) < 0; }).join(' ')).join(' ');
+    return rest || null;
   }
   var SIZE_BAND = { top: /(^|\s)(ב?מיד(ה|ות)\s+(גדול|רחב)|large\s+sizes?|big\s+sizes?|plus\s+sizes?)/i, bottom: /(^|\s)(ב?מיד(ה|ות)\s+(קטנ|צר)|small\s+sizes?|petite)/i };
   function onCode(c, code) { return !!(c.f[code] || (c.auto && c.auto[code])); }

@@ -39,7 +39,11 @@
       var back = !opts.about && !opts.text ? backTo() : null;
       if (back) {
         var bt = back.tid ? turnById(back.tid) : null;
-        if (bt) { bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt; }).concat([bt]); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null; }
+        if (bt) {
+          bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt; }).concat([bt]); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null;
+          // a search comes back with its words in the field, as they were left
+          if (bt.kind === 'results' && bt.q) { keepInField(bt.q); }
+        }
         else if (back.q) { opts.text = back.q; }
       }
       // "about this product" only from the product page's own search row; the header's search is the store's search
@@ -74,7 +78,8 @@
     S.closedAt = Date.now();
     // words typed and left in the field come back with the next opening, as a search sent does
     var left = INPUT.value.trim();
-    if (left && !S.askMode) { keepBack(left, null); }
+    // (the words of the search on screen are that search, already kept with it)
+    if (left && !S.askMode && left !== S.keptQ) { keepBack(left, null); }
     hideLayer(); MENU.hidden = true;
     SCRIM.classList.remove('is-open'); D.classList.remove('is-open'); D.classList.remove('is-wide'); S.wide = null; S.menu = '';
     D.style.removeProperty('--ls-drag');

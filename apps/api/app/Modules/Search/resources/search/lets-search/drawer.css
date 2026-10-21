@@ -558,3 +558,10 @@
 .is-frame .ls-mini__img { object-fit: contain; padding: 12px; mix-blend-mode: multiply; }
 .is-frame .ls-about__img, .is-frame .ls-order__img { object-fit: contain; padding: 6px; mix-blend-mode: multiply; }
 .is-frame .ls-prow__img { object-fit: contain; padding: 4px; mix-blend-mode: multiply; }
+
+/* "a question about these results?": what to ask, by the results, and the shopper's own question */
+.ls-askabout { margin: 4px 0 6px; padding: 12px; border-radius: var(--lsp-r-md); background: var(--ls-bg-sunken); }
+.ls-askabout .ls-follow { margin-top: 0; }
+.ls-askabout__form { margin-top: 10px; }
+.ls-askabout__form .ls-field { min-height: 44px; background: var(--ls-bg); }
+.ls-askabout__form input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; color: inherit; outline: none; padding-inline: 12px 4px; }

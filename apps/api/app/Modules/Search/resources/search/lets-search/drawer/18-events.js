@@ -58,6 +58,7 @@
       return;
     }
     if (f.matches('[data-shop-lead]')) { var st = turnById(f.dataset.shopLead); if (st) { sendShopLead(st, f); } return; }
+    if (f.matches('[data-ask-about-form]')) { var at = turnById(f.dataset.askAboutForm), own = f.querySelector('input'); if (at && own && own.value.trim()) { askAbout(at, own.value); } return; }
     if (f.matches('[data-lead-flow]')) {
       var lt = turnById(f.dataset.leadFlow), lf = lt && lt.leadFlow;
       if (!lf || lf.busy || lf.state === 'declined' || lf.state === 'done') { return; }
@@ -160,7 +161,7 @@
     if (d.share && el.closest('.ls-menu')) { shareGo(d.share); return; }
     if (d.expand !== undefined) { hideMenu(); toggleExpand(); return; }
     if (d.new !== undefined) {
-      var old = S.turns; hideMenu(); S.turns = []; S.wide = null; S.tab = 'chat'; store('local', 'ls_back', null); persist(); render();
+      var old = S.turns; hideMenu(); S.turns = []; S.wide = null; S.tab = 'chat'; store('local', 'ls_back', null); keepInField(''); persist(); render();
       toast(t('chatCleared'), function () { S.turns = old; persist(); render(); });
       return;
     }
@@ -172,6 +173,7 @@
     if (d.focus !== undefined) { INPUT.focus(); return; }
     if (d.q) { e.preventDefault(); submit(d.q, 'search'); return; }
     if (d.notSure) { e.preventDefault(); notSure(turnById(d.notSure)); return; }
+    if (d.askAbout) { e.preventDefault(); askAbout(turnById(d.askAbout), d.question); return; }
     if (d.ask) { e.preventDefault(); submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
     if (d.savedAnswer) {
       e.preventDefault();

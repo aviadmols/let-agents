@@ -6,8 +6,10 @@
   function onType() {
     var q = INPUT.value.trim();
     FIELD.classList.toggle('has-text', !!q);
-    if (!q) { hideLive(); return; }
+    if (!q) { S.keptQ = null; hideLive(); return; }
     if (!S.open) { return; }
+    // the search on screen, left in the field: nothing new to show until the words change
+    if (q === S.keptQ) { hideLive(); return; }
     if (!S.index) { loadIndex().then(onType); return; }
     if (S.tab !== 'chat' || S.wide) { S.tab = 'chat'; S.wide = null; render(); }
     // on a product page the words ask about the product, and the product's information stays as it is;
@@ -29,13 +31,24 @@
   // typing=1: spelling only and nothing counted on the server; the search is counted once the shopper pauses.
   // Half a second after the last key the words are asked again by meaning too (meaning=1), so "מברגה עם בטריה"
   // finds the store's "סוללות" while still typing: one vector per wording, kept on the server.
-  function liveServer(q, byMeaning) {
-    json(API + '/search/' + SITE + '?q=' + encodeURIComponent(q) + '&typing=1' + (byMeaning ? '&meaning=1' : '') + visitQuery()).then(function (r) {
+  // words: what is searched, when the filters read from the words took some of them (restWords); q stays what was typed
+  function liveServer(q, byMeaning, words) {
+    json(API + '/search/' + SITE + '?q=' + encodeURIComponent(words || q) + '&typing=1' + (byMeaning ? '&meaning=1' : '') + visitQuery()).then(function (r) {
       var lv = S.live;
       if (!lv || lv.q !== q) { return; }
       var d = r.body || {};
       var ids = (d.ids || []).filter(function (id) { return /^p:/.test(id); });
       if (!ids.length) { ids = ((d.groups && d.groups.product) || []).map(function (p) { return p.id; }); }
+      // "ספרים על חטופים": "ספרים" is the filter "ספר", so the search is for "על חטופים", filtered to books, not every
+      // book there is. Asked once more, before anything shows; when the rest finds nothing, the whole words stand.
+      if (words && !ids.length && lv.whole) { ids = lv.whole; words = null; }
+      if (!words && !byMeaning) {
+        lv.ids = ids; lv.actions = d.actions || [];
+        readTags(lv);
+        var rest = restWords(lv);
+        if (rest) { lv.whole = ids; lv.words = rest; liveServer(q, false, rest); return; }
+        lv.words = null;
+      }
       // Nothing by spelling on the server, while the drawer's own index found some: those stay on screen (the
       // meaning pass may add to them), instead of blinking away
       var spelled = ids.length;
@@ -53,7 +66,7 @@
       if (!byMeaning) {
         clearTimeout(pauseTimer);
         pauseTimer = setTimeout(function () { if (S.live === lv) { countSearch(q, lv.ids.length); } }, PAUSE_MS);
-        if (willMean) { clearTimeout(meaningTimer); meaningTimer = setTimeout(function () { if (S.live === lv) { liveServer(q, true); } }, 500); }
+        if (willMean) { clearTimeout(meaningTimer); meaningTimer = setTimeout(function () { if (S.live === lv) { liveServer(q, true, lv.words || null); } }, 500); }
       }
       return products(filtered(lv).slice(0, 8).map(function (x) { return x.id; })).then(function () { if (S.live === lv) { renderLive(false); } });
     }).catch(function () {

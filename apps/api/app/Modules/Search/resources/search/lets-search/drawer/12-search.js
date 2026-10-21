@@ -3,6 +3,7 @@
   function submit(raw, kind, about, typed) {
     var q = String(raw || '').trim();
     if (!q) { return; }
+    if (q === S.keptQ && kind !== 'ask' && !isQuestion(q) && S.turns.some(function (x) { return x.kind === 'results' && x.q === q && !x.prev; })) { return blurPhone(); }
     // what was being looked at live goes with the search: its filters, and its results when they're the server's
     var lv = S.live && S.live.q === q ? S.live : null;
     var carried = lv ? JSON.parse(JSON.stringify(lv.c)) : (S.pendingC || null);
@@ -10,7 +11,10 @@
     INPUT.value = ''; FIELD.classList.remove('has-text'); hideLive();
     S.tab = 'chat'; S.wide = null;
     if (kind === 'ask' && off('ask') && !(about || S.askMode)) { kind = 'search'; }
-    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q)))) { askTurn(q, null, about || S.askMode); return blurPhone(); }
+    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q)))) { S.keptQ = null; askTurn(q, null, about || S.askMode); return blurPhone(); }
+    // a search stays in the field as it was typed: back in the field, the shopper goes on from it (as Aviad asked,
+    // 2026-10-21). The same words again ask nothing: their results are already on screen.
+    keepInField(q);
     if (typed) { remember(q); }
     if (lv && lv.server) {
       addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, focus: lv.focus, single: lv.single, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
@@ -21,6 +25,12 @@
     blurPhone();
   }
   function blurPhone() { if (isPhone()) { INPUT.blur(); } }
+  // the words of the search on screen, left in the field; typing on from them is a new search, as always
+  function keepInField(q) {
+    S.keptQ = q || null;
+    INPUT.value = q || '';
+    FIELD.classList.toggle('has-text', !!q);
+  }
   // The shopper's own recent searches, in this browser only: what they typed and searched, never a chip, a
   // suggested question, a link someone sent or a question to the assistant. The same words once, the latest first.
   function remember(q) {
@@ -48,7 +58,37 @@
 
   // ---------------------------------------------------------------- search turn
   function searchTurn(q, carried) {
-    var turn = addTurn({ kind: 'results', q: q, loading: true, c: carried || blankC() });
+    runSearch(addTurn({ kind: 'results', q: q, loading: true, c: carried || blankC() }), q);
+  }
+  // A filter read from the words, taken off, takes its words with it (as Aviad asked, 2026-10-21): the search goes on
+  // with the words left, in the same place, with the filters the shopper chose and the ones they took off; the field
+  // says the same words. Nothing left: the search is closed, and the drawer is ready for a new one.
+  function dropWords(turn, places) {
+    var q = wordsOf(turn.q).filter(function (w, i) { return places.indexOf(i) < 0; }).join(' ');
+    if (turn === S.live) { INPUT.value = q; onType(); return; }
+    var inField = INPUT.value.trim() === String(turn.q || '').trim();
+    if (!q) {
+      S.turns = S.turns.filter(function (x) { return x !== turn; });
+      if (S.wide === turn.id) { S.wide = null; }
+      store('local', 'ls_back', null);
+      if (inField) { keepInField(''); }
+      persist(); render();
+      return;
+    }
+    var c = C(turn);
+    turn.c = Object.assign(blankC(), { f: c.f, no: c.no, sort: c.sort, stock: c.stock, sale: c.sale });
+    Object.assign(turn, { q: q, loading: true, ids: [], more: null, limit: S.wide === turn.id ? STEP : null, single: null, focus: null, content: [], cats: [] });
+    if (inField) { keepInField(q); }
+    keepBack(q, turn.id, S.wide === turn.id);
+    update(turn, {});
+    runSearch(turn, q);
+  }
+  // the products of a search answer, in its order
+  function idsOf(d) {
+    var ids = (d.ids || []).filter(function (id) { return /^p:/.test(id); });
+    return ids.length ? ids : ((d.groups && d.groups.product) || []).map(function (p) { return p.id; });
+  }
+  function runSearch(turn, q) {
     announce(t('announceSearching'));
     loadIndex().then(function () {
       // the server counts this search, unless this tab already counted it (counted=1)
@@ -58,13 +98,25 @@
       markCounted(norm(q)); rememberSearch(q);
       return r;
     }).then(function (r) {
-      var d = r.body || {};
-      var ids = (d.ids || []).filter(function (id) { return /^p:/.test(id); });
-      if (!ids.length) { ids = ((d.groups && d.groups.product) || []).map(function (p) { return p.id; }); }
-      var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
+      var d = r.body || {}, ids = idsOf(d);
       // the words' own asks ("הכי זול", "במבצע") are read with the tags: chosen, marked, and can be taken off
       Object.assign(turn, { ids: ids, actions: d.actions || [] });
       readTags(turn);
+      // "ספרים על חטופים": "ספרים" is the filter "ספר", so the search is for "על חטופים", filtered to books, not every
+      // book there is (as Aviad asked, 2026-10-21). Asked once more, counted once; when the rest finds nothing, the
+      // whole words stand.
+      var rest = restWords(turn);
+      if (!rest) { return { d: d, ids: ids }; }
+      return json(API + '/search/' + SITE + '?q=' + encodeURIComponent(rest) + '&counted=1' + visitQuery()).then(function (r2) {
+        var d2 = r2.body || {}, ids2 = idsOf(d2);
+        if (!ids2.length) { return { d: d, ids: ids }; }
+        Object.assign(turn, { ids: ids2, words: rest });
+        readTags(turn);
+        return { d: d2, ids: ids2 };
+      }, function () { return { d: d, ids: ids }; });
+    }).then(function (got) {
+      var d = got.d, ids = got.ids;
+      var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       return products(ids.slice(0, 8)).then(function () {
         update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, single: single, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
         announce(t('announceResults', { n: ids.length }));
@@ -279,7 +331,7 @@
     if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
     if (!guideFirst) { html += guidesHtml(turn.content, turn.q); }
     // asked of the store's AI only over a few results (search.not_sure_max): a long list is narrowed by its filters first
-    if (!off('ask') && list.length <= notSureMax()) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-not-sure="' + esc(turn.id) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>' + (turn.aiOpen ? myAi(turn) : '');
+    if (!off('ask') && list.length <= notSureMax()) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-not-sure="' + esc(turn.id) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>' + (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }
 
