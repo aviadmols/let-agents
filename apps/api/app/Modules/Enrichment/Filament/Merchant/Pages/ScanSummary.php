@@ -296,6 +296,20 @@ final class ScanSummary extends Page
         ];
     }
 
+    /**
+     * The team's word on a tag by meaning: kept (one the check took out comes back) or taken out. It holds when the
+     * product is tagged again; the search reads it in the next index.
+     */
+    public function decideMeaning(string $assignmentId, bool $keep): void
+    {
+        if (! app()->bound(ProductMeaning::class)) {
+            return;
+        }
+
+        app(ProductMeaning::class)->decide($assignmentId, $keep);
+        Notification::make()->success()->title(__($keep ? 'enrichment::scan.meaning_kept' : 'enrichment::scan.meaning_dropped'))->send();
+    }
+
     /** A tag the team does not want: set aside, and not read back into the product. */
     public function removeTag(string $factId): void
     {

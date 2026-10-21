@@ -15,6 +15,8 @@ final class Meaning implements ProductMeaning
         return TaxonomyAssignment::query()->where('subject_type', $type)->where('subject_id', $id)->with('tag.group')->get()
             ->filter(fn (TaxonomyAssignment $a): bool => $a->tag !== null && $a->tag->group !== null)
             ->map(fn (TaxonomyAssignment $a): array => [
+                'id' => (string) $a->id,
+                'team' => in_array($a->checked, TaxonomyAssignment::TEAM, true),
                 'group' => $a->tag->group->label($locale),
                 'label' => $locale === 'he' ? $a->tag->label_he : $a->tag->label_en,
                 'weight' => (float) $a->weight,
@@ -26,5 +28,14 @@ final class Meaning implements ProductMeaning
             ])
             ->sort(fn (array $a, array $b): int => [$order[$a['status']] ?? 3, -$a['weight'], $a['label']] <=> [$order[$b['status']] ?? 3, -$b['weight'], $b['label']])
             ->values()->all();
+    }
+
+    public function decide(string $assignmentId, bool $keep): void
+    {
+        TaxonomyAssignment::query()->whereKey($assignmentId)->first()?->forceFill([
+            'status' => $keep ? TaxonomyAssignment::KEPT : TaxonomyAssignment::REJECTED,
+            'checked' => $keep ? TaxonomyAssignment::TEAM_KEPT : TaxonomyAssignment::TEAM_OUT,
+            'check_note' => $keep ? null : (string) __('taxonomy::runs.team_out'),
+        ] + ($keep ? ['confidence' => 1.0] : []))->save();
     }
 }

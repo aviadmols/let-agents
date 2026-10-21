@@ -150,16 +150,25 @@ final class ScanSummaryTest extends TestCase
     public function test_what_it_was_understood_to_be_about_is_shown_with_what_each_tag_rests_on(): void
     {
         $book = $this->product('1000', 'The Lean Startup');
-        $this->app->instance(ProductMeaning::class, new class implements ProductMeaning
+        $meaning = new class implements ProductMeaning
         {
+            /** @var list<array{string, bool}> */
+            public array $decided = [];
+
             public function of(string $type, string $id, string $locale): array
             {
                 return [
-                    ['group' => 'נושא', 'label' => 'יזמות ועסקים', 'weight' => 1.0, 'source' => 'catalog', 'evidence' => 'ספר היזמות והניהול החשוב ביותר', 'explicit' => false, 'status' => 'kept', 'note' => null],
-                    ['group' => 'נושא', 'label' => 'מנהיגות וניהול', 'weight' => 0.6, 'source' => 'catalog', 'evidence' => 'יזמים, ממנהלים', 'explicit' => false, 'status' => 'rejected', 'note' => 'הספר לא עוסק במנהיגות'],
+                    ['id' => 'a1', 'team' => false, 'group' => 'נושא', 'label' => 'יזמות ועסקים', 'weight' => 1.0, 'source' => 'catalog', 'evidence' => 'ספר היזמות והניהול החשוב ביותר', 'explicit' => false, 'status' => 'kept', 'note' => null],
+                    ['id' => 'a2', 'team' => false, 'group' => 'נושא', 'label' => 'מנהיגות וניהול', 'weight' => 0.6, 'source' => 'catalog', 'evidence' => 'יזמים, ממנהלים', 'explicit' => false, 'status' => 'rejected', 'note' => 'הספר לא עוסק במנהיגות'],
                 ];
             }
-        });
+
+            public function decide(string $assignmentId, bool $keep): void
+            {
+                $this->decided[] = [$assignmentId, $keep];
+            }
+        };
+        $this->app->instance(ProductMeaning::class, $meaning);
 
         Livewire::test(ScanSummary::class)
             ->call('select', $book->id)
@@ -169,7 +178,12 @@ final class ScanSummaryTest extends TestCase
             ->assertSee('מטקסט החנות')
             ->assertSee('מבוסס על: «ספר היזמות והניהול החשוב ביותר»')
             ->assertSee('תגית אחת נפסלה בבדיקה')
-            ->assertSee('הספר לא עוסק במנהיגות');
+            ->assertSee('הספר לא עוסק במנהיגות')
+            ->assertSee('להחזיר')
+            ->call('decideMeaning', 'a2', true)
+            ->call('decideMeaning', 'a1', false);
+
+        $this->assertSame([['a2', true], ['a1', false]], $meaning->decided, 'the one the check took out comes back; the other goes');
     }
 
     private function product(string $external, string $title): CatalogProduct

@@ -15,10 +15,15 @@
                     <strong>{{ $m['label'] }}</strong>
                     <span class="lp-pill" data-tone="{{ $m['weight'] >= 0.7 ? 'good' : '' }}">{{ $t('meaning_weight.'.($m['weight'] >= 0.7 ? 'central' : ($m['weight'] >= 0.4 ? 'part' : 'background'))) }}</span>
                     @if ($m['status'] === 'review')<span class="lp-pill" data-tone="warn">{{ $t('meaning_review') }}</span>@endif
+                    @if ($m['team'])<span class="lp-pill" data-tone="good">{{ $t('meaning_team') }}</span>@endif
                     <span class="lp-note">· {{ $t('meaning_sources.'.$m['source']) }}{{ $m['explicit'] ? ' · '.$t('meaning_explicit') : '' }}</span>
                     @if ($m['evidence'])
                         <span class="lp-note" style="display: block; margin-top: 2px">{{ $t('meaning_based') }}: «{{ $m['evidence'] }}»</span>
                     @endif
+                    <span style="display: block; margin-top: 4px">
+                        @if ($m['status'] === 'review')<button type="button" class="lp-link" wire:click="decideMeaning('{{ $m['id'] }}', true)">{{ $t('meaning_keep') }}</button> · @endif
+                        <button type="button" class="lp-link" wire:click="decideMeaning('{{ $m['id'] }}', false)" data-meaning-drop>{{ $t('meaning_drop') }}</button>
+                    </span>
                 </span>
             </div>
         @endforeach
@@ -35,6 +40,7 @@
                         <s>{{ $m['label'] }}</s>
                         @if ($m['evidence'])<span class="lp-note"> · {{ $t('meaning_based') }}: «{{ $m['evidence'] }}»</span>@endif
                         @if ($m['note'])<span class="lp-note" style="display: block; margin-top: 2px">{{ $t('meaning_why_out') }}: {{ $m['note'] }}</span>@endif
+                        <button type="button" class="lp-link" style="display: block; margin-top: 4px" wire:click="decideMeaning('{{ $m['id'] }}', true)" data-meaning-restore>{{ $t('meaning_restore') }}</button>
                     </span>
                 </div>
             @endforeach

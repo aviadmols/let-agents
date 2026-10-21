@@ -44,6 +44,13 @@ class TaxonomyAssignment extends Model
 
     public const SOURCES = ['catalog', 'picture', 'knowledge'];
 
+    /** checked: what the team said of a tag (kept or taken out), which tagging again and the rules never undo */
+    public const TEAM_KEPT = 'team';
+
+    public const TEAM_OUT = 'team_out';
+
+    public const TEAM = [self::TEAM_KEPT, self::TEAM_OUT];
+
     protected $guarded = ['id'];
 
     protected function casts(): array

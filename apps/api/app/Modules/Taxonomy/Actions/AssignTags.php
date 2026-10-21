@@ -343,9 +343,14 @@ final class AssignTags
      */
     private function save(string $shopId, array $item, array $tags, int $dropped, int $version, string $runId): void
     {
-        TaxonomyAssignment::query()->where('subject_type', $item['type'])->where('subject_id', $item['id'])->delete();
+        // what the team decided of a tag stays as it left it; the model's word on that tag is not taken
+        $team = TaxonomyAssignment::query()->where('subject_type', $item['type'])->where('subject_id', $item['id'])->whereIn('checked', TaxonomyAssignment::TEAM)->pluck('tag_id')->flip();
+        TaxonomyAssignment::query()->where('subject_type', $item['type'])->where('subject_id', $item['id'])->where(fn ($q) => $q->whereNull('checked')->orWhereNotIn('checked', TaxonomyAssignment::TEAM))->delete();
 
         foreach ($tags as $k) {
+            if (isset($team[$k['tag']->id])) {
+                continue;
+            }
             TaxonomyAssignment::query()->create([
                 'shop_id' => $shopId, 'subject_type' => $item['type'], 'subject_id' => $item['id'], 'tag_id' => $k['tag']->id,
                 'source' => $k['source'], 'evidence' => $k['evidence'] ?: null, 'confidence' => round($k['confidence'], 3), 'weight' => round($k['weight'], 3), 'explicit' => $k['explicit'], 'status' => $k['status'],

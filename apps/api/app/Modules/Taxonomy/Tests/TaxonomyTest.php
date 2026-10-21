@@ -24,6 +24,7 @@ use App\Modules\Taxonomy\Models\TaxonomySubject;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
 use App\Modules\Taxonomy\Support\Bank;
 use App\Modules\Taxonomy\Support\Evaluation;
+use App\Modules\Taxonomy\Support\Meaning;
 use App\Modules\Taxonomy\Support\Norm;
 use App\Modules\Taxonomy\Support\Sample;
 use App\Modules\Tenancy\Models\Shop;
@@ -110,6 +111,30 @@ final class TaxonomyTest extends TestCase
         $asked = count($this->calls);
         app(ReviewPictureGroups::class)->handle($this->shop->id);
         $this->assertCount($asked, $this->calls, 'the same bank is never asked twice');
+    }
+
+    public function test_the_teams_word_on_a_tag_holds_when_the_product_is_tagged_again(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->tagging();
+        app(AssignTags::class)->handle($this->shop->id, posts: false);
+        $book = fn (): array => app(TenantContext::class)->run($this->shop->id, fn () => TaxonomyAssignment::query()->where('subject_id', CatalogProduct::query()->where('external_id', 'b1')->value('id'))->with('tag')->get()
+            ->mapWithKeys(fn (TaxonomyAssignment $a): array => [$a->tag->label_he => $a->status.'/'.$a->checked])->all());
+        $out = $book();
+        $this->assertSame('rejected/taken_out', $out['מתח'], 'the check took the thriller out');
+
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $ids = TaxonomyAssignment::query()->with('tag')->get()->keyBy(fn (TaxonomyAssignment $a): string => $a->tag->label_he.'|'.$a->subject_id);
+            $b1 = CatalogProduct::query()->where('external_id', 'b1')->value('id');
+            app(Meaning::class)->decide($ids['מתח|'.$b1]->id, true);
+            app(Meaning::class)->decide($ids['חטופים|'.$b1]->id, false);
+        });
+        app(AssignTags::class)->handle($this->shop->id, posts: false, all: true);
+
+        $after = $book();
+        $this->assertSame('kept/team', $after['מתח'], 'brought back by the team, and kept when tagged again');
+        $this->assertSame('rejected/team_out', $after['חטופים'], 'taken out by the team, and not given again');
     }
 
     public function test_the_bank_is_designed_from_a_sample_and_reviewed_by_the_other_family(): void

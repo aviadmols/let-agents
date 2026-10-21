@@ -21,7 +21,8 @@ final class ApplyTagRules
     {
         $out = 0;
 
-        TaxonomyAssignment::query()->where('status', TaxonomyAssignment::KEPT)->where('source', 'picture')
+        // the team's word stands over a rule: a tag it kept stays kept
+        TaxonomyAssignment::query()->where('status', TaxonomyAssignment::KEPT)->where('source', 'picture')->where(fn ($q) => $q->whereNull('checked')->orWhereNotIn('checked', TaxonomyAssignment::TEAM))
             ->whereHas('tag.group', fn ($q) => $q->where('from_picture', false))
             ->orderBy('id')->chunkById(500, function ($chunk) use (&$out): void {
                 foreach ($chunk as $a) {

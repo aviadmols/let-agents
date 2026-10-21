@@ -17,7 +17,13 @@ interface ProductMeaning
      * The kept and waiting tags first, the most central first; then those the check took out.
      *
      * @param  string  $type  product | content
-     * @return list<array{group: string, label: string, weight: float, source: string, evidence: string|null, explicit: bool, status: string, note: string|null}>
+     * @return list<array{id: string, group: string, label: string, weight: float, source: string, evidence: string|null, explicit: bool, status: string, note: string|null, team: bool}>
      */
     public function of(string $type, string $id, string $locale): array;
+
+    /**
+     * The team's word on one tag: kept (one the check took out comes back) or taken out. It holds: tagging the
+     * product again and the rules leave it as the team left it.
+     */
+    public function decide(string $assignmentId, bool $keep): void;
 }
