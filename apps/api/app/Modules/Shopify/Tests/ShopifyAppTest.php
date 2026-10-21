@@ -95,8 +95,12 @@ final class ShopifyAppTest extends TestCase
         $this->assertStringStartsWith('https://'.self::SHOP.'/admin/oauth/authorize?', $authorize->headers->get('Location'));
         parse_str((string) parse_url((string) $authorize->headers->get('Location'), PHP_URL_QUERY), $asked);
 
-        $this->get('/shopify/callback?'.http_build_query(self::signed(['code' => 'abc', 'state' => $asked['state']])))
-            ->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
+        // The store chooses a plan first, then approves it in Shopify.
+        $plans = $this->get('/shopify/callback?'.http_build_query(self::signed(['code' => 'abc', 'state' => $asked['state']])))
+            ->assertOk()
+            ->assertSeeInOrder(['Essentials', '$49', 'Starter', '$99', 'Growth', '$199', 'Pro', '$299']);
+        $this->assertNull(collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate')), 'nothing to approve before a plan is chosen');
+        $this->get(self::choice($plans, 'growth'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
 
         $install = ShopifyInstall::query()->sole();
         $shop = Shop::query()->sole();
@@ -115,12 +119,16 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame('https://agents.lets.co.il/api/v1', $metafields['variables']['metafields'][1]['value']);
 
         $plan = collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate'))['variables'];
-        $this->assertEquals([49, 'USD', 'EVERY_30_DAYS', true], [
+        $this->assertEquals(['Lets Growth', 199, 'USD', 'EVERY_30_DAYS', true], [
+            $plan['name'],
             $plan['lineItems'][0]['plan']['appRecurringPricingDetails']['price']['amount'],
             $plan['lineItems'][0]['plan']['appRecurringPricingDetails']['price']['currencyCode'],
             $plan['lineItems'][0]['plan']['appRecurringPricingDetails']['interval'],
             $plan['test'],
-        ], '$49 every 30 days, in test mode on a development store');
+        ], 'the chosen plan at its price every 30 days, in test mode on a development store');
+
+        // A link to a plan only works as we signed it.
+        $this->get(str_replace('plan=growth', 'plan=pro', self::choice($plans, 'growth')))->assertNotFound();
 
         Queue::assertPushed(QueuedCommand::class);
 
@@ -161,10 +169,10 @@ final class ShopifyAppTest extends TestCase
         $this->assertTrue(Features::enabled('search.photos', $install->shop_id) && Features::enabled('retrieval.image_index', $install->shop_id), 'photo search and the picture scan are on from the first day');
         $this->assertNull(collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate')), 'nobody is asked to pay');
 
-        // Once charging is on, the free store approves the plan when it next opens the app.
+        // Once charging is on, the free store chooses and approves a plan when it next opens the app.
         Settings::set('shopify.charge', true);
-        $this->get('/shopify/app?'.http_build_query(self::signed([])))
-            ->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
+        $plans = $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertOk();
+        $this->get(self::choice($plans, 'starter'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
         $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
     }
 
@@ -217,12 +225,13 @@ final class ShopifyAppTest extends TestCase
     public function test_an_approved_plan_activates_the_shop_and_opens_its_panel(): void
     {
         $install = $this->installed();
-        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->toIso8601String()]];
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->toIso8601String()]];
 
         $this->get('/shopify/billing/return?shop='.self::SHOP)
             ->assertRedirect(route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]));
 
         $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+        $this->assertSame('growth', $install->shop->fresh()->plan, 'the shop is on the plan its subscription names');
         $this->assertAuthenticatedAs(User::query()->where('email', 'owner@gueta.test')->sole());
 
         // Opening the app from the Shopify admin later goes straight to the panel.
@@ -371,12 +380,21 @@ final class ShopifyAppTest extends TestCase
     {
         $install = $this->installed();
 
-        // The plan is not approved: inside the frame, the approval opens on top, not in it.
-        $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4'])))
+        // The plan is not approved: inside the frame the plans show, and each opens its approval on top, not in it.
+        $plans = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4'])))
             ->assertOk()
             ->assertSee('target="_top"', false)
-            ->assertSee('https://gueta-test.myshopify.com/admin/charges/confirm', false);
+            ->assertSee('shopify/billing/start', false);
+        $this->get(self::choice($plans, 'pro'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
         $this->assertSame('pending', $install->fresh()->subscription_status);
+    }
+
+    /** The signed link a plans page offers for one plan. */
+    private static function choice(TestResponse $plans, string $code): string
+    {
+        preg_match('~href="([^"]*shopify/billing/start[^"]*plan='.$code.'[^"]*)"~', (string) $plans->getContent(), $m);
+
+        return html_entity_decode($m[1] ?? 'missing', ENT_QUOTES);
     }
 
     private function installed(): ShopifyInstall

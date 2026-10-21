@@ -138,6 +138,15 @@
             "unit": "days"
         },
         {
+            "name": "history_days",
+            "type": "int",
+            "default": 3650,
+            "min": 30,
+            "max": 3650,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
             "name": "visits_per_minute",
             "type": "int",
             "default": 120,

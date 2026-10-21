@@ -11,6 +11,9 @@ Route::middleware('throttle:shopify')->group(function (): void {
     // A refresh inside Shopify asks for the screen the merchant was on, after the app address.
     Route::get('shopify/app/{path}', [ShopifyAppController::class, 'open'])->where('path', 'merchant(/[A-Za-z0-9_-]+)*')->name('shopify.app.deep');
     Route::get('shopify/billing/return', [ShopifyAppController::class, 'billingReturn'])->name('shopify.billing.return');
+    // Signed by us: the plans to choose from, and the one chosen, off to Shopify to approve.
+    Route::get('shopify/plans', [ShopifyAppController::class, 'plans'])->name('shopify.plans');
+    Route::get('shopify/billing/start', [ShopifyAppController::class, 'startPlan'])->name('shopify.billing.start');
 });
 
 // Each shop's panel is on its own address ({slug}.shop_domain), so the Shopify admin keeps only the

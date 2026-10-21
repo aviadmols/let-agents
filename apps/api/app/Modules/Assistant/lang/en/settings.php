@@ -95,6 +95,10 @@ return [
         'label' => 'New questions per shop per day',
         'description' => 'Past this, shoppers are pointed to the store team until tomorrow.',
     ],
+    'answers_per_month' => [
+        'label' => 'AI answers per shop a month',
+        'description' => 'Answers the AI writes to shoppers\' questions in a calendar month. Saved answers do not count. Past it, search keeps working and shoppers are pointed to the store team until next month. The shop\'s plan may hold it lower.',
+    ],
     'asks_per_minute' => [
         'label' => 'Question requests per minute, per address',
         'description' => 'Flood protection, including questions answered from memory.',

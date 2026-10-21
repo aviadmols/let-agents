@@ -343,6 +343,15 @@
             "unit": "searches"
         },
         {
+            "name": "photos_per_month",
+            "type": "int",
+            "default": 1000000,
+            "min": 0,
+            "max": 1000000,
+            "scope": "shop",
+            "unit": "searches"
+        },
+        {
             "name": "all_ids",
             "type": "int",
             "default": 3000,

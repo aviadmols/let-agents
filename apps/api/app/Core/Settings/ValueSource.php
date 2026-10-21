@@ -11,4 +11,6 @@ enum ValueSource: string
     case Default = 'default';
     case Global = 'global';
     case Shop = 'shop';
+    // the shop's plan holds it lower (PlanCeilings)
+    case Plan = 'plan';
 }

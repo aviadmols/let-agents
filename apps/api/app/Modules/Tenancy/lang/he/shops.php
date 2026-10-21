@@ -20,6 +20,8 @@ return [
         'active_keys' => 'מפתחות פעילים',
         'created_at' => 'נוצרה',
         'plan' => 'תוכנית',
+        'plan_help' => 'המגבלות של התוכנית חלות על החנות מעל ההגדרות שלה. חנות Shopify עוברת לתוכנית שאישרה ב-Shopify.',
+        'billing' => 'תשלום',
         'trial' => 'ניסיון',
         'start_trial' => 'להתחיל בתקופת ניסיון',
         'start_trial_help' => 'עד :products מוצרים, :questions שאלות ביום, :pictures, למשך :days ימים.',

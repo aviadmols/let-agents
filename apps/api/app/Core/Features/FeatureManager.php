@@ -3,6 +3,8 @@
 namespace App\Core\Features;
 
 use App\Core\Features\Models\FeatureOverride;
+use App\Core\Plans\NoCeilings;
+use App\Core\Plans\PlanCeilings;
 use App\Core\Settings\OverrideScope;
 use App\Core\Settings\ValueSource;
 use App\Core\Tenancy\TenantContext;
@@ -13,6 +15,7 @@ use Illuminate\Contracts\Cache\Repository as Cache;
  *
  * Resolution order: the shop's override, then the global override, then the default the
  * module declared. Asking about a feature no enabled module declared is a bug, so it throws.
+ * A shop's plan may hold a feature off above all of these (PlanCeilings), never on.
  */
 final class FeatureManager
 {
@@ -25,6 +28,7 @@ final class FeatureManager
         private readonly FeatureRegistry $registry,
         private readonly TenantContext $tenant,
         private readonly Cache $cache,
+        private readonly PlanCeilings $plans = new NoCeilings,
     ) {}
 
     public function enabled(string $key, ?string $shopId = null): bool
@@ -81,6 +85,18 @@ final class FeatureManager
 
     /** @return array{0: bool, 1: ValueSource} */
     private function resolve(string $key, ?string $shopId): array
+    {
+        $found = $this->stored($key, $shopId);
+
+        if ($found[0] && $shopId !== null && ($this->plans->for($shopId)['features'][$key] ?? null) === false) {
+            return [false, ValueSource::Plan];
+        }
+
+        return $found;
+    }
+
+    /** @return array{0: bool, 1: ValueSource} */
+    private function stored(string $key, ?string $shopId): array
     {
         $definition = $this->registry->get($key);
         $overrides = $this->overrides()[$key] ?? [];

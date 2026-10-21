@@ -4,6 +4,7 @@ namespace App\Modules\Assistant\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Usage\MonthlyUsage;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,5 +53,27 @@ final class DailyQuestionsTest extends TestCase
         }
 
         $this->assertSame(20, $allowed, 'one shopper past their two, up to the store\'s twenty');
+    }
+
+    public function test_the_month_holds_the_shop_at_its_plan_and_a_day_refused_takes_none_of_it(): void
+    {
+        $shop = Shop::factory()->create(['plan' => 'essentials']);
+        Features::override('assistant.visitor_limit', false, $shop->id);
+        Settings::set('assistant.questions_per_shop_per_day', 10, $shop->id);
+
+        $allowed = 0;
+        for ($i = 0; $i < 12; $i++) {
+            $allowed += DailyQuestions::allow($shop->id, 'v', '203.0.113.1') ? 1 : 0;
+        }
+        $this->assertSame(10, $allowed);
+        $this->assertSame(10, app(MonthlyUsage::class)->used($shop->id, DailyQuestions::METER), 'the two the day refused took none of the month');
+
+        Settings::set('assistant.answers_per_month', 12, $shop->id);
+        $this->travel(1)->days();
+        $allowed = 0;
+        for ($i = 0; $i < 5; $i++) {
+            $allowed += DailyQuestions::allow($shop->id, 'v', '203.0.113.1') ? 1 : 0;
+        }
+        $this->assertSame(2, $allowed, 'a new day, but only two left of the month');
     }
 }

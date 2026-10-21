@@ -2,6 +2,8 @@
 
 namespace App\Modules\Analytics\Filament\Merchant\Pages;
 
+use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Filament\HasPeriod;
 use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Analytics\Models\AnalyticsVisitStep;
@@ -28,6 +30,22 @@ use UnitEnum;
 final class ShopSessions extends Page
 {
     use HasPeriod;
+
+    /** As far back as the shop's plan lets it see (analytics.history_days). */
+    protected function historyDays(): ?int
+    {
+        $shop = Filament::getTenant();
+
+        return $shop instanceof Shop ? (int) Settings::get('analytics.history_days', $shop->id) : null;
+    }
+
+    /** Shopper sessions are part of the shop's plan (analytics.sessions). */
+    public static function canAccess(): bool
+    {
+        $shop = Filament::getTenant();
+
+        return parent::canAccess() && (! $shop instanceof Shop || Features::enabled('analytics.sessions', $shop->id));
+    }
 
     /** Rows a "load more" adds. */
     private const PAGE = 30;

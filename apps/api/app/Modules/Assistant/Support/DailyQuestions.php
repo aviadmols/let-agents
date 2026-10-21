@@ -4,6 +4,7 @@ namespace App\Modules\Assistant\Support;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Usage\MonthlyUsage;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -14,9 +15,15 @@ use Illuminate\Support\Facades\RateLimiter;
  *
  * A store may lift the limit on each shopper (assistant.visitor_limit off): then neither the shopper
  * nor the address is counted, and the shop's own daily cap still keeps its plan and its budget.
+ *
+ * Above the day, the month: assistant.answers_per_month (the shop's plan may hold it lower), counted
+ * in MonthlyUsage only once the day's counts let the question through.
  */
 final class DailyQuestions
 {
+    /** The month's answers, in MonthlyUsage. */
+    public const METER = 'answers';
+
     public static function allow(string $shopId, string $visitorHash, ?string $ip): bool
     {
         $each = Features::enabled('assistant.visitor_limit', $shopId);
@@ -35,6 +42,10 @@ final class DailyQuestions
             if (RateLimiter::tooManyAttempts($key, $max)) {
                 return false;
             }
+        }
+
+        if (! app(MonthlyUsage::class)->take($shopId, self::METER, (int) Settings::get('assistant.answers_per_month', $shopId))) {
+            return false;
         }
 
         foreach (array_keys($limits) as $key) {

@@ -14,12 +14,15 @@ use App\Modules\Shopify\Support\ShopifyApi;
 use App\Modules\Shopify\Support\ShopifyApps;
 use App\Modules\Shopify\Support\ShopifySessionToken;
 use App\Modules\Shopify\Support\ShopifySignatures;
+use App\Modules\Tenancy\Models\Plan;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -31,6 +34,8 @@ use Throwable;
  *   GET /shopify/app              the app opened inside the Shopify admin: the shop's own panel,
  *                                 in the admin's frame; a store without our token gets it on the
  *                                 spot, in exchange for the session token Shopify opened with
+ *   GET /shopify/plans            the plans to choose from (a link we signed), before approving one
+ *   GET /shopify/billing/start    the chosen plan, off to Shopify to approve it (a link we signed)
  *   GET /shopify/billing/return   after the merchant approved (or not) the monthly plan
  *
  * Every request Shopify sends is signed, or carries its session token; a link older than a few
@@ -186,10 +191,69 @@ final class ShopifyAppController
         return $this->intoPanel($request, $install);
     }
 
-    /** A subscribed store goes to its panel; one without a subscription approves the plan first. */
+    /** The plans a store chooses from: a signed link, from onward() or from the panel's "Connection and plan". */
+    public function plans(Request $request): Response
+    {
+        $install = $this->signedInstall($request);
+
+        if ($install === null) {
+            return response(__('shopify::app.bad_request'), 404);
+        }
+
+        return $this->choosePlan($install);
+    }
+
+    /** The plan the merchant chose, off to Shopify to approve it, out of the admin's frame. */
+    public function startPlan(Request $request, ManageSubscription $billing): RedirectResponse|Response
+    {
+        $install = $this->signedInstall($request);
+        $plan = Plan::query()->offered()->where('code', (string) $request->query('plan'))->first();
+
+        if ($install === null || $plan === null) {
+            return response(__('shopify::app.bad_request'), 404);
+        }
+
+        $approve = $billing->start($install, url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain])), $plan);
+
+        return $this->outward($request, $approve, ShopifyApps::key($install->client_id));
+    }
+
+    /** A link to the plans, signed for this store, for an hour: the panel offers it as "change plan". */
+    public static function plansLink(string $shopDomain): string
+    {
+        return URL::temporarySignedRoute('shopify.plans', now()->addHour(), ['shop' => $shopDomain]);
+    }
+
+    /** The offered plans, each a signed link to approve it; the shop's own plan marked. */
+    private function choosePlan(ShopifyInstall $install): Response
+    {
+        $current = $install->subscribed() ? Shop::query()->find($install->shop_id)?->plan : null;
+        $plans = Plan::query()->offered()->get()->map(fn (Plan $plan): array => [
+            'plan' => $plan,
+            'current' => $plan->code === $current,
+            'lines' => $plan->lines(),
+            'url' => URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $install->shop_domain, 'plan' => $plan->code]),
+        ])->all();
+
+        return response(view('shopify::plans', ['plans' => $plans, 'key' => ShopifyApps::key($install->client_id)]));
+    }
+
+    private function signedInstall(Request $request): ?ShopifyInstall
+    {
+        $shop = $request->hasValidSignature() ? ShopifySignatures::shopDomain($request->query('shop')) : null;
+        $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
+
+        return $install !== null && $install->installed() ? $install : null;
+    }
+
+    /** A subscribed store goes to its panel; one without a subscription chooses a plan and approves it first. */
     private function onward(Request $request, ShopifyInstall $install, ManageSubscription $billing): RedirectResponse|Response
     {
         if (! in_array($billing->refresh($install), [ShopifyInstall::ACTIVE, ShopifyInstall::FREE], true)) {
+            if (Plan::query()->offered()->exists()) {
+                return $this->choosePlan($install);
+            }
+
             $approve = $billing->start($install, url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain])));
 
             return $this->outward($request, $approve, ShopifyApps::key($install->client_id));

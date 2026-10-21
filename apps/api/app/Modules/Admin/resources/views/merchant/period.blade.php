@@ -1,7 +1,7 @@
 {{-- The period control the design puts beside a screen's heading: 7, 30 or 90 days, or dates (App\Core\Filament\HasPeriod). --}}
 <div class="lp-period" x-data="{ open: false, from: @js($this->from), to: @js($this->to) }" @keydown.escape.window="open = false" @click.outside="open = false">
     <div class="lp-tabs" role="group" aria-label="{{ __('admin::home.period') }}">
-        @foreach ($this->periods() as $days)
+        @foreach ($this->offeredPeriods() as $days)
             <button type="button" wire:click="setDays({{ $days }})" @class(['is-on' => $this->days === $days]) aria-pressed="{{ $this->days === $days ? 'true' : 'false' }}">{{ __('admin::home.days', ['n' => $days]) }}</button>
         @endforeach
         <button type="button" @click="open = !open" @class(['is-on' => $this->days === 0]) aria-expanded="false" :aria-expanded="open.toString()" data-period-custom>

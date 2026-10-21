@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Database\Factories\ShopFactory;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Enums\Vertical;
+use App\Modules\Tenancy\Support\ShopPlanCeilings;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property array{kind?: string, languages?: list<string>, sells?: list<string>}|null $profile what the shop said about itself: a store, a content site or both; its other languages; what it sells
  * @property Carbon|null $trial_ends_at while set the shop is on trial (StartTrial), and stays limited past the date until the trial is ended
  * @property array<string, array{0: string, 1: mixed}>|null $trial_saved the shop's own settings from before the trial
+ * @property ?string $plan the code of the plan the shop pays for (Plan); null: no plan holds it
  */
 class Shop extends Model
 {
@@ -56,6 +58,7 @@ class Shop extends Model
         'status',
         'vertical',
         'vertical_locked',
+        'plan',
     ];
 
     protected $attributes = [
@@ -80,6 +83,13 @@ class Shop extends Model
 
     protected static function booted(): void
     {
+        // a shop on another plan is under other ceilings from its next request on
+        static::saved(function (Shop $shop): void {
+            if ($shop->wasChanged('plan') || $shop->wasRecentlyCreated && $shop->plan !== null) {
+                ShopPlanCeilings::flush();
+            }
+        });
+
         // The kernel's override tables have no foreign key to shops, so clean them here.
         static::deleted(function (Shop $shop): void {
             Features::purgeShop($shop->id);
@@ -96,6 +106,12 @@ class Shop extends Model
     public function apiKeys(): HasMany
     {
         return $this->hasMany(ShopApiKey::class);
+    }
+
+    /** The plan the shop pays for, or null when no plan holds it. */
+    public function currentPlan(): ?Plan
+    {
+        return Plan::byCode($this->plan);
     }
 
     /** On trial: limited by TrialLimits until the trial is ended, also after its last day. */

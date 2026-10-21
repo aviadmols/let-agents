@@ -109,6 +109,10 @@ return [
         'label' => 'Photo searches a day',
         'description' => 'Per shop. Beyond it the camera answers that the service is not available today. 0 turns it off.',
     ],
+    'photos_per_month' => [
+        'label' => 'Photo searches per shop a month',
+        'description' => 'In a calendar month. Past it, photo search stops until next month and everything else keeps working. The shop\'s plan may hold it lower.',
+    ],
     'photo_requests_per_minute' => [
         'label' => 'Photo searches a minute',
         'description' => 'Per IP address and site.',

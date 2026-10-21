@@ -173,6 +173,24 @@ final class UsersSettingsTest extends TestCase
         $this->assertSame(0, ShopInvitation::query()->count());
     }
 
+    public function test_the_shops_plan_holds_how_many_people_its_panel_has(): void
+    {
+        Mail::fake();
+        $this->shop->forceFill(['plan' => 'starter'])->save();
+
+        Livewire::test(UsersSettings::class)->set('data.email', 'dan@agency.co.il')->call('invite');
+        $this->assertSame(1, ShopInvitation::query()->count(), 'the owner and one waiting: Starter\'s two');
+
+        Livewire::test(UsersSettings::class)->set('data.email', 'shira@example.com')->call('invite')
+            ->assertSee('בתוכנית שלכם יש מקום ל־2 משתמשים');
+        $this->assertSame(1, ShopInvitation::query()->count());
+
+        // the one waiting can still be sent again
+        Livewire::test(UsersSettings::class)->set('data.email', 'dan@agency.co.il')->call('invite');
+        $this->assertSame(1, ShopInvitation::query()->count());
+        Mail::assertSentCount(2);
+    }
+
     public function test_only_owners_invite_and_remove_and_the_last_owner_stays(): void
     {
         Mail::fake();

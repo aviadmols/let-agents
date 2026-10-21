@@ -25,6 +25,36 @@
         </x-lp::kv>
     </x-lp::card>
 
+    @if ($d['plan_lines'] !== [])
+        <x-lp::card :title="$t('allowance_title')" :help="$t('allowance_help')" style="max-width: 640px" data-allowance>
+            @if ($d['plans_url'] !== null)
+                <x-slot:head>
+                    <a class="lp-btn lp-btn-sm" href="{{ $d['plans_url'] }}" target="_top" data-change-plan>{{ $t('change_plan') }}</a>
+                </x-slot:head>
+            @endif
+            @if ($d['allowance'] !== [])
+                <x-lp::kv>
+                    @foreach ($d['allowance'] as $row)
+                        <x-lp::kv-row :label="$row['label']">
+                            <span style="display: inline-flex; align-items: center; gap: 8px">
+                                <span class="lp-bar" @if ($row['tone'] !== '') data-tone="{{ $row['tone'] }}" @endif><i style="width: {{ $row['percent'] }}%"></i></span>
+                                <span>{{ $row['used'] >= $row['limit'] ? $t('allowance_full') : $t('allowance_of', ['used' => number_format($row['used']), 'limit' => number_format($row['limit'])]) }}</span>
+                            </span>
+                        </x-lp::kv-row>
+                    @endforeach
+                </x-lp::kv>
+            @endif
+            <ul style="margin: 12px 0 0; padding-inline-start: 18px; display: grid; gap: 4px">
+                @foreach ($d['plan_lines'] as $line)
+                    <li>{{ $line }}</li>
+                @endforeach
+            </ul>
+            @if ($d['plans_url'] === null)
+                <p style="margin: 12px 0 0; color: var(--lp-muted, #6b6b73); font-size: 13px">{{ $t('change_plan_woo') }}</p>
+            @endif
+        </x-lp::card>
+    @endif
+
     @if ($d['woo'])
         @php($package = $this->package())
         <x-lp::card :title="$t('plugin_title')" :help="$t('plugin_help')" style="max-width: 640px" data-plugin>

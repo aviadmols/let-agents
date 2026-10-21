@@ -2,6 +2,8 @@
 
 namespace App\Core\Settings;
 
+use App\Core\Plans\NoCeilings;
+use App\Core\Plans\PlanCeilings;
 use App\Core\Settings\Models\SettingOverride;
 use App\Core\Tenancy\TenantContext;
 use Illuminate\Contracts\Cache\Repository as Cache;
@@ -12,7 +14,8 @@ use Illuminate\Support\Facades\Log;
  *
  * Resolution order: the shop's override (only for shop-scoped settings), then the global
  * override, then the declared default. Every write is normalized against the declaration,
- * so a value outside its range can never be stored.
+ * so a value outside its range can never be stored. A shop's plan may hold a value lower above
+ * all of these (PlanCeilings): a number at most the plan's, a choice the plan's.
  */
 final class SettingManager
 {
@@ -25,6 +28,7 @@ final class SettingManager
         private readonly SettingRegistry $registry,
         private readonly TenantContext $tenant,
         private readonly Cache $cache,
+        private readonly PlanCeilings $plans = new NoCeilings,
     ) {}
 
     public function get(string $key, ?string $shopId = null): int|float|bool|string
@@ -105,6 +109,28 @@ final class SettingManager
 
     /** @return array{0: int|float|bool|string, 1: ValueSource} */
     private function resolve(string $key, ?string $shopId): array
+    {
+        $found = $this->stored($key, $shopId);
+        $ceiling = $shopId === null ? null : ($this->plans->for($shopId)['settings'][$key] ?? null);
+
+        if ($ceiling === null) {
+            return $found;
+        }
+
+        try {
+            $ceiling = $this->registry->get($key)->normalize($ceiling);
+        } catch (InvalidSettingValue) {
+            return $found;
+        }
+
+        $value = $found[0];
+        $lower = is_int($value) || is_float($value) ? $ceiling < $value : (is_bool($value) ? ($value && ! $ceiling) : $ceiling !== $value);
+
+        return $lower ? [$ceiling, ValueSource::Plan] : $found;
+    }
+
+    /** @return array{0: int|float|bool|string, 1: ValueSource} */
+    private function stored(string $key, ?string $shopId): array
     {
         $definition = $this->registry->get($key);
         $overrides = $this->overrides()[$key] ?? [];

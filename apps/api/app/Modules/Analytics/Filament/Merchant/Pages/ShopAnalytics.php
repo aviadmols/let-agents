@@ -2,6 +2,7 @@
 
 namespace App\Modules\Analytics\Filament\Merchant\Pages;
 
+use App\Core\Facades\Settings;
 use App\Core\Filament\HasPeriod;
 use App\Modules\Admin\Contracts\ReportRow;
 use App\Modules\Admin\Contracts\ReportSeries;
@@ -27,6 +28,14 @@ use UnitEnum;
 final class ShopAnalytics extends Page
 {
     use HasPeriod;
+
+    /** As far back as the shop's plan lets it see (analytics.history_days). */
+    protected function historyDays(): ?int
+    {
+        $shop = Filament::getTenant();
+
+        return $shop instanceof Shop ? (int) Settings::get('analytics.history_days', $shop->id) : null;
+    }
 
     /** How many rows each list shows on the screen; its whole list shows the rest. */
     /** The chart's measures, each a series a module gives (ReportSeries). */

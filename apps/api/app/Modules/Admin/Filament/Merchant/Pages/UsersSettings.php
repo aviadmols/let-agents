@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Core\Facades\Settings;
 use App\Core\Localization\Locales;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Actions\InviteToShop;
@@ -159,6 +160,9 @@ class UsersSettings extends Page
             $this->problems['email'] = __('admin::shop_settings.users.email_wrong');
         } elseif ($this->shop()->belongsToMany(User::class, 'shop_user')->whereRaw('lower(email) = ?', [$email])->exists()) {
             $this->problems['email'] = __('admin::shop_settings.users.already');
+        } elseif (! app(InviteToShop::class)->hasRoom($this->shop(), $email)) {
+            $room = (int) Settings::get('admin.max_team_members', $this->shop()->id);
+            $this->problems['email'] = trans_choice('admin::shop_settings.users.full', $room, ['count' => $room]);
         }
 
         if ($this->problems !== []) {

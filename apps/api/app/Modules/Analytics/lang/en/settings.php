@@ -53,6 +53,10 @@ return [
         'label' => 'How long sessions are kept',
         'description' => 'After this the visit and all its steps, the IP address included, are deleted.',
     ],
+    'history_days' => [
+        'label' => 'How far back the shop sees its data',
+        'description' => 'On the shop\'s insights and sessions screens. The data itself is kept as the retention setting says. The shop\'s plan may hold it lower.',
+    ],
     'visits_per_minute' => [
         'label' => 'Visit batches a minute, per shopper address',
         'description' => 'Past this, batches are refused until the minute ends.',

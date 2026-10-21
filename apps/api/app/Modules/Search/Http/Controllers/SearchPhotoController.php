@@ -5,6 +5,7 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Http\Visit;
+use App\Core\Usage\MonthlyUsage;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Http\StorefrontSite;
 use finfo;
@@ -17,11 +18,14 @@ use Illuminate\Support\Facades\Cache;
  *
  * A shopper's photo, compared with the shop's product pictures. Refused when the shop has search
  * by photo off, the file is not a JPEG, PNG or WEBP picture, it is too big, or the shop reached
- * its photos for the day. The photo is read in memory and never stored.
+ * its photos for the day or the month. The photo is read in memory and never stored.
  */
 final class SearchPhotoController
 {
     private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    /** The month's photo searches, in MonthlyUsage. */
+    public const METER = 'photos';
 
     public function __invoke(Request $request, SearchCatalog $search, string $site): JsonResponse
     {
@@ -60,6 +64,11 @@ final class SearchPhotoController
 
         if (Features::enabled('search.photo_limits', $shopId) && Cache::increment($key) > (int) Settings::get('search.photos_per_day', $shopId)) {
             return response()->json(['error' => 'daily_limit'], 429);
+        }
+
+        // the month's, as the shop's plan allows (search.photos_per_month)
+        if (! app(MonthlyUsage::class)->take($shopId, self::METER, (int) Settings::get('search.photos_per_month', $shopId))) {
+            return response()->json(['error' => 'monthly_limit'], 429);
         }
 
         // Which of the separate things in the photo the shopper chose; 0 is the one the reader saw first.

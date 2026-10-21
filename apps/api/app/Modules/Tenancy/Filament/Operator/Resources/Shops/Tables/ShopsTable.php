@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Actions\EndTrial;
 use App\Modules\Tenancy\Actions\StartTrial;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
+use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
 use App\Modules\Tenancy\Support\TrialLimits;
 use Filament\Actions\Action;
@@ -39,6 +40,12 @@ final class ShopsTable
     /** The merchant panel belongs to the Admin module, so this links to it by route name too. */
     private const MERCHANT_OVERVIEW_ROUTE = 'filament.merchant.pages.overview';
 
+    /** @return array<string, string> code => name */
+    private static function planNames(): array
+    {
+        return once(fn (): array => Plan::query()->pluck('name', 'code')->all());
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -49,7 +56,7 @@ final class ShopsTable
                 ->addSelect([
                     'connected' => DB::table('store_connections')->selectRaw('count(*)')
                         ->whereColumn('store_connections.shop_id', 'shops.id')->where('status', 'connected'),
-                    'plan' => DB::table('shopify_installs')->select('subscription_status')
+                    'billing' => DB::table('shopify_installs')->select('subscription_status')
                         ->whereColumn('shopify_installs.shop_id', 'shops.id')->limit(1),
                     'products_count' => DB::table('catalog_products')->selectRaw('count(*)')
                         ->whereColumn('catalog_products.shop_id', 'shops.id')->whereNull('removed_at'),
@@ -86,9 +93,15 @@ final class ShopsTable
                     ->label(__('tenancy::shops.fields.connected'))
                     ->boolean()
                     ->state(fn (Shop $record): bool => (int) $record->getAttribute('connected') > 0),
-                // A Shopify store pays through Shopify; its plan is the subscription Shopify reports.
+                // The plan the shop pays for: the ceilings on its features and settings.
                 TextColumn::make('plan')
                     ->label(__('tenancy::shops.fields.plan'))
+                    ->formatStateUsing(fn (?string $state): string => self::planNames()[$state] ?? (string) $state)
+                    ->placeholder(__('tenancy::plans.none'))
+                    ->sortable(),
+                // A Shopify store pays through Shopify: the subscription Shopify reports.
+                TextColumn::make('billing')
+                    ->label(__('tenancy::shops.fields.billing'))
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'active' => 'success',

@@ -4,7 +4,9 @@ namespace App\Modules\Shopify\Support;
 
 use App\Core\Facades\Settings;
 use App\Modules\Admin\Contracts\ConnectionFacts;
+use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
+use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 
@@ -24,6 +26,11 @@ final class ShopifyConnectionFacts implements ConnectionFacts
 
         $facts = ['app_installed' => $install->installed(), 'connected' => $install->installed()];
 
+        // the merchant changes plan themselves, in Shopify's billing
+        if ($install->installed() && Plan::query()->offered()->exists()) {
+            $facts['plans_url'] = ShopifyAppController::plansLink($install->shop_domain);
+        }
+
         if (! $install->subscribed()) {
             return $facts + ['plan_waiting' => $install->installed()];
         }
@@ -31,7 +38,7 @@ final class ShopifyConnectionFacts implements ConnectionFacts
         $trial = $install->trial_ends_at !== null && $install->trial_ends_at->isFuture() ? $install->trial_ends_at : null;
 
         return $facts + [
-            'plan' => (string) Settings::get('shopify.plan_name'),
+            'plan' => $shop->currentPlan()?->billingName() ?? (string) Settings::get('shopify.plan_name'),
             'trial_ends' => $trial,
             'renews' => $install->subscription_status === ShopifyInstall::ACTIVE ? self::renews($trial ?? $install->subscribed_at) : null,
         ];

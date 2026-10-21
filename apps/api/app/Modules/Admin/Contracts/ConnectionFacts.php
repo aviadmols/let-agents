@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Models\Shop;
  *   plan            string       the plan's name, in the shop manager's words
  *   renews          CarbonInterface  when the plan renews
  *   trial_ends      CarbonInterface  when the trial ends, while in one
+ *   plans_url       string       where the merchant changes plan themselves (Shopify's billing), when they can
  */
 interface ConnectionFacts
 {

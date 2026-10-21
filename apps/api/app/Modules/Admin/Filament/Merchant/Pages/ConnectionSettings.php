@@ -2,7 +2,10 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Core\Facades\Settings;
+use App\Core\Settings\SettingRegistry;
 use App\Core\Tenancy\TenantContext;
+use App\Core\Usage\MonthlyUsage;
 use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\HomeCard;
 use App\Modules\Admin\Contracts\StorePlugin;
@@ -29,6 +32,12 @@ use UnitEnum;
  */
 class ConnectionSettings extends Page
 {
+    /** A monthly setting at this or above is no limit (its default). */
+    private const NO_LIMIT = 1000000;
+
+    /** The bar turns amber from this share of the month's allowance. */
+    private const WARN_PERCENT = 80;
+
     public static string $sideGroup = 'connect';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLink;
@@ -79,6 +88,9 @@ class ConnectionSettings extends Page
             'synced' => ($facts['last_sync'] ?? null) instanceof CarbonInterface ? $facts['last_sync']->locale(app()->getLocale())->diffForHumans() : $t('never_synced'),
             'plan' => $this->plan($facts),
             'usage' => $this->usage($shop),
+            'plan_lines' => $shop->currentPlan()?->lines() ?? [],
+            'allowance' => $this->allowance($shop),
+            'plans_url' => is_string($facts['plans_url'] ?? null) ? $facts['plans_url'] : null,
             'has_token' => (bool) ($facts['has_token'] ?? false),
         ];
     }
@@ -169,6 +181,39 @@ class ConnectionSettings extends Page
             ($facts['renews'] ?? null) instanceof CarbonInterface => $t('plan_renews', ['plan' => $name, 'date' => $date($facts['renews'])]),
             default => $name,
         };
+    }
+
+    /**
+     * This month's answers and photo searches against the shop's plan, where the plan counts them.
+     *
+     * @return list<array{label: string, used: int, limit: int, percent: int, tone: string}>
+     */
+    private function allowance(Shop $shop): array
+    {
+        if ($shop->currentPlan() === null) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach (['answers' => 'assistant.answers_per_month', 'photos' => 'search.photos_per_month'] as $meter => $key) {
+            $limit = app(SettingRegistry::class)->has($key) ? (int) Settings::get($key, $shop->id) : 0;
+
+            if ($limit <= 0 || $limit >= self::NO_LIMIT) {
+                continue;
+            }
+
+            $used = app(MonthlyUsage::class)->used($shop->id, $meter);
+            $rows[] = [
+                'label' => __('admin::shop_settings.connection.allowance_'.$meter),
+                'used' => $used,
+                'limit' => $limit,
+                'percent' => (int) min(100, round($used * 100 / $limit)),
+                'tone' => $used >= $limit ? 'bad' : ($used * 100 >= $limit * self::WARN_PERCENT ? 'warn' : ''),
+            ];
+        }
+
+        return $rows;
     }
 
     /** @return array{percent: int, tone: string}|null the month's AI allowance, as the home's card has it */

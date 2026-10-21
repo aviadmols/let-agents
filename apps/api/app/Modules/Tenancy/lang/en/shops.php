@@ -20,6 +20,8 @@ return [
         'active_keys' => 'Active keys',
         'created_at' => 'Created',
         'plan' => 'Plan',
+        'plan_help' => 'The plan\'s limits apply to the shop above its own settings. A Shopify store moves to the plan it approves in Shopify.',
+        'billing' => 'Billing',
         'trial' => 'Trial',
         'start_trial' => 'Start on a trial',
         'start_trial_help' => 'Up to :products products, :questions questions a day, :pictures, for :days days.',

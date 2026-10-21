@@ -4,10 +4,12 @@ namespace App\Modules\Tenancy;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Core\Plans\PlanCeilings;
 use App\Modules\Tenancy\Actions\CreateShop;
 use App\Modules\Tenancy\Contracts\CreatesShops;
 use App\Modules\Tenancy\Http\Middleware\AuthenticateShopKey;
 use App\Modules\Tenancy\Models\ShopApiKey;
+use App\Modules\Tenancy\Support\ShopPlanCeilings;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,6 +19,8 @@ final class TenancyServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->bind(CreatesShops::class, CreateShop::class);
+        // the plan a shop pays for holds its features and settings (the kernel asks)
+        $this->app->scoped(PlanCeilings::class, ShopPlanCeilings::class);
     }
 
     protected function bootModule(): void

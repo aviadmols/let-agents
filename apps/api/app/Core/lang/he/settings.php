@@ -7,6 +7,7 @@ return [
         'shop' => 'הגדרת חנות',
     ],
     'units' => [
+        'members' => 'משתמשים',
         'keys' => 'מפתחות',
         'requests' => 'בקשות',
         'exposures' => 'חשיפות',

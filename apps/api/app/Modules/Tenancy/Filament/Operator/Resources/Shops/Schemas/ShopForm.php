@@ -5,6 +5,7 @@ namespace App\Modules\Tenancy\Filament\Operator\Resources\Shops\Schemas;
 use App\Core\Localization\Locales;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
+use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
 use App\Modules\Tenancy\Support\TrialLimits;
 use Filament\Forms\Components\Select;
@@ -60,6 +61,14 @@ final class ShopForm
                             ->options(ShopStatus::options())
                             ->default(ShopStatus::Active->value)
                             ->required(),
+                        // The plan's limits are ceilings on the shop's features and settings (PlanCeilings).
+                        // A Shopify store's plan follows the subscription it approves.
+                        Select::make('plan')
+                            ->label(__('tenancy::shops.fields.plan'))
+                            ->options(fn (): array => Plan::query()->orderBy('sort')->get()
+                                ->mapWithKeys(fn (Plan $plan): array => [$plan->code => $plan->price() === null ? $plan->name : $plan->name.' · $'.number_format($plan->price())])->all())
+                            ->placeholder(__('tenancy::plans.none'))
+                            ->helperText(__('tenancy::shops.fields.plan_help')),
                         // A new shop may start on a trial (StartTrial); later, the shops table starts and ends one.
                         Toggle::make('trial')
                             ->label(__('tenancy::shops.fields.start_trial'))

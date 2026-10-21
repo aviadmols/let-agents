@@ -7,6 +7,7 @@ return [
         'shop' => 'Shop setting',
     ],
     'units' => [
+        'members' => 'members',
         'keys' => 'keys',
         'requests' => 'requests',
         'exposures' => 'exposures',

@@ -10,6 +10,8 @@ use App\Core\Features\FeatureManager;
 use App\Core\Features\FeatureRegistry;
 use App\Core\Modules\ModuleRepository;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Core\Plans\NoCeilings;
+use App\Core\Plans\PlanCeilings;
 use App\Core\Settings\SettingManager;
 use App\Core\Settings\SettingRegistry;
 use App\Core\Tenancy\TenantContext;
@@ -38,6 +40,8 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->scoped(TenantContext::class);
         $this->app->scoped(FeatureManager::class);
         $this->app->scoped(SettingManager::class);
+        // Until a module that keeps plans binds its own, no shop has a plan above it.
+        $this->app->scoped(PlanCeilings::class, NoCeilings::class);
 
         $this->registerModules();
     }
