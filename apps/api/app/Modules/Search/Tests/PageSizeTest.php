@@ -78,4 +78,35 @@ final class PageSizeTest extends TestCase
         $this->assertSame([$at * 1000 + 1], array_column(HebrewSearch::facets('טבעת רובי מידה 54', $index['facets']), 'code'));
         $this->assertSame('טבעת רובי', HebrewSearch::withoutFacetWords($index, 'טבעת רובי מידה 54'), 'searched as the filter, not as words');
     }
+
+    public function test_a_ring_the_store_resizes_is_found_in_every_size_its_page_offers(): void
+    {
+        // Rocks: one variant, "מידה נוכחית: 53", and a picker that makes it 51, 52, 54 or 55
+        $page = '<variant-picker data-current-size="53" data-current-size-label="מידה נוכחית" data-decrease-label="הקטנה ל" data-increase-label="הגדלה ל">'
+            .'<input class="sr-only" type="radio" name="main-option1" value="51"><span class="size-label-text">הקטנה ל 51</span>'
+            .'<input class="sr-only" type="radio" name="main-option1" value="52"><span class="size-label-text">הקטנה ל 52</span>'
+            .'<input class="sr-only" type="radio" name="main-option1" value="54"><span class="size-label-text">הגדלה ל 54</span>'
+            .'<input class="sr-only" type="radio" name="main-option1" value="55"><span class="size-label-text">הגדלה ל 55</span>'
+            .'<input class="sr-only" type="radio" name="main-option1" value="53"><span>מידה נוכחית: 53</span></variant-picker>'
+            .'<input type="radio" name="gift" value="1"><input type="radio" name="gift" value="2">';
+        $this->assertSame([51.0, 52.0, 53.0, 54.0, 55.0], PageChoices::offered($page, 53.0));
+        $this->assertSame([7.0, 7.5], PageChoices::offered('<p>Ring size: 7</p><p>Resize to 7.5 available</p>', 7.0));
+        $this->assertSame([], PageChoices::offered('<p>מידה נוכחית: 53</p><table><tr><td>48</td></tr></table>', 53.0), 'one size, no other offered');
+
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'he']);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach ([['1', 53, [51, 52, 53, 54, 55]], ['2', 58, null], ['3', 60, null]] as [$id, $size, $offered]) {
+                $ring = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "טבעת $id", 'url' => "https://r.test/p/$id", 'price' => 1000, 'in_stock' => true, 'purchasable' => true, 'hash' => "h$id", 'payload' => []]);
+                CatalogProductChoice::query()->create(['shop_id' => $shop->id, 'product_id' => $ring->id, 'fields' => [], 'size' => $size, 'size_label' => 'מידה נוכחית', 'sizes' => $offered]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $index = app(TenantContext::class)->run($shop->id, fn () => LoadedIndex::for($shop->id));
+        $sizes = collect($index['facets'])->firstWhere('k', BuildSearchIndex::VARIANT_SIZE);
+        $this->assertSame(['51', '52', '53', '54', '55', '58', '60'], array_column($sizes['v'], 'l'));
+        $at = array_search($sizes, $index['facets'], true);
+        $this->assertCount(5, array_filter($index['records']['p:1']['f'] ?? [], fn (int $c): bool => intdiv($c, 1000) === $at), 'the ring of 53 under each of its five sizes');
+        $this->assertEquals(53, $index['records']['p:1']['z'], 'its own size stays its size');
+    }
 }

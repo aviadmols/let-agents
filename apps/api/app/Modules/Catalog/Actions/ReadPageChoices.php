@@ -200,7 +200,9 @@ final class ReadPageChoices
         $body = (string) $response->body();
         $form = $forms ? PageChoices::form($body) : null;
         $size = $sizes ? PageChoices::size($body) : null;
-        $hash = $form === null && $size === null ? null : hash('sha256', ($form ?? '').'|'.json_encode($size));
+        // the other sizes it is offered in, a resize away ("הגדלה ל 54")
+        $offered = $size === null ? [] : PageChoices::offered($body, (float) $size['size']);
+        $hash = $form === null && $size === null ? null : hash('sha256', ($form ?? '').'|'.json_encode($size).'|'.json_encode($offered));
 
         // The same form and size for the same product: nothing to read again.
         if ($row->exists && $row->form_hash === $hash && $row->product_hash === $product->hash) {
@@ -210,11 +212,12 @@ final class ReadPageChoices
         }
 
         $fields = $form === null ? [] : PageChoices::read($form, $product->price === null ? null : (float) $product->price);
-        $different = ! $row->exists || $row->fields !== $fields || (float) $row->size !== (float) ($size['size'] ?? 0);
+        $different = ! $row->exists || $row->fields !== $fields || (float) $row->size !== (float) ($size['size'] ?? 0) || (array) $row->sizes !== $offered;
         $row->fill([
             'fields' => $fields,
             'size' => $size['size'] ?? null,
             'size_label' => $size['label'] ?? null,
+            'sizes' => $offered === [] ? null : $offered,
             'form_hash' => $hash,
             'product_hash' => $product->hash,
             'checked_at' => now(),

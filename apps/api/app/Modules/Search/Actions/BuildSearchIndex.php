@@ -172,7 +172,9 @@ final class BuildSearchIndex
         $sized = false;
         $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
         // Where no variant has a size, the sizes the product pages say are the size filter (a ring of one size each).
-        $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->all(), $this->locale($shopId));
+        // Every size the page offers it in, a resize away ("הגדלה ל 54"), is one of its sizes too: "מידה 54" finds the ring of 53.
+        $offered = CatalogProductChoice::query()->whereNotNull('sizes')->pluck('sizes', 'product_id');
+        $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->map(fn (float $z, string $id): array => array_values(array_unique([$z, ...array_map('floatval', (array) ($offered[$id] ?? []))])))->all(), $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
         // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
@@ -379,12 +381,12 @@ final class BuildSearchIndex
      * MIN_PAGE_SIZED products have one.
      *
      * @param  list<array{k: string, l: string, v: list<array<string, string>>}>  $facets  appended to
-     * @param  array<string, float>  $sizes  by product id
+     * @param  array<string, list<float>>  $sizes  every size of each product, by product id
      * @return array<string, list<int>> the product's code, by product id
      */
     private function pageSizeFacet(array &$facets, array $sizes, string $locale): array
     {
-        $values = array_values(array_unique(array_map(fn (float $z): string => self::sizeText($z), $sizes)));
+        $values = array_values(array_unique(array_map(fn (float $z): string => self::sizeText($z), array_merge([], ...array_values($sizes)))));
 
         if (in_array(self::VARIANT_SIZE, array_column($facets, 'k'), true) || count($values) < 2 || count($sizes) < self::MIN_PAGE_SIZED) {
             return [];
@@ -395,7 +397,7 @@ final class BuildSearchIndex
         $facets[] = ['k' => self::VARIANT_SIZE, 'l' => (string) __('search::storefront.facet_size', [], $locale), 'v' => array_map(fn (string $v): array => ['k' => $v, 'l' => $v], $values)];
         $code = array_flip($values);
 
-        return array_map(fn (float $z): array => [$at * 1000 + $code[self::sizeText($z)]], $sizes);
+        return array_map(fn (array $zs): array => array_values(array_unique(array_map(fn (float $z): int => $at * 1000 + $code[self::sizeText($z)], $zs))), $sizes);
     }
 
     /** 54.0 is "54", 54.5 is "54.5": a size as a page writes it. */

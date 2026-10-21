@@ -148,6 +148,54 @@ final class PageChoices
         return null;
     }
 
+    /** The other sizes are within this many of the one it is: a resize, not a size table's whole range. */
+    private const RESIZE_REACH = 15;
+
+    /**
+     * Every size the page offers the product in, its own among them, when it offers others: a ring of 53
+     * the store makes smaller or larger ("הקטנה ל 51", "הגדלה ל 54", "Resize to 7.5"), or a picker whose
+     * choices hold its size and others around it. Sorted; empty when the page offers none but its own.
+     *
+     * @return list<float>
+     */
+    public static function offered(string $html, float $current): array
+    {
+        $number = '(\d{1,3}(?:[.,]\d{1,2})?)';
+        $found = [];
+
+        $text = html_entity_decode(strip_tags((string) preg_replace('~<(script|style)\b.*?</\1>~siu', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (preg_match_all('/(?:הגדלה|הקטנה|התאמה|הרחבה)\s*ל[\s\-־]*'.$number.'|resize(?:d)?\s+to\s+'.$number.'/iu', $text, $m, PREG_SET_ORDER) > 0) {
+            foreach ($m as $hit) {
+                $found[] = (float) str_replace(',', '.', $hit[1] !== '' ? $hit[1] : $hit[2]);
+            }
+        }
+
+        // a picker of radio choices, one of them its own size: the others are the sizes offered
+        $groups = [];
+        if (preg_match_all('~<input\b[^>]*\btype=["\']radio["\'][^>]*>~iu', $html, $inputs) > 0) {
+            foreach ($inputs[0] as $input) {
+                if (preg_match('~\bname=["\']([^"\']+)["\']~u', $input, $n) === 1 && preg_match('~\bvalue=["\']\s*'.$number.'\s*["\']~u', $input, $v) === 1) {
+                    $groups[$n[1]][] = (float) str_replace(',', '.', $v[1]);
+                }
+            }
+        }
+        foreach ($groups as $values) {
+            if (count($values) >= 2 && in_array($current, $values, true)) {
+                array_push($found, ...$values);
+            }
+        }
+
+        $found = array_values(array_unique(array_filter($found, fn (float $z): bool => $z > 0 && abs($z - $current) <= self::RESIZE_REACH)));
+        if ($found === [] || $found === [$current]) {
+            return [];
+        }
+        $found[] = $current;
+        $found = array_values(array_unique(array_map(fn (float $z): float => round($z, 2), $found)));
+        sort($found);
+
+        return $found;
+    }
+
     /** @return array{size: float, label: string}|null */
     private static function sized(string $value, string $label): ?array
     {
