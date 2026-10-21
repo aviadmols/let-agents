@@ -73,7 +73,7 @@ final class AnswerSiteQuestion
      * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
      * 5 is the facts-only writer the bench tries, never released here).
      */
-    public const PROMPT_VERSION = 8;
+    public const PROMPT_VERSION = 9;
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
@@ -454,6 +454,57 @@ final class AnswerSiteQuestion
         usort($named, fn (string|int $a, string|int $b): int => [$scores[$b], mb_strlen($titles[(string) $a])] <=> [$scores[$a], mb_strlen($titles[(string) $b])]);
 
         return array_slice(array_map('strval', $named), 0, self::NAMED_PRODUCTS);
+    }
+
+    /**
+     * The products an answer names that are not picked yet, in the order it names them, each a pick with the sentence
+     * that names it as its why, up to the picks' limit. Only of the products the writer was given ($productsByRef). A name
+     * counts in quotes ("דרקולה"), or whole (never inside another word, maybe after a prefix letter) when it is long
+     * enough not to be a common word: two words or more, or five letters.
+     *
+     * @param  list<array{ref: string, external_id: string, title: string, why: string}>  $picks
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @return list<array{ref: string, external_id: string, title: string, why: string}>
+     */
+    public static function namedInAnswer(string $answer, array $picks, array $productsByRef): array
+    {
+        $picked = array_flip(array_column($picks, 'ref'));
+        $sentences = preg_split('/(?<=[.!?])\s+/u', trim($answer)) ?: [];
+        $lower = mb_strtolower($answer);
+        $found = [];
+
+        foreach ($productsByRef as $ref => $product) {
+            $core = self::titleCore((string) ($product['title'] ?? ''));
+            if (isset($picked[$ref]) || mb_strlen($core) < 2) {
+                continue;
+            }
+            $name = preg_quote($core, '/');
+            $quoted = '/["״«“\']\s*'.$name.'/u';
+            $whole = '/(?<![\p{L}\p{N}])[והבלמשכ]?'.$name.'(?![\p{L}\p{N}])/u';
+            $long = str_contains($core, ' ') || mb_strlen($core) >= 5;
+
+            foreach ($sentences as $sentence) {
+                $said = mb_strtolower($sentence);
+                if (preg_match($quoted, $said) === 1 || ($long && preg_match($whole, $said) === 1)) {
+                    $why = trim((string) preg_replace('/\s+/u', ' ', $sentence));
+                    $found[] = ['at' => (int) mb_strpos($lower, $core), 'pick' => [
+                        'ref' => (string) $ref, 'external_id' => (string) $product['external_id'], 'title' => (string) $product['title'],
+                        'why' => mb_strlen($why) > 160 ? rtrim(mb_substr($why, 0, 159)).'…' : $why,
+                    ]];
+                    break;
+                }
+            }
+        }
+
+        usort($found, fn (array $a, array $b): int => $a['at'] <=> $b['at']);
+        foreach ($found as $named) {
+            if (count($picks) >= self::MAX_PICKS) {
+                break;
+            }
+            $picks[] = $named['pick'];
+        }
+
+        return $picks;
     }
 
     /** A title as other text names it: before its subtitle or its code ("חטוף - אלי שרעבי" is "חטוף"). */
@@ -1083,6 +1134,12 @@ final class AnswerSiteQuestion
 
                     $screened = $this->screen($reply->data, $prepared, $question, $mode);
                     ['answer' => $answer, 'cited' => $cited, 'picks' => $picks, 'refusal' => $answerRefusal] = $screened;
+                    // Every product the answer names is shown under it, as Aviad asked (2026-10-21): "דרקולה" in a sentence
+                    // is a card too. Only of the products the writer was given, and before the checker, which judges them
+                    // like any pick: nothing reaches the shopper unchecked.
+                    if ($answer !== '') {
+                        $picks = self::namedInAnswer($answer, $picks, $prepared['productsByRef']);
+                    }
                     // Sentences code took out (a number the pages do not have), the rest kept.
                     $checked['trimmed'] = $screened['trimmed'];
                     $flags['personal'] = $answerRefusal === 'contact_details';
