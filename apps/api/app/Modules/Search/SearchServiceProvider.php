@@ -14,6 +14,7 @@ use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Enrichment\Events\FactsDecided;
+use App\Modules\Search\Console\CompareEmbeddersCommand;
 use App\Modules\Search\Console\ForgetVisitsCommand;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
@@ -128,6 +129,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
             ResumePictureScansCommand::class,
             ForgetVisitsCommand::class,
             SearchCommand::class,
+            CompareEmbeddersCommand::class,
         ];
     }
 }

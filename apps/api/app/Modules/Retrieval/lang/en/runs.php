@@ -13,4 +13,5 @@ return [
     'captions_no_provider' => 'Picture descriptions: no provider set for descriptions or for text vectors.',
     'chunk_experiment' => 'Piece size experiment: :pieces pieces of up to :chars characters, in memory only, the index untouched.',
     'chunk_experiment_no_provider' => 'Piece size experiment: no provider set for text vectors.',
+    'embedder_trial' => 'Embedding model trial: :model on :queries searches and :pieces pieces, in memory only, the index untouched.',
 ];
