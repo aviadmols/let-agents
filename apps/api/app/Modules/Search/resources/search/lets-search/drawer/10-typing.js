@@ -64,6 +64,7 @@
       if (!byMeaning && !spelled && (lv.ids || []).length) { ids = lv.ids; }
       lv.ids = ids; lv.server = true; lv.total = d.total || ids.length; lv.focus = d.focus || null;
       lv.single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
+      lv.singleBy = lv.single ? d.single.by : null;
       lv.content = ((d.groups && d.groups.content) || []).slice(0, 3); lv.cats = ((d.groups && d.groups.category) || []).slice(0, 4);
       lv.actions = d.actions || [];
       // Nothing by spelling, and the meaning pass still to come: still thinking, not "no results" yet

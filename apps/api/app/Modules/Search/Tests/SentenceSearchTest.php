@@ -38,6 +38,7 @@ final class SentenceSearchTest extends TestCase
             ['3', 'טבעת יהלומים יוקרתית', 'טבעות זהב צהוב', 5000, [0, 1000, 2000]],
             ['4', 'טבעת זהב לבן עדינה', 'טבעות פס זהב צהוב בשוליים', 900, [0, 1001]],
             ['5', 'תליון משובץ יהלומים', 'תליונים סגר טבעת', 2300, [1, 1000, 2000]],
+            ['6', 'עגיל בודד משובץ יהלום', 'עגילים עגיל נעצים', 1100, [2000]],
         ]);
         $json = (string) json_encode(['items' => $items, 'facets' => $facets, 'actions' => []], JSON_UNESCAPED_UNICODE);
         app(TenantContext::class)->run($this->shop->id, fn () => SearchIndex::query()->create(['shop_id' => $this->shop->id, 'hash' => md5($json), 'items' => $json, 'counts' => [], 'built_at' => now()]));
@@ -61,6 +62,14 @@ final class SentenceSearchTest extends TestCase
         $this->assertContains('1', $found['ids']);
         $this->assertNotContains('4', $found['ids'], 'it carries white gold; its words mention a yellow-gold rim');
         $this->assertNotContains('2', $found['ids']);
+    }
+
+    public function test_a_word_inside_another_word_is_no_product_shown_alone(): void
+    {
+        $search = fn (string $query): ?array => app(SearchCatalog::class)->handle($this->shop->id, $query, ['product'], false, null, false)['single'];
+
+        $this->assertNull($search('עצים'), '"עצים" inside the earring\'s "נעצים" (studs): not shown alone as if it were asked for');
+        $this->assertSame(['id' => 'p:6', 'by' => 'words'], $search('עגיל בודד'), 'the only product that says the words, as words');
     }
 
     public function test_what_a_sentence_means_keeps_a_product_word_the_store_lacks(): void

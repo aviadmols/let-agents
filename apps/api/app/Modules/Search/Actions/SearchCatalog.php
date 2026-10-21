@@ -177,6 +177,14 @@ final class SearchCatalog
                 ? HebrewSearch::single($index['codes'] ?? [], $query, $spelling)
                 : null;
             $single = $single !== null && isset($index['records'][$single['id']]) ? $single : null;
+            // alone by its words only when it says them as words: "עצים" inside an earring's "נעצים" is no match to show alone
+            if ($single !== null && $single['by'] === 'words') {
+                $record = $index['records'][$single['id']];
+                $text = (string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '');
+                // each word as typed, or without its own prefix letter ("בכסף" is said by "כסף")
+                $single = array_all(array_filter(explode(' ', HebrewSearch::normalize($query))), fn (string $w): bool => HebrewSearch::says($text, $w)
+                    || (mb_strlen($w) > 3 && preg_match('/^[והבלמשכ]/u', $w) === 1 && HebrewSearch::says($text, mb_substr($w, 1)))) ? $single : null;
+            }
             // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, to choose from.
             $focus = $minPrice === null && $maxPrice === null && $without === [] && $actions['ids'] === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
 

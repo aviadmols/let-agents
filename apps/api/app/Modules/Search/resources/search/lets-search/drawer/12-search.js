@@ -17,7 +17,7 @@
     keepInField(q);
     if (typed) { remember(q); }
     if (lv && lv.server) {
-      addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, focus: lv.focus, single: lv.single, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
+      addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, focus: lv.focus, single: lv.single, singleBy: lv.singleBy, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
       // kept without asking the server again, so it is counted here (once per tab, as a pause would)
       countSearch(q, lv.ids.length);
       announce(t('announceResults', { n: lv.ids.length }));
@@ -118,7 +118,7 @@
       var d = got.d, ids = got.ids;
       var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       return products(ids.slice(0, 8)).then(function () {
-        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, single: single, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
+        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
         announce(t('announceResults', { n: ids.length }));
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -300,7 +300,7 @@
     var list = filtered(turn), total = (turn.ids || []).length, html = '';
     if (turn.single && rec(turn.single)) {
       var s = rec(turn.single);
-      html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
+      html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku && turn.singleBy === 'sku' ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
     }
     if (!total) {
       if (turn.focus && turn.focus.options && turn.focus.options.length) {
