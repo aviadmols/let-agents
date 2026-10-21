@@ -127,7 +127,7 @@
       shareSearch: 'שיתוף החיפוש', shareStore: 'שיתוף החנות', shareHelp: 'קישור לתוצאות כפי שהן עכשיו, עם הסינון.', shareStoreHelp: 'קישור לחנות, לשלוח למי שתרצו.', shareMore: 'עוד…', shareCopied: 'הקישור הועתק: פותח את החנות עם החיפוש הזה.',
       shareText: 'תראו מה מצאתי ב:store: :q', shareStoreText: 'תראו את :store:',
       aiAsk: 'לשאול את ה-AI שלי', aiHelp: 'החיפוש והמוצרים נשלחים ל-AI שתבחרו, כדי להתייעץ לפני הקנייה.', aiStoreHelp: 'כל החנות נשלחת ל-AI שתבחרו: הוא ימליץ, ישווה ויכין קישור לתשלום עם המוצרים בסל.',
-      aiCopy: 'העתקת קישור', aiPaste: 'השאלה והתוצאות הועתקו. הדביקו אותן ב־Gemini.', aiCopied: 'הקישור הועתק. אפשר להדביק אותו בכל AI.', aiFailed: 'לא הצלחנו להכין את הקישור. נסו שוב.', aiFor: 'נשלח: ":q" · :n מוצרים',
+      aiCopy: 'העתקת קישור', aiPaste: 'הועתק. ב־Gemini לחצו על תיבת הכתיבה והדביקו (Ctrl+V, ובטלפון: לחיצה ארוכה ← הדבקה), ושלחו.', geminiHow: 'ל־Gemini אי אפשר לשלוח שאלה מוכנה: נעתיק אותה בשבילכם, תדביקו אותה ב־Gemini ותשלחו.', geminiGo: 'העתקה ופתיחת Gemini', geminiOpen: 'פתיחת Gemini', geminiCopy: 'העתיקו את הטקסט והדביקו אותו ב־Gemini:', aiCopied: 'הקישור הועתק. אפשר להדביק אותו בכל AI.', aiFailed: 'לא הצלחנו להכין את הקישור. נסו שוב.', aiFor: 'נשלח: ":q" · :n מוצרים',
       kitTitle: 'יש בחנות ערכה מוכנה', myAiTitle: 'רוצים לבדוק לעומק עם ה-AI שלכם?', myAiSub: 'הוא יקבל את השאלה ואת כל המידע מהחנות, ויחזיר הזמנה מוכנה לסל כאן.', aiPromptQ: 'השאלה שלי: ":q". אני רוצה לקנות ב:store. ענה/י מהמידע של החנות וסיים/י בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
       aiPrompt: 'אני רוצה לקנות ב:store. סיים/י תמיד כל המלצה בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
       leadRequired: 'צריך למלא את זה', leadBadField: 'משהו כאן לא תקין', helpful: 'עזר?', helpfulYes: 'כן, עזר', helpfulNo: 'לא עזר', helpfulThanks: 'תודה, זה עוזר לנו להשתפר.', helpfulSorry: 'תודה. הצוות של החנות יראה את התשובה הזאת.',
@@ -180,7 +180,7 @@
       shareSearch: 'Share the search', shareStore: 'Share the store', shareHelp: 'A link to the results as they are now, filters included.', shareStoreHelp: 'A link to the store, to send to anyone.', shareMore: 'More…', shareCopied: 'Link copied: it opens the store with this search.',
       shareText: 'Look what I found at :store: :q', shareStoreText: 'Have a look at :store:',
       aiAsk: 'Ask my AI', aiHelp: 'The search and its products go to the AI you choose, to take advice before buying.', aiStoreHelp: 'The whole store goes to the AI you choose: it recommends, compares and makes a checkout link with the products in the cart.',
-      aiCopy: 'Copy link', aiPaste: 'The question and the results are copied. Paste them into Gemini.', aiCopied: 'Link copied. Paste it into any AI.', aiFailed: 'We could not prepare the link. Please try again.', aiFor: 'Sending: ":q" · :n products',
+      aiCopy: 'Copy link', aiPaste: 'Copied. In Gemini, tap the message box, paste (Ctrl+V, or on a phone: long-press → Paste) and send.', geminiHow: 'Gemini cannot be sent a ready question: we copy it for you, you paste it into Gemini and send.', geminiGo: 'Copy and open Gemini', geminiOpen: 'Open Gemini', geminiCopy: 'Copy this text and paste it into Gemini:', aiCopied: 'Link copied. Paste it into any AI.', aiFailed: 'We could not prepare the link. Please try again.', aiFor: 'Sending: ":q" · :n products',
       kitTitle: 'The store has a ready-made kit', myAiTitle: 'Want to look deeper with your own AI?', myAiSub: 'It gets the question and all the store\'s information, and brings back an order ready for the cart here.', aiPromptQ: 'My question: ":q". I want to buy from :store. Answer from the store\'s information and end with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
       aiPrompt: 'I want to buy from :store. Always end every recommendation with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
       leadRequired: 'Please fill this in', leadBadField: 'Something here is not right', helpful: 'Helpful?', helpfulYes: 'Yes, it helped', helpfulNo: 'No, it didn\'t help', helpfulThanks: 'Thanks, that helps us improve.', helpfulSorry: 'Thanks. The store\'s team will see this answer.',
@@ -3117,7 +3117,7 @@
     if (!turn || !turn.q || !ask || !ask.open || off('aiShare') || !(turn.advice || turn.aiOpen || complexAsk(turn.q))) { return ''; }
     return '<div class="ls-myai"><div class="ls-myai__t">' + esc(t('myAiTitle')) + '</div><div class="ls-myai__s">' + esc(t('myAiSub')) + '</div><div class="ls-myai__btns">' +
       ['chatgpt', 'claude', 'gemini'].filter(function (k) { return ask.open[k]; }).map(function (k) { return '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-ai-ask="' + k + '" data-turn="' + turn.id + '">' + logo(k) + esc({ chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini' }[k]) + '</button>'; }).join('') +
-      '</div></div>';
+      '</div>' + geminiHtml(turn.id) + '</div>';
   }
   // the question and the products of its answer, handed to the shopper's own AI
   // "Not sure what fits?" under a search's results, as the shop set it (search.not_sure): its AI recommends among
@@ -3129,24 +3129,41 @@
     if (S.config.notSure === 'outside' && S.config.aiAsk && S.config.aiAsk.open) { rt.aiOpen = !rt.aiOpen; render(); return; }
     askTurn(t('adviceQ', { q: rt.q }), { products: ids }, false, { advice: ids });
   }
-  // Gemini opens an empty chat whatever its address says: the words go to the clipboard inside the press (a
-  // ClipboardItem that waits for them keeps the press's permission), and the shopper pastes them there
-  function pasteFor(choice, ready) {
-    if (choice !== 'gemini') { return; }
-    try {
-      if (win.ClipboardItem && win.navigator.clipboard && win.navigator.clipboard.write) {
-        win.navigator.clipboard.write([new win.ClipboardItem({ 'text/plain': ready.then(function (d) { return new Blob([d.prompt], { type: 'text/plain' }); }) })]).then(function () { toast(t('aiPaste')); }, function () { ready.then(function (d) { copyText(d.prompt, function () { toast(t('aiPaste')); }); }); });
-        return;
-      }
-    } catch (e) { /* an older browser: below */ }
-    ready.then(function (d) { copyText(d.prompt, function () { toast(t('aiPaste')); }); });
+  // Gemini opens an empty chat whatever its address says, and a page that has just opened another tab may no longer
+  // write to the clipboard. So Gemini takes two presses: the first readies the words and says what comes next; the
+  // second copies them while this page still has the focus, then opens Gemini to paste them into.
+  var GEMINI = null;
+  function geminiReady(ready, where) {
+    ready.then(function (d) {
+      GEMINI = { prompt: d.prompt, url: d.open.gemini, where: where, copied: false };
+      if (where === 'menu') { var n = MENU.querySelector('[data-menu-note]'); if (n) { n.innerHTML = geminiHtml('menu'); } } else { render(); }
+    }, function () { if (where === 'menu') { menuNote(t('aiFailed')); } else { toast(t('aiFailed')); } });
   }
-  function askAiAbout(turn, choice) {
+  function geminiHtml(where) {
+    if (!GEMINI || GEMINI.where !== where) { return ''; }
+    // copied, and the browser kept the tab from opening: a plain link opens it, no clipboard needed
+    var go = GEMINI.copied ? '<a class="ls-btn ls-btn--primary ls-btn--sm" href="' + esc(GEMINI.url) + '" target="_blank" rel="noopener">' + logo('gemini') + esc(t('geminiOpen')) + '</a>'
+      : '<button class="ls-btn ls-btn--primary ls-btn--sm" data-gemini-go>' + logo('gemini') + esc(t('geminiGo')) + '</button>';
+    return '<div class="ls-gemini"><p class="ls-gemini__how">' + esc(t(GEMINI.copied ? 'aiPaste' : 'geminiHow')) + '</p>' + go + '</div>';
+  }
+  function geminiGo() {
+    var g = GEMINI;
+    if (!g) { return; }
+    var open = function () {
+      var w = win.open(g.url, '_blank');
+      if (w) { try { w.opener = null; } catch (e) { /* fine */ } toast(t('aiPaste')); return; }
+      g.copied = true;
+      if (g.where === 'menu') { var n = MENU.querySelector('[data-menu-note]'); if (n) { n.innerHTML = geminiHtml('menu'); } } else { render(); }
+    };
+    var p = win.navigator.clipboard && win.navigator.clipboard.writeText ? win.navigator.clipboard.writeText(g.prompt) : Promise.reject();
+    p.then(open, function () { win.prompt(t('geminiCopy'), g.prompt); open(); });
+  }  function askAiAbout(turn, choice) {
     if (!turn) { return; }
     // what the answer picked; else the results it was asked about (advice), or the results themselves
     var ids = (turn.picks && turn.picks.length ? turn.picks.map(function (p) { return pid(p.id); }) : turn.advice || (turn.kind === 'results' ? filtered(turn).map(function (r) { return pid(r.id); }) : [])).slice(0, 24);
-    var tab = win.open('about:blank', '_blank'), ready = shareFor({ q: turn.q, ids: ids, turn: null, asked: true });
-    pasteFor(choice, ready);
+    var ready = shareFor({ q: turn.q, ids: ids, turn: null, asked: true });
+    if (choice === 'gemini') { geminiReady(ready, turn.id); return; }
+    var tab = win.open('about:blank', '_blank');
     ready.then(function (data) {
       if (tab) { try { tab.opener = null; } catch (e) { /* fine */ } tab.location.href = data.open[choice]; } else { win.location.href = data.open[choice]; }
     }, function () { if (tab) { tab.close(); } toast(t('aiFailed')); });
@@ -3154,8 +3171,9 @@
   function askAi(choice) {
     var cx = shareCtx();
     // the tab opens inside the press, so no popup blocker stops it, and goes where it should once the link is ready
-    var tab = choice === 'copy' ? null : win.open('about:blank', '_blank'), ready = shareFor(cx);
-    pasteFor(choice, ready);
+    var ready = shareFor(cx);
+    if (choice === 'gemini') { geminiReady(ready, 'menu'); return; }
+    var tab = choice === 'copy' ? null : win.open('about:blank', '_blank');
     ready.then(function (data) {
       if (choice === 'copy') { copyText(data.prompt, function () { menuNote(t('aiCopied')); }); return; }
       if (tab) { try { tab.opener = null; } catch (e) { /* fine */ } tab.location.href = data.open[choice]; } else { win.location.href = data.open[choice]; }
@@ -3364,6 +3382,7 @@
     if (d.menuView !== undefined) { showMenu(d.menuView); return; }
     if (d.ai) { askAi(d.ai); return; }
     if (d.aiAsk) { askAiAbout(turnById(d.turn), d.aiAsk); return; }
+    if (d.geminiGo !== undefined) { geminiGo(); return; }
     if (d.share && el.closest('.ls-menu')) { shareGo(d.share); return; }
     if (d.expand !== undefined) { hideMenu(); toggleExpand(); return; }
     if (d.new !== undefined) {

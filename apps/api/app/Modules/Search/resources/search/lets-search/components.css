@@ -356,6 +356,8 @@ img:not(.ls-pic2):has(+ .ls-pic2) { transition: opacity 320ms ease, transform 50
 .ls-ask__about { display: block; margin-top: 2px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-noanswer__hint { margin: 8px 0 0; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-note { margin: 0 0 10px; }
+.ls-gemini { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ls-border, rgba(127,127,127,.18)); }
+.ls-gemini__how { margin: 0 0 8px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-note__text { margin: 0 0 4px; padding: 0 4px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 
 /* after "added": a quiet row under the card */
