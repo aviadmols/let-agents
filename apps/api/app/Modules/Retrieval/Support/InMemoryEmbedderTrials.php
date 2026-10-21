@@ -4,7 +4,6 @@ namespace App\Modules\Retrieval\Support;
 
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\Embedder;
-use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
@@ -38,9 +37,12 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
     /** What the live search compares by meaning, and how its results name them. */
     private const PREFIX = [ChunkSource::Product->value => 'p:', ChunkSource::Content->value => 'c:'];
 
+    /** How many of each query's nearest documents give their similarity to the distribution the thresholds are read from. */
+    private const POOL = 40;
+
     public function __construct(
         private readonly Embedder $embedder,
-        private readonly ImageEmbedder $imageEmbedder,
+        private readonly QueryVectors $queries,
         private readonly SpendGuard $spend,
         private readonly RecordsRuns $runs,
     ) {}
@@ -51,11 +53,11 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
         $out = [];
 
         foreach ($trials as $trial) {
-            $result = ['ranked' => [], 'pieces' => 0, 'input_tokens' => 0, 'cost_usd' => 0.0, 'stopped' => null];
+            $result = ['ranked' => [], 'scores' => [], 'pieces' => 0, 'input_tokens' => 0, 'cost_usd' => 0.0, 'stopped' => null];
 
             $this->runs->track(self::AGENT, 'retrieval.embedder_trial', function (RunContext $run) use (&$result, $trial, $queries, $limit, $maxUsd): void {
                 $result = $this->trial($run, $trial, $queries, max(1, $limit), $maxUsd);
-                $run->output(['trial' => $trial->name, 'model' => $result['model'], 'queries' => count($queries)] + array_diff_key($result, ['ranked' => 1]))
+                $run->output(['trial' => $trial->name, 'model' => $result['model'], 'queries' => count($queries)] + array_diff_key($result, ['ranked' => 1, 'scores' => 1]))
                     ->summary('retrieval::runs.embedder_trial', ['model' => $result['model'], 'queries' => (string) count($queries), 'pieces' => (string) $result['pieces']]);
             }, $shopId, ['trial' => $trial->name, 'model' => $trial->model], RunTrigger::Manual);
 
@@ -100,7 +102,7 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
 
     /**
      * @param  list<string>  $queries
-     * @return array{model: string, ranked: array<string, list<string>>, pieces: int, input_tokens: int, cost_usd: float, stopped: string|null}
+     * @return array{model: string, ranked: array<string, list<string>>, scores: list<float>, pieces: int, input_tokens: int, cost_usd: float, stopped: string|null}
      */
     private function trial(RunContext $run, EmbedderTrial $trial, array $queries, int $limit, float $maxUsd): array
     {
@@ -109,7 +111,7 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
             ? [$index->providerName, $index->model, (int) Settings::get('retrieval.embedding_dimensions') ?: null, (float) Settings::get('retrieval.embedding_usd_per_million')]
             : [strtolower(trim($trial->provider)), trim($trial->model), $trial->dimensions, $trial->usdPerMillion];
         $provider = AiProviderName::tryFrom($providerName);
-        $result = ['model' => $providerName.' · '.$model, 'ranked' => [], 'pieces' => 0, 'input_tokens' => 0, 'cost_usd' => 0.0, 'stopped' => null];
+        $result = ['model' => $providerName.' · '.$model, 'ranked' => [], 'scores' => [], 'pieces' => 0, 'input_tokens' => 0, 'cost_usd' => 0.0, 'stopped' => null];
 
         if ($provider === null || $model === '' || $index->model === '') {
             $result['stopped'] = 'unknown_provider';
@@ -118,7 +120,8 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
         }
 
         // One call: SpendGuard first, this trial's own ceiling, the cost on the run.
-        $embed = function (array $texts, bool $asQuery) use ($run, $trial, $provider, $providerName, $model, $dimensions, $price, $maxUsd, &$result): ?array {
+        // The queries as the live search embeds them (QueryVectors::asQuery), the pieces as the index does.
+        $embed = function (array $texts, bool $asQuery) use ($run, $provider, $providerName, $model, $dimensions, $price, $maxUsd, &$result): ?array {
             $estimate = array_sum(array_map('mb_strlen', $texts)) / self::CHARS_PER_TOKEN * $price / 1_000_000;
             if ($maxUsd < $result['cost_usd'] + $estimate) {
                 $result['stopped'] = 'max_usd';
@@ -127,8 +130,8 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
             }
             try {
                 $this->spend->assertCanSpend($estimate);
-                $embeddings = $asQuery && $trial->asSearch
-                    ? $this->imageEmbedder->embedTextsForImages($provider, $model, $texts, $dimensions, query: true)
+                $embeddings = $asQuery
+                    ? $this->queries->asQuery($provider, $model, $texts, $dimensions)
                     : $this->embedder->embed($provider, $model, $texts, $dimensions);
             } catch (SpendCapReached) {
                 $result['stopped'] = 'spend_cap';
@@ -159,15 +162,16 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
         $top = array_fill(0, count($queries), []);
         $doc = null;
         $best = [];
-        $flush = function () use (&$doc, &$best, &$top, $limit): void {
+        $keep = max($limit, self::POOL);
+        $flush = function () use (&$doc, &$best, &$top, $keep): void {
             if ($doc === null) {
                 return;
             }
             foreach ($best as $q => $similarity) {
                 $top[$q][$doc] = $similarity;
-                if (count($top[$q]) > $limit * 3) {
+                if (count($top[$q]) > $keep * 3) {
                     arsort($top[$q]);
-                    $top[$q] = array_slice($top[$q], 0, $limit, true);
+                    $top[$q] = array_slice($top[$q], 0, $keep, true);
                 }
             }
             $best = [];
@@ -229,10 +233,14 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
         }
         $flush();
 
+        $scores = [];
         foreach ($queries as $q => $text) {
             arsort($top[$q]);
             $result['ranked'][$text] = array_slice(array_keys($top[$q]), 0, $limit);
+            array_push($scores, ...array_slice(array_values($top[$q]), 0, self::POOL));
         }
+        rsort($scores);
+        $result['scores'] = array_map(fn (float $s): float => round($s, 4), $scores);
         $result['cost_usd'] = round($result['cost_usd'], 6);
 
         return $result;

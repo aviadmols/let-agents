@@ -16,11 +16,14 @@ interface EmbedderTrials
 {
     /**
      * By trial name. Its ranked list is by query: 'p:<external id>' or 'c:<external id>', nearest first.
+     * Its scores are the similarities of every query's nearest documents, highest first: where a
+     * threshold falls in them says how many results it lets through, so a threshold of one model can
+     * be carried to another. Queries are embedded as the live search embeds them (QueryVectors::asQuery).
      * Each trial stops once it spent $maxUsd.
      *
      * @param  list<string>  $queries
      * @param  list<EmbedderTrial>  $trials
-     * @return array<string, array{ranked: array<string, list<string>>, pieces: int, input_tokens: int, cost_usd: float, stopped: string|null}>
+     * @return array<string, array{ranked: array<string, list<string>>, scores: list<float>, pieces: int, input_tokens: int, cost_usd: float, stopped: string|null}>
      */
     public function rank(string $shopId, array $queries, array $trials, int $limit, float $maxUsd): array;
 

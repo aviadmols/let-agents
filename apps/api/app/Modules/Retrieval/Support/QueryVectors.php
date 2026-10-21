@@ -4,10 +4,12 @@ namespace App\Modules\Retrieval\Support;
 
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\Embedder;
+use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Retrieval\Models\RetrievalQueryVector;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -73,7 +75,7 @@ final class QueryVectors
             $this->spend->assertCanSpend(forShopper: true, estimatedUsd: mb_strlen($text) * $price / 1_000_000);
             $embeddings = $images
                 ? $this->imageEmbedder->embedTextsForImages($choice->provider, $choice->model, [$text], $dimensions)
-                : $this->embedder->embed($choice->provider, $choice->model, [$text], $dimensions);
+                : $this->asQuery($choice->provider, $choice->model, [$text], $dimensions);
         } catch (SpendCapReached|ModelCallFailed) {
             return null;
         }
@@ -97,6 +99,29 @@ final class QueryVectors
         $this->record($shopId, $choice->providerName, $choice->model, $embeddings->inputTokens, $embeddings->costUsd($price));
 
         return $vector;
+    }
+
+    /**
+     * A shopper's words, embedded as a search query. A model that holds words and pictures in one space
+     * (gemini-embedding-2) is told the task in front of the words, as picture search sends them, and finds
+     * the pages better for it; the pages themselves are embedded plain (BuildIndex). Any other model gets
+     * the words as they are.
+     *
+     * @param  list<string>  $texts
+     *
+     * @throws ModelCallFailed
+     */
+    public function asQuery(AiProviderName $provider, string $model, array $texts, ?int $dimensions): Embeddings
+    {
+        try {
+            return $this->imageEmbedder->embedTextsForImages($provider, $model, $texts, $dimensions, query: true);
+        } catch (ModelCallFailed $e) {
+            if ($e->reason !== ModelCallFailed::UNSUPPORTED) {
+                throw $e;
+            }
+
+            return $this->embedder->embed($provider, $model, $texts, $dimensions);
+        }
     }
 
     /**

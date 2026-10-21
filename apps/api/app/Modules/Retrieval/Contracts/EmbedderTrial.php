@@ -4,9 +4,8 @@ namespace App\Modules\Retrieval\Contracts;
 
 /**
  * One way of turning the shop's words into vectors, to be measured (EmbedderTrials): the index as it
- * stands, or a provider and model tried in memory. "As search" embeds the shopper's words as a search
- * query, the way the model's own driver does it for pictures (a model like gemini-embedding-2 is told
- * the task in front of the text); otherwise queries and pages are embedded alike, as the index does.
+ * stands, or a provider and model tried in memory. Either way the shopper's words are embedded as the
+ * live search embeds them, as a search query where the model takes one (gemini-embedding-2).
  */
 final class EmbedderTrial
 {
@@ -16,7 +15,6 @@ final class EmbedderTrial
         public readonly string $model = '',
         public readonly ?int $dimensions = null,
         public readonly float $usdPerMillion = 0.0,
-        public readonly bool $asSearch = false,
         public readonly bool $index = false,
     ) {}
 

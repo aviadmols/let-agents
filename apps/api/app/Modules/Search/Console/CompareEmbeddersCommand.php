@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Contracts\EmbedderTrial;
 use App\Modules\Retrieval\Contracts\EmbedderTrials;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Console\Command;
@@ -15,16 +16,17 @@ use Illuminate\Console\Command;
  *
  * The truth is the shop's own: a search and the product or page a shopper clicked from it
  * (search_clicks), the most clicked searches first. For each, the products and pages nearest it by
- * meaning, as the live search ranks them, by three trials:
- *
- *   index        the index as it stands
- *   <model>      another model, queries and pages embedded alike: what switching the settings gives
- *   <model> as search   the same model, the shopper's words embedded as a search query, as the
- *                picture search already sends them: what a small change to the text path gives
+ * meaning, as the live search ranks them, by the index as it stands and by another model, the
+ * shopper's words embedded as the live search embeds them (as a search query where the model takes one).
  *
  * The other model is the picture model's by default (retrieval.image_*), so the question answered
  * is "what if the words used it too". In memory only: nothing is written to the index or shown to
  * shoppers. Each trial is accounted on a run of retrieval.embedder_trial and stops at --max-usd.
+ *
+ * Then what a switch needs besides the model: each threshold that depends on it, carried to the other
+ * model so it lets through as many results as today (where it falls among the similarities of every
+ * query's nearest documents, in each model); and what it costs, once (the whole index embedded again)
+ * and a month (the last 30 days' embedding, of changed pages and of new wordings, at the other price).
  *
  * The clicks came from what today's search showed, so they lean towards today's model: a tie
  * favours the index, and only a clear gain is one.
@@ -35,6 +37,18 @@ final class CompareEmbeddersCommand extends Command
     private const CHARS_PER_TOKEN = 2;
 
     private const EXAMPLES = 12;
+
+    /** The thresholds read against similarities of the words' model (the pictures' are the picture model's). */
+    private const THRESHOLDS = [
+        'search.semantic_min_similarity' => 'a product found by meaning',
+        'search.meaning_only_min_similarity' => 'results by meaning alone',
+        'search.content_min_similarity' => 'a guide or a page by meaning',
+        'assistant.site_min_similarity' => 'what the assistant reads from the pages',
+        'retrieval.min_alternative_similarity' => 'similar products (product to product: check it by eye)',
+    ];
+
+    /** The runs that embed the words day to day: changed pages, and each new wording a shopper types. */
+    private const EMBEDDING_AGENTS = ['retrieval.indexer', 'retrieval.query_embedder'];
 
     protected $signature = 'search:compare-embedders {shop : the shop\'s slug or id}
         {--days=180 : searches clicked in this many days}
@@ -73,11 +87,7 @@ final class CompareEmbeddersCommand extends Command
         $model = (string) ($this->option('model') ?: Settings::get('retrieval.image_model'));
         $dimensions = (int) ($this->option('dimensions') ?: Settings::get('retrieval.image_dimensions')) ?: null;
         $price = (float) ($this->option('price') ?? Settings::get('retrieval.image_text_usd_per_million'));
-        $tried = [
-            EmbedderTrial::index(),
-            new EmbedderTrial($model, $provider, $model, $dimensions, $price),
-            new EmbedderTrial($model.' as search', $provider, $model, $dimensions, $price, asSearch: true),
-        ];
+        $tried = [EmbedderTrial::index(), new EmbedderTrial($model, $provider, $model, $dimensions, $price)];
 
         $this->info("{$shop->name}: ".count($truth).' clicked searches, measured to '.$limit.' results.');
         $results = $tenant->run($shop->id, fn () => $trials->rank($shop->id, array_keys($truth), $tried, $limit, (float) $this->option('max-usd')));
@@ -98,17 +108,53 @@ final class CompareEmbeddersCommand extends Command
 
         $this->examples($truth, $titles, $ranks, $results, $limit);
 
-        // What switching would cost: the whole index embedded again, and the questions of the page sections.
+        $this->thresholds($shop->id, $results['index']['scores'] ?? [], $results[$model]['scores'] ?? [], $model);
+
+        // What switching costs: once, the whole index and the questions of the page sections embedded again;
+        // a month, what the last 30 days embedded (changed pages, new wordings), at the other price.
+        $now = (float) Settings::get('retrieval.embedding_usd_per_million');
         $tokens = ($size['chars'] + $size['ask_chars']) / self::CHARS_PER_TOKEN;
+        $month = (int) $tenant->runUnscoped(fn () => Run::query()->where('shop_id', $shop->id)->whereIn('agent', self::EMBEDDING_AGENTS)
+            ->where('created_at', '>=', now()->subDays(30))->sum('input_tokens'));
         $this->newLine();
         $this->line(sprintf(
-            'Switching: %d pieces (%s characters) and %d question vectors (%s characters), about %s tokens: about $%s with %s, $%s with the index\'s model.',
+            'Once: %d pieces (%s characters) and %d question vectors (%s characters), about %s tokens: about $%s with %s.',
             $size['pieces'], number_format($size['chars']), $size['asks'], number_format($size['ask_chars']), number_format($tokens),
-            number_format($tokens * $price / 1_000_000, 2), $model, number_format($tokens * (float) Settings::get('retrieval.embedding_usd_per_million') / 1_000_000, 2),
+            number_format($tokens * $price / 1_000_000, 2), $model,
+        ));
+        $this->line(sprintf(
+            'A month: the last 30 days embedded %s tokens (changed pages and new wordings): $%s today, about $%s with %s.',
+            number_format($month), number_format($month * $now / 1_000_000, 4), number_format($month * $price / 1_000_000, 4), $model,
         ));
         $this->line('The clicks came from what today\'s search showed, so they lean towards the index: only a clear gain is one.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Each threshold that depends on the words' model, carried to the other one: where it falls among today's
+     * similarities (the share of nearest documents it lets through), the same place among the other model's.
+     *
+     * @param  list<float>  $today  highest first
+     * @param  list<float>  $other  highest first
+     */
+    private function thresholds(string $shopId, array $today, array $other, string $model): void
+    {
+        if ($today === [] || $other === []) {
+            return;
+        }
+
+        $rows = [];
+        foreach (self::THRESHOLDS as $key => $what) {
+            $now = (float) Settings::get($key, $shopId);
+            $share = count(array_filter($today, fn (float $s): bool => $s >= $now)) / count($today);
+            $at = max(0, (int) ceil($share * count($other)) - 1);
+            $rows[] = [$key, $what, number_format($now, 2), number_format(100 * $share, 1).'%', $share > 0 ? number_format($other[$at], 2) : '> '.number_format($other[0], 2)];
+        }
+
+        $this->newLine();
+        $this->line('Thresholds that depend on the words\' model, carried to '.$model.' (as many results let through as today):');
+        $this->table(['setting', 'for', 'today', 'lets through', $model], $rows);
     }
 
     /**

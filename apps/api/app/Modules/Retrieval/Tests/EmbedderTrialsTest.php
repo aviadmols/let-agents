@@ -63,10 +63,10 @@ final class EmbedderTrialsTest extends TestCase
 
     public function test_each_trial_ranks_products_and_pages_by_their_best_piece(): void
     {
-        $trials = [EmbedderTrial::index(), new EmbedderTrial('other', 'gemini', 'gemini-embedding-2', 768, 0.2), new EmbedderTrial('other as search', 'gemini', 'gemini-embedding-2', 768, 0.2, asSearch: true)];
+        $trials = [EmbedderTrial::index(), new EmbedderTrial('other', 'gemini', 'gemini-embedding-2', 768, 0.2)];
         $results = $this->inShop(fn () => app(EmbedderTrials::class)->rank($this->shop->id, ['מסור עגול', 'שמן לעץ', ' מסור עגול '], $trials, 3, 1.0));
 
-        $this->assertSame(['index', 'other', 'other as search'], array_keys($results));
+        $this->assertSame(['index', 'other'], array_keys($results));
         foreach ($results as $name => $result) {
             $this->assertNull($result['stopped'], $name);
             $this->assertSame(['מסור עגול', 'שמן לעץ'], array_keys($result['ranked']), 'each wording once, trimmed');
@@ -75,8 +75,13 @@ final class EmbedderTrialsTest extends TestCase
             $this->assertLessThanOrEqual(3, count($result['ranked']['שמן לעץ']));
             $this->assertSame(count(array_unique($result['ranked']['שמן לעץ'])), count($result['ranked']['שמן לעץ']), 'a document once, by its best piece');
         }
-        $this->assertSame([true], $this->pictures->asQuery, 'only the queries go the search way, once, in one batch');
+        $this->assertSame([true, true], $this->pictures->asQuery, 'each trial asks its queries the way the live search does, once, in one batch');
         $this->assertSame($results['index']['pieces'], $results['other']['pieces'], 'every trial reads the same pieces');
+        $scores = $results['other']['scores'];
+        $this->assertNotEmpty($scores);
+        $sorted = $scores;
+        rsort($sorted);
+        $this->assertSame($sorted, $scores, 'the similarities come highest first, for the thresholds to be read from');
     }
 
     public function test_nothing_is_written_and_every_trial_is_accounted(): void

@@ -81,7 +81,9 @@ final class CompareEmbeddersTest extends TestCase
         $this->artisan('search:compare-embedders', ['shop' => $this->shop->slug, '--queries' => 2])
             ->expectsOutputToContain('2 clicked searches')
             ->expectsOutputToContain('100.0%')
-            ->expectsOutputToContain('Switching:')
+            ->expectsOutputToContain('search.semantic_min_similarity')
+            ->expectsOutputToContain('Once:')
+            ->expectsOutputToContain('A month:')
             ->assertSuccessful();
     }
 
