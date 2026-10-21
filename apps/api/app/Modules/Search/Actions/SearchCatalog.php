@@ -181,6 +181,10 @@ final class SearchCatalog
                 : [];
             $describedIds = array_flip($described);
             $byMeaning = $meaning && ! $code;
+            // "חולצה עם האות M" in a jewellery store: a word the catalogue has nothing close to asks for what the store may not
+            // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
+            // a few of them, and the drawer says the word was not found (unknown) rather than showing dozens as if it were.
+            $unknown = $byMeaning ? HebrewSearch::unknownWords($index['engine'], $query) : [];
             $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => []];
             $meaning = $near['products'];
             // Guides and pages found by meaning are a group of their own, never a rank among products: an
@@ -188,6 +192,11 @@ final class SearchCatalog
             // suggested, after what the words and the meaning found themselves (guided()).
             $guides = $this->guides($shopId, $near['content'], $index['records']);
             $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
+            if ($unknown !== []) {
+                $few = (int) Settings::get('search.unknown_results', $shopId);
+                $meaning = array_slice($meaning, 0, $few);
+                $pictures = array_slice($pictures, 0, $few);
+            }
 
             // "טבעת יהלום סוליטר בכסף": when products hold every word, only they are shown, however
             // close by meaning or by picture a gold solitaire or a silver zircon ring may be. The
@@ -307,7 +316,7 @@ final class SearchCatalog
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
-            return ['query' => $query, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'unknown' => $unknown, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 

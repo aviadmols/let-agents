@@ -167,6 +167,15 @@
             "scope": "global"
         },
         {
+            "name": "unknown_results",
+            "type": "int",
+            "default": 12,
+            "min": 0,
+            "max": 100,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
             "name": "word_enough",
             "type": "int",
             "default": 12,

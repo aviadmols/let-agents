@@ -99,6 +99,33 @@ final class HebrewSearch
      * every word no product or page holds anything close to ("ביתית", "וזולה"). "מה הכי טוב
      * למברגה ביתית וזולה" is "למברגה". Empty when nothing is left.
      */
+    /** A word is known to the catalogue when one of its words is at least this close to it. */
+    public const KNOWN = 0.75;
+
+    /**
+     * The words of a query the catalogue has nothing close to: "חולצה" in a jewellery store (its nearest,
+     * "חוליה", at .47). Not a question or filler word, not a number, three letters or more.
+     *
+     * @return list<string>
+     */
+    public static function unknownWords(array $index, string $query): array
+    {
+        $out = [];
+
+        foreach (explode(' ', self::normalize($query)) as $word) {
+            if (mb_strlen($word) < 3 || preg_match('/\d/u', $word) === 1 || in_array($word, self::FILLER, true) || in_array($word, self::DESCRIBES, true) || in_array($word, self::GENERIC, true)) {
+                continue;
+            }
+
+            $close = self::closeWords($index, $word);
+            if (($close === [] ? 0.0 : (float) max($close)) < self::KNOWN) {
+                $out[] = $word;
+            }
+        }
+
+        return $out;
+    }
+
     public static function aboutWords(array $index, string $query): string
     {
         $words = array_filter(explode(' ', self::normalize($query)), fn (string $w): bool => $w !== '' && ! in_array($w, self::FILLER, true));

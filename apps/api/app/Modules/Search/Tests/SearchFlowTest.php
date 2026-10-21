@@ -266,6 +266,23 @@ final class SearchFlowTest extends TestCase
         $this->assertSame(['104', '103'], array_column($this->search('אורן')->json('groups.product'), 'external_id'), 'enough hold it as typed: only they');
     }
 
+    public function test_a_word_the_catalogue_does_not_know_is_said_and_only_the_nearest_few_follow(): void
+    {
+        // Rocks: "חולצה עם האות M" showed 48 link chains by meaning (.40 to .45): the store sells no shirts.
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->meaning = [
+            ['source' => 'product', 'source_id' => 'y', 'external_id' => '102', 'title' => 'בורג איסכורית 6X40', 'similarity' => 0.44],
+            ['source' => 'product', 'source_id' => 'x', 'external_id' => '104', 'title' => 'עץ אורן מוקצע 42X142', 'similarity' => 0.62],
+        ];
+
+        Settings::set('search.unknown_results', 1, $this->shop->id);
+        $shirt = $this->search('חולצה')->json();
+        $this->assertSame(['חולצה'], $shirt['unknown'], 'the drawer says it is not here');
+        $this->assertSame(['102'], array_column($shirt['groups']['product'], 'external_id'), 'only the nearest few');
+
+        $this->assertSame([], $this->search('אורן')->json('unknown'), 'a word the catalogue has');
+    }
+
     public function test_guides_by_meaning_are_their_own_group_suggest_their_products_for_a_need_and_age(): void
     {
         $this->inShop(function (): void {

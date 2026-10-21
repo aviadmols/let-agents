@@ -33,6 +33,10 @@ return [
         'label' => 'What an old guide loses a year',
         'description' => 'Taken off the similarity of news, a product review or a buying guide for each year since it was updated, up to three: models and prices change. A how-to, a project idea or a material guide does not age.',
     ],
+    'unknown_results' => [
+        'label' => 'Products by meaning for an unknown word',
+        'description' => 'When a search holds a word the catalogue has nothing close to ("shirt" in a jewellery store), at most this many products join by meaning or picture, and the drawer says the word was not found on the site. What is truly close ("a light beam": a pine plank) is still shown.',
+    ],
     'word_enough' => [
         'label' => 'One word many products hold',
         'description' => 'When at least this many products hold a one-word search as typed ("topaz"), only they are shown, without products found by meaning or picture alone (citrine, yellow sapphire). When few hold it, meaning fills in as usual.',
