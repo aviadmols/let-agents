@@ -89,10 +89,10 @@
       askWho: 'שאלו את :name', searchFor: 'חיפוש "‎:q‎"', categories: 'קטגוריות', products: 'מוצרים', guides: 'מדריכים ודפים', quick: 'תשובות מהאתר',
       showAll: 'הצגת כל :n התוצאות', askSpecific: 'אפשר לחפש מוצר, או לשאול שאלה מדויקת יותר, למשל לפי נושא, קהל או תקציב, ואעזור למצוא.', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'לא בטוחים מה מתאים? שאלו את :name', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
-      productsCount: ':n מוצרים', askedAbout: 'נשאל על: :t', askedAboutProduct: 'נשאל על מוצר: :t', alsoRelated: 'מוצרים שקשורים לשאלה', alsoAll: 'לכל התוצאות', wanted: 'מוצרים פופולריים', notHere: 'לא מצאנו «:w» באתר. אלה הקרובים ביותר לפי משמעות:', meaningOnly: 'אף מוצר לא מכיל את המילים «:q». אלה הקרובים ביותר לפי משמעות:', meaningMostly: 'רק :n מוצרים מכילים את המילים; השאר קרובים לפי משמעות.', askFind: 'לבקש מ־:name למצוא את זה', askFindQ: 'תראה לי :q', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
+      productsCount: ':n מוצרים', askedAbout: 'נשאל על: :t', askedAboutProduct: 'נשאל על מוצר: :t', alsoRelated: 'מוצרים שקשורים לשאלה', alsoAll: 'לכל התוצאות', wanted: 'מוצרים פופולריים', notHere: 'לא מצאנו «:w» באתר. אלה הקרובים ביותר לפי משמעות:', showingFor: 'מציג תוצאות ל«:kept» · «:gone» לא נמצא באתר', meaningOnly: 'אף מוצר לא מכיל את המילים «:q». אלה הקרובים ביותר לפי משמעות:', meaningMostly: 'רק :n מוצרים מכילים את המילים; השאר קרובים לפי משמעות.', askFind: 'לבקש מ־:name למצוא את זה', askFindQ: 'תראה לי :q', oneProduct: 'מוצר אחד', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
       didYouMean: 'לא מצאנו בדיוק את "‎:q‎". למה התכוונתם?', category: 'קטגוריה: :t', exactSku: 'נמצא לפי מק״ט :sku', exact: 'התאמה מדויקת',
-      noResults: 'לא מצאנו את "‎:q‎"', noResultsSub: 'נסו מילה אחרת, או התחילו מקטגוריה.', askCardT: ':name ימצא את זה בשבילכם', askCardS: 'ה־AI עובר על כל המוצרים באתר ומחזיר את מה שמתאים למה שכתבתם.',
+      noResults: 'לא מצאנו את "‎:q‎"', noResultsSub: 'נסו מילה אחרת, או התחילו מקטגוריה.',
       backToChat: 'חזרה לשיחה', loadMore: 'הצגת עוד', onSite: 'לכל התוצאות בדף החיפוש',
       add: 'הוספה לסל', added: 'נוסף לסל', addFailed: 'לא הצלחנו להוסיף. נסו לפתוח את המוצר.', options: 'בחירת אפשרויות', outStock: 'אזל', similarInStock: 'דומים במלאי', similar: 'דומים',
       onSaleBadge: 'במבצע', outBadge: 'אזל', toCart: 'לעגלה', keepGoing: 'ממשיכים לחפש', goesWith: 'מתאים לקנות יחד', whyShown: 'למה זה מוצג?', whyShownText: 'החנות סימנה את המוצרים האלה כמשלימים למוצר שהוספתם.',
@@ -142,10 +142,10 @@
       askWho: 'Ask :name', searchFor: 'Search "‎:q‎"', categories: 'Categories', products: 'Products', guides: 'Guides and pages', quick: 'Answers from the site',
       showAll: 'Show all :n results', askSpecific: 'You can search for a product, or ask a more specific question, for example by topic, audience or budget, and I will help find it.', understood: 'Read as: ":q"', searchFor: 'All search results for "‎:q‎"', showAllOne: 'Show the result', notSure: 'Not sure what fits? Ask :name', adviceQ: 'Which of the results for "‎:q‎" suits me best?', goPage: 'Go to :t', adviceNone: 'No clear pick among these results. You can talk them over with another AI:',
       noMatch: 'No match for "‎:q‎"', noMatchSub: 'We may call it something else. Ask, or start from a category.',
-      productsCount: ':n products', askedAbout: 'Asked about: :t', askedAboutProduct: 'Asked about the product: :t', alsoRelated: 'Products related to the question', alsoAll: 'All the results', wanted: 'Popular products', notHere: 'We did not find “:w” on the site. These are the closest by meaning:', meaningOnly: 'No product holds the words “:q”. These are the closest by meaning:', meaningMostly: 'Only :n products hold the words; the rest are close by meaning.', askFind: 'Ask :name to find it', askFindQ: 'Show me :q', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
+      productsCount: ':n products', askedAbout: 'Asked about: :t', askedAboutProduct: 'Asked about the product: :t', alsoRelated: 'Products related to the question', alsoAll: 'All the results', wanted: 'Popular products', notHere: 'We did not find “:w” on the site. These are the closest by meaning:', showingFor: 'Showing results for “:kept” · “:gone” is not on the site', meaningOnly: 'No product holds the words “:q”. These are the closest by meaning:', meaningMostly: 'Only :n products hold the words; the rest are close by meaning.', askFind: 'Ask :name to find it', askFindQ: 'Show me :q', oneProduct: '1 product', in: 'in :name', filter: 'Filter', sort: 'Sort', sortRel: 'Relevance', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', sortNew: 'Newest',
       inStock: 'In stock', onSale: 'On sale', clearAll: 'Clear', showN: 'Show :n products', noFilterMatch: 'Nothing matches every filter. Try removing one.',
       didYouMean: 'No exact match for "‎:q‎". Did you mean?', category: 'Category: :t', exactSku: 'Found by SKU :sku', exact: 'Exact match',
-      noResults: 'No results for "‎:q‎"', noResultsSub: 'Try another word, or start from a category.', askCardT: ':name will find it for you', askCardS: 'The AI reads every product on the site and brings back what fits what you wrote.',
+      noResults: 'No results for "‎:q‎"', noResultsSub: 'Try another word, or start from a category.',
       backToChat: 'Back to chat', loadMore: 'Show more', onSite: 'All results on the search page',
       add: 'Add to cart', added: 'Added', addFailed: 'Couldn\'t add it. Try opening the product.', options: 'Choose options', outStock: 'Sold out', similarInStock: 'Similar in stock', similar: 'Similar',
       onSaleBadge: 'Sale', outBadge: 'Sold out', toCart: 'View cart', keepGoing: 'Keep searching', goesWith: 'Goes well with', whyShown: 'Why am I seeing this?', whyShownText: 'The store marked these as going with what you added.',
@@ -1838,18 +1838,41 @@
   // a few of many. The AI one press away: "תראה לי <the words>" goes to the set finder, which reads the catalogue for it.
   var WEAK_HELD = 3, WEAK_TOTAL = 8;
   function noteHtml(turn) {
-    var E = S.engine, words = turn.unknown || [], total = (turn.ids || []).length, held = typeof turn.held === 'number' ? turn.held : null;
-    var typed = words.length && E && E.normalize ? String(turn.q || '').split(/\s+/).filter(function (w) { return words.indexOf(E.normalize(w)) >= 0; }) : [];
-    var text = typed.length ? t('notHere', { w: typed.join(' ') }) : held === 0 && total ? t('meaningOnly', { q: turn.q }) : held !== null && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
+    var E = S.engine, total = (turn.ids || []).length, held = typeof turn.held === 'number' ? turn.held : null;
+    // the words the store has nothing close to: the server's, or the engine's own while typing
+    var words = turn.unknown && turn.unknown.length ? turn.unknown : localUnknown(turn.q);
+    var typed = [], kept = [];
+    String(turn.q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(Boolean).forEach(function (w) {
+      if (E && E.normalize && words.indexOf(E.normalize(w)) >= 0) { typed.push(w); } else if (!STOP.test(w)) { kept.push(w); }
+    });
+    // "מה זה ספרי פנטזיה?": the books are shown, and it says so; "פנטזיה" is not on the site
+    var text = typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
+      : typed.length ? t('notHere', { w: typed.join(' ') })
+      : held === 0 && total ? t('meaningOnly', { q: turn.q })
+      : held !== null && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
     if (!text) { return ''; }
     return '<div data-unknown>' + askCardHtml(turn.q, text) + '</div>';
   }
-  // Nothing found, or only what is near by meaning: the store's AI is the next step, shown as one, not as a line among others.
-  // It reads the whole catalogue for the words ("תראה לי …": the set finder), where the search found nothing.
+  // the words of a search the catalogue has nothing close to, as the server's unknownWords reads them
+  function localUnknown(q) {
+    var E = S.engine;
+    if (!E || !E.closeWords || !E.normalize || !S.built) { return []; }
+    var out = [];
+    String(q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).forEach(function (w) {
+      if (w.length < 3 || /\d/.test(w) || STOP.test(w)) { return; }
+      var n = E.normalize(w), close = E.closeWords(S.built, n), top = 0;
+      (close.words || []).forEach(function (x) { top = Math.max(top, close.score[x] || 0); });
+      if (top < 0.75) { out.push(n); }
+    });
+    return out;
+  }
+  // Nothing found, or found only in part: the store's AI one press away, in the box the search box offers a question in
+  // ("שאלו את … / the words"). It reads the whole catalogue for them ("תראה לי …": the set finder).
   function askCardHtml(q, text) {
-    return '<div class="ls-askcard" data-askcard><span class="ls-askcard__mark">' + mark() + '</span><div class="ls-askcard__body"><div class="ls-askcard__t">' + esc(t('askCardT', { name: CFG.assistant })) + '</div>' +
-      '<p class="ls-askcard__s">' + esc(text || t('askCardS')) + '</p></div>' +
-      '<button class="ls-btn ls-btn--primary ls-askcard__go" data-ask="' + esc(t('askFindQ', { q: q })) + '">' + esc(t('askFind', { name: CFG.assistant })) + icon('fwd', 'ls-icon--sm') + '</button></div>';
+    return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') +
+      '<div class="ls-note"><button class="ls-ask" data-askcard data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"><span class="ls-ask__mark">' + mark() + '</span>' +
+      '<span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(q) + '</span></span>' +
+      '<span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
   }
   function resultsHtml(turn) {
     if (turn.loading) { return thinking(); }
