@@ -92,7 +92,7 @@ final class HebrewSearch
     public const TAG_WEIGHT = 0.3;
 
     /** Words that only say "things" ("כלים לגינה", "ציוד לגינה", "מוצרים לניקוי"), normalized. */
-    private const GENERIC = ['כלימ', 'כלי', 'ציוד', 'מוצרימ', 'מוצר', 'אביזרימ', 'אביזר', 'פריטימ', 'פריט', 'דברימ', 'חפצימ', 'things', 'products', 'items', 'stuff'];
+    private const GENERIC = ['כלימ', 'כלי', 'ציוד', 'מוצרימ', 'מוצר', 'אביזרימ', 'אביזר', 'פריטימ', 'פריט', 'דברימ', 'חפצימ', 'משהו', 'משהי', 'things', 'products', 'items', 'stuff', 'something', 'anything'];
 
     /**
      * What a sentence is about, in the catalogue's words: question and filler words dropped, then
@@ -769,7 +769,11 @@ final class HebrewSearch
         $generic = array_filter($tokens, fn (string $t): bool => in_array($t, self::GENERIC, true));
         $generic = count($generic) === count($tokens) ? [] : $generic;
         // A word that only says what follows is a colour or a finish ("בצבע שחור") is not counted.
-        $counted = count(array_filter($tokens, fn (string $t, int $at): bool => ! in_array($t, self::DESCRIBES, true) && ! isset($generic[$at]), ARRAY_FILTER_USE_BOTH)) ?: count($tokens);
+        // A filler word ("על", "של", "עם") is no hit either: "ספרים על חטופים" asks for the hostages, not for every
+        // book whose text says "על". With no other word, the fillers are the query.
+        $filler = array_filter($tokens, fn (string $t): bool => in_array($t, self::FILLER, true));
+        $filler = count($filler) === count($tokens) ? [] : $filler;
+        $counted = count(array_filter($tokens, fn (string $t, int $at): bool => ! in_array($t, self::DESCRIBES, true) && ! isset($generic[$at]) && ! isset($filler[$at]), ARRAY_FILTER_USE_BOTH)) ?: count($tokens);
         $needed = $counted <= 2 ? $counted : $counted - 1;
         // The words that must all be there for a record to hold the whole query: filler words
         // ("עם", "של") are not asked of it, nor "בצבע": "מקדחה בצבע שחור" is a black drill, and
@@ -795,8 +799,8 @@ final class HebrewSearch
             foreach ($best as $at => $value) {
                 // A generic word adds a little to the score of what holds it, never to what is found:
                 // "כלים לגינה" puts the garden tools before paint that says "כלים".
-                $score[$at] = ($score[$at] ?? 0) + $value * (isset($generic[$position]) ? self::GENERIC_WEIGHT : 1);
-                $hits[$at] = ($hits[$at] ?? 0) + (isset($generic[$position]) ? 0 : 1);
+                $score[$at] = ($score[$at] ?? 0) + $value * (isset($generic[$position]) || isset($filler[$position]) ? self::GENERIC_WEIGHT : 1);
+                $hits[$at] = ($hits[$at] ?? 0) + (isset($generic[$position]) || isset($filler[$position]) ? 0 : 1);
                 $matched[$at][$position] = true;
             }
         }

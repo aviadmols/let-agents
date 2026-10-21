@@ -140,7 +140,16 @@ final class SearchCatalog
             // those its index leaves out (no size: "גדול" stays a word).
             [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);
             // "שטיח כחול 80 על 150": a colour or a size the shop filters by is a filter, not a word (the page shows it as one).
+            $worded = $query;
             $query = $index === null ? $query : HebrewSearch::withoutFacetWords($index, $query);
+            // The filter read from the words is applied here too, as the drawer applies it: "ספר של תומס סואל" is his
+            // book, not every book with the author's name taken off. Within one filter any value; across filters all.
+            $read = [];
+            if ($index !== null && $query !== $worded) {
+                foreach (HebrewSearch::facets($worded, (array) ($index['facets'] ?? [])) as $named) {
+                    $read[intdiv((int) $named['code'], 1000)][] = (int) $named['code'];
+                }
+            }
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
 
             if ($index === null || $query === '') {
@@ -286,6 +295,10 @@ final class SearchCatalog
             // "עגילי חישוק זהב צהוב עם אבנים שקופות": the colours named, each with its part, weigh as in a
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
             $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
+            if ($read !== []) {
+                $held = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $codes): bool => array_intersect($codes, (array) ($r['f'] ?? [])) !== [])));
+                $groups['product'] = $held !== [] ? $held : $groups['product'];
+            }
 
             // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
             $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
@@ -316,7 +329,9 @@ final class SearchCatalog
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
-            return ['query' => $query, 'unknown' => $unknown, 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            // held: how many products hold every word as typed. None: what is shown is only what is nearest by meaning,
+            // and the drawer says so, with the AI one press away, rather than showing it as if it were what was asked for.
+            return ['query' => $query, 'unknown' => $unknown, 'held' => count(self::whole($spelling)), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
     }
 

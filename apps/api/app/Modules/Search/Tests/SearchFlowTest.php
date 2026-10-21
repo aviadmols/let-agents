@@ -278,9 +278,11 @@ final class SearchFlowTest extends TestCase
         Settings::set('search.unknown_results', 1, $this->shop->id);
         $shirt = $this->search('חולצה')->json();
         $this->assertSame(['חולצה'], $shirt['unknown'], 'the drawer says it is not here');
+        $this->assertSame(0, $shirt['held'], 'no product holds the words: shown as nearest, not as found');
         $this->assertSame(['102'], array_column($shirt['groups']['product'], 'external_id'), 'only the nearest few');
 
         $this->assertSame([], $this->search('אורן')->json('unknown'), 'a word the catalogue has');
+        $this->assertSame(2, $this->search('אורן')->json('held'));
     }
 
     public function test_guides_by_meaning_are_their_own_group_suggest_their_products_for_a_need_and_age(): void

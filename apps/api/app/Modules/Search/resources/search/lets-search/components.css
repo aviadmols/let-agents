@@ -355,7 +355,9 @@ img:not(.ls-pic2):has(+ .ls-pic2) { transition: opacity 320ms ease, transform 50
 .ls-understood { margin-bottom: 8px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-ask__about { display: block; margin-top: 2px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-noanswer__hint { margin: 8px 0 0; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
-.ls-unknown { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--ls-surface-2, rgba(127,127,127,.08)); font-size: var(--lsp-text-sm); }
+.ls-unknown { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--ls-surface-2, rgba(127,127,127,.08)); font-size: var(--lsp-text-sm); }
+.ls-unknown__text { margin: 0; flex: 1 1 240px; }
+.ls-unknown__ask { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 
 /* after "added": a quiet row under the card */
 .ls-added { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 10px 12px; border-radius: var(--lsp-r-sm); background: var(--ls-bg-sunken); font-size: var(--lsp-text-sm); }
