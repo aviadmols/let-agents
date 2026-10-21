@@ -298,7 +298,7 @@
       '<div class="ls-summary" style="margin-top:' + (similar ? 18 : 8) + 'px"><div class="ls-summary__count ls-num" style="font-size:20px;font-weight:500">' + title + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn) + '</div>' +
       (similar && !(turn.ids || []).length ? '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>' : list.length ? '<div class="ls-grid">' + shown.map(card).join('') + '</div>' : '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '</div>') +
-      (list.length > shown.length ? '<div class="ls-more"><button class="ls-btn ls-btn--secondary" data-loadmore="' + turn.id + '">' + esc(t('loadMore')) + '</button></div>' : '') +
-      (!similar && CFG.searchUrl ? '<div class="ls-more"><a class="ls-btn ls-btn--link" href="' + esc(CFG.searchUrl + '?s=' + encodeURIComponent(turn.q)) + '">' + esc(t('onSite')) + '</a></div>' : '');
+      // no way out to the theme's own search page: the drawer's results are the search (as Aviad asked, 2026-10-21)
+      (list.length > shown.length ? '<div class="ls-more"><button class="ls-btn ls-btn--secondary" data-loadmore="' + turn.id + '">' + esc(t('loadMore')) + '</button></div>' : '');
   }
 
