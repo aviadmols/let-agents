@@ -10,6 +10,7 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -140,6 +141,22 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame([], $this->similar('302')->json('products'), 'a baby cream has no swaddles for similar items');
     }
 
+    public function test_the_tags_a_product_shares_come_before_what_its_description_reads_near(): void
+    {
+        // Sela: "חטוף" shares "חטופים ושבי" with "מפגש עם עצמי בגיהינום"; its description reads near "דרקולה" (303 here)
+        Settings::set('search.similar_by', 'meaning', $this->shop->id);
+        $this->app->instance(RelatedByTags::class, new class implements RelatedByTags
+        {
+            public function to(string $shopId, string $externalId, int $limit): array
+            {
+                return [['external_id' => '302', 'score' => 0.8]];
+            }
+        });
+
+        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the one sharing its tags first, the meaning after, to fill');
+        $this->assertSame(['302'], array_column($this->similar('301', 1)->json('products'), 'external_id'), 'enough share its tags: only they');
+    }
+
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void
     {
         // A bookshop whose bundles look alike: by content alone, the pictures never asked.
@@ -210,8 +227,8 @@ final class SimilarItemsTest extends TestCase
         $this->assertFalse($sizes()->json('enabled'), 'no similar items, no help');
     }
 
-    private function similar(string $id): TestResponse
+    private function similar(string $id, ?int $limit = null): TestResponse
     {
-        return $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/similar?id='.rawurlencode($id));
+        return $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/similar?id='.rawurlencode($id).($limit === null ? '' : '&limit='.$limit));
     }
 }

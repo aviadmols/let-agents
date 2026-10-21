@@ -15,6 +15,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\DescribedProducts;
@@ -93,6 +94,9 @@ final class SearchCatalog
 
     /** Reciprocal rank constant: how much a lower rank still counts. */
     private const RRF_K = 60;
+
+    /** How much the tags a product shares count beside the meaning and the picture, in the similar products. */
+    private const TAG_SHARE = 2.0;
 
     /** The kinds of article that grow old (models, prices, what is new); a how-to guide does not. */
     private const AGEING_KINDS = ['news', 'product_review', 'buying_guide'];
@@ -413,14 +417,23 @@ final class SearchCatalog
             $by = (string) Settings::get('search.similar_by', $shopId);
             $looks = $by === 'meaning' || ! $this->semantic->picturesReady() ? [] : array_map('strval', array_column($this->semantic->lookAlike($product->id, $limit * 4), 'external_id'));
             $means = $by === 'picture' && $looks !== [] ? [] : array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id'));
+            // The tags by meaning it shares with others, where the shop has them (Taxonomy): what it is about, not how its
+            // description reads. Those that share them first, the meaning (and the picture) ordering them among themselves;
+            // when they are enough, only they. "חטוף" is like "מפגש עם עצמי בגיהינום", not like "דרקולה".
+            $tagged = app()->bound(RelatedByTags::class) ? array_column(app(RelatedByTags::class)->to($shopId, $externalId, $limit * 4), 'external_id') : [];
             $rank = [];
-            foreach ([$looks, $means] as $list) {
+            foreach ([[$tagged, self::TAG_SHARE], [$looks, 1.0], [$means, 1.0]] as [$list, $share]) {
                 foreach ($list as $at => $id) {
-                    $rank[$id] = ($rank[$id] ?? 0) + 1 / (self::RRF_K + $at);
+                    $rank[(string) $id] = ($rank[(string) $id] ?? 0) + $share / (self::RRF_K + $at);
                 }
             }
             arsort($rank);
             $ids = array_map('strval', array_keys($rank));
+            if ($tagged !== []) {
+                $sharing = array_flip(array_map('strval', $tagged));
+                $first = array_values(array_filter($ids, fn (string $id): bool => isset($sharing[$id])));
+                $ids = count($first) >= $limit ? $first : [...$first, ...array_values(array_filter($ids, fn (string $id): bool => ! isset($sharing[$id])))];
+            }
 
             // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids));
@@ -436,6 +449,10 @@ final class SearchCatalog
             }
 
             usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
+            // in stock first within each: those that share its tags still before the rest
+            if (isset($sharing)) {
+                $records = [...array_filter($records, fn (array $r): bool => isset($sharing[substr((string) $r['id'], 2)])), ...array_filter($records, fn (array $r): bool => ! isset($sharing[substr((string) $r['id'], 2)]))];
+            }
             // Its own colours (the metal, the stone): a yellow-gold ring's alike are yellow gold first. Only where the
             // shop filters by colour: a bookshop's covers are not a kind, and a black cover's alike are not black first.
             $own = $index['records']['p:'.$externalId] ?? null;
