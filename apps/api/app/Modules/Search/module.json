@@ -167,6 +167,14 @@
             "scope": "global"
         },
         {
+            "name": "meaning_only_min_similarity",
+            "type": "float",
+            "default": 0.4,
+            "min": 0,
+            "max": 1,
+            "scope": "shop"
+        },
+        {
             "name": "unknown_results",
             "type": "int",
             "default": 12,

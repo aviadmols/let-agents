@@ -64,6 +64,7 @@ class AssistantSettings extends Page
             'on_products' => 'feature:assistant.on_products',
             'on_content' => 'feature:assistant.on_content',
             'on_search' => 'feature:assistant.on_search',
+            'visitor_limit' => 'feature:assistant.visitor_limit',
             'per_visitor' => 'setting:assistant.questions_per_visitor_per_day',
             'per_shop' => 'setting:assistant.questions_per_shop_per_day',
             'no_answer' => 'setting:assistant.no_answer',

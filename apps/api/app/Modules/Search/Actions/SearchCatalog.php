@@ -194,13 +194,21 @@ final class SearchCatalog
             // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
             // a few of them, and the drawer says the word was not found (unknown) rather than showing dozens as if it were.
             $unknown = $byMeaning ? HebrewSearch::unknownWords($index['engine'], $query) : [];
-            $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => []];
+            $near = $byMeaning ? $this->meaning($shopId, $query, $index['records']) : ['products' => [], 'content' => [], 'best' => 0.0];
+            // "מדע בדיוני" in a store with no science fiction: no product holds the words, and the nearest by meaning is far
+            // (.36: books on politics). Nothing is shown as if it were found; the drawer says so, with the AI one press away.
+            // How near is near enough is the store's (search.meaning_only_min_similarity).
+            // A picture near enough by its own floor still counts ("קורה בהירה": a pine plank).
+            $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
+            $weak = $byMeaning && $pictures === [] && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId);
+            if ($weak) {
+                $near['products'] = [];
+            }
             $meaning = $near['products'];
             // Guides and pages found by meaning are a group of their own, never a rank among products: an
             // old article never pushes a product down. What a guide about the need links to may still be
             // suggested, after what the words and the meaning found themselves (guided()).
             $guides = $this->guides($shopId, $near['content'], $index['records']);
-            $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
             if ($unknown !== []) {
                 $few = (int) Settings::get('search.unknown_results', $shopId);
                 $meaning = array_slice($meaning, 0, $few);
@@ -1080,12 +1088,13 @@ final class SearchCatalog
     private function meaning(string $shopId, string $query, array $records): array
     {
         if (! Features::enabled('search.semantic', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
-            return ['products' => [], 'content' => []];
+            return ['products' => [], 'content' => [], 'best' => 0.0];
         }
 
         $limit = (int) Settings::get('search.semantic_results');
         $floor = (float) Settings::get('search.semantic_min_similarity');
-        $out = ['products' => [], 'content' => []];
+        // best: how near the nearest product is, whatever the floor
+        $out = ['products' => [], 'content' => [], 'best' => 0.0];
 
         foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {
             if ($hit['source'] !== 'product') {
@@ -1095,6 +1104,7 @@ final class SearchCatalog
             }
 
             $id = 'p:'.$hit['external_id'];
+            $out['best'] = max($out['best'], (float) $hit['similarity']);
 
             if ($hit['similarity'] >= $floor && isset($records[$id])) {
                 $out['products'][] = $id;

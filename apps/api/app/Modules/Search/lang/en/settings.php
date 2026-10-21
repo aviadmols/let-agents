@@ -33,6 +33,10 @@ return [
         'label' => 'What an old guide loses a year',
         'description' => 'Taken off the similarity of news, a product review or a buying guide for each year since it was updated, up to three: models and prices change. A how-to, a project idea or a material guide does not age.',
     ],
+    'meaning_only_min_similarity' => [
+        'label' => 'When no product holds the words',
+        'description' => 'When no product holds the search words ("science fiction" in a store with none), products by meaning are shown only if the nearest is at least this close. Otherwise the search says nothing was found and offers to ask the AI. A store whose names say little may set it lower.',
+    ],
     'unknown_results' => [
         'label' => 'Products by meaning for an unknown word',
         'description' => 'When a search holds a word the catalogue has nothing close to ("shirt" in a jewellery store), at most this many products join by meaning or picture, and the drawer says the word was not found on the site. What is truly close ("a light beam": a pine plank) is still shown.',

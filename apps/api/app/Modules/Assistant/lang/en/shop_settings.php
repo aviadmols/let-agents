@@ -15,6 +15,8 @@ return [
     'on_search' => 'In the search window',
     'on_search_sub' => 'A shopper who types a question in the search box, about the whole store. For example "Do you ship to Eilat?"',
     'limits' => 'Limits, so the monthly allowance lasts',
+    'visitor_limit' => 'Limit each shopper\'s questions',
+    'visitor_limit_sub' => 'Off: every shopper asks as much as they like. The whole store\'s daily limit stays, so the monthly allowance lasts',
     'per_visitor' => 'Questions per shopper a day',
     'per_visitor_sub' => 'Beyond this the shopper is sent to the team (WhatsApp or leaving details). 20 is enough for any real shopper',
     'per_visitor_tip' => 'Counted per browser. A shopper past the number sees "ask the team" instead of an answer.',

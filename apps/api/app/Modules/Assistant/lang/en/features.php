@@ -37,6 +37,10 @@ return [
         'label' => 'AI help writing answers to shopper questions',
         'description' => 'On the shopper questions screen: a button that drafts an answer from the product information and the store pages, or from a few words the team typed. Nothing is published without the team.',
     ],
+    'visitor_limit' => [
+        'label' => 'Limit each shopper\'s questions',
+        'description' => 'Each shopper and each network address asks up to the daily number set. Off: no limit per shopper; the whole store\'s daily limit stays.',
+    ],
     'prepare_answers' => [
         'label' => 'Ready answers to questions about the store',
         'description' => 'After every sync: the questions shoppers ask about the store (delivery, returns, warranty, payments…) are chosen in code from what the store\'s pages say, and answered ahead from the site\'s pages, checked by another model family. Only an answer that passed its check is shown to shoppers, without a model. Asked again only when the page it was written from changes.',

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Tenancy\Models\Shop;
@@ -35,5 +36,21 @@ final class DailyQuestionsTest extends TestCase
         $this->assertTrue(DailyQuestions::allow($shop->id, 'same', '203.0.113.1'));
         $this->assertTrue(DailyQuestions::allow($shop->id, 'same', '203.0.113.2'));
         $this->assertFalse(DailyQuestions::allow($shop->id, 'same', '203.0.113.3'));
+    }
+
+    public function test_a_store_that_lifts_the_limit_on_each_shopper_keeps_its_own_daily_cap(): void
+    {
+        $shop = Shop::factory()->create();
+        Settings::set('assistant.questions_per_visitor_per_day', 2, $shop->id);
+        Settings::set('assistant.questions_per_address_per_day', 2, $shop->id);
+        Settings::set('assistant.questions_per_shop_per_day', 20, $shop->id);
+        Features::override('assistant.visitor_limit', false, $shop->id);
+
+        $allowed = 0;
+        for ($i = 0; $i < 25; $i++) {
+            $allowed += DailyQuestions::allow($shop->id, 'same', '203.0.113.1') ? 1 : 0;
+        }
+
+        $this->assertSame(20, $allowed, 'one shopper past their two, up to the store\'s twenty');
     }
 }

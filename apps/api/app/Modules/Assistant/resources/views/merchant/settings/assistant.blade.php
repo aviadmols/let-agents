@@ -23,9 +23,13 @@
         </div>
 
         <div class="lp-set-label">{{ $t('limits') }}</div>
+        <x-lp::row :title="$t('visitor_limit')" :sub="$t('visitor_limit_sub')"><x-lp::toggle model="data.visitor_limit" :label="$t('visitor_limit')" /></x-lp::row>
+        {{-- the number per shopper only while the limit is on --}}
+        <div x-data x-show="$wire.data.visitor_limit">
         <x-lp::row :title="$t('per_visitor')" :sub="$t('per_visitor_sub')" :tip="$t('per_visitor_tip')">
             <x-lp::num model="data.per_visitor" :min="$visitor['min']" :max="$visitor['max']" :label="$t('per_visitor')" />
         </x-lp::row>
+        </div>
         @if ($this->problem('per_visitor'))<span class="lp-set-error" role="alert">{{ $this->problem('per_visitor') }}</span>@endif
         <x-lp::row :title="$t('per_shop')" :sub="$busiest > 0 ? $t('per_shop_sub').'. '.$t('per_shop_busiest', ['n' => number_format($busiest)]) : $t('per_shop_sub')" :tip="$t('per_shop_tip')">
             <x-lp::num model="data.per_shop" :min="$shop['min']" :max="$shop['max']" :step="10" :label="$t('per_shop')" />
