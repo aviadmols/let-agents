@@ -26,6 +26,7 @@
         <x-lp::row :title="$t('compare')"><x-lp::toggle model="data.compare" :label="$t('compare')" /></x-lp::row>
         <x-lp::row :title="$t('rate')" :sub="$t('rate_sub')" :tip="$t('rate_tip')"><x-lp::toggle model="data.rate" :label="$t('rate')" /></x-lp::row>
         <x-lp::row :title="$t('oos')" :sub="$t('oos_sub')"><x-lp::toggle model="data.out_of_stock" :label="$t('oos')" /></x-lp::row>
+        <x-lp::row :title="$t('lets_posts')" :sub="$t('lets_posts_sub')" :tip="$t('lets_posts_tip')"><x-lp::toggle model="data.lets_posts" :label="$t('lets_posts')" /></x-lp::row>
     </x-lp::card>
 
     <x-lp::save />

@@ -12,6 +12,7 @@ use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Filament\Merchant\Pages\LookSettings;
 use App\Modules\Search\Filament\Merchant\Pages\ManualConnectSettings;
@@ -141,6 +142,15 @@ final class SearchSettingsPagesTest extends TestCase
             ->set('data.nudge', false)
             ->set('data.nudge_at', ' header__search-link  icon ')
             ->call('save');
+
+        // the posts Lets wrote: out of the results by default; turned on, saved, and the search index built again at once
+        $this->assertFalse(Features::enabled('search.lets_posts', $this->shop->id));
+        $built = Run::query()->where('agent', BuildSearchIndex::AGENT)->count();
+        $page->assertSee('פוסטים של Lets בתוצאות החיפוש')->set('data.lets_posts', true)->call('save');
+        $this->assertTrue(Features::enabled('search.lets_posts', $this->shop->id));
+        $this->assertSame($built + 1, Run::query()->where('agent', BuildSearchIndex::AGENT)->count(), 'the index is built again when the posts go in or out');
+        $page->call('save');
+        $this->assertSame($built + 1, Run::query()->where('agent', BuildSearchIndex::AGENT)->count(), 'not on a save that did not change them');
 
         $this->assertFalse(Features::enabled('search.take_over_field', $this->shop->id));
         $this->assertFalse(Features::enabled('search.nudge', $this->shop->id));

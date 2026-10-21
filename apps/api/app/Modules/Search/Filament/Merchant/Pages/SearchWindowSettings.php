@@ -7,6 +7,8 @@ use App\Core\Filament\EditsShopSettings;
 use App\Core\Settings\SettingRegistry;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Search\Actions\BuildSearchIndex;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -16,12 +18,15 @@ use UnitEnum;
  * Settings · The search window, as the designer's panel lays it out: whether Lets search runs on the
  * site at all (the card's switch), whether it takes over the theme's own search box, whether a new shopper is
  * invited to try it once, and what the drawer offers: photos, questions, similar items, prices, the cart, the wishlist and compare, "Helpful?" under
- * an answer, and the product page's row when a product or a size is sold out. Each is a feature or a
- * setting the drawer reads (SearchIndexController).
+ * an answer, the product page's row when a product or a size is sold out, and whether the posts Lets wrote
+ * are search results. Each is a feature or a setting the drawer reads (SearchIndexController).
  */
 class SearchWindowSettings extends Page
 {
     use EditsShopSettings;
+
+    /** The posts Lets wrote went in or out of the results on this save: the search index is built again (not a Livewire property). */
+    private bool $postsChanged = false;
 
     public static string $sideGroup = 'shoppers';
 
@@ -68,7 +73,22 @@ class SearchWindowSettings extends Page
             'compare' => 'feature:shortlist.compare',
             'rate' => 'feature:search.rate_answers',
             'out_of_stock' => 'feature:search.out_of_stock_similar',
+            'lets_posts' => 'feature:search.lets_posts',
         ];
+    }
+
+    protected function checkMore(): void
+    {
+        $this->postsChanged = Features::enabled('search.lets_posts', $this->shopId()) !== (bool) ($this->data['lets_posts'] ?? false);
+    }
+
+    /** What is in the search index changed: built again now, on the queue, as after a catalogue sync. Code only. */
+    protected function saved(): void
+    {
+        if ($this->postsChanged) {
+            $shopId = $this->shopId();
+            dispatch(fn () => app(BuildSearchIndex::class)->handle($shopId, RunTrigger::System));
+        }
     }
 
     /** Photo search needs the shop's pictures scanned: turning it on starts the scan too. */

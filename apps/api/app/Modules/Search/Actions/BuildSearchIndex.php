@@ -235,8 +235,13 @@ final class BuildSearchIndex
         }
 
         // What the store says about itself is for the assistant, never a result of its own; nor is a page the
-        // platform serves at its own address, which would take the shopper off the store's site.
-        foreach (CatalogContent::query()->active()->onTheSite()->where('type', '!=', CatalogContent::KNOWLEDGE)->orderBy('id')->lazy(200) as $content) {
+        // platform serves at its own address (a post Lets wrote), which would take the shopper off the store's
+        // site, unless the shop chose to show them (search.lets_posts).
+        $contents = CatalogContent::query()->active()->where('type', '!=', CatalogContent::KNOWLEDGE);
+        if (! Features::enabled('search.lets_posts', $shopId)) {
+            $contents->onTheSite();
+        }
+        foreach ($contents->orderBy('id')->lazy(200) as $content) {
             $words = [];
 
             foreach ((array) $content->terms as $terms) {

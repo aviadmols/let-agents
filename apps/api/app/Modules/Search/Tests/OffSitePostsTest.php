@@ -55,5 +55,12 @@ final class OffSitePostsTest extends TestCase
         $result = $this->getJson("/api/v1/search/{$site}?q=".urlencode('דק מעץ'), ['Origin' => 'https://www.deck.test'])->assertOk()->json();
         $this->assertNotContains('איך שומרים על דק מעץ בחורף', array_column($result['groups']['content'], 'title'));
         $this->assertContains('איך בונים דק מעץ', array_column($result['groups']['content'], 'title'));
+
+        // the shop chose to show them (search.lets_posts): a result like any guide
+        Features::override('search.lets_posts', true, $shop->id);
+        LoadedIndex::forget();
+        $this->assertSame(3, app(BuildSearchIndex::class)->handle($shop->id)->output['counts']['content']);
+        $result = $this->getJson("/api/v1/search/{$site}?q=".urlencode('דק מעץ'), ['Origin' => 'https://www.deck.test'])->assertOk()->json();
+        $this->assertContains('איך שומרים על דק מעץ בחורף', array_column($result['groups']['content'], 'title'));
     }
 }

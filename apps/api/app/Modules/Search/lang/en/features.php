@@ -93,4 +93,8 @@ return [
         'label' => 'Invite shoppers to try the search',
         'description' => 'A small line beside the search icon: "Try our new search". It shows once only to each new shopper, on their first visit, and goes away by itself after a few seconds. A shopper who visited before never sees it.',
     ],
+    'lets_posts' => [
+        'label' => 'Lets posts in search results',
+        'description' => 'Posts Lets wrote and the store published live at Lets\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
+    ],
 ];
