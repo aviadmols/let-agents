@@ -12,6 +12,7 @@ use App\Modules\Catalog\Console\ReadSitePagesCommand;
 use App\Modules\Catalog\Console\SamplePagesCommand;
 use App\Modules\Catalog\Console\SyncCatalogCommand;
 use App\Modules\Catalog\Console\SyncChangedProductsCommand;
+use App\Modules\Catalog\Console\SyncStockCommand;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Events\CatalogSyncRequested;
 use App\Modules\Catalog\Events\ColourNamesPlaced;
@@ -52,6 +53,13 @@ final class CatalogServiceProvider extends ModuleServiceProvider
                 ->dailyAt('02:30')
                 ->timezone('Asia/Jerusalem')
                 ->name('catalog:sync-daily')
+                ->onOneServer();
+
+            // Stock alone, light, every hour: each shop checked as often as it asks (catalog.stock_every_hours).
+            $schedule->command('catalog:stock')
+                ->hourlyAt(15)
+                ->name('catalog:stock')
+                ->withoutOverlapping(50)
                 ->onOneServer();
 
             // Prices and stock three times a day (catalog.refresh): the products alone.
@@ -100,6 +108,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
         return [
             SyncCatalogCommand::class,
             SyncChangedProductsCommand::class,
+            SyncStockCommand::class,
             ReadPageChoicesCommand::class,
             SamplePagesCommand::class,
             BuildVariantsCommand::class,

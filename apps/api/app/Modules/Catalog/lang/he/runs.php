@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'stock' => 'בדיקת מלאי: :products מוצרים עברו מבמלאי לאזל או חזרה.',
     'refreshed' => 'רענון מחירים ומלאי: :updated מוצרים השתנו, :removed ירדו מהחנות.',
     'choices_read' => 'עמודי מוצר: נקראו :read, :changed השתנו; :with מוצרים מבקשים בחירה (אורך, מידה) לפני הוספה לסל.',
     'changes_synced' => 'שינויים מהחנות: :created מוצרים חדשים, :updated השתנו, :removed ירדו מהחנות.',

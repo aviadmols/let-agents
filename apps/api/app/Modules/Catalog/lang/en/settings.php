@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'stock_every_hours' => ['label' => 'Check stock every', 'description' => 'How many hours between checks of stock alone (a light, fast read). A product sold out or back in stock is updated in search right after.'],
     'max_products' => [
         'label' => 'Maximum products per shop',
         'description' => 'A sync stops reading at this number and says so. Nothing is marked removed after a stopped sync.',

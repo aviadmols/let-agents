@@ -5,6 +5,7 @@ namespace App\Modules\Shopify\Feed;
 use App\Core\Text\HtmlText;
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
 use App\Modules\Connections\Contracts\ReadsChangedProducts;
+use App\Modules\Connections\Contracts\ReadsStock;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Models\ShopifyInstall;
@@ -23,7 +24,7 @@ use Illuminate\Support\Facades\Http;
  * is above 1,000 points, and a product with its variants and collections costs about 60, so a
  * product page holds 15 products, not 50.
  */
-final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
+final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts, ReadsStock
 {
     private const PRODUCTS_PER_PAGE = 15;
 
@@ -77,6 +78,20 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 
     // "published_status:published" is publication to the Online Store; onlineStoreUrl is checked
     // again on every product, because that is what Shopify itself documents as "on the store".
+    /** Stock alone: what each product and its first variants can be bought now. Small pages, a cheap query. */
+    private const STOCK_PER_PAGE = 50;
+
+    private const STOCK_VARIANTS = 15;
+
+    private const STOCK = <<<'GRAPHQL'
+        query Stock($first: Int!, $after: String, $variants: Int!) {
+          products(first: $first, after: $after, sortKey: ID, query: "status:active AND published_status:published") {
+            nodes { id tracksInventory totalInventory variantsCount { count } variants(first: $variants) { nodes { id availableForSale } } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+        GRAPHQL;
+
     private const PRODUCTS = <<<'GRAPHQL'
         query Products($first: Int!, $after: String, $collections: Int!, $variants: Int!) {
           products(first: $first, after: $after, sortKey: ID, reverse: true, query: "status:active AND published_status:published") {
@@ -222,6 +237,30 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
      * Store is a record; one archived or set to draft is gone. One active without an Online Store
      * address is left to the nightly read, which knows whether the whole store is behind a password.
      */
+    public function stock(StoreConnection $connection): ?Generator
+    {
+        $install = $this->install($connection);
+
+        foreach ($this->pages($install, self::STOCK, 'products', ['first' => self::STOCK_PER_PAGE, 'variants' => self::STOCK_VARIANTS]) as $nodes) {
+            $page = [];
+
+            foreach ($nodes as $node) {
+                $variants = (array) data_get($node, 'variants.nodes', []);
+                // as the full read decides it: a variant that can be bought; past the variants read, what the store counts
+                $available = array_filter($variants, fn ($v): bool => is_array($v) && ($v['availableForSale'] ?? false) === true) !== [];
+                if (! $available && (int) data_get($node, 'variantsCount.count', 0) > count($variants)) {
+                    $available = ! ($node['tracksInventory'] ?? true) || (int) ($node['totalInventory'] ?? 0) > 0;
+                }
+                $page[self::id($node['id'])] = [
+                    'in_stock' => $available,
+                    'variants' => array_column(array_map(fn (array $v): array => [self::id($v['id'] ?? ''), ($v['availableForSale'] ?? false) === true], array_filter($variants, 'is_array')), 1, 0),
+                ];
+            }
+
+            yield $page;
+        }
+    }
+
     public function changedProducts(StoreConnection $connection, CarbonInterface $since): ?Generator
     {
         return $this->changed($connection, $since);

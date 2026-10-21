@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'stock' => 'Stock check: :products products went out of stock or back.',
     'refreshed' => 'Prices and stock refreshed: :updated products changed, :removed taken off the store.',
     'choices_read' => 'Product pages: :read read, :changed changed; :with products ask for a choice (a length, a size) before the cart.',
     'changes_synced' => 'Changes from the store: :created new products, :updated changed, :removed taken off the store.',

@@ -6,17 +6,20 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\SyncCatalog;
 use App\Modules\Catalog\Actions\SyncChangedProducts;
+use App\Modules\Catalog\Actions\SyncStock;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Catalog\Support\FeedRecord;
+use App\Modules\Connections\Contracts\ReadsStock;
 use App\Modules\Connections\Contracts\StoreFeed;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\PluginStoreFeed;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Tenancy\Models\Shop;
+use Generator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
@@ -205,6 +208,60 @@ final class SyncCatalogTest extends TestCase
         $shuffled['relations'] = array_reverse($record['relations']);
 
         $this->assertSame(FeedRecord::product($record)['hash'], FeedRecord::product($shuffled)['hash']);
+    }
+
+    public function test_stock_alone_is_read_lightly_and_only_what_changed_is_written(): void
+    {
+        app(SyncCatalog::class)->handle($this->shop->id);
+        $this->inShop(fn () => CatalogVariant::query()->create(['shop_id' => $this->shop->id, 'product_id' => CatalogProduct::query()->where('external_id', '12')->value('id'), 'external_id' => '121', 'position' => 0, 'title' => 'S', 'in_stock' => true]));
+        $stock = [['11' => ['in_stock' => false, 'variants' => []], '12' => ['in_stock' => true, 'variants' => ['121' => false]], '13' => ['in_stock' => true, 'variants' => []]]];
+        $feed = new class($stock) implements ReadsStock, StoreFeed
+        {
+            public int $reads = 0;
+
+            public function __construct(private readonly array $pages) {}
+
+            public function stock(StoreConnection $connection): ?Generator
+            {
+                $this->reads++;
+                yield from $this->pages;
+            }
+
+            public function categories(StoreConnection $connection): array
+            {
+                return [];
+            }
+
+            public function products(StoreConnection $connection): Generator
+            {
+                yield from [];
+            }
+
+            public function content(StoreConnection $connection, string $type): Generator
+            {
+                yield from [];
+            }
+
+            public function contentTypes(StoreConnection $connection): array
+            {
+                return [];
+            }
+        };
+        $this->app->instance(StoreFeed::class, $feed);
+        Event::fake([CatalogProductsChanged::class]);
+
+        $run = app(SyncStock::class)->handle($this->shop->id);
+
+        $this->assertSame(['products' => 1, 'variants' => 1, 'read' => 3], array_intersect_key($run->output, ['products' => 1, 'variants' => 1, 'read' => 1]));
+        $this->inShop(function (): void {
+            $this->assertFalse(CatalogProduct::query()->where('external_id', '11')->sole()->in_stock, 'sold out');
+            $this->assertFalse(CatalogVariant::query()->where('external_id', '121')->sole()->in_stock, 'its size sold out');
+        });
+        Event::assertDispatched(CatalogProductsChanged::class, fn (CatalogProductsChanged $e): bool => $e->externalIds === ['11', '12']);
+
+        $this->assertNull(app(SyncStock::class)->handle($this->shop->id), 'checked a moment ago: not due');
+        $this->assertSame(1, $feed->reads);
+        $this->assertNull(app(SyncStock::class)->handle($this->shop->id, now: true), 'read again, nothing changed: no run');
     }
 
     public function test_a_product_with_variants_has_a_row_for_each_and_its_stock_follows_the_store(): void

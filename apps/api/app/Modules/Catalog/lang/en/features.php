@@ -13,6 +13,10 @@ return [
         'label' => 'Nightly catalog sync',
         'description' => 'Reads the whole catalog from the store every night at 02:30, Israel time.',
     ],
+    'stock_checks' => [
+        'label' => 'Stock checks a few times a day',
+        'description' => 'A light read of stock alone: what can be bought now. A product sold out or back in stock is updated in search without waiting for the night. On Shopify.',
+    ],
     'live_sync' => [
         'label' => 'New products and changes within minutes',
         'description' => 'Every 10 minutes asks the store what changed since the last look: a new or edited product enters the catalog and the search, one taken off the store leaves. Shopify and WordPress.',
