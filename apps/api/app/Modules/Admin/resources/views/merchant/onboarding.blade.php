@@ -233,7 +233,15 @@
                                         <h2>{{ $t('try.title') }}</h2>
                                         @if ($searchable !== null)<span class="lp-sample" data-searchable>{{ trans_choice('admin::onboarding.try.knows', $searchable, ['count' => number_format($searchable)]) }}</span>@endif
                                     </div>
-                                    <p class="lp-onb-help">{{ $t($this->live() ? 'try.help_live' : 'try.help') }}</p>
+                                    @php($embed = $this->embedUrl())
+                                    <p class="lp-onb-help">{{ $t($this->live() ? 'try.help_live' : ($embed !== null ? 'try.help_shopify' : 'try.help')) }}</p>
+                                    @if ($embed !== null)
+                                        {{-- on Shopify the search is in the store once the app embed is on: that first, then the try --}}
+                                        <div class="lp-fact" style="align-items: center; margin-block-end: 12px" data-embed>
+                                            <span style="flex: 1">{{ $t('try.embed') }}</span>
+                                            <a href="{{ $embed }}" class="lp-btn lp-btn-sm lp-btn-primary" style="flex: none" target="_blank" rel="noopener" data-embed-link>{{ $t('try.embed_button') }}</a>
+                                        </div>
+                                    @endif
                                     <form class="lp-set-field lp-set-wide lp-onb-try-field" x-on:submit.prevent="go(q)">
                                         <svg class="lp-ico" aria-hidden="true"><use href="#lp-i-search"/></svg>
                                         <input type="search" x-model="q" placeholder="{{ $t('try.placeholder') }}" aria-label="{{ $t('try.label') }}" enterkeyhint="search">

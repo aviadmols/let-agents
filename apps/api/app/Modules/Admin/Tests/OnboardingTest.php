@@ -2,6 +2,8 @@
 
 namespace App\Modules\Admin\Tests;
 
+use App\Modules\Admin\Contracts\FirstStep;
+use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopScan;
 use App\Modules\Admin\Contracts\StorePlugin;
@@ -32,6 +34,7 @@ final class OnboardingTest extends TestCase
     {
         parent::setUp();
         self::$facts = [];
+        OnboardingTestSteps::$live = false;
         $this->app->tag([OnboardingTestFacts::class], ShopFacts::TAG);
         app()->setLocale('he');
     }
@@ -162,6 +165,29 @@ final class OnboardingTest extends TestCase
         $this->actingAs($owner)->get("/merchant/{$shop->slug}/overview")->assertOk()->assertSee('data-home', false);
     }
 
+    public function test_on_shopify_the_try_asks_for_lets_to_be_on_in_the_theme_first(): void
+    {
+        $this->app->tag([OnboardingTestSteps::class], FirstSteps::STEPS_TAG);
+        $this->as(Shop::factory()->onboarding()->create(['platform' => ShopPlatform::Shopify]));
+
+        // the search is in a Shopify store only once the app embed is on: that comes before the try
+        Livewire::test(Onboarding::class)->set('step', 3)
+            ->assertSee('data-try', false)
+            ->assertSee('להפעיל בתבנית')
+            ->assertSee(OnboardingTestSteps::EMBED, false)
+            ->assertDontSee('בתצוגה מקדימה שרק אתם רואים')
+            ->assertSeeHtmlInOrder(['data-embed-link', 'lp-onb-try-field']);
+
+        // once Lets is live there is nothing to switch on
+        OnboardingTestSteps::$live = true;
+        Livewire::test(Onboarding::class)->set('step', 3)->assertSee('data-try', false)->assertDontSee('data-embed-link', false);
+
+        // a WooCommerce store has no app embed: its try is as it was
+        OnboardingTestSteps::$live = false;
+        $this->as(Shop::factory()->onboarding()->create());
+        Livewire::test(Onboarding::class)->set('step', 3)->assertSee('data-try', false)->assertDontSee('data-embed-link', false);
+    }
+
     public function test_a_viewer_is_not_sent_here_and_changes_nothing_on_it(): void
     {
         $shop = Shop::factory()->onboarding()->create(['name' => 'חנות']);
@@ -243,5 +269,23 @@ final class OnboardingTestScan implements ShopScan
     public function learned(Shop $shop): array
     {
         return [];
+    }
+}
+
+/** The search's first steps as the test sets them: on Shopify "on" opens the theme editor; "look" opens the store. */
+final class OnboardingTestSteps implements FirstSteps
+{
+    public const EMBED = 'https://gueta-test.myshopify.com/admin/themes/current/editor?context=apps';
+
+    public static bool $live = false;
+
+    public function steps(Shop $shop): array
+    {
+        $shopify = $shop->platform === ShopPlatform::Shopify;
+
+        return [
+            new FirstStep(key: 'on', order: 1, title: 'on', body: 'on', button: 'on', url: $shopify ? self::EMBED : '/settings', done: self::$live, external: $shopify),
+            new FirstStep(key: 'look', order: 2, title: 'look', body: 'look', button: 'look', url: 'https://shop.test/?let_agents_preview=abc', done: self::$live, external: true),
+        ];
     }
 }

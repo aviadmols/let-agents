@@ -5,8 +5,11 @@ namespace App\Modules\Shopify\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\ShopScan;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Runs\Jobs\FirstScanStep;
+use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
@@ -20,6 +23,7 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -51,6 +55,9 @@ final class ShopifyAppTest extends TestCase
 
     /** A token Shopify has withdrawn: its calls answer 401. */
     private ?string $withdrawn = null;
+
+    /** What the fake store answers when the app writes its metafields. */
+    private array $metafieldErrors = [];
 
     protected function setUp(): void
     {
@@ -86,7 +93,7 @@ final class ShopifyAppTest extends TestCase
                 str_contains($query, 'appSubscriptionCancel') => ['appSubscriptionCancel' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'CANCELLED'], 'userErrors' => []]],
                 str_contains($query, 'appSubscriptionCreate') => ['appSubscriptionCreate' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'PENDING'], 'confirmationUrl' => 'https://gueta-test.myshopify.com/admin/charges/confirm', 'userErrors' => []]],
                 str_contains($query, 'activeSubscriptions') => ['currentAppInstallation' => ['activeSubscriptions' => $this->subscriptions], 'shop' => ['plan' => ['partnerDevelopment' => true]]],
-                str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => []]],
+                str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => $this->metafieldErrors]],
                 str_contains($query, 'contactEmail') => ['shop' => ['id' => 'gid://shopify/Shop/7', 'name' => 'גואטה טסט', 'email' => 'Owner@Gueta.test', 'currencyCode' => 'ILS', 'ianaTimezone' => 'Asia/Jerusalem', 'primaryDomain' => ['host' => 'shop.gueta.test'], 'plan' => ['partnerDevelopment' => true]]],
                 default => ['shop' => ['id' => 'gid://shopify/Shop/7', 'plan' => ['partnerDevelopment' => true]]],
             }]);
@@ -134,7 +141,7 @@ final class ShopifyAppTest extends TestCase
         // A link to a plan only works as we signed it.
         $this->get(str_replace('plan=growth', 'plan=pro', self::choice($plans, 'growth')))->assertNotFound();
 
-        Queue::assertPushed(QueuedCommand::class);
+        Queue::assertPushed(FirstScanStep::class, fn (FirstScanStep $job): bool => $job->step === 'catalog' && $job->shopId === $shop->id);
 
         $pixel = collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'webPixelCreate'));
         $this->assertSame(['siteKey' => $connection->site_key, 'api' => 'https://agents.lets.co.il/api/v1'], json_decode($pixel['variables']['settings'], true), 'the purchase pixel is on, with the store\'s site key');
@@ -180,6 +187,14 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
     }
 
+    public function test_a_new_shop_speaks_the_language_its_products_are_written_in(): void
+    {
+        $this->assertSame('en', InstallStore::language(['Snowboard Demo', 'The Complete Snowboard', 'Gift Card', 'The Collection Snowboard: Liquid']), 'Shopify\'s sample store');
+        $this->assertSame('he', InstallStore::language(['גואטה', 'מברגה Makita DHP 18V', 'Bosch GSR 12V', 'דיסק חיתוך 125 מ"מ']), 'brand names in a Hebrew store');
+        $this->assertSame('he', InstallStore::language(['גואטה טסט']), 'no products yet: by its name');
+        $this->assertSame('en', InstallStore::language(['']));
+    }
+
     public function test_installing_again_after_asking_to_delete_keeps_the_shop(): void
     {
         Settings::set('shopify.charge', false);
@@ -199,6 +214,39 @@ final class ShopifyAppTest extends TestCase
         $this->assertFalse($shop->leaving(), 'coming back calls off the deletion');
         $this->assertNull($shop->deletion_asked_by);
         $this->assertSame(ShopStatus::Active, $shop->status, 'and the search is back on the site');
+    }
+
+    public function test_a_new_store_starts_its_first_scan_at_install_once_and_a_store_installing_again_only_syncs(): void
+    {
+        Settings::set('shopify.charge', false);
+        $install = $this->installed();
+
+        // The scan's first step is the catalogue: no sync of its own beside it.
+        Queue::assertPushed(FirstScanStep::class, 1);
+        Queue::assertPushed(FirstScanStep::class, fn (FirstScanStep $job): bool => $job->step === 'catalog' && $job->shopId === $install->shop_id);
+        Queue::assertNotPushed(QueuedCommand::class);
+        $this->assertFalse(app(ShopScan::class)->progress($install->shop)['finished'], 'the onboarding opens on the scan under way');
+
+        // The manager's "start the scan" goes on with it, never a second one.
+        $this->assertTrue(app(ShopScan::class)->start($install->shop));
+        Queue::assertPushed(FirstScanStep::class, 1);
+
+        // Installed again: the same shop, its catalogue synced, no scan started by the install.
+        $this->installed();
+        Queue::assertPushed(FirstScanStep::class, 1);
+        Queue::assertPushed(QueuedCommand::class, 1);
+    }
+
+    public function test_metafields_shopify_refuses_are_logged_with_the_store(): void
+    {
+        Log::spy();
+        $this->metafieldErrors = [['field' => ['metafields', '0', 'value'], 'message' => 'Value is invalid']];
+
+        $this->installed();
+
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context): bool => $message === 'shopify.metafields.not_set'
+            && $context['shop'] === self::SHOP
+            && $context['errors'][0]['message'] === 'Value is invalid');
     }
 
     public function test_a_store_on_a_custom_app_is_installed_and_renewed_with_that_apps_credentials(): void

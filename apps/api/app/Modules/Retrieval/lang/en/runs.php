@@ -6,6 +6,8 @@ return [
     'matching_off' => 'Matching with a model is off for this shop.',
     'query_vectors' => 'Search vectors: :count new queries today.',
     'images_indexed' => 'Pictures: :products products with a picture, :embedded given a vector, :kept unchanged, :pending waiting.',
+    'images_no_provider' => 'Pictures failed: no model is set for picture vectors, so none of :products products with a picture was scanned. :pending waiting.',
+    'images_refused' => 'Pictures failed: the picture model refused (:reason). :embedded given a vector, :kept unchanged, :pending waiting.',
     'captions_busy' => 'The pictures of this shop are already being described; this one did not start.',
     'images_busy' => 'Another picture scan of this shop is already running; this one did not start.',
     'captioned' => 'Picture descriptions: :described described, :left left.',

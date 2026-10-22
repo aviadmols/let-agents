@@ -420,6 +420,17 @@ final class Onboarding extends Page
         return $look instanceof FirstStep && is_string($look->url) && $look->url !== '' ? $look->url : null;
     }
 
+    /**
+     * Where a Shopify store switches Lets on in its theme, while it is not live: there the search is in the
+     * store only once the app embed is on, so the try asks for it first (the first step "on" has the link).
+     */
+    public function embedUrl(): ?string
+    {
+        $on = collect($this->steps())->firstWhere('key', 'on');
+
+        return $this->shopify() && $on instanceof FirstStep && ! $on->done && $on->external && is_string($on->url) && $on->url !== '' ? $on->url : null;
+    }
+
     /** Whether the store is live already: a try is then the shoppers' own search, not a preview. */
     public function live(): bool
     {

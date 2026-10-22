@@ -96,6 +96,8 @@ final class BuildImageIndex
             ->delete();
 
         $todo = [];
+        // What the provider said when it refused a picture asked alone: a key, a quota, an outage.
+        $refused = null;
 
         foreach (CatalogProduct::query()->active()->whereNotNull('image_url')->orderBy('id')->lazy(200) as $product) {
             $url = (string) $product->image_url;
@@ -173,6 +175,7 @@ final class BuildImageIndex
                 // alone: what fails alone is marked unreadable and the rest go on; only when every
                 // one fails (a key, a quota, an outage) does the scan stop.
                 report($e);
+                $refused = $e->reason;
                 [$vectors, $kept] = $this->oneByOne($choice, $images, $rows, $dimensions);
 
                 // Several refused, every one alone: not the pictures (a key, a quota, an outage).
@@ -225,13 +228,24 @@ final class BuildImageIndex
             ->count();
         $stats['cost_usd'] = round($stats['cost_usd'], 6);
 
-        $run->output($stats + ['provider' => $choice->providerName, 'model' => $choice->model])
-            ->summary('retrieval::runs.images_indexed', [
-                'products' => (string) $stats['products'],
-                'embedded' => (string) $stats['embedded'],
-                'kept' => (string) $stats['kept'],
-                'pending' => (string) $stats['pending'],
-            ]);
+        $run->output($stats + ['provider' => $choice->providerName, 'model' => $choice->model]);
+        $counts = [
+            'products' => (string) $stats['products'],
+            'embedded' => (string) $stats['embedded'],
+            'kept' => (string) $stats['kept'],
+            'pending' => (string) $stats['pending'],
+        ];
+
+        // A scan that never reached the picture model is a failed run, never "done" with no picture given a
+        // vector (and no camera in the search): no provider set, the provider refusing a whole batch, or
+        // refusing every picture of a shop that has none yet. The next part, the resume or the night tries again.
+        if ($stats['stopped'] === 'unknown_provider' && $todo !== []) {
+            $run->fail('retrieval::runs.images_no_provider', $counts);
+        } elseif ($refused !== null && ($stats['stopped'] === $refused || $stats['embedded'] + $stats['kept'] === 0)) {
+            $run->fail('retrieval::runs.images_refused', $counts + ['reason' => $refused]);
+        } else {
+            $run->summary('retrieval::runs.images_indexed', $counts);
+        }
     }
 
     /**

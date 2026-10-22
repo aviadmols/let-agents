@@ -5,6 +5,7 @@ namespace App\Modules\Retrieval\Tests;
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
+use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Retrieval\Actions\BuildImageIndex;
@@ -178,6 +179,39 @@ final class ImageIndexTest extends TestCase
     private function shirt(string $externalId, string $title, string $image): CatalogProduct
     {
         return $this->product($externalId, $title, 'חולצת כותנה.', ['image_url' => $image]);
+    }
+
+    public function test_a_scan_that_cannot_reach_the_picture_model_fails_with_a_line_saying_so(): void
+    {
+        // No provider the Ai module knows: nothing is fetched or paid for, and the run says why.
+        Settings::set('retrieval.image_provider', 'nobody');
+        $run = app(BuildImageIndex::class)->handle($this->shop->id);
+
+        $this->assertSame('failed', $run->status->value, 'never "done" with no picture given a vector');
+        $this->assertSame('retrieval::runs.images_no_provider', $run->summary_key);
+        $this->assertSame('unknown_provider', $run->output['stopped']);
+        $this->assertSame(0, $this->pictures->images);
+
+        // The provider refuses every picture (a key, a quota, an outage): failed too, the pictures left for the next scan.
+        Settings::set('retrieval.image_provider', 'gemini');
+        $this->app->instance(ImageEmbedder::class, new class implements ImageEmbedder
+        {
+            public function embedImages(AiProviderName $provider, string $model, array $images, ?int $dimensions = null): Embeddings
+            {
+                throw new ModelCallFailed(ModelCallFailed::NO_KEY);
+            }
+
+            public function embedTextsForImages(AiProviderName $provider, string $model, array $texts, ?int $dimensions = null, bool $query = true): Embeddings
+            {
+                throw new ModelCallFailed(ModelCallFailed::NO_KEY);
+            }
+        });
+        $refused = app(BuildImageIndex::class)->handle($this->shop->id);
+
+        $this->assertSame('failed', $refused->status->value);
+        $this->assertSame(['retrieval::runs.images_refused', 'no_key'], [$refused->summary_key, $refused->output['stopped']]);
+        $this->assertStringContainsString('no_key', (string) $refused->summary());
+        $this->assertSame(3, $this->inShop(fn () => RetrievalImage::query()->whereNull('error')->whereNull('embedding')->count()), 'not marked unreadable: the next scan asks again');
     }
 
     public function test_one_scan_of_a_shop_at_a_time(): void
