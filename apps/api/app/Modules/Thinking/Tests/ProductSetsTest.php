@@ -194,17 +194,18 @@ final class ProductSetsTest extends TestCase
         $this->assertSame('איזה ספרי חטופים יש לכם?', AnswerSiteQuestion::corrected('אזה ספרי חטפים יש לכמם', 'איזה ספרי חטופים יש לכם?'));
     }
 
-    public function test_a_store_with_none_of_it_says_so_and_offers_the_team(): void
+    public function test_a_store_with_none_of_it_hands_the_question_to_the_answer_never_a_dead_end(): void
     {
         $this->books();
 
         $result = $this->ask('איזה ספרי בישול יש לכם?');
 
-        $this->assertSame('no_info', $result['outcome']);
-        $this->assertSame(__('thinking::sets.none', ['subject' => 'ספרי בישול']), $result['not_found']);
-        $this->assertArrayHasKey('no_answer', $result);
         $this->assertFalse($this->calls[0]['user']['candidates'][0]['says']);
-        $this->assertCount(1, $this->calls, 'nothing chosen: nothing to check');
+        $this->assertArrayNotHasKey('set', $result, 'no set of none');
+        // answered as any other question: a close alternative or a recommendation when the store has one (answer_site v9);
+        // here nothing in the store is near cookery, so it is "not found" as any question, never the set's dead end
+        $this->assertNotSame(__('thinking::sets.none', ['subject' => 'ספרי בישול']), $result['not_found'] ?? null);
+        $this->assertSame('no_info', $result['outcome']);
     }
 
     public function test_a_broad_request_in_a_jewellery_store_asks_one_question_the_checker_let_through(): void

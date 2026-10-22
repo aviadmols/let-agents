@@ -2282,10 +2282,12 @@ final class AnswerSiteQuestion
             return null;
         }
 
-        // the store was looked through and has none of it, nor anything close: said so, with what the
-        // store offers instead of an answer (the team, leaving details), as any "not found"
+        // none of the set itself, nor a close one: the question is answered as any other, by the store's pages and
+        // products by meaning, so the shopper still gets a recommendation or an honest close alternative ("there is
+        // no fantasy here, but…") and "not found" only when nothing is close at all (answer_site v9). A set chosen
+        // again on a changed catalogue may come back empty where it once had near ones: never a dead end then.
         if ($found['ids'] === []) {
-            return $this->fixed('no_info', $locale, $found['from']) + ['not_found' => $found['answer']];
+            return null;
         }
 
         return [
