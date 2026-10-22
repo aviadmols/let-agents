@@ -11,8 +11,7 @@
         "Analytics",
         "Ai",
         "Admin",
-        "Connections"
-    ],
+        "Connections", "Shopify"],
     "provider": "LeadsServiceProvider",
     "features": [
         {

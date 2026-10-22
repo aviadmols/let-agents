@@ -49,6 +49,7 @@ final class ShopifyWebhooksController
                 $topic === 'customers/redact' ? 'redact' : 'report',
                 mb_strtolower((string) ($payload['customer']['email'] ?? '')),
                 (string) ($payload['customer']['id'] ?? ''),
+                (string) ($payload['customer']['phone'] ?? ''),
             )),
             // 48 hours after the app was removed: the shop and all it holds go, the kernel's tables and its files too
             // (deleted as a model, so Shop::deleted cleans what has no foreign key).

@@ -7,13 +7,17 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Leads\Actions\DescribeLeadForm;
 use App\Modules\Leads\Actions\OfferCallToAction;
+use App\Modules\Leads\Console\ForgetOldLeadsCommand;
 use App\Modules\Leads\Console\LeadsCommand;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
+use App\Modules\Leads\Listeners\ForgetShopperLeads;
 use App\Modules\Leads\Support\LeadTimeline;
+use App\Modules\Shopify\Events\ShopperDataRequested;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 
 final class LeadsServiceProvider extends ModuleServiceProvider
@@ -28,12 +32,21 @@ final class LeadsServiceProvider extends ModuleServiceProvider
     protected function moduleCommands(): array
     {
         return [
+            ForgetOldLeadsCommand::class,
             LeadsCommand::class,
         ];
     }
 
     protected function bootModule(): void
     {
+        // A lead is kept leads.retention_days (a year), then deleted with the person's details in it.
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->command('leads:forget-old')->dailyAt('03:55')->name('leads:forget-old')->withoutOverlapping();
+        });
+
+        // A shopper's request to be erased, passed on by Shopify: every lead they left by that email or phone.
+        Event::listen(ShopperDataRequested::class, ForgetShopperLeads::class);
+
         // After the nightly reading, because everything a call to action is written from is what
         // that reading just found.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {

@@ -6,8 +6,7 @@
         "Connections",
         "Catalog",
         "Analytics",
-        "Admin"
-    ],
+        "Admin", "Shopify"],
     "provider": "ShoppersServiceProvider",
     "features": [
         {

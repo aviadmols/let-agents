@@ -4,7 +4,7 @@ namespace App\Modules\Shopify\Events;
 
 /**
  * Shopify passed on a shopper's privacy request: "redact" to erase what is kept about them in
- * this shop, "report" to say what is kept. Modules that keep shopper data, by email or by the
+ * this shop, "report" to say what is kept. Modules that keep shopper data, by email, phone or the
  * Shopify customer id, listen.
  */
 final class ShopperDataRequested
@@ -14,5 +14,6 @@ final class ShopperDataRequested
         public readonly string $kind,
         public readonly string $email,
         public readonly string $customerId = '',
+        public readonly string $phone = '',
     ) {}
 }
