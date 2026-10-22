@@ -82,7 +82,7 @@ final class CreateTaskFile
                 'task' => $type,
                 'review_tier' => $type === TaskType::FactReview ? max(1, min(2, $reviewTier)) : 0,
                 'prompt_key' => $type->value,
-                'prompt_version' => PromptLibrary::version($type),
+                'prompt_version' => PromptLibrary::version($type, $needsVocabulary ? $vocabulary?->definition() : null),
                 'prompt_hash' => PromptLibrary::hash($system),
                 'system_prompt' => $system,
                 'vocabulary_id' => $needsVocabulary ? $vocabulary?->id : null,

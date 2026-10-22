@@ -37,8 +37,16 @@ final class VocabularyText
         $lines[] = '';
         $lines[] = '## Choices and yes/no specs (`yes`, from candidates)';
 
+        $kinds = [];
+
         foreach ($vocabulary->attributes() as $attribute) {
             $type = $attribute['type'] ?? 'number';
+
+            if ($type === 'enum' && $vocabulary->readByModel((string) $attribute['key'])) {
+                $kinds[] = $attribute;
+
+                continue;
+            }
 
             if ($type === 'enum') {
                 $values = array_map(fn (array $v): string => '`'.$v['key'].'` '.$v['label']['he'], (array) $attribute['values']);
@@ -47,6 +55,20 @@ final class VocabularyText
 
             if ($type === 'boolean') {
                 $lines[] = '- `'.$attribute['key'].'`: '.$attribute['label']['he'].' (value true)'.self::hint($attribute);
+            }
+        }
+
+        // What kind of product it is (a book's genre, a jewel's style): read from the whole text, not from
+        // words code found. Only vocabularies that have one get the section, so the others' prompts stay as they were.
+        if ($kinds !== []) {
+            $lines[] = '';
+            $lines[] = '## Kinds (`add`, judged from the text read as a whole)';
+
+            foreach ($kinds as $attribute) {
+                $values = array_map(fn (array $v): string => '`'.$v['key'].'` '.$v['label']['he'], (array) $attribute['values']);
+                $applies = (array) ($attribute['applies_to'] ?? []);
+                $lines[] = '- `'.$attribute['key'].'` ('.$attribute['label']['he'].'), '.(($attribute['multiple'] ?? false) === true ? 'one or more of' : 'one of').': '.implode(' | ', $values).self::hint($attribute)
+                    .($applies === [] ? '' : '. Only for: '.implode(', ', $applies));
             }
         }
 

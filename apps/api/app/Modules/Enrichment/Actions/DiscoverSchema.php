@@ -25,8 +25,11 @@ final class DiscoverSchema
 
     public const ACTION = 'enrichment.discover_schema';
 
-    /** The counting's own version, part of the fingerprint: a change here counts again. */
-    public const VERSION = 2;
+    /**
+     * The counting's own version, part of the fingerprint: a change here counts again. 3: vocabularies carry
+     * the kind of product (read_by: model), so a branch whose last proposal has none may get a new one.
+     */
+    public const VERSION = 3;
 
     public function __construct(
         private readonly RecordsRuns $runs,

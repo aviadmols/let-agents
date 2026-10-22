@@ -20,7 +20,8 @@ use App\Modules\Runs\Models\Run;
  *   fill      40  a pilot: code reads the sample's products with the proposed vocabulary (nothing
  *                 saved), and counts how many of what a buyer must know it found. Required counts
  *                 in full, recommended by half. A vocabulary that names none is measured on all its
- *                 attributes, and says so.
+ *                 attributes, and says so. The kind of product (`read_by: model`) is left out: a model
+ *                 reads it, not code.
  *   form      15  what code had to leave out to make the vocabulary hold together
  *   review    25  the verdict of the reviewer of the other family, less what it dropped and found missing
  *
@@ -126,14 +127,17 @@ final class ScoreSchemaProposal
     private function pilot(VocabularyDefinition $definition, array $ids): array
     {
         $products = CatalogProduct::query()->whereIn('id', $ids)->orderBy('external_id')->get();
-        $required = array_column($definition->attributesOf(VocabularyDefinition::REQUIRED), 'key');
-        $recommended = array_column($definition->attributesOf(VocabularyDefinition::RECOMMENDED), 'key');
+        // The kind of product is read by a model from the whole description, never by code: a pilot in code
+        // would find it on no product and count that against a vocabulary that is right to have it.
+        $inCode = fn (array $attributes): array => array_values(array_filter(array_column($attributes, 'key'), fn (string $key): bool => ! $definition->readByModel($key)));
+        $required = $inCode($definition->attributesOf(VocabularyDefinition::REQUIRED));
+        $recommended = $inCode($definition->attributesOf(VocabularyDefinition::RECOMMENDED));
         $weights = array_fill_keys($required, 1.0) + array_fill_keys($recommended, 0.5);
         $measuredOn = 'asked';
 
         // A vocabulary that asks for nothing is measured on everything it reads: weaker, and said.
         if ($weights === []) {
-            $weights = array_fill_keys(array_column($definition->attributes(), 'key'), 1.0);
+            $weights = array_fill_keys($inCode($definition->attributes()), 1.0);
             $measuredOn = 'all';
         }
 

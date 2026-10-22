@@ -16,16 +16,32 @@ final class PromptLibrary
 {
     /** @var array<string, int> task => current version */
     public const CURRENT = [
-        'product_extraction' => 3,
-        'fact_review' => 4,
+        'product_extraction' => 4,
+        'fact_review' => 5,
         'content_mapping' => 2,
         'product_highlights' => 2,
         'product_summary' => 1,
         'section_questions' => 1,
     ];
 
-    public static function version(TaskType $task): int
+    /**
+     * The version before the kind of product (read_by: model), still sent for a vocabulary that has no kind: its
+     * prompt, and so every input hash, stays exactly as it was, and none of its products is read or reviewed again.
+     *
+     * @var array<string, int>
+     */
+    public const WITHOUT_KIND = [
+        'product_extraction' => 3,
+        'fact_review' => 4,
+    ];
+
+    /** The version a task is sent at; for the vocabulary it is read with, when the version depends on it. */
+    public static function version(TaskType $task, ?VocabularyDefinition $vocabulary = null): int
     {
+        if (isset(self::WITHOUT_KIND[$task->value]) && ! $vocabulary?->hasKind()) {
+            return self::WITHOUT_KIND[$task->value];
+        }
+
         return self::CURRENT[$task->value];
     }
 
@@ -48,7 +64,7 @@ final class PromptLibrary
      */
     public static function render(TaskType $task, ?VocabularyDefinition $vocabulary, array $uses = []): string
     {
-        $text = self::template($task);
+        $text = self::template($task, self::version($task, $vocabulary));
         $useLines = implode("\n", array_map(fn (array $use): string => '- `'.$use['key'].'`: '.$use['label']['he'], $uses));
 
         return trim(str_replace(

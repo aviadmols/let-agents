@@ -228,6 +228,7 @@ return [
         'pilot_found' => 'Pilot on :products products, :on:',
         'measured_on' => ['asked' => 'the attributes a buyer must know', 'all' => 'every attribute (the vocabulary names none as required)'],
         'importance' => ['required' => 'required', 'recommended' => 'recommended', 'optional' => 'optional'],
+        'read_by_model' => 'read from the whole description',
         'discover' => 'Discover again',
         'read_catalog' => 'Read the catalog in code now',
         'how' => 'Discovery runs in the background and shows here when done.',

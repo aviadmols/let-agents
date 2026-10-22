@@ -116,7 +116,9 @@ final class SchemaDiscovery extends Page
                 'kind' => $kind === 'number' ? 'number · '.($attribute['dimension'] ?? '') : $kind, 'values' => $values,
                 'sample' => (float) ($coverage['attributes'][$key]['share'] ?? 0), 'catalog' => $read['attributes'][$key]['share'] ?? null,
                 'source' => self::sources($read['attributes'][$key]['sources'] ?? []) ?: (string) ($proposal->review['writer']['sources'][$key] ?? ''),
-                'decision' => $decision, 'why' => (string) ($attribute['why']['he'] ?? ''), 'importance' => (string) ($attribute['importance'] ?? ''), 'author' => $author($key)];
+                'decision' => $decision, 'why' => (string) ($attribute['why']['he'] ?? ''), 'importance' => (string) ($attribute['importance'] ?? ''), 'author' => $author($key),
+                // The kind of product, read by a model from the whole description: its 0% in the sample is expected.
+                'read_by' => (string) ($attribute['read_by'] ?? '')];
         }
         foreach ((array) ($proposal->review['dropped'] ?? []) as $drop) {
             $rows[] = ['part' => $drop['kind'] === 'product_type' ? 'type' : 'attribute', 'key' => (string) $drop['key'], 'label' => '', 'kind' => (string) $drop['kind'],

@@ -28,6 +28,13 @@ final class VocabularyDefinition
 
     public const IMPORTANCE = [self::REQUIRED, self::RECOMMENDED, self::OPTIONAL];
 
+    /**
+     * `read_by` on a choice that says what kind of product it is (a book's genre, a jewel's style, a tool's
+     * job): stores seldom write the kind in a field or in so many words, so a model reads it from the whole
+     * description, and no pattern needs to match for it or its values to stay.
+     */
+    public const READ_BY_MODEL = 'model';
+
     /** A root of "*" is the whole catalog: a store that sells one kind of thing has no one category above it. */
     public const WHOLE_CATALOG = '*';
 
@@ -114,6 +121,10 @@ final class VocabularyDefinition
 
             if (isset($attribute['multiple']) && ($type !== 'enum' || ! is_bool($attribute['multiple']))) {
                 $problems[] = "{$at}.multiple is true or false, on a choice only";
+            }
+
+            if (isset($attribute['read_by']) && ($type !== 'enum' || $attribute['read_by'] !== self::READ_BY_MODEL)) {
+                $problems[] = "{$at}.read_by is \"".self::READ_BY_MODEL.'", on a choice only';
             }
 
             if ($type === 'enum') {
@@ -325,6 +336,24 @@ final class VocabularyDefinition
         }
 
         return null;
+    }
+
+    /** Whether a choice is the kind of product, read by a model from the whole description (READ_BY_MODEL). */
+    public function readByModel(string $attributeKey): bool
+    {
+        return ($this->attribute($attributeKey)['read_by'] ?? null) === self::READ_BY_MODEL;
+    }
+
+    /** Whether any choice is the kind of product (READ_BY_MODEL). */
+    public function hasKind(): bool
+    {
+        foreach ($this->attributes() as $attribute) {
+            if (($attribute['type'] ?? 'number') === 'enum' && ($attribute['read_by'] ?? null) === self::READ_BY_MODEL) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return list<array{key: string, label: array<string, string>, patterns?: list<string>, hint?: string}> */

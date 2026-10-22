@@ -24,10 +24,13 @@ use App\Modules\Enrichment\Actions\ReadPromisesInCode;
 use App\Modules\Enrichment\Actions\RunNightlyReading;
 use App\Modules\Enrichment\Enums\TaskType;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
+use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Enrichment\Scanning\BranchPlan;
 use App\Modules\Enrichment\Scanning\WordAudit;
 use App\Modules\Enrichment\Support\TaskFile;
 use App\Modules\Enrichment\Support\VocabularyBranch;
+use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
@@ -37,6 +40,7 @@ use Illuminate\Console\Command;
  * The same actions the operator panel runs, for scripts and local work:
  *
  *   enrichment vocabulary gueta-avigdor --template=power-tools
+ *   enrichment schema gueta-avigdor --branch=branch_1751
  *   enrichment code gueta-avigdor
  *   enrichment tasks gueta-avigdor product_extraction --vocabulary=wood --limit=20 --out=tasks.jsonl
  *   enrichment results <batch id> answers.jsonl --model=claude-haiku-4-5
@@ -60,6 +64,7 @@ final class EnrichmentCommand extends Command
         {--out= : where to write the task file}
         {--model= : the model that produced the results}
         {--force : structure: also when a vocabulary already covers the whole catalog}
+        {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
         {--include-done : ask again about products already read with the same input}
         {--all-products : nightly: every product a model has not read, not only a night of them (the first scan)}
         {--scheduled : every shop that has articles, when its flag is on (audit only)}';
@@ -82,12 +87,8 @@ final class EnrichmentCommand extends Command
             // Read only: where the vocabulary's words would mislead code (WordAudit).
             'words' => $this->words(),
             // The shop's own vocabulary: counted in code, then written and reviewed, for the operator to approve.
-            'schema' => $this->shopStep(function (Shop $shop): Run {
-                ['run' => $run, 'proposal' => $proposal] = app(DiscoverSchema::class)->handle($shop->id);
-                $this->line((string) $run->summary());
-
-                return $proposal === null ? $run : app(ProposeSchema::class)->handle($proposal);
-            }),
+            // Never scored or gated here: the proposal waits on the Schema discovery page for a person.
+            'schema' => $this->schema(),
             // The first scan's structure: branches, a vocabulary for each, a score, and the gate.
             'structure' => $this->shopStep(fn (Shop $shop): Run => app(BuildStructure::class)->handle($shop->id, (bool) $this->option('force'))),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),
@@ -118,6 +119,51 @@ final class EnrichmentCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * A proposal for the whole catalog, or with --branch for one branch of it, and the kinds of product it
+     * proposes (read_by: model), so the person who approves it sees the list first.
+     */
+    private function schema(): int
+    {
+        $shop = $this->shop();
+
+        if (! $shop) {
+            return $this->failWith('Shop not found.');
+        }
+
+        $branch = null;
+        if ($this->option('branch') !== null) {
+            $branches = app(TenantContext::class)->run($shop->id, fn (): array => BranchPlan::of()['branches']);
+            $branch = collect($branches)->firstWhere('key', (string) $this->option('branch'));
+
+            if ($branch === null) {
+                return $this->failWith('Branch not found. Branches: '.(implode(', ', array_map(fn (array $b): string => $b['key'].' ('.$b['name'].', '.$b['products'].')', $branches)) ?: 'none'));
+            }
+        }
+
+        ['run' => $run, 'proposal' => $proposal] = app(DiscoverSchema::class)->handle($shop->id, null, $branch);
+        $this->line((string) $run->summary());
+
+        if ($proposal === null) {
+            return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+        }
+
+        $run = app(ProposeSchema::class)->handle($proposal);
+        $this->line((string) $run->summary());
+        $proposal = app(TenantContext::class)->run($shop->id, fn (): ?EnrichmentSchemaProposal => EnrichmentSchemaProposal::query()->find($proposal->id));
+
+        foreach ((array) ($proposal?->proposed['attributes'] ?? []) as $attribute) {
+            if (($attribute['read_by'] ?? null) === VocabularyDefinition::READ_BY_MODEL) {
+                $this->line($attribute['key'].' ('.($attribute['label']['he'] ?? '').'): '.implode(', ', array_map(fn (array $v): string => $v['key'].' '.($v['label']['he'] ?? ''), (array) ($attribute['values'] ?? []))));
+            }
+        }
+        if ($proposal !== null) {
+            $this->line("Proposal {$proposal->id}: {$proposal->status}");
+        }
+
+        return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
     }
 
     private function vocabulary(): int

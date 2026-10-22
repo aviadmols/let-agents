@@ -12,6 +12,7 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
+use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\KnowledgeEvidence;
 use App\Modules\Enrichment\Scanning\NaturalColours;
 use App\Modules\Enrichment\Scanning\PictureText;
@@ -39,7 +40,7 @@ final class ProposeSchema
     public const TEMPLATE_FIT = 0.3;
 
     /** The released version each prompt is sent at; a released one is never edited. */
-    private const PROMPTS = ['schema_writer' => 3, 'schema_review' => 3, 'schema_revise' => 3];
+    private const PROMPTS = ['schema_writer' => 4, 'schema_review' => 4, 'schema_revise' => 4];
 
     private const WRITER_OUTPUT_TOKENS = 12000;
 
@@ -211,9 +212,12 @@ final class ProposeSchema
         $vocabulary['schema_version'] = VocabularyDefinition::SCHEMA_VERSION;
         $branch = $proposal->branch;
         $vocabulary['root_category_external_id'] = $branch['root'] ?? VocabularyDefinition::WHOLE_CATALOG;
+        // A whole-catalog proposal for a shop that already reads its whole catalog with one vocabulary is that
+        // vocabulary's next version, whatever key the writer chose: approved, it replaces it instead of reading twice.
+        $whole = $branch === null ? EnrichmentVocabulary::query()->where('active', true)->where('root_category_external_id', VocabularyDefinition::WHOLE_CATALOG)->orderBy('key')->value('key') : null;
         $vocabulary['key'] = $branch !== null
             ? $branch['key']
-            : (preg_match('/^[a-z][a-z0-9_]{1,40}$/', (string) ($vocabulary['key'] ?? '')) === 1 ? $vocabulary['key'] : ($proposal->template ?? 'store'));
+            : ($whole ?? (preg_match('/^[a-z][a-z0-9_]{1,40}$/', (string) ($vocabulary['key'] ?? '')) === 1 ? $vocabulary['key'] : ($proposal->template ?? 'store')));
         if ($branch !== null && (! is_string($vocabulary['name']['he'] ?? null) || ! is_string($vocabulary['name']['en'] ?? null))) {
             $vocabulary['name'] = ['he' => $branch['name'], 'en' => $branch['name']];
         }
@@ -258,6 +262,11 @@ final class ProposeSchema
             }
             if (isset($entry['why']) && (! is_string($entry['why']['he'] ?? null) || ! is_string($entry['why']['en'] ?? null))) {
                 unset($entry['why']);
+            }
+            // Read by a model is said of a choice only; on anything else the attribute stays, read as before.
+            if (isset($entry['read_by']) && (($entry['type'] ?? 'number') !== 'enum' || $entry['read_by'] !== VocabularyDefinition::READ_BY_MODEL)) {
+                $problems[] = 'attribute '.($entry['key'] ?? '?').': read_by '.json_encode($entry['read_by']).' left off';
+                unset($entry['read_by']);
             }
         }
         unset($entry);
@@ -325,7 +334,8 @@ final class ProposeSchema
                     $values[(string) $value['key']] = SchemaStats::share($read, (array) ($value['patterns'] ?? []));
                 }
                 $all = array_merge(...array_map(fn (array $v): array => (array) ($v['patterns'] ?? []), (array) ($attribute['values'] ?? [])));
-                $out['attributes'][$key] = ['share' => SchemaStats::share($read, $all), 'values' => $values];
+                // The kind of product is read by a model from the whole description: its share says only how often the words are written.
+                $out['attributes'][$key] = ['share' => SchemaStats::share($read, $all), 'values' => $values] + (($attribute['read_by'] ?? null) === VocabularyDefinition::READ_BY_MODEL ? ['read_by' => 'model'] : []);
             } elseif ($kind === 'boolean') {
                 $out['attributes'][$key] = ['share' => SchemaStats::share($read, (array) ($attribute['patterns'] ?? []))];
             } else {
@@ -342,6 +352,8 @@ final class ProposeSchema
      *
      * An attribute the vocabulary marks `required` or `recommended` is kept at 0: nobody writes it,
      * and that is the gap to ask the store about, not a reason to stop asking (docs/strict-scan.md).
+     * The kind of product (`read_by: model`) is kept whole, every value: a model reads it from the
+     * description read as a whole, so no store has to write "פנטזיה" for a fantasy novel to be one.
      *
      * @param  array{product_types: array<string, float>, attributes: array<string, array<string, mixed>>}  $coverage
      * @param  array<string, mixed>  $vocabulary  the vocabulary the coverage was measured on, when importance should be honoured
@@ -351,9 +363,13 @@ final class ProposeSchema
     {
         $why = (string) __('enrichment::ui.schema.unread');
         $asked = [];
+        $byModel = [];
         foreach ((array) ($vocabulary['attributes'] ?? []) as $entry) {
             if (is_array($entry) && in_array($entry['importance'] ?? null, [VocabularyDefinition::REQUIRED, VocabularyDefinition::RECOMMENDED], true)) {
                 $asked[(string) ($entry['key'] ?? '')] = true;
+            }
+            if (is_array($entry) && ($entry['read_by'] ?? null) === VocabularyDefinition::READ_BY_MODEL) {
+                $byModel[(string) ($entry['key'] ?? '')] = true;
             }
         }
         // A colour a stone in the sample implies stays, though no title said it: titles name a ruby, never its
@@ -369,7 +385,7 @@ final class ProposeSchema
         $looks = $vocabulary === [] ? null : VocabularyDefinition::fromTrusted($vocabulary);
         $out = [];
         foreach ($coverage['attributes'] as $key => $attribute) {
-            if ($looks !== null && $looks->readFromImage((string) $key)) {
+            if (isset($byModel[(string) $key]) || ($looks !== null && $looks->readFromImage((string) $key))) {
                 continue;
             }
             $keeps = (string) $key === NaturalColours::COLOUR ? $implied : [];
