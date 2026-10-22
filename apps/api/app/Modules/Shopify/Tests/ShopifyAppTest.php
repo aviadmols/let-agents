@@ -305,7 +305,7 @@ final class ShopifyAppTest extends TestCase
         Settings::set('search.results_per_group', 7, $install->shop_id);
         $this->webhook('shop/redact', ['shop_domain' => self::SHOP])->assertOk();
         $this->assertSame(0, Shop::query()->count(), 'the shop and all it holds are erased');
-        $this->assertSame(0, DB::table('setting_overrides')->where('shop_id', $install->shop_id)->count(), 'its own settings too, which have no foreign key');
+        $this->assertSame(0, DB::table('setting_overrides')->where('scope', $install->shop_id)->count(), 'its own settings too, which have no foreign key');
     }
 
     public function test_the_owner_ending_the_plan_cancels_it_in_shopify_and_a_shop_being_deleted_stays_paused(): void

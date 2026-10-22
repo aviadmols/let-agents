@@ -55,6 +55,7 @@ final class PrivacySettingsTest extends TestCase
             'id' => (string) Str::ulid(), 'shop_id' => $this->shop->id, 'token_hash' => 'secret-hash', 'share_code' => 'rocks0000001', 'items' => '["3"]',
             'phone' => Crypt::encryptString('0501234567'), 'created_at' => now(), 'updated_at' => now(),
         ]);
+        Settings::set('search.results_per_group', 7, $this->shop->id);
         $viewer = User::factory()->create();
         $viewer->attachShop($this->shop, ShopRole::Viewer);
 
@@ -73,6 +74,7 @@ final class PrivacySettingsTest extends TestCase
         $this->assertStringContainsString('רוקס', (string) $zip->getFromName('shop.csv'));
         $this->assertStringContainsString('owner@example.com', (string) $zip->getFromName('team.csv'));
         $this->assertNotFalse($zip->getFromName('README.txt'));
+        $this->assertStringContainsString('search.results_per_group', (string) $zip->getFromName('settings.csv'), 'the settings chosen for the shop');
 
         $lists = (string) $zip->getFromName('Shortlist/shortlist_wishlists.csv');
         $this->assertStringContainsString('0501234567', $lists, 'what a shopper left is read as written, not encrypted');
@@ -152,7 +154,7 @@ final class PrivacySettingsTest extends TestCase
 
         $this->assertNull(Shop::query()->find($this->shop->id));
         $this->assertSame(0, DB::table('monthly_usage')->where('shop_id', $this->shop->id)->count());
-        $this->assertSame(0, DB::table('setting_overrides')->where('shop_id', $this->shop->id)->count());
+        $this->assertSame(0, DB::table('setting_overrides')->where('scope', $this->shop->id)->count());
         $this->assertNotNull($this->owner->fresh(), 'the people stay');
         Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::DELETED);
     }

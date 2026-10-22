@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Actions;
 
+use App\Core\Settings\OverrideScope;
 use App\Core\Tenancy\BelongsToTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
@@ -109,7 +110,7 @@ final class ExportShopData
             if (! Schema::hasTable($table)) {
                 continue;
             }
-            foreach (DB::table($table)->where('shop_id', $shop->id)->orderBy('key')->get() as $row) {
+            foreach (DB::table($table)->where('scope', OverrideScope::for($shop->id))->orderBy('key')->get() as $row) {
                 $values = (array) $row;
                 yield ['kind' => $kind, 'key' => $values['key'] ?? '', 'value' => $this->plain($values['value'] ?? $values['enabled'] ?? null)];
             }
