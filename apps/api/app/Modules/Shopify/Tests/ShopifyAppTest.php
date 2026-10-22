@@ -180,6 +180,27 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
     }
 
+    public function test_installing_again_after_asking_to_delete_keeps_the_shop(): void
+    {
+        Settings::set('shopify.charge', false);
+        $install = function (): void {
+            $authorize = $this->get('/shopify/install?shop='.self::SHOP)->assertRedirect();
+            parse_str((string) parse_url((string) $authorize->headers->get('Location'), PHP_URL_QUERY), $asked);
+            $this->get('/shopify/callback?'.http_build_query(self::signed(['code' => 'abc', 'state' => $asked['state']])))->assertRedirect();
+        };
+
+        $install();
+        $shop = ShopifyInstall::query()->sole()->shop;
+        $shop->forceFill(['status' => ShopStatus::Paused, 'cancelled_at' => now(), 'deletion_due_at' => now()->addDays(30), 'deletion_asked_by' => 'owner@example.com'])->save();
+
+        $install();
+
+        $shop->refresh();
+        $this->assertFalse($shop->leaving(), 'coming back calls off the deletion');
+        $this->assertNull($shop->deletion_asked_by);
+        $this->assertSame(ShopStatus::Active, $shop->status, 'and the search is back on the site');
+    }
+
     public function test_a_store_on_a_custom_app_is_installed_and_renewed_with_that_apps_credentials(): void
     {
         Settings::set('shopify.charge', false);

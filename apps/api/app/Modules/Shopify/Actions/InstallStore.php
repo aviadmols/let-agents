@@ -77,6 +77,11 @@ final class InstallStore
                 'timezone' => (string) ($store['ianaTimezone'] ?? 'Asia/Jerusalem'),
             ]);
 
+            // Installed again after asking for the shop to be deleted: it is kept, and the plan can start again.
+            if ($shop->leaving()) {
+                $shop->forceFill(['deletion_due_at' => null, 'deletion_asked_by' => null])->save();
+            }
+
             // Paused until the merchant approves the subscription: the storefront stays quiet.
             if (! $install->subscribed()) {
                 $shop->forceFill(['status' => ShopStatus::Paused])->save();
