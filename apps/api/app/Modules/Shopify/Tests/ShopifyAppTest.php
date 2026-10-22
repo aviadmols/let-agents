@@ -317,6 +317,12 @@ final class ShopifyAppTest extends TestCase
 
         $this->assertSame('https://'.self::SHOP.'/admin/themes/current/editor?context=apps&activateAppId=test-key/app-embed', $url, 'the theme editor opens with the app embed on: Shopify\'s deep link');
         $this->assertFileExists(base_path('../../extensions/shopify/extensions/let-agents-search/blocks/'.ShopifyConnectionFacts::EMBED.'.liquid'), 'the link names the embed block that exists');
+
+        // and each plan, straight to Shopify's approval of it
+        $growth = (string) (app(ShopifyConnectionFacts::class)->facts($install->shop)['plan_urls']['growth'] ?? '');
+        $this->assertStringContainsString('/shopify/billing/start?', $growth);
+        $this->assertStringContainsString('plan=growth', $growth);
+        $this->assertStringContainsString('signature=', $growth);
     }
 
     public function test_the_owner_ending_the_plan_cancels_it_in_shopify_and_a_shop_being_deleted_stays_paused(): void

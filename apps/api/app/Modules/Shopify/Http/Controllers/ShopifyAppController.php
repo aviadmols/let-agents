@@ -224,6 +224,12 @@ final class ShopifyAppController
         return URL::temporarySignedRoute('shopify.plans', now()->addHour(), ['shop' => $shopDomain]);
     }
 
+    /** One plan, signed for this store, for an hour: off to Shopify to approve it (the panel's upgrade or downgrade). */
+    public static function planLink(string $shopDomain, string $plan): string
+    {
+        return URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $shopDomain, 'plan' => $plan]);
+    }
+
     /** The offered plans, each a signed link to approve it; the shop's own plan marked. */
     private function choosePlan(ShopifyInstall $install): Response
     {

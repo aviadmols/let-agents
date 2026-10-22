@@ -81,5 +81,7 @@ return [
         'by' => 'Asked by: :name',
         'due' => 'Deletion date: :date',
         'by_hand' => 'No platform bills this shop: stop the billing by hand.',
+        'plan_asked' => 'The owner of :shop asks to change plan',
+        'plan' => 'Plan asked for: :plan',
     ],
 ];

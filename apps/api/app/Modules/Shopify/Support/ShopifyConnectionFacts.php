@@ -38,6 +38,8 @@ final class ShopifyConnectionFacts implements ConnectionFacts
         // the merchant changes plan themselves, in Shopify's billing
         if ($install->installed() && Plan::query()->offered()->exists()) {
             $facts['plans_url'] = ShopifyAppController::plansLink($install->shop_domain);
+            // each plan straight to Shopify's approval: an upgrade holds at once, a downgrade from the next period
+            $facts['plan_urls'] = Plan::query()->offered()->pluck('code')->mapWithKeys(fn (string $code): array => [$code => ShopifyAppController::planLink($install->shop_domain, $code)])->all();
         }
 
         if (! $install->subscribed()) {

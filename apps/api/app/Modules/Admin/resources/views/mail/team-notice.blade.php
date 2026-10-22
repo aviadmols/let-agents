@@ -9,8 +9,9 @@
         <h1 style="margin:0 0 12px;font-size:20px;font-weight:600">{{ $t($kind, ['shop' => $shopName]) }}</h1>
         <p style="margin:0 0 8px;font-size:15px;line-height:1.6" dir="ltr">{{ $domain }}</p>
         @if ($by)<p style="margin:0 0 8px;font-size:15px;line-height:1.6">{{ $t('by', ['name' => $by]) }}</p>@endif
+        @if ($plan)<p style="margin:0 0 8px;font-size:15px;line-height:1.6;font-weight:500">{{ $t('plan', ['plan' => $plan]) }}</p>@endif
         @if ($due)<p style="margin:0 0 8px;font-size:15px;line-height:1.6">{{ $t('due', ['date' => $due->locale(app()->getLocale())->translatedFormat('j.n.Y')]) }}</p>@endif
-        @if ($billedByHand && $kind !== \App\Modules\Admin\Mail\TeamNoticeMail::KEPT && $kind !== \App\Modules\Admin\Mail\TeamNoticeMail::DELETED)
+        @if ($billedByHand && in_array($kind, [\App\Modules\Admin\Mail\TeamNoticeMail::PLAN_ENDED, \App\Modules\Admin\Mail\TeamNoticeMail::DELETION_ASKED], true))
             <p style="margin:0;font-size:15px;line-height:1.6;font-weight:500">{{ $t('by_hand') }}</p>
         @endif
     </div>

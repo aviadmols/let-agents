@@ -9,9 +9,12 @@ use App\Core\Usage\MonthlyUsage;
 use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\HomeCard;
 use App\Modules\Admin\Contracts\StorePlugin;
+use App\Modules\Admin\Mail\TeamNoticeMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
+use App\Modules\Admin\Support\ShopLeavingNotices;
 use App\Modules\Tenancy\Enums\ShopPlatform;
+use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Carbon\CarbonInterface;
@@ -91,8 +94,51 @@ class ConnectionSettings extends Page
             'plan_lines' => $shop->currentPlan()?->lines() ?? [],
             'allowance' => $this->allowance($shop),
             'plans_url' => is_string($facts['plans_url'] ?? null) ? $facts['plans_url'] : null,
+            'plans' => $this->plans($shop, (array) ($facts['plan_urls'] ?? [])),
             'has_token' => (bool) ($facts['has_token'] ?? false),
         ];
+    }
+
+    /**
+     * The plans side by side: each one's price and what it gives, the shop's own marked, and the way to it. An upgrade or
+     * a downgrade, by price against the shop's plan; a Shopify store approves it in Shopify's billing (plan_urls), any
+     * other store asks the team (askPlan).
+     *
+     * @param  array<string, string>  $urls
+     * @return list<array{code: string, name: string, price: string, lines: list<string>, current: bool, move: string|null, url: string|null}>
+     */
+    private function plans(Shop $shop, array $urls): array
+    {
+        $current = $shop->cancelled_at === null && ! $shop->leaving() ? $shop->currentPlan() : null;
+
+        return Plan::query()->offered()->get()->map(fn (Plan $plan): array => [
+            'code' => $plan->code,
+            'name' => $plan->name,
+            'price' => '$'.number_format((float) $plan->price()),
+            'lines' => $plan->lines(),
+            'current' => $current?->code === $plan->code,
+            'move' => $current === null ? 'choose' : match ($plan->price() <=> $current->price()) {
+                1 => 'upgrade', -1 => 'downgrade', default => null
+            },
+            'url' => is_string($urls[$plan->code] ?? null) ? $urls[$plan->code] : null,
+        ])->all();
+    }
+
+    /** A store no platform bills asks the team to move it to a plan: the team is told, and switches it. */
+    public function askPlan(string $code): void
+    {
+        $shop = $this->shop();
+        $plan = Plan::query()->offered()->where('code', $code)->first();
+        $user = Auth::user();
+
+        if ($plan === null || ! $user instanceof User || ! $user->managesShop($shop)) {
+            Notification::make()->warning()->title(__('admin::shop_settings.owners_only'))->send();
+
+            return;
+        }
+
+        ShopLeavingNotices::team($shop, TeamNoticeMail::PLAN_ASKED, (string) $user->email, true, $plan->name);
+        Notification::make()->success()->title(__('admin::shop_settings.connection.plan_asked', ['plan' => $plan->name]))->send();
     }
 
     /** @return array{version: string, filename: string}|null the plugin zip a WordPress store can download */

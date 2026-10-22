@@ -26,6 +26,9 @@ final class TeamNoticeMail extends Mailable
 
     public const DELETED = 'deleted';
 
+    /** A store the team bills asks to move to another plan. */
+    public const PLAN_ASKED = 'plan_asked';
+
     public function __construct(
         public readonly string $kind,
         public readonly string $shopName,
@@ -33,6 +36,7 @@ final class TeamNoticeMail extends Mailable
         public readonly ?string $by,
         public readonly bool $billedByHand,
         public readonly ?CarbonInterface $due = null,
+        public readonly ?string $plan = null,
     ) {}
 
     public function envelope(): Envelope

@@ -55,6 +55,35 @@
         </x-lp::card>
     @endif
 
+    @if ($d['plans'] !== [])
+        {{-- The plans side by side: the shop's own marked, an upgrade or a downgrade to each of the others. --}}
+        <x-lp::card :title="$t('plans_title')" :help="$t($d['woo'] ? 'plans_help_team' : 'plans_help')" style="max-width: 960px" data-plans>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+                @foreach ($d['plans'] as $plan)
+                    <div data-plan="{{ $plan['code'] }}" style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; box-shadow: inset 0 0 0 {{ $plan['current'] ? '2px var(--la-ink, #0b0b0c)' : '1px var(--la-line, #e4e4e9)' }}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+                            <b style="font-size: 16px; font-weight: 600">{{ $plan['name'] }}</b>
+                            @if ($plan['current'])<span class="lp-pill" data-tone="good"><i></i>{{ $t('current_plan') }}</span>@endif
+                        </div>
+                        <div><span style="font-size: 26px; font-weight: 600" dir="ltr">{{ $plan['price'] }}</span> <span style="color: var(--la-muted, #6b6b73); font-size: 13px">{{ $t('per_month') }}</span></div>
+                        <ul style="margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; font-size: 13px; color: var(--la-muted, #6b6b73)">
+                            @foreach ($plan['lines'] as $line)<li>{{ $line }}</li>@endforeach
+                        </ul>
+                        @if (! $plan['current'] && $plan['move'] !== null && $this->canConnect())
+                            <div style="margin-top: auto">
+                                @if ($plan['url'] !== null)
+                                    <a class="lp-btn lp-btn-sm {{ $plan['move'] === 'downgrade' ? '' : 'lp-btn-primary' }}" href="{{ $plan['url'] }}" target="_top" data-plan-move="{{ $plan['move'] }}">{{ $t($plan['move']) }}</a>
+                                @else
+                                    <button type="button" class="lp-btn lp-btn-sm {{ $plan['move'] === 'downgrade' ? '' : 'lp-btn-primary' }}" wire:click="askPlan('{{ $plan['code'] }}')" wire:loading.attr="disabled" data-plan-move="{{ $plan['move'] }}">{{ $t($plan['move']) }}</button>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </x-lp::card>
+    @endif
+
     @if ($d['woo'])
         @php($package = $this->package())
         <x-lp::card :title="$t('plugin_title')" :help="$t('plugin_help')" style="max-width: 640px" data-plugin>

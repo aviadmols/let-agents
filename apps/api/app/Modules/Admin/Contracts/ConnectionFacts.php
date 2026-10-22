@@ -21,6 +21,7 @@ use App\Modules\Tenancy\Models\Shop;
  *   trial_ends      CarbonInterface  when the trial ends, while in one
  *   plans_url       string       where the merchant changes plan themselves (Shopify's billing), when they can
  *   embed_url       string       where the merchant switches Lets on in the store's theme (Shopify's theme editor, the app embed on)
+ *   plan_urls       array<string, string>  plan code => where the merchant approves that plan themselves (Shopify's billing)
  */
 interface ConnectionFacts
 {
