@@ -158,6 +158,19 @@ final class ProductSetsTest extends TestCase
         $this->ask('תן לי את כל ספרי החטופים');
         $this->assertCount(4, $this->calls);
         $this->assertSame(1, app(TenantContext::class)->run($this->shop->id, fn () => ProductSet::query()->count()));
+
+        // the scan learns more of a book it chooses from (its genre): chosen again; the same tags read again at night: not
+        $learn = fn (string $status) => app(TenantContext::class)->run($this->shop->id, fn () => EnrichmentFact::query()->create([
+            'shop_id' => $this->shop->id, 'product_id' => CatalogProduct::query()->where('external_id', '4001')->value('id'), 'kind' => 'choice', 'key' => 'genre',
+            'value_text' => 'ממואר', 'origin' => 'model', 'status' => $status, 'input_hash' => str_repeat('a', 64),
+        ]));
+        $first = $learn('approved');
+        $this->ask('תן לי את כל ספרי החטופים');
+        $this->assertCount(6, $this->calls, 'chosen again with what is now known of it');
+        app(TenantContext::class)->run($this->shop->id, fn () => $first->forceFill(['status' => 'superseded'])->save());
+        $learn('approved');
+        $this->assertSame('bank', $this->ask('תן לי את כל ספרי החטופים')['from'], 'read again, the same: kept');
+        $this->assertCount(6, $this->calls);
     }
 
     public function test_in_a_small_store_the_whole_catalogue_is_read_and_the_nearest_is_offered_as_what_it_is(): void

@@ -31,6 +31,8 @@ use App\Modules\Assistant\Support\QuestionGuard;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Retrieval\Contracts\TopicQuestions;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -661,13 +663,15 @@ final class AnswerSiteQuestion
 
         // "Not on the site" holds until the store says more, and only then is a model asked again: a page
         // or post added or changed since (a cancellation policy written later), an answer of the team's
-        // own written or changed since, or a product added since. Not a day passing, not the index read
-        // again for the night. And only once the question was also asked in other ways (the second look).
+        // own written or changed since, a product added since, or the scan learned more of the products (a
+        // book's genre: "פנטזיה" was not there, and now is). Not a day passing, not the index read again for
+        // the night. And only once the question was also asked in other ways (the second look).
         $after = fn (mixed $at): bool => $at !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($at));
 
         return $after(CatalogContent::query()->active()->max('updated_at'))
             || $after(AssistantAnswer::query()->where('source', 'team')->max('updated_at'))
             || $after(CatalogProduct::query()->active()->max('created_at'))
+            || (((array) $saved->flags)['learned'] ?? null) !== self::learned()
             || ((int) (((array) $saved->flags)['looked'] ?? 0) < self::LOOK_VERSION && Features::enabled('assistant.second_look', $shopId));
     }
 
@@ -2352,7 +2356,8 @@ final class AnswerSiteQuestion
             'output_tokens' => $output,
             'cost_usd' => round($cost, 6),
             'run_id' => $run->runId,
-            'flags' => $flags,
+            // a "not on the site" remembers what the scan knew of the products then (stale())
+            'flags' => $outcome === AssistantAnswer::NO_INFO ? ['learned' => self::learned()] + (array) $flags : $flags,
             'last_asked_at' => now(),
         ];
 
@@ -2369,6 +2374,17 @@ final class AnswerSiteQuestion
             'asked_count' => 0,
             'visitors' => 0,
         ]);
+    }
+
+    /**
+     * What the scan has learned of the shop's products, in short: how many tags it holds and of how many
+     * kinds. Read again each night, the same tags give the same mark; a new kind (a book's genre) changes it.
+     */
+    private static function learned(): string
+    {
+        $facts = EnrichmentFact::query()->whereNotNull('product_id')->where('status', FactStatus::Approved);
+
+        return $facts->count().':'.(clone $facts)->distinct()->count('key');
     }
 
     /** What the store is, for the topic check: its name and what it sells. */

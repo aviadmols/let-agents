@@ -299,9 +299,25 @@ final class FindProductSet implements ProductSets
         $ids = $candidates->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
         $hashes = $candidates->mapWithKeys(fn (CatalogProduct $p): array => [(string) $p->external_id => $p->hash])->all();
         ksort($hashes, SORT_STRING);
-        // what the set was chosen from and by: the products, the prompts' version and the two models
+        // and what the scan learned of them: a set chosen before the books had a genre is chosen again once they do.
+        // Sorted, so the same tags read again at night give the same fingerprint.
+        $learned = [];
+        foreach ($candidates as $product) {
+            $tags = [];
+            foreach ($this->facts[$product->id] ?? [] as $field => $values) {
+                foreach ($values as $value) {
+                    $tags[] = $field.':'.$value;
+                }
+            }
+            if ($tags !== []) {
+                sort($tags, SORT_STRING);
+                $learned[(string) $product->external_id] = array_values(array_unique($tags));
+            }
+        }
+        ksort($learned, SORT_STRING);
+        // what the set was chosen from and by: the products, what is known of them, the prompts' version and the two models
         $models = [Settings::get('thinking.picker_model'), Settings::get('thinking.checker_model')];
-        $fingerprint = hash('sha256', (string) json_encode([self::PROMPT_VERSION, $models, $key, $hashes]));
+        $fingerprint = hash('sha256', (string) json_encode([self::PROMPT_VERSION, $models, $key, $hashes, $learned]));
         $saved = ProductSet::query()->where('subject_key', $key)->first();
         $from = 'bank';
 

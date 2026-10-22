@@ -18,6 +18,9 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Runs\Models\Run;
@@ -281,6 +284,31 @@ final class SiteQuestionTest extends TestCase
         ];
 
         $this->assertSame('answered', $this->ask('מה מדיניות ההחזרים?')->json('data.outcome'), 'not served from memory: looked for again, the wider way');
+    }
+
+    public function test_a_not_found_is_asked_again_once_the_scan_learned_more_of_the_products(): void
+    {
+        // Seen on Sela: "show me fantasy" kept as not on the site, and served from memory ever after.
+        $this->passages = [];
+        Features::override('assistant.second_look', false);
+        $this->assertSame('no_info', $this->ask('יש לכם ספרי פנטזיה?')->json('data.outcome'));
+        $guide = $this->article('703', 'ספרי פנטזיה', 'מבחר ספרי פנטזיה לנוער ולמבוגרים.');
+        $this->inShop(fn () => CatalogContent::query()->update(['updated_at' => now()->subDay()]));
+        $this->passages = [['source' => 'content', 'source_id' => $guide->id, 'external_id' => '703', 'title' => 'ספרי פנטזיה', 'text' => 'מבחר ספרי פנטזיה לנוער ולמבוגרים.', 'similarity' => 0.8]];
+        $this->replies = [
+            ['found' => true, 'answer' => 'כן, יש מבחר ספרי פנטזיה לנוער ולמבוגרים.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $this->assertSame('no_info', $this->ask('יש לכם ספרי פנטזיה?')->json('data.outcome'), 'nothing new in the store: from memory');
+        $this->assertCount(0, $this->calls, 'no model');
+
+        // The scan learns the books' genre: the same question is looked at again.
+        $this->inShop(fn () => EnrichmentFact::query()->create([
+            'shop_id' => $this->shop->id, 'product_id' => CatalogProduct::query()->value('id'), 'kind' => FactKind::Choice, 'key' => 'genre',
+            'value_text' => 'פנטזיה', 'origin' => 'model', 'status' => FactStatus::Approved, 'input_hash' => str_repeat('a', 64),
+        ]));
+        $this->assertSame('answered', $this->ask('יש לכם ספרי פנטזיה?')->json('data.outcome'), 'asked again, once the scan learned more');
     }
 
     public function test_when_code_has_no_other_wording_a_small_model_writes_them_once(): void
