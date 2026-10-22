@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Shopify\Console\ConnectPixelCommand;
 use App\Modules\Shopify\Feed\ShopifyBlog;
 use App\Modules\Shopify\Feed\ShopifyStoreFeed;
+use App\Modules\Shopify\Http\Middleware\CheckShopifySessionToken;
 use App\Modules\Shopify\Http\Middleware\FrameInsideShopify;
 use App\Modules\Shopify\Support\EmbeddedApp;
 use App\Modules\Shopify\Support\ShopifyConnectionFacts;
@@ -17,6 +18,7 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\RateLimiter;
 
 final class ShopifyServiceProvider extends ModuleServiceProvider
@@ -40,6 +42,9 @@ final class ShopifyServiceProvider extends ModuleServiceProvider
         // carries App Bridge, the admin's bridge to the frame.
         $this->app->make(Kernel::class)->pushMiddleware(FrameInsideShopify::class);
         FilamentView::registerRenderHook(PanelsRenderHook::HEAD_START, fn (): string => EmbeddedApp::head());
+        // the panel's requests from inside the admin carry its session token; where one comes, it is checked
+        // (after the session starts, so it is checked against the person signed in)
+        $this->app->make(Router::class)->pushMiddlewareToGroup('web', CheckShopifySessionToken::class);
     }
 
     protected function moduleCommands(): array

@@ -37,17 +37,37 @@ window.__letAgentsFetch = window.fetch ? window.fetch.bind(window) : null;
 </script>
 <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 <script>
-// App Bridge makes every request of this page wait for a Shopify token. The panel signs in with its
-// own cookie and needs none, and when the token does not come (the panel lives on the shop's own
-// address), every button and every save waits forever, silently. Livewire's requests go as the
-// browser sends them; the rest as App Bridge does.
+// App Bridge makes every request of this page wait for a Shopify token, and when the token does not
+// come (the panel lives on the shop's own address), every button and every save waits forever,
+// silently. So Livewire's requests ask for the session token themselves, wait for it a moment at
+// most, and go with it (Authorization: Bearer, checked by CheckShopifySessionToken, as Shopify asks
+// of embedded apps); a token that did not come in time leaves the request as the browser sends it,
+// signed in by its cookie. The rest go as App Bridge sends them.
 (function () {
     var own = window.__letAgentsFetch;
     var bridged = window.fetch;
     if (!own || !bridged || own === bridged) { return; }
+    var WAIT_MS = 1500;
+    function sessionToken() {
+        return new Promise(function (resolve) {
+            var timer = setTimeout(function () { resolve(null); }, WAIT_MS);
+            var done = function (token) { clearTimeout(timer); resolve(typeof token === 'string' && token ? token : null); };
+            try {
+                window.shopify && window.shopify.idToken ? window.shopify.idToken().then(done, function () { done(null); }) : done(null);
+            } catch (e) {
+                done(null);
+            }
+        });
+    }
     window.fetch = function (input, init) {
         var url = typeof input === 'string' ? input : (input && input.url) || String(input || '');
-        return /\/livewire[^\/]*\/update/.test(url) ? own(input, init) : bridged.apply(this, arguments);
+        if (!/\/livewire[^\/]*\/update/.test(url)) { return bridged.apply(this, arguments); }
+        return sessionToken().then(function (token) {
+            if (!token) { return own(input, init); }
+            var headers = new Headers((init && init.headers) || (input && input.headers) || {});
+            headers.set('Authorization', 'Bearer ' + token);
+            return own(input, Object.assign({}, init || {}, { headers: headers }));
+        });
     };
 })();
 // An expired page (a deploy, a long pause, a session that is gone) asks to reload with confirm(),
