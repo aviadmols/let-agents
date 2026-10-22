@@ -18,6 +18,32 @@ final class Locales
         return self::supported()[0];
     }
 
+    /**
+     * What $write gives in each language, by locale: a report written in code, ready in whichever language
+     * its reader's account is.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $write
+     * @return array<string, T>
+     */
+    public static function each(callable $write): array
+    {
+        $was = app()->getLocale();
+        $written = [];
+
+        try {
+            foreach (self::supported() as $locale) {
+                app()->setLocale($locale);
+                $written[$locale] = $write();
+            }
+        } finally {
+            app()->setLocale($was);
+        }
+
+        return $written;
+    }
+
     public static function isSupported(?string $locale): bool
     {
         return $locale !== null && in_array($locale, self::supported(), true);

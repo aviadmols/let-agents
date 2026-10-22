@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $score
  * @property string|null $summary
  * @property list<string>|null $improvements
+ * @property array<string, array{summary?: string, improvements?: list<string>}>|null $languages the same words in another language, by locale
  * @property list<array{ask_id: string, score: int, note: string, flag?: string}> $items flag: what the operator should check (ReviewSearchAsks::FLAGS)
  * @property array{asks: int, answered: int, no_match: int, whatsapp_shown: int, whatsapp_clicked: int, picked: int} $counts
  * @property string $status reviewed, quiet (no questions) or failed
@@ -44,6 +45,19 @@ class AssistantAskReview extends Model
             'improvements' => 'array',
             'items' => 'array',
             'counts' => 'array',
+            'languages' => 'array',
         ];
+    }
+
+    /** The words for the shop in the reader's language: the review writes them in Hebrew, and in English too. */
+    public function summaryIn(string $locale): ?string
+    {
+        return ($this->languages[$locale]['summary'] ?? null) ?: $this->summary;
+    }
+
+    /** @return list<string> */
+    public function improvementsIn(string $locale): array
+    {
+        return ($this->languages[$locale]['improvements'] ?? null) ?: (array) $this->improvements;
     }
 }

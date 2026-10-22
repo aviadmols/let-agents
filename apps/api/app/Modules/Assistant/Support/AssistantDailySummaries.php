@@ -66,7 +66,7 @@ final class AssistantDailySummaries implements DailySummaries
                     shopId: (string) $review->shop_id,
                     day: $review->day,
                     headline: __('assistant::ui.daily.headline', ['score' => (string) ($review->score ?? '—'), 'asks' => number_format((int) ($review->counts['asks'] ?? 0))]),
-                    summary: $operator ? $review->summary : ReviewWords::forMerchant($review->summary),
+                    summary: $operator ? $review->summaryIn(app()->getLocale()) : ReviewWords::forMerchant($review->summaryIn(app()->getLocale())),
                     lists: array_values(array_filter([
                         $in === [] ? null : ['label' => __('assistant::ui.daily.in', ['count' => count($in)]), 'items' => array_slice($in, 0, self::ITEMS), 'tone' => 'good'],
                         $out === [] ? null : ['label' => __($operator ? 'assistant::ui.daily.out' : 'assistant::ui.daily.out_shop', ['count' => count($out)]), 'items' => array_slice($out, 0, self::ITEMS), 'tone' => 'warn'],

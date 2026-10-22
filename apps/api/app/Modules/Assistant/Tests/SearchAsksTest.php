@@ -202,6 +202,8 @@ final class SearchAsksTest extends TestCase
             'items' => [['id' => 'a1', 'score' => 5, 'note' => 'מדויק.'], ['id' => 'a2', 'score' => 3, 'note' => 'אין בחנות.'], ['id' => 'a9', 'score' => 1, 'note' => 'לא קיים.']],
             'summary' => 'יום טוב. רוב השאלות נענו.',
             'improvements' => ['להוסיף גנרטורים לקטלוג.'],
+            'summary_en' => 'A good day. Most questions were answered.',
+            'improvements_en' => ['Add generators to the catalogue.'],
         ]];
 
         $run = app(ReviewSearchAsks::class)->handle($this->shop->id);
@@ -216,13 +218,20 @@ final class SearchAsksTest extends TestCase
         app(ReviewSearchAsks::class)->handle($this->shop->id);
         $this->assertCount(1, $this->calls, 'the same day is not reviewed twice');
 
-        $merchant = User::factory()->create();
+        $merchant = User::factory()->create(['locale' => 'he']);
         $merchant->attachShop($this->shop);
         $page = $this->actingAs($merchant)->followingRedirects()->get("/merchant/{$this->shop->slug}/assistant/questions")->assertOk();
         $page->assertSee('יום טוב. רוב השאלות נענו.');
         $page->assertSee('להוסיף גנרטורים לקטלוג.');
         $page->assertDontSee('reviewNow', false);
         $page->assertDontSee('$0.', false);
+
+        // an account in English reads the same review in English
+        $merchant->forceFill(['locale' => 'en'])->save();
+        $page = $this->actingAs($merchant)->followingRedirects()->get("/merchant/{$this->shop->slug}/assistant/questions")->assertOk();
+        $page->assertSee('A good day. Most questions were answered.');
+        $page->assertSee('Add generators to the catalogue.');
+        $page->assertDontSee('יום טוב. רוב השאלות נענו.');
     }
 
     public function test_the_daily_review_keeps_the_answers_that_scored_well_in_the_bank_and_reports_both(): void

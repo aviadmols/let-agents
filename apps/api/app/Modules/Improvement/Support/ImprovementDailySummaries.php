@@ -46,7 +46,7 @@ final class ImprovementDailySummaries implements DailySummaries
             return $reviews->map(function (ImprovementReview $review) use ($shops, $operator): DailySummary {
                 $waiting = $review->proposals->where('status', ImprovementProposal::PENDING)->pluck('title')->map(fn ($t): string => (string) $t)->values()->all();
                 $done = $review->proposals->whereIn('status', [ImprovementProposal::APPLIED, ImprovementProposal::APPROVED])->pluck('title')->map(fn ($t): string => (string) $t)->values()->all();
-                $lines = array_values(array_filter(array_map('trim', explode("\n", Digest::forMerchant((string) $review->digest))), fn (string $l): bool => $l !== ''));
+                $lines = array_values(array_filter(array_map('trim', explode("\n", Digest::forMerchant($review->digestIn(app()->getLocale())))), fn (string $l): bool => $l !== ''));
                 $shop = $shops->get($review->shop_id);
 
                 return new DailySummary(

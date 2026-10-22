@@ -38,7 +38,7 @@ final class ReviewSearchAsks
 
     public const ACTION = 'assistant.review_asks';
 
-    public const PROMPT_VERSION = 3;
+    public const PROMPT_VERSION = 4;
 
     /** What the reviewer may mark an item for the operator: an answer that invents, a refusal with the answer at hand, picks off the question. */
     public const FLAGS = ['invented', 'refused_answerable', 'wrong_products'];
@@ -166,10 +166,13 @@ final class ReviewSearchAsks
 
         $score = $scored === [] ? null : (int) round(array_sum(array_column($scored, 'score')) / count($scored) / 5 * 100);
         $bank = $this->bank($shopId, $scored, $byRef);
-        $improvements = array_slice(array_values(array_filter(array_map(fn ($line): string => mb_substr(trim((string) $line), 0, 200), (array) ($reply->data['improvements'] ?? [])))), 0, self::MAX_IMPROVEMENTS);
+        $lines = fn (mixed $list): array => array_slice(array_values(array_filter(array_map(fn ($line): string => mb_substr(trim((string) $line), 0, 200), (array) $list))), 0, self::MAX_IMPROVEMENTS);
+        $improvements = $lines($reply->data['improvements'] ?? []);
         $summary = mb_substr(trim((string) ($reply->data['summary'] ?? '')), 0, 1200);
+        // the same words in English, for a reader whose account is in English (AssistantAskReview::summaryIn)
+        $english = array_filter(['summary' => mb_substr(trim((string) ($reply->data['summary_en'] ?? '')), 0, 1200), 'improvements' => $lines($reply->data['improvements_en'] ?? [])]);
 
-        $this->save($day, AssistantAskReview::REVIEWED, $score, $summary === '' ? null : $summary, $improvements, array_values($scored), $counts, $reviewer->provider->value.' · '.$reviewer->model, $run);
+        $this->save($day, AssistantAskReview::REVIEWED, $score, $summary === '' ? null : $summary, $improvements, array_values($scored), $counts, $reviewer->provider->value.' · '.$reviewer->model, $run, $english === [] ? null : ['en' => $english]);
 
         // Each ask's failure read again with what the review said of it (AnswerFailure): a flag or a low
         // score is a reason code alone could not see. Code only.
@@ -253,7 +256,7 @@ final class ReviewSearchAsks
      * @param  list<array{ask_id: string, score: int, note: string, flag?: string}>  $items
      * @param  array<string, int>  $counts
      */
-    private function save(string $day, string $status, ?int $score, ?string $summary, array $improvements, array $items, array $counts, ?string $by, RunContext $run): void
+    private function save(string $day, string $status, ?int $score, ?string $summary, array $improvements, array $items, array $counts, ?string $by, RunContext $run, ?array $languages = null): void
     {
         // Found by its date, not its stored form: SQLite keeps a time with the date.
         $existing = AssistantAskReview::query()->whereDate('day', $day)->first();
@@ -262,6 +265,7 @@ final class ReviewSearchAsks
             'score' => $score,
             'summary' => $summary,
             'improvements' => $improvements,
+            'languages' => $languages,
             'items' => $items,
             'counts' => $counts,
             'reviewed_by' => $by,

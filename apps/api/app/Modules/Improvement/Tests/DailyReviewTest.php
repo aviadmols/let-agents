@@ -112,6 +112,8 @@ final class DailyReviewTest extends TestCase
         $this->assertSame([ImprovementReview::REVIEWED, 2, 1, 1], [$review->status, $review->proposed, $review->accepted, $review->applied]);
         $this->assertStringContainsString('חומרי בניין', $review->digest);
         $this->assertStringContainsString('29 חיפושים, 9 בלי תוצאות', $review->digest, 'yesterday, counted in code');
+        $this->assertStringContainsString('29 searches, 9 with no results', $review->digestIn('en'), 'and the same report in English, for an account in English');
+        $this->assertSame($review->digest, $review->digestIn('he'));
     }
 
     public function test_the_same_evidence_is_never_paid_for_twice(): void

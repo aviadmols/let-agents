@@ -4,6 +4,7 @@ namespace App\Modules\Improvement\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Localization\Locales;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
@@ -73,10 +74,11 @@ final class RunDailyReview
         // The scheduled review waits for enough searches since the last one to have something to think
         // about (improvement.searches_between_reviews), as Aviad asked (2026-10-18). Pressing the button never waits.
         if ($trigger === RunTrigger::Schedule && ($wait = $this->waiting($shopId)) !== null) {
+            $digests = Locales::each(fn (): string => (string) __('improvement::digest.waiting', $wait + ['left' => $wait['needed'] - $wait['searches']]));
             $review = ImprovementReview::query()->updateOrCreate(
                 ['shop_id' => $shopId, 'day' => now()->toDateString()],
                 ['status' => ImprovementReview::WAITING, 'evidence' => [], 'proposed' => 0, 'accepted' => 0, 'applied' => 0, 'run_id' => $run->runId,
-                    'digest' => (string) __('improvement::digest.waiting', $wait + ['left' => $wait['needed'] - $wait['searches']])],
+                    'digest' => $digests[app()->getLocale()] ?? '', 'digests' => $digests],
             );
             $run->output(['status' => $review->status] + $wait)->summary('improvement::runs.waiting', ['searches' => (string) $wait['searches'], 'needed' => (string) $wait['needed']]);
 
@@ -363,8 +365,11 @@ final class RunDailyReview
     /** @param list<ImprovementProposal> $proposals */
     private function finish(RunContext $run, ImprovementReview $review, string $shopId, array $proposals, ?string $stopped = null): void
     {
-        $digest = Digest::write($shopId, $review->refresh(), $proposals, $stopped);
-        $review->update(['digest' => $digest, 'mailed' => Digest::mail($shopId, $digest)]);
+        // Written in code, so in every language at no cost: each reader sees it in their account's. The mail goes in the run's.
+        $review->refresh();
+        $digests = Locales::each(fn (): string => Digest::write($shopId, $review, $proposals, $stopped));
+        $digest = $digests[app()->getLocale()] ?? Digest::write($shopId, $review, $proposals, $stopped);
+        $review->update(['digest' => $digest, 'digests' => $digests, 'mailed' => Digest::mail($shopId, $digest)]);
 
         $run->output(['status' => $review->status, 'proposed' => $review->proposed, 'accepted' => $review->accepted, 'applied' => $review->applied, 'stopped' => $stopped])
             ->summary("improvement::runs.{$review->status}", [

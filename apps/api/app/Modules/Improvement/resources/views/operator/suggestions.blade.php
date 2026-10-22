@@ -97,7 +97,7 @@
     @else
         @if ($s['latest'])
             <x-filament::section :heading="__('improvement::ui.latest', ['date' => $s['latest']->day->format('d.m.Y')])" collapsible collapsed>
-                <pre style="white-space:pre-wrap;font:inherit;margin:0">{{ \App\Modules\Improvement\Support\Digest::forMerchant((string) $s['latest']->digest) }}</pre>
+                <pre style="white-space:pre-wrap;font:inherit;margin:0">{{ \App\Modules\Improvement\Support\Digest::forMerchant($s['latest']->digestIn(app()->getLocale())) }}</pre>
             </x-filament::section>
         @endif
 

@@ -45,17 +45,17 @@
                         </div>
                         <div style="display:grid;gap:8px;min-width:0">
                             <div style="{{ $small }}">{{ __('assistant::ui.asks.report_for', ['day' => $latest->day->format('d/m/Y')]) }}</div>
-                            @if ($latest->summary)<p style="margin:0">{{ $latest->summary }}</p>@endif
+                            @if ($latest->summaryIn(app()->getLocale()))<p dir="auto" style="margin:0">{{ $latest->summaryIn(app()->getLocale()) }}</p>@endif
                             <div style="display:flex;flex-wrap:wrap;gap:6px">
                                 @foreach (['asks', 'answered', 'no_match', 'whatsapp_shown', 'whatsapp_clicked', 'picked'] as $count)
                                     <span style="font-size:12.5px;padding:2px 10px;border-radius:999px;background:rgba(127,127,127,.12)">{{ __('assistant::ui.asks.counts.'.$count, ['count' => number_format((int) ($latest->counts[$count] ?? 0))]) }}</span>
                                 @endforeach
                             </div>
-                            @if ($latest->improvements)
+                            @if ($latest->improvementsIn(app()->getLocale()))
                                 <div>
                                     <strong style="font-size:13px">{{ __('assistant::ui.asks.improvements') }}</strong>
                                     <ul style="margin:4px 0 0;padding-inline-start:20px">
-                                        @foreach ($latest->improvements as $line)<li>{{ $line }}</li>@endforeach
+                                        @foreach ($latest->improvementsIn(app()->getLocale()) as $line)<li dir="auto">{{ $line }}</li>@endforeach
                                     </ul>
                                 </div>
                             @endif

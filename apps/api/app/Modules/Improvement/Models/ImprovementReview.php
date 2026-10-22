@@ -19,7 +19,8 @@ use Illuminate\Support\Carbon;
  * @property int $proposed
  * @property int $accepted
  * @property int $applied
- * @property string $digest
+ * @property string $digest the report in the language it ran in (the one mailed)
+ * @property array<string, string>|null $digests the same report in each of the panel's languages, by locale
  * @property bool $mailed
  * @property string|null $run_id
  */
@@ -41,7 +42,13 @@ class ImprovementReview extends Model
 
     protected function casts(): array
     {
-        return ['day' => 'date', 'evidence' => 'array', 'mailed' => 'boolean'];
+        return ['day' => 'date', 'evidence' => 'array', 'digests' => 'array', 'mailed' => 'boolean'];
+    }
+
+    /** The report in the reader's language; one written before there were languages, as it was written. */
+    public function digestIn(string $locale): string
+    {
+        return (string) (($this->digests[$locale] ?? null) ?: $this->digest);
     }
 
     /** @return HasMany<ImprovementProposal, $this> */

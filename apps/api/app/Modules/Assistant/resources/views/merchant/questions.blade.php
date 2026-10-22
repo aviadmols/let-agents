@@ -10,14 +10,14 @@
     <div class="lp-page" data-questions>
         {{-- the daily check of the questions: what went well and what to improve --}}
         @php($review = $this->searchAsks()['latest'] ?? null)
-        @php($said = $review ? \App\Modules\Assistant\Support\ReviewWords::forMerchant($review->summary) : null)
-        @php($better = $review ? \App\Modules\Assistant\Support\ReviewWords::improvements((array) $review->improvements) : [])
+        @php($said = $review ? \App\Modules\Assistant\Support\ReviewWords::forMerchant($review->summaryIn(app()->getLocale())) : null)
+        @php($better = $review ? \App\Modules\Assistant\Support\ReviewWords::improvements($review->improvementsIn(app()->getLocale())) : [])
         @if ($review && ($said || $better))
             <section class="lp-card" data-review>
                 <div class="lp-card-t"><h2>{{ $t('review_title') }}</h2><span class="lp-note">{{ $review->day->format('j.n') }}</span></div>
-                @if ($said)<p style="margin: 0; color: var(--la-ink)">{{ $said }}</p>@endif
+                @if ($said)<p dir="auto" style="margin: 0; color: var(--la-ink)">{{ $said }}</p>@endif
                 @if ($better)
-                    <ul class="lp-notes">@foreach ($better as $improvement)<li>{{ $improvement }}</li>@endforeach</ul>
+                    <ul class="lp-notes">@foreach ($better as $improvement)<li dir="auto">{{ $improvement }}</li>@endforeach</ul>
                 @endif
             </section>
         @endif
