@@ -23,7 +23,7 @@
                             <span style="{{ $small }}">{{ $entry['kind'] }}</span>
                         </div>
                         <span style="justify-self:start;font-size:12.5px;padding:2px 10px;border-radius:999px;background:{{ $tones[$s->tone] ?? $tones[''] }}">{{ $s->headline }}</span>
-                        @if ($s->summary)<p style="margin:0;font-size:13.5px;line-height:1.55;white-space:pre-line">{{ $s->summary }}</p>@endif
+                        @if ($s->summary)<p dir="auto" style="margin:0;font-size:13.5px;line-height:1.55;white-space:pre-line">{{ $s->summary }}</p>@endif
                         @foreach ($s->lists as $list)
                             <details @if (($list['tone'] ?? '') === 'warn') open @endif>
                                 <summary style="cursor:pointer;font-size:13px;font-weight:600">{{ $list['label'] }}</summary>

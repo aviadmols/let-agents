@@ -31,7 +31,7 @@
                                         @if ($loop->first)<span class="la-badge" data-tone="info"><i></i>{{ __('admin::daily.latest') }}</span>@endif
                                     </div>
                                     <span class="la-badge" data-tone="{{ $day->tone ?: 'info' }}" style="justify-self: start"><i></i>{{ $day->headline }}</span>
-                                    @if ($day->summary)<p>{{ $day->summary }}</p>@endif
+                                    @if ($day->summary)<p dir="auto">{{ $day->summary }}</p>@endif
                                     @foreach ($day->lists as $list)
                                         <div class="la-day-list">
                                             <strong>{{ $list['label'] }}</strong>
