@@ -139,7 +139,9 @@ final class SearchCatalog
             [$priced, $minPrice, $maxPrice] = HebrewSearch::priceRange(mb_substr($raw, 0, 120));
             // "בלי יהלומים": that word is not searched for, and what holds it is kept away.
             [$query, $without] = HebrewSearch::without($priced);
-            $index = trim($query) === '' ? null : LoadedIndex::for($shopId);
+            // one letter is not a search: "ס" found the one book whose author is "תומס ס. טיילור" and called it the
+            // exact match. Under two letters or digits it is as nothing typed.
+            $index = mb_strlen((string) preg_replace('/[^\p{L}\p{N}]/u', '', $query)) < 2 ? null : LoadedIndex::for($shopId);
             // "הכי זול", "במבצע", "גדול מ-2": actions, not words. The same phrases in every shop, less
             // those its index leaves out (no size: "גדול" stays a word).
             [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);

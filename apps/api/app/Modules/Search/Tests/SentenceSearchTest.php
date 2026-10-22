@@ -72,6 +72,19 @@ final class SentenceSearchTest extends TestCase
         $this->assertSame(['id' => 'p:6', 'by' => 'words'], $search('עגיל בודד'), 'the only product that says the words, as words');
     }
 
+    public function test_one_letter_is_not_a_search(): void
+    {
+        // Seen on Sela: "ס" found the one book whose author is "תומס ס. טיילור" and showed it as the exact match.
+        $search = fn (string $query): array => app(SearchCatalog::class)->handle($this->shop->id, $query, ['product'], false, null, false);
+
+        foreach (['ע', ' ע ', 'ע.', '7'] as $typed) {
+            $found = $search($typed);
+            $this->assertNull($found['single'] ?? null, "\"{$typed}\": no exact match");
+            $this->assertSame([], $found['groups']['product'] ?? [], "\"{$typed}\": no results yet");
+        }
+        $this->assertSame(['id' => 'p:6', 'by' => 'words'], $search('עגיל בודד')['single'], 'two words, as before');
+    }
+
     public function test_what_a_sentence_means_keeps_a_product_word_the_store_lacks(): void
     {
         $index = app(TenantContext::class)->run($this->shop->id, fn () => LoadedIndex::for($this->shop->id));

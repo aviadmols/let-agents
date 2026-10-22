@@ -11,6 +11,8 @@
     FIELD.classList.toggle('has-text', !!q);
     clearTimeout(wordTimer);
     if (!q) { S.keptQ = null; hideLive(); return; }
+    // one letter is not a search yet ("ס" is in an author's initial): the results wait for a second one
+    if (q.replace(/[^\p{L}\p{N}]/gu, '').length < 2) { hideLive(); return; }
     if (!S.open) { return; }
     // the search on screen, left in the field: nothing new to show until the words change
     if (q === S.keptQ) { hideLive(); return; }
