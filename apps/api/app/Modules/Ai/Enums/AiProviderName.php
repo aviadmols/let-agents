@@ -8,6 +8,7 @@ enum AiProviderName: string
     case Anthropic = 'anthropic';
     case Gemini = 'gemini';
     case Replicate = 'replicate';
+    case Voyage = 'voyage';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum AiProviderName: string
             self::Anthropic => 'Anthropic (Claude)',
             self::Gemini => 'Google (Gemini)',
             self::Replicate => 'Replicate (images)',
+            self::Voyage => 'Voyage AI (embeddings)',
         };
     }
 

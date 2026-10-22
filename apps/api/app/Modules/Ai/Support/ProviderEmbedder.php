@@ -8,6 +8,7 @@ use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ImageEmbeddingDriver;
 use App\Modules\Ai\Contracts\ModelCallFailed;
+use App\Modules\Ai\Contracts\QueryEmbeddingDriver;
 use App\Modules\Ai\Enums\AiProviderName;
 
 /** Hands texts and pictures to the driver of the provider asked for, with that provider's key. */
@@ -50,6 +51,13 @@ final class ProviderEmbedder implements Embedder, ImageEmbedder
     {
         if ($texts === []) {
             return new Embeddings([], 0);
+        }
+
+        // a model of words alone that embeds a query apart from documents (Voyage): the shopper's words as a query
+        foreach ($this->drivers as $driver) {
+            if ($query && $driver instanceof QueryEmbeddingDriver && $driver->provider() === $provider) {
+                return $driver->embedQueries(ProviderKey::for($provider), $model, array_values($texts), $dimensions);
+            }
         }
 
         return $this->imageDriver($provider)->embedTextsForImages(ProviderKey::for($provider), $model, array_values($texts), $dimensions, $query);

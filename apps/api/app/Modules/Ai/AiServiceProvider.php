@@ -23,6 +23,7 @@ use App\Modules\Ai\Support\Drivers\OpenAiBatches;
 use App\Modules\Ai\Support\Drivers\OpenAiChat;
 use App\Modules\Ai\Support\Drivers\OpenAiEmbeddings;
 use App\Modules\Ai\Support\Drivers\ReplicateImages;
+use App\Modules\Ai\Support\Drivers\VoyageEmbeddings;
 use App\Modules\Ai\Support\KeyAlert;
 use App\Modules\Ai\Support\MonthlySpendGuard;
 use App\Modules\Ai\Support\ProviderBatchModel;
@@ -49,7 +50,7 @@ final class AiServiceProvider extends ModuleServiceProvider
     /** Providers that make pictures (Try-On). */
     public const IMAGE_DRIVERS = [ReplicateImages::class];
 
-    public const EMBEDDING_DRIVERS = [OpenAiEmbeddings::class, GeminiEmbeddings::class];
+    public const EMBEDDING_DRIVERS = [OpenAiEmbeddings::class, GeminiEmbeddings::class, VoyageEmbeddings::class];
 
     /** Providers that put pictures and words in one space. */
     public const IMAGE_EMBEDDING_DRIVERS = [GeminiEmbeddings::class];

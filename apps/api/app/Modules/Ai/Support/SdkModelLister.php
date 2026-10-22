@@ -33,7 +33,30 @@ final class SdkModelLister implements ListsProviderModels
             AiProviderName::OpenAi => $this->openAi($apiKey),
             AiProviderName::Gemini => $this->gemini($apiKey),
             AiProviderName::Replicate => $this->replicate($apiKey),
+            AiProviderName::Voyage => $this->voyage($apiKey),
         };
+    }
+
+    /**
+     * Voyage has no list of models to ask for: the key is checked with one word embedded by its smallest
+     * model (inside the free tokens every account has), and its current embedding models are listed.
+     *
+     * @return list<array{id: string, name: string, created_at: ?string}>
+     */
+    private function voyage(string $apiKey): array
+    {
+        try {
+            $response = Http::timeout((int) self::TIMEOUT_SECONDS)->withToken($apiKey)->acceptJson()
+                ->post('https://api.voyageai.com/v1/embeddings', ['input' => ['ok'], 'model' => 'voyage-4-lite']);
+        } catch (ConnectionException $e) {
+            throw new ProviderCheckFailed(ProviderCheckFailed::UNREACHABLE, null, $e);
+        }
+
+        if (! $response->successful()) {
+            throw ProviderCheckFailed::fromStatus($response->status());
+        }
+
+        return array_map(fn (string $id): array => ['id' => $id, 'name' => $id, 'created_at' => null], ['voyage-4-large', 'voyage-4', 'voyage-4-lite']);
     }
 
     /** @return list<array{id: string, name: string, created_at: ?string}> */

@@ -7,6 +7,7 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\EmbeddingDriver;
 use App\Modules\Ai\Contracts\Embeddings;
+use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\StructuredChatDriver;
@@ -17,6 +18,8 @@ use App\Modules\Ai\Models\AiProvider;
 use App\Modules\Ai\Support\ProviderChatModel;
 use App\Modules\Ai\Support\ProviderEmbedder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
@@ -90,6 +93,27 @@ final class ProviderDriversTest extends TestCase
         $this->assertSame(['ok' => true], $chat->structured(AiProviderName::Anthropic, 'claude-haiku-5-5', 's', 'u', ['type' => 'object'], 100)->data);
         $this->assertSame(['driver' => 'openai'], $chat->structured(AiProviderName::OpenAi, 'gpt', 's', 'u', ['type' => 'object'], 100)->data);
         $this->assertSame([['anthropic', 'structured', 'object'], ['openai', 'sk-openai-1111', 'gpt']], $calls);
+    }
+
+    public function test_voyage_embeds_pages_as_documents_and_the_shoppers_words_as_a_query(): void
+    {
+        $this->connected('voyage', 'pa-voyage-3333');
+        Http::fake(['api.voyageai.com/*' => fn (HttpRequest $request) => Http::response([
+            // back out of order: put in the order asked
+            'data' => [['embedding' => [0.0, 1.0], 'index' => 1], ['embedding' => [1.0, 0.0], 'index' => 0]],
+            'usage' => ['total_tokens' => 7],
+        ])]);
+        $embedder = app(Embedder::class);
+
+        $pages = $embedder->embed(AiProviderName::Voyage, 'voyage-4-large', ['מברגה', 'דיסק'], 1024);
+        $this->assertSame([[1.0, 0.0], [0.0, 1.0]], $pages->vectors);
+        $this->assertSame(7, $pages->inputTokens);
+        app(ImageEmbedder::class)->embedTextsForImages(AiProviderName::Voyage, 'voyage-4-large', ['מברגה נטענת', 'x'], 1024, query: true);
+
+        $sent = Http::recorded()->map(fn (array $pair): array => $pair[0]->data())->all();
+        $this->assertSame(['document', 'query'], array_column($sent, 'input_type'));
+        $this->assertSame([1024, 1024], array_column($sent, 'output_dimension'));
+        $this->assertSame('Bearer pa-voyage-3333', Http::recorded()[0][0]->header('Authorization')[0]);
     }
 
     public function test_a_provider_without_a_driver_or_without_a_key_is_refused(): void
