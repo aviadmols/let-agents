@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\HomeCard;
 use App\Modules\Admin\Contracts\OverviewBlock;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Admin\Support\Home;
+use App\Modules\Admin\Support\Onboarding as FirstRun;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -48,6 +49,15 @@ final class ShopOverview extends Page
     public static function getNavigationLabel(): string
     {
         return __('admin::home.nav');
+    }
+
+    /** A shop not set up yet opens on its first-run screens, with the address it came with (Shopify's frame). */
+    public function mount(): void
+    {
+        if (FirstRun::lands($this->shop(), Auth::user())) {
+            $query = (string) request()->getQueryString();
+            $this->redirect(Onboarding::getUrl().($query === '' ? '' : '?'.$query));
+        }
     }
 
     public function getTitle(): string

@@ -11,6 +11,7 @@ use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ReadsContentAgain;
+use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
@@ -32,6 +33,7 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\AssistantDailySummaries;
 use App\Modules\Assistant\Support\AssistantHome;
 use App\Modules\Assistant\Support\AssistantReport;
+use App\Modules\Assistant\Support\AssistantShopFacts;
 use App\Modules\Assistant\Support\AssistantTimeline;
 use App\Modules\Assistant\Support\ContentReadAgain;
 use App\Modules\Catalog\Events\CatalogUpdated;
@@ -53,6 +55,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         $this->app->tag([AssistantHome::class], HomeCards::CARDS_TAG);
         $this->app->tag([AssistantDailySummaries::class], DailySummaries::TAG);
         $this->app->tag([AssistantHome::class], FirstSteps::STEPS_TAG);
+        // What this module counted, for the first-run screens.
+        $this->app->tag([AssistantShopFacts::class], ShopFacts::TAG);
         $this->app->bind(SuggestsQuestions::class, SuggestQuestions::class);
         //
     }

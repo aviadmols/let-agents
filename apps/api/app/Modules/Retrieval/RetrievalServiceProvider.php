@@ -3,6 +3,7 @@
 namespace App\Modules\Retrieval;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Retrieval\Actions\CaptionImages;
@@ -29,6 +30,7 @@ use App\Modules\Retrieval\Support\InMemoryEmbedderTrials;
 use App\Modules\Retrieval\Support\PassageSearch;
 use App\Modules\Retrieval\Support\QueuedVectorRefresh;
 use App\Modules\Retrieval\Support\RetrievalRunner;
+use App\Modules\Retrieval\Support\RetrievalShopFacts;
 use App\Modules\Retrieval\Support\TopicAsks;
 use App\Modules\Retrieval\Support\VectorSearch;
 use Illuminate\Console\Scheduling\Schedule;
@@ -59,6 +61,8 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
         $this->app->bind(RefreshesVectors::class, QueuedVectorRefresh::class);
         $this->app->tag(self::SOURCES, 'retrieval.sources');
         $this->app->tag(self::CANDIDATES, 'retrieval.candidates');
+        // What this module counted, for the first-run screens.
+        $this->app->tag([RetrievalShopFacts::class], ShopFacts::TAG);
     }
 
     protected function bootModule(): void

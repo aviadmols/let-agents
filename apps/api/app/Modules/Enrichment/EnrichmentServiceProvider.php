@@ -6,6 +6,7 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Enrichment\Actions\RereadPage;
@@ -16,6 +17,7 @@ use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Listeners\RebuildCards;
 use App\Modules\Enrichment\Support\EnrichmentHome;
 use App\Modules\Enrichment\Support\EnrichmentScanDetails;
+use App\Modules\Enrichment\Support\EnrichmentShopFacts;
 use App\Modules\Enrichment\Support\FactNotes;
 use App\Modules\Enrichment\Support\StoredCards;
 use App\Modules\Enrichment\Support\WrittenSectionQuestions;
@@ -32,6 +34,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
         $this->app->tag([EnrichmentHome::class], FirstSteps::STEPS_TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([EnrichmentScanDetails::class], ScanDetails::TAG);
+        // What this module counted, for the first-run screens.
+        $this->app->tag([EnrichmentShopFacts::class], ShopFacts::TAG);
         // What the scan learned and approved joins the meaning vectors of products and posts.
         $this->app->tag([FactNotes::class], DocumentNotes::NOTES_TAG);
         // The questions each section of a page or post answers, for the section's second vector.

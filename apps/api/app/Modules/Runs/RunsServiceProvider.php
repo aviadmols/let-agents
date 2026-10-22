@@ -4,6 +4,7 @@ namespace App\Modules\Runs;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\ShopScan;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Runs\Console\FullScanCommand;
 use App\Modules\Runs\Console\ResumeScansCommand;
@@ -14,6 +15,7 @@ use App\Modules\Runs\Contracts\ScansShops;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Runs\Models\RunCall;
 use App\Modules\Runs\Support\CallLog;
+use App\Modules\Runs\Support\OnboardingScan;
 use App\Modules\Runs\Support\RunRecorder;
 use App\Modules\Runs\Support\RunStack;
 use App\Modules\Runs\Support\RunTimeline;
@@ -26,6 +28,8 @@ final class RunsServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->bind(ScansShops::class, ShopScans::class);
+        // The scan as the first-run screens draw it.
+        $this->app->bind(ShopScan::class, OnboardingScan::class);
         $this->app->tag([RunTimeline::class], TimelineSource::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ScanHome::class], HomeSource::TAG);

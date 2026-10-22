@@ -377,14 +377,19 @@ final class ShopifyAppTest extends TestCase
         $panel = (string) $opened->headers->get('Location');
         $this->assertStringContainsString('host=YWRtaW4', $panel, 'the panel keeps what Shopify opened with');
 
+        // A store just installed opens on its first-run screens, still with what Shopify opened with.
+        $welcome = (string) $this->get($panel, ['Sec-Fetch-Dest' => 'iframe'])->assertRedirect()->headers->get('Location');
+        $this->assertStringContainsString('/merchant/gueta-test/welcome?', $welcome);
+        $this->assertStringContainsString('host=YWRtaW4', $welcome);
+
         // The panel inside the frame: framed for this shop only, App Bridge in its head.
-        $page = $this->get($panel, ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
+        $page = $this->get($welcome, ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
         $this->assertSame('frame-ancestors https://'.self::SHOP.' https://admin.shopify.com;', $page->headers->get('Content-Security-Policy'));
         $page->assertSee('<meta name="shopify-api-key" content="test-key">', false)->assertSee('cdn.shopify.com/shopifycloud/app-bridge.js', false)
             ->assertSee('window.__letAgentsFetch', false)->assertSee('failed.status === 419', false);
 
         // Opened on its own, outside the admin, the same page carries no bridge.
-        $this->get(route('filament.merchant.pages.overview', ['tenant' => 'gueta-test']))->assertOk()->assertDontSee('shopify-api-key', false);
+        $this->get(strtok($welcome, '?'))->assertOk()->assertDontSee('shopify-api-key', false);
 
         // Opened again in the admin: straight to the panel, no second exchange.
         $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'id_token' => self::idToken()])))->assertRedirect();

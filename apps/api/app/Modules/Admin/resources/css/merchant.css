@@ -921,3 +921,163 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-acct-full .lp-set-save { margin-top: 4px; flex-wrap: wrap; }
 @media (max-width: 900px) { .fi-panel-merchant .lp-acct-form { grid-template-columns: 1fr; } }
 .fi-panel-merchant .lp-set-grid > .lp-set-card + .lp-set-card { margin-block-start: 0; }
+
+/* ================================================================== the first-run screens (Onboarding), as the design's "onboarding" and "the five first wins" */
+
+.fi-panel-merchant .lp-onb-wrap { display: flex; flex-direction: column; gap: 16px; }
+.fi-panel-merchant .lp-onb { background: var(--la-paper); border-radius: var(--la-r); box-shadow: var(--la-shadow); padding: 36px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; }
+
+/* the steps: done in lime, now on a sunk ground */
+.fi-panel-merchant .lp-onb-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.fi-panel-merchant .lp-onb-step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; color: var(--la-muted); font-size: 14px; }
+.fi-panel-merchant .lp-onb-i { width: 26px; height: 26px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--la-axis); display: grid; place-items: center; font-size: 12px; flex: none; font-variant-numeric: tabular-nums; }
+.fi-panel-merchant .lp-onb-i svg { width: 13px; height: 13px; }
+.fi-panel-merchant .lp-onb-step.is-done .lp-onb-i { background: var(--lp-lime); box-shadow: none; color: var(--lp-ink); }
+.fi-panel-merchant .lp-onb-step.is-now { color: var(--la-ink); font-weight: 500; background: var(--la-sunk); }
+.fi-panel-merchant .lp-onb-step.is-now .lp-onb-i { box-shadow: inset 0 0 0 1.5px var(--la-ink); color: var(--la-ink); }
+.fi-panel-merchant .lp-onb-step small { display: block; font-weight: 400; color: var(--la-muted); font-size: 12.5px; }
+
+/* each step breathes: its parts evenly apart, the title and its line together */
+.fi-panel-merchant .lp-onb-body { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.fi-panel-merchant .lp-onb-pane { display: flex; flex-direction: column; gap: 22px; min-width: 0; animation: lp-focus-in 360ms cubic-bezier(.23, 1, .32, 1) backwards; }
+.fi-panel-merchant .lp-onb-pane > h2, .fi-panel-merchant .lp-onb-scan-head h2 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; color: var(--la-ink); text-wrap: balance; }
+.fi-panel-merchant .lp-onb-pane > h2 + .lp-onb-lead { margin-top: -14px; }
+.fi-panel-merchant .lp-onb-lead { margin: 0; color: var(--la-muted); max-width: 52ch; }
+.fi-panel-merchant .lp-onb-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* 1 · the platforms: monochrome logos, ink when chosen */
+.fi-panel-merchant .lp-onb-platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fi-panel-merchant .lp-onb-platform { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; row-gap: 2px; align-items: center; padding: 18px; border: 0; border-radius: 16px; background: var(--la-paper); box-shadow: inset 0 0 0 1.5px var(--la-axis); text-align: start; font: inherit; color: var(--la-ink); cursor: pointer; }
+.fi-panel-merchant .lp-onb-platform.is-on { box-shadow: inset 0 0 0 2px var(--la-ink); }
+.fi-panel-merchant .lp-onb-platform b { font-size: 15px; font-weight: 600; }
+.fi-panel-merchant .lp-onb-platform > span:last-child { font-size: 13px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-plogo { grid-row: 1 / 3; width: 44px; height: 44px; border-radius: 12px; background: var(--la-plane); display: grid; place-items: center; color: var(--la-axis); transition: color 180ms ease, background-color 180ms ease; }
+.fi-panel-merchant .lp-onb-plogo svg { width: 24px; height: 24px; }
+.fi-panel-merchant .lp-onb-plogo-woo svg { width: 34px; height: 34px; }
+.fi-panel-merchant .lp-onb-platform.is-on .lp-onb-plogo { color: var(--la-ink); background: var(--la-sunk); }
+.fi-panel-merchant .lp-onb-platform:focus-visible { outline: 2px solid var(--la-ink); outline-offset: 2px; }
+.fi-panel-merchant .lp-onb-address { max-width: 520px; display: flex; flex-direction: column; gap: 8px; }
+.fi-panel-merchant .lp-onb-address label { font-size: 13px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-address .lp-set-field { min-height: 44px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-address .lp-sample { margin: 0; }
+.fi-panel-merchant .lp-onb-plugin { max-width: 640px; padding: 16px 18px; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--la-line); }
+.fi-panel-merchant .lp-onb-plugin .lp-card-t { margin-block-end: 4px; }
+.fi-panel-merchant .lp-onb-plugin .lp-card-t h2 { font-size: 15px; letter-spacing: 0; }
+.fi-panel-merchant .lp-onb-token { flex-direction: column; margin-top: 12px; }
+.fi-panel-merchant .lp-onb-token-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; }
+.fi-panel-merchant .lp-onb-token-row .lp-set-field { flex: 1; min-width: 220px; }
+.fi-panel-merchant .lp-onb-token ol { margin: 4px 0 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+/* the mark, turning over like an hourglass while Lets reads */
+.fi-panel-merchant .lp-onb-mark { --s: 18px; width: var(--s); height: var(--s); display: inline-grid; grid-template-rows: 1fr 1fr; flex: none; }
+.fi-panel-merchant .lp-onb-mark i { display: block; background: currentColor; }
+.fi-panel-merchant .lp-onb-mark i:first-child { border-radius: 0 0 50% 50% / 0 0 100% 100%; transform-origin: 50% 100%; }
+.fi-panel-merchant .lp-onb-mark i:last-child { border-radius: 50% 50% 0 0 / 100% 100% 0 0; transform-origin: 50% 0%; }
+.fi-panel-merchant .lp-onb-mark.is-think { animation: lp-onb-hourglass 1.8s cubic-bezier(.77, 0, .175, 1) infinite; }
+.fi-panel-merchant .lp-onb-mark.is-think i { animation: lp-onb-sand 1.8s cubic-bezier(.77, 0, .175, 1) infinite; }
+@keyframes lp-onb-hourglass { 0%, 30% { transform: rotate(0deg); } 70%, 100% { transform: rotate(180deg); } }
+@keyframes lp-onb-sand { 0%, 30% { transform: scaleX(1); } 50% { transform: scaleX(.62); } 70%, 100% { transform: scaleX(1); } }
+.fi-panel-merchant .lp-onb-think { display: inline-flex; align-items: center; gap: 10px; color: var(--la-muted); font-size: 15px; }
+.fi-panel-merchant .lp-onb-think .lp-onb-mark { color: var(--la-ink); }
+.fi-panel-merchant .lp-onb-think-t {
+    color: var(--la-ink);
+    -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / .5) 0%, rgb(0 0 0 / .5) 40%, #000 50%, rgb(0 0 0 / .5) 60%, rgb(0 0 0 / .5) 100%);
+    mask-image: linear-gradient(90deg, rgb(0 0 0 / .5) 0%, rgb(0 0 0 / .5) 40%, #000 50%, rgb(0 0 0 / .5) 60%, rgb(0 0 0 / .5) 100%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    animation: lp-onb-sweep 2.2s linear infinite;
+}
+@keyframes lp-onb-sweep { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0% 0; mask-position: 0% 0; } }
+.fi-panel-merchant .lp-onb-reading { min-height: 48px; display: grid; place-items: center start; }
+
+/* 2 · what Lets found, a row each with its lime check, and the form to fix it */
+.fi-panel-merchant .lp-onb-found { display: flex; flex-direction: column; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--la-line); }
+.fi-panel-merchant .lp-onb-found-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 24px; gap: 14px; align-items: center; padding: 14px 16px; border-block-end: 1px solid var(--la-line); animation: lp-focus-in 360ms cubic-bezier(.23, 1, .32, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
+.fi-panel-merchant .lp-onb-found-row:last-child { border-block-end: 0; }
+.fi-panel-merchant .lp-onb-k { font-size: 13px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-found-row b { font-weight: 500; color: var(--la-ink); min-width: 0; overflow-wrap: anywhere; }
+.fi-panel-merchant .lp-onb-ok { width: 24px; height: 24px; padding: 5px; border-radius: 50%; background: var(--lp-lime); color: var(--lp-ink); }
+.fi-panel-merchant .lp-onb-form { display: flex; flex-direction: column; gap: 12px; max-width: 520px; animation: lp-focus-in 360ms cubic-bezier(.23, 1, .32, 1) backwards; }
+.fi-panel-merchant .lp-onb-form > label { font-size: 13px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-form .lp-set-field { min-height: 44px; }
+.fi-panel-merchant .lp-onb-form .lp-onb-actions { margin-top: 8px; }
+.fi-panel-merchant .lp-onb-dd { position: relative; }
+.fi-panel-merchant .lp-onb-dd-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 5px 14px; border: 0; border-radius: 22px; background: var(--la-paper); box-shadow: inset 0 0 0 1.5px var(--la-line); font: inherit; color: var(--la-ink); cursor: pointer; text-align: start; }
+.fi-panel-merchant .lp-onb-dd-btn[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--la-ink); }
+.fi-panel-merchant .lp-onb-dd-vals { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.fi-panel-merchant .lp-onb-dd-btn .lp-ico { color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-dd-menu { position: absolute; top: calc(100% + 6px); inset-inline: 0; z-index: 20; padding: 8px; border-radius: 16px; background: var(--la-paper); box-shadow: var(--la-pop); }
+.fi-panel-merchant .lp-onb-dd-menu .lp-set-field { min-height: 36px; margin-bottom: 6px; }
+.fi-panel-merchant .lp-onb-dd-list { display: flex; flex-direction: column; max-height: 240px; overflow-y: auto; }
+.fi-panel-merchant .lp-onb-dd-opt { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border: 0; border-radius: 10px; background: none; font: inherit; font-size: 14px; color: var(--la-ink); cursor: pointer; text-align: start; }
+.fi-panel-merchant .lp-onb-dd-opt small { margin-inline-start: auto; font-size: 12px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-dd-check { width: 18px; height: 18px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px var(--la-axis); display: grid; place-items: center; flex: none; }
+.fi-panel-merchant .lp-onb-dd-check svg { width: 12px; height: 12px; opacity: 0; }
+.fi-panel-merchant .lp-onb-dd-opt[aria-selected="true"] .lp-onb-dd-check { background: var(--la-accent); box-shadow: none; color: var(--la-paper); }
+.fi-panel-merchant .lp-onb-dd-opt[aria-selected="true"] .lp-onb-dd-check svg { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+    .fi-panel-merchant .lp-onb-dd-opt:hover { background: var(--la-sunk); }
+}
+
+/* 3 · the scan beside a live try */
+.fi-panel-merchant .lp-onb-scan-head { display: flex; align-items: center; gap: 16px; }
+.fi-panel-merchant .lp-onb-scan-head h2 { margin-bottom: 4px; }
+.fi-panel-merchant .lp-onb-sand { width: 48px; height: 48px; border-radius: 50%; background: var(--la-accent); color: var(--la-paper); display: grid; place-items: center; flex: none; }
+.fi-panel-merchant .lp-onb-sand .lp-onb-mark { --s: 22px; }
+.fi-panel-merchant .lp-onb-split { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.fi-panel-merchant .lp-onb-scan { display: flex; flex-direction: column; gap: 10px; }
+.fi-panel-merchant .lp-onb-scan-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 100px; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--la-sunk); transition: opacity 240ms ease; }
+.fi-panel-merchant .lp-onb-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--la-paper); display: grid; place-items: center; color: var(--la-ink-2); }
+.fi-panel-merchant .lp-onb-ic svg { width: 20px; height: 20px; }
+.fi-panel-merchant .lp-onb-t { font-weight: 500; color: var(--la-ink); }
+.fi-panel-merchant .lp-onb-s { font-size: 13px; color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-n { font-weight: 600; font-variant-numeric: tabular-nums; text-align: end; color: var(--la-ink); }
+.fi-panel-merchant .lp-onb-n .lp-onb-s { font-weight: 400; }
+.fi-panel-merchant .lp-onb-scan-row.is-done .lp-onb-ic { background: var(--la-ink); color: var(--la-paper); }
+.fi-panel-merchant .lp-onb-scan-row.is-wait { opacity: .55; }
+.fi-panel-merchant .lp-onb-learned { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.fi-panel-merchant .lp-onb-fact { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: var(--la-sunk); font-size: 14px; color: var(--la-ink-2); animation: lp-focus-in 360ms cubic-bezier(.23, 1, .32, 1) backwards; }
+.fi-panel-merchant .lp-onb-fact > svg { width: 26px; height: 26px; padding: 5px; border-radius: 50%; background: var(--lp-lime); color: var(--lp-ink); flex: none; }
+.fi-panel-merchant .lp-onb-fact b { display: block; font-weight: 600; margin-bottom: 2px; color: var(--la-ink); }
+.fi-panel-merchant .lp-onb-try { box-shadow: inset 0 0 0 1px var(--la-line); position: sticky; top: 16px; }
+.fi-panel-merchant .lp-onb-help { margin: 0 0 12px; font-size: 13.5px; color: var(--la-muted); line-height: 1.55; }
+.fi-panel-merchant .lp-onb-try-field { min-height: 44px; }
+.fi-panel-merchant .lp-onb-try-field .lp-ico { color: var(--la-muted); }
+.fi-panel-merchant .lp-onb-tries { margin-top: 12px; }
+.fi-panel-merchant .lp-onb-tries .lp-chip { background: var(--la-sunk); box-shadow: none; }
+
+/* 4 · the first steps, the home's own list */
+.fi-panel-merchant .lp-onb-wins { box-shadow: inset 0 0 0 1px var(--la-line); }
+.fi-panel-merchant .lp-onb-wins .lp-bar { display: block; width: 100%; height: 6px; }
+
+@media (max-width: 1080px) {
+    .fi-panel-merchant .lp-onb-split { grid-template-columns: minmax(0, 1fr); }
+    .fi-panel-merchant .lp-onb-try { position: static; }
+}
+
+@media (max-width: 900px) {
+    .fi-panel-merchant .lp-onb { grid-template-columns: minmax(0, 1fr); padding: 20px; gap: 20px; }
+    .fi-panel-merchant .lp-onb-steps { flex-direction: row; overflow-x: auto; }
+    .fi-panel-merchant .lp-onb-step { flex: none; }
+    .fi-panel-merchant .lp-onb-step small { display: none; }
+}
+
+@media (max-width: 640px) {
+    .fi-panel-merchant .lp-onb-platforms { grid-template-columns: minmax(0, 1fr); }
+    /* the tabs above say where you are */
+    .fi-panel-merchant .lp-onb-steps { display: none; }
+    .fi-panel-merchant .lp-onb-found-row { grid-template-columns: 76px minmax(0, 1fr) 24px; gap: 10px; }
+    .fi-panel-merchant .lp-onb-scan-row { grid-template-columns: 44px minmax(0, 1fr); }
+    .fi-panel-merchant .lp-onb-n { grid-column: 2; text-align: start; }
+    .fi-panel-merchant .lp-onb-pane > h2, .fi-panel-merchant .lp-onb-scan-head h2 { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fi-panel-merchant .lp-onb-mark.is-think,
+    .fi-panel-merchant .lp-onb-mark.is-think i,
+    .fi-panel-merchant .lp-onb-think-t,
+    .fi-panel-merchant .lp-onb-pane,
+    .fi-panel-merchant .lp-onb-found-row,
+    .fi-panel-merchant .lp-onb-form,
+    .fi-panel-merchant .lp-onb-fact { animation: none; -webkit-mask-image: none; mask-image: none; }
+}

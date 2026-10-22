@@ -28,7 +28,15 @@ class ShopFactory extends Factory
             'currency' => 'ILS',
             'timezone' => 'Asia/Jerusalem',
             'status' => ShopStatus::Active,
+            // a shop in a test is past its first-run screens unless it asks for them (onboarding())
+            'onboarded_at' => now(),
         ];
+    }
+
+    /** A shop just created: its panel opens on the first-run screens. */
+    public function onboarding(): static
+    {
+        return $this->state(['onboarded_at' => null]);
     }
 
     public function paused(): static

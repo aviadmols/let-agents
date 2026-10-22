@@ -39,6 +39,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $cancelled_at the owner ended the plan: the shop is paused, its data kept
  * @property Carbon|null $deletion_due_at the owner asked for the shop to be deleted: paused until then, deleted on this day unless kept
  * @property string|null $deletion_asked_by the email of who asked for it
+ * @property Carbon|null $onboarded_at when the manager went through the first-run screens; until then the panel opens on them
  */
 class Shop extends Model
 {
@@ -84,6 +85,7 @@ class Shop extends Model
             'trial_saved' => 'array',
             'cancelled_at' => 'datetime',
             'deletion_due_at' => 'datetime',
+            'onboarded_at' => 'datetime',
         ];
     }
 

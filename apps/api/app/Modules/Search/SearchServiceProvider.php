@@ -8,6 +8,7 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsNamed;
@@ -26,6 +27,7 @@ use App\Modules\Search\Support\SearchFirstSteps;
 use App\Modules\Search\Support\SearchHome;
 use App\Modules\Search\Support\SearchReport;
 use App\Modules\Search\Support\SearchScanDetails;
+use App\Modules\Search\Support\SearchShopFacts;
 use App\Modules\Search\Support\SpellingProductsForQuery;
 use App\Modules\Search\Support\SpellingProductsNamed;
 use App\Modules\Search\Support\StoredPageTags;
@@ -43,6 +45,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
         $this->app->tag([SearchFirstSteps::class], FirstSteps::STEPS_TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([SearchScanDetails::class], ScanDetails::TAG);
+        // What this module counted, for the first-run screens.
+        $this->app->tag([SearchShopFacts::class], ShopFacts::TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([SearchHome::class], HomeSource::TAG);
     }
