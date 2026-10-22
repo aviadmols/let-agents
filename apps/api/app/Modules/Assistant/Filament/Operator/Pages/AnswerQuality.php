@@ -208,7 +208,7 @@ class AnswerQuality extends Page
         return app(TenantContext::class)->runUnscoped(function (): array {
             $cases = AssistantQualityCase::query()->when($this->shop !== '', fn (Builder $q) => $q->where('shop_id', $this->shop))
                 ->when($this->casesKind !== '', fn (Builder $q) => $q->where('kind', $this->casesKind))
-                ->orderByRaw('case when last_passed = 0 then 0 when last_passed is null then 1 else 2 end')->latest('created_at')->limit(200)->get();
+                ->orderByRaw('case when last_passed = false then 0 when last_passed is null then 1 else 2 end')->latest('created_at')->limit(200)->get();
             $shops = Shop::query()->whereIn('id', $cases->pluck('shop_id')->unique()->values())->pluck('name', 'id');
 
             return $cases->map(fn (AssistantQualityCase $c): array => [
