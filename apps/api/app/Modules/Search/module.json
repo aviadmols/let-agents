@@ -180,7 +180,7 @@
             "default": 0.3,
             "min": 0,
             "max": 1,
-            "scope": "global"
+            "scope": "shop"
         },
         {
             "name": "wanted_min_adds",
@@ -232,7 +232,7 @@
             "default": 0.45,
             "min": 0,
             "max": 1,
-            "scope": "global"
+            "scope": "shop"
         },
         {
             "name": "content_age_penalty",

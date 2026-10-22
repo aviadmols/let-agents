@@ -2,7 +2,6 @@
 
 namespace App\Modules\Retrieval\Support;
 
-use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\SpendCapReached;
@@ -55,8 +54,8 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
         foreach ($trials as $trial) {
             $result = ['ranked' => [], 'scores' => [], 'pieces' => 0, 'input_tokens' => 0, 'cost_usd' => 0.0, 'stopped' => null];
 
-            $this->runs->track(self::AGENT, 'retrieval.embedder_trial', function (RunContext $run) use (&$result, $trial, $queries, $limit, $maxUsd): void {
-                $result = $this->trial($run, $trial, $queries, max(1, $limit), $maxUsd);
+            $this->runs->track(self::AGENT, 'retrieval.embedder_trial', function (RunContext $run) use (&$result, $shopId, $trial, $queries, $limit, $maxUsd): void {
+                $result = $this->trial($run, $shopId, $trial, $queries, max(1, $limit), $maxUsd);
                 $run->output(['trial' => $trial->name, 'model' => $result['model'], 'queries' => count($queries)] + array_diff_key($result, ['ranked' => 1, 'scores' => 1]))
                     ->summary('retrieval::runs.embedder_trial', ['model' => $result['model'], 'queries' => (string) count($queries), 'pieces' => (string) $result['pieces']]);
             }, $shopId, ['trial' => $trial->name, 'model' => $trial->model], RunTrigger::Manual);
@@ -104,11 +103,12 @@ final class InMemoryEmbedderTrials implements EmbedderTrials
      * @param  list<string>  $queries
      * @return array{model: string, ranked: array<string, list<string>>, scores: list<float>, pieces: int, input_tokens: int, cost_usd: float, stopped: string|null}
      */
-    private function trial(RunContext $run, EmbedderTrial $trial, array $queries, int $limit, float $maxUsd): array
+    private function trial(RunContext $run, string $shopId, EmbedderTrial $trial, array $queries, int $limit, float $maxUsd): array
     {
-        $index = ModelChoice::for('embedding');
+        $words = EmbeddingChoice::forShop($shopId);
+        $index = $words->choice;
         [$providerName, $model, $dimensions, $price] = $trial->index
-            ? [$index->providerName, $index->model, (int) Settings::get('retrieval.embedding_dimensions') ?: null, (float) Settings::get('retrieval.embedding_usd_per_million')]
+            ? [$index->providerName, $index->model, $words->dimensions, $words->usdPerMillion]
             : [strtolower(trim($trial->provider)), trim($trial->model), $trial->dimensions, $trial->usdPerMillion];
         $provider = AiProviderName::tryFrom($providerName);
         $result = ['model' => $providerName.' · '.$model, 'ranked' => [], 'scores' => [], 'pieces' => 0, 'input_tokens' => 0, 'cost_usd' => 0.0, 'stopped' => null];

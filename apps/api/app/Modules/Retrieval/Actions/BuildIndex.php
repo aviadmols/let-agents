@@ -13,6 +13,7 @@ use App\Modules\Retrieval\Contracts\SectionQuestions;
 use App\Modules\Retrieval\Enums\ChunkSource;
 use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Retrieval\Support\Chunker;
+use App\Modules\Retrieval\Support\EmbeddingChoice;
 use App\Modules\Retrieval\Support\ModelChoice;
 use App\Modules\Retrieval\Support\Topics;
 use App\Modules\Retrieval\Support\VectorSearch;
@@ -30,7 +31,7 @@ use App\Modules\Runs\Models\Run;
  *   2. cut       Chunker, at paragraphs and sentences, the title on every piece
  *   3. compare   a piece whose text hash is unchanged keeps its vector; a source document that
  *                is gone takes its pieces with it
- *   4. embed     the pieces without a vector of the current model, in batches, each batch
+ *   4. embed     the pieces without a vector of the shop's words' model, in batches, each batch
  *                asking SpendGuard first and recording its cost on the run
  *
  * Stopping early is not failing: a run that hit the spending cap or found no key leaves the
@@ -168,9 +169,9 @@ final class BuildIndex
     /** @return array{provider: string, model: string, dimensions: int|null, embedded: int, pending: int, stopped: string|null, cost_usd: float} */
     private function embed(RunContext $run, string $shopId): array
     {
-        $choice = ModelChoice::for('embedding');
-        $dimensions = (int) Settings::get('retrieval.embedding_dimensions') ?: null;
-        $price = (float) Settings::get('retrieval.embedding_usd_per_million');
+        // the shop's own words' model (retrieval.embedding_* may be set for one shop)
+        $words = EmbeddingChoice::forShop($shopId);
+        [$choice, $dimensions, $price] = [$words->choice, $words->dimensions, $words->usdPerMillion];
         $pending = fn () => RetrievalChunk::query()->where(fn ($q) => $q->whereNull('embedding_model')->orWhere('embedding_model', '!=', $choice->model));
 
         $result = ['provider' => $choice->providerName, 'model' => $choice->model, 'dimensions' => null, 'embedded' => 0, 'pending' => 0, 'stopped' => null, 'cost_usd' => 0.0];

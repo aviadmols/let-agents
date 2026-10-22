@@ -1132,7 +1132,7 @@ final class SearchCatalog
         }
 
         $limit = (int) Settings::get('search.semantic_results');
-        $floor = (float) Settings::get('search.semantic_min_similarity');
+        $floor = (float) Settings::get('search.semantic_min_similarity', $shopId);
         // best: how near the nearest product is, whatever the floor
         $out = ['products' => [], 'content' => [], 'best' => 0.0];
 
@@ -1169,7 +1169,7 @@ final class SearchCatalog
             return [];
         }
 
-        $floor = max((float) Settings::get('search.semantic_min_similarity'), (float) Settings::get('search.content_min_similarity'));
+        $floor = max((float) Settings::get('search.semantic_min_similarity', $shopId), (float) Settings::get('search.content_min_similarity', $shopId));
         $hits = [];
 
         foreach ($near as $hit) {

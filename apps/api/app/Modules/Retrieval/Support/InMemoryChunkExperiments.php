@@ -2,7 +2,6 @@
 
 namespace App\Modules\Retrieval\Support;
 
-use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Retrieval\Contracts\ChunkExperiments;
@@ -112,9 +111,8 @@ final class InMemoryChunkExperiments implements ChunkExperiments
             }
         }
 
-        $choice = ModelChoice::for('embedding');
-        $dimensions = (int) Settings::get('retrieval.embedding_dimensions') ?: null;
-        $price = (float) Settings::get('retrieval.embedding_usd_per_million');
+        $words = EmbeddingChoice::forShop($shopId);
+        [$choice, $dimensions, $price] = [$words->choice, $words->dimensions, $words->usdPerMillion];
 
         $this->runs->track(self::AGENT, 'retrieval.chunk_experiment', function (RunContext $run) use (&$pieces, $choice, $dimensions, $price, $chunkChars): void {
             if ($choice->provider === null) {

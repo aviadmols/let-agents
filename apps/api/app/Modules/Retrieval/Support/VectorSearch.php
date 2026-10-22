@@ -26,6 +26,7 @@ final class VectorSearch implements PictureContent, SemanticSearch
 
     public function similarTo(string $source, string $sourceId, array $sources, int $limit): array
     {
+        // the tenant's shop: callers run inside it (SemanticSearch)
         $model = ModelChoice::for('embedding')->model;
         $seed = RetrievalChunk::query()
             ->where('source', $source)->where('source_id', $sourceId)
@@ -50,7 +51,7 @@ final class VectorSearch implements PictureContent, SemanticSearch
 
         $vector = app(QueryVectors::class)->for($shopId, $text);
 
-        return $vector === null ? [] : $this->nearest($vector, ModelChoice::for('embedding')->model, $sources, $limit);
+        return $vector === null ? [] : $this->nearest($vector, ModelChoice::for('embedding', $shopId)->model, $sources, $limit);
     }
 
     /**
@@ -111,7 +112,7 @@ final class VectorSearch implements PictureContent, SemanticSearch
 
     public function picturesNearWords(string $shopId, string $text, int $limit): array
     {
-        $model = ModelChoice::for('embedding')->model;
+        $model = ModelChoice::for('embedding', $shopId)->model;
 
         if ($limit < 1 || trim($text) === '' || ! RetrievalImage::query()->where('caption_model', $model)->whereNotNull('caption_embedding')->exists()) {
             return [];

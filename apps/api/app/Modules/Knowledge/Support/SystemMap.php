@@ -39,7 +39,9 @@ final class SystemMap
     /** @return array<string, mixed> */
     public static function index(): array
     {
-        $model = (string) Settings::get('retrieval.embedding_model');
+        // the shop's own words' model: a shop may have moved to another
+        $shop = app(TenantContext::class)->id();
+        $model = (string) Settings::get('retrieval.embedding_model', $shop);
         $chunks = RetrievalChunk::query()
             ->select('source')
             ->selectRaw('count(*) as chunks')
@@ -92,7 +94,7 @@ final class SystemMap
             'chunks' => $total,
             'embedded' => $embedded,
             'pending' => $total - $embedded,
-            'model' => (string) Settings::get('retrieval.embedding_provider').' · '.$model,
+            'model' => (string) Settings::get('retrieval.embedding_provider', $shop).' · '.$model,
             'dimensions' => RetrievalChunk::query()->where('embedding_model', $model)->whereNotNull('dimensions')->value('dimensions'),
             'last' => self::lastRun(self::INDEX_ACTION),
             'spend' => self::spend(),
@@ -124,7 +126,7 @@ final class SystemMap
         return [
             'evidence' => [
                 'orders' => AnalyticsOrder::query()->where('ordered_at', '>=', now()->subDays((int) Settings::get('retrieval.purchase_window_days')))->count(),
-                'vectors' => RetrievalChunk::query()->where('source', 'product')->where('embedding_model', (string) Settings::get('retrieval.embedding_model'))->count(),
+                'vectors' => RetrievalChunk::query()->where('source', 'product')->where('embedding_model', (string) Settings::get('retrieval.embedding_model', app(TenantContext::class)->id()))->count(),
                 'guides' => $guides,
             ],
             'model' => (string) Settings::get('retrieval.match_provider').' · '.(string) Settings::get('retrieval.match_model'),

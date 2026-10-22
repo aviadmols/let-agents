@@ -7,6 +7,7 @@ use App\Core\Plans\PlanCeilings;
 use App\Core\Settings\Models\SettingOverride;
 use App\Core\Tenancy\TenantContext;
 use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -192,5 +193,11 @@ final class SettingManager
     {
         $this->overrides = null;
         $this->cache->forget(self::CACHE_KEY);
+        // Written inside a transaction, another process may cache the rows as they were before it
+        // commits, and keep them: forgotten again once it has (at once, outside a transaction).
+        DB::afterCommit(function (): void {
+            $this->overrides = null;
+            $this->cache->forget(self::CACHE_KEY);
+        });
     }
 }

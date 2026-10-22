@@ -112,7 +112,7 @@ final class CompareEmbeddersCommand extends Command
 
         // What switching costs: once, the whole index and the questions of the page sections embedded again;
         // a month, what the last 30 days embedded (changed pages, new wordings), at the other price.
-        $now = (float) Settings::get('retrieval.embedding_usd_per_million');
+        $now = (float) Settings::get('retrieval.embedding_usd_per_million', $shop->id);
         $tokens = ($size['chars'] + $size['ask_chars']) / self::CHARS_PER_TOKEN;
         $month = (int) $tenant->runUnscoped(fn () => Run::query()->where('shop_id', $shop->id)->whereIn('agent', self::EMBEDDING_AGENTS)
             ->where('created_at', '>=', now()->subDays(30))->sum('input_tokens'));

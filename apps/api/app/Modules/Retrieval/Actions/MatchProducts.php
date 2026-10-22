@@ -192,7 +192,7 @@ final class MatchProducts
             $tally['cost_usd'] += $cost;
             $tally['asked']++;
 
-            $verdicts = MatchCheck::judge($reply->data, $candidates, $limits, $available, (float) Settings::get('retrieval.min_alternative_similarity'));
+            $verdicts = MatchCheck::judge($reply->data, $candidates, $limits, $available, (float) Settings::get('retrieval.min_alternative_similarity', $shopId));
             $this->save($product, MatchRequestStatus::Answered, $hash, $candidates, $reply->data, $verdicts, $choice, $reply->inputTokens, $reply->outputTokens, $cost);
 
             foreach ($verdicts as $verdict) {

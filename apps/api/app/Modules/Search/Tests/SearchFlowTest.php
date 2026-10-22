@@ -329,6 +329,11 @@ final class SearchFlowTest extends TestCase
         $this->assertSame([], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
         Settings::set('search.meaning_only_min_similarity', 0.4, $this->shop->id);
         $this->assertSame(['102'], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
+
+        // How near a product found by meaning must be is the shop's too (it moves with the shop's words' model).
+        Settings::set('search.semantic_min_similarity', 0.45, $this->shop->id);
+        $this->assertSame([], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
+        $this->assertSame(0.3, Settings::get('search.semantic_min_similarity'), 'every other shop keeps the default');
     }
 
     public function test_with_a_price_only_what_holds_the_words_is_shown(): void

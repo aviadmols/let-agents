@@ -12,6 +12,7 @@ use App\Modules\Retrieval\Candidates\LookAlike;
 use App\Modules\Retrieval\Candidates\MentionedTogether;
 use App\Modules\Retrieval\Candidates\SimilarProducts;
 use App\Modules\Retrieval\Console\RetrievalCommand;
+use App\Modules\Retrieval\Console\SwitchEmbedderCommand;
 use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Contracts\ChunkExperiments;
 use App\Modules\Retrieval\Contracts\EmbedderTrials;
@@ -87,6 +88,7 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
     {
         return [
             RetrievalCommand::class,
+            SwitchEmbedderCommand::class,
         ];
     }
 }

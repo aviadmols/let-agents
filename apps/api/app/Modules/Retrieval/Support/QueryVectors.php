@@ -48,7 +48,8 @@ final class QueryVectors
     {
         $text = mb_substr(trim($text), 0, self::MAX_CHARS);
         $images = $space === 'image';
-        $choice = ModelChoice::for($images ? 'image' : 'embedding');
+        // the shop's own words' model: a shop may have moved to another (retrieval:switch-embedder)
+        $choice = ModelChoice::for($images ? 'image' : 'embedding', $shopId);
 
         if ($text === '' || $choice->provider === null || $choice->model === '') {
             return null;
@@ -68,8 +69,8 @@ final class QueryVectors
             return $saved->vector();
         }
 
-        $price = (float) Settings::get($images ? 'retrieval.image_text_usd_per_million' : 'retrieval.embedding_usd_per_million');
-        $dimensions = (int) Settings::get($images ? 'retrieval.image_dimensions' : 'retrieval.embedding_dimensions') ?: null;
+        $price = (float) Settings::get($images ? 'retrieval.image_text_usd_per_million' : 'retrieval.embedding_usd_per_million', $shopId);
+        $dimensions = (int) Settings::get($images ? 'retrieval.image_dimensions' : 'retrieval.embedding_dimensions', $shopId) ?: null;
 
         try {
             $this->spend->assertCanSpend(forShopper: true, estimatedUsd: mb_strlen($text) * $price / 1_000_000);

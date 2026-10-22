@@ -39,7 +39,7 @@
             "default": "openai",
             "min": 1,
             "max": 40,
-            "scope": "global"
+            "scope": "shop"
         },
         {
             "name": "embedding_model",
@@ -47,7 +47,7 @@
             "default": "text-embedding-3-small",
             "min": 1,
             "max": 120,
-            "scope": "global"
+            "scope": "shop"
         },
         {
             "name": "embedding_dimensions",
@@ -55,7 +55,7 @@
             "default": 0,
             "min": 0,
             "max": 4096,
-            "scope": "global"
+            "scope": "shop"
         },
         {
             "name": "embedding_usd_per_million",
@@ -63,7 +63,7 @@
             "default": 0.02,
             "min": 0,
             "max": 100,
-            "scope": "global",
+            "scope": "shop",
             "unit": "usd"
         },
         {
@@ -207,7 +207,7 @@
             "default": 0.5,
             "min": 0,
             "max": 1,
-            "scope": "global"
+            "scope": "shop"
         },
         {
             "name": "image_provider",

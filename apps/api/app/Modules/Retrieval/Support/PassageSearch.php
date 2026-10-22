@@ -38,7 +38,7 @@ final class PassageSearch implements Passages
             return [];
         }
 
-        $model = ModelChoice::for('embedding')->model;
+        $model = ModelChoice::for('embedding', $shopId)->model;
         $topics = in_array(ChunkSource::Content->value, $sources, true) ? Topics::ofQuestion($text) : [];
         $rows = DB::connection()->getDriverName() === 'pgsql'
             ? $this->inPostgres($vector, $model, $sources, $limit * self::OVERFETCH, $topics)

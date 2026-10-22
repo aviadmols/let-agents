@@ -13,7 +13,7 @@ use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Retrieval\Contracts\CaptionsPictures;
 use App\Modules\Retrieval\Models\RetrievalImage;
-use App\Modules\Retrieval\Support\ModelChoice;
+use App\Modules\Retrieval\Support\EmbeddingChoice;
 use App\Modules\Retrieval\Support\PictureAddress;
 use App\Modules\Retrieval\Support\VectorSearch;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -22,6 +22,7 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -120,6 +121,16 @@ final class CaptionImages implements CaptionsPictures
             : hash('sha256', $urlHash.'|'.self::OTHER_LANGUAGE_VERSION.'|'.$model.'|'.$language);
     }
 
+    /**
+     * What a description's vector is made of: the sentence and its words, as one text.
+     *
+     * @param  list<string>  $words
+     */
+    public static function text(string $caption, array $words): string
+    {
+        return trim($caption.' '.implode(', ', $words));
+    }
+
     /** The language the store writes its products in, named for the model. */
     public static function language(string $shopId): string
     {
@@ -134,7 +145,8 @@ final class CaptionImages implements CaptionsPictures
         $reader = AiProviderName::tryFrom(strtolower(trim((string) Settings::get('retrieval.caption_provider'))));
         $model = trim((string) Settings::get('retrieval.caption_model'));
         $language = self::language($shopId);
-        $text = ModelChoice::for('embedding');
+        $words = EmbeddingChoice::forShop($shopId);
+        $text = $words->choice;
 
         if (! Features::enabled('retrieval.image_captions', $shopId)) {
             $run->output($stats + ['off' => true])->summary('retrieval::runs.captions_off');
@@ -149,16 +161,23 @@ final class CaptionImages implements CaptionsPictures
         }
 
         $todo = RetrievalImage::query()->whereNotNull('embedded_at')->whereNull('error')
-            ->orderBy('id')->get(['id', 'title', 'image_url', 'url_hash', 'caption_key', 'caption_model'])
+            ->orderBy('id')->get(['id', 'title', 'image_url', 'url_hash', 'caption', 'caption_words', 'caption_key', 'caption_model'])
             ->filter(fn (RetrievalImage $i): bool => $i->caption_key !== self::key($i->url_hash, $model, $language) || $i->caption_model !== $text->model)
             ->values();
-        $limit = (int) Settings::get('retrieval.images_per_part');
+        $limit = $part = (int) Settings::get('retrieval.images_per_part');
         $system = (string) file_get_contents(__DIR__.'/../Prompts/caption.v'.($language === 'Hebrew' ? self::PROMPT_VERSION : self::OTHER_LANGUAGE_VERSION).'.md');
         $maxOutput = (int) Settings::get('retrieval.caption_max_output_tokens');
         $in = (float) Settings::get('retrieval.caption_input_usd_per_million');
         $out = (float) Settings::get('retrieval.caption_output_usd_per_million');
-        $textPrice = (float) Settings::get('retrieval.embedding_usd_per_million');
-        $dimensions = (int) Settings::get('retrieval.embedding_dimensions') ?: null;
+        $textPrice = $words->usdPerMillion;
+        $dimensions = $words->dimensions;
+
+        // Described already, only not embedded with the shop's words' model (it moved to another): its words
+        // embedded again, the picture not read again.
+        [$already, $todo] = $todo->partition(fn (RetrievalImage $i): bool => $i->caption_key === self::key($i->url_hash, $model, $language));
+        $todo = $todo->values();
+        $this->embedAgain($run, $already->take($limit)->values(), $words, $stats);
+        $limit = $stats['stopped'] === null ? max(0, $limit - $already->count()) : 0;
 
         foreach ($todo->take($limit)->chunk(self::BATCH) as $batch) {
             $described = [];
@@ -213,7 +232,7 @@ final class CaptionImages implements CaptionsPictures
                 }
 
                 // The description and its words, one text each, embedded together.
-                $texts = array_map(fn (array $d): string => trim($d['caption'].' '.implode(', ', $d['words'])), $described);
+                $texts = array_map(fn (array $d): string => self::text($d['caption'], $d['words']), $described);
                 $this->spend->assertCanSpend(array_sum(array_map('mb_strlen', $texts)) / 2 * $textPrice / 1_000_000);
                 $embeddings = $this->embedder->embed($text->provider, $text->model, $texts, $dimensions);
                 $run->usage($text->providerName, $text->model, $embeddings->inputTokens, 0, 0, $embeddings->costUsd($textPrice));
@@ -247,14 +266,69 @@ final class CaptionImages implements CaptionsPictures
             }
         }
 
-        $stats['left'] = max(0, $todo->count() - $stats['described'] - $stats['skipped']);
+        $stats['left'] = max(0, $todo->count() + $already->count() - $stats['described'] - $stats['skipped'] - ($stats['embedded_again'] ?? 0));
 
-        if ($stats['stopped'] === null && $todo->count() > $limit) {
+        if ($stats['stopped'] === null && $todo->count() + $already->count() > $part) {
             $stats['stopped'] = 'more';
         }
 
         $stats['cost_usd'] = round($stats['cost_usd'], 6);
         $run->output($stats)->summary('retrieval::runs.captioned', ['described' => (string) $stats['described'], 'left' => (string) $stats['left']]);
+    }
+
+    /**
+     * Descriptions already written, embedded with the words' model the shop uses now; one with nothing
+     * to embed (a picture passed over) is only marked so. One call per batch, SpendGuard first.
+     *
+     * @param  Collection<int, RetrievalImage>  $images
+     * @param  array<string, mixed>  $stats
+     */
+    private function embedAgain(RunContext $run, Collection $images, EmbeddingChoice $words, array &$stats): void
+    {
+        $stats['embedded_again'] = 0;
+        $model = $words->model();
+
+        foreach ($images->chunk(self::BATCH) as $batch) {
+            $texts = [];
+            foreach ($batch as $image) {
+                $text = self::text((string) $image->caption, array_values((array) $image->caption_words));
+                if ($text === '') {
+                    RetrievalImage::query()->whereKey($image->id)->update(['caption_model' => $model, 'caption_embedding' => null]);
+                    $stats['embedded_again']++;
+
+                    continue;
+                }
+                $texts[$image->id] = $text;
+            }
+
+            if ($texts === []) {
+                continue;
+            }
+
+            try {
+                $this->spend->assertCanSpend(array_sum(array_map('mb_strlen', $texts)) / 2 * $words->usdPerMillion / 1_000_000);
+                $embeddings = $this->embedder->embed($words->choice->provider, $model, array_values($texts), $words->dimensions);
+            } catch (SpendCapReached) {
+                $stats['stopped'] = 'spend_cap';
+
+                return;
+            } catch (ModelCallFailed $e) {
+                report($e);
+                $stats['stopped'] = $e->reason;
+
+                return;
+            }
+
+            $run->usage($words->choice->providerName, $model, $embeddings->inputTokens, 0, 0, $embeddings->costUsd($words->usdPerMillion));
+            $stats['cost_usd'] += $embeddings->costUsd($words->usdPerMillion);
+
+            foreach (array_keys($texts) as $i => $id) {
+                if (($embeddings->vectors[$i] ?? null) !== null) {
+                    RetrievalImage::query()->whereKey($id)->update(['caption_model' => $model, 'caption_embedding' => VectorSearch::column($embeddings->vectors[$i])]);
+                    $stats['embedded_again']++;
+                }
+            }
+        }
     }
 
     /** @return array{mime: string, data: string}|null */
