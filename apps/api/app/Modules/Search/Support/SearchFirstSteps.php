@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Support;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\FirstStep;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Analytics\Models\AnalyticsEvent;
@@ -36,6 +37,8 @@ final class SearchFirstSteps implements FirstSteps
         $site = $connection?->site_url ?: ($shop->domain ? 'https://'.$shop->domain : null);
         $preview = $site === null ? null : rtrim($site, '/').'/'.($connection !== null && ! $live ? '?let_agents_preview='.$connection->previewKey() : '');
         $looked = DB::table('shop_notices_done')->where('shop_id', $shop->id)->where('key', self::LOOK_DONE)->exists();
+        // a Shopify store switches Lets on in its theme: the theme editor opens with the app embed on, one Save away
+        $embed = $shop->platform === ShopPlatform::Shopify ? $this->embedUrl($shop) : null;
 
         return [
             new FirstStep(
@@ -43,9 +46,10 @@ final class SearchFirstSteps implements FirstSteps
                 order: 10,
                 title: __('search::home.step.on.title'),
                 body: __($shop->platform === ShopPlatform::Shopify ? 'search::home.step.on.body_shopify' : 'search::home.step.on.body_woocommerce'),
-                button: __('search::home.step.on.button'),
-                url: ManualConnectSettings::getUrl(panel: 'merchant', tenant: $shop),
+                button: __($embed !== null ? 'search::home.step.on.button_shopify' : 'search::home.step.on.button'),
+                url: $embed ?? ManualConnectSettings::getUrl(panel: 'merchant', tenant: $shop),
                 done: $live,
+                external: $embed !== null,
             ),
             new FirstStep(
                 key: 'look',
@@ -58,6 +62,19 @@ final class SearchFirstSteps implements FirstSteps
                 external: true,
             ),
         ];
+    }
+
+    /** Where the store's platform switches Lets on in its theme (ConnectionFacts' embed_url), when it says. */
+    private function embedUrl(Shop $shop): ?string
+    {
+        foreach (app()->tagged(ConnectionFacts::TAG) as $source) {
+            $url = $source instanceof ConnectionFacts ? ($source->facts($shop)['embed_url'] ?? null) : null;
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return null;
     }
 
     private function live(): bool

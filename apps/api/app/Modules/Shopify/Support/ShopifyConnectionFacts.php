@@ -16,6 +16,9 @@ use Carbon\CarbonInterface;
  */
 final class ShopifyConnectionFacts implements ConnectionFacts
 {
+    /** The app embed's block file (extensions/shopify/extensions/let-agents-search/blocks/app-embed.liquid). */
+    public const EMBED = 'app-embed';
+
     public function facts(Shop $shop): array
     {
         $install = ShopifyInstall::query()->where('shop_id', $shop->id)->latest('installed_at')->first();
@@ -25,6 +28,12 @@ final class ShopifyConnectionFacts implements ConnectionFacts
         }
 
         $facts = ['app_installed' => $install->installed(), 'connected' => $install->installed()];
+
+        // the theme editor with the app embed switched on, waiting for the merchant to save (Shopify's deep link)
+        if ($install->installed()) {
+            $facts['embed_url'] = 'https://'.$install->shop_domain.'/admin/themes/current/editor?context=apps&activateAppId='
+                .rawurlencode(ShopifyApps::key($install->client_id)).'/'.self::EMBED;
+        }
 
         // the merchant changes plan themselves, in Shopify's billing
         if ($install->installed() && Plan::query()->offered()->exists()) {

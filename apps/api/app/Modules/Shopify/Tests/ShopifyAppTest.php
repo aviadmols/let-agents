@@ -10,6 +10,7 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
+use App\Modules\Shopify\Support\ShopifyConnectionFacts;
 use App\Modules\Shopify\Support\ShopifySubscription;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
@@ -306,6 +307,16 @@ final class ShopifyAppTest extends TestCase
         $this->webhook('shop/redact', ['shop_domain' => self::SHOP])->assertOk();
         $this->assertSame(0, Shop::query()->count(), 'the shop and all it holds are erased');
         $this->assertSame(0, DB::table('setting_overrides')->where('scope', $install->shop_id)->count(), 'its own settings too, which have no foreign key');
+    }
+
+    public function test_the_merchant_switches_lets_on_in_the_theme_with_one_link(): void
+    {
+        $install = $this->installed();
+
+        $url = app(ShopifyConnectionFacts::class)->facts($install->shop)['embed_url'] ?? null;
+
+        $this->assertSame('https://'.self::SHOP.'/admin/themes/current/editor?context=apps&activateAppId=test-key/app-embed', $url, 'the theme editor opens with the app embed on: Shopify\'s deep link');
+        $this->assertFileExists(base_path('../../extensions/shopify/extensions/let-agents-search/blocks/'.ShopifyConnectionFacts::EMBED.'.liquid'), 'the link names the embed block that exists');
     }
 
     public function test_the_owner_ending_the_plan_cancels_it_in_shopify_and_a_shop_being_deleted_stays_paused(): void
