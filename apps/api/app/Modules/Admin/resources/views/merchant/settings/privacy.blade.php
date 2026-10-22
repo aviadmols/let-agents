@@ -81,9 +81,9 @@
                     <div><button type="button" class="lp-btn lp-btn-danger" wire:click="$set('confirming', 'me')" data-delete-me>{{ $t('me.button') }}</button></div>
                 @else
                     <div class="lp-privacy-confirm lp-acct-form" role="group" style="grid-template-columns: 1fr">
-                        <label>{{ $t('me.password') }}
-                            <x-lp::field model="password" type="password" ltr autocomplete="current-password" />
-                            @if ($this->problem('password'))<span class="lp-set-error" role="alert">{{ $this->problem('password') }}</span>@endif
+                        <label>{{ $t('me.type_phrase') }} <code class="lp-privacy-phrase" dir="ltr">{{ $this::PHRASE }}</code>
+                            <x-lp::field model="phrase" ltr autocomplete="off" />
+                            @if ($this->problem('phrase'))<span class="lp-set-error" role="alert">{{ $this->problem('phrase') }}</span>@endif
                         </label>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap">
                             <button type="button" class="lp-btn lp-btn-danger" wire:click="deleteMe" wire:loading.attr="disabled" data-delete-me-yes>{{ $t('me.confirm_button') }}</button>

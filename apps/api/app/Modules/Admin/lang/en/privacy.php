@@ -47,10 +47,10 @@ return [
     'me' => [
         'title' => 'Delete my account',
         'help' => 'Your account will be deleted and you will leave every shop. The shops themselves keep working.',
-        'password' => 'Your password',
+        'type_phrase' => 'To confirm, type exactly:',
         'button' => 'Delete my account',
         'confirm_button' => 'Delete my account',
-        'password_wrong' => 'That password is wrong.',
+        'phrase_wrong' => 'Type exactly :phrase, in capital letters.',
         'alone' => 'You are the only owner of :shops. First make someone else an owner on the users page, or delete the shop.',
         'operator' => 'A Lets team account is not deleted from here.',
     ],

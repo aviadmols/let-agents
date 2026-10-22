@@ -167,10 +167,11 @@ final class PrivacySettingsTest extends TestCase
 
         Livewire::test(PrivacySettings::class)
             ->call('$set', 'confirming', 'me')
-            ->set('password', 'wrong')
+            ->assertSee('DELETE LETS')
+            ->set('phrase', 'delete lets')
             ->call('deleteMe')
-            ->assertSee('הסיסמה לא נכונה.')
-            ->set('password', 'viewer-password')
+            ->assertSee('יש להקליד בדיוק DELETE LETS, באותיות גדולות.')
+            ->set('phrase', ' DELETE LETS ')
             ->call('deleteMe')
             ->assertRedirect();
 

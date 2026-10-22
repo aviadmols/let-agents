@@ -15,7 +15,6 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 use UnitEnum;
@@ -24,10 +23,14 @@ use UnitEnum;
  * Settings · Privacy and account: what the shop's owner can take and end. Downloading everything the shop holds
  * (ExportShopData); ending the plan at once (EndShopPlan: the search leaves the site, nothing is lost); asking for
  * the shop and all it holds to be deleted, with days to change one's mind (AskToDeleteShop, KeepShop). And for
- * anyone, viewers too: deleting their own account (DeleteOwnAccount), the shops staying.
+ * anyone, viewers too: deleting their own account (DeleteOwnAccount), the shops staying, once they type PHRASE as
+ * it is shown (not a password: one who came in from Shopify may never have set one).
  */
 class PrivacySettings extends Page
 {
+    /** What deleting one's own account asks to be typed, exactly. */
+    public const PHRASE = 'DELETE LETS';
+
     public static string $sideGroup = 'account';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
@@ -45,7 +48,7 @@ class PrivacySettings extends Page
 
     public string $shopName = '';
 
-    public string $password = '';
+    public string $phrase = '';
 
     /** @var array<string, string> */
     public array $problems = [];
@@ -160,8 +163,8 @@ class PrivacySettings extends Page
         $user = $this->user();
         $this->problems = [];
 
-        if (! Hash::check($this->password, (string) $user->password)) {
-            $this->problems['password'] = __('admin::privacy.me.password_wrong');
+        if (trim($this->phrase) !== self::PHRASE) {
+            $this->problems['phrase'] = __('admin::privacy.me.phrase_wrong', ['phrase' => self::PHRASE]);
 
             return;
         }
@@ -169,7 +172,7 @@ class PrivacySettings extends Page
         $alone = $delete->alone($user);
 
         if ($alone !== [] || $user->is_operator) {
-            $this->problems['password'] = $user->is_operator ? __('admin::privacy.me.operator') : __('admin::privacy.me.alone', ['shops' => implode(', ', $alone)]);
+            $this->problems['phrase'] = $user->is_operator ? __('admin::privacy.me.operator') : __('admin::privacy.me.alone', ['shops' => implode(', ', $alone)]);
 
             return;
         }

@@ -423,6 +423,7 @@ html.dark .fi-panel-merchant {
 /* What cannot be taken back (Privacy and account): ending the plan, deleting the shop or one's account. */
 .fi-panel-merchant .lp-btn-danger { background: var(--lp-coral, #d23c3c); color: #fff; }
 .fi-panel-merchant .lp-privacy-confirm { margin-top: 4px; padding: 16px; border-radius: 16px; background: var(--la-sunk); display: grid; gap: 12px; }
+.fi-panel-merchant .lp-privacy-phrase { display: inline-block; margin-inline-start: 4px; padding: 2px 8px; border-radius: 6px; background: var(--la-paper); box-shadow: inset 0 0 0 1px var(--la-axis); font: 600 14px/1.5 ui-monospace, monospace; letter-spacing: .04em; user-select: all; }
 
 .fi-panel-merchant .lp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .fi-panel-merchant .lp-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--la-paper); color: var(--la-ink); box-shadow: inset 0 0 0 1px var(--la-axis); font: inherit; font-size: 13.5px; cursor: pointer; }
