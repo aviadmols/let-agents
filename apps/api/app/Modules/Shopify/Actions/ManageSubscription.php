@@ -40,7 +40,31 @@ final class ManageSubscription
         }
         GQL;
 
+    private const CANCEL = <<<'GQL'
+        mutation ($id: ID!) {
+          appSubscriptionCancel(id: $id) {
+            appSubscription { id status }
+            userErrors { field message }
+          }
+        }
+        GQL;
+
     public function __construct(private readonly ShopifyApi $api) {}
+
+    /** The owner ended the plan: Shopify stops billing at once, and the shop pauses. */
+    public function cancel(ShopifyInstall $install): void
+    {
+        if ($install->subscription_id !== null && $install->subscription_id !== '') {
+            $answer = (array) ($this->api->query($install, self::CANCEL, ['id' => $install->subscription_id])['appSubscriptionCancel'] ?? []);
+
+            if (($answer['userErrors'] ?? []) !== []) {
+                throw new RuntimeException('Shopify refused to cancel the subscription: '.json_encode($answer['userErrors']));
+            }
+        }
+
+        $install->forceFill(['subscription_status' => 'cancelled'])->save();
+        $this->follow($install);
+    }
 
     /** Where the merchant approves the plan in Shopify. */
     public function start(ShopifyInstall $install, string $returnUrl, ?Plan $plan = null): string
@@ -124,13 +148,19 @@ final class ManageSubscription
         }
     }
 
-    /** The shop is active exactly while the store has the app and a live subscription. */
+    /**
+     * The shop is active exactly while the store has the app and a live subscription. A plan approved again after
+     * the owner ended one is a plan again; a shop waiting to be deleted stays paused whatever Shopify says.
+     */
     public function follow(ShopifyInstall $install): void
     {
         $shop = Shop::query()->find($install->shop_id);
 
-        if ($shop !== null && $shop->status !== ShopStatus::Disabled) {
-            $shop->forceFill(['status' => $install->subscribed() ? ShopStatus::Active : ShopStatus::Paused])->save();
+        if ($shop === null || $shop->status === ShopStatus::Disabled || $shop->leaving()) {
+            return;
         }
+
+        $subscribed = $install->subscribed();
+        $shop->forceFill(['status' => $subscribed ? ShopStatus::Active : ShopStatus::Paused] + ($subscribed ? ['cancelled_at' => null] : []))->save();
     }
 }

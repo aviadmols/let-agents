@@ -420,6 +420,9 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-btn:disabled { opacity: .45; cursor: default; }
 .fi-panel-merchant .lp-btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
 .fi-panel-merchant .lp-btn-primary { background: var(--la-accent); color: var(--la-paper); }
+/* What cannot be taken back (Privacy and account): ending the plan, deleting the shop or one's account. */
+.fi-panel-merchant .lp-btn-danger { background: var(--lp-coral, #d23c3c); color: #fff; }
+.fi-panel-merchant .lp-privacy-confirm { margin-top: 4px; padding: 16px; border-radius: 16px; background: var(--la-sunk); display: grid; gap: 12px; }
 
 .fi-panel-merchant .lp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .fi-panel-merchant .lp-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--la-paper); color: var(--la-ink); box-shadow: inset 0 0 0 1px var(--la-axis); font: inherit; font-size: 13.5px; cursor: pointer; }

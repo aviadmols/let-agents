@@ -4,6 +4,7 @@ namespace App\Modules\Admin;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Console\CreateOperatorCommand;
+use App\Modules\Admin\Console\DeleteDueShopsCommand;
 use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Contracts\TimelineSource;
@@ -17,6 +18,7 @@ use App\Modules\Admin\Support\ViewerGuard;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -52,12 +54,18 @@ final class AdminServiceProvider extends ModuleServiceProvider
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
             }
         });
+
+        // The shops whose owners asked for them to be deleted, on their day (Settings · Privacy and account).
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->command('shops:delete-due')->dailyAt('04:10')->name('shops:delete-due')->withoutOverlapping();
+        });
     }
 
     protected function moduleCommands(): array
     {
         return [
             CreateOperatorCommand::class,
+            DeleteDueShopsCommand::class,
             SetPasswordCommand::class,
         ];
     }

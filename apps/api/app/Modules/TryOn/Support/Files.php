@@ -2,6 +2,9 @@
 
 namespace App\Modules\TryOn\Support;
 
+use App\Modules\TryOn\Models\TryOnJob;
+use App\Modules\TryOn\Models\TryOnPhoto;
+use App\Modules\TryOn\Models\TryOnStep;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,5 +32,25 @@ final class Files
             self::disk()->delete($path);
             DB::table(self::TABLE)->where('path', $path)->delete();
         }
+    }
+
+    /**
+     * Deletes a photo's pictures: the photo, every picture made from it, and the pictures its steps kept. The
+     * rows stay, without paths, so the log still says what happened.
+     */
+    public static function forgetPhoto(TryOnPhoto $photo): void
+    {
+        foreach (TryOnStep::query()->where('photo_id', $photo->id)->whereNotNull('images')->get() as $step) {
+            foreach ((array) $step->images as $path) {
+                self::delete($path);
+            }
+            $step->update(['images' => null]);
+        }
+        foreach (TryOnJob::query()->where('photo_id', $photo->id)->whereNotNull('result_path')->get() as $job) {
+            self::delete($job->result_path);
+            $job->update(['result_path' => null]);
+        }
+        self::delete($photo->path);
+        $photo->update(['path' => null]);
     }
 }

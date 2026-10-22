@@ -3,6 +3,7 @@
 namespace App\Modules\Shopify;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\CancelsSubscription;
 use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Shopify\Console\ConnectPixelCommand;
 use App\Modules\Shopify\Feed\ShopifyBlog;
@@ -10,6 +11,7 @@ use App\Modules\Shopify\Feed\ShopifyStoreFeed;
 use App\Modules\Shopify\Http\Middleware\FrameInsideShopify;
 use App\Modules\Shopify\Support\EmbeddedApp;
 use App\Modules\Shopify\Support\ShopifyConnectionFacts;
+use App\Modules\Shopify\Support\ShopifySubscription;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -25,6 +27,8 @@ final class ShopifyServiceProvider extends ModuleServiceProvider
         $this->app->tag([ShopifyBlog::class], 'connections.store_blogs');
         // The app and its plan on the shop's "Connection and plan".
         $this->app->tag([ShopifyConnectionFacts::class], ConnectionFacts::TAG);
+        // The plan, ended in Shopify when the owner ends it or deletes the shop.
+        $this->app->tag([ShopifySubscription::class], CancelsSubscription::TAG);
     }
 
     protected function bootModule(): void

@@ -10,6 +10,7 @@
         { "name": "default_locale", "type": "enum", "options": ["he", "en"], "default": "he", "scope": "global" },
         { "name": "invitation_days", "type": "int", "default": 7, "min": 1, "max": 30, "scope": "global", "unit": "days" },
         { "name": "max_team_members", "type": "int", "default": 100, "min": 1, "max": 1000, "scope": "shop", "unit": "members" },
-        { "name": "daily_reports_days", "type": "int", "default": 14, "min": 1, "max": 90, "scope": "global", "unit": "days" }
+        { "name": "daily_reports_days", "type": "int", "default": 14, "min": 1, "max": 90, "scope": "global", "unit": "days" },
+        { "name": "shop_deletion_days", "type": "int", "default": 30, "min": 1, "max": 90, "scope": "global", "unit": "days" }
     ]
 }

@@ -5,6 +5,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Localization\Locales;
+use App\Core\Usage\MonthlyUsage;
 use App\Modules\Tenancy\Database\Factories\ShopFactory;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -35,6 +36,9 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $trial_ends_at while set the shop is on trial (StartTrial), and stays limited past the date until the trial is ended
  * @property array<string, array{0: string, 1: mixed}>|null $trial_saved the shop's own settings from before the trial
  * @property ?string $plan the code of the plan the shop pays for (Plan); null: no plan holds it
+ * @property Carbon|null $cancelled_at the owner ended the plan: the shop is paused, its data kept
+ * @property Carbon|null $deletion_due_at the owner asked for the shop to be deleted: paused until then, deleted on this day unless kept
+ * @property string|null $deletion_asked_by the email of who asked for it
  */
 class Shop extends Model
 {
@@ -78,6 +82,8 @@ class Shop extends Model
             'profile' => 'array',
             'trial_ends_at' => 'datetime',
             'trial_saved' => 'array',
+            'cancelled_at' => 'datetime',
+            'deletion_due_at' => 'datetime',
         ];
     }
 
@@ -90,10 +96,11 @@ class Shop extends Model
             }
         });
 
-        // The kernel's override tables have no foreign key to shops, so clean them here.
+        // The kernel's tables have no foreign key to shops, so clean them here.
         static::deleted(function (Shop $shop): void {
             Features::purgeShop($shop->id);
             Settings::purgeShop($shop->id);
+            MonthlyUsage::forgetShop($shop->id);
         });
     }
 
@@ -129,6 +136,12 @@ class Shop extends Model
     public function isActive(): bool
     {
         return $this->status === ShopStatus::Active;
+    }
+
+    /** The owner asked for the shop to be deleted, and it is not yet. */
+    public function leaving(): bool
+    {
+        return $this->deletion_due_at !== null;
     }
 
     /** "rtl" or "ltr" for the language visitors see. */

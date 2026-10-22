@@ -50,8 +50,9 @@ final class ShopifyWebhooksController
                 mb_strtolower((string) ($payload['customer']['email'] ?? '')),
                 (string) ($payload['customer']['id'] ?? ''),
             )),
-            // 48 hours after the app was removed: the shop and all it holds go.
-            'shop/redact' => Shop::query()->whereKey($install->shop_id)->delete(),
+            // 48 hours after the app was removed: the shop and all it holds go, the kernel's tables and its files too
+            // (deleted as a model, so Shop::deleted cleans what has no foreign key).
+            'shop/redact' => Shop::query()->whereKey($install->shop_id)->first()?->delete(),
             default => null,
         };
 

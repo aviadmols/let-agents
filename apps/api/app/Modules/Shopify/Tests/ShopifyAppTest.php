@@ -10,12 +10,14 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
+use App\Modules\Shopify\Support\ShopifySubscription;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
@@ -80,6 +82,7 @@ final class ShopifyAppTest extends TestCase
                     : ['webPixel' => ['id' => 'gid://shopify/WebPixel/1'], 'userErrors' => []]],
                 str_contains($query, 'webPixelUpdate') => ['webPixelUpdate' => ['webPixel' => ['id' => 'gid://shopify/WebPixel/1'], 'userErrors' => []]],
                 str_contains($query, 'webPixel {') => ['webPixel' => ['id' => 'gid://shopify/WebPixel/1']],
+                str_contains($query, 'appSubscriptionCancel') => ['appSubscriptionCancel' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'CANCELLED'], 'userErrors' => []]],
                 str_contains($query, 'appSubscriptionCreate') => ['appSubscriptionCreate' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'PENDING'], 'confirmationUrl' => 'https://gueta-test.myshopify.com/admin/charges/confirm', 'userErrors' => []]],
                 str_contains($query, 'activeSubscriptions') => ['currentAppInstallation' => ['activeSubscriptions' => $this->subscriptions], 'shop' => ['plan' => ['partnerDevelopment' => true]]],
                 str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => []]],
@@ -299,8 +302,36 @@ final class ShopifyAppTest extends TestCase
         $this->assertNull($install->fresh()->access_token);
         $this->assertSame('failed', app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->sole()->status->value));
 
+        Settings::set('search.results_per_group', 7, $install->shop_id);
         $this->webhook('shop/redact', ['shop_domain' => self::SHOP])->assertOk();
         $this->assertSame(0, Shop::query()->count(), 'the shop and all it holds are erased');
+        $this->assertSame(0, DB::table('setting_overrides')->where('shop_id', $install->shop_id)->count(), 'its own settings too, which have no foreign key');
+    }
+
+    public function test_the_owner_ending_the_plan_cancels_it_in_shopify_and_a_shop_being_deleted_stays_paused(): void
+    {
+        $install = $this->installed();
+        $install->forceFill(['subscription_status' => 'active', 'subscription_id' => 'gid://shopify/AppSubscription/1'])->save();
+        $install->shop->forceFill(['status' => ShopStatus::Active])->save();
+        $billing = app(ShopifySubscription::class);
+
+        $this->assertTrue($billing->bills($install->shop));
+        $billing->cancel($install->shop);
+
+        $cancel = collect($this->graphql)->first(fn (array $call): bool => str_contains((string) ($call['query'] ?? ''), 'appSubscriptionCancel'));
+        $this->assertSame('gid://shopify/AppSubscription/1', $cancel['variables']['id'] ?? null, 'Shopify stops billing at once');
+        $this->assertSame(['cancelled', ShopStatus::Paused], [$install->fresh()->subscription_status, $install->shop->fresh()->status]);
+        $this->assertFalse($billing->bills($install->shop->fresh()));
+
+        // A plan approved again brings the shop back, unless its owner asked for it to be deleted.
+        $install->shop->forceFill(['deletion_due_at' => now()->addDays(30)])->save();
+        $this->webhook('app_subscriptions/update', ['app_subscription' => ['admin_graphql_api_id' => 'gid://shopify/AppSubscription/2', 'status' => 'ACTIVE']])->assertOk();
+        $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
+
+        $install->shop->forceFill(['deletion_due_at' => null, 'cancelled_at' => now()])->save();
+        $this->webhook('app_subscriptions/update', ['app_subscription' => ['admin_graphql_api_id' => 'gid://shopify/AppSubscription/2', 'status' => 'ACTIVE']])->assertOk();
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+        $this->assertNull($install->shop->fresh()->cancelled_at);
     }
 
     public function test_opened_inside_the_shopify_admin_the_app_installs_by_token_exchange_and_is_framed(): void

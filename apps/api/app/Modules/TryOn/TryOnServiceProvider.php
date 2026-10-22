@@ -3,7 +3,11 @@
 namespace App\Modules\TryOn;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Tenancy\Models\Shop;
 use App\Modules\TryOn\Console\PruneTryOnCommand;
+use App\Modules\TryOn\Models\TryOnPhoto;
+use App\Modules\TryOn\Support\Files;
 use Illuminate\Console\Scheduling\Schedule;
 
 /**
@@ -28,6 +32,12 @@ final class TryOnServiceProvider extends ModuleServiceProvider
         // Photos and pictures are kept for the shop's retention days, then deleted.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->command('try-on:prune')->dailyAt('03:50')->name('try-on:prune')->withoutOverlapping();
+        });
+
+        // A deleted shop's pictures go with it: its rows go by their foreign keys, the files on the disk only here.
+        Shop::deleting(function (Shop $shop): void {
+            app(TenantContext::class)->runUnscoped(fn () => TryOnPhoto::query()->where('shop_id', $shop->id)->whereNotNull('path')->orderBy('id')
+                ->each(fn (TryOnPhoto $photo) => Files::forgetPhoto($photo)));
         });
     }
 }

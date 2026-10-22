@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Panels;
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Http\Middleware\SyncTenantFromPanel;
@@ -114,6 +115,7 @@ final class MerchantPanelProvider extends PanelProvider
             'links' => [
                 ['label' => __('admin::shop_settings.profile.title'), 'url' => ProfileSettings::getUrl(tenant: $shop)],
                 ['label' => __('admin::home.connection'), 'url' => ConnectionSettings::getUrl(tenant: $shop)],
+                ['label' => __('admin::privacy.title'), 'url' => PrivacySettings::getUrl(tenant: $shop)],
             ],
             'logoutUrl' => filament()->getLogoutUrl(),
         ])->render());

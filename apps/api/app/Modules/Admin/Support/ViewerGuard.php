@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Support;
 
 use App\Modules\Admin\Enums\ShopRole;
+use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
@@ -59,6 +60,11 @@ final class ViewerGuard
         }
 
         if ($component instanceof ProfileSettings) {
+            return true;
+        }
+
+        // their own account is theirs to delete; the shop's plan and the shop itself are the owner's (PrivacySettings checks)
+        if ($component instanceof PrivacySettings && $method === 'deleteMe') {
             return true;
         }
 

@@ -32,6 +32,12 @@ final class MonthlyUsage
         return (int) DB::table(self::TABLE)->where(['shop_id' => $shopId, 'month' => self::month(), 'meter' => $meter])->value('used');
     }
 
+    /** A deleted shop's months: the table has no foreign key to shops. */
+    public static function forgetShop(string $shopId): void
+    {
+        DB::table(self::TABLE)->where('shop_id', $shopId)->delete();
+    }
+
     private static function month(): string
     {
         return now('UTC')->format('Y-m');

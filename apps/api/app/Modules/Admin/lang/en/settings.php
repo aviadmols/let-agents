@@ -21,4 +21,8 @@ return [
         'label' => 'Days of daily reports',
         'description' => 'How many days back the daily reports show on the shop\'s home and on the daily reports page.',
     ],
+    'shop_deletion_days' => [
+        'label' => 'Days until a shop is deleted',
+        'description' => 'When a shop\'s owner asks for it to be deleted, it turns off at once and is deleted with all its data after this many days. Until then they can keep it.',
+    ],
 ];

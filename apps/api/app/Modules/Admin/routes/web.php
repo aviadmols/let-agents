@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Admin\Http\Controllers\ExportShopDataController;
 use App\Modules\Admin\Http\Controllers\HomeController;
 use App\Modules\Admin\Http\Controllers\InvitationController;
 use App\Modules\Admin\Http\Controllers\SwitchLocaleController;
@@ -16,6 +17,9 @@ Route::post('admin/shop', SwitchShopController::class)->middleware(['web', 'auth
 
 // The display mode chosen in the top bar, kept on the person.
 Route::post('admin/theme/{theme}', SwitchThemeController::class)->middleware(['web', 'auth'])->name('admin.theme');
+
+// Everything a shop holds, as one ZIP, for its owner (Settings · Privacy and account).
+Route::get('account/{shop}/export', ExportShopDataController::class)->middleware(['web', 'auth', 'throttle:6,10'])->name('admin.privacy.export');
 
 // Those two are forms; their address opened again (a reload, back, a restored tab) is the panel, never "405".
 Route::get('admin/shop', fn () => redirect()->to('/'))->middleware('web');
