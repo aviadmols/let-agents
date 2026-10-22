@@ -18,6 +18,7 @@ use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -47,10 +48,13 @@ final class ReadPhotoTags
      * 11: stones by colour, light and shape, never by name, as the store's pictures are described (caption v4).
      * 12: in the same words as the pictures' v6: the metal's colour always, every colour on its own,
      * and the same care for clothes, shoes, accessories and furniture; up to eight details.
+     * 14: in the store's language (its content_locale), not always Hebrew: an English store's titles
+     * and categories are matched against these words.
      */
-    public const PROMPT_VERSION = 13;
+    public const PROMPT_VERSION = 14;
 
-    public const SECOND_VERSION = 1;
+    /** 2: in the store's language, as the first look. */
+    public const SECOND_VERSION = 2;
 
     /**
      * How a reading is checked after it comes (what box is sensible, how many words): the cache keeps
@@ -119,7 +123,7 @@ final class ReadPhotoTags
 
         // The shop's latest corrections go to the reader as notes, and are part of what is remembered.
         $notes = $this->notes();
-        $first = $this->remembered('look', $shopId, $hash, [self::PROMPT_VERSION, self::READ_RULES, $reader['model'], $notes],
+        $first = $this->remembered('look', $shopId, $hash, [self::PROMPT_VERSION, self::READ_RULES, $reader['model'], $notes, self::language($shopId)],
             fn (): ?array => $this->firstLook($shopId, $reader, $mime, $bytes, $notes));
 
         if ($first === null) {
@@ -154,7 +158,7 @@ final class ReadPhotoTags
         }
 
         $candidates = $placer->candidates($placed, $hits, $first['also'], self::MAX_CANDIDATES);
-        $answer = $this->remembered('second', $shopId, $hash, [self::SECOND_VERSION, $second['model'], $first['object'], array_column($candidates, 'title')],
+        $answer = $this->remembered('second', $shopId, $hash, [self::SECOND_VERSION, $second['model'], $first['object'], array_column($candidates, 'title'), self::language($shopId)],
             fn (): ?array => $this->secondLook($shopId, $second, $mime, $bytes, $first, $doubt, $candidates));
 
         if ($answer === null) {
@@ -310,7 +314,7 @@ final class ReadPhotoTags
     {
         $this->unreadable = false;
         $answer = null;
-        $user = "The shopper's photo is attached.".($notes === '' ? '' : "\n\n".$notes);
+        $user = "The shopper's photo is attached. The store's language: ".self::language($shopId).'.'.($notes === '' ? '' : "\n\n".$notes);
 
         $this->call($shopId, self::ACTION, $role, $mime, $bytes, (string) file_get_contents(self::PROMPT), $user, 'low',
             function (RunContext $run, array $data) use (&$answer): void {
@@ -347,7 +351,8 @@ final class ReadPhotoTags
             $list[] = ($i + 1).'. '.$candidate['title'].' ('.$candidate['n'].')';
         }
 
-        $user = 'First reading: '.($first['object'] ?? '-').' (sure '.round($first['sure'], 2).'). Why the second look: '.$doubt.".\n"
+        $user = "The store's language: ".self::language($shopId).".\n"
+            .'First reading: '.($first['object'] ?? '-').' (sure '.round($first['sure'], 2).'). Why the second look: '.$doubt.".\n"
             .($team === null || $team === '' ? '' : 'The store team marked the first reading wrong. Their word for what it is: '.$team."\n")
             ."Categories:\n".($list === [] ? '(none)' : implode("\n", $list));
         $answer = null;
@@ -404,6 +409,14 @@ final class ReadPhotoTags
                 $read($run, $reply->data);
             },
         );
+    }
+
+    /** The language the store writes its products in, named for the reader: its words are matched against the store's own. */
+    public static function language(string $shopId): string
+    {
+        $locale = (string) Shop::query()->whereKey($shopId)->value('content_locale');
+
+        return ['en' => 'English'][$locale] ?? 'Hebrew';
     }
 
     /**

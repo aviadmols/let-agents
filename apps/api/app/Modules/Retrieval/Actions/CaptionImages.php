@@ -20,13 +20,14 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
  * The second vector of every scanned picture: what it shows. A model that sees pictures writes a
- * short Hebrew sentence and a few search words for each; the sentence and the words are embedded
+ * short sentence and a few search words for each, in the store's language; the sentence and the words are embedded
  * with the text model in one call per batch. The picture's own vector says how it looks, this one
  * says what is in it, so a drill and a tool box of the same colour stop looking alike.
  *
@@ -46,6 +47,12 @@ final class CaptionImages implements CaptionsPictures
      * 6: the same care for clothes, shoes, bags and accessories, furniture and the rest.
      */
     public const PROMPT_VERSION = 6;
+
+    /**
+     * 7: v6 in the store's language, for a store that does not write in Hebrew (an English one): its
+     * titles are what the words are matched against. A Hebrew store stays on v6, its pictures as described.
+     */
+    public const OTHER_LANGUAGE_VERSION = 7;
 
     private const BATCH = 16;
 
@@ -106,9 +113,19 @@ final class CaptionImages implements CaptionsPictures
     }
 
     /** What a picture's description is keyed by: written again only when one of these changes. */
-    public static function key(string $urlHash, string $model): string
+    public static function key(string $urlHash, string $model, string $language = 'Hebrew'): string
     {
-        return hash('sha256', $urlHash.'|'.self::PROMPT_VERSION.'|'.$model);
+        return $language === 'Hebrew'
+            ? hash('sha256', $urlHash.'|'.self::PROMPT_VERSION.'|'.$model)
+            : hash('sha256', $urlHash.'|'.self::OTHER_LANGUAGE_VERSION.'|'.$model.'|'.$language);
+    }
+
+    /** The language the store writes its products in, named for the model. */
+    public static function language(string $shopId): string
+    {
+        $locale = (string) Shop::query()->whereKey($shopId)->value('content_locale');
+
+        return ['en' => 'English'][$locale] ?? 'Hebrew';
     }
 
     private function describe(RunContext $run, string $shopId): void
@@ -116,6 +133,7 @@ final class CaptionImages implements CaptionsPictures
         $stats = ['described' => 0, 'skipped' => 0, 'left' => 0, 'stopped' => null, 'cost_usd' => 0.0];
         $reader = AiProviderName::tryFrom(strtolower(trim((string) Settings::get('retrieval.caption_provider'))));
         $model = trim((string) Settings::get('retrieval.caption_model'));
+        $language = self::language($shopId);
         $text = ModelChoice::for('embedding');
 
         if (! Features::enabled('retrieval.image_captions', $shopId)) {
@@ -132,10 +150,10 @@ final class CaptionImages implements CaptionsPictures
 
         $todo = RetrievalImage::query()->whereNotNull('embedded_at')->whereNull('error')
             ->orderBy('id')->get(['id', 'title', 'image_url', 'url_hash', 'caption_key', 'caption_model'])
-            ->filter(fn (RetrievalImage $i): bool => $i->caption_key !== self::key($i->url_hash, $model) || $i->caption_model !== $text->model)
+            ->filter(fn (RetrievalImage $i): bool => $i->caption_key !== self::key($i->url_hash, $model, $language) || $i->caption_model !== $text->model)
             ->values();
         $limit = (int) Settings::get('retrieval.images_per_part');
-        $system = (string) file_get_contents(__DIR__.'/../Prompts/caption.v'.self::PROMPT_VERSION.'.md');
+        $system = (string) file_get_contents(__DIR__.'/../Prompts/caption.v'.($language === 'Hebrew' ? self::PROMPT_VERSION : self::OTHER_LANGUAGE_VERSION).'.md');
         $maxOutput = (int) Settings::get('retrieval.caption_max_output_tokens');
         $in = (float) Settings::get('retrieval.caption_input_usd_per_million');
         $out = (float) Settings::get('retrieval.caption_output_usd_per_million');
@@ -159,13 +177,13 @@ final class CaptionImages implements CaptionsPictures
                     try {
                         // The store's name for it, so the description uses the store's words ("רובי" for a red stone).
                         $user = 'The store calls this product: '.mb_substr((string) $image->title, 0, 300).'
-Describe this product photo.';
+'.($language === 'Hebrew' ? '' : "The store's language: {$language}.\n").'Describe this product photo.';
                         $reply = $this->vision->jsonWithImage($reader, $model, $system, $user, $picture['mime'], $picture['data'], $maxOutput, 'low');
                     } catch (ModelCallFailed $e) {
                         // One picture the model will not read (too big, a format it refuses) is passed
                         // over for good, so the next run does not pay again for the ones before it.
                         report($e);
-                        RetrievalImage::query()->whereKey($image->id)->update(['caption_key' => self::key($image->url_hash, $model), 'caption_model' => $text->model, 'caption' => null, 'captioned_at' => now()]);
+                        RetrievalImage::query()->whereKey($image->id)->update(['caption_key' => self::key($image->url_hash, $model, $language), 'caption_model' => $text->model, 'caption' => null, 'captioned_at' => now()]);
                         $stats['skipped']++;
 
                         continue;
@@ -220,7 +238,7 @@ Describe this product photo.';
                 RetrievalImage::query()->whereKey($d['image']->id)->update([
                     'caption' => $d['caption'],
                     'caption_words' => json_encode($d['words'], JSON_UNESCAPED_UNICODE),
-                    'caption_key' => self::key($d['image']->url_hash, $model),
+                    'caption_key' => self::key($d['image']->url_hash, $model, $language),
                     'caption_model' => $text->model,
                     'caption_embedding' => VectorSearch::column($vector),
                     'captioned_at' => now(),

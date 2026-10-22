@@ -256,15 +256,25 @@ final class SearchByPhotoTest extends TestCase
         ], array_map(fn (array $t): array => ['title' => $t['title'], 'kind' => $t['kind']], $result['tags']), 'the object first as the shop names it (פרגולה finds פרגולות), then real categories, then a word the shop has products for');
         $this->assertSame('פרגולה', $result['seen'], 'the shopper is told what was seen');
         $this->assertStringNotContainsString('עץ אורן', $vision->user, 'the reader gets no list to pick from');
+        $this->assertStringContainsString("The store's language: Hebrew.", $vision->user);
 
         $this->upload()->assertOk();
         $this->assertSame(1, $vision->calls, 'the same photo is never asked twice');
         $this->assertSame(1, Run::query()->where('agent', ReadPhotoTags::AGENT)->count(), 'the call is accounted for');
 
+        // an English store's photo is read in English, its titles' language: asked anew, not the Hebrew reading
+        $this->shop->forceFill(['content_locale' => 'en'])->save();
+        $this->upload()->assertOk();
+        $this->assertSame(2, $vision->calls);
+        $this->assertStringContainsString("The store's language: English.", $vision->user);
+        $this->shop->forceFill(['content_locale' => 'he'])->save();
+        $this->upload()->assertOk();
+        $this->assertSame(2, $vision->calls, 'each language remembered on its own');
+
         Features::override('search.photo_tags', false, $this->shop->id);
         Cache::flush();
         $this->assertSame([], $this->upload()->assertOk()->json('tags'));
-        $this->assertSame(1, $vision->calls, 'off is off');
+        $this->assertSame(2, $vision->calls, 'off is off');
     }
 
     public function test_a_photo_of_nothing_the_shop_sells_finds_nothing_and_a_scene_finds_its_tags_products(): void
