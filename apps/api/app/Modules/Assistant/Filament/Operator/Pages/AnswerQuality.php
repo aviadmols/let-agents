@@ -283,7 +283,7 @@ class AnswerQuality extends Page
     {
         return app(TenantContext::class)->runUnscoped(function (): array {
             $base = $this->scope(AssistantSearchAsk::query());
-            $by = (clone $base)->whereNotNull('failure')->selectRaw('coalesce(failure_team, failure) as reason, count(*) as n')->groupBy('reason')->pluck('n', 'reason')->map(fn ($n): int => (int) $n)->all();
+            $by = (clone $base)->whereNotNull('failure')->selectRaw('coalesce(failure_team, failure) as reason, count(*) as n')->groupByRaw('coalesce(failure_team, failure)')->pluck('n', 'reason')->map(fn ($n): int => (int) $n)->all();
             $team = (clone $base)->whereNull('failure')->whereNotNull('failure_team')->where('failure_team', '!=', 'fine')->selectRaw('failure_team as reason, count(*) as n')->groupBy('failure_team')->pluck('n', 'reason');
             foreach ($team as $reason => $n) {
                 $by[$reason] = ($by[$reason] ?? 0) + (int) $n;

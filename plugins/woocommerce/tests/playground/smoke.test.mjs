@@ -115,7 +115,7 @@ test('a product carries clean text, category path, attributes, public meta, rela
   assert.equal(d.title, 'מקדחה רוטטת 550W "Pro"');
   assert.equal(d.sku, 'DR-550');
   assert.match(d.description, /550W/);
-  assert.match(d.description, /מהירות משתנה\nראש 13 מ"מ/);
+  assert.match(d.description, /- מהירות משתנה\n- ראש 13 מ"מ/, 'list items keep their structure');
   assert.match(d.description, /שימושים:\nקידוח בבטון\nקידוח בעץ/, 'accordion titles and breaks with attributes end lines');
   for (const leak of ['<', 'alert', '[gallery', 'wp:paragraph']) assert.equal(d.description.includes(leak), false, `description leaks ${leak}`);
 
