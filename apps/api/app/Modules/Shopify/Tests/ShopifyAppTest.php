@@ -10,6 +10,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Runs\Jobs\FirstScanStep;
 use App\Modules\Shopify\Actions\InstallStore;
+use App\Modules\Shopify\Actions\ManageSubscription;
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
@@ -185,6 +186,22 @@ final class ShopifyAppTest extends TestCase
         $plans = $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertOk();
         $this->get(self::choice($plans, 'starter'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
         $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
+    }
+
+    public function test_charging_asks_the_public_apps_stores_to_pay_never_a_custom_app_made_for_one_store(): void
+    {
+        config(['services.shopify.more_apps' => 'custom-key:shpss_custom']);
+        $public = new ShopifyInstall(['client_id' => 'test-key']);
+        $custom = new ShopifyInstall(['client_id' => 'custom-key']);
+        $before = new ShopifyInstall(['client_id' => null]);
+
+        Settings::set('shopify.charge', false);
+        $this->assertFalse(ManageSubscription::charges($public));
+
+        Settings::set('shopify.charge', true);
+        $this->assertTrue(ManageSubscription::charges($public));
+        $this->assertTrue(ManageSubscription::charges($before), 'installed before the app was recorded: the public one');
+        $this->assertFalse(ManageSubscription::charges($custom), 'Rocks\' own app stays as agreed: its search is never paused for a plan');
     }
 
     public function test_a_new_shop_speaks_the_language_its_products_are_written_in(): void

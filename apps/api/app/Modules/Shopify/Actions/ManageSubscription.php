@@ -5,6 +5,7 @@ namespace App\Modules\Shopify\Actions;
 use App\Core\Facades\Settings;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
+use App\Modules\Shopify\Support\ShopifyApps;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
@@ -98,6 +99,17 @@ final class ManageSubscription
         return $url;
     }
 
+    /**
+     * Whether this store is asked to pay: charging is on, and the store came through the public app. A
+     * custom-distribution app made for one store (SHOPIFY_MORE_APPS, before the public one was approved)
+     * stays as agreed with that store, free: turning charging on for the App Store never pauses its search.
+     */
+    public static function charges(ShopifyInstall $install): bool
+    {
+        return (bool) Settings::get('shopify.charge')
+            && ShopifyApps::key($install->client_id) === ShopifyApps::key();
+    }
+
     /** Reads the store's subscription from Shopify and sets the install and the shop by it. */
     public function refresh(ShopifyInstall $install): string
     {
@@ -113,7 +125,7 @@ final class ManageSubscription
                 'trial_ends_at' => $trialDays > 0 ? now()->parse((string) $active['createdAt'])->addDays($trialDays) : null,
             ])->save();
             $this->planFrom($install, (string) ($active['name'] ?? ''));
-        } elseif (! (bool) Settings::get('shopify.charge')) {
+        } elseif (! self::charges($install)) {
             $install->forceFill(['subscription_status' => ShopifyInstall::FREE])->save();
         } elseif ($install->subscribed()) {
             $install->forceFill(['subscription_status' => 'cancelled'])->save();
