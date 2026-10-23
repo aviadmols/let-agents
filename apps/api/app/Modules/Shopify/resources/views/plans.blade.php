@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'he' ? 'rtl' : 'ltr' }}">
+<html lang="{{ app()->getLocale() }}" dir="{{ \App\Core\Localization\Locales::direction(app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,6 +15,7 @@
         main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 48px; }
         h1 { margin: 0 0 4px; font-size: 24px; }
         .sub { margin: 0 0 24px; color: var(--muted); }
+        .trial { display: inline-block; margin: -12px 0 24px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-weight: 600; font-size: 14px; }
         .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
         .plan { display: flex; flex-direction: column; padding: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
         .plan.is-current { border-color: var(--ink); }
@@ -33,6 +34,9 @@
 <main>
     <h1>{{ __('shopify::app.plans_title') }}</h1>
     <p class="sub">{{ __('shopify::app.plans_sub') }}</p>
+    @if ($trial ?? null)
+        <p class="trial" data-trial>{{ $trial }}</p>
+    @endif
     <div class="plans">
         @foreach ($plans as $row)
             @php($plan = $row['plan'])

@@ -30,7 +30,7 @@ final class ShopLeavingNotices
     public static function team(Shop $shop, string $kind, ?string $by, bool $billedByHand, ?string $plan = null): void
     {
         foreach (User::query()->where('is_operator', true)->get() as $operator) {
-            self::send($operator, new TeamNoticeMail($kind, (string) $shop->name, (string) $shop->domain, $by, $billedByHand, $shop->deletion_due_at, $plan));
+            self::send($operator, new TeamNoticeMail($kind, (string) $shop->name, (string) $shop->domain, $by, $billedByHand, $shop->deletion_due_at, $plan, $shop->planRunsUntil()));
         }
     }
 

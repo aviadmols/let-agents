@@ -9,7 +9,10 @@ use App\Modules\Shopify\Support\ShopifyApps;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use RuntimeException;
+use Throwable;
 
 /**
  * The app's monthly plan, billed by Shopify on the merchant's Shopify invoice every 30 days, after
@@ -21,7 +24,9 @@ use RuntimeException;
  * it ended or a plan was paid without one (trialDaysLeft).
  *
  * The shop is active while the subscription is, and paused otherwise: the storefront goes quiet
- * and nothing is lost. While shopify.charge is off nobody is billed: a store without a subscription
+ * and nothing is lost. A plan the owner cancels is not billed again, and the shop keeps working until the end of the
+ * period already paid (or of its free trial): Shop::plan_ends_at, after which EndDuePlans pauses it. Removing the app
+ * ends it at once. While shopify.charge is off nobody is billed: a store without a subscription
  * is marked free and active, and is asked to approve the plan once charging is turned on.
  */
 final class ManageSubscription
@@ -44,8 +49,8 @@ final class ManageSubscription
         GQL;
 
     private const CANCEL = <<<'GQL'
-        mutation ($id: ID!) {
-          appSubscriptionCancel(id: $id) {
+        mutation ($id: ID!, $prorate: Boolean) {
+          appSubscriptionCancel(id: $id, prorate: $prorate) {
             appSubscription { id status }
             userErrors { field message }
           }
@@ -54,11 +59,21 @@ final class ManageSubscription
 
     public function __construct(private readonly ShopifyApi $api) {}
 
-    /** The owner ended the plan: Shopify stops billing at once, and the shop pauses. */
-    public function cancel(ShopifyInstall $install): void
+    /**
+     * The owner ended the plan: Shopify cancels the subscription now (no credit back for the days left, prorate
+     * false), so it is never billed again, and the shop keeps working to the end of the period already paid.
+     * That end is read before cancelling (Shopify gives it only while the subscription is active) and kept on the
+     * shop. A store charged nothing (free) has none: it pauses at once.
+     *
+     * @return CarbonInterface|null when the service paid for ends; null: it ends now
+     */
+    public function cancel(ShopifyInstall $install): ?CarbonInterface
     {
+        $ends = null;
+
         if ($install->subscription_id !== null && $install->subscription_id !== '') {
-            $answer = (array) ($this->api->query($install, self::CANCEL, ['id' => $install->subscription_id])['appSubscriptionCancel'] ?? []);
+            $ends = $install->subscription_status === ShopifyInstall::ACTIVE ? $this->paidUntil($install) : null;
+            $answer = (array) ($this->api->query($install, self::CANCEL, ['id' => $install->subscription_id, 'prorate' => false])['appSubscriptionCancel'] ?? []);
 
             if (($answer['userErrors'] ?? []) !== []) {
                 throw new RuntimeException('Shopify refused to cancel the subscription: '.json_encode($answer['userErrors']));
@@ -66,7 +81,48 @@ final class ManageSubscription
         }
 
         $install->forceFill(['subscription_status' => 'cancelled'])->save();
+
+        if ($ends !== null) {
+            Shop::query()->find($install->shop_id)?->forceFill(['plan_ends_at' => $ends])->save();
+        }
+
         $this->follow($install);
+
+        return $ends;
+    }
+
+    /**
+     * When the period the store already paid for ends: its free trial's end while it is in one (nothing was billed,
+     * the trial runs out), otherwise the active subscription's currentPeriodEnd. Null when neither is ahead.
+     */
+    private function paidUntil(ShopifyInstall $install): ?CarbonInterface
+    {
+        $subscriptions = collect((array) ($this->api->query($install, self::ACTIVE)['currentAppInstallation']['activeSubscriptions'] ?? []));
+        $active = $subscriptions->first(fn (array $s): bool => (string) ($s['id'] ?? '') === $install->subscription_id)
+            ?? $subscriptions->first(fn (array $s): bool => strtoupper((string) ($s['status'] ?? '')) === 'ACTIVE');
+        $trialDays = (int) ($active['trialDays'] ?? 0);
+
+        $ends = array_filter([
+            $install->trial_ends_at,
+            $trialDays > 0 ? self::moment($active['createdAt'] ?? null)?->addDays($trialDays) : null,
+        ], fn (?CarbonInterface $at): bool => $at !== null && $at->isFuture());
+
+        if ($ends !== []) {
+            return max($ends);
+        }
+
+        $period = self::moment($active['currentPeriodEnd'] ?? null);
+
+        return $period !== null && $period->isFuture() ? $period : null;
+    }
+
+    private static function moment(mixed $value): ?CarbonInterface
+    {
+        try {
+            return is_string($value) && $value !== '' ? Carbon::parse($value) : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /** Where the merchant approves the plan in Shopify. */
@@ -180,8 +236,10 @@ final class ManageSubscription
     }
 
     /**
-     * The shop is active exactly while the store has the app and a live subscription. A plan approved again after
-     * the owner ended one is a plan again; a shop waiting to be deleted stays paused whatever Shopify says.
+     * The shop is active exactly while the store has the app and a live subscription, or a cancelled plan still runs
+     * to the end of its paid period (Shop::planRunsUntil): until then a cancellation Shopify reports changes nothing.
+     * Removing the app ends that period at once. A plan approved again after the owner ended one is a plan again;
+     * a shop waiting to be deleted stays paused whatever Shopify says.
      */
     public function follow(ShopifyInstall $install): void
     {
@@ -191,7 +249,16 @@ final class ManageSubscription
             return;
         }
 
-        $subscribed = $install->subscribed();
-        $shop->forceFill(['status' => $subscribed ? ShopStatus::Active : ShopStatus::Paused] + ($subscribed ? ['cancelled_at' => null] : []))->save();
+        if ($install->subscribed()) {
+            $shop->forceFill(['status' => ShopStatus::Active, 'cancelled_at' => null, 'plan_ends_at' => null])->save();
+
+            return;
+        }
+
+        if ($install->installed() && $shop->planRunsUntil() !== null) {
+            return;
+        }
+
+        $shop->forceFill(['status' => ShopStatus::Paused, 'plan_ends_at' => null])->save();
     }
 }

@@ -9,6 +9,8 @@ return [
     'plans_title' => 'Choose a plan',
     'plans_sub' => 'Billed monthly on your Shopify invoice. You can change plans at any time.',
     'plans_month' => 'a month',
+    'plans_trial' => '{1} 1-day free trial. Billing starts only when it ends.|[2,*] :days-day free trial. Billing starts only when it ends.',
+    'plans_trial_left' => '{1} 1 day left of your free trial. Billing starts only when it ends.|[2,*] :days days left of your free trial. Billing starts only when it ends.',
     'plans_choose' => 'Choose :plan',
     'plans_current' => 'Your plan',
     'plans_note' => 'An upgrade applies as soon as you approve it in Shopify; a smaller plan applies from the next billing period. Typed search is unlimited on every plan. When you reach a limit, search keeps working, and AI answers and photo searches wait for next month or an upgrade.',

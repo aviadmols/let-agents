@@ -36,7 +36,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $trial_ends_at while set the shop is on trial (StartTrial), and stays limited past the date until the trial is ended
  * @property array<string, array{0: string, 1: mixed}>|null $trial_saved the shop's own settings from before the trial
  * @property ?string $plan the code of the plan the shop pays for (Plan); null: no plan holds it
- * @property Carbon|null $cancelled_at the owner ended the plan: the shop is paused, its data kept
+ * @property Carbon|null $cancelled_at the owner ended the plan: the shop is paused, its data kept (from plan_ends_at, when set)
+ * @property Carbon|null $plan_ends_at a cancelled plan keeps the shop working until this moment, the end of the period already paid
  * @property Carbon|null $deletion_due_at the owner asked for the shop to be deleted: paused until then, deleted on this day unless kept
  * @property string|null $deletion_asked_by the email of who asked for it
  * @property Carbon|null $onboarded_at when the manager went through the first-run screens; until then the panel opens on them
@@ -84,6 +85,7 @@ class Shop extends Model
             'trial_ends_at' => 'datetime',
             'trial_saved' => 'array',
             'cancelled_at' => 'datetime',
+            'plan_ends_at' => 'datetime',
             'deletion_due_at' => 'datetime',
             'onboarded_at' => 'datetime',
         ];
@@ -138,6 +140,12 @@ class Shop extends Model
     public function isActive(): bool
     {
         return $this->status === ShopStatus::Active;
+    }
+
+    /** A cancelled plan that still runs: the end of the period already paid, while it is ahead; null otherwise. */
+    public function planRunsUntil(): ?Carbon
+    {
+        return $this->plan_ends_at !== null && $this->plan_ends_at->isFuture() ? $this->plan_ends_at : null;
     }
 
     /** The owner asked for the shop to be deleted, and it is not yet. */

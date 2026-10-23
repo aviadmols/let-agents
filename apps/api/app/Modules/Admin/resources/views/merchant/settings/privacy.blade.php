@@ -21,17 +21,24 @@
         {{-- End the plan --}}
         <x-lp::card :title="$t('plan.title')" data-privacy-plan>
             @if ($shop->leaving() || $shop->cancelled_at)
-                <p class="lp-set-help">{{ $t('plan.ended', ['date' => $date($shop->cancelled_at ?? now())]) }}</p>
+                @php($until = $shop->leaving() ? null : $shop->planRunsUntil())
+                @if ($until)
+                    <p class="lp-set-help" data-plan-runs-until>{{ $t('plan.ending', ['date' => $date($shop->cancelled_at), 'until' => $date($until)]) }}</p>
+                @else
+                    <p class="lp-set-help">{{ $t('plan.ended', ['date' => $date($shop->cancelled_at ?? now())]) }}</p>
+                @endif
                 @unless ($shop->leaving())<p class="lp-note">{{ $t('plan.again') }}</p>@endunless
             @else
-                <p class="lp-set-help">{{ $t('plan.active') }}</p>
+                {{-- a plan paid ahead runs to the end of its period; any other ends at once --}}
+                @php($now = $this->keepsPaidPeriod() ? '' : '_now')
+                <p class="lp-set-help">{{ $t('plan.active'.$now) }}</p>
                 @if (! $owner)
                     <p class="lp-note">{{ $t('owners_only') }}</p>
                 @elseif ($confirming !== 'plan')
                     <div><button type="button" class="lp-btn" wire:click="$set('confirming', 'plan')" data-end-plan>{{ $t('plan.button') }}</button></div>
                 @else
                     <div class="lp-privacy-confirm" role="group">
-                        <p style="margin: 0 0 12px; font-weight: 500">{{ $t('plan.confirm') }}</p>
+                        <p style="margin: 0 0 12px; font-weight: 500">{{ $t('plan.confirm'.$now) }}</p>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap">
                             <button type="button" class="lp-btn lp-btn-danger" wire:click="endPlan" wire:loading.attr="disabled" data-end-plan-yes>{{ $t('plan.yes') }}</button>
                             <button type="button" class="lp-btn" wire:click="$set('confirming', null)">{{ $t('back') }}</button>

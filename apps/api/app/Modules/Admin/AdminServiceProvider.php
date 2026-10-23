@@ -5,6 +5,7 @@ namespace App\Modules\Admin;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Console\CreateOperatorCommand;
 use App\Modules\Admin\Console\DeleteDueShopsCommand;
+use App\Modules\Admin\Console\EndDuePlansCommand;
 use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Contracts\TimelineSource;
@@ -58,6 +59,8 @@ final class AdminServiceProvider extends ModuleServiceProvider
         // The shops whose owners asked for them to be deleted, on their day (Settings · Privacy and account).
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->command('shops:delete-due')->dailyAt('04:10')->name('shops:delete-due')->withoutOverlapping();
+            // A cancelled plan that reached the end of the period already paid: the shop pauses within the hour.
+            $schedule->command('shops:end-due-plans')->hourlyAt(5)->name('shops:end-due-plans')->withoutOverlapping();
         });
     }
 
@@ -66,6 +69,7 @@ final class AdminServiceProvider extends ModuleServiceProvider
         return [
             CreateOperatorCommand::class,
             DeleteDueShopsCommand::class,
+            EndDuePlansCommand::class,
             SetPasswordCommand::class,
         ];
     }

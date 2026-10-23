@@ -12,9 +12,10 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
 
 /**
- * The owner asks for the shop and everything it holds to be deleted. The plan ends and the shop pauses at once; it
- * is deleted admin.shop_deletion_days later (DeleteDueShops), unless an owner keeps it before then (KeepShop). The
- * owners get the date and the link that keeps it, and the team is told.
+ * The owner asks for the shop and everything it holds to be deleted. The plan ends and the shop pauses at once (a
+ * period already paid does not run on: the shop asked to go); it is deleted admin.shop_deletion_days later
+ * (DeleteDueShops), unless an owner keeps it before then (KeepShop). The owners get the date and the link that keeps
+ * it, and the team is told.
  */
 final class AskToDeleteShop
 {
@@ -27,7 +28,7 @@ final class AskToDeleteShop
             return $shop->deletion_due_at;
         }
 
-        $billed = $this->endPlan->handle($shop, $by, tellTeam: false);
+        $billed = $this->endPlan->handle($shop, $by, tellTeam: false, atOnce: true);
         $shop->forceFill([
             'deletion_due_at' => now()->addDays((int) Settings::get('admin.shop_deletion_days')),
             'deletion_asked_by' => mb_substr((string) $by->email, 0, 190),

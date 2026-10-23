@@ -35,11 +35,11 @@ final class ShopifyConnectionFacts implements ConnectionFacts
                 .rawurlencode(ShopifyApps::key($install->client_id)).'/'.self::EMBED;
         }
 
-        // the merchant changes plan themselves, in Shopify's billing
+        // the merchant changes plan themselves, in Shopify's billing; the pages on the way speak the panel's language
         if ($install->installed() && Plan::query()->offered()->exists()) {
-            $facts['plans_url'] = ShopifyAppController::plansLink($install->shop_domain);
+            $facts['plans_url'] = ShopifyAppController::plansLink($install->shop_domain, app()->getLocale());
             // each plan straight to Shopify's approval: an upgrade holds at once, a downgrade from the next period
-            $facts['plan_urls'] = Plan::query()->offered()->pluck('code')->mapWithKeys(fn (string $code): array => [$code => ShopifyAppController::planLink($install->shop_domain, $code)])->all();
+            $facts['plan_urls'] = Plan::query()->offered()->pluck('code')->mapWithKeys(fn (string $code): array => [$code => ShopifyAppController::planLink($install->shop_domain, $code, app()->getLocale())])->all();
         }
 
         if (! $install->subscribed()) {

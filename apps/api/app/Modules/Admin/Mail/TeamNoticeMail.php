@@ -10,8 +10,8 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * To the operators: a shop's owner ended the plan (a store no platform bills is cancelled by hand), asked for the
- * shop to be deleted, kept it after all, or it was deleted.
+ * To the operators: a shop's owner ended the plan (a store no platform bills is cancelled by hand; one paid ahead
+ * works on $until), asked for the shop to be deleted, kept it after all, or it was deleted.
  */
 final class TeamNoticeMail extends Mailable
 {
@@ -37,6 +37,7 @@ final class TeamNoticeMail extends Mailable
         public readonly bool $billedByHand,
         public readonly ?CarbonInterface $due = null,
         public readonly ?string $plan = null,
+        public readonly ?CarbonInterface $until = null,
     ) {}
 
     public function envelope(): Envelope

@@ -5,13 +5,16 @@ namespace App\Modules\Admin\Tests;
 use App\Core\Facades\Settings;
 use App\Core\Usage\MonthlyUsage;
 use App\Modules\Admin\Actions\DeleteOwnAccount;
+use App\Modules\Admin\Contracts\CancelsSubscription;
 use App\Modules\Admin\Enums\ShopRole;
+use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Mail\ShopLeavingMail;
 use App\Modules\Admin\Mail\TeamNoticeMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
+use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -23,8 +26,9 @@ use Tests\TestCase;
 use ZipArchive;
 
 /**
- * Settings · Privacy and account: the owner downloads everything the shop holds, ends the plan at once, or asks for
- * the shop to be deleted, with days to keep it; anyone deletes their own account, never leaving a shop with no owner.
+ * Settings · Privacy and account: the owner downloads everything the shop holds, ends the plan (at once, or at the end
+ * of a period a platform was paid for), or asks for the shop to be deleted, with days to keep it; anyone deletes their
+ * own account, never leaving a shop with no owner.
  */
 final class PrivacySettingsTest extends TestCase
 {
@@ -84,7 +88,7 @@ final class PrivacySettingsTest extends TestCase
         $zip->close();
     }
 
-    public function test_the_owner_ends_the_plan_at_once_and_the_team_is_told_to_stop_billing_by_hand(): void
+    public function test_a_shop_no_platform_bills_ends_its_plan_at_once_and_the_team_is_told_to_stop_billing_by_hand(): void
     {
         $this->actingAs($this->owner);
 
@@ -100,6 +104,54 @@ final class PrivacySettingsTest extends TestCase
         $this->assertSame(ShopStatus::Paused, $shop->status, 'the search leaves the site; nothing is deleted');
         $this->assertNotNull($shop->cancelled_at);
         Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::PLAN_ENDED && $mail->billedByHand && $mail->hasTo('team@lets.test'));
+    }
+
+    public function test_a_plan_paid_ahead_stops_billing_and_keeps_the_search_until_its_period_ends(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $platform = $this->platform(now()->addDays(10));
+        $until = now()->addDays(10)->locale('he')->translatedFormat('j.n.Y');
+
+        Livewire::test(PrivacySettings::class)
+            ->assertSee('ביטול עוצר את החיוב: לא תחויבו שוב. החיפוש נשאר באתר שלכם עד סוף התקופה שכבר שולמה')
+            ->call('$set', 'confirming', 'plan')
+            ->assertSee('לבטל את המנוי? החיוב נעצר עכשיו, והחיפוש נשאר באתר שלכם עד סוף התקופה שכבר שולמה.')
+            ->call('endPlan')
+            ->assertNotified('המנוי בוטל והחיוב נעצר. החיפוש נשאר באתר שלכם עד '.$until.', סוף התקופה שכבר שולמה. אפשר לבחור חבילה מחדש בכל רגע.');
+
+        $shop = $this->shop->fresh();
+        $this->assertTrue($platform->cancelled, 'the platform stops billing now');
+        $this->assertSame(ShopStatus::Active, $shop->status, 'the search stays on the site');
+        $this->assertSame(now()->addDays(10)->toIso8601String(), $shop->plan_ends_at?->toIso8601String());
+        $this->assertNotNull($shop->cancelled_at);
+        Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::PLAN_ENDED && ! $mail->billedByHand && $mail->until !== null);
+
+        Livewire::test(PrivacySettings::class)->assertSee('עד '.$until.', סוף התקופה שכבר שולמה')->assertSee('אפשר לבחור חבילה מחדש בכל רגע');
+        Livewire::test(ConnectionSettings::class)->assertSee('בוטל · החיפוש נשאר באתר שלכם עד '.now()->addDays(10)->format('j.n.Y'));
+
+        // In English too.
+        $this->owner->forceFill(['locale' => 'en'])->save();
+        app()->setLocale('en');
+        Livewire::test(PrivacySettings::class)->assertSee('The search stays on your site until '.now()->addDays(10)->locale('en')->translatedFormat('j.n.Y').', the end of the period already paid.');
+
+        // The period over: the shop pauses within the hour, nothing deleted.
+        $this->travelTo(now()->addDays(10)->addMinute());
+        $this->artisan('shops:end-due-plans')->assertSuccessful();
+        $shop = $this->shop->fresh();
+        $this->assertSame([ShopStatus::Paused, null], [$shop->status, $shop->plan_ends_at]);
+        Livewire::test(PrivacySettings::class)->assertSee('The search is off the site, and all the data is kept.');
+    }
+
+    public function test_asking_to_delete_the_shop_takes_the_search_off_at_once_even_with_a_period_paid(): void
+    {
+        $platform = $this->platform(now()->addDays(10));
+
+        Livewire::test(PrivacySettings::class)->set('shopName', 'רוקס')->call('deleteShop');
+
+        $shop = $this->shop->fresh();
+        $this->assertTrue($platform->cancelled);
+        $this->assertSame([ShopStatus::Paused, null], [$shop->status, $shop->plan_ends_at], 'the shop asked to go: the search leaves now');
+        $this->assertTrue($shop->leaving());
     }
 
     public function test_only_the_owner_ends_the_plan_or_deletes_the_shop(): void
@@ -157,6 +209,38 @@ final class PrivacySettingsTest extends TestCase
         $this->assertSame(0, DB::table('setting_overrides')->where('scope', $this->shop->id)->count());
         $this->assertNotNull($this->owner->fresh(), 'the people stay');
         Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::DELETED);
+    }
+
+    /** A platform billing the shop for a period already paid that ends at $ends (as Shopify does). */
+    private function platform(CarbonInterface $ends): CancelsSubscription
+    {
+        $platform = new class($ends) implements CancelsSubscription
+        {
+            public bool $cancelled = false;
+
+            public function __construct(private readonly CarbonInterface $ends) {}
+
+            public function bills(Shop $shop): bool
+            {
+                return ! $this->cancelled;
+            }
+
+            public function keepsPaidPeriod(Shop $shop): bool
+            {
+                return true;
+            }
+
+            public function cancel(Shop $shop): ?CarbonInterface
+            {
+                $this->cancelled = true;
+
+                return $this->ends;
+            }
+        };
+        $this->app->instance('tests.paid_platform', $platform);
+        $this->app->tag(['tests.paid_platform'], CancelsSubscription::TAG);
+
+        return $platform;
     }
 
     public function test_anyone_deletes_their_own_account_but_never_leaves_a_shop_with_no_owner(): void

@@ -89,7 +89,7 @@ class ConnectionSettings extends Page
             'platform' => $platform,
             'domain' => $shop->domain,
             'synced' => ($facts['last_sync'] ?? null) instanceof CarbonInterface ? $facts['last_sync']->locale(app()->getLocale())->diffForHumans() : $t('never_synced'),
-            'plan' => $this->plan($facts),
+            'plan' => $this->plan($facts, $shop),
             'usage' => $this->usage($shop),
             'plan_lines' => $shop->currentPlan()?->lines() ?? [],
             'allowance' => $this->allowance($shop),
@@ -211,10 +211,15 @@ class ConnectionSettings extends Page
     }
 
     /** @param array<string, mixed> $facts */
-    private function plan(array $facts): string
+    private function plan(array $facts, Shop $shop): string
     {
         $t = fn (string $key, array $params = []): string => __('admin::shop_settings.connection.'.$key, $params);
         $date = fn (CarbonInterface $d): string => $d->format('j.n.Y');
+
+        // cancelled, and running to the end of the period already paid
+        if (! $shop->leaving() && ($until = $shop->planRunsUntil()) !== null) {
+            return $t('plan_ending', ['date' => $date($until)]);
+        }
 
         if (($facts['plan_waiting'] ?? false) === true) {
             return $t('plan_waiting');

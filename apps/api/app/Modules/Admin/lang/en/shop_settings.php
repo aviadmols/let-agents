@@ -46,6 +46,7 @@ return [
         'plan_renews' => ':plan · renews :date',
         'plan_trial' => ':plan · trial until :date',
         'plan_waiting' => 'Waiting for the plan to be approved in Shopify',
+        'plan_ending' => 'Cancelled · the search stays on your site until :date',
         'allowance_title' => 'What your plan includes',
         'allowance_help' => 'How much of the plan was used this month. At a limit, search keeps working, and AI answers and photo searches wait for next month or an upgrade.',
         'allowance_answers' => 'AI answers this month',

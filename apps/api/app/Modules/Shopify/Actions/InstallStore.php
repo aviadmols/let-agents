@@ -179,6 +179,14 @@ final class InstallStore
         $this->manager($install);
     }
 
+    /** The store's owner account, never an operator's; nothing is made when there is none. */
+    public function ownerAccount(ShopifyInstall $install): ?User
+    {
+        return User::query()->where('is_operator', false)
+            ->whereHas('shops', fn ($q) => $q->where('shops.id', $install->shop_id)->where('shop_user.role', ShopRole::Owner->value))
+            ->first();
+    }
+
     /**
      * Who Shopify signs in when the app opens: the store's owner. When the owner's email is an
      * operator's, the store gets an account of its own (owner@{store}.myshopify.com, this shop only):
@@ -192,9 +200,7 @@ final class InstallStore
             return null;
         }
 
-        $owner = User::query()->where('is_operator', false)
-            ->whereHas('shops', fn ($q) => $q->where('shops.id', $shop->id)->where('shop_user.role', ShopRole::Owner->value))
-            ->first();
+        $owner = $this->ownerAccount($install);
 
         if ($owner !== null || $install->owner_email === null || ! User::query()->where('email', $install->owner_email)->where('is_operator', true)->exists()) {
             return $owner;

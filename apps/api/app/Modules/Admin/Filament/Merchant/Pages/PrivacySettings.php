@@ -21,10 +21,11 @@ use UnitEnum;
 
 /**
  * Settings · Privacy and account: what the shop's owner can take and end. Downloading everything the shop holds
- * (ExportShopData); ending the plan at once (EndShopPlan: the search leaves the site, nothing is lost); asking for
- * the shop and all it holds to be deleted, with days to change one's mind (AskToDeleteShop, KeepShop). And for
- * anyone, viewers too: deleting their own account (DeleteOwnAccount), the shops staying, once they type PHRASE as
- * it is shown (not a password: one who came in from Shopify may never have set one).
+ * (ExportShopData); ending the plan (EndShopPlan: billing stops, and the search stays to the end of the period already
+ * paid, or leaves the site at once where nothing was paid ahead; nothing is lost); asking for the shop and all it
+ * holds to be deleted, with days to change one's mind (AskToDeleteShop, KeepShop). And for anyone, viewers too:
+ * deleting their own account (DeleteOwnAccount), the shops staying, once they type PHRASE as it is shown (not a
+ * password: one who came in from Shopify may never have set one).
  */
 class PrivacySettings extends Page
 {
@@ -107,6 +108,12 @@ class PrivacySettings extends Page
         return (bool) $this->user()->is_operator;
     }
 
+    /** Whether ending the plan keeps the search on the site to the end of the period already paid (or ends it at once). */
+    public function keepsPaidPeriod(): bool
+    {
+        return app(EndShopPlan::class)->keepsPaidPeriod($this->shop());
+    }
+
     public function endPlan(EndShopPlan $endPlan): void
     {
         abort_unless($this->owner(), 403);
@@ -121,7 +128,10 @@ class PrivacySettings extends Page
         }
 
         $this->confirming = null;
-        Notification::make()->success()->title(__('admin::privacy.plan.done'))->send();
+        $until = $this->shop()->planRunsUntil();
+        Notification::make()->success()->title($until === null
+            ? __('admin::privacy.plan.done_now')
+            : __('admin::privacy.plan.done', ['date' => $until->locale(app()->getLocale())->translatedFormat('j.n.Y')]))->send();
     }
 
     public function deleteShop(AskToDeleteShop $ask): void

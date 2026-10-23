@@ -91,7 +91,7 @@ final class ExportShopData
     /** @return array<string, mixed> */
     private function shopRow(Shop $shop): array
     {
-        return collect(['id', 'name', 'domain', 'platform', 'status', 'plan', 'content_locale', 'currency', 'timezone', 'created_at', 'cancelled_at', 'deletion_due_at'])
+        return collect(['id', 'name', 'domain', 'platform', 'status', 'plan', 'content_locale', 'currency', 'timezone', 'created_at', 'cancelled_at', 'plan_ends_at', 'deletion_due_at'])
             ->mapWithKeys(fn (string $column): array => [$column => $this->plain($shop->getAttributeValue($column))])->all();
     }
 

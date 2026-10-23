@@ -46,6 +46,7 @@ return [
         'plan_renews' => ':plan · מתחדש :date',
         'plan_trial' => ':plan · תקופת ניסיון עד :date',
         'plan_waiting' => 'ממתין לאישור המנוי ב-Shopify',
+        'plan_ending' => 'בוטל · החיפוש נשאר באתר שלכם עד :date',
         'allowance_title' => 'מה התוכנית כוללת',
         'allowance_help' => 'מה כבר נוצל החודש מתוך התוכנית. כשמגיעים למכסה, החיפוש ממשיך לעבוד, ותשובות AI וחיפוש בתמונה ממתינים לחודש הבא או לשדרוג.',
         'allowance_answers' => 'תשובות AI החודש',

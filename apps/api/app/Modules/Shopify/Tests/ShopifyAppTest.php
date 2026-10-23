@@ -5,7 +5,10 @@ namespace App\Modules\Shopify\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Actions\AskToDeleteShop;
+use App\Modules\Admin\Actions\EndShopPlan;
 use App\Modules\Admin\Contracts\ShopScan;
+use App\Modules\Admin\Mail\TeamNoticeMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Runs\Jobs\FirstScanStep;
@@ -19,6 +22,8 @@ use App\Modules\Shopify\Support\ShopifyConnectionFacts;
 use App\Modules\Shopify\Support\ShopifySubscription;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
+use Carbon\CarbonInterface;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -26,6 +31,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -566,6 +572,177 @@ final class ShopifyAppTest extends TestCase
             ->assertSee('shopify/billing/start', false);
         $this->get(self::choice($plans, 'pro'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
         $this->assertSame('pending', $install->fresh()->subscription_status);
+    }
+
+    public function test_a_cancelled_plan_stops_billing_now_and_keeps_the_search_until_the_paid_period_ends(): void
+    {
+        Mail::fake();
+        User::factory()->operator()->create(['email' => 'team@lets.test']);
+        $this->travelTo(now()->startOfSecond());
+        $install = $this->paying(now()->addDays(12));
+        $owner = User::query()->where('email', 'owner@gueta.test')->sole();
+        $this->assertTrue(app(EndShopPlan::class)->keepsPaidPeriod($install->shop));
+
+        app(EndShopPlan::class)->handle($install->shop, $owner);
+
+        $cancel = collect($this->graphql)->first(fn (array $call): bool => str_contains((string) ($call['query'] ?? ''), 'appSubscriptionCancel'));
+        $this->assertSame(['id' => 'gid://shopify/AppSubscription/1', 'prorate' => false], $cancel['variables'], 'cancelled in Shopify now, never billed again, no credit back');
+        $shop = $install->shop->fresh();
+        $this->assertSame(['cancelled', ShopStatus::Active], [$install->fresh()->subscription_status, $shop->status], 'the search stays on the site');
+        $this->assertSame(now()->addDays(12)->toIso8601String(), $shop->plan_ends_at?->toIso8601String(), 'until Shopify\'s currentPeriodEnd');
+        $this->assertNotNull($shop->cancelled_at);
+        Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::PLAN_ENDED && ! $mail->billedByHand && $mail->until?->equalTo(now()->addDays(12)));
+
+        // What Shopify reports of it, and reads of the subscription, pause nothing before the end.
+        $this->subscriptions = [];
+        $this->webhook('app_subscriptions/update', ['app_subscription' => ['admin_graphql_api_id' => 'gid://shopify/AppSubscription/1', 'status' => 'CANCELLED']])->assertOk();
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+
+        // Opened from the admin meanwhile: the panel, where a plan can be chosen again, not the plans.
+        $this->get('/shopify/app?'.http_build_query(self::signed([])))
+            ->assertRedirect(route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]));
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+
+        // The hour after the period ends, the shop pauses; before it, nothing.
+        $this->travelTo(now()->addDays(12)->subMinute());
+        $this->artisan('shops:end-due-plans')->assertSuccessful();
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+        $this->travel(2)->minutes();
+        $this->artisan('shops:end-due-plans')->assertSuccessful();
+        $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
+        $this->assertNull($install->shop->fresh()->plan_ends_at, 'applied once');
+        $this->assertNotNull($install->shop->fresh()->cancelled_at);
+
+        // Over: opening the app offers the plans again.
+        $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertOk()->assertSee('shopify/billing/start', false);
+    }
+
+    public function test_a_plan_cancelled_in_its_free_trial_runs_to_the_trials_end_and_a_store_with_no_period_known_stops_at_once(): void
+    {
+        Settings::set('shopify.trial_days', 14);
+        $this->travelTo(now()->startOfSecond());
+        $install = $this->installed();
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 14, 'createdAt' => now()->toIso8601String(), 'currentPeriodEnd' => now()->addDays(30)->toIso8601String()]];
+        app(ManageSubscription::class)->refresh($install->fresh());
+        $trialEnds = now()->addDays(14);
+        $this->travel(3)->days();
+
+        $ends = app(ShopifySubscription::class)->cancel($install->shop);
+
+        $this->assertSame($trialEnds->toIso8601String(), $ends?->toIso8601String(), 'nothing was billed: the service ends with the trial');
+        $this->assertSame([ShopStatus::Active, $trialEnds->toIso8601String()], [$install->shop->fresh()->status, $install->shop->fresh()->plan_ends_at?->toIso8601String()]);
+
+        // Neither a trial nor a period Shopify gives: the service ends now.
+        $install->shop->fresh()->forceFill(['plan_ends_at' => null, 'status' => ShopStatus::Active])->save();
+        $install->fresh()->forceFill(['subscription_status' => 'active', 'trial_ends_at' => null])->save();
+        $this->subscriptions = [];
+        $this->assertNull(app(ShopifySubscription::class)->cancel($install->shop));
+        $this->assertSame(ShopStatus::Paused, $install->shop->fresh()->status);
+    }
+
+    public function test_choosing_a_plan_again_before_the_end_clears_it(): void
+    {
+        $install = $this->paying(now()->addDays(10));
+        app(EndShopPlan::class)->handle($install->shop, User::query()->where('email', 'owner@gueta.test')->sole());
+        $this->assertNotNull($install->shop->fresh()->plan_ends_at);
+
+        $this->webhook('app_subscriptions/update', ['app_subscription' => ['admin_graphql_api_id' => 'gid://shopify/AppSubscription/2', 'status' => 'ACTIVE']])->assertOk();
+
+        $shop = $install->shop->fresh();
+        $this->assertSame([ShopStatus::Active, null, null], [$shop->status, $shop->plan_ends_at, $shop->cancelled_at], 'a plan again: nothing runs out');
+        $this->travel(11)->days();
+        $this->artisan('shops:end-due-plans')->assertSuccessful();
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status, 'the old end never pauses it');
+    }
+
+    public function test_removing_the_app_or_asking_to_delete_the_shop_ends_a_paid_period_at_once(): void
+    {
+        Mail::fake();
+        $install = $this->paying(now()->addDays(10));
+        $owner = User::query()->where('email', 'owner@gueta.test')->sole();
+        app(EndShopPlan::class)->handle($install->shop, $owner);
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+
+        // The app removed: no more search, whatever was paid.
+        $this->webhook('app/uninstalled', ['id' => 7])->assertOk();
+        $this->assertSame([ShopStatus::Paused, null], [$install->shop->fresh()->status, $install->shop->fresh()->plan_ends_at]);
+
+        // Installed again and paying, then the shop asked to be deleted: it leaves the site now.
+        Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
+        $install = $this->paying(now()->addDays(10));
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+        app(AskToDeleteShop::class)->handle($install->shop->fresh(), $owner);
+
+        $shop = $install->shop->fresh();
+        $this->assertSame([ShopStatus::Paused, null, 'cancelled'], [$shop->status, $shop->plan_ends_at, $install->fresh()->subscription_status]);
+        $this->assertTrue($shop->leaving());
+    }
+
+    public function test_a_store_charged_nothing_that_ends_its_plan_stops_at_once(): void
+    {
+        Settings::set('shopify.charge', false);
+        $install = $this->installed();
+        $this->assertSame([ShopifyInstall::FREE, ShopStatus::Active], [$install->fresh()->subscription_status, $install->shop->fresh()->status]);
+        $this->assertFalse(app(EndShopPlan::class)->keepsPaidPeriod($install->shop));
+
+        app(EndShopPlan::class)->handle($install->shop, User::query()->where('email', 'owner@gueta.test')->sole(), tellTeam: false);
+
+        $this->assertSame([ShopStatus::Paused, null], [$install->shop->fresh()->status, $install->shop->fresh()->plan_ends_at]);
+    }
+
+    public function test_the_plans_page_speaks_the_shopify_admins_language_and_shows_the_free_trial(): void
+    {
+        Settings::set('shopify.trial_days', 14);
+        $install = $this->installed();
+        $owner = User::query()->where('email', 'owner@gueta.test')->sole();
+        $owner->forceFill(['locale' => 'he'])->save();
+
+        // An English admin: the English page, whatever the owner's account says, and its links carry the language on.
+        $english = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'locale' => 'en-US'])))
+            ->assertOk()
+            ->assertSee('<html lang="en" dir="ltr">', false)
+            ->assertSee('Choose a plan')
+            ->assertSee('14-day free trial. Billing starts only when it ends.')
+            ->assertDontSee('בחירת תוכנית');
+        $this->assertStringContainsString('locale=en', self::choice($english, 'growth'));
+        $this->get(self::choice($english, 'growth'), ['Sec-Fetch-Dest' => 'iframe'])->assertOk()->assertSee('Continuing in Shopify');
+
+        // A Hebrew admin: the Hebrew page.
+        $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'locale' => 'he'])))
+            ->assertOk()
+            ->assertSee('<html lang="he" dir="rtl">', false)
+            ->assertSee('בחירת תוכנית')
+            ->assertSee('14 ימי ניסיון חינם. החיוב מתחיל רק בסופם.')
+            ->assertDontSee('Choose a plan');
+
+        // No language from Shopify: the owner's account, then English for a store written in English.
+        $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertOk()->assertSee('בחירת תוכנית');
+        $owner->forceFill(['locale' => null])->save();
+        $install->shop->forceFill(['content_locale' => 'en'])->save();
+        $this->get('/shopify/app?'.http_build_query(self::signed([])))->assertOk()->assertSee('Choose a plan');
+
+        // From the panel's "change plan", in the panel's language; part of the trial used: what is left of it.
+        $this->travelTo(now()->startOfSecond());
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 14, 'createdAt' => now()->toIso8601String()]];
+        app(ManageSubscription::class)->refresh($install->fresh());
+        $this->travel(4)->days();
+        $this->get(ShopifyAppController::plansLink(self::SHOP, 'en'))->assertOk()->assertSee('10 days left of your free trial.')->assertSee('Your plan');
+        $this->get(ShopifyAppController::plansLink(self::SHOP, 'he'))->assertOk()->assertSee('נשארו לכם 10 ימים מתקופת הניסיון החינם.');
+
+        // The trial over: no trial line.
+        $this->travel(11)->days();
+        $this->get(ShopifyAppController::plansLink(self::SHOP, 'en'))->assertOk()->assertDontSee('free trial');
+    }
+
+    /** An installed store paying for a plan whose current period ends at $periodEnd, active. */
+    private function paying(CarbonInterface $periodEnd): ShopifyInstall
+    {
+        $install = $this->installed();
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->subDays(18)->toIso8601String(), 'currentPeriodEnd' => $periodEnd->toIso8601String()]];
+        app(ManageSubscription::class)->refresh($install->fresh());
+        $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
+
+        return $install->fresh();
     }
 
     /** The signed link a plans page offers for one plan. */
