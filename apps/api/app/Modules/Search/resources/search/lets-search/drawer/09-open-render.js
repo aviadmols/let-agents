@@ -3,13 +3,14 @@
   // the search a result was opened from, for half an hour: on the next page, or in another tab
   var BACK_MS = 30 * 60 * 1000;
   // only a search for products is come back to: a question, its answer or "not found" is done once read,
-  // so the next opening after one starts clean (as Aviad asked, 2026-10-19)
-  // (and the similar products a product was opened from, which have no words); wide: the list was open in the large view,
-  // and comes back in it
+  // so the next opening after one starts clean (as Aviad asked, 2026-10-19) - unless the shopper left the
+  // page through one of the products the answer showed: then it is come back to, open, at that product
+  // (as Aviad asked, 2026-10-23). The same for the similar products a product was opened from, which have
+  // no words; wide: the list was open in the large view, and comes back in it
   function keepBack(q, tid, wide) {
     store('local', 'ls_back', q && !isQuestion(q) ? { q: q, tid: tid || null, wide: !!wide, at: Date.now() } : null);
   }
-  function keepBackTo(turn, card) { store('local', 'ls_back', { q: null, tid: turn.id, wide: S.wide === turn.id, card: card || null, at: Date.now() }); }
+  function keepBackTo(turn, card) { store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, wide: S.wide === turn.id, card: card || null, at: Date.now() }); }
   function backTo() {
     var b = store('local', 'ls_back');
     return b && b.at && Date.now() - b.at < BACK_MS && (b.q || b.tid) ? b : null;

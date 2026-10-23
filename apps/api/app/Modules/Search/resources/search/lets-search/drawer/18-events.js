@@ -109,8 +109,10 @@
   // acting on the assistant's pick, or its WhatsApp, counts on the question
   function countPress(el) {
     var turn = turnOf(el);
-    // left the page through one of the similar products: the next opening comes back to them, as they were shown
-    if (turn && turn.kind === 'similar' && el.tagName === 'A' && el.closest('[data-card]') && !el.dataset.heart) { keepBackTo(turn, el.closest('[data-card]').dataset.card); }
+    // left the page through one of the products a turn showed (a search's, an answer's, similar products): the next
+    // opening comes back to that turn, as it was shown, at that product
+    var left = el.tagName === 'A' && !el.dataset.heart ? el.closest('[data-card]') : null;
+    if (turn && left) { keepBackTo(turn, left.dataset.card); }
     if (!turn || !turn.q) { return null; }
     var card = el.closest('[data-card]'), pick = el.closest('.ls-pick'), after = pick && pick.querySelector('[data-after]');
     var id = card ? card.dataset.card : after ? after.dataset.after : (el.dataset.add || el.dataset.options || el.dataset.goto);
