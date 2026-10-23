@@ -18,9 +18,9 @@ automatically_update_urls_on_dev = false
 [access_scopes]
 # Shopify installs the app and grants these scopes; opening it then sends the store through
 # our OAuth callback (granted already, so it passes straight through) for an offline token.
-# Catalog and content for the index, draft orders and orders for the assistant's carts and reports.
+# Catalog and content for the index and the assistant's answers.
 # The web pixel (write_pixels, read_customer_events) reports purchases that came through the search.
-scopes = "read_products,read_content,write_content,read_online_store_pages,read_legal_policies,write_draft_orders,write_pixels,read_customer_events"
+scopes = "read_products,read_content,write_content,read_online_store_pages,read_legal_policies,write_pixels,read_customer_events"
 
 [auth]
 redirect_urls = [ "https://agents.lets.co.il/shopify/callback" ]
