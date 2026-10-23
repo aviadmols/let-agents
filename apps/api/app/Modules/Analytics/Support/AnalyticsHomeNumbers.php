@@ -28,7 +28,7 @@ final class AnalyticsHomeNumbers implements HomeNumbers
         $then = $this->window($before, $since);
 
         return [
-            'currency' => (string) (AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->latest('ordered_at')->value('currency') ?? 'ILS'),
+            'currency' => (string) (AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->latest('ordered_at')->value('currency') ?? ($shop->currency ?: 'ILS')),
             'visitors' => ['now' => $now['visitors'], 'before' => $then['visitors']],
             'adds' => ['now' => $now['adds'], 'before' => $then['adds']],
             'orders' => ['now' => $now['orders'], 'before' => $then['orders']],

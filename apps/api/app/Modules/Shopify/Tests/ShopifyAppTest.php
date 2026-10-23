@@ -400,6 +400,41 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame(0, DB::table('setting_overrides')->where('scope', $install->shop_id)->count(), 'its own settings too, which have no foreign key');
     }
 
+    public function test_the_trial_is_one_per_store_a_plan_change_or_a_new_install_carries_only_what_is_left(): void
+    {
+        Settings::set('shopify.trial_days', 14);
+        $this->travelTo(now()->startOfSecond()); // Shopify's createdAt is in whole seconds
+        $install = $this->installed();
+        $trialAsked = function () use ($install): int {
+            app(ManageSubscription::class)->start($install->fresh(), 'https://agents.lets.co.il/shopify/billing/return');
+
+            return (int) collect($this->graphql)->last(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate'))['variables']['trialDays'];
+        };
+
+        $this->assertSame(14, $trialAsked(), 'a store that never had a plan: the whole trial');
+
+        // Approved with its trial, then the plan changed four days in: ten days left, never fourteen again.
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 14, 'createdAt' => now()->toIso8601String()]];
+        app(ManageSubscription::class)->refresh($install->fresh());
+        $this->travel(4)->days();
+        $this->assertSame(10, $trialAsked());
+        $this->travel(3)->hours();
+        $this->assertSame(9, $trialAsked(), 'whole days, rounded down: changing plans never lengthens it');
+
+        // Removed and installed again within the trial: what is left of it.
+        $this->webhook('app/uninstalled', ['id' => 7])->assertOk();
+        $this->installed();
+        $this->assertSame(9, $trialAsked());
+
+        // The trial over: none.
+        $this->travel(11)->days();
+        $this->assertSame(0, $trialAsked());
+
+        // A plan paid without a trial (the trial's end not known): none either.
+        $install->fresh()->forceFill(['trial_ends_at' => null, 'subscribed_at' => now()->subDays(40)])->save();
+        $this->assertSame(0, $trialAsked());
+    }
+
     public function test_the_merchant_switches_lets_on_in_the_theme_with_one_link(): void
     {
         $install = $this->installed();

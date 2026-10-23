@@ -4,12 +4,14 @@ namespace App\Modules\Shoppers;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shoppers\Actions\ReadContact;
 use App\Modules\Shoppers\Contracts\ReadsContacts;
 use App\Modules\Shoppers\Contracts\VisitHistory;
 use App\Modules\Shoppers\Listeners\ForgetShopperContact;
 use App\Modules\Shoppers\Models\ShopperVerification;
+use App\Modules\Shoppers\Support\ShopperContactData;
 use App\Modules\Shoppers\Support\Visits;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -23,6 +25,8 @@ final class ShoppersServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(VisitHistory::class, Visits::class);
         $this->app->bind(ReadsContacts::class, ReadContact::class);
+        // A shopper who asks the store for what it keeps about them: their contact and the callbacks they asked for.
+        $this->app->tag([ShopperContactData::class], KeepsShopperData::TAG);
     }
 
     protected function bootModule(): void

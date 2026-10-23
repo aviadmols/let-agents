@@ -11,6 +11,7 @@ use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Http\Middleware\SyncTenantFromPanel;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
+use App\Modules\Admin\Support\HostedPanel;
 use App\Modules\Admin\Support\Tips;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -117,7 +118,8 @@ final class MerchantPanelProvider extends PanelProvider
                 ['label' => __('admin::home.connection'), 'url' => ConnectionSettings::getUrl(tenant: $shop)],
                 ['label' => __('admin::privacy.title'), 'url' => PrivacySettings::getUrl(tenant: $shop)],
             ],
-            'logoutUrl' => filament()->getLogoutUrl(),
+            // inside a platform's admin (Shopify's), which signed the person in, there is nothing to sign out of
+            'logoutUrl' => HostedPanel::inside() ? null : filament()->getLogoutUrl(),
         ])->render());
     }
 

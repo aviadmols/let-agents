@@ -4,6 +4,7 @@ namespace App\Modules\Analytics\Filament\Merchant\Pages;
 
 use App\Core\Facades\Settings;
 use App\Core\Filament\HasPeriod;
+use App\Core\Localization\Money;
 use App\Modules\Admin\Contracts\ReportRow;
 use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopReport;
@@ -207,9 +208,7 @@ final class ShopAnalytics extends Page
 
     public static function money(float $amount, string $currency): string
     {
-        $symbol = ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][$currency] ?? $currency.' ';
-
-        return $symbol.number_format($amount, $amount >= 1000 ? 0 : 2);
+        return Money::total($amount, $currency);
     }
 
     protected function periodChanged(): void

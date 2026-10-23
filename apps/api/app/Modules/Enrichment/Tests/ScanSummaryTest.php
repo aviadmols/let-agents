@@ -147,6 +147,19 @@ final class ScanSummaryTest extends TestCase
         $this->assertStringContainsString("Dimensions: 80 × 20 × 2 cm\nWeight: 1.5 kg", ProductDocuments::text($shelf->fresh()));
     }
 
+    public function test_prices_are_in_the_shops_own_currency(): void
+    {
+        $shelf = $this->product('800', 'מדף אלון');
+        $shelf->forceFill(['price' => '149.90'])->save();
+        CatalogVariant::query()->create(['product_id' => $shelf->id, 'external_id' => '801', 'position' => 0, 'title' => 'מדף אלון - 60 ס״מ', 'sku' => 'S801', 'price' => '120', 'in_stock' => true, 'purchasable' => true]);
+
+        Livewire::test(ScanSummary::class)->call('select', $shelf->id)->assertSee('₪149.90')->assertSee('₪120');
+
+        $this->shop->forceFill(['currency' => 'USD'])->save();
+        Filament::setTenant($this->shop->fresh());
+        Livewire::test(ScanSummary::class)->call('select', $shelf->id)->assertSee('$149.90')->assertSee('$120')->assertDontSee('₪');
+    }
+
     public function test_what_it_was_understood_to_be_about_is_shown_with_what_each_tag_rests_on(): void
     {
         $book = $this->product('1000', 'The Lean Startup');

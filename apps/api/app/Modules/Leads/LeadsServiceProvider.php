@@ -12,7 +12,9 @@ use App\Modules\Leads\Console\LeadsCommand;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
 use App\Modules\Leads\Listeners\ForgetShopperLeads;
+use App\Modules\Leads\Support\LeadShopperData;
 use App\Modules\Leads\Support\LeadTimeline;
+use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -25,6 +27,8 @@ final class LeadsServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->tag([LeadTimeline::class], TimelineSource::TAG);
+        // A shopper who asks the store for what it keeps about them: the leads they left.
+        $this->app->tag([LeadShopperData::class], KeepsShopperData::TAG);
         $this->app->bind(OffersCallsToAction::class, OfferCallToAction::class);
         $this->app->bind(DescribesLeadForm::class, DescribeLeadForm::class);
     }

@@ -46,7 +46,7 @@
                                 <h2>{{ $p['title'] }}</h2>
                                 <span class="lp-row-s">{{ collect([
                                     $p['sku'] ? $t('sku', ['sku' => $p['sku']]) : null,
-                                    $p['price'] !== null ? '₪'.number_format((float) $p['price'], (float) $p['price'] >= 100 ? 0 : 2) : null,
+                                    $this->price($p['price']),
                                     $p['in_stock'] ? $t('in_stock') : $t('out_of_stock'),
                                     $p['variants'] > 0 ? $t('variants', ['n' => $p['variants']]) : null,
                                 ])->filter()->implode(' · ') }}@if ($p['url']) · <a class="lp-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $t('to_store') }}</a>@endif</span>
@@ -109,7 +109,7 @@
                                     <summary class="lp-link">{{ trans_choice('enrichment::scan.variants_count', $p['variant_rows']['total'], ['n' => number_format($p['variant_rows']['total'])]) }}</summary>
                                     @foreach ($p['variant_rows']['rows'] as $v)
                                         <div class="lp-row">
-                                            <div class="lp-grow"><span class="lp-row-t">{{ $v['label'] }}</span><span class="lp-row-s">{{ collect([$v['sku'] ? $t('sku', ['sku' => $v['sku']]) : null, $v['price'] !== null ? '₪'.number_format((float) $v['price'], (float) $v['price'] == floor((float) $v['price']) ? 0 : 2) : null])->filter()->implode(' · ') }}</span></div>
+                                            <div class="lp-grow"><span class="lp-row-t">{{ $v['label'] }}</span><span class="lp-row-s">{{ collect([$v['sku'] ? $t('sku', ['sku' => $v['sku']]) : null, $this->price($v['price'])])->filter()->implode(' · ') }}</span></div>
                                             <span class="lp-pill" data-tone="{{ $v['in_stock'] ? 'good' : 'bad' }}"><i></i>{{ $v['in_stock'] ? $t('in_stock') : $t('out_of_stock') }}</span>
                                         </div>
                                     @endforeach

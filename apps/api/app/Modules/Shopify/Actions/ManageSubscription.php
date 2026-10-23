@@ -17,6 +17,8 @@ use RuntimeException;
  * shopify.plan_name at shopify.plan_price_usd when none is offered. A development store is billed
  * in test mode, so a test install never charges anyone. The active subscription's name says the
  * shop's plan again: an upgrade holds from its approval, a downgrade from the next period (Shopify).
+ * The trial is one per store: a plan changed, or the app installed again, carries the days left of it, and none once
+ * it ended or a plan was paid without one (trialDaysLeft).
  *
  * The shop is active while the subscription is, and paused otherwise: the storefront goes quiet
  * and nothing is lost. While shopify.charge is off nobody is billed: a store without a subscription
@@ -75,7 +77,7 @@ final class ManageSubscription
         $answer = (array) ($this->api->query($install, self::CREATE, [
             'name' => $plan?->billingName() ?? (string) Settings::get('shopify.plan_name'),
             'returnUrl' => $returnUrl,
-            'trialDays' => (int) Settings::get('shopify.trial_days'),
+            'trialDays' => self::trialDaysLeft($install),
             'test' => $dev || (bool) Settings::get('shopify.billing_test'),
             'lineItems' => [[
                 'plan' => ['appRecurringPricingDetails' => [
@@ -97,6 +99,23 @@ final class ManageSubscription
         ])->save();
 
         return $url;
+    }
+
+    /**
+     * The trial days a new subscription for this store gets: shopify.trial_days for a store that never had a plan;
+     * the whole days left until trial_ends_at for one in its trial (a plan changed, the app installed again: the
+     * install is kept by the store's address); none once the trial ended, or after a plan without one. Whole days,
+     * rounded down, so changing plans never lengthens the trial.
+     */
+    public static function trialDaysLeft(ShopifyInstall $install): int
+    {
+        $full = max(0, (int) Settings::get('shopify.trial_days'));
+
+        if ($install->trial_ends_at !== null) {
+            return min($full, max(0, (int) floor(now()->diffInSeconds($install->trial_ends_at, false) / 86400)));
+        }
+
+        return $install->subscribed_at === null ? $full : 0;
     }
 
     /**

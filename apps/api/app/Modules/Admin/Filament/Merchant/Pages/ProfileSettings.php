@@ -5,18 +5,21 @@ namespace App\Modules\Admin\Filament\Merchant\Pages;
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Http\Middleware\ApplyAdminLocale;
 use App\Modules\Admin\Models\User;
+use App\Modules\Admin\Support\HostedPanel;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Attributes\Locked;
 use UnitEnum;
 
 /**
  * Settings · My profile, as the designer's panel lays it out: the person's name and email, the panel's
  * language, its display mode (kept on the person, so the panel opens in it on any device, and the top
- * bar's switch changes the same), and a new password, given with the current one.
+ * bar's switch changes the same), and a new password, given with the current one. Inside a platform's admin
+ * (HostedPanel: the Shopify admin), which signed the person in, there is no password to change.
  */
 class ProfileSettings extends Page
 {
@@ -40,6 +43,10 @@ class ProfileSettings extends Page
 
     public bool $changingPassword = false;
 
+    /** Shown inside a platform's admin, as the page opened: no password here. */
+    #[Locked]
+    public bool $hosted = false;
+
     public static function getNavigationLabel(): string
     {
         return __('admin::shop_settings.profile.title');
@@ -58,6 +65,7 @@ class ProfileSettings extends Page
     public function mount(): void
     {
         $user = $this->user();
+        $this->hosted = HostedPanel::inside();
 
         $this->data = [
             'name' => (string) $user->name,
@@ -85,7 +93,7 @@ class ProfileSettings extends Page
         $email = mb_strtolower(trim((string) ($this->data['email'] ?? '')));
         $locale = Locales::isSupported((string) ($this->data['locale'] ?? '')) ? (string) $this->data['locale'] : app()->getLocale();
         $theme = in_array($this->data['theme'] ?? null, User::THEMES, true) ? (string) $this->data['theme'] : 'system';
-        $password = (string) ($this->data['password'] ?? '');
+        $password = $this->hosted ? '' : (string) ($this->data['password'] ?? '');
 
         if (mb_strlen($name) < 2) {
             $this->problems['name'] = $t('name_short');

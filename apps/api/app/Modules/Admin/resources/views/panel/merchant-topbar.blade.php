@@ -1,7 +1,7 @@
 {{--
     The shop's top bar, as the designer's panel draws it, at the top of every screen: the store and whether
     Lets is live in it, then the language, the store itself, and the person with their menu. An operator
-    who opened someone else's store is told so here, with the way back.
+    who opened someone else's store is told so here, with the way back. Inside a platform's admin (HostedPanel), no sign-out.
 --}}
 @php($t = fn (string $key, array $params = []) => __('admin::panels.top.'.$key, $params))
 <div class="lp-topbar" data-merchant-topbar data-shop-banner="{{ $shop->slug }}">
@@ -71,10 +71,12 @@
                 @if ($operator)
                     <a role="menuitem" href="{{ $operatorUrl }}">{{ __('admin::panels.switch.operator') }}</a>
                 @endif
-                <form method="post" action="{{ $logoutUrl }}">
-                    @csrf
-                    <button type="submit" role="menuitem" class="lp-menu-item">{{ $t('logout') }}</button>
-                </form>
+                @if ($logoutUrl)
+                    <form method="post" action="{{ $logoutUrl }}" data-logout>
+                        @csrf
+                        <button type="submit" role="menuitem" class="lp-menu-item">{{ $t('logout') }}</button>
+                    </form>
+                @endif
             </div>
         </div>
     </div>

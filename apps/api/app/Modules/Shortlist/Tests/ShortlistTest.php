@@ -12,11 +12,13 @@ use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
+use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shortlist\Actions\ProductCards;
 use App\Modules\Shortlist\Http\Controllers\ShortlistScriptController;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
+use App\Modules\Shortlist\Support\WishlistShopperData;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -193,6 +195,12 @@ final class ShortlistTest extends TestCase
         // Claiming a customer in the address without Shopify's signature opens nothing.
         $forged = '/api/v1/shortlist/proxy/wishlist?'.http_build_query(['shop' => 'rocks.myshopify.com', 'logged_in_customer_id' => '7001', 'timestamp' => (string) time(), 'signature' => str_repeat('a', 64)]);
         $this->postJson($forged, ['token' => self::BROWSER])->assertUnauthorized();
+
+        // The customer asks the store for what it keeps about them: their account's list, the products by name.
+        $this->assertContains(WishlistShopperData::class, array_map(fn (KeepsShopperData $source): string => $source::class, iterator_to_array(app()->tagged(KeepsShopperData::TAG))));
+        $kept = app(TenantContext::class)->run($this->shop->id, fn (): array => app(WishlistShopperData::class)->about(new ShopperDataRequested($this->shop->id, 'report', 'a@b.test', '7001')));
+        $this->assertSame([['id' => '12', 'name' => 'טבעת 12']], $kept['wishlist'][0]['products']);
+        $this->assertSame([], app(TenantContext::class)->run($this->shop->id, fn (): array => app(WishlistShopperData::class)->about(new ShopperDataRequested($this->shop->id, 'report', 'a@b.test', '7002'))));
 
         // The customer asks the store to forget them: their account's list goes, no one else's.
         event(new ShopperDataRequested($this->shop->id, 'report', 'a@b.test', '7001'));

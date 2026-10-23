@@ -6,8 +6,11 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Shopify\Contracts\KeepsShopperData;
+use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
+use App\Modules\Shoppers\Support\ShopperContactData;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -109,6 +112,21 @@ final class CallbackTest extends TestCase
 
             $this->assertNotNull($callback->fresh()->answered_at);
         });
+    }
+
+    public function test_a_shopper_who_asks_the_store_for_their_data_gets_their_contact_and_their_questions(): void
+    {
+        $this->leave('Dana@Example.com', 'האם יש עוד צבעים למוצר?')->assertOk();
+
+        $this->assertContains(ShopperContactData::class, array_map(fn (KeepsShopperData $source): string => $source::class, iterator_to_array(app()->tagged(KeepsShopperData::TAG))), 'asked with every module that keeps shopper data');
+        $about = fn (string $email): array => app(TenantContext::class)->run($this->shop->id, fn (): array => app(ShopperContactData::class)->about(new ShopperDataRequested($this->shop->id, 'report', $email, '7001')));
+
+        $data = $about('dana@example.com');
+        $this->assertSame(['email', 'dana@example.com'], [$data['contact_details'][0]['channel'], $data['contact_details'][0]['contact']], 'as written, not encrypted');
+        $this->assertSame(1, $data['contact_details'][0]['browsers_linked']);
+        $this->assertSame(['האם יש עוד צבעים למוצר?', 'product 10', null], [$data['callback_requests'][0]['question'], $data['callback_requests'][0]['page'], $data['callback_requests'][0]['answered_at']]);
+
+        $this->assertSame([], $about('noa@example.com'), 'somebody else is told nothing of hers');
     }
 
     private function leave(string $contact, string $question): TestResponse

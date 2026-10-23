@@ -2,19 +2,22 @@
 
 namespace App\Modules\Admin\Tests;
 
+use App\Modules\Admin\Contracts\PanelHost;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
  * Settings · My profile: name, email, the panel's language, its display mode (kept on the person and
- * honoured by the panel, and by the top bar's switch), and a new password given with the current one.
+ * honoured by the panel, and by the top bar's switch), and a new password given with the current one. Inside a
+ * platform's admin (a PanelHost: the Shopify admin), which signed the person in, neither a password nor a sign-out.
  */
 final class ProfileSettingsTest extends TestCase
 {
@@ -95,6 +98,38 @@ final class ProfileSettingsTest extends TestCase
         Livewire::test(ProfileSettings::class)->set('data.email', 'taken@example.com')->call('save')->assertSee('המייל הזה כבר שייך למשתמש אחר.');
 
         $this->assertSame('aviad@example.com', $this->me->fresh()?->email);
+    }
+
+    public function test_inside_a_platforms_admin_there_is_no_password_and_no_sign_out(): void
+    {
+        $this->app->instance('test.panel_host', new class implements PanelHost
+        {
+            public function hosts(Request $request): bool
+            {
+                return $request->headers->get('X-Test-Hosted') === '1';
+            }
+        });
+        $this->app->tag(['test.panel_host'], PanelHost::TAG);
+
+        // Outside: both, as ever.
+        $this->get("/merchant/{$this->shop->slug}/settings/profile")->assertOk()->assertSee('data-logout', false)->assertSee('data-change-password', false);
+
+        // Inside: the platform signed them in; nothing would lead to an email and password form.
+        $this->get("/merchant/{$this->shop->slug}/settings/profile", ['X-Test-Hosted' => '1'])->assertOk()
+            ->assertDontSee('data-logout', false)
+            ->assertDontSee('data-change-password', false)
+            ->assertSee('data-user-menu', false);
+
+        // And a password sent anyway is not changed: the page opened inside.
+        Livewire::withHeaders(['X-Test-Hosted' => '1'])->test(ProfileSettings::class)
+            ->assertSet('hosted', true)
+            ->assertDontSee('להחליף סיסמה')
+            ->set('data.current', 'old-password')
+            ->set('data.password', 'new-password-1')
+            ->set('data.password_again', 'new-password-1')
+            ->call('save')
+            ->assertNotified('נשמר');
+        $this->assertTrue(Hash::check('old-password', (string) $this->me->fresh()?->password));
     }
 
     public function test_the_top_bar_switch_keeps_the_mode_on_the_person(): void

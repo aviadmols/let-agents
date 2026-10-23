@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
+use App\Modules\Shopify\Http\Controllers\ShopperDataReportController;
 use Illuminate\Support\Facades\Route;
 
 // The Shopify app, as a merchant meets it. Signed by Shopify; see the controller.
@@ -24,3 +25,9 @@ if (filled(config('upsell.shop_domain'))) {
         Route::get('{path}', [ShopifyAppController::class, 'open'])->where('path', ShopifyAppController::RELOAD_PATH)->name('shopify.app.reload');
     });
 }
+
+// What the store keeps about a shopper who asked for it through Shopify, as a file, for the store's owners.
+Route::get('shopify/data-reports/{report}', ShopperDataReportController::class)
+    ->middleware('throttle:20,10')
+    ->where('report', '[0-9A-Za-z]{26}')
+    ->name('shopify.data_report');

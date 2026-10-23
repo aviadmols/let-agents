@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Filament\Merchant\Pages;
 
+use App\Core\Localization\Money;
 use App\Modules\Admin\Contracts\ReadsContentAgain;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -617,6 +618,12 @@ final class ScanSummary extends Page
             in_array($source, ['title', 'description', 'image', 'implied'], true) => $source,
             default => 'reading',
         };
+    }
+
+    /** A product's or an option's price, in the shop's own currency. */
+    public function price(mixed $amount): ?string
+    {
+        return $amount === null || $amount === '' ? null : Money::price((float) $amount, (string) $this->shop()->currency);
     }
 
     private function shop(): Shop

@@ -14,7 +14,7 @@
     @php($f = $this->figures())
     @php($q = $f['questions'] ?? ['all' => 0, 'answered' => 0, 'unanswered' => 0, 'off' => 0])
     @php($adds = $f['adds'] ?? ['all' => 0, 'search' => 0, 'widget' => 0, 'page' => 0])
-    @php($orders = $f['orders'] ?? ['n' => 0, 'revenue' => 0, 'currency' => 'ILS'])
+    @php($orders = $f['orders'] ?? ['n' => 0, 'revenue' => 0, 'currency' => (string) (\Filament\Facades\Filament::getTenant()?->currency ?: 'ILS')])
     @php($views = (int) ($f['views'] ?? 0))
     @php($daily = $this->chart())
     <div class="lp-page" data-analytics>

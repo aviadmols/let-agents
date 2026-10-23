@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
 use App\Core\Filament\HasPeriod;
+use App\Core\Localization\Money;
 use App\Modules\Admin\Contracts\FirstStep;
 use App\Modules\Admin\Contracts\HomeCard;
 use App\Modules\Admin\Contracts\OverviewBlock;
@@ -149,9 +150,7 @@ final class ShopOverview extends Page
 
     public static function money(float $amount, string $currency): string
     {
-        $symbol = ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][$currency] ?? $currency.' ';
-
-        return $symbol.number_format($amount, $amount >= 1000 ? 0 : 2);
+        return Money::total($amount, $currency);
     }
 
     public function inboxUrl(): string

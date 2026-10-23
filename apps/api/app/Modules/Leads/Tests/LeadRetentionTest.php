@@ -7,6 +7,8 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Leads\Enums\LeadGoal;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadFlow;
+use App\Modules\Leads\Support\LeadShopperData;
+use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shoppers\Contracts\ReadsContacts;
 use App\Modules\Tenancy\Models\Shop;
@@ -15,7 +17,8 @@ use Tests\TestCase;
 
 /**
  * A lead is kept its shop's leads.retention_days (a year), then goes with the person's details in it; and a shopper
- * who asks the store to erase them (Shopify's customers/redact) takes every lead they left by that email or phone.
+ * who asks the store to erase them (Shopify's customers/redact) takes every lead they left by that email or phone; one
+ * who asks for what the store keeps (customers/data_request) is given those same leads.
  */
 final class LeadRetentionTest extends TestCase
 {
@@ -60,6 +63,22 @@ final class LeadRetentionTest extends TestCase
         $this->assertSame([$someoneElse->id], $left);
         $this->assertNotContains($byEmail->id, $left);
         $this->assertNotContains($byPhone->id, $left);
+    }
+
+    public function test_a_shopper_asking_for_their_data_is_given_the_leads_they_left_by_email_or_phone(): void
+    {
+        $this->lead('Dana@Example.com');
+        $this->lead('0501234567');
+        $this->lead('noa@example.com');
+
+        $this->assertContains(LeadShopperData::class, array_map(fn (KeepsShopperData $source): string => $source::class, iterator_to_array(app()->tagged(KeepsShopperData::TAG))));
+        $about = fn (string $email, string $phone = ''): array => app(TenantContext::class)->run($this->shop->id, fn (): array => app(LeadShopperData::class)->about(new ShopperDataRequested($this->shop->id, 'report', $email, '7', $phone)));
+
+        $leads = $about('dana@example.com', '+972-50-123-4567')['leads'];
+        $this->assertSame(['dana@example.com', '972501234567'], array_column($leads, 'contact'), 'as written, not encrypted');
+        $this->assertSame(['y', 'product 10'], [$leads[0]['agreed_to'], $leads[0]['page']]);
+        $this->assertSame([], $about('tal@example.com'));
+        $this->assertSame(3, $this->leads(), 'a report erases nothing');
     }
 
     private function leads(): int

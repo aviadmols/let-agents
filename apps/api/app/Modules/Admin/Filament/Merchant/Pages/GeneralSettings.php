@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
 use App\Core\Filament\EditsShopSettings;
+use App\Core\Localization\Money;
 use App\Modules\Admin\Actions\SaveShopProfile;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -78,7 +79,7 @@ class GeneralSettings extends Page
 
     public static function symbol(string $currency): string
     {
-        return ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][$currency] ?? $currency;
+        return Money::symbol($currency);
     }
 
     private function shop(): Shop

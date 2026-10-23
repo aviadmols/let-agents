@@ -5,6 +5,7 @@ namespace App\Modules\Analytics\Filament\Merchant\Pages;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Filament\HasPeriod;
+use App\Core\Localization\Money;
 use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Analytics\Models\AnalyticsVisitStep;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -327,9 +328,8 @@ final class ShopSessions extends Page
     {
         $shop = Filament::getTenant();
         $currency = $shop instanceof Shop ? (string) $shop->currency : 'ILS';
-        $symbol = ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][$currency] ?? $currency.' ';
 
-        return $symbol.number_format((float) $amount, (float) $amount >= 1000 ? 0 : 2);
+        return Money::total((float) $amount, $currency);
     }
 
     private function stepText(AnalyticsVisitStep $step, string $title, ?string $page, bool $first): string
