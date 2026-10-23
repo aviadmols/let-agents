@@ -183,12 +183,13 @@ final class ShopifyAppController
             return response(__('shopify::app.bad_request'), 404);
         }
 
-        // Whatever the link says, the subscription is read from Shopify itself.
-        if (! in_array($billing->refresh($install), [ShopifyInstall::ACTIVE, ShopifyInstall::FREE], true)) {
-            return response(view('shopify::declined', ['shop' => $shop]), 402);
-        }
+        // Whatever the link says, the subscription is read from Shopify itself. Nobody is signed in here: the
+        // link carries no proof of who follows it (anyone who knows a store's address could). Back into the
+        // app inside the Shopify admin, which opens it with a session token: the panel when the plan was
+        // approved, the plans again when it was declined. The app stays embedded throughout.
+        $billing->refresh($install);
 
-        return $this->intoPanel($request, $install);
+        return redirect()->away('https://'.$install->shop_domain.'/admin/apps/'.ShopifyApps::key($install->client_id));
     }
 
     /** The plans a store chooses from: a signed link, from onward() or from the panel's "Connection and plan". */

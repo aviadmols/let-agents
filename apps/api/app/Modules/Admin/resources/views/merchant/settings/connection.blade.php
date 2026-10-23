@@ -29,7 +29,7 @@
         <x-lp::card :title="$t('allowance_title')" :help="$t('allowance_help')" style="max-width: 640px" data-allowance>
             @if ($d['plans_url'] !== null)
                 <x-slot:head>
-                    <a class="lp-btn lp-btn-sm" href="{{ $d['plans_url'] }}" target="_top" data-change-plan>{{ $t('change_plan') }}</a>
+                    <a class="lp-btn lp-btn-sm" href="{{ $d['plans_url'] }}" data-change-plan>{{ $t('change_plan') }}</a>
                 </x-slot:head>
             @endif
             @if ($d['allowance'] !== [])

@@ -14,6 +14,7 @@ use App\Modules\Shopify\Actions\ManageSubscription;
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
+use App\Modules\Shopify\Support\ShopifyApps;
 use App\Modules\Shopify\Support\ShopifyConnectionFacts;
 use App\Modules\Shopify\Support\ShopifySubscription;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -317,12 +318,14 @@ final class ShopifyAppTest extends TestCase
         $install = $this->installed();
         $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->toIso8601String()]];
 
+        // Back from Shopify's approval: the subscription is read, and the merchant goes back into the app
+        // inside the admin. The return link signs nobody in: anyone may follow it with a store's address.
         $this->get('/shopify/billing/return?shop='.self::SHOP)
-            ->assertRedirect(route('filament.merchant.pages.overview', ['tenant' => $install->shop->slug]));
+            ->assertRedirect('https://'.self::SHOP.'/admin/apps/'.ShopifyApps::key($install->client_id));
+        $this->assertGuest();
 
         $this->assertSame(ShopStatus::Active, $install->shop->fresh()->status);
         $this->assertSame('growth', $install->shop->fresh()->plan, 'the shop is on the plan its subscription names');
-        $this->assertAuthenticatedAs(User::query()->where('email', 'owner@gueta.test')->sole());
 
         // Opening the app from the Shopify admin later goes straight to the panel.
         $this->get('/shopify/app?'.http_build_query(self::signed([])))
@@ -369,7 +372,9 @@ final class ShopifyAppTest extends TestCase
     {
         $install = $this->installed();
 
-        $this->get('/shopify/billing/return?shop='.self::SHOP)->assertStatus(402)->assertSee(__('shopify::app.declined_title'));
+        // declined: back into the app inside the admin, which offers the plans again; nobody signed in
+        $this->get('/shopify/billing/return?shop='.self::SHOP)->assertRedirect('https://'.self::SHOP.'/admin/apps/'.ShopifyApps::key($install->client_id));
+        $this->assertGuest();
 
         $site = app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->sole()->site_key);
         $this->getJson("/api/v1/search/{$site}/index")->assertNotFound();
