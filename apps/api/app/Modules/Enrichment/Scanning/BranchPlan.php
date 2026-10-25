@@ -4,6 +4,7 @@ namespace App\Modules\Enrichment\Scanning;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 
@@ -17,12 +18,19 @@ use App\Modules\Catalog\Models\CatalogProduct;
  * "diamonds" is not buried inside a general vocabulary. A category too small for a vocabulary of
  * its own is left to the rest. The store's own categories are never changed.
  *
+ * A campaign ("NIGHT SALE", "חדש באתר") or whom products are for ("גברים", "ילדים") is never a branch: it says
+ * nothing of what its products are. When the branches cover less than WHOLE_BELOW of the catalog (a store of many
+ * small categories, one a kind each), the whole catalog is one branch instead (whole: true, no branches).
+ *
  * Inside the shop's tenant.
  */
 final class BranchPlan
 {
+    /** Branches covering less than this share of the catalog give way to one vocabulary for all of it. */
+    public const WHOLE_BELOW = 0.5;
+
     /**
-     * @return array{total: int, rest: int, branches: list<array{key: string, name: string, path: string, root: string, products: int, split_from: string|null}>}
+     * @return array{total: int, rest: int, whole: bool, branches: list<array{key: string, name: string, path: string, root: string, products: int, split_from: string|null}>}
      */
     public static function of(?int $minProducts = null, ?int $splitPercent = null, ?int $maxBranches = null): array
     {
@@ -66,10 +74,12 @@ final class BranchPlan
         };
 
         $chosen = [];
-        $place = function (string $externalId, ?string $splitFrom) use (&$place, &$chosen, $below, $children, $min, $split, $total): void {
+        $kinds = app(ProductKinds::class);
+        $place = function (string $externalId, ?string $splitFrom) use (&$place, &$chosen, $below, $children, $min, $split, $total, $categories, $kinds): void {
             $size = count($below($externalId));
+            $name = (string) $categories[$externalId]->name;
 
-            if ($size < $min) {
+            if ($size < $min || $kinds->campaign($name) || $kinds->onlyWhom($name)) {
                 return;
             }
 
@@ -111,7 +121,11 @@ final class BranchPlan
             ];
         }
 
-        return ['total' => $total, 'rest' => max(0, $total - count($covered)), 'branches' => $branches];
+        if ($total > 0 && count($covered) < $total * self::WHOLE_BELOW) {
+            return ['total' => $total, 'rest' => 0, 'whole' => true, 'branches' => []];
+        }
+
+        return ['total' => $total, 'rest' => max(0, $total - count($covered)), 'whole' => false, 'branches' => $branches];
     }
 
     /** A vocabulary key from a category id: snake_case, starts with a letter, unique per category. */

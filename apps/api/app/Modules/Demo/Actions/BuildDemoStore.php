@@ -84,6 +84,8 @@ final class BuildDemoStore
             'search.photos_per_month' => (int) Settings::get('demo.photos'),
             'assistant.prepared_per_sync' => (int) Settings::get('demo.prepared_questions'),
             'enrichment.max_branches' => (int) Settings::get('demo.vocabulary_branches'),
+            // a demo's tags are its vocabulary's: none waits for a person (Vans: four held at 49 to 64 of 80)
+            'enrichment.schema_pass_score' => (int) Settings::get('demo.vocabulary_pass_score'),
             // each product's main picture only: its other pictures (side views) were most of a demo's scan time
             'retrieval.gallery_pictures' => 0,
             'assistant.post_knowledge_posts' => 20,

@@ -62,11 +62,13 @@ final class BuildStructure
 
         $plan = BranchPlan::of();
         $have = $vocabularies->map(fn (EnrichmentVocabulary $v): string => $v->definition()->rootCategoryExternalId())->all();
-        $counts = ['branches' => count($plan['branches']), 'already' => 0, 'proposed' => 0, 'approved' => 0, 'held' => 0, 'failed' => 0, 'unchanged' => 0, 'stopped' => 0];
+        // the whole catalog as one (null), where its categories make no branches worth one (BranchPlan::WHOLE_BELOW)
+        $targets = ($plan['whole'] ?? false) ? [null] : $plan['branches'];
+        $counts = ['branches' => count($targets), 'already' => 0, 'proposed' => 0, 'approved' => 0, 'held' => 0, 'failed' => 0, 'unchanged' => 0, 'stopped' => 0];
         $branches = [];
 
-        foreach ($plan['branches'] as $at => $branch) {
-            if (in_array($branch['root'], $have, true)) {
+        foreach ($targets as $at => $branch) {
+            if ($branch !== null && in_array($branch['root'], $have, true)) {
                 $counts['already']++;
 
                 continue;
@@ -75,7 +77,7 @@ final class BuildStructure
             ['proposal' => $proposal] = $this->discover->handle($shopId, null, $branch);
 
             // Nothing new counted: the last proposal of this branch is where it stands.
-            $proposal ??= EnrichmentSchemaProposal::query()->where('branch_key', $branch['key'])->latest()->first();
+            $proposal ??= EnrichmentSchemaProposal::query()->when($branch === null, fn ($q) => $q->whereNull('branch_key'), fn ($q) => $q->where('branch_key', $branch['key']))->latest()->first();
 
             if ($proposal === null) {
                 $counts['unchanged']++;
@@ -95,11 +97,11 @@ final class BuildStructure
 
                 if ($proposal->status === EnrichmentSchemaProposal::FAILED) {
                     $counts['failed']++;
-                    $branches[] = ['branch' => $branch['name'], 'outcome' => 'failed'];
+                    $branches[] = ['branch' => $branch['name'] ?? '*', 'outcome' => 'failed'];
 
                     // The cap is the shop's for all branches: nothing else would be written either.
                     if ($written->summary_key === 'assistant::runs.spend_cap') {
-                        $counts['stopped'] = count($plan['branches']) - $at - 1;
+                        $counts['stopped'] = count($targets) - $at - 1;
                         break;
                     }
 
@@ -113,7 +115,7 @@ final class BuildStructure
                 $this->score->handle($proposal);
                 $gate = $this->advance->handle($proposal->refresh());
                 $counts[$gate['outcome'] === AdvanceSchemaProposal::APPROVED ? 'approved' : 'held']++;
-                $branches[] = ['branch' => $branch['name'], 'score' => $proposal->score, 'outcome' => $gate['outcome'], 'why' => $gate['why']];
+                $branches[] = ['branch' => $branch['name'] ?? '*', 'score' => $proposal->score, 'outcome' => $gate['outcome'], 'why' => $gate['why']];
             }
         }
 

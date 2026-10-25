@@ -47,4 +47,7 @@ interface ProductKinds
      * @return list<string>
      */
     public function audiences(CatalogProduct $product): array;
+
+    /** Whether a category's name only says whom its products are for ("גברים", "ילדות", "Kids"), never what they are. */
+    public function onlyWhom(string $name): bool;
 }

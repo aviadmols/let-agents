@@ -27,6 +27,7 @@
         { "name": "questions", "type": "int", "default": 15, "min": 0, "max": 200, "scope": "global", "unit": "questions" },
         { "name": "photos", "type": "int", "default": 30, "min": 0, "max": 500, "scope": "global", "unit": "items" },
         { "name": "prepared_questions", "type": "int", "default": 5, "min": 0, "max": 20, "scope": "global", "unit": "questions" },
-        { "name": "vocabulary_branches", "type": "int", "default": 4, "min": 1, "max": 12, "scope": "global", "unit": "items" }
+        { "name": "vocabulary_branches", "type": "int", "default": 4, "min": 1, "max": 12, "scope": "global", "unit": "items" },
+        { "name": "vocabulary_pass_score", "type": "int", "default": 50, "min": 50, "max": 100, "scope": "global" }
     ]
 }

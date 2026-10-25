@@ -132,6 +132,13 @@ final class CatalogProductKinds implements ProductKinds
         return array_values(array_filter(['women', 'men'], fn (string $a): bool => isset($said[$a])));
     }
 
+    public function onlyWhom(string $name): bool
+    {
+        $words = preg_split('/[^\p{L}]+/u', mb_strtolower($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return $words !== [] && array_filter($words, fn (string $word): bool => array_filter(self::AUDIENCE, fn (string $p): bool => preg_match($p, $word) === 1) === [] && ! in_array($word, ['ו', 'and', 'for'], true)) === [];
+    }
+
     /** @return array<string, true> every audience word its title, type, tags and categories say */
     private static function saidAudiences(CatalogProduct $product): array
     {

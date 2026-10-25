@@ -76,6 +76,33 @@ final class BranchPlanTest extends TestCase
         $this->assertSame(20, $cut['rest'], 'what no branch covers is counted, not lost');
     }
 
+    public function test_a_campaign_or_whom_is_no_branch_and_too_little_covered_is_the_whole_catalog(): void
+    {
+        // Vans: its branches were "NIGHT SALE", "חדש באתר" and "גברים"; Story: 233 categories of a few products each, no
+        // branch at all, so no vocabulary and no tags.
+        $this->buildShop();
+        $sale = $this->category('sale', 'NIGHT SALE');
+        $men = $this->category('men', 'גברים');
+        $shoes = $this->category('shoes', 'נעליים');
+        $n = 0;
+        foreach ([[$sale, 20], [$men, 20], [$shoes, 60]] as [$category, $count]) {
+            for ($i = 0; $i < $count; $i++) {
+                $this->product('p'.(++$n), 'מוצר '.$n, '', [$category]);
+            }
+        }
+        $plan = $this->inShop(fn (): array => BranchPlan::of(minProducts: 15, splitPercent: 90, maxBranches: 12));
+        $this->assertSame(['shoes'], array_column($plan['branches'], 'root'), 'never the campaign nor whom it is for');
+        $this->assertFalse($plan['whole']);
+
+        $this->buildShop();
+        for ($i = 1; $i <= 40; $i++) {
+            $this->product('t'.$i, 'מוצר '.$i, '', [$this->category('c'.$i, 'סוג '.$i)]);
+        }
+        $many = $this->inShop(fn (): array => BranchPlan::of(minProducts: 15, splitPercent: 35, maxBranches: 12));
+        $this->assertTrue($many['whole'], 'forty kinds of one product each: one vocabulary for the whole catalog');
+        $this->assertSame([], $many['branches']);
+    }
+
     public function test_the_shops_own_settings_are_the_defaults(): void
     {
         $this->buildShop();
