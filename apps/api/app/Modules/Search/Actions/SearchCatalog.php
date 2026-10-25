@@ -210,7 +210,9 @@ final class SearchCatalog
             // יהלומ"), then read for filters like any search. Words a product holds together are searched as typed. The
             // meaning reads the whole sentence: "משהו לחבר קרשים" is about joining boards.
             $sentence = null;
+            $scattered = null;
             if ($index !== null && str_contains(trim($query), ' ') && self::whole(HebrewSearch::search($index['engine'], $query)) === []) {
+                $scattered = $query;
                 $meant = HebrewSearch::meant($index['engine'], $query);
                 $sentence = $meant !== HebrewSearch::normalize($query) ? HebrewSearch::normalize($query) : null;
                 $query = $meant;
@@ -448,6 +450,12 @@ final class SearchCatalog
             // "עגילי חישוק זהב צהוב עם אבנים שקופות": the colours named, each with its part, weigh as in a
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
             $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
+            // A sentence no product holds whole ("חולצה לבנה עם כיס קטן בצד לגברים") is found by meaning and by picture, which
+            // tell a white shirt with a pocket from a white t-shirt poorly: what says more of its words comes first ("כיס",
+            // in a shirt's picture words), in stock and colour order kept within each (Story, 25.10)
+            if ($scattered !== null) {
+                $groups['product'] = self::bySaidWords($groups['product'], $scattered);
+            }
             // "תיק לבן": a word of the search that opens the titles of a kind of product here ("תיק גב", "תיק צד") says the
             // kind asked for, and what is said with it ("לבן", "עם כיס") holds across every kind: only that kind is shown. A
             // white keychain is no white bag: none, and the drawer offers the AI. A kind alone ("מדף") keeps what is very
@@ -988,6 +996,48 @@ final class SearchCatalog
      * @param  list<array{family: string, group: string, part: string|null, weight: float}>  $colours
      * @return list<array<string, mixed>>
      */
+    /**
+     * Products ordered by how many words of the search each says in its title and words (its tags, its picture's words),
+     * a word in any of its forms ("לבנה" is "לבן", "בצד" is "צד", "כיסים" is "כיס"); the order before kept within each
+     * count. Words a question wraps itself in say nothing.
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @return list<array<string, mixed>>
+     */
+    private static function bySaidWords(array $records, string $query): array
+    {
+        $words = array_values(array_filter(array_unique(explode(' ', HebrewSearch::normalize($query))), fn (string $w): bool => mb_strlen($w) >= 2 && ! HebrewSearch::isFiller($w)));
+        if (count($words) < 2 || count($records) < 2) {
+            return $records;
+        }
+        $forms = array_map(function (string $w): array {
+            $out = [$w];
+            $bare = preg_match('/^[והבלמשכ][א-ת]{2,}$/u', $w) === 1 ? mb_substr($w, 1) : null;
+            foreach (array_filter([$w, $bare]) as $f) {
+                $out[] = $f;
+                if (mb_strlen($f) > 3) {
+                    $out[] = (string) preg_replace('/(ה|ת|ימ|ות)$/u', '', $f);
+                }
+            }
+            // in English, one and many: "pocket" says "pockets", "pockets" says "pocket"
+            if (preg_match('/^[a-z]{3,}$/', $w) === 1) {
+                array_push($out, $w.'s', (string) preg_replace('/(es|s)$/', '', $w));
+            }
+
+            return array_values(array_unique(array_filter($out, fn (string $f): bool => mb_strlen($f) >= 2)));
+        }, $words);
+
+        $said = [];
+        foreach ($records as $at => $record) {
+            $text = (string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '');
+            $said[$at] = count(array_filter($forms, fn (array $fs): bool => array_any($fs, fn (string $f): bool => HebrewSearch::says($text, $f))));
+        }
+        $order = array_keys($records);
+        usort($order, fn (int $a, int $b): int => [$said[$b], $a] <=> [$said[$a], $b]);
+
+        return array_map(fn (int $at): array => $records[$at], $order);
+    }
+
     private static function byColour(array $records, array $colours): array
     {
         if ($colours === [] || count($records) < 2) {

@@ -275,6 +275,29 @@ final class SearchFlowTest extends TestCase
         $this->assertNotContains('805', $ids, 'only somewhat near, when the words found four: left out');
     }
 
+    public function test_a_sentence_no_product_holds_whole_shows_what_says_most_of_it_first(): void
+    {
+        // Story: "חולצה לבנה עם כיס קטן בצד לגברים" is held whole by no product, so meaning and pictures found it, and put
+        // white T-shirts before the white shirt whose picture words say "כיס חזה".
+        $this->inShop(function (): void {
+            $this->product('901', 'טי שירט לבנה לגברים', ['payload' => ['tags' => ['חולצה']]]);
+            $this->product('902', 'חולצה מכופתרת לגברים Mateo', ['payload' => ['tags' => ['לבן', 'כיס חזה']]]);
+            $this->product('911', 'Men white tee', ['payload' => ['tags' => ['shirt']]]);
+            $this->product('912', 'Men shirt Mateo', ['payload' => ['tags' => ['white pockets']]]);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $near = fn (string $first, string $second): array => [
+            ['source' => 'product', 'source_id' => 'a', 'external_id' => $first, 'title' => '', 'similarity' => 0.58],
+            ['source' => 'product', 'source_id' => 'b', 'external_id' => $second, 'title' => '', 'similarity' => 0.55],
+        ];
+
+        $this->meaning = $near('901', '902');
+        $this->assertSame('902', $this->search('חולצה לבנה עם כיס קטן בצד לגברים')->json('groups.product.0.external_id'));
+
+        $this->meaning = $near('911', '912');
+        $this->assertSame('912', $this->search('white shirt with a small side pocket for men')->json('groups.product.0.external_id'), 'the same in English, "pocket" saying "pockets"');
+    }
+
     public function test_one_word_many_products_hold_as_typed_shows_only_them(): void
     {
         // Rocks: "טופז" found 93 topaz rings and, by meaning, citrine and yellow sapphire after them.
