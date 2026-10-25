@@ -13,6 +13,7 @@ return [
     'cost_total' => 'Spent on the :count demos shown: :usd',
     'cost_parts' => 'building :build · visitors :visitors',
     'cost_of_cap' => ':percent% of the :cap cap',
+    'cost_earlier' => 'earlier scans :usd',
     'open' => 'Open',
     'extend' => 'Extend',
     'reshoot' => 'Retake picture',

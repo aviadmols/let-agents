@@ -4,7 +4,6 @@
     @php($cell = 'padding:8px;border-bottom:1px solid #f1f1f4;text-align:start;vertical-align:top;font-size:13px')
     @php($counts = $this->counts())
     @php($demos = $this->demos())
-    @php($cap = (float) \App\Core\Facades\Settings::get('demo.budget_usd'))
 
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <x-filament::link href="{{ route('demo.form') }}" target="_blank" icon="heroicon-m-arrow-top-right-on-square">{{ $t('page') }}</x-filament::link>
@@ -58,9 +57,13 @@
                                         <div style="font-weight:600" dir="ltr">${{ number_format((float) $demo->spent, 3) }}</div>
                                         @if ($demo->spent_parts !== null)
                                             <div style="{{ $small }}">{{ $t('cost_parts', ['build' => '$'.number_format($demo->spent_parts['build'], 3), 'visitors' => '$'.number_format($demo->spent_parts['visitors'], 3)]) }}</div>
-                                        @endif
-                                        @if ($cap > 0)
-                                            <div style="{{ $small }}">{{ $t('cost_of_cap', ['percent' => (int) round(100 * $demo->spent / $cap), 'cap' => '$'.rtrim(rtrim(number_format($cap, 2), '0'), '.')]) }}</div>
+                                            @if ($demo->earlier > 0)
+                                                <div style="{{ $small }}">{{ $t('cost_earlier', ['usd' => '$'.number_format($demo->earlier, 3)]) }}</div>
+                                            @endif
+                                            @if ($demo->cap > 0)
+                                                {{-- the store's own cap, against what this store spent: earlier tries were other stores --}}
+                                                <div style="{{ $small }}">{{ $t('cost_of_cap', ['percent' => (int) round(100 * array_sum($demo->spent_parts) / $demo->cap), 'cap' => '$'.rtrim(rtrim(number_format($demo->cap, 2), '0'), '.')]) }}</div>
+                                            @endif
                                         @endif
                                     @endif
                                 </td>

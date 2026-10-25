@@ -52,7 +52,8 @@ class Demos extends Page
 
     /**
      * The demos, each with what it cost us: kept on its row for what ended (an earlier try, or the demo itself),
-     * and, while its store lasts, its store's model calls so far, building it and its visitors apart.
+     * and, while its store lasts, its store's model calls so far, building it and its visitors apart, against that
+     * store's own cap (each store has its own: earlier tries are counted, not held against it).
      *
      * @return Collection<int, DemoSite>
      */
@@ -64,6 +65,8 @@ class Demos extends Page
                 $live = $d->status !== DemoSite::EXPIRED && $d->shop_id !== null ? SweepDemos::costs($d->shop_id) : null;
                 $d->setAttribute('spent', $live === null && $d->cost_usd === null ? null : round((float) $d->cost_usd + array_sum($live ?? []), 4));
                 $d->setAttribute('spent_parts', $live);
+                $d->setAttribute('earlier', $live !== null ? (float) $d->cost_usd : 0.0);
+                $d->setAttribute('cap', $live !== null ? (float) Settings::get('ai.shop_monthly_cap_usd', $d->shop_id) : 0.0);
             });
     }
 

@@ -23,7 +23,7 @@
         { "name": "keep_days", "type": "int", "default": 7, "min": 1, "max": 60, "scope": "global", "unit": "days" },
         { "name": "per_day", "type": "int", "default": 20, "min": 0, "max": 500, "scope": "global", "unit": "items" },
         { "name": "per_email_per_day", "type": "int", "default": 3, "min": 1, "max": 50, "scope": "global", "unit": "items" },
-        { "name": "budget_usd", "type": "float", "default": 2, "min": 0.2, "max": 20, "scope": "global", "unit": "usd" },
+        { "name": "budget_usd", "type": "float", "default": 4, "min": 0.2, "max": 20, "scope": "global", "unit": "usd" },
         { "name": "questions", "type": "int", "default": 15, "min": 0, "max": 200, "scope": "global", "unit": "questions" },
         { "name": "photos", "type": "int", "default": 30, "min": 0, "max": 500, "scope": "global", "unit": "items" },
         { "name": "prepared_questions", "type": "int", "default": 5, "min": 0, "max": 20, "scope": "global", "unit": "questions" },

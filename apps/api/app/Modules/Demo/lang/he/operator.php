@@ -13,6 +13,7 @@ return [
     'cost_total' => 'סך העלות של :count הדמו שברשימה: :usd',
     'cost_parts' => 'בנייה :build · גולשים :visitors',
     'cost_of_cap' => ':percent% מתקרה של :cap',
+    'cost_earlier' => 'סריקות קודמות :usd',
     'open' => 'לפתוח',
     'extend' => 'להאריך',
     'reshoot' => 'לצלם מחדש',
