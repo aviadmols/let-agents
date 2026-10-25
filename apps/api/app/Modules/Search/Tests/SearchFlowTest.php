@@ -253,6 +253,27 @@ final class SearchFlowTest extends TestCase
         $this->assertSame([], $this->meaningAsked);
     }
 
+    public function test_when_the_words_found_a_few_the_meaning_adds_only_what_is_very_near(): void
+    {
+        // The meaning pass follows every search now: it must not pad what the words already found.
+        foreach (['801' => 'מדף אורן 60', '802' => 'מדף אורן 80', '803' => 'מדף אורן 100', '804' => 'מדף אורן 120'] as $id => $title) {
+            $this->product($id, $title);
+        }
+        $this->product('805', 'ארון כתר פלסטיק');
+        $this->product('806', 'כוורת מדפים מעץ');
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->meaning = [
+            ['source' => 'product', 'source_id' => 'a', 'external_id' => '806', 'title' => 'כוורת מדפים מעץ', 'similarity' => 0.62],
+            ['source' => 'product', 'source_id' => 'b', 'external_id' => '805', 'title' => 'ארון כתר פלסטיק', 'similarity' => 0.40],
+        ];
+
+        $ids = array_column($this->search('מדף')->json('groups.product'), 'external_id');
+
+        $this->assertContains('801', $ids);
+        $this->assertContains('806', $ids, 'very near by meaning: added');
+        $this->assertNotContains('805', $ids, 'only somewhat near, when the words found four: left out');
+    }
+
     public function test_one_word_many_products_hold_as_typed_shows_only_them(): void
     {
         // Rocks: "טופז" found 93 topaz rings and, by meaning, citrine and yellow sapphire after them.

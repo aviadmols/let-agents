@@ -113,6 +113,13 @@ final class SearchCatalog
     /** A product its description names (DescribedProducts) weighs like one found by meaning, a little less. */
     private const DESCRIBED_WEIGHT = 0.9;
 
+    /**
+     * Products the spelling found from which the meaning only adds what is very near: the meaning pass runs on
+     * every search now (as Aviad asked, 2026-10-25), and when the words already found a few, what is merely
+     * close by meaning would pad them (search.meaning_only_min_similarity instead of semantic_min_similarity).
+     */
+    private const SPELLED_ENOUGH = 4;
+
     /** A filter about colour or metal ("מתכת", "צבע האבן", variant_color): the shop sorts by it. Not a name that looks like a colour. */
     private const COLOUR_FILTER = '/colou?r|metal|צבע|מתכת/iu';
 
@@ -217,7 +224,8 @@ final class SearchCatalog
             // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
             // a few of them, and the drawer says the word was not found (unknown) rather than showing dozens as if it were.
             $unknown = $byMeaning ? HebrewSearch::unknownWords($index['engine'], $query) : [];
-            $near = $byMeaning ? $this->meaning($shopId, $sentence ?? $query, $index['records']) : ['products' => [], 'content' => [], 'best' => 0.0];
+            $spelled = array_column(array_filter($spelling, fn (array $hit): bool => str_starts_with($hit['id'], 'p:')), 'id');
+            $near = $byMeaning ? $this->meaning($shopId, $sentence ?? $query, $index['records'], $spelled) : ['products' => [], 'content' => [], 'best' => 0.0];
             // "מדע בדיוני" in a store with no science fiction: no product holds the words, and the nearest by meaning is far
             // (.36: books on politics). Nothing is shown as if it were found; the drawer says so, with the AI one press away.
             // How near is near enough is the store's (search.meaning_only_min_similarity).
@@ -1125,14 +1133,18 @@ final class SearchCatalog
         }
     }
 
-    private function meaning(string $shopId, string $query, array $records): array
+    /** @param list<string> $spelled the products the spelling found: they keep the usual floor, anything else needs to be very near when they are a few */
+    private function meaning(string $shopId, string $query, array $records, array $spelled = []): array
     {
         if (! Features::enabled('search.semantic', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
             return ['products' => [], 'content' => [], 'best' => 0.0];
         }
 
         $limit = (int) Settings::get('search.semantic_results');
-        $floor = (float) Settings::get('search.semantic_min_similarity', $shopId);
+        $usual = (float) Settings::get('search.semantic_min_similarity', $shopId);
+        $strict = max($usual, (float) Settings::get('search.meaning_only_min_similarity', $shopId));
+        $found = array_flip($spelled);
+        $floor = fn (string $id): float => count($found) >= self::SPELLED_ENOUGH && ! isset($found[$id]) ? $strict : $usual;
         // best: how near the nearest product is, whatever the floor
         $out = ['products' => [], 'content' => [], 'best' => 0.0];
 
@@ -1146,7 +1158,7 @@ final class SearchCatalog
             $id = 'p:'.$hit['external_id'];
             $out['best'] = max($out['best'], (float) $hit['similarity']);
 
-            if ($hit['similarity'] >= $floor && isset($records[$id])) {
+            if ($hit['similarity'] >= $floor($id) && isset($records[$id])) {
                 $out['products'][] = $id;
             }
         }

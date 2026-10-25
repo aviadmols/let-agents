@@ -71,7 +71,11 @@
       lv.actions = d.actions || [];
       // Nothing by spelling, and the meaning pass still to come: still thinking, not "no results" yet
       // (it often finds what the store calls by another word). "No results" only once both found nothing.
-      var willMean = !byMeaning && (wordsOf(q).length >= 2 || spelled < 4);
+      // The meaning pass follows every search of three letters or more: the index first, then the meaning (as
+      // Aviad asked, 2026-10-25); the server keeps it from padding what the words already found (SPELLED_ENOUGH).
+      var willMean = !byMeaning && q.replace(/[^\p{L}\p{N}]/gu, '').length >= 3;
+      if (byMeaning) { lv.meant = true; }
+      lv.willMean = lv.willMean || willMean;
       lv.pending = willMean && !ids.length;
       readTags(lv);
       renderLive(false);

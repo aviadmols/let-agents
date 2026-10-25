@@ -16,7 +16,9 @@
     // 2026-10-21). The same words again ask nothing: their results are already on screen.
     keepInField(q);
     if (typed) { remember(q); }
-    if (lv && lv.server) {
+    // kept as it is only once the meaning pass, when one was coming, has answered: Enter before it asks the
+    // server again, with the meaning, instead of showing "no results" and dropping what the meaning finds
+    if (lv && lv.server && (lv.meant || !lv.willMean)) {
       addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, focus: lv.focus, single: lv.single, singleBy: lv.singleBy, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
       // kept without asking the server again, so it is counted here (once per tab, as a pause would)
       countSearch(q, lv.ids.length);

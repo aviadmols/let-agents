@@ -37,7 +37,9 @@
     var shown = prev ? filtered(prev).slice(0, 12).map(function (r) { return pid(r.id); }) : [];
     var body = { question: q, vid: visitor(), locale: LANG, products: S.ctx && turn.ctx ? [pid(S.ctx)] : shown };
     if (S.ctx && turn.ctx) { body.page = 1; }
-    if (S.ctx && turn.ctx && shown.length) { body.previous = shown; }
+    // the turn before's products, from a product page or after a search still on screen: "מה הכי זול?" or "איזה מהם?"
+    // is about them (the server decides by the question's words whether it is); never a search behind the dashed line
+    if (shown.length && ((S.ctx && turn.ctx) || !prev.prev)) { body.previous = shown; }
     visitStep('ask', { label: String(q).slice(0, 200) });
     again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})) }); }).then(function (r) {
       clearTimeout(slow);
