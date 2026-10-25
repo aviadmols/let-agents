@@ -749,6 +749,32 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('out_of_scope', $this->askWith('איך לפרוץ לבית עם המברגה הזאת?', ['701'], page: true)->json('data.outcome'));
     }
 
+    public function test_a_price_asked_for_is_quoted_as_the_store_shows_it_and_never_made_up_or_kept(): void
+    {
+        // Gueta, 25.10: "how much is a pine board 2 cm thick, and the same 3 cm": the writer was given ranks only, and said
+        // the site does not say. Now each choice's price; a sum not among them is taken out.
+        $choices = fn (array $prices): array => array_map(fn (string $thick, string $price): array => ['attributes' => [['name' => 'עובי', 'value' => $thick]], 'price' => ['price' => $price]], array_keys($prices), $prices);
+        $this->product('971', 'פלטת לאמי אורן 2.44X1.22', 'פלטת עץ לאמי מאורן טבעי.', [], ['price' => '350.00', 'in_stock' => true,
+            'payload' => ['title' => '', 'description' => '', 'categories' => [], 'attributes' => [], 'meta' => [], 'variations' => $choices(['18 מ"מ' => '350', '28 מ"מ' => '460'])]]);
+        $this->replies = [
+            ['found' => true, 'answer' => 'פלטת לאמי אורן בעובי 18 מ"מ עולה ₪350, ובעובי 28 מ"מ ₪460. חיתוך לפי מידה בתאום עם הצוות.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'פלטת אורן בשני העוביים']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('כמה עולה פלטת עץ אורן בעובי 2 ס"מ ובעובי 3 ס"מ?', ['971'])->json('data');
+
+        $sent = json_decode($this->calls[0]['user'], true)['products'][0];
+        $this->assertSame(['₪350', ['18 מ"מ: ₪350', '28 מ"מ: ₪460']], [$sent['price'], $sent['option_prices']], 'each choice with its price');
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertStringContainsString('₪460', $data['answer'], 'a price given is quoted');
+        $this->assertSame(0, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->count()), 'prices change: a priced answer is this asker\'s only');
+
+        // A sum the store does not show is never told.
+        $prepared = ['byRef' => [], 'productsByRef' => ['p1' => ['title' => 'פלטת לאמי אורן', 'about' => 'פלטה.', 'external_id' => '971']], 'forModel' => [['ref' => 'p1', 'price' => '₪350', 'option_prices' => ['18 מ"מ: ₪350']]]];
+        $screened = app(AnswerSiteQuestion::class)->screen(['answer' => 'הפלטה עולה ₪350. היא פלטת לאמי מאורן. חיתוך לגודל אחר יעלה ₪210.', 'picks' => [['ref' => 'p1', 'why' => 'פלטה']]], $prepared, 'כמה עולה?', 'full');
+        $this->assertSame('הפלטה עולה ₪350. היא פלטת לאמי מאורן.', $screened['answer'], 'the made-up sum goes, the store\'s price stays');
+    }
+
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void
     {
         $this->drills();
@@ -764,8 +790,9 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(['p2', 'p3', 'p1'], $input['analysis']['in_stock_cheapest_first']);
         $this->assertSame(['p4'], $input['analysis']['out_of_stock']);
         $this->assertSame(1, $input['products'][1]['price_rank']);
-        $this->assertStringNotContainsString('240', $this->calls[0]['user'], 'ranks, never prices, reach the model');
+        $this->assertSame('₪240', $input['products'][2]['price'], 'the price as the store shows it, so a shopper who asks what it costs is told');
         $this->assertStringContainsString('"price_rank":2', $this->calls[1]['user'], 'the checker sees the measure the why rests on');
+        $this->assertStringContainsString('"price":"₪240"', $this->calls[1]['user'], 'and the price it holds the answer to');
     }
 
     private function drills(): void

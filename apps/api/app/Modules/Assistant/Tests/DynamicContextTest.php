@@ -236,12 +236,12 @@ final class DynamicContextTest extends TestCase
     {
         $full = $this->ask('באיזו מידה יש את טבעת הגרנט?', AnswerContext::FULL);
         $this->assertCount(8, $full['products']);
-        $this->assertSame(['about', 'brand', 'in_stock', 'price_rank', 'ref', 'title'], $this->sortedKeys($full['products'][0]));
+        $this->assertSame(['about', 'brand', 'in_stock', 'price', 'price_rank', 'ref', 'title'], $this->sortedKeys($full['products'][0]));
 
         $dynamic = $this->ask('באיזו מידה יש את טבעת הגרנט? ', AnswerContext::DYNAMIC);
 
         $this->assertLessThan(count($full['products']), count($dynamic['products']));
-        $this->assertSame(['about', 'in_stock', 'measures', 'ref', 'sizes', 'title'], $this->sortedKeys($dynamic['products'][0]), 'a size question: the sizes and measures, not the brand');
+        $this->assertSame(['about', 'in_stock', 'measures', 'price', 'ref', 'sizes', 'title'], $this->sortedKeys($dynamic['products'][0]), 'a size question: the sizes and measures, not the brand; the price, always');
         $this->assertSame(['6.5', '7'], $dynamic['products'][0]['sizes']);
         $this->assertSame(['weight: 2.4 g'], $dynamic['products'][0]['measures']);
 

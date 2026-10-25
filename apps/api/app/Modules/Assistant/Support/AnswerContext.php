@@ -129,7 +129,7 @@ final class AnswerContext
             return $entry;
         }
 
-        $base = array_intersect_key($entry, array_flip(['ref', 'title', 'in_stock']));
+        $base = array_intersect_key($entry, array_flip(['ref', 'title', 'in_stock', 'price', 'option_prices']));
         $words = Question::words($question);
         $about = (string) ($entry['about'] ?? '');
         $mentions = $about !== '' && array_filter($words, fn (string $w): bool => mb_stripos($about, $w) !== false) !== [];

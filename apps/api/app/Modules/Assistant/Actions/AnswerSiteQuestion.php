@@ -4,6 +4,7 @@ namespace App\Modules\Assistant\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Localization\Money;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -77,7 +78,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
      * 5 is the facts-only writer the bench tries, never released here).
      */
-    public const PROMPT_VERSION = 9;
+    public const PROMPT_VERSION = 10;
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
@@ -1452,9 +1453,13 @@ final class AnswerSiteQuestion implements TriesQuestions
             $known .= "\n".json_encode($forModel, JSON_UNESCAPED_UNICODE);
         }
 
+        // The products' prices as the writer was given them (forModel()): a sum in the answer is one of these, or it goes.
+        $prices = implode("\n", array_map(fn (array $p): string => implode(' ', [$p['price'] ?? '', ...(array) ($p['option_prices'] ?? [])]), $forModel));
+        $known .= "\n".$prices;
+
         // What the cited pages themselves say: a store's policy may name its cancellation fee ("עד 5% או
-        // 100 ₪") and how to reach it; quoted from there, that is the store's word, not one made up.
-        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited));
+        // 100 ₪") and how to reach it; quoted from there, that is the store's word, not one made up. And the prices above.
+        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))."\n".$prices;
 
         // Code's checks on the answer, sentence by sentence (gate()); the picks stand or fall on their own.
         $trimmed = 0;
@@ -1631,7 +1636,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             'question' => $question,
             'answer' => $answer,
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
-            'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price_rank'])), $picks),
+            'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank'])), $picks),
             'analysis' => $analysis,
         ], JSON_UNESCAPED_UNICODE);
     }
@@ -1978,7 +1983,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /**
-     * The products as the model sees them: what they are, and code's ranks instead of prices.
+     * The products as the model sees them: what they are, code's ranks, and their prices as the store shows them (each
+     * choice's own when the price depends on one), so a shopper who asks what something costs is told. The writer may
+     * quote them only as given; code holds every sum in an answer to them (screen()).
      *
      * @param  array<string, array<string, mixed>>  $productsByRef
      * @param  array{in_stock_cheapest_first: list<string>}  $analysis
@@ -1998,6 +2005,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'brand' => $p['brand'] ?? null,
                 'in_stock' => $p['in_stock'],
                 'on_sale' => $p['on_sale'] ?: null,
+                'price' => ($p['price'] ?? 0) > 0 ? Money::price((float) $p['price'], (string) ($p['currency'] ?? 'ILS')) : null,
+                'option_prices' => ($p['option_prices'] ?? []) ?: null,
                 'price_rank' => isset($rank[$ref]) ? $rank[$ref] + 1 : null,
             ], fn ($v): bool => $v !== null && $v !== '');
         }
@@ -2073,6 +2082,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'in_stock' => (bool) $product->in_stock,
                 'on_sale' => (bool) $product->on_sale,
                 'price' => $product->price !== null ? (float) $product->price : null,
+                'currency' => (string) ($product->currency ?: 'ILS'),
+                'option_prices' => self::optionPrices($product),
             ] + self::details($product);
         }
 
@@ -2102,6 +2113,34 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @return array{sku: string, attributes: list<string>, sizes: list<string>, measures: list<string>, options_in_stock: list<string>}
      */
+    /** Choices a price depends on, at most this many, each with its price ("18 מ\"מ: ₪350"). */
+    private const OPTION_PRICES = 12;
+
+    /**
+     * A product whose price depends on a choice (a thickness, a size): each choice with its price, as the store sells
+     * it; none when every choice costs the same. What the writer may quote, exactly, and code holds it to.
+     *
+     * @return list<string>
+     */
+    private static function optionPrices(CatalogProduct $product): array
+    {
+        $currency = (string) ($product->currency ?: 'ILS');
+        $out = [];
+        $prices = [];
+
+        foreach ((array) ($product->payload['variations'] ?? []) as $variation) {
+            $price = $variation['price']['price'] ?? $variation['price'] ?? null;
+            $choice = implode(' / ', array_filter(array_map(fn ($a): string => trim((string) (is_array($a) ? ($a['value'] ?? '') : $a)), (array) ($variation['attributes'] ?? []))));
+            if (! is_numeric($price) || (float) $price <= 0 || $choice === '') {
+                continue;
+            }
+            $prices[] = (float) $price;
+            $out[$choice] = $choice.': '.Money::price((float) $price, $currency);
+        }
+
+        return count(array_unique($prices)) > 1 ? array_slice(array_values($out), 0, self::OPTION_PRICES) : [];
+    }
+
     private static function details(CatalogProduct $product): array
     {
         $attributes = array_map(fn (array $a): string => $a['name'].': '.implode(', ', $a['values']), $product->storeAttributes());
@@ -2480,6 +2519,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         // An answer that says what was asked about is not here ("נמצא כאן רק חטוף", "הספר של שם טוב לא מופיע"):
         // this asker's only. Kept, it answered every later question about that book wrongly, also once it was found.
         if ($outcome === AssistantAnswer::ANSWERED && self::saysMissing((string) $answer)) {
+            return null;
+        }
+        // An answer that quotes a price is today's: prices change, so it is this asker's only, never the next shopper's.
+        if ($outcome === AssistantAnswer::ANSWERED && preg_match('~₪|ש"ח|ש״ח|\d\s*שקל|[$€£]\s?\d~u', (string) $answer) === 1) {
             return null;
         }
 
