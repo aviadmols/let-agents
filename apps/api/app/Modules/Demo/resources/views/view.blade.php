@@ -50,7 +50,7 @@
 
     @if ($siteKey)
         <script>
-            window.LetsSearchConfig = { site: @json($siteKey), api: @json(url('/api/v1')), locale: @json(app()->getLocale()), launcher: 'float' };
+            window.LetsSearchConfig = { site: @json($siteKey), api: @json(url('/api/v1')), locale: @json($site->choices['language'] ?? app()->getLocale()), launcher: 'float' };
             // the hint goes once the search was opened
             document.addEventListener('click', function (e) { if (e.target && e.target.closest && !e.target.closest('[data-demo-bar]')) { var h = document.querySelector('[data-hint]'); if (h) { h.remove(); } } }, true);
         </script>

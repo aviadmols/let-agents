@@ -17,7 +17,7 @@ final class SweepDemosCommand extends Command
     public function handle(SweepDemos $sweep): int
     {
         $counts = $sweep->handle();
-        $this->line("finished {$counts['finished']}, ended {$counts['expired']}, forgotten {$counts['forgotten']}");
+        $this->line("picked up {$counts['picked_up']}, finished {$counts['finished']}, ended {$counts['expired']}, forgotten {$counts['forgotten']}");
 
         return self::SUCCESS;
     }

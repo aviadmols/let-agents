@@ -44,6 +44,15 @@
             </div>
         </fieldset>
 
+        <fieldset>
+            <legend class="field">{{ $t('start.language') }}</legend>
+            <div class="choices choices--two">
+                @foreach (\App\Modules\Demo\Actions\StartDemo::LANGUAGES as $language)
+                    <label class="choice"><input type="radio" name="language" value="{{ $language }}" required @checked(($old['language'] ?? $locale) === $language)><span><b>{{ $t('start.languages.'.$language.'.title') }}</b><small>{{ $t('start.languages.'.$language.'.text') }}</small></span></label>
+                @endforeach
+            </div>
+        </fieldset>
+
         <label class="check"><input type="checkbox" name="consent" value="1" @checked($old['consent'] ?? false)><span>{{ $t('start.consent') }}</span></label>
 
         <button class="btn btn--block" type="submit">{{ $t('start.go') }}</button>

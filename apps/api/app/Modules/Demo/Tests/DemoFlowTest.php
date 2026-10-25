@@ -6,8 +6,10 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
 use App\Modules\Demo\Jobs\PrepareDemoJob;
+use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Mail\DemoMail;
 use App\Modules\Demo\Models\DemoSite;
 use App\Modules\Demo\Support\PublicStoreFeed;
@@ -43,7 +45,17 @@ final class DemoFlowTest extends TestCase
 
     private function start(array $input = []): TestResponse
     {
-        return $this->post('/demo', $input + ['url' => 'https://www.store.test/shop', 'email' => 'Owner@Store.test', 'kind' => 'store', 'matters' => 'look', 'consent' => '1']);
+        return $this->post('/demo', $input + ['url' => 'https://www.store.test/shop', 'email' => 'Owner@Store.test', 'kind' => 'store', 'matters' => 'look', 'language' => 'he', 'consent' => '1']);
+    }
+
+    /** A demo asked for and its code typed: its store built, its preparation waiting in the queue. */
+    private function verified(array $input = []): DemoSite
+    {
+        $this->start($input);
+        $site = DemoSite::query()->latest('id')->firstOrFail();
+        $this->post('/demo/'.$site->token.'/verify', ['code' => Mail::sent(DemoMail::class)->last()->data['code']]);
+
+        return $site->refresh();
     }
 
     public function test_the_address_and_the_email_send_a_code_and_nothing_is_built_before_it(): void
@@ -54,7 +66,7 @@ final class DemoFlowTest extends TestCase
         $this->start()->assertRedirect();
 
         $site = DemoSite::query()->sole();
-        $this->assertSame(['store.test', 'owner@store.test', DemoSite::PENDING, ['kind' => 'store', 'matters' => 'look']], [$site->host, $site->email, $site->status, $site->choices]);
+        $this->assertSame(['store.test', 'owner@store.test', DemoSite::PENDING, ['kind' => 'store', 'matters' => 'look', 'language' => 'he']], [$site->host, $site->email, $site->status, $site->choices]);
         Mail::assertSent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'code' && $m->hasTo('owner@store.test') && preg_match('/^\d{6}$/', $m->data['code'] ?? '') === 1);
         $this->assertSame(0, Shop::query()->count(), 'no store until the email is proven');
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-verify', false);
@@ -136,5 +148,80 @@ final class DemoFlowTest extends TestCase
         $this->assertSame(['7', 'טבעת זהב', 'https://store.test/products/ring', 'variable', 'טבעת זהב 14K'], [$record['external_id'], $record['title'], $record['url'], $record['type'], $record['description']]);
         $this->assertSame(['890', '990', true, true], [$record['price']['price'], $record['price']['regular_price'], $record['price']['on_sale'], $record['stock']['in_stock']]);
         $this->assertSame([['name' => 'מידה', 'value' => '52']], $record['variations'][0]['attributes']);
+    }
+
+    public function test_the_language_chosen_is_the_stores_and_its_searchs(): void
+    {
+        $this->start(['language' => 'xx'])->assertSessionHas('demo_error', 'choose');
+
+        $site = $this->verified(['language' => 'en']);
+        $this->assertSame('en', $site->shop->content_locale);
+
+        $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 3])->save();
+        $this->get('/demo/'.$site->token.'?lang=he')->assertOk()->assertSee('locale: "en"', false);
+    }
+
+    public function test_the_scan_screen_shows_each_step_of_the_preparation(): void
+    {
+        $site = $this->verified();
+        $this->getJson('/demo/'.$site->token.'/progress')->assertOk()
+            ->assertJsonPath('steps', [['key' => 'read', 'state' => 'running'], ['key' => 'scan', 'state' => 'waiting'], ['key' => 'picture', 'state' => 'waiting']])
+            ->assertJsonPath('slow', false)->assertJsonPath('error', null);
+
+        Http::fake(['https://store.test/products.json*' => Http::response('<html></html>'), 'https://store.test/wp-json/*' => Http::response([['id' => 1]])]);
+        (new PrepareDemoJob($site->id))->handle(app(TenantContext::class));
+
+        $site->refresh();
+        $this->assertNotNull($site->read_at);
+        $this->assertNotNull($site->scan_at, 'the scan began');
+        $this->assertSame('woocommerce', $site->platform);
+        Queue::assertPushed(ShootDemoJob::class, fn (ShootDemoJob $job): bool => $job->demoId === $site->id);
+        $this->getJson('/demo/'.$site->token.'/progress')
+            ->assertJsonPath('steps', [['key' => 'read', 'state' => 'done'], ['key' => 'scan', 'state' => 'done'], ['key' => 'picture', 'state' => 'running']]);
+
+        $site->forceFill(['shot_at' => now()])->save();
+        $this->getJson('/demo/'.$site->token.'/progress')->assertJsonPath('steps.2.state', 'skipped');
+    }
+
+    public function test_a_preparation_that_stopped_is_sent_again_then_shown_as_a_problem_with_what_to_do(): void
+    {
+        $site = $this->verified();
+        $this->travel(5)->minutes();
+        $this->getJson('/demo/'.$site->token.'/progress')->assertJsonPath('slow', true);
+
+        Queue::fake();
+        app(SweepDemos::class)->handle();
+        Queue::assertPushed(PrepareDemoJob::class, 1);
+
+        $site->forceFill(['attempts' => 3])->save();
+        $this->travel(5)->minutes();
+        app(SweepDemos::class)->handle();
+        $this->assertSame([DemoSite::FAILED, 'stuck'], [$site->fresh()->status, $site->fresh()->error]);
+
+        $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-problem="stuck"', false)->assertSee('name="url"', false);
+        $this->getJson('/demo/'.$site->token.'/progress')->assertJsonPath('error', 'stuck')->assertJsonPath('steps.0.state', 'failed');
+    }
+
+    public function test_after_a_problem_the_demo_is_tried_again_at_the_address_corrected(): void
+    {
+        $site = $this->verified();
+        $old = $site->shop_id;
+        $site->forceFill(['status' => DemoSite::FAILED, 'error' => 'unreachable'])->save();
+        Http::fake(['https://shop.test/' => Http::response('<html><title>Shop</title></html>')]);
+
+        $this->post('/demo/'.$site->token.'/again', ['url' => 'not an address'])->assertSessionHas('demo_error', 'bad_url');
+        $this->get('/demo/'.$site->token)->assertSee('data-retry-error="bad_url"', false);
+
+        Queue::fake();
+        $this->post('/demo/'.$site->token.'/again', ['url' => 'https://shop.test'])->assertRedirect('/demo/'.$site->token);
+
+        $site->refresh();
+        $this->assertSame([DemoSite::SCANNING, 'shop.test', 1, null], [$site->status, $site->host, $site->retries, $site->error]);
+        $this->assertNull(Shop::query()->find($old), 'the failed demo\'s store went');
+        $this->assertSame('shop.test', $site->shop->domain);
+        Queue::assertPushed(PrepareDemoJob::class);
+
+        $site->forceFill(['status' => DemoSite::FAILED, 'retries' => RetryDemo::MOST])->save();
+        $this->post('/demo/'.$site->token.'/again')->assertSessionHas('demo_error', 'too_many');
     }
 }

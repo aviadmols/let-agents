@@ -34,7 +34,9 @@ final class FinishDemo
         }
 
         $products = (int) ($progress['facts']['products'] ?? 0);
-        if ($products === 0) {
+        $pages = (int) ($progress['facts']['pages'] ?? 0);
+        // a store shows its products; a content site may show only its pages
+        if ($products === 0 && ($pages === 0 || ($site->choices['kind'] ?? 'store') === 'store')) {
             $site->forceFill(['status' => DemoSite::FAILED, 'error' => 'no_products'])->save();
 
             return $site;
@@ -43,7 +45,7 @@ final class FinishDemo
         $site->forceFill([
             'status' => DemoSite::READY,
             'products' => $products,
-            'pages' => (int) ($progress['facts']['pages'] ?? 0),
+            'pages' => $pages,
             'ready_at' => now(),
             'expires_at' => now()->addDays((int) Settings::get('demo.keep_days')),
         ])->save();

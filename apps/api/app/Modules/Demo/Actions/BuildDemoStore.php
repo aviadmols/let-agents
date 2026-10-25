@@ -53,7 +53,7 @@ final class BuildDemoStore
                 'domain' => $site->host,
                 'platform' => 'woocommerce',
                 'slug' => 'demo-'.Str::lower(Str::random(6)),
-                'content_locale' => $site->locale,
+                'content_locale' => $site->choices['language'] ?? $site->locale,
                 'status' => ShopStatus::Demo->value,
             ]);
             $shop->forceFill(['profile' => ['kind' => (string) ($site->choices['kind'] ?? 'store')]])->save();

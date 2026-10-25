@@ -35,6 +35,7 @@
         fieldset { border: 0; padding: 0; margin: 22px 0 0; min-width: 0; }
         fieldset legend.field { margin: 0; padding: 0; }
         .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+        .choices--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         @media (max-width: 520px) { .choices { grid-template-columns: 1fr; } }
         .choice { position: relative; display: block; cursor: pointer; }
         .choice input { position: absolute; opacity: 0; pointer-events: none; }

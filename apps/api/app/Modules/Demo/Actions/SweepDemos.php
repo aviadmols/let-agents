@@ -2,28 +2,52 @@
 
 namespace App\Modules\Demo\Actions;
 
+use App\Modules\Demo\Jobs\PrepareDemoJob;
 use App\Modules\Demo\Models\DemoSite;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The demos, kept in order: a scan done is finished for whoever left its screen (FinishDemo); a demo past its end
- * is deleted with all its store holds (the shop and, by cascade, its catalogue, search, vectors, answers, usage), its
- * pictures dropped and its row kept as expired for the team; a code never used is forgotten after a day; an
- * expired row after demo rows' own time. Code only.
+ * The demos, kept in order: a preparation that stopped before the scan began (its job cut off) is sent again, a few
+ * times, then the demo fails, said on its screen; a picture still not taken long after is given up on; a scan done
+ * is finished for whoever left its screen (FinishDemo); a demo past its end is deleted with all its store holds
+ * (the shop and, by cascade, its catalogue, search, vectors, answers, usage), its pictures dropped and its row kept
+ * as expired for the team; a code never used is forgotten after a day; an expired row after demo rows' own time.
+ * Code only.
  */
 final class SweepDemos
 {
     /** An expired demo's row, without its store, stays this long for the team to see who asked. */
     private const ROW_DAYS = 90;
 
+    /** A demo's preparation is sent this many times at most. */
+    private const TRIES = 3;
+
     public function __construct(private readonly FinishDemo $finish) {}
 
-    /** @return array{finished: int, expired: int, forgotten: int} */
+    /** A preparation with no step done this long is taken to have stopped. */
+    private const STOPPED_MINUTES = 4;
+
+    /** @return array{picked_up: int, finished: int, expired: int, forgotten: int} */
     public function handle(): array
     {
-        $counts = ['finished' => 0, 'expired' => 0, 'forgotten' => 0];
+        $counts = ['picked_up' => 0, 'finished' => 0, 'expired' => 0, 'forgotten' => 0];
+
+        foreach (DemoSite::query()->where('status', DemoSite::SCANNING)->whereNotNull('shop_id')->whereNull('scan_at')
+            ->where('updated_at', '<', now()->subMinutes(self::STOPPED_MINUTES))->get() as $site) {
+            if ($site->attempts >= self::TRIES) {
+                $site->forceFill(['status' => DemoSite::FAILED, 'error' => 'stuck'])->save();
+
+                continue;
+            }
+            $site->touch();
+            PrepareDemoJob::dispatch($site->id)->onQueue('long');
+            $counts['picked_up']++;
+        }
+
+        DemoSite::query()->where('status', DemoSite::SCANNING)->whereNotNull('scan_at')->whereNull('shot_at')
+            ->where('scan_at', '<', now()->subMinutes(15))->update(['shot_at' => now()]);
 
         foreach (DemoSite::query()->where('status', DemoSite::SCANNING)->get() as $site) {
             $counts['finished'] += $this->finish->handle($site)->status !== DemoSite::SCANNING ? 1 : 0;

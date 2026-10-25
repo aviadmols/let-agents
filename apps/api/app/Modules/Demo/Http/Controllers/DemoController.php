@@ -6,6 +6,7 @@ use App\Core\Localization\Locales;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Actions\FinishDemo;
+use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\StartDemo;
 use App\Modules\Demo\Actions\VerifyDemo;
 use App\Modules\Demo\Models\DemoSite;
@@ -25,7 +26,9 @@ use Illuminate\Routing\Controller;
  *                               the demo itself (the store's picture with Lets' floating search on it), or its end
  *   POST /demo/{token}/verify   the code (VerifyDemo): the demo store is built and its scan starts
  *   POST /demo/{token}/code     a new code
- *   GET  /demo/{token}/progress the scan so far, for the screen to draw; done, the demo is ready (FinishDemo)
+ *   GET  /demo/{token}/progress the preparation and the scan so far, for the screen to draw, or the problem it hit;
+ *                               done, the demo is ready (FinishDemo)
+ *   POST /demo/{token}/again    after a problem: again, at the same address or a corrected one (RetryDemo)
  *   GET  /demo/{token}/shot/{which}  the store's picture, for a computer or a phone
  */
 final class DemoController extends Controller
@@ -38,7 +41,7 @@ final class DemoController extends Controller
     public function start(Request $request, StartDemo $start): RedirectResponse
     {
         $locale = $this->speak($request);
-        $result = $start->handle($request->only(['url', 'email', 'kind', 'matters', 'consent']), $request->ip(), $locale);
+        $result = $start->handle($request->only(['url', 'email', 'kind', 'matters', 'language', 'consent']), $request->ip(), $locale);
 
         if (isset($result['error'])) {
             return redirect()->route('demo.form', ['lang' => $locale])->withInput()->with('demo_error', $result['error']);
@@ -54,7 +57,8 @@ final class DemoController extends Controller
 
         return match ($site->status) {
             DemoSite::PENDING => response(view('demo::verify', ['site' => $site, 'result' => session('demo_result')])),
-            DemoSite::SCANNING => response(view('demo::scan', ['site' => $site])),
+            // a problem is shown on the scan screen, where it happened, with what to do about it
+            DemoSite::SCANNING, DemoSite::FAILED => response(view('demo::scan', ['site' => $site, 'steps' => self::steps($site), 'retry' => session('demo_error')])),
             DemoSite::READY => $site->live() ? response(view('demo::view', ['site' => $site, 'siteKey' => $this->siteKey($site)])) : response(view('demo::ended', ['site' => $site])),
             default => response(view('demo::ended', ['site' => $site])),
         };
@@ -86,9 +90,46 @@ final class DemoController extends Controller
 
         return response()->json([
             'status' => $site->status,
+            'error' => $site->status === DemoSite::FAILED ? ($site->error ?? 'other') : null,
+            'steps' => self::steps($site),
+            // the scan not begun a while after the code: said, so no one waits on a screen that looks still
+            'slow' => $site->status === DemoSite::SCANNING && $site->scan_at === null && $site->verified_at?->lt(now()->subMinutes(2)) === true,
             'rows' => $progress['rows'] ?? [],
             'learned' => $progress['learned'] ?? [],
         ])->header('Cache-Control', 'no-store');
+    }
+
+    public function again(Request $request, string $token, RetryDemo $retry): RedirectResponse
+    {
+        $site = $this->site($token);
+        $result = $retry->handle($site, is_string($request->input('url')) ? $request->input('url') : null);
+
+        return redirect()->route('demo.show', $site->token)->with('demo_error', $result === 'ok' ? null : $result);
+    }
+
+    /**
+     * The demo's preparation before its scan, a step at a time (PrepareDemoJob, ShootDemoJob): reading the site,
+     * starting the scan, the home page's picture. Each waiting, running, done, failed or, for the picture, skipped.
+     *
+     * @return list<array{key: string, state: string}>
+     */
+    private static function steps(DemoSite $site): array
+    {
+        $failed = $site->status === DemoSite::FAILED;
+        $state = fn (bool $done, bool $begun): string => match (true) {
+            $done => 'done',
+            ! $begun => 'waiting',
+            $failed => 'failed',
+            default => 'running',
+        };
+
+        return [
+            ['key' => 'read', 'state' => $state($site->read_at !== null, true)],
+            ['key' => 'scan', 'state' => $state($site->scan_at !== null, $site->read_at !== null)],
+            ['key' => 'picture', 'state' => $site->shot_at !== null
+                ? ($site->screenshot !== null ? 'done' : 'skipped')
+                : ($failed ? 'waiting' : $state(false, $site->scan_at !== null))],
+        ];
     }
 
     public function shot(string $token, string $which): Response

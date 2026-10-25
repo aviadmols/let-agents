@@ -27,13 +27,16 @@ final class StartDemo
 
     public const MATTERS = ['look', 'content', 'both'];
 
+    /** The language of the store's site and its search, as whoever asks chooses it. */
+    public const LANGUAGES = ['he', 'en'];
+
     /** The code is good this long, and this many times wrong. */
     public const CODE_MINUTES = 15;
 
     public const CODE_TRIES = 5;
 
     /**
-     * @param  array{url?: mixed, email?: mixed, kind?: mixed, matters?: mixed, consent?: mixed}  $input
+     * @param  array{url?: mixed, email?: mixed, kind?: mixed, matters?: mixed, language?: mixed, consent?: mixed}  $input
      * @return array{token: string}|array{error: string}
      */
     public function handle(array $input, ?string $ip, string $locale): array
@@ -45,13 +48,9 @@ final class StartDemo
             ! Features::enabled('demo.enabled') => 'closed',
             $host === null => 'bad_url',
             filter_var($email, FILTER_VALIDATE_EMAIL) === false => 'bad_email',
-            ! in_array($input['kind'] ?? null, self::KINDS, true) || ! in_array($input['matters'] ?? null, self::MATTERS, true) => 'choose',
-            ! PublicSite::public($host) => 'bad_url',
-            Shop::query()->where('domain', $host)->where('status', '!=', ShopStatus::Demo->value)->exists() => 'already',
-            DemoSite::query()->where('created_at', '>=', now()->startOfDay())->count() >= (int) Settings::get('demo.per_day') => 'busy',
-            DemoSite::query()->where('email', $email)->where('created_at', '>=', now()->subDay())->count() >= (int) Settings::get('demo.per_email_per_day') => 'too_many',
-            PublicSite::get($host, '/') === null => 'unreachable',
-            default => null,
+            ! in_array($input['kind'] ?? null, self::KINDS, true) || ! in_array($input['matters'] ?? null, self::MATTERS, true)
+                || ! in_array($input['language'] ?? null, self::LANGUAGES, true) => 'choose',
+            default => self::siteProblem($host, $email),
         };
 
         if ($error !== null) {
@@ -65,7 +64,7 @@ final class StartDemo
             'host' => $host,
             'email' => $email,
             'consent' => (bool) ($input['consent'] ?? false),
-            'choices' => ['kind' => $input['kind'], 'matters' => $input['matters']],
+            'choices' => ['kind' => $input['kind'], 'matters' => $input['matters'], 'language' => $input['language']],
             'locale' => $locale,
             'code_hash' => Hash::make($code),
             'code_expires_at' => now()->addMinutes(self::CODE_MINUTES),
@@ -76,6 +75,23 @@ final class StartDemo
         self::sendCode($site, $code);
 
         return ['token' => $site->token];
+    }
+
+    /**
+     * What stops a demo of this site, before anything is read or paid for: no public address, a store already on
+     * Lets, the day's demos used up, this email's (when it asks for a new demo, not again for the same one), a site
+     * that does not answer. Null when nothing does.
+     */
+    public static function siteProblem(string $host, ?string $email): ?string
+    {
+        return match (true) {
+            ! PublicSite::public($host) => 'bad_url',
+            Shop::query()->where('domain', $host)->where('status', '!=', ShopStatus::Demo->value)->exists() => 'already',
+            DemoSite::query()->where('created_at', '>=', now()->startOfDay())->count() >= (int) Settings::get('demo.per_day') => 'busy',
+            $email !== null && DemoSite::query()->where('email', $email)->where('created_at', '>=', now()->subDay())->count() >= (int) Settings::get('demo.per_email_per_day') => 'too_many',
+            PublicSite::get($host, '/') === null => 'unreachable',
+            default => null,
+        };
     }
 
     /** A new code for the same demo: the old one stops working. */

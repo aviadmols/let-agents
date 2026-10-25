@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $title
  * @property string $email
  * @property bool $consent
- * @property array{kind?: string, matters?: string}|null $choices
+ * @property array{kind?: string, matters?: string, language?: string}|null $choices
  * @property string $locale
  * @property string|null $code_hash
  * @property Carbon|null $code_expires_at
@@ -36,6 +36,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $ready_at
  * @property Carbon|null $emailed_at
  * @property Carbon|null $expires_at
+ * @property Carbon|null $read_at
+ * @property Carbon|null $scan_at
+ * @property Carbon|null $shot_at
+ * @property int $attempts
+ * @property int $retries
  */
 class DemoSite extends Model
 {
@@ -69,6 +74,11 @@ class DemoSite extends Model
             'ready_at' => 'datetime',
             'emailed_at' => 'datetime',
             'expires_at' => 'datetime',
+            'read_at' => 'datetime',
+            'scan_at' => 'datetime',
+            'shot_at' => 'datetime',
+            'attempts' => 'integer',
+            'retries' => 'integer',
         ];
     }
 

@@ -36,7 +36,14 @@ final class VerifyDemo
         }
 
         $site->forceFill(['verified_at' => now(), 'code_hash' => null])->save();
+        $this->begin($site);
 
+        return 'ok';
+    }
+
+    /** A verified demo begins: the store's live demo when it has one, else a demo store of its own and its preparation. */
+    public function begin(DemoSite $site): void
+    {
         $live = DemoSite::query()->where('host', $site->host)->whereKeyNot($site->id)->whereNotNull('shop_id')
             ->whereIn('status', [DemoSite::SCANNING, DemoSite::READY])->latest()->first();
 
@@ -46,12 +53,10 @@ final class VerifyDemo
                 'screenshot' => $live->screenshot, 'screenshot_mobile' => $live->screenshot_mobile, 'products' => $live->products, 'pages' => $live->pages,
                 'ready_at' => $live->ready_at, 'expires_at' => $live->expires_at])->save();
 
-            return 'ok';
+            return;
         }
 
         $this->build->handle($site);
         PrepareDemoJob::dispatch($site->id)->onQueue('long');
-
-        return 'ok';
     }
 }
