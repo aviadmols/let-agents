@@ -120,7 +120,7 @@
       var d = got.d, ids = got.ids;
       var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       return products(ids.slice(0, 8)).then(function () {
-        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
+        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, near: d.near || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
         announce(t('announceResults', { n: ids.length }));
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });

@@ -176,6 +176,10 @@
     all.forEach(function (r) { recForms(r); r._ww.forEach(function (w) { if (w.length > start.length && w.indexOf(start) === 0) { n[w] = (n[w] || 0) + 1; } }); });
     return Object.keys(n).sort(function (a, b) { return n[b] - n[a]; })[0] || null;
   }
+  function nearTerm(turn, n) {
+    var hit = (turn.near || []).filter(function (x) { return x && x.word === n; })[0];
+    return hit ? String(hit.term) : null;
+  }
   function readWords(turn, all, taken) {
     var c = C(turn), E = S.engine;
     c.words = {};
@@ -194,6 +198,12 @@
       var says = all.filter(function (r) { return saysWord(r, forms); }).length;
       // part typed and no product says it whole: the word it starts ("לוג": "לוגו"), named as the store says it
       var whole = !says && !not && i === words.length - 1 ? completed(all, n) : null;
+      // a word the store does not write, read by meaning as one it does (the server's near: "מפוספס" is "פסים")
+      var near = !says && !whole ? nearTerm(turn, n) : null;
+      if (near) {
+        var nf = wordForms(E.normalize(near));
+        if (all.some(function (r) { return saysWord(r, nf); })) { whole = near; }
+      }
       if (!says && !whole) { return; }
       if (not && says === all.length) { return; }
       c.words[key] = { label: not ? w + ' ' + word : (whole || word), at: not ? [i, i + 1] : [i], forms: whole ? wordForms(whole) : forms, not: !!not };

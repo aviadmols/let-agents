@@ -21,6 +21,7 @@ use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\RefreshesVectors;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Contracts\TermVectors;
 use App\Modules\Retrieval\Contracts\TopicQuestions;
 use App\Modules\Retrieval\Listeners\RefreshVectors;
 use App\Modules\Retrieval\Sources\ContentDocuments;
@@ -32,6 +33,7 @@ use App\Modules\Retrieval\Support\PassageSearch;
 use App\Modules\Retrieval\Support\QueuedVectorRefresh;
 use App\Modules\Retrieval\Support\RetrievalRunner;
 use App\Modules\Retrieval\Support\RetrievalShopFacts;
+use App\Modules\Retrieval\Support\StoredTermVectors;
 use App\Modules\Retrieval\Support\TopicAsks;
 use App\Modules\Retrieval\Support\VectorSearch;
 use Illuminate\Console\Scheduling\Schedule;
@@ -51,6 +53,7 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->bind(SemanticSearch::class, VectorSearch::class);
+        $this->app->bind(TermVectors::class, StoredTermVectors::class);
         $this->app->bind(Passages::class, PassageSearch::class);
         $this->app->bind(TopicQuestions::class, TopicAsks::class);
         // One per process: the pieces it embeds are kept for the next question of the same experiment.

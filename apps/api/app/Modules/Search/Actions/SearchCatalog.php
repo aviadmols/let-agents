@@ -14,6 +14,7 @@ use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Contracts\TermVectors;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Contracts\RelatedByTags;
@@ -66,6 +67,9 @@ final class SearchCatalog
 
     /** A filter of whom a product is for: kept when a search that found nothing is loosened (loosened()). */
     private const WHOM_FACETS = ['audience', 'gender', 'for_whom', 'target_audience', 'age_group'];
+
+    /** Words a search does not know, read by meaning as the store's nearest (search.word_vectors), at most. */
+    private const NEAR_WORDS = 2;
 
     /** A search that found nothing is tried again without one word, this many words at most (loosened()). */
     private const LOOSE_TRIES = 3;
@@ -429,6 +433,28 @@ final class SearchCatalog
             // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
             // a few of them, and the drawer says the word was not found (unknown) rather than showing dozens as if it were.
             $unknown = $byMeaning ? HebrewSearch::unknownWords($index['engine'], $query) : [];
+            // a word the store does not write, read as the one it does nearest in meaning ("מפוספס": "פסים"): at a pause or
+            // on Enter only, one vector per word, kept. What says that word is found with the rest, and the word is no
+            // longer "not found".
+            $nearWords = [];
+            if ($unknown !== [] && Features::enabled('search.word_vectors', $shopId) && app()->bound(TermVectors::class)) {
+                $floor = (float) Settings::get('search.word_vector_min', $shopId);
+                foreach (array_slice($unknown, 0, self::NEAR_WORDS) as $word) {
+                    $best = app(TermVectors::class)->nearest($shopId, HebrewSearch::withFinals((string) $word), 1, $floor)[0] ?? null;
+                    if ($best !== null && HebrewSearch::normalize($best['term']) !== $word) {
+                        $nearWords[(string) $word] = (string) $best['term'];
+                    }
+                }
+                $unknown = array_values(array_diff($unknown, array_keys($nearWords)));
+            }
+            $termHits = [];
+            foreach ($nearWords as $term) {
+                foreach (HebrewSearch::search($index['engine'], $term) as $hit) {
+                    if (str_starts_with((string) $hit['id'], 'p:') && ! in_array($hit['id'], $termHits, true)) {
+                        $termHits[] = (string) $hit['id'];
+                    }
+                }
+            }
             $spelled = array_column(array_filter($spelling, fn (array $hit): bool => str_starts_with($hit['id'], 'p:')), 'id');
             $near = $byMeaning ? $this->meaning($shopId, $sentence ?? $query, $index['records'], $spelled) : ['products' => [], 'content' => [], 'best' => 0.0];
             // "מדע בדיוני" in a store with no science fiction: no product holds the words, and the nearest by meaning is far
@@ -548,7 +574,7 @@ final class SearchCatalog
             if (isset($held)) {
                 $guided = array_values(array_filter($guided, fn (string $id): bool => isset($held[$id])));
             }
-            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided, $described], [...$pinned, ...$subject], [1.0, 1.0, self::GUIDED_WEIGHT, self::DESCRIBED_WEIGHT]);
+            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided, $described, $termHits], [...$pinned, ...$subject], [1.0, 1.0, self::GUIDED_WEIGHT, self::DESCRIBED_WEIGHT, 1.0]);
             // The guides by meaning after those the words found, each once.
             $ranked = [...$ranked, ...array_values(array_diff(array_column($guides, 'id'), $ranked))];
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
@@ -654,7 +680,9 @@ final class SearchCatalog
 
             // held: how many products hold every word as typed. None: what is shown is only what is nearest by meaning,
             // and the drawer says so, with the AI one press away, rather than showing it as if it were what was asked for.
-            return ['query' => $query, 'unknown' => $unknown, 'held' => count(self::whole($spelling)), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
+            return ['query' => $query, 'unknown' => $unknown, 'held' => count(self::whole($spelling)), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts]
+                // the words read by meaning as the store writes them ("מפוספס": "פסים"), for the drawer to show as it reads them
+                + ($nearWords === [] ? [] : ['near' => array_map(fn (string $w, string $t): array => ['word' => $w, 'term' => $t], array_keys($nearWords), array_values($nearWords))]);
         });
     }
 

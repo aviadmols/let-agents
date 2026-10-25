@@ -97,6 +97,10 @@ return [
         'label' => 'Lets posts in search results',
         'description' => 'Posts Lets wrote and the store published live at Lets\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
     ],
+    'word_vectors' => [
+        'label' => 'Words by meaning',
+        'description' => 'A word the store does not write ("striped") is read by its meaning as one it does ("stripes"), and shown as a filter.',
+    ],
     'scan_check' => [
         'label' => 'Search check after a scan',
         'description' => 'At the end of every scan the search is tried on searches made from the products and on searches like a shopper\'s; what fails is mended for this store alone, and a report is sent.',

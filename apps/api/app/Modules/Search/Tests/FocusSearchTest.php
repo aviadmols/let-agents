@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Retrieval\Contracts\TermVectors;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Support\HebrewSearch;
@@ -126,6 +127,37 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['לבן'], $found['loosened']['left'] ?? null, 'and says the white was left out');
         $this->assertSame([['query' => 'חולצה לגברים לבן', 'count' => 1]], $found['loosened']['also'] ?? null, 'the white men\'s shirt a press away');
         $this->assertArrayNotHasKey('loosened', $this->search('חולצה לגברים'), 'found as asked: nothing loosened');
+    }
+
+    public function test_a_word_the_store_does_not_write_is_read_by_meaning_as_one_it_does(): void
+    {
+        // "חולצה מפוספסת" in a store that writes "פסים": the striped shirt, and the word is not "not found".
+        $this->app->instance(TermVectors::class, new class implements TermVectors
+        {
+            public function remember(string $shopId, array $terms): int
+            {
+                return 0;
+            }
+
+            public function nearest(string $shopId, string $word, int $limit, float $floor): array
+            {
+                return str_starts_with($word, 'מפוספס') ? [['term' => 'פסים', 'similarity' => 0.82]] : [];
+            }
+        });
+        $this->catalog([
+            '1' => ['חולצה מכופתרת Striped פסים', 'ביגוד'],
+            '2' => ['חולצה מכופתרת Plain', 'ביגוד'],
+            '3' => ['מכנסיים Lou', 'ביגוד'],
+        ]);
+
+        $found = $this->search('חולצה מפוספסת');
+
+        $this->assertSame('1', $found['groups']['product'][0]['external_id'] ?? null);
+        $this->assertSame([['word' => 'מפוספסת', 'term' => 'פסים']], $found['near'] ?? null, 'read as the store writes it');
+        $this->assertNotContains('מפוספסת', (array) $found['unknown']);
+
+        Features::override('search.word_vectors', false, $this->shop->id);
+        $this->assertArrayNotHasKey('near', $this->search('חולצה מפוספסת'), 'off for the store: never asked');
     }
 
     public function test_a_latin_name_typed_in_hebrew_finds_it(): void

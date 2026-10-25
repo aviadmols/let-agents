@@ -395,6 +395,14 @@ return [
         'label' => 'Search check after a scan: mend or only report',
         'description' => 'After every scan the search is tried the way shoppers will search. "dry": a report only, nothing written. "apply": what fails is mended for this store alone (tags from the products\' descriptions, and searches one model matched and a model of the other family checked).',
     ],
+    'word_vector_min' => [
+        'label' => 'Least likeness for a word by meaning',
+        'description' => 'How near in meaning a typed word must be to a word of the store to be read as it.',
+    ],
+    'vocabulary_terms' => [
+        'label' => 'Store words kept by meaning',
+        'description' => 'How many of the words the products say are kept as vectors, at every index build (only new ones cost).',
+    ],
     'scan_check_usd' => [
         'label' => 'Cost cap of the search check after a scan',
         'description' => 'For a store\'s whole check: writing shoppers\' searches, the mending and the questions to the assistant. What does not fit under it is not done.',

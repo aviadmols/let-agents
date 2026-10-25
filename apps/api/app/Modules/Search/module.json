@@ -17,6 +17,10 @@
     "provider": "SearchServiceProvider",
     "features": [
         {
+            "name": "word_vectors",
+            "default": true
+        },
+        {
             "name": "content_by_meaning",
             "default": false
         },
@@ -953,6 +957,23 @@
             ],
             "default": "dry",
             "scope": "shop"
+        },
+        {
+            "name": "word_vector_min",
+            "type": "float",
+            "default": 0.6,
+            "min": 0.3,
+            "max": 0.95,
+            "scope": "shop"
+        },
+        {
+            "name": "vocabulary_terms",
+            "type": "int",
+            "default": 1500,
+            "min": 0,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "items"
         },
         {
             "name": "scan_check_usd",
