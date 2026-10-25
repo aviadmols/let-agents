@@ -44,6 +44,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 
 /**
@@ -149,7 +150,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         'מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'אלה', 'אלו', 'them', 'these', 'those', 'ones'];
 
     /** Words that point back at the products the conversation just showed. */
-    private const REFERS = ['מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'them', 'these', 'those', 'ones'];
+    private const REFERS = ['מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'התוצאות', 'them', 'these', 'those', 'ones', 'results'];
 
     /** Words that ask about the whole store, whatever was shown before: "מה הכי זול באתר". */
     private const STORE_WIDE = ['באתר', 'בחנות', 'מכל', 'האתר', 'החנות', 'בכל', 'store', 'shop', 'site', 'all'];
@@ -1445,7 +1446,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($cited === [] && $picks === [] && $answer !== '') {
             $picks = self::namedInAnswer($answer, [], $productsByRef);
         }
-        $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
+        // A number the answer gives is known when any page the writer was given says it, cited or not (Rocks, 25.10: "14
+        // יום" was in the line every product page prints and in the returns policy, the writer cited the two pages that
+        // say "שבועיים", and the sentence that answered the question was taken out).
+        $known = implode("\n", array_map(fn (array $passage): string => $passage['title']."\n".$passage['text'], $byRef))
             ."\n".implode("\n", array_map(fn (array $p): string => $p['title'].' '.$p['about'], $productsByRef))."\n".$question;
 
         // A size or a measure the model was given in dynamic mode is in what it was given.
@@ -1554,6 +1558,9 @@ final class AnswerSiteQuestion implements TriesQuestions
         for ($i = 0; $i < count($parts); $i += 2) {
             if (trim($parts[$i]) !== '' && $bad($parts[$i])) {
                 $out++;
+                // a bare "כן." or "Yes." just before it answered what went: it goes too (Rocks, 25.10: "כן." was left
+                // in front of the exceptions, the policy it said yes to taken out)
+                $left = (string) preg_replace('/(?:^|(?<=[.!?\n]))\s*(?:כן|לא|בהחלט|yes|no|sure)[.!,]?\s*$/iu', '', $left);
 
                 continue;
             }
@@ -2400,9 +2407,14 @@ final class AnswerSiteQuestion implements TriesQuestions
                 ? CatalogProduct::query()->whereKey($passage['source_id'])->first(['title', 'url'])
                 : CatalogContent::query()->whereKey($passage['source_id'])->first(['title', 'url']);
 
-            // what the store says about itself (shipping, returns): the drawer shows no products beside such an answer
-            $out[] = ['title' => (string) ($page->title ?? $passage['title']), 'url' => $page?->url, 'type' => $passage['source'] === 'product' ? 'product' : 'content']
-                + (($passage['kind'] ?? null) === 'knowledge' ? ['store' => true] : []);
+            // A store's policy page under the name Shopify gives it in English ("Terms of service"), in the store's language.
+            $policy = preg_match('~/policies/([a-z-]+)~', (string) ($page?->url ?? ''), $m) === 1 && Lang::has('assistant::answers.policies.'.$m[1]) ? $m[1] : null;
+            $title = $policy !== null && preg_match('/^[\x00-\x7F]+$/', (string) ($page->title ?? '')) === 1
+                ? (string) __('assistant::answers.policies.'.$policy, [], (string) (Shop::query()->whereKey($this->tenant->require())->value('content_locale') ?: 'he'))
+                : (string) ($page->title ?? $passage['title']);
+            // what the store says about itself (shipping, returns, its policies): the drawer shows no products beside such an answer
+            $out[] = ['title' => $title, 'url' => $page?->url, 'type' => $passage['source'] === 'product' ? 'product' : 'content']
+                + (($passage['kind'] ?? null) === 'knowledge' || $policy !== null ? ['store' => true] : []);
 
             if (count($out) >= self::MAX_SOURCES) {
                 break;

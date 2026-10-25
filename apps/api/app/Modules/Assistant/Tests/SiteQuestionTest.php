@@ -10,6 +10,7 @@ use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Actions\MendShownQuestions;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -773,6 +774,41 @@ final class SiteQuestionTest extends TestCase
         $prepared = ['byRef' => [], 'productsByRef' => ['p1' => ['title' => 'פלטת לאמי אורן', 'about' => 'פלטה.', 'external_id' => '971']], 'forModel' => [['ref' => 'p1', 'price' => '₪350', 'option_prices' => ['18 מ"מ: ₪350']]]];
         $screened = app(AnswerSiteQuestion::class)->screen(['answer' => 'הפלטה עולה ₪350. היא פלטת לאמי מאורן. חיתוך לגודל אחר יעלה ₪210.', 'picks' => [['ref' => 'p1', 'why' => 'פלטה']]], $prepared, 'כמה עולה?', 'full');
         $this->assertSame('הפלטה עולה ₪350. היא פלטת לאמי מאורן.', $screened['answer'], 'the made-up sum goes, the store\'s price stays');
+    }
+
+    public function test_a_number_any_given_page_states_stays_and_a_bare_yes_never_outlives_what_it_answered(): void
+    {
+        // Rocks, 25.10: "14 יום" is in the line every product page prints, not in the two pages the writer cited, which
+        // say "שבועיים"; the sentence that answered was taken out and "כן." was left in front of the exceptions.
+        $prepared = ['byRef' => [
+            's1' => ['title' => 'מידע שמופיע בכל דפי המוצר באתר', 'text' => '- החזר כספי מלא תוך 14 יום', 'source' => 'content', 'source_id' => '1'],
+            's2' => ['title' => 'תקנון', 'text' => 'ניתן להחזיר מוצר תוך שבועיים. לא ניתן להחזיר מוצר שנעשה בו שימוש.', 'source' => 'content', 'source_id' => '2'],
+        ], 'productsByRef' => [], 'forModel' => []];
+        $screen = fn (string $answer): array => app(AnswerSiteQuestion::class)->screen(['answer' => $answer, 'refs' => ['s2']], $prepared, 'אפשר להחזיר?', 'full');
+
+        $kept = $screen('כן. אפשר להחזיר מוצר ולקבל החזר כספי מלא בתוך 14 יום. מוצר שנעשה בו שימוש לא ניתן להחזיר.');
+        $this->assertSame('כן. אפשר להחזיר מוצר ולקבל החזר כספי מלא בתוך 14 יום. מוצר שנעשה בו שימוש לא ניתן להחזיר.', $kept['answer'], 'a number a given page states is the store\'s, cited or not');
+
+        $trimmed = $screen('כן. אפשר להחזיר תוך 30 יום. מוצר שנעשה בו שימוש לא ניתן להחזיר, ואפשר לפנות לצוות החנות לכל שאלה.');
+        $this->assertSame('מוצר שנעשה בו שימוש לא ניתן להחזיר, ואפשר לפנות לצוות החנות לכל שאלה.', $trimmed['answer'], 'the made-up number goes, and the "כן." it answered with it');
+    }
+
+    public function test_the_questions_shown_to_others_are_mended_once_and_never_changed_into_another(): void
+    {
+        $saved = fn (string $question): AssistantAnswer => $this->inShop(fn () => AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'question' => $question, 'question_key' => Question::key($question),
+            'answer' => 'תשובה.', 'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN, 'source' => 'store', 'shared_at' => now(), 'asked_count' => 2, 'visitors' => 2, 'prompt_version' => 7, 'last_asked_at' => now()]));
+        $typo = $saved('אפשר להחיזר מוצר?');
+        $fine = $saved('תוך כמה זמן מגיע המשלוח?');
+        $this->replies = [['questions' => [['id' => 'q1', 'corrected' => 'אפשר להחזיר מוצר?'], ['id' => 'q2', 'corrected' => 'מה שעות הפתיחה של החנות בסניף?']]]];
+
+        app(MendShownQuestions::class)->handle($this->shop->id);
+
+        $this->assertSame('אפשר להחזיר מוצר?', $typo->fresh()->flags['corrected'] ?? null, 'the slip mended');
+        $this->assertArrayNotHasKey('corrected', (array) $fine->fresh()->flags, 'a wording that changes the question is never kept');
+        $this->assertTrue((bool) ($fine->fresh()->flags['mend_read'] ?? false));
+        $this->assertCount(1, $this->calls, 'all the shop\'s questions in one call');
+        $this->assertNull(app(MendShownQuestions::class)->handle($this->shop->id), 'never asked twice');
+        $this->assertTrue(AnswerSiteQuestion::pointsBack('מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "ספר"?'), 'the drawer\'s question about one search\'s results is never kept for others');
     }
 
     public function test_code_reads_the_results_before_the_model_ranks_never_prices(): void

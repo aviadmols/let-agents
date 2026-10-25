@@ -8,6 +8,15 @@ return [
     'unavailable' => 'לא הצלחנו לענות כרגע. נסו שוב מאוחר יותר.',
     'personal_data' => 'כדי לשמור על הפרטיות שלכם, אל תכתבו כאן טלפון, מייל, כתובת או פרטי תשלום. אפשר לשאול בלי הפרטים, או לפנות ישירות לצוות החנות.',
     'blocked' => 'אי אפשר לשאול כאן כרגע. הצוות של החנות ישמח לעזור.',
+    // A store's policy pages under the names Shopify gives them in English, as sources in the store's language.
+    'policies' => [
+        'refund-policy' => 'מדיניות החזרות',
+        'shipping-policy' => 'מדיניות משלוחים',
+        'terms-of-service' => 'תקנון',
+        'privacy-policy' => 'מדיניות פרטיות',
+        'contact-information' => 'פרטי התקשרות',
+        'legal-notice' => 'הודעה משפטית',
+    ],
     'site' => [
         'personal_data' => 'כדי לשמור על הפרטיות שלכם, אל תכתבו כאן טלפון, מייל, כתובת או פרטי תשלום. אפשר לשאול בלי הפרטים, או לפנות ישירות לצוות החנות.',
         'blocked' => 'אי אפשר לשאול כאן כרגע. הצוות של החנות ישמח לעזור.',

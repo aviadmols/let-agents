@@ -167,7 +167,8 @@
     }
     html += setHtml(turn);
     html += alsoHtml(turn);
-    var src = (turn.sources || []).filter(function (s) { return s && (s.title || s.product); });
+    // a page the shopper can open, never what Lets gathered of the store with no page of its own ("מה שהפוסטים…")
+    var src = (turn.sources || []).filter(function (s) { return s && ((s.title && s.url) || s.product); });
     if (src.length) {
       html += '<div class="ls-source">' + icon('doc', 'ls-icon--sm') + esc(t('from')) + ' ' + src.slice(0, 2).map(function (s) { var r = s.product && rec(s.product); return '<a href="' + esc(s.url || (r && r.url) || '#') + '">' + esc(s.title || (r && decode(r.title).split('|')[0]) || '') + '</a>'; }).join(' · ') + '</div>';
     }

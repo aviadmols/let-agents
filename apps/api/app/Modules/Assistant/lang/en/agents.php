@@ -8,5 +8,6 @@ return [
     'team_helper' => 'Drafts the team answers',
     'knowledge_checker' => 'Checks what the team added against the site',
     'answer_preparer' => 'Prepares answers to questions about the store',
+    'question_mender' => 'Mends the spelling of questions shown to shoppers',
     'page_reader' => 'Reads what every product page says',
 ];

@@ -28,6 +28,7 @@ use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Lang;
 
 /**
  * What a shop's search box searches, as one list: every product the store still publishes,
@@ -577,6 +578,8 @@ final class BuildSearchIndex
             return [];
         }
 
+        $locale = $this->locale($shopId);
+
         return AssistantAnswer::query()
             ->with(['product:id,title,url,removed_at', 'content:id,title,url'])
             ->where('outcome', AssistantAnswer::ANSWERED)->where('status', AssistantAnswer::SHOWN)->whereNotNull('answer')->shared()
@@ -594,9 +597,27 @@ final class BuildSearchIndex
                 'answer' => mb_substr((string) $a->answer, 0, 400),
                 'sources' => $a->product !== null
                     ? [['title' => $a->product->title, 'url' => $a->product->url]]
-                    : ($a->content !== null ? [['title' => $a->content->title, 'url' => $a->content->url]] : array_map(fn (array $s): array => ['title' => $s['title'], 'url' => $s['url'] ?? null], (array) $a->sources)),
+                    : ($a->content !== null ? [['title' => $a->content->title, 'url' => $a->content->url]] : array_map(fn (array $s): array => self::source($s, $locale), (array) $a->sources)),
             ])
             ->values()->all();
+    }
+
+    /**
+     * A source of a kept answer as the drawer shows it: whether it is what the store says about itself (no products
+     * beside such an answer: Rocks, 25.10, a pendant under the returns policy), and a policy page Shopify names in
+     * English ("Terms of service") in the store's language, as the answer itself now names it.
+     *
+     * @param  array<string, mixed>  $source
+     * @return array{title: string, url: string|null, store?: bool}
+     */
+    private static function source(array $source, string $locale): array
+    {
+        $url = isset($source['url']) ? (string) $source['url'] : null;
+        $policy = preg_match('~/policies/([a-z-]+)~', (string) $url, $m) === 1 && Lang::has('assistant::answers.policies.'.$m[1]) ? $m[1] : null;
+        $title = (string) ($source['title'] ?? '');
+
+        return ['title' => $policy !== null && preg_match('/^[\x00-\x7F]+$/', $title) === 1 ? (string) __('assistant::answers.policies.'.$policy, [], $locale) : $title, 'url' => $url]
+            + (($source['store'] ?? false) || $policy !== null ? ['store' => true] : []);
     }
 
     /**

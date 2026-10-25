@@ -22,6 +22,7 @@ use App\Modules\Assistant\Console\CheckerCompareCommand;
 use App\Modules\Assistant\Console\CheckerReportCommand;
 use App\Modules\Assistant\Console\ContextEvalCommand;
 use App\Modules\Assistant\Console\KnowledgeCommand;
+use App\Modules\Assistant\Console\MendQuestionsCommand;
 use App\Modules\Assistant\Console\QualityBaselineCommand;
 use App\Modules\Assistant\Console\QualityCasesCommand;
 use App\Modules\Assistant\Console\ReadPostsCommand;
@@ -101,6 +102,15 @@ final class AssistantServiceProvider extends ModuleServiceProvider
                 ->onOneServer()
                 ->runInBackground();
 
+            // Before the search index is built (02:40): the questions shoppers are shown, as their askers meant them.
+            $schedule->command('assistant:mend-questions --all')
+                ->dailyAt('02:20')
+                ->timezone('Asia/Jerusalem')
+                ->name('assistant:mend-questions')
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->runInBackground();
+
             // At night: what the new or changed posts say about the store.
             $schedule->command('assistant:read-posts --all')
                 ->dailyAt('03:40')
@@ -118,6 +128,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
             ReviewAsksCommand::class,
             KnowledgeCommand::class,
             ReadPostsCommand::class,
+            MendQuestionsCommand::class,
             CheckerReportCommand::class,
             CheckerCompareCommand::class,
             AnswerReportCommand::class,

@@ -8,6 +8,15 @@ return [
     'unavailable' => 'We could not answer right now. Please try again later.',
     'personal_data' => 'To keep your details private, please do not write a phone number, email, address or payment details here. Ask without them, or contact the store team directly.',
     'blocked' => 'Questions are not available here right now. The store team will be glad to help.',
+    // A store's policy pages under the names Shopify gives them in English, as sources in the store's language.
+    'policies' => [
+        'refund-policy' => 'Refund policy',
+        'shipping-policy' => 'Shipping policy',
+        'terms-of-service' => 'Terms of service',
+        'privacy-policy' => 'Privacy policy',
+        'contact-information' => 'Contact information',
+        'legal-notice' => 'Legal notice',
+    ],
     'site' => [
         'personal_data' => 'To keep your details private, please do not write a phone number, email, address or payment details here. Ask without them, or contact the store team directly.',
         'blocked' => 'Questions are not available here right now. The store team will be glad to help.',
