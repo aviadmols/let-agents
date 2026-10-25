@@ -54,6 +54,8 @@ final class PrepareDemoJob implements ShouldQueue
             'platform' => $read['platform'] === PublicSite::SHOPIFY ? ShopPlatform::Shopify : ShopPlatform::WooCommerce,
             'name' => $read['title'],
             'currency' => $read['currency'],
+            // the language the store's content is written in, from its own site, not the language the demo was asked in
+            'content_locale' => in_array($read['locale'], ['he', 'en'], true) ? $read['locale'] : null,
         ]))->save();
         $site->forceFill(['platform' => $read['platform'], 'title' => $read['title']])->save();
 

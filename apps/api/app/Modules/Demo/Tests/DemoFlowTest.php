@@ -48,7 +48,8 @@ final class DemoFlowTest extends TestCase
 
     public function test_the_address_and_the_email_send_a_code_and_nothing_is_built_before_it(): void
     {
-        $this->get('/demo')->assertOk()->assertSee('data-demo-start', false)->assertSee('ראו את Lets על החנות שלכם');
+        $this->get('/demo')->assertOk()->assertSee('data-demo-start', false)->assertSee('See Lets on your store');
+        $this->get('/demo?lang=he')->assertOk()->assertSee('ראו את Lets על החנות שלכם', false);
 
         $this->start()->assertRedirect();
 

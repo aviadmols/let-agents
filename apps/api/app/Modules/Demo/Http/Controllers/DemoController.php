@@ -115,13 +115,13 @@ final class DemoController extends Controller
     }
 
     /**
-     * The page's language: as its link asks (?lang=en from lets.co.il's English pages), else Hebrew. Never the
-     * browser's: many browsers in Israel speak English to a Hebrew reader.
+     * The page's language: as its link asks (?lang=he from lets.co.il's Hebrew pages), else English (as Aviad asked,
+     * 25.10). Never the browser's. The store's own language is read from its site (PrepareDemoJob), whatever this is.
      */
     private function speak(Request $request): string
     {
         $asked = $request->query('lang', $request->input('lang'));
-        $locale = Locales::negotiate(is_string($asked) ? $asked : null) ?? 'he';
+        $locale = Locales::negotiate(is_string($asked) ? $asked : null) ?? 'en';
         app()->setLocale($locale);
 
         return $locale;
