@@ -453,7 +453,9 @@ final class SearchCatalog
             // A sentence no product holds whole ("חולצה לבנה עם כיס קטן בצד לגברים") is found by meaning and by picture, which
             // tell a white shirt with a pocket from a white t-shirt poorly: what says more of its words comes first ("כיס",
             // in a shirt's picture words), in stock and colour order kept within each (Story, 25.10)
-            if ($scattered !== null) {
+            // a description, never a question about a kind ("איזה עץ לפרגולה?": the wood before a bracket that names wood
+            // and pergola both) nor what the search already put first
+            if ($scattered !== null && ! $asks && $pinned === [] && $subject === []) {
                 $groups['product'] = self::bySaidWords($groups['product'], $scattered);
             }
             // "תיק לבן": a word of the search that opens the titles of a kind of product here ("תיק גב", "תיק צד") says the
