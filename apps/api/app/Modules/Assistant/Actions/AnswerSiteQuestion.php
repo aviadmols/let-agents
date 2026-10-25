@@ -1392,6 +1392,11 @@ final class AnswerSiteQuestion
         if ($cited === [] && $picks === [] && $this->namedTitles !== [] && isset($productsByRef['p1']) && trim((string) ($data['answer'] ?? '')) !== '') {
             $picks = $this->picks([['ref' => 'p1', 'why' => '']], $productsByRef);
         }
+        // An answer that names the products it compares rests on their own descriptions, as picks do: "מה ההבדל ביניהם?"
+        // about the books on screen cites no page (Sela, 25.10). Each named product goes to the checker like any pick.
+        if ($cited === [] && $picks === [] && $answer !== '') {
+            $picks = self::namedInAnswer($answer, [], $productsByRef);
+        }
         $known = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))
             ."\n".implode("\n", array_map(fn (array $p): string => $p['title'].' '.$p['about'], $productsByRef))."\n".$question;
 

@@ -638,6 +638,23 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'an answer about one conversation is not the next shopper\'s');
     }
 
+    public function test_the_difference_between_the_products_shown_rests_on_the_products_it_names(): void
+    {
+        // Sela, 25.10: "מה ההבדל ביניהם?" about six books was answered from their descriptions, citing no page, and dropped.
+        $this->product('801', 'דרקולה', 'רומן אימה קלאסי על רוזן ערפד בטרנסילבניה.', [], ['price' => '118.00', 'in_stock' => true]);
+        $this->product('802', 'מדוע אומות נכשלות', 'ספר כלכלה על מוסדות, עוני ושגשוג של מדינות.', [], ['price' => '84.00', 'in_stock' => true]);
+        $this->replies = [
+            ['found' => true, 'answer' => '"דרקולה" הוא רומן אימה על רוזן ערפד. "מדוע אומות נכשלות" הוא ספר כלכלה על עוני ושגשוג של מדינות.', 'refs' => [], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('מה ההבדל ביניהם?', ['801', '802'])->json('data');
+
+        $this->assertSame('answered', $data['outcome'], 'the books the answer names are what it rests on');
+        $this->assertSame(['801', '802'], array_column($data['picks'], 'external_id'));
+        $this->assertCount(2, $this->calls, 'and the checker judged them like any pick');
+    }
+
     public function test_a_question_from_a_product_page_is_about_that_product_never_a_saved_answer(): void
     {
         $this->drills();
