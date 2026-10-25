@@ -15,7 +15,7 @@
     // "questions shoppers asked", the suggestions, and the gaps the daily review learns from)
     if (turn.ctx) {
       visitStep('ask', { label: String(q).slice(0, 200), item: String(pid(turn.ctx)) });
-      again(function () { return json(API + '/widget/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(pid(turn.ctx)), type: 'product', question: q, vid: visitor(), locale: LANG }) }); }).then(function (r) {
+      again(function () { return json(API + '/widget/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ id: String(pid(turn.ctx)), type: 'product', question: q, vid: visitor(), locale: LANG }), wait: 90000 }); }).then(function (r) {
         clearTimeout(slow);
         if (!r.ok) { throw new Error('ask'); }
         var d = (r.body && r.body.data) || {};
@@ -47,7 +47,7 @@
     // is about them (the server decides by the question's words whether it is); never a search behind the dashed line
     if (shown.length && ((S.ctx && turn.ctx) || !prev.prev)) { body.previous = shown; }
     visitStep('ask', { label: String(q).slice(0, 200) });
-    again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})) }); }).then(function (r) {
+    again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})), wait: 90000 }); }).then(function (r) {
       clearTimeout(slow);
       if (!r.ok) { throw new Error('ask'); }
       var d = (r.body && r.body.data) || r.body || {};

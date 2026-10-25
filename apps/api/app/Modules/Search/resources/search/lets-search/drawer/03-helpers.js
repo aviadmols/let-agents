@@ -24,10 +24,17 @@
     return null;
   }
   function uid() { return Math.random().toString(36).slice(2, 10); }
+  // A request that never ends (a connection dropped while the server switched to a new version, Story 25.10: "מחפש
+  // בחנות…" for good) is given up after a while (opts.wait, ms): the turn shows its error and "try again", and again()
+  // asks once more first. A question to the AI waits longer than a search.
   function json(url, opts) {
-    return win.fetch(url, Object.assign({ credentials: 'omit' }, opts || {})).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (body) { return { ok: r.ok, status: r.status, body: body }; });
-    });
+    opts = Object.assign({ credentials: 'omit' }, opts || {});
+    var wait = opts.wait || 30000, ctl = win.AbortController ? new win.AbortController() : null, timer = null;
+    delete opts.wait;
+    if (ctl) { opts.signal = ctl.signal; timer = setTimeout(function () { ctl.abort(); }, wait); }
+    return win.fetch(url, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) { clearTimeout(timer); return { ok: r.ok, status: r.status, body: body }; });
+    }, function (e) { clearTimeout(timer); throw e; });
   }
   // A question's request cut off on the way (a network blip, the server switching to a new version): asked once
   // more a moment later. The answer, if it was written meanwhile, is kept there and comes back at once.
@@ -36,7 +43,7 @@
   function again(send) {
     return send().catch(function () { return new Promise(function (go) { setTimeout(go, 1500); }).then(send); });
   }
-  function post(url, body) { return json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  function post(url, body) { return json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), wait: 90000 }); }
   var API = String(CFG.api).replace(/\/$/, '');
   var SITE = encodeURIComponent(CFG.site);
   function words(text, from) { var i = from || 0; return esc(text).split(' ').map(function (w) { return '<span class="ls-w" style="--i:' + (i++) + '">' + w + ' </span>'; }).join(''); }

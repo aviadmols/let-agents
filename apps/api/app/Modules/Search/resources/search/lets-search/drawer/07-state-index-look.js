@@ -21,7 +21,7 @@
   // ---------------------------------------------------------------- index (everything instant comes from here)
   function loadIndex() {
     if (S.indexing) { return S.indexing; }
-    S.indexing = json(API + '/search/' + SITE + '/index?locale=' + LANG).then(function (r) {
+    S.indexing = json(API + '/search/' + SITE + '/index?locale=' + LANG, { wait: 60000 }).then(function (r) {
       var d = r.body || {};
       S.index = d; S.config = d.config || {}; S.facets = d.facets || [];
       (d.items || []).forEach(function (it) { S.records[it.id] = it; });
@@ -34,6 +34,10 @@
       shopSettings();
       render();
       return d;
+    }, function (e) {
+      // not kept failed: the next search asks for the index again
+      S.indexing = null;
+      throw e;
     });
     return S.indexing;
   }
