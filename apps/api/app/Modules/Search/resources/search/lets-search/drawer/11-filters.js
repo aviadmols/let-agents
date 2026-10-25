@@ -149,7 +149,10 @@
     c.autoStock = stocked;
     if (c.autoStock && !c.saidStock && all.length && !filtered(turn).length) { c.autoStock = false; }
     // ✦ the words no filter here took that the results say ("גרב" of "כובע גרב"): chips too (as Aviad asked, 2026-10-25)
-    readWords(turn, all, taken);
+    // the words of the filters still on: one let go above leaves its word free to be read on its own
+    var held = [];
+    Object.keys(c.auto).forEach(function (code) { [].push.apply(held, c.at[code] || []); });
+    readWords(turn, all, held);
   }
   // A word of the search, no filter's, that a result says in its title or words (its tags, its picture's words), in any of
   // its forms: a chip read from the words, narrowing to what says it. At most WORD_CHIPS; never one that empties the results.
@@ -206,12 +209,25 @@
       }
       if (!says && !whole) { return; }
       if (not && says === all.length) { return; }
-      c.words[key] = { label: not ? w + ' ' + word : (whole || word), at: not ? [i, i + 1] : [i], forms: whole ? wordForms(whole) : forms, not: !!not };
+      var useForms = whole ? wordForms(whole) : forms, share = storeShare(useForms);
+      // the store's subject, said by most of what it sells ("פטריה" in a store of mushroom formulas): it tells nothing
+      // apart, and as a chip it narrowed "פטריה לכשב וריכוז" to the products whose words happen to say it
+      if (!not && share > SUBJECT_SHARE) { return; }
+      // shown as the store writes it: "לפוקוס" is "פוקוס", "וריכוז" is "ריכוז" (its prefix letter left out)
+      var bare = !whole && n.length > 3 && !all.some(function (r) { return recForms(r)[n]; }) && all.some(function (r) { return recForms(r)[n.slice(1)]; }) ? word.slice(1) : word;
+      c.words[key] = { label: not ? w + ' ' + bare : (whole || bare), at: not ? [i, i + 1] : [i], forms: useForms, not: !!not, share: share };
       if (not) { used.push(i + 1); }
     });
-    // never emptying: the last read goes first while nothing holds them all
-    var keys = Object.keys(c.words);
-    while (keys.length && !filtered(turn).length) { delete c.words[keys.pop()]; }
+    // never emptying: while nothing holds them all, the broadest goes first ("פטריה" before "פוקוס")
+    var keys = Object.keys(c.words).sort(function (a, b) { return c.words[b].share - c.words[a].share; });
+    while (keys.length && !filtered(turn).length) { delete c.words[keys.shift()]; }
+  }
+  // how much of the store says a word: of every product in the index
+  var SUBJECT_SHARE = 0.5;
+  function storeShare(forms) {
+    var products = Object.keys(S.records).map(function (id) { return S.records[id]; }).filter(function (r) { return r && r.t === 'product'; });
+    if (!products.length) { return 0; }
+    return products.filter(function (r) { return saysWord(r, forms); }).length / products.length;
   }
   // The words the filters read from them did not take: what is searched, while those filters narrow it ("ספרים על חטופים"
   // is "על חטופים" among books). Null when nothing was taken, or nothing that means anything is left: the words stand whole.
