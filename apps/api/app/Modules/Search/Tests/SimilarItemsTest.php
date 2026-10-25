@@ -201,11 +201,17 @@ final class SimilarItemsTest extends TestCase
         app(BuildSearchIndex::class)->handle($this->shop->id);
         LoadedIndex::forget();
 
-        // the pictures put 302 before 303; the tags would have shown 303 alone. 303 shares its leopard: first, 302 after.
-        $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
+        // the pictures put 302 before 303; the tags would have shown 303 alone. 303 is a brown leopard as it is; a plain
+        // red bag is no leopard backpack's alike, however near its picture (Story: a striped and a floral shirt were a brown
+        // overshirt's, for being button shirts)
+        $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
 
-        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['כחול'])]));
-        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'nothing shared: the pictures\' order, never the tags alone');
+        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['נמר', 'כחול'])]));
+        $this->assertSame([], $this->similar('301', 2)->json('products'), 'a blue leopard is of another colour: none, never padded');
+
+        // its picture names no colour: nothing to keep to, the pictures' order, never the tags alone
+        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => json_encode(['נמר'])]));
+        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
     }
 
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void

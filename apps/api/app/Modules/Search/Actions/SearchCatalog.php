@@ -64,6 +64,15 @@ final class SearchCatalog
 
     private const SEEN_COLOUR = 0.4;
 
+    /** Where looks matter, its alike are of its colour: the same family, whatever the tone (Colours::near). */
+    private const SAME_COLOUR = 0.8;
+
+    /** Where looks matter, this many pictures and meanings are read for its alike: few of the nearest are of its colour. */
+    private const LOOKS_POOL = 150;
+
+    /** Words of a picture that say it is printed, not plain: a print, stripes, checks, flowers, an animal's coat. */
+    private const PATTERNED = '/הדפס|מודפס|פסים|משבצ|פרחונ|פרחים|דוגמ|נמר|זברה|הסוואה|פייזלי|נקוד|print|stripe|check|plaid|tartan|floral|pattern|leopard|zebra|camo|paisley|polka|dots/iu';
+
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
 
@@ -526,6 +535,36 @@ final class SearchCatalog
         });
     }
 
+    /**
+     * Of a product's alike, those that look like it by its picture's words: of the colour it shows most (Colours::dominant,
+     * the same family) and printed as it is, or plain as it is. Its picture naming no colour (no words read): all of them.
+     *
+     * @param  list<string>  $externalIds
+     * @return list<string>
+     */
+    private static function seenAlike(CatalogProduct $product, array $externalIds): array
+    {
+        $own = array_values((array) (RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words'])?->caption_words ?? []));
+        $colour = Colours::dominant($own);
+        if ($colour === null || $externalIds === []) {
+            return $externalIds;
+        }
+        $printed = self::patterned($own);
+        $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
+
+        return array_values(array_filter($externalIds, function (string $id) use ($theirs, $colour, $printed): bool {
+            $words = array_values((array) ($theirs->get($id)?->caption_words ?? []));
+
+            return Colours::near($colour, Colours::dominant($words)) >= self::SAME_COLOUR && self::patterned($words) === $printed;
+        }));
+    }
+
+    /** @param  list<mixed>  $words */
+    private static function patterned(array $words): bool
+    {
+        return preg_match(self::PATTERNED, implode(' ', array_filter($words, 'is_string'))) === 1;
+    }
+
     private static function bySeenWords(CatalogProduct $product, array $externalIds): array
     {
         if (count($externalIds) < 2) {
@@ -724,6 +763,7 @@ final class SearchCatalog
             $by = (string) Settings::get('search.similar_by', $shopId);
             // in another colour, a wider pool: most of the nearest are of its own colour, and they go
             $pool = $limit * ($otherColour || $wants !== null ? 12 : 4);
+            $pool = $by === 'meaning' ? $pool : max($pool, self::LOOKS_POOL);
             $looks = $by === 'meaning' || ! $this->semantic->picturesReady() ? [] : array_map('strval', array_column($this->semantic->lookAlike($product->id, $pool), 'external_id'));
             $means = $by === 'picture' && $looks !== [] ? [] : array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $pool), 'external_id'));
             // The tags by meaning it shares with others, where the shop has them (Taxonomy): what it is about, not how its
@@ -755,6 +795,9 @@ final class SearchCatalog
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids));
             // Where looks matter, what its picture is described with shows most (its colour, its print, its material): a
             // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
+            // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
+            // what it wants ("עם יהלום"): only kind made a striped, a floral and a denim shirt a brown overshirt's alike (Story)
+            $ids = $looksLead && ! $otherColour && ($wants['words'] ?? []) === [] ? self::seenAlike($product, $ids) : $ids;
             $ids = $looksLead ? self::bySeenWords($product, $ids) : $ids;
 
             $records = [];
