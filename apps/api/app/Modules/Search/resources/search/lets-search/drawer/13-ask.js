@@ -154,7 +154,7 @@
     var n = String(turn.answer || '').split(' ').length;
     // asked with typing mistakes: how the question was read, so the shopper sees what was answered
     var html = kitsHtml(turn) + (turn.corrected ? '<div class="ls-understood" dir="auto">' + esc(t('understood', { q: turn.corrected })) + '</div>' : '') +
-      '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(turn.answer, anim) + '</div>';
+      '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(turn.answer, anim, (turn.picks || []).concat(turn.sources || []).map(function (p) { var r = p.id && rec(p.id); return { title: decode((r && r.title) || p.title || '').split(/\s[-–|]\s/)[0], url: (r && r.url) || p.url }; }).filter(function (p) { return p.title && p.url; })) + '</div>';
     // the page the question names, which the answer rests on ("מנויים"): a button to it
     if (turn.page && turn.page.url) { html += '<a class="ls-btn ls-btn--secondary ls-btn--sm ls-answer__page" href="' + esc(turn.page.url) + '">' + esc(t('goPage', { t: turn.page.title })) + '</a>'; }
     if (turn.picks && turn.picks.length) {

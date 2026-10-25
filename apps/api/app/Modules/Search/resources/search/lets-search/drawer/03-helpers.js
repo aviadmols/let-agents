@@ -60,8 +60,18 @@
     });
     return blocks;
   }
-  function answerText(text, anim) {
-    var n = 0, out = function (s) { var h = anim ? words(s, n) : esc(s); n += String(s).split(' ').length; return h; };
+  // "לפי העמוד שלה", "according to its page": the words lead to that page (as Aviad asked, 2026-10-25). The page is
+  // the one the answer names just before them, else the first it rests on.
+  var PAGE_SAID = /(?:לפי|על[ -]פי|כפי שכתוב ב|כמו שכתוב ב)\s?(?:ה)?(?:עמודים|עמוד|דף)(?:\s(?:המוצר|שלה|שלו|שלנו|שלהם|באתר))*|according to (?:its|the|our) (?:product )?pages?/i;
+  function answerText(text, anim, pages) {
+    var n = 0, said = '', plain = function (s) { var h = anim ? words(s, n) : esc(s); n += String(s).split(' ').length; return h; };
+    var out = function (s) {
+      var m = pages && pages.length ? PAGE_SAID.exec(s) : null, before = m ? s.slice(0, m.index) : s;
+      if (!m) { said += s + ' '; return plain(s); }
+      var near = (said + before).slice(-160).toLowerCase(), page = pages.filter(function (p) { return near.indexOf(String(p.title).toLowerCase()) >= 0; })[0] || pages[0];
+      said += before + m[0];
+      return plain(before) + '<a class="ls-answer__page-link" href="' + esc(page.url) + '">' + plain(m[0]) + '</a>' + out(s.slice(m.index + m[0].length));
+    };
     return answerBlocks(text).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + out(s) + '</li>'; }).join('') + '</ul>' : '<p>' + out(b.text) + '</p>'; }).join('');
   }
 

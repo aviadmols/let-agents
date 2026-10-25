@@ -343,7 +343,10 @@ img:not(.ls-pic2):has(+ .ls-pic2) { transition: opacity 320ms ease, transform 50
 .ls-pick__why { margin-top: 4px; font-size: var(--lsp-text-sm); color: var(--ls-fg-strong-muted); line-height: 1.45; }
 .ls-pick__row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
-.ls-source { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
+/* the pages an answer rests on: plain words in a line that wraps where it must, never a column of broken names */
+.ls-source { display: block; margin-top: 14px; font-size: var(--lsp-text-sm); line-height: 1.6; color: var(--ls-fg-muted); }
+.ls-source .ls-icon { display: inline-block; vertical-align: -3px; margin-inline-end: 6px; }
+.ls-answer__page-link { color: inherit; text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 3px; }
 .ls-source a { color: var(--ls-fg-strong-muted); text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 3px; }
 .ls-follow { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
 /* a set asked to see, under its answer: a question to narrow it by, the grid, the search for more */
