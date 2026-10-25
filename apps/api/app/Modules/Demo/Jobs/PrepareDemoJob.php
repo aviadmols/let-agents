@@ -17,8 +17,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * A verified demo, made ready to scan, a step at a time, each kept on its row (read_at, scan_at) for the scan screen
  * to show: what the store runs on, its name, language and currency, read from its site; then the store's first scan
- * (ShopScan), the same a real store gets, held to the demo's limits (BuildDemoStore). The home page's picture comes
- * after, in a job of its own (ShootDemoJob), so a slow picture never holds the scan. A step done is not done again:
+ * (ShopScan), the same a real store gets, held to the demo's limits (BuildDemoStore). A step done is not done again:
  * a job cut off is tried again (tries, and SweepDemos for one that never came back). A site that does not answer
  * fails the demo, said plainly on the scan screen.
  */
@@ -83,10 +82,6 @@ final class PrepareDemoJob implements ShouldQueue
                 return;
             }
             $site->forceFill(['scan_at' => now()])->save();
-        }
-
-        if ($site->shot_at === null) {
-            ShootDemoJob::dispatch($site->id);
         }
     }
 }

@@ -22,14 +22,13 @@ use Illuminate\Routing\Controller;
  *   GET  /demo                  the store's address, their email, what the site is and what matters in its search
  *   POST /demo                  checked (StartDemo): a code goes to the email
  *   GET  /demo/{token}          by where it stands: the code to type, the scan as a real store's first run shows it,
- *                               the demo itself (the store's picture with Lets' floating search on it), or its end
+ *                               the demo itself (a phone with Lets' floating search in it), or its end
  *   POST /demo/{token}/verify   the code (VerifyDemo): the demo store is built and its scan starts
  *   POST /demo/{token}/code     a new code
  *   GET  /demo/{token}/progress the preparation and the scan so far, for the screen to draw, or the problem it hit;
  *                               done, the demo is ready (FinishDemo)
  *   POST /demo/{token}/again    after a problem: again, at the same address or a corrected one (RetryDemo)
- *   GET  /demo/{token}/phone    the demo in its phone: the store's picture and the floating search, framed by the demo
- *   GET  /demo/{token}/shot/{which}  the store's picture (a phone's; a computer's for a demo from before)
+ *   GET  /demo/{token}/phone    the demo in its phone: what it is and the floating search, framed by the demo page
  */
 final class DemoController extends Controller
 {
@@ -144,16 +143,6 @@ final class DemoController extends Controller
 
         return response(view('demo::phone', ['site' => $site, 'siteKey' => $this->siteKey($site)]))
             ->header('Content-Security-Policy', "frame-ancestors 'self';");
-    }
-
-    public function shot(string $token, string $which): Response
-    {
-        $site = $this->site($token);
-        $picture = $which === 'mobile' ? $site->screenshot_mobile : $site->screenshot;
-
-        abort_if($picture === null || ! $site->live(), 404);
-
-        return response((string) base64_decode($picture), 200, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, max-age=3600']);
     }
 
     /** The demo its link names, and the demo's language for all it says (the scan's lines on /progress too). */

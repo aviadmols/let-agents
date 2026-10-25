@@ -12,7 +12,6 @@ use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
 use App\Modules\Demo\Filament\Operator\Pages\Demos;
 use App\Modules\Demo\Jobs\PrepareDemoJob;
-use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Mail\DemoMail;
 use App\Modules\Demo\Models\DemoSite;
 use App\Modules\Demo\Support\DemoProgress;
@@ -251,8 +250,10 @@ final class DemoFlowTest extends TestCase
         $site = $this->verified();
         $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 300, 'store_products' => 1240, 'pictures' => 0])->save();
 
-        $this->get('/demo/'.$site->token)->assertOk()->assertSee('This is only a demo, so results may be partial.')
-            ->assertSee('It read 300 of the store&#039;s 1,240 products.', false);
+        // in the phone, instead of a picture of the store, in the store's language (Hebrew here) and Lets' fonts
+        $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee('data-intro', false)->assertDontSee('<img class="site"', false)
+            ->assertSee(__('demo::page.view.demo_note', [], 'he'))->assertSee(__('demo::page.view.demo_read', ['read' => '300', 'total' => '1,240'], 'he'))
+            ->assertSee('family=Google+Sans', false);
 
         $shop = $site->shop_id;
         app(Demos::class)->remove($site->id);
@@ -349,7 +350,6 @@ final class DemoFlowTest extends TestCase
         $this->assertNotNull($site->read_at);
         $this->assertNotNull($site->scan_at, 'the scan began');
         $this->assertSame('woocommerce', $site->platform);
-        Queue::assertPushed(ShootDemoJob::class, fn (ShootDemoJob $job): bool => $job->demoId === $site->id);
         $this->getJson('/demo/'.$site->token.'/progress')
             ->assertJsonPath('steps', [['key' => 'read', 'state' => 'done'], ['key' => 'scan', 'state' => 'done']]);
     }

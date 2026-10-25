@@ -10,10 +10,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The demos, kept in order: a preparation that stopped before the scan began (its job cut off) is sent again, a few
- * times, then the demo fails, said on its screen; a picture still not taken long after is given up on; a scan done
- * is finished for whoever left its screen (FinishDemo); a demo past its end is deleted with all its store holds
- * (the shop and, by cascade, its catalogue, search, vectors, answers, usage), its pictures dropped and its row kept
- * as expired for the team; a code never used is forgotten after a day; an expired row after demo rows' own time.
+ * times, then the demo fails, said on its screen; a scan done is finished for whoever left its screen (FinishDemo);
+ * a demo past its end is deleted with all its store holds (the shop and, by cascade, its catalogue, search, vectors,
+ * answers, usage), any picture of an earlier demo dropped, and its row kept as expired for the team; a code never used is forgotten after a day; an expired row after demo rows' own time.
  * Code only.
  */
 final class SweepDemos
@@ -45,9 +44,6 @@ final class SweepDemos
             PrepareDemoJob::dispatch($site->id)->onQueue('long');
             $counts['picked_up']++;
         }
-
-        DemoSite::query()->where('status', DemoSite::SCANNING)->whereNotNull('scan_at')->whereNull('shot_at')
-            ->where('scan_at', '<', now()->subMinutes(15))->update(['shot_at' => now()]);
 
         foreach (DemoSite::query()->where('status', DemoSite::SCANNING)->get() as $site) {
             $counts['finished'] += $this->finish->handle($site)->status !== DemoSite::SCANNING ? 1 : 0;

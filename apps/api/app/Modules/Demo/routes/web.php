@@ -12,4 +12,3 @@ Route::post('demo/{token}/code', [DemoController::class, 'code'])->middleware('t
 Route::post('demo/{token}/again', [DemoController::class, 'again'])->middleware('throttle:demo-start')->name('demo.again');
 Route::get('demo/{token}/progress', [DemoController::class, 'progress'])->middleware('throttle:demo-page')->name('demo.progress');
 Route::get('demo/{token}/phone', [DemoController::class, 'phone'])->middleware('throttle:demo-page')->name('demo.phone');
-Route::get('demo/{token}/shot/{which}', [DemoController::class, 'shot'])->whereIn('which', ['desktop', 'mobile'])->middleware('throttle:demo-page')->name('demo.shot');
