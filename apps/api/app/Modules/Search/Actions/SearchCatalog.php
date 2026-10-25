@@ -64,6 +64,18 @@ final class SearchCatalog
 
     private const SEEN_COLOUR = 0.4;
 
+    /** A filter of whom a product is for: kept when a search that found nothing is loosened (loosened()). */
+    private const WHOM_FACETS = ['audience', 'gender', 'for_whom', 'target_audience', 'age_group'];
+
+    /** A search that found nothing is tried again without one word, this many words at most (loosened()). */
+    private const LOOSE_TRIES = 3;
+
+    /** Words that only join or point at a filter: never what a loosened search left out. */
+    private const LOOSE_WORDS = '/^(?:עמ|ו?בצבע|צבע|ו?בגוונ|with|in|colou?r|for|and)$/u';
+
+    /** A colour asked for: the pictures of this many products read for the colour they show most (byPictureColour). */
+    private const PICTURE_COLOUR_READ = 120;
+
     /** Where looks matter, its alike are of its colour: the same family, whatever the tone (Colours::near). */
     private const SAME_COLOUR = 0.8;
 
@@ -194,6 +206,129 @@ final class SearchCatalog
      * @param  bool  $meaning  false while a shopper is still typing: spelling only, code only, no vector
      */
     public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true, array $visit = []): array
+    {
+        $result = $this->searchOnce($shopId, $raw, $only, $count, $perGroup, $meaning, $visit);
+
+        return ($result['total'] ?? 0) === 0 ? $this->loosened($shopId, $raw, $only, $perGroup, $meaning, $result) : $result;
+    }
+
+    /**
+     * Nothing found for words that ask several things ("חולצה לגברים בצבע לבן עם פסים": no shirt here is filed under men and
+     * white and says stripes): the search tries again, looser, the way the AI would answer "the nearest there is", in code.
+     * Each word that says how it is, left out in turn, a colour first ("לבן": the striped men's shirts), then the others from
+     * the last ("פסים": the white men's shirts); never the first word (what it is) and never whom it is for. The first that
+     * finds is shown, saying what it left out (loosened), and the others that find are offered beside it. A word alone is
+     * never loosened: nothing is looser.
+     *
+     * @param  array<string, mixed>  $result  the search as typed, which found nothing
+     * @return array<string, mixed>
+     */
+    private function loosened(string $shopId, string $raw, ?array $only, ?int $perGroup, bool $meaning, array $result): array
+    {
+        $words = array_values(array_filter(preg_split('/\s+/u', trim($raw)) ?: [], fn (string $w): bool => $w !== ''));
+        // a word alone is never loosened, and narrower searches already offered stay what is offered
+        if (count($words) < 2 || ($result['focus']['options'] ?? []) !== []) {
+            return $result;
+        }
+        $index = $this->tenant->run($shopId, fn (): ?array => LoadedIndex::for($shopId));
+        if ($index === null) {
+            return $result;
+        }
+        $facets = (array) ($index['facets'] ?? []);
+        $whomSaid = array_map(fn (array $n): string => HebrewSearch::normalize((string) $n['said']), array_filter(HebrewSearch::facets($raw, $facets),
+            fn (array $n): bool => in_array((string) ($facets[intdiv((int) $n['code'], 1000)]['k'] ?? ''), self::WHOM_FACETS, true)));
+
+        // the words that say how it is: not the first (what it is), not whom it is for, not one that only joins
+        $first = null;
+        $describing = [];
+        foreach ($words as $at => $word) {
+            $plain = HebrewSearch::normalize($word);
+            if ($plain === '' || HebrewSearch::isFiller($plain) || preg_match(self::LOOSE_WORDS, $plain) === 1) {
+                continue;
+            }
+            if ($first === null) {
+                $first = $at;
+
+                continue;
+            }
+            if (array_filter($whomSaid, fn (string $s): bool => $s !== '' && str_contains($plain, $s)) !== []) {
+                continue;
+            }
+            $describing[] = ['at' => $at, 'word' => $word, 'colour' => Colours::mentions($word) !== []];
+        }
+        // a colour first, then the others from the last typed
+        usort($describing, fn (array $a, array $b): int => [$b['colour'], $b['at']] <=> [$a['colour'], $a['at']]);
+
+        $rungs = [];
+        foreach (array_slice($describing, 0, self::LOOSE_TRIES) as $d) {
+            $rest = $words;
+            unset($rest[$d['at']]);
+            $rungs[] = ['query' => self::withoutLooseWords(implode(' ', $rest)), 'left' => [$d['word']]];
+        }
+
+        // the kind it named holds in a looser search too: "תיק" alone keeps what is near it (a keychain "Micro Old Skool תיק"),
+        // "תיק לבן" without the white is the bags
+        $kinds = self::askedKinds($index, $raw);
+        $found = [];
+        foreach ($rungs as $rung) {
+            if ($rung['query'] === '' || HebrewSearch::normalize($rung['query']) === HebrewSearch::normalize($raw)) {
+                continue;
+            }
+            $tried = $this->searchOnce($shopId, $rung['query'], $only, false, $perGroup, $meaning);
+            if ($kinds !== []) {
+                $tried = self::keptToKinds($tried, $index, $kinds);
+            }
+            // products only: a guide that names a word is no nearest product
+            if (($tried['counts']['product'] ?? 0) > 0) {
+                $found[] = $rung + ['result' => $tried];
+            }
+        }
+        if ($found === []) {
+            return $result;
+        }
+        $first = array_shift($found);
+
+        return $first['result'] + ['loosened' => [
+            'left' => $first['left'],
+            'query' => $first['query'],
+            'also' => array_map(fn (array $f): array => ['query' => $f['query'], 'count' => (int) ($f['result']['counts']['product'] ?? 0)], $found),
+        ]];
+    }
+
+    /**
+     * A search's products kept to the kinds asked for (ofKinds), its counts and ids with them.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  array<string, mixed>  $index
+     * @param  array<string, int>  $kinds
+     * @return array<string, mixed>
+     */
+    private static function keptToKinds(array $result, array $index, array $kinds): array
+    {
+        $of = fn (string $id): bool => self::ofKinds((array) ($index['records'][$id] ?? []), $kinds);
+        $products = array_values(array_filter((array) ($result['groups']['product'] ?? []), fn (array $p): bool => $of('p:'.(string) ($p['external_id'] ?? ''))));
+        $ids = array_values(array_filter((array) ($result['ids'] ?? []), fn (string $id): bool => ! str_starts_with($id, 'p:') || $of($id)));
+        $result['groups']['product'] = $products;
+        $result['ids'] = $ids;
+        $all = count(array_filter($ids, fn (string $id): bool => str_starts_with($id, 'p:')));
+        $result['counts']['product'] = max(count($products), $all);
+        $result['total'] = array_sum((array) $result['counts']);
+
+        return $result;
+    }
+
+    /** "בצבע" and "in colour" left alone once the colour is taken out: no word of what is searched. */
+    private static function withoutLooseWords(string $query): string
+    {
+        $query = (string) preg_replace('/(^|\s)(?:ו?בצבע|ו?בגוון|in|colou?r)(?=\s|$)/iu', ' ', $query);
+        // and a joining word left at the end ("חולצה לגברים לבן עם")
+        $query = (string) preg_replace('/(?:\s(?:עם|ו|או|with|and|or|for))+\s*$/iu', '', ' '.trim($query));
+
+        return trim((string) preg_replace('/\s+/u', ' ', $query));
+    }
+
+    /** One search pass, as typed: what handle() loosens when it finds nothing. */
+    private function searchOnce(string $shopId, string $raw, ?array $only, bool $count, ?int $perGroup, bool $meaning, array $visit = []): array
     {
         return $this->tenant->run($shopId, function () use ($shopId, $raw, $only, $count, $perGroup, $meaning, $visit): array {
             // "עד 2500 ש״ח": the amount is not searched for; products outside the range are kept away.
@@ -449,7 +584,11 @@ final class SearchCatalog
 
             // "עגילי חישוק זהב צהוב עם אבנים שקופות": the colours named, each with its part, weigh as in a
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
-            $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
+            $asked = Colours::parts([$priced]);
+            $groups['product'] = self::byColour($groups['product'], $asked);
+            // and, where looks matter, what its picture shows most is that colour before what has it as a detail: a black
+            // T-shirt sold as "Black-White" (its print) is filed under white too, and came among the white ones (Vans)
+            $groups['product'] = $asked !== [] && Looks::matter($shopId) ? self::byPictureColour($groups['product'], $asked) : $groups['product'];
             // A sentence no product holds whole ("חולצה לבנה עם כיס קטן בצד לגברים") is found by meaning and by picture, which
             // tell a white shirt with a pocket from a white t-shirt poorly: what says more of its words comes first ("כיס",
             // in a shirt's picture words), in stock and colour order kept within each (Story, 25.10)
@@ -1038,6 +1177,31 @@ final class SearchCatalog
         usort($order, fn (int $a, int $b): int => [$said[$b], $a] <=> [$said[$a], $b]);
 
         return array_map(fn (int $at): array => $records[$at], $order);
+    }
+
+    /**
+     * Products whose picture shows most a colour asked for (Colours::dominant, a colour before a metal) first, those whose
+     * picture words name no colour next, and those that show most another colour last; the order before kept within each.
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @param  list<array{family: string, group: string, part: string|null, weight: float}>  $asked
+     * @return list<array<string, mixed>>
+     */
+    private static function byPictureColour(array $records, array $asked): array
+    {
+        $families = array_flip(array_column($asked, 'family'));
+        if (count($records) < 2) {
+            return $records;
+        }
+        $head = array_slice($records, 0, self::PICTURE_COLOUR_READ);
+        $words = RetrievalImage::query()->whereIn('external_id', array_map(fn (array $r): string => substr((string) $r['id'], 2), $head))->pluck('caption_words', 'external_id');
+        $bands = [0 => [], 1 => [], 2 => []];
+        foreach ($head as $record) {
+            $shows = Colours::dominant(array_values((array) ($words[substr((string) $record['id'], 2)] ?? [])), colourFirst: true);
+            $bands[$shows === null ? 1 : (isset($families[$shows['family']]) ? 0 : 2)][] = $record;
+        }
+
+        return [...$bands[0], ...$bands[1], ...$bands[2], ...array_slice($records, self::PICTURE_COLOUR_READ)];
     }
 
     private static function byColour(array $records, array $colours): array

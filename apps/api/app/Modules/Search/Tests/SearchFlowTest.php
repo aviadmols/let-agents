@@ -21,6 +21,7 @@ use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchIndex;
@@ -296,6 +297,21 @@ final class SearchFlowTest extends TestCase
 
         $this->meaning = $near('911', '912');
         $this->assertSame('912', $this->search('white shirt with a small side pocket for men')->json('groups.product.0.external_id'), 'the same in English, "pocket" saying "pockets"');
+    }
+
+    public function test_a_colour_asked_for_shows_what_its_picture_shows_most_before_what_has_it_as_a_detail(): void
+    {
+        // Vans: "חולצה לבנה טי שירט" showed a black T-shirt sold as "Black-White" (its print) among the white ones.
+        $this->inShop(function (): void {
+            foreach (['931' => ['חולצת טי Basic', ['חולצת טי', 'לבן', 'לוגו שחור']], '932' => ['חולצת טי Stretch Logo', ['חולצת טי', 'שחור', 'לבן']]] as $id => [$title, $words]) {
+                $product = $this->product($id, $title, ['payload' => ['tags' => ['לבן', 'שחור']]]);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $this->assertSame(['931', '932'], array_column($this->search('חולצת טי לבנה')->json('groups.product'), 'external_id'), 'the white one, then the black one with white on it');
     }
 
     public function test_one_word_many_products_hold_as_typed_shows_only_them(): void

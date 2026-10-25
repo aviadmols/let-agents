@@ -120,7 +120,7 @@
       var d = got.d, ids = got.ids;
       var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       return products(ids.slice(0, 8)).then(function () {
-        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
+        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
         announce(t('announceResults', { n: ids.length }));
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -269,13 +269,42 @@
     String(turn.q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(Boolean).forEach(function (w) {
       if (E && E.normalize && words.indexOf(E.normalize(w)) >= 0) { typed.push(w); } else if (!STOP.test(w)) { kept.push(w); }
     });
+    // "נעלים לגברים מנומרות": a word none of the products shown says, though the store has it elsewhere (a leopard bag):
+    // said, never shown as if they were it (as Aviad asked, 2026-10-25)
+    var shownList = filtered(turn), missing = typed.length ? [] : unsaid(turn.q, shownList);
+    var rest = missing.length ? kept.filter(function (w) { return missing.indexOf(w) < 0; }) : [];
     // "מה זה ספרי פנטזיה?": the books are shown, and it says so; "פנטזיה" is not on the site
-    var text = typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
+    // nothing as asked: the server searched looser, and says what it left out; the other way it found is a press away
+    if (turn.loosened && turn.loosened.left && turn.loosened.left.length) {
+      return '<div data-unknown><p class="ls-note__text">' + esc(t('loosened', { q: turn.q, w: turn.loosened.left.join(' ') })) + '</p>' +
+        ((turn.loosened.also || []).length ? '<div class="ls-chips" style="margin:6px 0 10px">' + turn.loosened.also.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' : '') + '</div>';
+    }
+    var text = missing.length && shownList.length && rest.length ? t('noneSaid', { gone: missing.join(' '), kept: rest.join(' ') })
+      : typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
       : typed.length ? t('notHere', { w: typed.join(' ') })
       : held === 0 && total ? t('meaningOnly', { q: turn.q })
       : held !== null && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
     if (!text) { return ''; }
     return '<div data-unknown>' + askCardHtml(turn.q, text) + '</div>';
+  }
+  // The words of a search, as typed, that no product shown says in its title or words (its tags, its picture's words),
+  // a word in any of its forms: "לבנה" is "לבן", "בצד" is "צד", "pocket" is "pockets". Only for a search of two words or more.
+  function wordForms(w) {
+    var out = [w], bare = /^[והבלמשכ][א-ת]{3,}$/.test(w) ? w.slice(1) : null;
+    [w, bare].forEach(function (x) { if (x) { out.push(x); if (x.length > 3) { out.push(x.replace(/(ה|ת|ימ|ות|י)$/, '')); } } });
+    if (/^[a-z]{3,}$/.test(w)) { out.push(w + 's', w.replace(/(es|s)$/, '')); }
+    return out;
+  }
+  // words that ask for a filter, an order or a price, never what a product says: "בצבע", "במידה", "הכי זולה", "במבצע"
+  var ASKS_ONLY = /^([והבל]?(צבע|גוון|מידה|מידות|מבצע|מחיר|זול|זולה|זולים|זולות|יקר|יקרה|יקרים|יקרות)|הכי|ביותר|עד|מעל|מתחת|size|colou?rs?|cheap(er|est)?|expensive|sale|price|under|over|for|with|without|and)$/i;
+  function unsaid(q, list) {
+    var E = S.engine;
+    if (!E || !E.normalize || !list.length) { return []; }
+    var typed = String(q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 3 && !STOP.test(w) && !ASKS_ONLY.test(w) && !/\d/.test(w); });
+    if (typed.length < 2) { return []; }
+    var said = {};
+    list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; }); }); });
+    return typed.filter(function (w) { return !wordForms(E.normalize(w)).some(function (f) { return said[f]; }); });
   }
   // the words of a search the catalogue has nothing close to, as the server's unknownWords reads them
   function localUnknown(q) {

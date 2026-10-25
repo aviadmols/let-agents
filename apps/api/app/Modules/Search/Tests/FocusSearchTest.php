@@ -65,7 +65,13 @@ final class FocusSearchTest extends TestCase
             '5' => ['נעלי סניקרס Era', 'שחור'],
         ]);
 
-        $this->assertSame([], array_column($this->search('תיק לבן')['groups']['product'], 'external_id'), 'no white bag: no other white thing instead');
+        // no white bag: the bags, said to be without the white (as Aviad asked, 2026-10-25: the nearest, not "not found"),
+        // never another white thing instead
+        $white = $this->search('תיק לבן');
+        $bags = array_column($white['groups']['product'], 'external_id');
+        sort($bags);
+        $this->assertSame(['1', '2'], $bags, 'the bags, not the white keychain nor the white sneakers');
+        $this->assertSame(['לבן'], $white['loosened']['left'] ?? null);
         $black = array_column($this->search('תיק שחור')['groups']['product'], 'external_id');
         sort($black);
         $this->assertSame(['1', '2'], $black, 'the black bags, not the black sneakers');
@@ -101,6 +107,25 @@ final class FocusSearchTest extends TestCase
         sort($men);
         $this->assertSame(['1', '3'], $men, 'the man\'s shirt and the unisex one, never the woman\'s or the child\'s');
         $this->assertSame(['4'], array_column($this->search('חולצה לילדים')['groups']['product'], 'external_id'));
+    }
+
+    public function test_nothing_as_asked_shows_the_nearest_looser_search_and_says_what_it_left_out(): void
+    {
+        // Story: "חולצה לגברים בצבע לבן עם פסים" showed "לא מצאנו" while the AI found striped and white men's shirts: no
+        // shirt here is men's, white and striped. In code: first without the colour, then without the other words.
+        $this->catalog([
+            '1' => ['חולצה מכופתרת לגברים Striped פסים', 'כחול'],
+            '2' => ['חולצה מכופתרת לגברים Mateo', 'לבן'],
+            '3' => ['חולצה מכופתרת לנשים Kayla פסים', 'לבן'],
+            '4' => ['מכנסיים לגברים Lou', 'שחור'],
+        ]);
+
+        $found = $this->search('חולצה לגברים בצבע לבן עם פסים');
+
+        $this->assertSame(['1'], array_column($found['groups']['product'], 'external_id'), 'the striped men\'s shirt, whom it is for kept');
+        $this->assertSame(['לבן'], $found['loosened']['left'] ?? null, 'and says the white was left out');
+        $this->assertSame([['query' => 'חולצה לגברים לבן', 'count' => 1]], $found['loosened']['also'] ?? null, 'the white men\'s shirt a press away');
+        $this->assertArrayNotHasKey('loosened', $this->search('חולצה לגברים'), 'found as asked: nothing loosened');
     }
 
     public function test_a_latin_name_typed_in_hebrew_finds_it(): void
