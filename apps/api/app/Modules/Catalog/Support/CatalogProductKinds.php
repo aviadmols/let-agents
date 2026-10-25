@@ -70,18 +70,72 @@ final class CatalogProductKinds implements ProductKinds
     {
         $marks = $this->marks($product);
 
-        if ($marks === [] || $externalIds === []) {
+        // a product of no known kind keeps them all, of its own people still (a man's, never a woman's)
+        if ($externalIds === [] || ($marks === [] && self::audience($product) === null)) {
             return $externalIds;
         }
 
-        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $externalIds)->get(['external_id', 'title', 'payload'])
+        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $externalIds)->get(['id', 'external_id', 'title', 'payload'])
             ->keyBy(fn (CatalogProduct $p): string => (string) $p->external_id);
+        $audience = self::audience($product);
 
-        return array_values(array_filter($externalIds, function (string $id) use ($others, $marks): bool {
+        return array_values(array_filter($externalIds, function (string $id) use ($others, $marks, $audience): bool {
             $other = $others->get($id);
 
-            return $other !== null && array_intersect($marks, self::allMarks($other)) !== [];
+            return $other !== null && ($marks === [] || array_intersect($marks, self::allMarks($other)) !== []) && self::sameAudience($audience, self::audience($other));
         }));
+    }
+
+    /** Words that say whom a product is for, as the store writes them in its titles, tags and categories. */
+    private const AUDIENCE = [
+        'women' => '/^(?:[לוה]{0,2}נשים|[לוה]{0,2}אישה|[לוה]{0,2}נשי|women|womens|woman|ladies|female)$/u',
+        'men' => '/^(?:[לוה]{0,2}גברים|[לוה]{0,2}גבר|men|mens|man|male)$/u',
+        'kids' => '/^(?:[לוה]{0,2}ילדים|[לוה]{0,2}ילדות|[לוה]{0,2}ילד|[לוה]{0,2}ילדה|[לוה]{0,2}נוער|[לוה]{0,2}בנים|[לוה]{0,2}בנות|kids|kid|boys|girls|youth|junior|juniors|children|child)$/u',
+        'babies' => '/^(?:[לוה]{0,2}תינוקות|[לוה]{0,2}תינוק|[לוה]{0,2}תינוקת|[לוה]{0,2}פעוטות|[לוה]{0,2}פעוטים|baby|babies|infant|infants|toddler|toddlers|newborn)$/u',
+        'unisex' => '/^(?:unisex|יוניסקס)$/u',
+    ];
+
+    /**
+     * Whom a product is for, as the store says it in its title, product type, categories and tags ("לנשים",
+     * "ביגוד_גברים", "_תינוקות", "kids"): women, men, kids, babies, or null when it says none or both men and women
+     * (unisex). Never its description, which may say "מתאים לגברים ולנשים" of anything.
+     */
+    public static function audience(CatalogProduct $product): ?string
+    {
+        $text = mb_strtolower(implode(' ', [(string) $product->title, (string) ($product->payload['product_type'] ?? ''),
+            ...array_map('strval', (array) ($product->payload['tags'] ?? [])), ...array_map(fn (array $path): string => implode(' ', $path), $product->categoryPaths())]));
+        $said = [];
+        foreach (preg_split('/[^\p{L}]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            foreach (self::AUDIENCE as $audience => $pattern) {
+                if (preg_match($pattern, $word) === 1) {
+                    $said[$audience] = true;
+                }
+            }
+        }
+
+        if (isset($said['unisex']) || (isset($said['women']) && isset($said['men']))) {
+            return null;
+        }
+
+        // the young are kids or babies; a store that says both of one product sells it to both
+        foreach (['babies', 'kids', 'women', 'men'] as $audience) {
+            if (isset($said[$audience])) {
+                return $audience;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether two products are for the same people: a man's shirt is never like a woman's, a grown-up's shoe never like
+     * a child's. Kids and babies are one (an infant's sneaker is like a toddler's); a product for anyone is like any.
+     */
+    private static function sameAudience(?string $a, ?string $b): bool
+    {
+        $young = ['kids' => true, 'babies' => true];
+
+        return $a === null || $b === null || $a === $b || (isset($young[$a]) && isset($young[$b]));
     }
 
     public function hasLike(CatalogProduct $product): bool
