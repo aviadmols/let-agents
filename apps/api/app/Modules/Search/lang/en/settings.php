@@ -369,6 +369,10 @@ return [
         'label' => 'Products a search returns for filtering',
         'description' => 'Every product found, up to this many, goes to the drawer: its filters, order and count work on them. A search that finds more shows this many.',
     ],
+    'photo_close_look' => [
+        'label' => 'How alike is "the most alike"',
+        'description' => 'A photo search marks its first product "the most alike" only when its picture is at least this alike (0.75 = 75%). Below it, the drawer says nothing in the store looks quite like the photo, and shows the nearest.',
+    ],
     'photo_colour_weight' => [
         'label' => 'Weight of colours in photo search',
         'description' => 'How much the colour of each part (the metal, the stone, the shirt, the pocket) decides the order, beyond how alike the pictures look. 0 turns it off.',

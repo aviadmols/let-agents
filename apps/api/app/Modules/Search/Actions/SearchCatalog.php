@@ -463,12 +463,9 @@ final class SearchCatalog
         });
     }
 
-    /** A title's kind word, as its stem: the Hebrew word it opens with ("תיק גב Old Skool" is "תק"); '' when none. */
     private static function headOf(string $title): string
     {
-        $first = explode(' ', HebrewSearch::normalize($title), 2)[0];
-
-        return preg_match('/^[א-ת]{2,}$/u', $first) === 1 ? HebrewSearch::stem($first) : '';
+        return HebrewSearch::head($title);
     }
 
     /**
@@ -704,12 +701,14 @@ final class SearchCatalog
                 // ring is matched with the pictures described so, not with every gold ring.
                 $words = $look->details !== [] ? [$look->object, ...$look->details] : array_column($tags, 'title');
                 $content = app(PictureContent::class)->picturesNearWords($shopId, implode(', ', array_filter($words)), self::PHOTO_ALL);
-                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details])), $look->lacks, $look->object));
+                // what the reader said the object has not ("בלי הדפס" among its details) counts as what it lacks
+                $lacks = array_values(array_unique([...$look->lacks, ...self::saidLacking($look->details)]));
+                $products = $this->samePictureFirst($index, $hits, $this->taggedProducts($index, $tags, $hits, $shopId, $content, array_values(array_filter([$look->object, ...$look->details])), $lacks, $look->object));
                 $products = $rank ? $this->ranker->handle($shopId, $bytes, $look->box, $products, self::described($look)) : $products;
                 $record && $this->counter->photo($shopId, count($products));
                 $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut, $visit);
 
-                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true] + $seen;
+                return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => array_map(fn (array $t): array => array_diff_key($t, ['id' => 0, 'main' => 0]), $tags), 'searched' => true, 'close' => self::closeToPhoto($products, $shopId)] + $seen;
             }
 
             $hits = array_slice($hits, 0, max(48, (int) Settings::get('search.semantic_results')));
@@ -725,8 +724,41 @@ final class SearchCatalog
             $record && $this->counter->photo($shopId, count($products));
             $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut, $visit);
 
-            return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null] + $seen;
+            return ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => $hits !== [] || $index !== null, 'close' => self::closeToPhoto($products, $shopId)] + $seen;
         });
+    }
+
+    /**
+     * Whether the first product shown truly looks like the photo (its picture's likeness, else its match, at least
+     * search.photo_close_look): only then is it "the most alike". A store with no olive plain tee shows its nearest
+     * tees, said to be the nearest, not the most alike.
+     *
+     * @param  list<array<string, mixed>>  $products
+     */
+    private static function closeToPhoto(array $products, string $shopId): bool
+    {
+        $first = $products[0] ?? null;
+        $likeness = $first === null ? null : ($first['look'] ?? $first['match'] ?? null);
+
+        return $likeness !== null && (int) $likeness >= (int) round((float) Settings::get('search.photo_close_look', $shopId) * 100);
+    }
+
+    /**
+     * What a photo's details say its object has not ("בלי הדפס", "ללא אבן", "without a hood"): those words.
+     *
+     * @param  list<string>  $details
+     * @return list<string>
+     */
+    private static function saidLacking(array $details): array
+    {
+        $lacks = [];
+        foreach ($details as $detail) {
+            if (preg_match('/^\s*(?:בלי|ללא|without|no)\s+(.+)$/iu', (string) $detail, $m) === 1 && trim($m[1]) !== '') {
+                $lacks[] = trim($m[1]);
+            }
+        }
+
+        return $lacks;
     }
 
     /**

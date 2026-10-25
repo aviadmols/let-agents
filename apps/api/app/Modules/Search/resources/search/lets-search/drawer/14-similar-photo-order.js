@@ -137,7 +137,7 @@
       d = d.data || d;
       var ps = ((d.groups && d.groups.product) || []).map(function (p) { return { id: pid(p.external_id || p.id), match: p.match }; }).filter(function (p) { return rec(p.id); });
       return products(ps.slice(0, 6).map(function (p) { return p.id; })).then(function () {
-        update(turn, { loading: false, ids: ps.map(function (p) { return p.id; }), tags: d.tags || [], seen: d.seen || '', unclear: !!d.unclear, nothing: !!d.nothing, items: d.items || null, item: d.item || 0, off: {} });
+        update(turn, { loading: false, ids: ps.map(function (p) { return p.id; }), tags: d.tags || [], seen: d.seen || '', unclear: !!d.unclear, nothing: !!d.nothing, items: d.items || null, item: d.item || 0, off: {}, close: d.close !== false });
         visitStep('photo', { label: String(d.seen || '').slice(0, 200), n: ps.length });
       });
     }).catch(function () { update(turn, { loading: false, failed: true }); });
@@ -170,7 +170,9 @@
     var list = turn.ids.map(rec).filter(Boolean);
     var html = photoItems(turn) + (turn.seen ? '<div class="ls-seen"><span class="ls-seen__label">' + esc(t('photoSeen')) + ' <b>' + esc(turn.seen) + '</b></span></div>' : '') + tagRow(false);
     if (off.length) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('photoTagSite', { t: (turn.tags || []).filter(function (x, i) { return off.indexOf(i) < 0; }).map(function (x) { return x.title; }).join(' ') })) + ' · <button class="ls-btn ls-btn--link" data-q="' + esc((turn.tags || []).filter(function (x, i) { return off.indexOf(i) < 0; }).map(function (x) { return x.title; }).join(' ')) + '">' + esc(LANG === 'he' ? 'חיפוש' : 'Search') + '</button></span></div>'; }
-    html += '<div class="ls-grid" style="margin-top:12px">' + list.slice(0, 6).map(function (r, i) { var c = card(r); return i === 0 ? c.replace('<span class="ls-card__heart">', '<span class="ls-best">' + esc(t('photoBest')) + '</span><span class="ls-card__heart">') : c; }).join('') + '</div>';
+    // the first is the most alike only when it truly looks like the photo; else what the store has, said to be the nearest
+    if (!turn.close) { html += '<div class="ls-note" data-photo-far>' + icon('info') + '<span>' + esc(t('photoNotClose')) + '</span></div>'; }
+    html += '<div class="ls-grid" style="margin-top:12px">' + list.slice(0, 6).map(function (r, i) { var c = card(r); return i === 0 && turn.close ? c.replace('<span class="ls-card__heart">', '<span class="ls-best">' + esc(t('photoBest')) + '</span><span class="ls-card__heart">') : c; }).join('') + '</div>';
     return html;
   }
 

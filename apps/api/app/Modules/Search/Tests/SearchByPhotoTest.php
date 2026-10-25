@@ -104,6 +104,7 @@ final class SearchByPhotoTest extends TestCase
 
         $this->assertSame(['1', '2'], array_column($result['groups']['product'], 'external_id'), 'the jeans do not look like a striped shirt');
         $this->assertGreaterThanOrEqual(95, $result['groups']['product'][0]['match']);
+        $this->assertTrue($result['close'], 'its first truly looks like the photo: the drawer may call it the most alike');
         $this->assertSame('https://www.store.test/p/1', $result['groups']['product'][0]['url']);
 
         $this->upload()->assertOk();
@@ -112,6 +113,11 @@ final class SearchByPhotoTest extends TestCase
 
         $term = $this->inShop(fn () => SearchTerm::query()->sole());
         $this->assertSame(['[photo]', 2, 0], [$term->query, $term->searches, $term->empty], 'counted, the photo never kept');
+
+        // Vans: a plain olive tee's photo showed striped knits at 60% marked "the most alike". Under the store's mark,
+        // the nearest are shown as the nearest.
+        Settings::set('search.photo_close_look', 0.99, $this->shop->id);
+        $this->assertFalse($this->upload()->assertOk()->json('close'), 'not alike enough to be called the most alike');
     }
 
     public function test_the_camera_shows_only_where_pictures_are_indexed(): void

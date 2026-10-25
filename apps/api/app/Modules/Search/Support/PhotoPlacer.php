@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogProduct;
 
 /**
@@ -30,6 +31,17 @@ final class PhotoPlacer
 
     /** A category shared by at least this share of the voting products is nearly as shared as the top one. */
     private const NEAR_SHARE = 0.6;
+
+    /** A category whose products open with this many different kind words, none of them on half, holds many kinds. */
+    private const MIXED_KINDS = 4;
+
+    private const MIXED_TOP_SHARE = 0.5;
+
+    /** Products of a category read for mixed(). */
+    private const MIXED_SAMPLE = 300;
+
+    /** @var array<string, bool> category external id => whether it holds many kinds */
+    private array $mixed = [];
 
     /** @var array<string, list<list<string>>> each record's words, by record id */
     private array $words = [];
@@ -370,13 +382,18 @@ final class PhotoPlacer
     {
         $counts = [];
 
+        // a campaign or a collection ("חדש באתר", "NIGHT SALE") holds products of every kind: it never wins as one,
+        // by its name, or, whatever it is called ("Summer Vibes", "גברים"), by holding many kinds (mixed())
+        $kinds = app()->bound(ProductKinds::class) ? app(ProductKinds::class) : null;
         foreach ($this->categoriesOf($externalIds) as $categories) {
             foreach ($categories as $category) {
-                if ($this->record(self::CATEGORY.$category) !== null) {
+                $record = $this->record(self::CATEGORY.$category);
+                if ($record !== null && ! ($kinds?->campaign((string) ($record['title'] ?? '')) ?? false)) {
                     $counts[$category] = ($counts[$category] ?? 0) + 1;
                 }
             }
         }
+        $counts = array_filter($counts, fn (string $category): bool => ! $this->mixed($category), ARRAY_FILTER_USE_KEY);
 
         if ($counts === [] || (max($counts) < 2 && count($externalIds) > 1)) {
             return [];
@@ -393,6 +410,28 @@ final class PhotoPlacer
         });
 
         return array_map('strval', array_keys($counts));
+    }
+
+    /**
+     * Whether a category holds many kinds of product, not one: its products' Hebrew titles open with many different
+     * words ("נעלי", "קפוצ'ון", "תיק", "חולצת"), none of them most. Read from the store's own titles, whatever the
+     * category is called; a category of English titles, which say no kind, is never taken for mixed.
+     */
+    private function mixed(string $category): bool
+    {
+        if (! array_key_exists($category, $this->mixed)) {
+            $heads = [];
+            $titles = CatalogProduct::query()->whereNull('removed_at')->whereHas('categories', fn ($q) => $q->where('external_id', $category))
+                ->limit(self::MIXED_SAMPLE)->pluck('title');
+            foreach ($titles as $title) {
+                $head = HebrewSearch::head((string) $title);
+                $head !== '' && $heads[$head] = ($heads[$head] ?? 0) + 1;
+            }
+            $named = array_sum($heads);
+            $this->mixed[$category] = $named >= max(2, $titles->count() / 2) && count($heads) >= self::MIXED_KINDS && max($heads) < $named * self::MIXED_TOP_SHARE;
+        }
+
+        return $this->mixed[$category];
     }
 
     /** @return list<list<string>> */

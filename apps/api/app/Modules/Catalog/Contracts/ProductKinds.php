@@ -23,6 +23,12 @@ interface ProductKinds
      */
     public function sameKind(CatalogProduct $product, array $externalIds): array;
 
+    /**
+     * Whether a category or tag names a campaign, a season or a collection rather than a kind ("חדש באתר", "NIGHT SALE",
+     * "CLUB 20%", "כל מה שחם", "BACK TO SCHOOL", "FW25"): never what a product is.
+     */
+    public function campaign(string $name): bool;
+
     /** Whether the store has another active product of its kind (false when its kind is unknown). */
     public function hasLike(CatalogProduct $product): bool;
 

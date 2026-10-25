@@ -924,6 +924,14 @@
             "unit": "days"
         },
         {
+            "name": "photo_close_look",
+            "type": "float",
+            "default": 0.75,
+            "min": 0.5,
+            "max": 1,
+            "scope": "shop"
+        },
+        {
             "name": "photo_colour_weight",
             "type": "float",
             "default": 0.3,

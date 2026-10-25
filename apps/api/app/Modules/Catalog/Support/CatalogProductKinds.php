@@ -22,8 +22,16 @@ final class CatalogProductKinds implements ProductKinds
     /** A series may run through much of a small store ("אייקוני - כדורים פורחים" on half of it), never all of it. */
     private const SERIES_MAX_SHARE = 0.75;
 
-    /** A campaign, not a kind: a sale, a season, a date ("sale 20%", "july20", "חזרה לגן", "Top 10"). */
-    private const CAMPAIGN = '/\d|%|\b(sale|off|new|top|last|chance|outlet|clearance|black friday)\b|מבצע|הנחה|סייל|חדש|חזרה ל/iu';
+    /**
+     * A campaign, not a kind: a sale, a season, a date, a collection, what is new or in fashion ("sale 20%", "july20",
+     * "חזרה לגן", "Top 10", "חדש באתר", "CLUB 20%", "כל מה שחם", "BACK TO SCHOOL", "טרנדים").
+     */
+    private const CAMPAIGN = '/\d|%|\b(sale|off|new|top|last|chance|outlet|clearance|black friday|club|back to school|trend\w*|collection)\b|מבצע|הנחה|סייל|חדש|חזרה ל|כל מה ש|טרנד|קולקצי/iu';
+
+    public function campaign(string $name): bool
+    {
+        return preg_match(self::CAMPAIGN, $name) === 1;
+    }
 
     /** Words a store uses for a print, a collection or a series. */
     private const SERIES_WORDS = '/הדפס|דוגמ|קולקצי|סדרת|אייקוני|print|pattern|collection|series/iu';

@@ -627,6 +627,17 @@ final class HebrewSearch
         return trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text));
     }
 
+    /**
+     * What a Hebrew title says the product is, as a stem: the word it opens with ("תיק גב Old Skool" is "תק",
+     * "נעלי סניקרס" and "נעליים" both "נעל"); '' when it opens with no Hebrew word (an English title opens with a model).
+     */
+    public static function head(string $title): string
+    {
+        $first = explode(' ', self::normalize($title), 2)[0];
+
+        return preg_match('/^[א-ת]{2,}$/u', $first) === 1 ? self::stem($first) : '';
+    }
+
     /** ברגים and בורג are both ברג. */
     public static function stem(string $word): string
     {
