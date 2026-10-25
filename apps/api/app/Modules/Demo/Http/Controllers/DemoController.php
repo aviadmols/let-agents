@@ -108,8 +108,8 @@ final class DemoController extends Controller
     }
 
     /**
-     * The demo's preparation before its scan, a step at a time (PrepareDemoJob, ShootDemoJob): reading the site,
-     * starting the scan, the home page's picture. Each waiting, running, done, failed or, for the picture, skipped.
+     * The demo's preparation before its scan, a step at a time (PrepareDemoJob): reading the site, starting the
+     * scan. Each waiting, running, done or failed. The home page's picture is taken meanwhile, not shown as a step.
      *
      * @return list<array{key: string, state: string}>
      */
@@ -126,9 +126,6 @@ final class DemoController extends Controller
         return [
             ['key' => 'read', 'state' => $state($site->read_at !== null, true)],
             ['key' => 'scan', 'state' => $state($site->scan_at !== null, $site->read_at !== null)],
-            ['key' => 'picture', 'state' => $site->shot_at !== null
-                ? ($site->screenshot !== null ? 'done' : 'skipped')
-                : ($failed ? 'waiting' : $state(false, $site->scan_at !== null))],
         ];
     }
 

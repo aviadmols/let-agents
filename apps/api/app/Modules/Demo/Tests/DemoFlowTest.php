@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
+use App\Modules\Demo\Filament\Operator\Pages\Demos;
 use App\Modules\Demo\Jobs\PrepareDemoJob;
 use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Mail\DemoMail;
@@ -17,6 +18,7 @@ use App\Modules\Tenancy\Contracts\CreatesShops;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -150,6 +152,23 @@ final class DemoFlowTest extends TestCase
         $this->assertSame([['name' => 'מידה', 'value' => '52']], $record['variations'][0]['attributes']);
     }
 
+    public function test_each_demo_shows_what_it_cost_building_it_and_its_visitors_apart_and_keeps_it_when_it_ends(): void
+    {
+        $site = $this->verified();
+        $spend = fn (string $agent, float $usd) => DB::table('ai_usage')->insert(['shop_id' => $site->shop_id, 'agent' => $agent, 'action' => $agent, 'provider' => 'openai',
+            'model' => 'm', 'cost_usd' => $usd, 'day' => now()->toDateString(), 'created_at' => now()]);
+        $spend('taxonomy.tagger', 0.3);
+        $spend('assistant.site_answerer', 0.05);
+
+        $this->assertSame(['build' => 0.3, 'visitors' => 0.05], SweepDemos::costs($site->shop_id));
+        $page = app(Demos::class);
+        $this->assertSame(0.35, $page->demos()->firstWhere('id', $site->id)->spent);
+
+        SweepDemos::end($site->refresh());
+        $this->assertSame(0.35, $site->fresh()->cost_usd, 'the store and its ledger went; what it cost stays on its row');
+        $this->assertSame(0.35, $page->demos()->firstWhere('id', $site->id)->spent);
+    }
+
     public function test_the_language_chosen_is_the_stores_and_its_searchs(): void
     {
         $this->start(['language' => 'xx'])->assertSessionHas('demo_error', 'choose');
@@ -165,7 +184,7 @@ final class DemoFlowTest extends TestCase
     {
         $site = $this->verified();
         $this->getJson('/demo/'.$site->token.'/progress')->assertOk()
-            ->assertJsonPath('steps', [['key' => 'read', 'state' => 'running'], ['key' => 'scan', 'state' => 'waiting'], ['key' => 'picture', 'state' => 'waiting']])
+            ->assertJsonPath('steps', [['key' => 'read', 'state' => 'running'], ['key' => 'scan', 'state' => 'waiting']])
             ->assertJsonPath('slow', false)->assertJsonPath('error', null);
 
         Http::fake(['https://store.test/products.json*' => Http::response('<html></html>'), 'https://store.test/wp-json/*' => Http::response([['id' => 1]])]);
@@ -177,10 +196,7 @@ final class DemoFlowTest extends TestCase
         $this->assertSame('woocommerce', $site->platform);
         Queue::assertPushed(ShootDemoJob::class, fn (ShootDemoJob $job): bool => $job->demoId === $site->id);
         $this->getJson('/demo/'.$site->token.'/progress')
-            ->assertJsonPath('steps', [['key' => 'read', 'state' => 'done'], ['key' => 'scan', 'state' => 'done'], ['key' => 'picture', 'state' => 'running']]);
-
-        $site->forceFill(['shot_at' => now()])->save();
-        $this->getJson('/demo/'.$site->token.'/progress')->assertJsonPath('steps.2.state', 'skipped');
+            ->assertJsonPath('steps', [['key' => 'read', 'state' => 'done'], ['key' => 'scan', 'state' => 'done']]);
     }
 
     public function test_a_preparation_that_stopped_is_sent_again_then_shown_as_a_problem_with_what_to_do(): void

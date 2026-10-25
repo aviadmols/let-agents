@@ -1,5 +1,5 @@
 {{-- The demo store's scan as a real store's first run shows it (the Admin module's onboarding, step 3): first its
-     preparation a step at a time (reading the site, starting the scan, the home page's picture), then the products,
+     preparation a step at a time (reading the site, starting the scan), then the products,
      their pictures, the pages, the tags and the knowledge as they grow, and what was learned. A problem is shown here,
      where it happened, with what to do: the address asked again when it may be wrong, and a button to try again.
      Polls DemoController::progress. --}}
@@ -95,7 +95,7 @@
         <p class="group">{{ $t('scan.getting_ready') }}</p>
         <div class="rows steps" data-steps aria-live="polite">
             @foreach ($steps as $step)
-                <div class="row is-{{ $step['state'] === 'skipped' ? 'done' : $step['state'] }}" data-step="{{ $step['key'] }}">
+                <div class="row is-{{ $step['state'] }}" data-step="{{ $step['key'] }}">
                     <span class="ic" aria-hidden="true">{!! $t('scan.icons.'.$step['key']) !!}</span>
                     <div><div class="rt">{{ $t('scan.steps.'.$step['key'].'.title') }}</div><div class="rs">{{ $t('scan.steps.'.$step['key'].'.sub') }}</div></div>
                     <div class="rn" data-state>{{ $t('scan.states.'.$step['state']) }}</div>
@@ -129,7 +129,7 @@
                 (d.steps || []).forEach(function (s) {
                     var row = box.querySelector('[data-step="' + s.key + '"]');
                     if (!row) { return; }
-                    row.className = 'row is-' + (s.state === 'skipped' ? 'done' : s.state);
+                    row.className = 'row is-' + s.state;
                     row.querySelector('[data-state]').textContent = states[s.state] || '';
                 });
                 box.querySelector('[data-slow]').hidden = !d.slow;

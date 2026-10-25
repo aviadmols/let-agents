@@ -4,9 +4,11 @@
     @php($cell = 'padding:8px;border-bottom:1px solid #f1f1f4;text-align:start;vertical-align:top;font-size:13px')
     @php($counts = $this->counts())
     @php($demos = $this->demos())
+    @php($cap = (float) \App\Core\Facades\Settings::get('demo.budget_usd'))
 
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <x-filament::link href="{{ route('demo.form') }}" target="_blank" icon="heroicon-m-arrow-top-right-on-square">{{ $t('page') }}</x-filament::link>
+        <span style="{{ $small }}" data-cost-total>{{ $t('cost_total', ['usd' => '$'.number_format((float) $demos->sum('spent'), 3), 'count' => $demos->count()]) }}</span>
         <span style="flex:1"></span>
         @foreach (['' => 'all', 'pending' => 'pending', 'scanning' => 'scanning', 'ready' => 'ready', 'failed' => 'failed', 'expired' => 'expired'] as $value => $key)
             <x-filament::button size="xs" :color="$status === $value ? 'primary' : 'gray'" wire:click="$set('status', '{{ $value }}')">
@@ -42,7 +44,19 @@
                                     @if ($demo->error)<div style="{{ $small }}">{{ $demo->error }}</div>@endif
                                 </td>
                                 <td style="{{ $cell }};white-space:nowrap">{{ $t('read_counts', ['products' => number_format($demo->products), 'pages' => number_format($demo->pages)]) }}</td>
-                                <td style="{{ $cell }}" dir="ltr">{{ $demo->spent !== null ? '$'.number_format((float) $demo->spent, 3) : '—' }}</td>
+                                <td style="{{ $cell }};white-space:nowrap" data-cost="{{ $demo->spent }}">
+                                    @if ($demo->spent === null)
+                                        —
+                                    @else
+                                        <div style="font-weight:600" dir="ltr">${{ number_format((float) $demo->spent, 3) }}</div>
+                                        @if ($demo->spent_parts !== null)
+                                            <div style="{{ $small }}">{{ $t('cost_parts', ['build' => '$'.number_format($demo->spent_parts['build'], 3), 'visitors' => '$'.number_format($demo->spent_parts['visitors'], 3)]) }}</div>
+                                        @endif
+                                        @if ($cap > 0)
+                                            <div style="{{ $small }}">{{ $t('cost_of_cap', ['percent' => (int) round(100 * $demo->spent / $cap), 'cap' => '$'.rtrim(rtrim(number_format($cap, 2), '0'), '.')]) }}</div>
+                                        @endif
+                                    @endif
+                                </td>
                                 <td style="{{ $cell }};white-space:nowrap" dir="ltr">{{ $demo->expires_at?->timezone('Asia/Jerusalem')->format('d/m H:i') ?? '—' }}</td>
                                 <td style="{{ $cell }};white-space:nowrap">
                                     @if (in_array($demo->status, ['scanning', 'ready'], true))

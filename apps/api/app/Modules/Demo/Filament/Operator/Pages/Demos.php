@@ -48,12 +48,21 @@ class Demos extends Page
         return __('demo::operator.subheading', ['days' => Settings::get('demo.keep_days'), 'per_day' => Settings::get('demo.per_day'), 'budget' => Settings::get('demo.budget_usd')]);
     }
 
-    /** @return Collection<int, DemoSite> */
+    /**
+     * The demos, each with what it cost us: kept on its row for what ended (an earlier try, or the demo itself),
+     * and, while its store lasts, its store's model calls so far, building it and its visitors apart.
+     *
+     * @return Collection<int, DemoSite>
+     */
     public function demos(): Collection
     {
         return DemoSite::query()->when($this->status !== '', fn ($q) => $q->where('status', $this->status))
             ->latest()->limit(self::SHOWN)->get()
-            ->each(fn (DemoSite $d) => $d->setAttribute('spent', $d->shop_id !== null ? SweepDemos::cost($d->shop_id) : $d->cost_usd));
+            ->each(function (DemoSite $d): void {
+                $live = $d->status !== DemoSite::EXPIRED && $d->shop_id !== null ? SweepDemos::costs($d->shop_id) : null;
+                $d->setAttribute('spent', $live === null && $d->cost_usd === null ? null : round((float) $d->cost_usd + array_sum($live ?? []), 4));
+                $d->setAttribute('spent_parts', $live);
+            });
     }
 
     /** @return array<string, int> status => how many, for the filter */

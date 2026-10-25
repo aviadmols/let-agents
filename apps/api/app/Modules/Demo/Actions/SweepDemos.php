@@ -65,18 +65,37 @@ final class SweepDemos
         return $counts;
     }
 
-    /** What a demo store's model calls cost so far (the spend ledger, ai_usage). */
-    public static function cost(string $shopId): float
+    /** The model calls made for whoever tries the demo (a search, a question, a photo); every other call built it. */
+    public const VISITORS = ['assistant.site_answerer', 'assistant.answerer', 'search.photo_reader', 'search.resolver', 'retrieval.query_embedder', 'retrieval.matcher', 'try_on.maker'];
+
+    /**
+     * What a demo store's model calls cost so far (the spend ledger, ai_usage): building it, and its visitors.
+     *
+     * @return array{build: float, visitors: float}
+     */
+    public static function costs(string $shopId): array
     {
-        return round((float) DB::table('ai_usage')->where('shop_id', $shopId)->sum('cost_usd'), 4);
+        $byAgent = DB::table('ai_usage')->where('shop_id', $shopId)->selectRaw('agent, sum(cost_usd) as usd')->groupBy('agent')
+            ->pluck('usd', 'agent')->map(fn ($usd): float => (float) $usd);
+        $visitors = (float) $byAgent->only(self::VISITORS)->sum();
+
+        return ['build' => round((float) $byAgent->sum() - $visitors, 4), 'visitors' => round($visitors, 4)];
     }
 
-    /** A demo ended now: its store deleted when no other live demo shows it, its pictures dropped. */
+    public static function cost(string $shopId): float
+    {
+        return round(array_sum(self::costs($shopId)), 4);
+    }
+
+    /**
+     * A demo ended now: its store deleted when no other live demo shows it, its pictures dropped, what its store cost
+     * kept on its row (added to what earlier tries of it cost, RetryDemo), since the store's ledger goes with it.
+     */
     public static function end(DemoSite $site): void
     {
         $shopId = $site->shop_id;
         $site->forceFill(['status' => DemoSite::EXPIRED, 'screenshot' => null, 'screenshot_mobile' => null, 'expires_at' => $site->expires_at ?? now(),
-            'cost_usd' => $shopId === null ? $site->cost_usd : self::cost($shopId)])->save();
+            'cost_usd' => $shopId === null ? $site->cost_usd : round((float) $site->cost_usd + self::cost($shopId), 4)])->save();
 
         $shown = $shopId !== null && DemoSite::query()->where('shop_id', $shopId)->whereIn('status', [DemoSite::SCANNING, DemoSite::READY])->exists();
         if ($shopId !== null && ! $shown) {

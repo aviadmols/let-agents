@@ -68,14 +68,12 @@ return [
         'steps' => [
             'read' => ['title' => 'Reading the site', 'sub' => 'What it runs on, its name and language'],
             'scan' => ['title' => 'Starting the scan', 'sub' => 'As for a real store that connects'],
-            'picture' => ['title' => 'Taking a picture of the home page', 'sub' => 'The background of your demo'],
         ],
         'states' => [
             'waiting' => 'Waiting',
             'running' => 'Working on it',
             'done' => 'Done',
             'failed' => 'Stopped',
-            'skipped' => 'No picture',
         ],
         'slow' => 'The site is answering slowly, and we keep trying. You can close this page: we email you when the demo is ready.',
         'problem' => [
@@ -111,7 +109,6 @@ return [
             'knowledge' => '<svg viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg>',
             'read' => '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
             'scan' => '<svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>',
-            'picture' => '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
         ],
     ],
     'view' => [
