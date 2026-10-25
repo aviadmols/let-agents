@@ -208,6 +208,8 @@ final class SimilarItemsTest extends TestCase
 
         app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['נמר', 'כחול'])]));
         $this->assertSame([], $this->similar('301', 2)->json('products'), 'a blue leopard is of another colour: none, never padded');
+        // and the shopper is offered, apart, what of its kind its look left out ("אולי אלה יעניינו אתכם")
+        $this->assertEqualsCanonicalizing(['302', '303'], array_column($this->similar('301', 2)->json('others'), 'external_id'));
 
         // its picture names no colour: nothing to keep to, the pictures' order, never the tags alone
         app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => json_encode(['נמר'])]));

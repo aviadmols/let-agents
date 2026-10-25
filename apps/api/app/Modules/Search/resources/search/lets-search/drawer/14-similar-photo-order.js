@@ -13,10 +13,12 @@
     BODY.scrollTop = 0;
     json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : '')).then(function (r) {
       var ids = ((r.body && r.body.products) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id); });
-      return products(ids.slice(0, 24).map(pid)).then(function () {
+      // few or none look like it: those of its kind its look left out (another colour, a print), shown apart as "maybe these"
+      var others = ((r.body && r.body.others) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id) && ids.indexOf(x) < 0; });
+      return products(ids.slice(0, 24).map(pid).concat(others.map(pid))).then(function () {
         if (oos) { update(turn, oosPatch(turn, ids, oos)); BODY.scrollTop = 0; return; }
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
-        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked) });
+        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked), others: others });
         BODY.scrollTop = 0;
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -68,7 +70,8 @@
     if (turn.error) { return errorHtml(turn); }
     if (!(turn.ids || []).length) {
       // asked for more than its alike and none is all of it: said so, and its alike are a choice, never shown in its place
-      return turn.wants ? '<p class="ls-noanswer__text">' + esc(t('similarAskedNone', { w: turn.wants })) + '</p><button class="ls-btn ls-btn--secondary ls-btn--sm" data-similar="' + esc(turn.of) + '">' + esc(t('similarAll')) + '</button>' : '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>';
+      if (turn.wants) { return '<p class="ls-noanswer__text">' + esc(t('similarAskedNone', { w: turn.wants })) + '</p><button class="ls-btn ls-btn--secondary ls-btn--sm" data-similar="' + esc(turn.of) + '">' + esc(t('similarAll')) + '</button>'; }
+      return othersHtml(turn, t('similarNoneOthers')) || '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>';
     }
     var list = filtered(turn), n = gridN(turn);
     // like the results: how many, the order to show them in, and the filters (the large view has them in its head)
@@ -76,7 +79,14 @@
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn);
     if (!list.length) { return head + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
     return oosNote(turn) + (turn.wants ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarAsked', { w: turn.wants })) + '</p>' : '') + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
-      (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '');
+      (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '') + othersHtml(turn, null);
+  }
+  // those of its kind that do not look like it, apart and said to be so: a line when none is alike, a title when few are
+  function othersHtml(turn, line) {
+    var list = (turn.others || []).map(rec).filter(Boolean);
+    if (!list.length) { return ''; }
+    return (line ? '<p class="ls-noanswer__text">' + esc(line) + '</p>' : '<div class="ls-block__title" style="margin-top:18px">' + esc(t('similarMaybe')) + '</div>') +
+      '<div class="ls-grid">' + list.slice(0, 8).map(card).join('') + '</div>';
   }
 
   // ---------------------------------------------------------------- photo

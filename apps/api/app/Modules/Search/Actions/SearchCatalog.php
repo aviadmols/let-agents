@@ -743,12 +743,17 @@ final class SearchCatalog
      *
      * @return list<array<string, mixed>>
      */
-    /** @param bool $otherColour "in another colour": its alike, never of its own colour or stone */
-    public function similar(string $shopId, string $externalId, int $limit, bool $otherColour = false, ?array $wants = null): array
+    /**
+     * @param  bool  $otherColour  "in another colour": its alike, never of its own colour or stone
+     * @param  list<array<string, mixed>>|null  $others  filled with those of its kind and audience its look left out (another
+     *                                                   colour, a print beside plain), in stock first: "maybe these" when few are alike
+     */
+    public function similar(string $shopId, string $externalId, int $limit, bool $otherColour = false, ?array $wants = null, ?array &$others = null): array
     {
         $wants = $wants !== null && SimilarWants::any($wants) ? $wants : null;
+        $others = [];
 
-        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour, $wants): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour, $wants, &$others): array {
             $index = LoadedIndex::for($shopId);
             $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'title', 'payload']);
 
@@ -797,7 +802,13 @@ final class SearchCatalog
             // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
             // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
             // what it wants ("עם יהלום"): only kind made a striped, a floral and a denim shirt a brown overshirt's alike (Story)
+            $ofKind = $ids;
             $ids = $looksLead && ! $otherColour && ($wants['words'] ?? []) === [] ? self::seenAlike($product, $ids) : $ids;
+            // what its look left out, as the store sells them now: never the product itself, and still all the question asked
+            $left = array_filter(array_map(fn (string $id): ?array => $id === $externalId ? null : ($index['records']['p:'.$id] ?? null), array_values(array_diff($ofKind, $ids))));
+            $left = $wants === null ? array_values($left) : SimilarWants::apply(array_values($left), $wants, $index['records']['p:'.$externalId] ?? null);
+            usort($left, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
+            $others = array_map(fn (array $r): array => $this->present($r), array_slice($left, 0, $limit));
             $ids = $looksLead ? self::bySeenWords($product, $ids) : $ids;
 
             $records = [];

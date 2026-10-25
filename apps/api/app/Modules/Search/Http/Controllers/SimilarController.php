@@ -21,6 +21,9 @@ final class SimilarController
 
     private const MAX_ASKED = 200;
 
+    /** Below this many alike, the others of its kind are offered apart. */
+    public const FEW_ALIKE = 4;
+
     public function __invoke(Request $request, SearchCatalog $search, string $site): JsonResponse
     {
         $connection = StorefrontSite::resolve($request, $site);
@@ -50,8 +53,10 @@ final class SimilarController
         // "q": the question asked on its page, for what else it wants of them ("עם יהלום והרבה יותר יקרה"), read in code
         $asked = mb_substr(trim((string) $request->query('q', '')), 0, self::MAX_ASKED);
         $wants = $asked === '' ? null : $search->similarWants($shopId, $id, $asked);
-        $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other', $wants);
+        $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other', $wants, $others);
+        // few or none look like it: those of its kind its look left out, to be shown apart as "maybe these" (never as alike)
+        $others = count($products) < self::FEW_ALIKE ? array_slice((array) $others, 0, $limit) : [];
 
-        return response()->json(['products' => $products] + ($wants === null ? [] : ['asked' => $wants]), 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return response()->json(['products' => $products] + ($others === [] ? [] : ['others' => $others]) + ($wants === null ? [] : ['asked' => $wants]), 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }
