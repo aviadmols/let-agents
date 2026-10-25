@@ -107,6 +107,21 @@ final class SimilarItemsTest extends TestCase
         });
     }
 
+    public function test_asked_in_another_colour_none_of_its_own_colour_is_shown(): void
+    {
+        // Rocks: "יש טבעות דומות עם אבן בצבע אחר?" asked on an amethyst ring's page
+        $title = fn (string $id, string $t) => app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', $id)->update(['title' => $t]));
+        $title('301', 'טבעת עם אבן סגולה');
+        $title('302', 'טבעת עם אבן סגולה כהה');
+        $title('303', 'טבעת עם אבן כחולה');
+        $this->travel(2)->seconds();
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $this->assertSame(['303'], array_column($this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/similar?id=301&colour=other')->json('products'), 'external_id'), 'the blue one, never the other purple one');
+        $this->assertContains('302', array_column($this->similar('301')->json('products'), 'external_id'), 'asked plainly, the purple one is alike');
+    }
+
     public function test_similar_items_come_by_picture_and_meaning_in_stock_first_and_never_the_product_itself(): void
     {
         $products = $this->similar('301')->assertOk()->json('products');

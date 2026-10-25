@@ -554,6 +554,31 @@ final class SearchCatalog
         return isset($kinds[self::headOf((string) ($record['title'] ?? ''))]) || array_intersect_key($kinds, array_flip((array) ($record['kd'] ?? []))) !== [];
     }
 
+    /**
+     * Of these alike, those of another colour than its own: where the store filters by colour or stone ("צבע", "אבן"),
+     * none sharing a value of those with it; elsewhere none whose title names a colour its own names.
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @param  array<string, mixed>|null  $own
+     * @param  list<array<string, mixed>>  $facets
+     * @return list<array<string, mixed>>
+     */
+    private static function otherColour(array $records, ?array $own, array $facets): array
+    {
+        if ($own === null) {
+            return $records;
+        }
+        $looks = array_keys(array_filter($facets, fn (array $f): bool => preg_match('/colou?r|stone|gem|צבע|אבנ|אבן/iu', (string) ($f['k'] ?? '').' '.(string) ($f['l'] ?? '')) === 1));
+        $codes = array_values(array_filter((array) ($own['f'] ?? []), fn ($code): bool => in_array(intdiv((int) $code, 1000), $looks, true)));
+        if ($codes !== []) {
+            return array_values(array_filter($records, fn (array $r): bool => array_intersect($codes, (array) ($r['f'] ?? [])) === []));
+        }
+        $colours = fn (array $r): array => array_column(array_filter(Colours::mentions((string) ($r['title'] ?? '')), fn (array $m): bool => $m['group'] !== 'metal'), 'family');
+        $mine = $colours($own);
+
+        return $mine === [] ? $records : array_values(array_filter($records, fn (array $r): bool => array_intersect($mine, $colours($r)) === []));
+    }
+
     private static function headOf(string $title): string
     {
         return HebrewSearch::head($title);
@@ -657,9 +682,10 @@ final class SearchCatalog
      *
      * @return list<array<string, mixed>>
      */
-    public function similar(string $shopId, string $externalId, int $limit): array
+    /** @param bool $otherColour "in another colour": its alike, never of its own colour or stone */
+    public function similar(string $shopId, string $externalId, int $limit, bool $otherColour = false): array
     {
-        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit): array {
+        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour): array {
             $index = LoadedIndex::for($shopId);
             $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'title', 'payload']);
 
@@ -715,6 +741,10 @@ final class SearchCatalog
                 }
             }
 
+            // "in another colour" (Rocks: a ring like this amethyst one, with another stone): never one of its own colour
+            if ($otherColour) {
+                $records = self::otherColour($records, $index['records']['p:'.$externalId] ?? null, (array) ($index['facets'] ?? []));
+            }
             usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
             // in stock first within each: those that share its tags still before the rest
             if (isset($sharing)) {

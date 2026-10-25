@@ -2,7 +2,7 @@
   // size: { value, shown } from size help: only the similar items that have it in stock now
   // oos: from the product page's row for a product or a variant sold out ({ whole, want: [{ value, shown, size }], size }):
   // only the similar ones in stock, and in the option that is gone (the variant filters, asked of one variant in stock)
-  function similarTurn(id, size, oos) {
+  function similarTurn(id, size, oos, otherColour) {
     // on a desktop the similar items open large, like "show all": the product on top, filters, the full grid
     S.tab = 'chat'; S.wide = null;
     // the similar items stand alone at the top; the search they came from waits behind the dashed line
@@ -11,7 +11,7 @@
     var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
     BODY.scrollTop = 0;
-    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '')).then(function (r) {
+    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '')).then(function (r) {
       var ids = ((r.body && r.body.products) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id); });
       return products(ids.slice(0, 24).map(pid)).then(function () {
         if (oos) { update(turn, oosPatch(turn, ids, oos)); BODY.scrollTop = 0; return; }

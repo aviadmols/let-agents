@@ -44,7 +44,8 @@ final class SimilarController
 
         // A bigger pool when the page will keep only some (the ones in a size that is gone here).
         $limit = $request->has('limit') ? max(1, min(self::MAX_LIMIT, (int) $request->query('limit'))) : (int) Settings::get('search.results_per_group', $shopId);
-        $products = $search->similar($shopId, $id, $limit);
+        // "colour=other": its alike in another colour or stone (a question asked on its page, "יש דומות בצבע אחר?")
+        $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other');
 
         return response()->json(['products' => $products], 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
