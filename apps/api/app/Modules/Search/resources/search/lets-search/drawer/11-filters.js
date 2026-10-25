@@ -24,7 +24,9 @@
     if (!lw.length || lw.join('').length < 2) { return { n: 0, of: 0, at: [] }; }
     var places = lw.map(function (w) {
       var out = [];
-      tw.forEach(function (x, i) { if (x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || alike(x, w)) { out.push(i); } });
+      // a word that names what the products are (a category, a kind) is that, never a look-alike value: "עגילי זהב"
+      // is earrings, not "עגול" (Rocks, 25.10). Said as it is, it still names the value.
+      tw.forEach(function (x, i) { if (x === w || stem(x) === w || (w.length >= 4 && x.indexOf(w) === 0 && x.length - w.length <= 2) || (alike(x, w) && !namesKind(x))) { out.push(i); } });
       return out;
     });
     var best = [];
@@ -44,6 +46,15 @@
       });
     })(0, []);
     return { n: best.length, of: lw.length, at: best };
+  }
+  // Whether a typed word is a form of a word in the name of one of the store's categories or kinds ("עגילי" of "עגילים").
+  function namesKind(x) {
+    if (x.length < 3) { return false; }
+    return (S.facets || []).some(function (f) {
+      return (f.k === 'category' || f.k === 'type') && (f.v || []).some(function (v) {
+        return wordsOf(v.l).some(function (w) { return w.length >= 3 && (x === w || stem(x) === w || ((w.indexOf(x) === 0 || x.indexOf(w) === 0) && Math.abs(w.length - x.length) <= 2)); });
+      });
+    });
   }
   // A category (or a tag shown as a filter) is read from the words when its whole name is typed, or, for a name of
   // three words or more, all of it but one word and at least two: "ספרי מופת" is "ספרי מופת מתורגמים".

@@ -562,6 +562,40 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame([], $this->calls, 'no model for arithmetic');
     }
 
+    public function test_a_price_range_with_another_wish_is_the_writers_among_the_stores_products_inside_it(): void
+    {
+        // Rocks, 25.10: "the biggest diamond between 2000 and 2500" read only "up to 2500", the search found nothing, the
+        // writer got two rings at 1,000 and told the shopper the site shows no prices.
+        $this->product('961', 'טבעת סוליטר משובצת יהלום במשקל 0.93 קארט', 'טבעת.', [], ['price' => '2500.00', 'in_stock' => true]);
+        $this->product('962', 'טבעת וינטאג משובצת יהלום מרכזי 0.18 קראט', 'טבעת.', [], ['price' => '2050.00', 'in_stock' => true]);
+        $this->product('963', 'טבעת זהב משובצת יהלום', 'טבעת.', [], ['price' => '1000.00', 'in_stock' => true]);
+        $this->product('964', 'טבעת סוליטר יהלום גדולה', 'טבעת.', [], ['price' => '6900.00', 'in_stock' => true]);
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return str_contains($question, 'טבעת') ? ['963', '964', '961', '962'] : [];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'הטבעת עם היהלום הגדול ביותר בטווח היא זו של 0.93 קארט.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'יהלום של 0.93 קארט']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('תראה לי טבעת יהלום עם היהלום הכי גדול במחיר שבין 2000 עד 2500', ['963'])->json('data');
+
+        $sent = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['טבעת סוליטר משובצת יהלום במשקל 0.93 קארט', 'טבעת וינטאג משובצת יהלום מרכזי 0.18 קראט'], array_column($sent['products'], 'title'), 'the store\'s diamond rings inside the range, not the one at 1,000 on screen, not the one at 6,900');
+        $this->assertSame(['answered', 'model', '961'], [$data['outcome'], $data['from'], $data['picks'][0]['external_id']], 'the biggest diamond is the writer\'s to choose, not the cheapest by code');
+        $this->assertEquals(['min' => 2000, 'max' => 2500], $data['range'], 'the storefront keeps its suggestions to the range');
+        $this->assertNull(AnswerSiteQuestion::notFoundLine('האתר לא מציג כאן מחירים, לכן אי אפשר לסנן לפי טווח.', 'טבעת עד 2500'), 'the writer never sees prices: nothing it says of them is shown');
+    }
+
     public function test_the_cheapest_with_no_product_named_is_the_whole_stores_merchandise(): void
     {
         // What the words happened to find: a ring and a pendant, far from the cheapest.

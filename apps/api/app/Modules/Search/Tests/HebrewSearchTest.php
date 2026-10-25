@@ -68,6 +68,30 @@ final class HebrewSearchTest extends TestCase
         $this->assertContains('p:3', array_column(HebrewSearch::search($index, 'מלחמה'), 'id'), '"מלחמה" finds "מלחמת העולם"');
     }
 
+    public function test_a_word_the_catalogue_holds_is_that_word_not_one_its_vowel_letters_make_alike(): void
+    {
+        // Rocks, 25.10: "עגילי זהב" found rings "בחיתוך עגול": with ו and י dropped, "עגיל" and "עגול" are one stem.
+        $items = [
+            ['id' => 'p:1', 't' => 'product', 'title' => 'עגילי וינטג צמודים', 'keywords' => 'עגילים זהב'],
+            ['id' => 'p:2', 't' => 'product', 'title' => 'טבעת בחיתוך עגול', 'keywords' => 'טבעות זהב'],
+            ['id' => 'p:3', 't' => 'product', 'title' => 'חולצה לבנה'],
+        ];
+        $index = HebrewSearch::build($items);
+
+        $this->assertSame(['p:1'], array_column(HebrewSearch::search($index, 'עגילי זהב'), 'id'), 'earrings, not a ring cut round');
+        $this->assertSame(['p:2'], array_column(HebrewSearch::search($index, 'עגול'), 'id'), 'and round is round');
+        $this->assertSame(['p:3'], array_column(HebrewSearch::search($index, 'חולצה לבינה'), 'id'), 'a slip nothing plainly holds is still forgiven');
+
+        $node = (new ExecutableFinder)->find('node');
+        if ($node !== null) {
+            $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const i=e.build('.json_encode($items, JSON_UNESCAPED_UNICODE).');'
+                .'process.stdout.write(JSON.stringify(["עגילי זהב","עגול","חולצה לבינה"].map(q=>e.search(i,q).map(h=>h.id))));';
+            $process = new Process([$node, '-e', $harness]);
+            $process->mustRun();
+            $this->assertSame([['p:1'], ['p:2'], ['p:3']], json_decode($process->getOutput(), true), 'the browser reads them the same');
+        }
+    }
+
     public function test_records_that_hold_the_words_as_typed_come_first(): void
     {
         $hits = HebrewSearch::search(HebrewSearch::build(self::fixture()['items']), 'ברגים');

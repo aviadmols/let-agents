@@ -153,6 +153,24 @@
   }
 
   /** @return {{words: string[], score: Object}} close catalogue words in the order PHP keeps them */
+  /** A word's endings, for telling its forms from another word: "עגילימ", "עגילי", "עגיל" are all "עגיל". */
+  function core(word) {
+    return word.length > 3 ? word.replace(/(?:ימ|ות|ה|ת|י)$/, '') : word;
+  }
+
+  /** Whether a catalogue word is a form of one typed: the same, the typed one at its start, or one the other's core with an ending. */
+  function formOf(candidate, typed) {
+    return typed.some(function (word) {
+      var c = core(word);
+      return candidate === word || (word.length >= 3 && (candidate.indexOf(word) === 0 || candidate.indexOf(c) === 0 || word.indexOf(core(candidate)) === 0));
+    });
+  }
+
+  /** Whether a catalogue word is another word than one typed that only their ו and י tell apart ("עגול", "עגיל"). */
+  function vowelsApart(candidate, typed) {
+    return typed.some(function (word) { return word.length >= 3 && stem(core(candidate)) === stem(core(word)) && !formOf(candidate, [word]); });
+  }
+
   var NUMBER_WORDS = { 'אחד': '1', 'אחת': '1', 'שניים': '2', 'שתיים': '2', 'שני': '2', 'שתי': '2', 'שלוש': '3', 'שלושה': '3', 'ארבע': '4', 'ארבעה': '4', 'חמש': '5', 'חמישה': '5', 'שש': '6', 'שישה': '6', 'שבע': '7', 'שבעה': '7', 'שמונה': '8', 'תשע': '9', 'תשעה': '9', 'עשר': '10', 'עשרה': '10', 'שתיםעשרה': '12' };
   function closeWords(index, typed) {
     var found = {};
@@ -218,6 +236,13 @@
           found[candidate] = score;
         }
       }
+    }
+
+    // A word the catalogue holds plainly ("עגילי" of "עגילים") is that word: another one that only looks like it with its
+    // ו and י dropped is not ("עגול"). A slip nothing plainly holds ("לבין") is still read as the word it is close to.
+    // As on the server (HebrewSearch::closeWords).
+    if (order.some(function (c) { return formOf(c, variants); })) {
+      order = order.filter(function (c) { return formOf(c, variants) || !vowelsApart(c, variants); });
     }
 
     var best = 0;

@@ -26,7 +26,7 @@
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
         } else {
-          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: related(q), h: hours(), noAnswer: d.no_answer || null, notFound: d.not_found || null });
+          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: related(q, d.range), h: hours(), noAnswer: d.no_answer || null, notFound: d.not_found || null });
           announce(t('noInfo'));
         }
       }).catch(function () { clearTimeout(slow); update(turn, { loading: false, error: true }); });
@@ -61,7 +61,7 @@
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
         } else {
-          var rel = related(q);
+          var rel = related(q, d.range);
           update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: rel, h: hours(), noAnswer: d.no_answer || null, notFound: d.not_found || null });
           announce(t('noInfo'));
         }
@@ -129,11 +129,15 @@
     return '<div class="ls-block__title" style="margin-top:14px">' + esc(t('alsoRelated')) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) +
       '<button class="ls-btn ls-btn--link ls-btn--sm" data-q="' + esc(turn.q) + '">' + esc(t('alsoAll')) + '</button>';
   }
-  function related(q) {
+  // two products the question's words name, in stock; inside the price it named, as the server read it (range), or none
+  // (Rocks, 25.10: rings at 1,000 suggested for "between 2000 and 2500")
+  function related(q, range) {
     var seen = {}, out = [];
-    String(q).replace(/[?.!,״"']/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 3 && !STOP.test(w); }).sort(function (a, b) { return b.length - a.length; }).forEach(function (w) {
+    var min = range && range.min != null ? Number(range.min) : null, max = range && range.max != null ? Number(range.max) : null;
+    var priced = function (x) { return (min === null && max === null) || (typeof x.pr === 'number' && (min === null || x.pr >= min) && (max === null || x.pr <= max)); };
+    String(q).replace(/[?.!,״"']/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 3 && !STOP.test(w) && !/^\d+$/.test(w); }).sort(function (a, b) { return b.length - a.length; }).forEach(function (w) {
       var stem = w.replace(/^[והבלמשכ](?=[א-ת]{3})/, '').replace(/(ים|ות)$/, '');
-      hits(w).forEach(function (x) { if (x.t === 'product' && x.s === 1 && !seen[x.id] && out.length < 2 && (x.title + ' ' + (x.kw || '')).indexOf(stem) >= 0) { seen[x.id] = 1; out.push(pid(x.id)); } });
+      hits(w).forEach(function (x) { if (x.t === 'product' && x.s === 1 && !seen[x.id] && out.length < 2 && priced(x) && (x.title + ' ' + (x.kw || '')).indexOf(stem) >= 0) { seen[x.id] = 1; out.push(pid(x.id)); } });
     });
     return out;
   }

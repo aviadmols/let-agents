@@ -261,10 +261,11 @@ final class HebrewSearch
         };
 
         $patterns = [
-            // between and from-to: both ends
-            '/\s(?:בין|between)\s*'.$num.$cur.'\s*(?:ל-?|and|to|עד|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
+            // between and from-to: both ends. "שבין", "ובין": a prefix letter before "בין" (Rocks, 25.10: "במחיר שבין 2000
+            // עד 2500" was read as "up to 2500", and "2000" was searched for as a word no product holds)
+            '/\s(?:[והבלמשכ]?בין|between)\s*'.$num.$cur.'\s*(?:ל-?|and|to|עד|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
             '/\s(?:מ-?|מ־|from)\s*'.$num.$cur.'\s*(?:עד|to|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
-            '/\s'.$num.$cur.'\s*(?:-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
+            '/\s'.$num.$cur.'\s*(?:-|–|עד|to)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
             // a top
             '/\s(?:עד|מתחת\s*ל-?|מתחת|פחות\s*מ-?|לא\s+יותר\s+מ-?|under|below|up\s+to|max)\s*'.$num.$cur.'(?=\s)/iu' => 'max',
             // a bottom
@@ -296,6 +297,11 @@ final class HebrewSearch
         if ($min === null && $max === null && preg_match('/\s'.$num.'\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils)(?=\s)/iu', $text, $m) === 1) {
             $max = $amount($m, 1);
             $text = str_replace($m[0], ' ', $text);
+        }
+
+        // "במחיר", "בתקציב של": with the range read, the word that introduced it says nothing a product holds.
+        if ($min !== null || $max !== null) {
+            $text = (string) preg_replace('/\s(?:[בו]?מחיר(?:ים)?|[בו]?תקציב|[בו]?טווח(?:\s+מחירים)?|price|budget)(?:\s+של)?(?=\s)/iu', ' ', $text);
         }
 
         return [trim((string) preg_replace('/\s+/u', ' ', $text)), $min, $max];
@@ -791,9 +797,51 @@ final class HebrewSearch
             }
         }
 
+        // A word the catalogue holds plainly (as typed, or a form of it: "עגילי" of "עגילים") is that word: another one that
+        // only looks like it with its ו and י dropped is not ("עגול": Rocks, 25.10, "עגילי זהב" found rings cut round). A slip
+        // nothing plainly holds ("לבין") is still read as the word it is close to.
+        if (array_any(array_keys($found), fn ($candidate): bool => self::formOf((string) $candidate, $variants))) {
+            $found = array_filter($found, static fn ($score, $candidate): bool => self::formOf((string) $candidate, $variants) || ! self::vowelsApart((string) $candidate, $variants), ARRAY_FILTER_USE_BOTH);
+        }
+
         $floor = $found ? max(self::FLOOR, max($found) * self::RELATIVE_FLOOR) : self::FLOOR;
 
         return array_filter($found, static fn ($score): bool => $score >= $floor);
+    }
+
+    /** A word's endings, for telling its forms from another word: "עגילימ", "עגילי", "עגיל" are all "עגיל". */
+    private static function core(string $word): string
+    {
+        return mb_strlen($word) > 3 ? (string) preg_replace('/(?:ימ|ות|ה|ת|י)$/u', '', $word) : $word;
+    }
+
+    /**
+     * Whether a catalogue word is a form of one typed: the same word, the typed one at its start ("עגילימ" for "עגילי"),
+     * or one is the other's core with an ending ("טבעת" for "טבעות").
+     *
+     * @param  list<string>  $typed
+     */
+    private static function formOf(string $candidate, array $typed): bool
+    {
+        foreach ($typed as $word) {
+            $core = self::core($word);
+            if ($candidate === $word || (mb_strlen($word) >= 3 && (str_starts_with($candidate, $word) || str_starts_with($candidate, $core) || str_starts_with($word, self::core($candidate))))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a catalogue word is another word than one typed that only their ו and י tell apart ("עגול", "עגיל"): the
+     * same letters once those are dropped (stem()), and neither the other's form.
+     *
+     * @param  list<string>  $typed
+     */
+    private static function vowelsApart(string $candidate, array $typed): bool
+    {
+        return array_any($typed, fn (string $word): bool => mb_strlen($word) >= 3 && self::stem(self::core($candidate)) === self::stem(self::core($word)) && ! self::formOf($candidate, [$word]));
     }
 
     /** A word of three letters or more anywhere in the words ("פרגולה" in "פרגולות"); a shorter one only as a word of its own, maybe after a prefix letter ("לב", "בלב", never "לבן"). */

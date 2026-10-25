@@ -245,6 +245,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             // The page the answer rests on that the question names ("מנויים" for "מה זה תוכנית מנויים?"): a button to it.
             $page = $result['outcome'] === AssistantAnswer::ANSWERED ? self::namedPage($question, (array) ($result['sources'] ?? [])) : null;
             $result += $page === null ? [] : ['page' => $page];
+            // The price the question names, as code read it: what the storefront suggests beside "not found" keeps to it.
+            $range = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+            $result += $range['min'] === null && $range['max'] === null ? [] : ['range' => $range];
 
             return $this->logged($shopId, $question, $products, $result);
         });
@@ -813,7 +816,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // Before all: what the store says about itself on every product page, in its team's words,
         // and the team's answers to questions like this one.
         $found = $this->knowledge($question, $shopId, $found);
-        $candidates = $this->candidates($shown);
+        $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         $type = AnswerContext::type($question);
         $counts = ['found' => count($found), 'shown' => count($candidates)];
         $debug = null;
@@ -1481,6 +1484,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($line === '' || mb_strlen($line) > self::NOT_FOUND_CHARS || preg_match('~https?://|www\.~i', $line) === 1) {
             return null;
         }
+        // The writer is never given prices (code reads them), so whatever it says of prices is not known to it: "האתר לא
+        // מציג כאן מחירים" told a shopper the store has none (Rocks, 25.10). The plain "not found" is said instead.
+        if (preg_match('/מחיר|תקציב|₪|ש["״]ח|שקל|\b(?:price|prices|priced|budget|cost)\b/iu', $line) === 1) {
+            return null;
+        }
 
         [$left, $refusal] = self::gate($line, $question, '');
 
@@ -1805,6 +1813,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         $asks = self::analysis($question, [])['asks'];
         ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
+        // A range with another wish ("the biggest diamond", "the best for a gift") is not answered by price alone:
+        // the writer chooses among the products inside it (withinPrice()).
+        if ($asks === 'in_range' && preg_match('/הכי|ביותר|\b(?:most|best|biggest|largest|smallest|nicest)\b/iu', $question) === 1) {
+            return null;
+        }
         $named = self::named($question);
         $wholeStore = ! $followUp && $named === [] && in_array($asks, ['cheapest', 'most_expensive'], true);
         // A question that names a product is answered from every product of the store the words name, as the
@@ -1998,6 +2011,40 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<string>  $shown
      * @return list<array{external_id: string, title: string, about: string, category: string}>
      */
+    /**
+     * A price the question names is code's, never the writer's: it is given ranks, not prices. So what was shown or
+     * named outside the range never reaches it, and when none of that is inside, the store's own products the words
+     * name are, inside the range, in stock first (Rocks, 25.10: "the biggest diamond between 2000 and 2500" was given
+     * two rings at 1,000, and the writer said the site shows no prices). A question with no price: as it was.
+     *
+     * @param  list<array<string, mixed>>  $candidates
+     * @return list<array<string, mixed>>
+     */
+    private function withinPrice(string $shopId, string $question, array $candidates): array
+    {
+        ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+
+        if ($min === null && $max === null) {
+            return $candidates;
+        }
+
+        $within = fn (array $p): bool => $p['price'] !== null && $p['price'] > 0 && ($min === null || $p['price'] >= $min) && ($max === null || $p['price'] <= $max);
+        $inside = array_values(array_filter($candidates, $within));
+
+        if ($inside === [] && app()->bound(ProductsNamed::class) && ($named = app(ProductsNamed::class)->all($shopId, $question)) !== []) {
+            // in the order the store's search named them, what is in stock first
+            $stock = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $named)->where('price', '>', 0)
+                ->when($min !== null, fn ($q) => $q->where('price', '>=', $min))
+                ->when($max !== null, fn ($q) => $q->where('price', '<=', $max))
+                ->pluck('in_stock', 'external_id');
+            $ids = array_values(array_filter($named, fn (string $id): bool => isset($stock[$id])));
+            usort($ids, fn (string $a, string $b): int => (int) $stock[$b] <=> (int) $stock[$a]);
+            $inside = $this->candidates(array_slice($ids, 0, self::MAX_PRODUCTS));
+        }
+
+        return $inside;
+    }
+
     private function candidates(array $shown): array
     {
         if ($shown === []) {
