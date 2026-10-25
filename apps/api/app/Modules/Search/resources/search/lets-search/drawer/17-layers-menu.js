@@ -39,6 +39,7 @@
     var c = C(turn), n = blankC();
     Object.keys(c.no).forEach(function (k) { n.no[k] = true; });
     Object.keys(c.auto).forEach(function (k) { n.no[k] = true; });
+    Object.keys(c.words || {}).forEach(function (k) { n.no['w:' + k] = true; });
     if (c.autoStock) { n.no.stock = true; }
     if (c.autoSale) { n.no.sale = true; }
     if (withSort) { n.no.sort = true; } else { n.sort = c.sort; n.autoSort = c.autoSort; }
@@ -51,6 +52,10 @@
       if (c.autoStock) { c.autoStock = false; c.no.stock = true; if (c.saidStock) { words = saidAt(turn.q, /^במלאי$/, ['in', 'stock']); } } else { c.stock = !c.stock; }
     } else if (key === 'sale') {
       if (c.autoSale) { c.autoSale = false; c.no.sale = true; words = saidAt(turn.q, /^ב?מבצע$/, ['on', 'sale']); } else { c.sale = !c.sale; }
+    } else if (key.indexOf('w:') === 0) {
+      // a word read as a chip, taken off: out of the search too, as a filter read from the words is
+      var wd = c.words && c.words[key.slice(2)];
+      if (wd) { delete c.words[key.slice(2)]; c.no[key] = true; words = wd.at.slice(); }
     } else {
       var code = Number(key.split(':')[1]);
       if (c.auto[code] && !c.f[code] && c.at && c.at[code] && c.at[code].length) { words = c.at[code]; }

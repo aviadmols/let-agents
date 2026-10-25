@@ -148,6 +148,60 @@
     while (loose.length && all.length && !filtered(turn).length) { delete c.auto[loose.shift()]; }
     c.autoStock = stocked;
     if (c.autoStock && !c.saidStock && all.length && !filtered(turn).length) { c.autoStock = false; }
+    // ✦ the words no filter here took that the results say ("גרב" of "כובע גרב"): chips too (as Aviad asked, 2026-10-25)
+    readWords(turn, all, taken);
+  }
+  // A word of the search, no filter's, that a result says in its title or words (its tags, its picture's words), in any of
+  // its forms: a chip read from the words, narrowing to what says it. At most WORD_CHIPS; never one that empties the results.
+  var WORD_CHIPS = 3;
+  var WITHOUT_WORD = /^(בלי|ללא|without|no)$/i;
+  function recForms(r) {
+    if (!r._wf) {
+      var set = {}, list = S.engine.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').filter(Boolean);
+      list.forEach(function (w) { wordForms(w).forEach(function (f) { set[f] = 1; }); });
+      r._wf = set;
+      r._ww = list;
+    }
+    return r._wf;
+  }
+  // a word read as a chip holds in any of its forms, or (part typed, "לוג") as the start of a word of the product ("לוגו")
+  function saysWord(r, forms, start) {
+    var set = recForms(r);
+    if (forms.some(function (f) { return set[f]; })) { return true; }
+    return !!start && r._ww.some(function (w) { return w.length > start.length && w.indexOf(start) === 0; });
+  }
+  // the word a part typed is the start of, as the results most often say it ("לוג": "לוגו")
+  function completed(all, start) {
+    var n = {};
+    all.forEach(function (r) { recForms(r); r._ww.forEach(function (w) { if (w.length > start.length && w.indexOf(start) === 0) { n[w] = (n[w] || 0) + 1; } }); });
+    return Object.keys(n).sort(function (a, b) { return n[b] - n[a]; })[0] || null;
+  }
+  function readWords(turn, all, taken) {
+    var c = C(turn), E = S.engine;
+    c.words = {};
+    var words = wordsOf(turn.q);
+    if (!E || !E.normalize || !all.length || words.length < 2) { return; }
+    var used = [];
+    words.forEach(function (w, i) {
+      if (Object.keys(c.words).length >= WORD_CHIPS || used.indexOf(i) >= 0 || taken.indexOf(i) >= 0) { return; }
+      // "בלי כפתורים": a chip that keeps away what says it
+      var not = WITHOUT_WORD.test(w) && words[i + 1] && taken.indexOf(i + 1) < 0;
+      var word = not ? words[i + 1] : w;
+      if (word.length < 3 || STOP.test(word) || ASKS_ONLY.test(word) || /\d/.test(word)) { return; }
+      var n = E.normalize(word), key = (not ? '-' : '') + n;
+      if (!n || c.no['w:' + key] || c.words[key]) { return; }
+      var forms = wordForms(n);
+      var says = all.filter(function (r) { return saysWord(r, forms); }).length;
+      // part typed and no product says it whole: the word it starts ("לוג": "לוגו"), named as the store says it
+      var whole = !says && !not && i === words.length - 1 ? completed(all, n) : null;
+      if (!says && !whole) { return; }
+      if (not && says === all.length) { return; }
+      c.words[key] = { label: not ? w + ' ' + word : (whole || word), at: not ? [i, i + 1] : [i], forms: whole ? wordForms(whole) : forms, not: !!not };
+      if (not) { used.push(i + 1); }
+    });
+    // never emptying: the last read goes first while nothing holds them all
+    var keys = Object.keys(c.words);
+    while (keys.length && !filtered(turn).length) { delete c.words[keys.pop()]; }
   }
   // The words the filters read from them did not take: what is searched, while those filters narrow it ("ספרים על חטופים"
   // is "על חטופים" among books). Null when nothing was taken, or nothing that means anything is left: the words stand whole.
@@ -202,6 +256,7 @@
   function activeRow(turn) {
     var c = C(turn), pills = [];
     codesOn(c).forEach(function (code) { var x = valueOf(code); if (x && x.value) { pills.push({ key: 'f:' + code, label: chipText(x.facet, x.value), auto: !c.f[code], sw: swatch(x.facet, x.value) }); } });
+    Object.keys(c.words || {}).forEach(function (k) { pills.push({ key: 'w:' + k, label: c.words[k].label, auto: true }); });
     if (onStock(c)) { pills.push({ key: 'stock', label: t('inStock'), auto: !c.stock && !!c.saidStock }); }
     if (onSale(c)) { pills.push({ key: 'sale', label: t('onSale'), auto: !c.sale }); }
     if (!pills.length) { return ''; }

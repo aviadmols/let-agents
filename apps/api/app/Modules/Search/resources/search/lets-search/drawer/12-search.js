@@ -166,6 +166,9 @@
       var strict = together.length ? pass(true) : [];
       out = strict.length ? strict : pass(false);
     }
+    // the words read as chips: what says each of them
+    var ws = Object.keys(c.words || {});
+    if (ws.length) { out = out.filter(function (r) { return ws.every(function (k) { return saysWord(r, c.words[k].forms) !== !!c.words[k].not; }); }); }
     if (onStock(c)) { out = out.filter(function (r) { return r.s === 1; }); }
     if (onSale(c)) { out = out.filter(function (r) { return r.sl === 1; }); }
     var so = sortOf(c);
@@ -194,13 +197,14 @@
       stock: all.some(function (r) { return r.s === 0; }) && all.some(function (r) { return r.s === 1; }),
       sale: all.some(function (r) { return r.sl === 1; }) && all.some(function (r) { return r.sl !== 1; }) };
   }
-  function activeFilters(c) { return codesOn(c).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
+  function activeFilters(c) { return codesOn(c).length + Object.keys(c.words || {}).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
   function chipRow(turn) {
     var fc = facetChips(turn, 4), c = C(turn), act = activeFilters(c);
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
     if (fc.stock || onStock(c)) { chips += chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock && !!c.saidStock); }
     if (fc.sale || onSale(c)) { chips += chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale); }
     fc.codes.forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(f, v)); });
+    Object.keys(c.words || {}).forEach(function (k) { chips += chip(c.words[k].label, true, 'w:' + k, turn.id, true); });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }
   function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '" data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">' + count + '</span>' : '') + '</button>'; }
@@ -265,13 +269,18 @@
     // the words the store has nothing close to: the server's, even none (it read "מתנה לאשתי טבעת יהלום" as "טבעת יהלום",
     // "לאשתי" is whom it is for), or the engine's own while typing
     var words = Array.isArray(turn.unknown) ? turn.unknown : localUnknown(turn.q);
-    var typed = [], kept = [];
-    String(turn.q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(Boolean).forEach(function (w) {
-      if (E && E.normalize && words.indexOf(E.normalize(w)) >= 0) { typed.push(w); } else if (!STOP.test(w)) { kept.push(w); }
+    var typed = [], kept = [], c0 = C(turn), read = [];
+    Object.keys(c0.auto || {}).forEach(function (code) { [].push.apply(read, (c0.at && c0.at[code]) || []); });
+    // and the words read as chips of their own ("גרב", "בלי לוגו")
+    Object.keys(c0.words || {}).forEach(function (k) { [].push.apply(read, c0.words[k].at || []); });
+    wordsOf(turn.q).forEach(function (w, i) {
+      // a word that only asks for a filter ("בצבע") is neither missing nor what is shown
+      if (ASKS_ONLY.test(w)) { return; }
+      if (E && E.normalize && words.indexOf(E.normalize(w)) >= 0 && read.indexOf(i) < 0) { typed.push(w); } else if (!STOP.test(w)) { kept.push(w); }
     });
     // "נעלים לגברים מנומרות": a word none of the products shown says, though the store has it elsewhere (a leopard bag):
     // said, never shown as if they were it (as Aviad asked, 2026-10-25)
-    var shownList = filtered(turn), missing = typed.length ? [] : unsaid(turn.q, shownList);
+    var shownList = filtered(turn), missing = typed.length ? [] : unsaid(turn.q, shownList, read);
     var rest = missing.length ? kept.filter(function (w) { return missing.indexOf(w) < 0; }) : [];
     // "מה זה ספרי פנטזיה?": the books are shown, and it says so; "פנטזיה" is not on the site
     // nothing as asked: the server searched looser, and says what it left out; the other way it found is a press away
@@ -297,10 +306,11 @@
   }
   // words that ask for a filter, an order or a price, never what a product says: "בצבע", "במידה", "הכי זולה", "במבצע"
   var ASKS_ONLY = /^([והבל]?(צבע|גוון|מידה|מידות|מבצע|מחיר|זול|זולה|זולים|זולות|יקר|יקרה|יקרים|יקרות)|הכי|ביותר|עד|מעל|מתחת|size|colou?rs?|cheap(er|est)?|expensive|sale|price|under|over|for|with|without|and)$/i;
-  function unsaid(q, list) {
+  // read: where the words that set a filter were typed ("קובע", read as the filter "כובע"): never missing
+  function unsaid(q, list, read) {
     var E = S.engine;
     if (!E || !E.normalize || !list.length) { return []; }
-    var typed = String(q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 3 && !STOP.test(w) && !ASKS_ONLY.test(w) && !/\d/.test(w); });
+    var typed = wordsOf(q).filter(function (w, i) { return (read || []).indexOf(i) < 0 && w.length >= 3 && !STOP.test(w) && !ASKS_ONLY.test(w) && !/\d/.test(w); });
     if (typed.length < 2) { return []; }
     var said = {};
     list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; }); }); });
