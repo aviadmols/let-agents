@@ -139,6 +139,12 @@ final class QueryVectors
             return null;
         }
 
+        // Framed as the store's pictures are (BuildImageIndex trims their plain background): a ring photographed on
+        // white, compared whole with rings stored trimmed, lost to look-alikes, its own picture among them (Rocks)
+        if (($trimmed = PictureTrim::trim($bytes)) !== null) {
+            [$mime, $bytes] = ['image/jpeg', $trimmed];
+        }
+
         $stored = 'photo:'.$choice->model;
         $hash = hash('sha256', $bytes);
         $saved = RetrievalQueryVector::query()->where('embedding_model', $stored)->where('text_hash', $hash)->first();

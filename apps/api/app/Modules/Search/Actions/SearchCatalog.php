@@ -568,8 +568,12 @@ final class SearchCatalog
         if ($own === null) {
             return $records;
         }
-        $looks = array_keys(array_filter($facets, fn (array $f): bool => preg_match('/colou?r|stone|gem|צבע|אבנ|אבן/iu', (string) ($f['k'] ?? '').' '.(string) ($f['l'] ?? '')) === 1));
-        $codes = array_values(array_filter((array) ($own['f'] ?? []), fn ($code): bool => in_array(intdiv((int) $code, 1000), $looks, true)));
+        // a colour filter only (a stone's colour among them, "צבע האבן"), never the stone or its cut: the diamonds beside
+        // an amethyst are on nearly every ring. And of its colours only those few of the alike share: the small clear
+        // stones around it are no colour of its own (Rocks: "another colour" left no ring at all)
+        $looks = array_keys(array_filter($facets, fn (array $f): bool => preg_match('/colou?r|צבע/iu', (string) ($f['k'] ?? '').' '.(string) ($f['l'] ?? '')) === 1));
+        $codes = array_values(array_filter((array) ($own['f'] ?? []), fn ($code): bool => in_array(intdiv((int) $code, 1000), $looks, true)
+            && count(array_filter($records, fn (array $r): bool => in_array($code, (array) ($r['f'] ?? []), true))) <= count($records) / 2));
         if ($codes !== []) {
             return array_values(array_filter($records, fn (array $r): bool => array_intersect($codes, (array) ($r['f'] ?? [])) === []));
         }
