@@ -131,7 +131,7 @@ final class DemoFlowTest extends TestCase
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-bar', false)->assertSee('/demo/'.$site->token.'/phone', false);
         $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee("launcher: 'float'", false)
             ->assertHeader('Content-Security-Policy', "frame-ancestors 'self';")
-            ->assertSee('<html lang="he" dir="rtl">', false)->assertSee(__('demo::page.view.hint', [], 'he'));
+            ->assertSee('<html lang="en" dir="ltr">', false)->assertSee('Try the search')->assertSee('locale: "he"', false)->assertDontSee('data-hint', false);
 
         $this->travel(8)->days();
         app(SweepDemos::class)->handle();
@@ -250,9 +250,9 @@ final class DemoFlowTest extends TestCase
         $site = $this->verified();
         $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 300, 'store_products' => 1240, 'pictures' => 0])->save();
 
-        // in the phone, instead of a picture of the store, in the store's language (Hebrew here) and Lets' fonts
+        // plainly on the phone's screen, instead of a picture of the store, in the demo's language and Lets' fonts
         $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee('data-intro', false)->assertDontSee('<img class="site"', false)
-            ->assertSee(__('demo::page.view.demo_note', [], 'he'))->assertSee(__('demo::page.view.demo_read', ['read' => '300', 'total' => '1,240'], 'he'))
+            ->assertSee('This is only a demo, so results may be partial.')->assertSee('It read 300 of the store&#039;s 1,240 products.', false)
             ->assertSee('family=Google+Sans', false);
 
         $shop = $site->shop_id;
