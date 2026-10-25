@@ -180,17 +180,25 @@
     });
     return out;
   }
-  // the shop's most added to the cart lately, under what people ask (the index config's wanted); none, no section
+  // the shop's most added to the cart lately, first of all (the index config's wanted); none, no section
   function wantedHtml() {
     var list = (S.config.wanted || []).map(rec).filter(Boolean);
     if (!list.length) { return ''; }
-    return '<div class="ls-sec__title" style="margin-top:18px">' + esc(t('wanted')) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }));
+    return '<div class="ls-sec__title">' + esc(t('wanted')) + '</div><div style="margin-bottom:18px">' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) + '</div>';
   }
+  // The opening screen, in this order (as Aviad asked, 2026-10-25): the store's popular products, what people ask
+  // here, the store's popular searches, the shopper's own recent ones, and search by photo.
   function welcome() {
     // the shop's own most searched words (the index config), never anyone else's: none yet, no section
     var pop = S.config.popular || [];
     var asks = off('ask') ? [] : peopleAsk();
     return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t(welcomeSub())) + '</p>' +
+      wantedHtml() +
+      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div><div class="ls-stack" style="margin-bottom:18px">' + asks.map(function (a) {
+        // a question about one product or guide says which: "על מה הספר?" alone says nothing here
+        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(t(a.ak === 'product' ? 'askedAboutProduct' : 'askedAbout', { t: decode(a.src[0].title) })) + '</span>' : '';
+        return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span>' + about + '</span></button>';
+      }).join('') + '</div>' : '') +
       // one row that scrolls (a swipe, or a drag with the mouse); the small button opens them all
       (pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + (pop.length > 3 ? '<button class="ls-sec__more" data-pop-all aria-expanded="' + !!S.popAll + '">' + esc(t(S.popAll ? 'popLess' : 'popAll')) + '</button>' : '') + '</div>' +
         '<div class="ls-chips ls-chips--drag' + (S.popAll ? ' is-all' : '') + '" style="margin-bottom:18px">' + pop.map(function (q) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(q) + '">' + icon('trend', 'ls-icon--sm') + esc(q) + '</button>'; }).join('') + '</div>' : '') +
@@ -199,11 +207,6 @@
         return '<span class="ls-chip ls-chip--quiet ls-recent"><button class="ls-recent__q" data-recent="' + esc(q) + '">' + icon('history', 'ls-icon--sm') + '<span dir="auto">' + esc(q) + '</span></button>' +
           '<button class="ls-recent__x" data-unrecent="' + esc(q) + '" aria-label="' + esc(t('removeRecent') + ': ' + q) + '">' + icon('x', 'ls-icon--sm') + '</button></span>';
       }).join('') + '</div>' : '') +
-      (asks.length ? '<div class="ls-sec__title">' + esc(t('tryAsk')) + '</div>' : '') + '<div class="ls-stack">' + asks.map(function (a) {
-        // a question about one product or guide says which: "על מה הספר?" alone says nothing here
-        var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(t(a.ak === 'product' ? 'askedAboutProduct' : 'askedAbout', { t: decode(a.src[0].title) })) + '</span>' : '';
-        return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span>' + about + '</span></button>';
-      }).join('') +
-      '</div>' + wantedHtml() + '<div class="ls-stack"><button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
+      '<div class="ls-stack"><button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }
 
