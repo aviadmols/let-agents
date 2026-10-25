@@ -147,7 +147,7 @@ final class CheckStoreSearch
         $failed = array_values(array_filter($cases, fn (array $c): bool => ! $c['passed']));
 
         // 4: mend what failed, this store's only
-        $tags = $this->featureTags($shopId, (string) $index['hash'], array_filter($failed, fn (array $c): bool => $c['source'] === 'shopper'), $apply);
+        $tags = $this->featureTags($shopId, (string) $index['hash'], (array) $index['records'], array_filter($failed, fn (array $c): bool => $c['source'] === 'shopper'), $apply);
         $resolved = [];
         $toResolve = array_values(array_unique(array_map(fn (array $c): string => $c['q'], array_filter($failed, fn (array $c): bool => $c['source'] === 'shopper'))));
         if ($toResolve !== [] && $spent < $cap) {
@@ -396,7 +396,8 @@ final class CheckStoreSearch
      * @param  array<int, array{q: string}>  $failed
      * @return list<array{tag: string, products: int}>
      */
-    private function featureTags(string $shopId, string $hash, array $failed, bool $apply): array
+    /** @param array<string, array<string, mixed>> $records the index's, by id */
+    private function featureTags(string $shopId, string $hash, array $records, array $failed, bool $apply): array
     {
         $total = CatalogProduct::query()->active()->count();
         $out = [];
@@ -410,7 +411,10 @@ final class CheckStoreSearch
                     if ($size === 1 && mb_strlen($phrase) < 4) {
                         continue;
                     }
-                    $ids = DescribedProducts::find($shopId, $hash, $phrase);
+                    // only where the description says it and the product's own words do not: what its title or tags say
+                    // the search finds already ("סניקרס", "14 אינץ'" in the titles), and is no feature to add
+                    $ids = array_values(array_filter(DescribedProducts::find($shopId, $hash, $phrase),
+                        fn (string $id): bool => isset($records[$id]) && ! HebrewSearch::says((string) $records[$id]['title'].' '.(string) ($records[$id]['kw'] ?? ''), $phrase)));
                     if ($ids === [] || count($ids) > $total * self::FEATURE_MAX_SHARE) {
                         continue;
                     }
