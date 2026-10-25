@@ -2,6 +2,7 @@
 
 namespace App\Modules\Demo\Models;
 
+use App\Core\Facades\Features;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -91,5 +92,11 @@ class DemoSite extends Model
     public function live(): bool
     {
         return in_array($this->status, [self::SCANNING, self::READY], true) && ($this->expires_at === null || $this->expires_at->isFuture());
+    }
+
+    /** Whether the demo reads its products' pictures: not when only the content matters to whoever asked. */
+    public function readsPictures(): bool
+    {
+        return ($this->choices['matters'] ?? 'both') !== 'content' && Features::enabled('demo.pictures');
     }
 }

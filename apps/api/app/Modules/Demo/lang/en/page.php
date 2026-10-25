@@ -101,6 +101,15 @@ return [
             'tags' => 'The tags',
             'knowledge' => 'The knowledge centre',
         ],
+        'said' => [
+            'products' => ':count products read.',
+            'products_limit' => 'The demo reads up to :limit products, so it stopped there: the demo may show only part of the store, and some results may be missing. Connecting the store for real reads every product.',
+            'images' => ':count pictures looked at: colour, material and what each one shows.',
+            'pages' => ':count pages and posts read.',
+            'pages_limit' => 'The demo reads up to :limit pages and posts, so some may be missing.',
+            'tags' => 'The products are sorted into :count tags.',
+            'knowledge' => 'The knowledge centre is ready: answers to shoppers come from the site\'s own pages, terms and policies.',
+        ],
         'icons' => [
             'products' => '<svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="m3 7.5 9 4.5 9-4.5M12 12v9"/></svg>',
             'images' => '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 9"/></svg>',
@@ -119,6 +128,7 @@ return [
         'cta_url' => 'https://lets.co.il/#install',
         'hint' => 'Try the search: press the button, type anything, or snap a product.',
         'no_picture' => 'We could not take a picture of the home page, but the search works: press the button in the corner.',
+        'partial' => 'The demo knows up to :limit products, so some results may be missing',
     ],
     'ended' => [
         'title' => 'The demo has ended',

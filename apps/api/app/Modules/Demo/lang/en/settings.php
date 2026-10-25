@@ -10,4 +10,5 @@ return [
     'questions' => ['label' => 'AI questions in a demo', 'description' => 'How many questions to the AI each demo may ask.'],
     'photos' => ['label' => 'Photo searches in a demo', 'description' => 'How many searches by photo each demo may make.'],
     'prepared_questions' => ['label' => 'Questions answered ahead in a demo', 'description' => 'How many questions about the store (shipping, returns...) are answered ahead from its terms and pages, to show in "What people ask here".'],
+    'vocabulary_branches' => ['label' => 'Product groups given a vocabulary in a demo', 'description' => 'How many groups of the store\'s products get a vocabulary of their own (types, details to filter by), written and checked by models. The most costly part of a demo\'s scan: about 10 cents a group.'],
 ];

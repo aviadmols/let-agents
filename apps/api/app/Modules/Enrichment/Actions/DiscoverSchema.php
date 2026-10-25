@@ -98,11 +98,12 @@ final class DiscoverSchema
         ]);
 
         $keys = count($stats['attributes']) + count($stats['spec_fields']) + count($stats['measurements']) + count($stats['key_values']);
+        // a ready vocabulary is named only when it is the starting point; one that fits a few titles is no news
         $run->output(['sampled' => $stats['sampled'], 'proposal' => $proposal->id, 'keys' => $keys, 'templates' => $stats['templates']])
-            ->summary('enrichment::runs.schema_discovered', [
+            ->summary($proposal->template !== null ? 'enrichment::runs.schema_discovered' : 'enrichment::runs.schema_discovered_own', [
                 'products' => (string) $stats['sampled'],
                 'keys' => (string) $keys,
-                'template' => $template ?? '-',
+                'template' => (string) $proposal->template,
                 'fit' => (string) round($fit * 100),
             ]);
 

@@ -26,6 +26,7 @@
         { "name": "budget_usd", "type": "float", "default": 2, "min": 0.2, "max": 20, "scope": "global", "unit": "usd" },
         { "name": "questions", "type": "int", "default": 15, "min": 0, "max": 200, "scope": "global", "unit": "questions" },
         { "name": "photos", "type": "int", "default": 30, "min": 0, "max": 500, "scope": "global", "unit": "items" },
-        { "name": "prepared_questions", "type": "int", "default": 5, "min": 0, "max": 20, "scope": "global", "unit": "questions" }
+        { "name": "prepared_questions", "type": "int", "default": 5, "min": 0, "max": 20, "scope": "global", "unit": "questions" },
+        { "name": "vocabulary_branches", "type": "int", "default": 4, "min": 1, "max": 12, "scope": "global", "unit": "items" }
     ]
 }

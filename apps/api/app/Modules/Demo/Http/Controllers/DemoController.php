@@ -86,7 +86,7 @@ final class DemoController extends Controller
     public function progress(string $token, FinishDemo $finish): JsonResponse
     {
         $site = $finish->handle($this->site($token));
-        $progress = $site->shop !== null && in_array($site->status, [DemoSite::SCANNING, DemoSite::READY], true) ? DemoProgress::of($site->shop) : null;
+        $progress = $site->shop !== null && in_array($site->status, [DemoSite::SCANNING, DemoSite::READY], true) ? DemoProgress::of($site->shop, $site->readsPictures()) : null;
 
         return response()->json([
             'status' => $site->status,

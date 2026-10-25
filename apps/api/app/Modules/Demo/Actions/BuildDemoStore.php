@@ -45,7 +45,7 @@ final class BuildDemoStore
     public function handle(DemoSite $site): Shop
     {
         $matters = (string) ($site->choices['matters'] ?? 'both');
-        $pictures = $matters !== 'content' && Features::enabled('demo.pictures');
+        $pictures = $site->readsPictures();
 
         $shop = DB::transaction(function () use ($site): Shop {
             $shop = $this->shops->handle([
@@ -83,6 +83,7 @@ final class BuildDemoStore
             'assistant.answers_per_month' => (int) Settings::get('demo.questions'),
             'search.photos_per_month' => (int) Settings::get('demo.photos'),
             'assistant.prepared_per_sync' => (int) Settings::get('demo.prepared_questions'),
+            'enrichment.max_branches' => (int) Settings::get('demo.vocabulary_branches'),
             'assistant.post_knowledge_posts' => 20,
             'search.show_cart' => false,
             'search.similar_by' => ['look' => 'picture', 'content' => 'meaning'][$matters] ?? 'both',

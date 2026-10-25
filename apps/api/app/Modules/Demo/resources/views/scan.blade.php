@@ -28,6 +28,12 @@
         .row.is-failed .ic { background: #fdecec; color: #8a1c1c; }
         .row.is-failed .rn { color: #8a1c1c; }
         @keyframes pulse { 50% { opacity: .45; } }
+        /* a bar a row: how far by count when the whole is known, else a sweep while it runs */
+        .meter { position: relative; height: 4px; margin-top: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+        .meter i { position: absolute; inset-block: 0; inset-inline-start: 0; width: 0; border-radius: inherit; background: var(--ink); transition: width .6s cubic-bezier(.23, 1, .32, 1); }
+        .row.is-done .meter i { width: 100%; }
+        .row.is-running .meter.is-open i { width: 32%; animation: sweep 1.6s ease-in-out infinite; }
+        @keyframes sweep { 0% { inset-inline-start: -32%; } 100% { inset-inline-start: 100%; } }
         .group { margin: 24px 0 -14px; font-size: 12.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
         .steps .row { padding-block: 8px; }
         .steps .rn { font-size: 13px; font-weight: 500; }
@@ -47,7 +53,7 @@
         .fact svg { width: 26px; height: 26px; padding: 5px; border-radius: 50%; background: var(--lime); color: var(--ink); flex: none; fill: none; stroke: currentColor; stroke-width: 3; }
         .fact b { display: block; font-weight: 600; margin-bottom: 2px; }
         @keyframes in { from { opacity: 0; transform: translateY(6px); } }
-        @media (prefers-reduced-motion: reduce) { .mark.is-think, .mark.is-think i, .fact, .row.is-running .ic { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .mark.is-think, .mark.is-think i, .fact, .row.is-running .ic, .row.is-running .meter.is-open i { animation: none; } }
     </style>
 @endpush
 @section('body')
@@ -97,7 +103,7 @@
             @foreach ($steps as $step)
                 <div class="row is-{{ $step['state'] }}" data-step="{{ $step['key'] }}">
                     <span class="ic" aria-hidden="true">{!! $t('scan.icons.'.$step['key']) !!}</span>
-                    <div><div class="rt">{{ $t('scan.steps.'.$step['key'].'.title') }}</div><div class="rs">{{ $t('scan.steps.'.$step['key'].'.sub') }}</div></div>
+                    <div><div class="rt">{{ $t('scan.steps.'.$step['key'].'.title') }}</div><div class="rs">{{ $t('scan.steps.'.$step['key'].'.sub') }}</div><div class="meter is-open" aria-hidden="true"><i></i></div></div>
                     <div class="rn" data-state>{{ $t('scan.states.'.$step['state']) }}</div>
                 </div>
             @endforeach
@@ -105,11 +111,16 @@
 
         <p class="group">{{ $t('scan.scanning') }}</p>
         <div class="rows" data-rows aria-live="polite">
-            @foreach (['products', 'images', 'pages', 'tags', 'knowledge'] as $part)
+            {{-- the pictures only when the demo reads them; the knowledge centre by where it stands, not by a count --}}
+            @foreach (array_values(array_filter(['products', 'images', 'pages', 'tags', 'knowledge'], fn (string $p): bool => $p !== 'images' || $site->readsPictures())) as $part)
                 <div class="row is-wait" data-row="{{ $part }}">
                     <span class="ic" aria-hidden="true">{!! $t('scan.icons.'.$part) !!}</span>
-                    <div><div class="rt">{{ $t('scan.rows.'.$part.'.title') }}</div><div class="rs">{{ $t('scan.rows.'.$part.'.sub') }}</div></div>
-                    <div class="rn"><span data-n>0</span><div class="rs" data-unit>{{ $t('scan.rows.'.$part.'.unit') }}</div></div>
+                    <div><div class="rt">{{ $t('scan.rows.'.$part.'.title') }}</div><div class="rs">{{ $t('scan.rows.'.$part.'.sub') }}</div><div class="meter is-open" aria-hidden="true" data-meter><i></i></div></div>
+                    @if ($part === 'knowledge')
+                        <div class="rn" data-state>{{ $t('scan.states.waiting') }}</div>
+                    @else
+                        <div class="rn"><span data-n>0</span><div class="rs" data-unit>{{ $t('scan.rows.'.$part.'.unit') }}</div></div>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -136,7 +147,13 @@
                 (d.rows || []).forEach(function (r) {
                     var row = box.querySelector('[data-row="' + r.key + '"]');
                     if (!row) { return; }
-                    row.className = 'row is-' + (r.state === 'done' ? 'done' : r.state === 'running' ? 'running' : 'wait');
+                    var state = r.state === 'done' ? 'done' : r.state === 'running' ? 'running' : 'wait';
+                    row.className = 'row is-' + state;
+                    // the bar: by count when the whole is known, a sweep while it runs when not
+                    var meter = row.querySelector('[data-meter]');
+                    meter.classList.toggle('is-open', !r.of);
+                    meter.querySelector('i').style.width = r.of && state !== 'done' ? Math.min(100, Math.round(100 * r.n / r.of)) + '%' : '';
+                    if (r.key === 'knowledge') { row.querySelector('[data-state]').textContent = states[state === 'wait' ? 'waiting' : state] || ''; return; }
                     row.querySelector('[data-n]').textContent = Number(r.n).toLocaleString();
                     if (r.of) { row.querySelector('[data-unit]').textContent = of.replace(':count', Number(r.of).toLocaleString()); }
                 });

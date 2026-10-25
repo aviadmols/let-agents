@@ -34,6 +34,9 @@
     <div class="bar" data-demo-bar>
         <span><span class="mark" aria-hidden="true"></span><b>{{ $t('view.bar', ['site' => $site->title ?? $site->host]) }}</b></span>
         <span class="muted">{{ $t('view.until', ['date' => $until ?? '']) }}</span>
+        @if ($site->products >= ($limit = (int) \App\Core\Facades\Settings::get('demo.max_products')))
+            <span class="muted" data-partial>{{ $t('view.partial', ['limit' => number_format($limit)]) }}</span>
+        @endif
         <a class="cta" href="{{ $t('view.cta_url') }}" target="_blank" rel="noopener">{{ $t('view.cta') }}</a>
     </div>
 

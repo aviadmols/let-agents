@@ -13,6 +13,7 @@ use App\Modules\Demo\Jobs\PrepareDemoJob;
 use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Mail\DemoMail;
 use App\Modules\Demo\Models\DemoSite;
+use App\Modules\Demo\Support\DemoProgress;
 use App\Modules\Demo\Support\PublicStoreFeed;
 use App\Modules\Tenancy\Contracts\CreatesShops;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -167,6 +168,40 @@ final class DemoFlowTest extends TestCase
         SweepDemos::end($site->refresh());
         $this->assertSame(0.35, $site->fresh()->cost_usd, 'the store and its ledger went; what it cost stays on its row');
         $this->assertSame(0.35, $page->demos()->firstWhere('id', $site->id)->spent);
+    }
+
+    public function test_the_scan_screen_says_what_was_read_in_its_own_words_and_the_demos_limit_never_what_changed(): void
+    {
+        $site = $this->verified();
+        app()->setLocale('en');
+        $learned = [
+            ['part' => 'products', 'text' => 'Read 300, 300 new, 0 changed. No product was marked removed. To read the rest, raise the limit in the settings.'],
+            ['part' => 'pages', 'text' => 'Site pages: 10 new, 0 changed, 0 left the site.'],
+            ['part' => 'tags', 'text' => 'Sampled 277 products and found 4 candidate keys.'],
+        ];
+
+        $learned[] = ['part' => 'knowledge', 'text' => '2 answers prepared.'];
+
+        $said = DemoProgress::said($site->shop, $learned, ['products' => 300, 'pages_read' => 10, 'tags' => 0, 'answers' => 2]);
+
+        $this->assertSame(['products', 'pages', 'knowledge'], array_column($said, 'part'), 'a part with nothing counted says nothing');
+        $this->assertStringNotContainsString('2', $said[2]['text'], 'the knowledge centre is said without its few answers counted');
+        $this->assertStringContainsString('300 products read.', $said[0]['text']);
+        $this->assertStringContainsString('may show only part of the store', $said[0]['text'], 'at the demo\'s limit: said so');
+        $this->assertSame('10 pages and posts read.', $said[1]['text']);
+        foreach ($said as $line) {
+            $this->assertDoesNotMatchRegularExpression('/changed|removed|settings/i', $line['text']);
+        }
+    }
+
+    public function test_a_demo_that_reads_no_pictures_shows_no_pictures_on_its_scan_screen(): void
+    {
+        $content = $this->verified(['matters' => 'content']);
+        $this->get('/demo/'.$content->token)->assertOk()->assertDontSee('data-row="images"', false)->assertSee('data-row="knowledge"', false);
+
+        $this->travel(1)->minutes();
+        $look = $this->verified(['url' => 'https://store.test', 'email' => 'other@store.test', 'matters' => 'look']);
+        $this->get('/demo/'.$look->token)->assertOk()->assertSee('data-row="images"', false);
     }
 
     public function test_the_language_chosen_is_the_stores_and_its_searchs(): void
