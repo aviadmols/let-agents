@@ -77,6 +77,25 @@ final class PublicSite
     }
 
     /**
+     * Whether the site runs on what Lets connects to, Shopify or WordPress (a store on WooCommerce or a content site):
+     * its home page says so (Shopify's CDN, WordPress's folders or generator), else its Shopify product feed or its
+     * WordPress API answers. A site on anything else gets no demo it could never connect as.
+     */
+    public static function supported(string $host): bool
+    {
+        $html = (string) self::get($host, '/')?->body();
+        if (preg_match('~cdn\.shopify\.com|Shopify\.theme|/wp-content/|/wp-includes/|<meta[^>]+generator[^>]+WordPress~i', $html) === 1) {
+            return true;
+        }
+
+        if (is_array(self::json($host, '/products.json', ['limit' => 1])['products'] ?? null)) {
+            return true;
+        }
+
+        return isset(self::json($host, '/wp-json/')['namespaces']);
+    }
+
+    /**
      * What the store runs on: Shopify when its public product feed answers, WooCommerce when its public store API does,
      * else other (read by its sitemap). With its name, language and currency from the home page, and how many products
      * it has in all when its feed says (WooCommerce's does, in X-WP-Total).

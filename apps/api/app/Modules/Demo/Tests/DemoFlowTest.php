@@ -46,7 +46,7 @@ final class DemoFlowTest extends TestCase
 
         Mail::fake();
         Queue::fake();
-        Http::fake(['https://store.test/' => Http::response('<html lang="he"><title>חנות בדיקה</title></html>')]);
+        Http::fake(['https://store.test/' => Http::response('<html lang="he"><title>חנות בדיקה</title><link rel="stylesheet" href="/wp-content/themes/store.css"></html>')]);
     }
 
     private function start(array $input = []): TestResponse
@@ -76,6 +76,17 @@ final class DemoFlowTest extends TestCase
         Mail::assertSent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'code' && $m->locale === 'en' && $m->hasTo('owner@store.test') && preg_match('/^\d{6}$/', $m->data['code'] ?? '') === 1);
         $this->assertSame(0, Shop::query()->count(), 'no store until the email is proven');
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-verify', false);
+    }
+
+    public function test_a_site_on_neither_shopify_nor_wordpress_gets_no_demo_and_is_told_why(): void
+    {
+        Http::fake(['https://wix.test/' => Http::response('<html><title>A Wix store</title><script src="https://static.wixstatic.com/x.js"></script></html>'),
+            'https://wix.test/*' => Http::response('Not found', 404)]);
+
+        $this->start(['url' => 'https://wix.test'])->assertSessionHas('demo_error', 'not_supported');
+        $this->assertSame(0, DemoSite::query()->count(), 'no code sent, nothing kept');
+        $this->get('/demo')->assertOk();
+        $this->assertStringContainsString('Shopify and WordPress', __('demo::page.errors.not_supported'));
     }
 
     public function test_a_store_already_on_lets_or_no_address_is_no_demo(): void
@@ -271,7 +282,7 @@ final class DemoFlowTest extends TestCase
         $failed->forceFill(['status' => DemoSite::FAILED, 'error' => 'unreachable'])->save();
 
         $this->travel(1)->minutes();
-        Http::fake(['https://other.test/' => Http::response('<html><title>Other</title></html>')]);
+        Http::fake(['https://other.test/' => Http::response('<html><title>Other</title><script src="https://cdn.shopify.com/s/x.js"></script></html>')]);
         $stalled = $this->verified(['url' => 'https://other.test', 'email' => 'other@store.test']);
         $stalled->forceFill(['scan_at' => now()])->save();
 
@@ -367,7 +378,7 @@ final class DemoFlowTest extends TestCase
         $site = $this->verified();
         $old = $site->shop_id;
         $site->forceFill(['status' => DemoSite::FAILED, 'error' => 'unreachable'])->save();
-        Http::fake(['https://shop.test/' => Http::response('<html><title>Shop</title></html>')]);
+        Http::fake(['https://shop.test/' => Http::response('<html><title>Shop</title><link href="/wp-content/x.css"></html>')]);
 
         $this->post('/demo/'.$site->token.'/again', ['url' => 'not an address'])->assertSessionHas('demo_error', 'bad_url');
         $this->get('/demo/'.$site->token)->assertSee('data-retry-error="bad_url"', false);

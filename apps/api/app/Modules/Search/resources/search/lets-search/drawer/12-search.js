@@ -222,7 +222,8 @@
   function heartBtn(id, on, float) { if (SHORT && SHORT.heartResults === false) { return ''; } return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
   function buyBtn(r, cls) {
     var id = pid(r.id);
-    if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--secondary ' + cls + '" href="' + esc(r.url) + '">' + esc(t('orderPage')) + '</a>' : ''; }
+    // no cart: the product's page is the card's one action, as strong as "add to cart" where there is one
+    if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--primary ' + cls + '" href="' + esc(r.url) + '">' + esc(t('orderPage')) + '</a>' : ''; }
     if (r.s === 0) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-similar="' + esc(id) + '">' + esc(t('similarInStock')) + '</button>'; }
     if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + esc(t('options')) + '</button>'; }
     return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';

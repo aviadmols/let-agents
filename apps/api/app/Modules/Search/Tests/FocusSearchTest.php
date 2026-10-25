@@ -53,6 +53,25 @@ final class FocusSearchTest extends TestCase
         $this->assertNull($result['focus'], 'something holds every word: nothing to choose');
     }
 
+    public function test_a_kind_named_with_a_colour_shows_that_kind_only_or_none(): void
+    {
+        // Vans: "תיק לבן" showed a white keychain, white sneakers and a white T-shirt: the colour holds across kinds,
+        // and the store has no white bag. The kind named ("תיק", opening "תיק גב", "תיק צד") holds: none is shown.
+        $this->catalog([
+            '1' => ['תיק גב Old Skool', 'שחור'],
+            '2' => ['תיק צד Lawler', 'שחור'],
+            '3' => ['מחזיק מפתחות Micro Old Skool תיק', 'לבן'],
+            '4' => ['נעלי סניקרס Authentic', 'לבן'],
+            '5' => ['נעלי סניקרס Era', 'שחור'],
+        ]);
+
+        $this->assertSame([], array_column($this->search('תיק לבן')['groups']['product'], 'external_id'), 'no white bag: no other white thing instead');
+        $black = array_column($this->search('תיק שחור')['groups']['product'], 'external_id');
+        sort($black);
+        $this->assertSame(['1', '2'], $black, 'the black bags, not the black sneakers');
+        $this->assertSame(['4'], array_column($this->search('נעליים לבנות')['groups']['product'], 'external_id'), 'the plural names the kind "נעלי" opens');
+    }
+
     public function test_a_colour_is_one_word_whatever_its_gender(): void
     {
         // Gueta: "מברגה שחורה" showed two handles, holding "שחורה" and "הברגה" (threading), and none

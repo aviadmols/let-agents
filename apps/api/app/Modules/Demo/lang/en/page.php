@@ -40,6 +40,7 @@ return [
         'busy' => 'Today\'s demos are all taken. Please try again tomorrow.',
         'too_many' => 'You already asked for a few demos today from this email. Please try again tomorrow.',
         'unreachable' => 'The site did not answer. Check the address, and that the site is open to visitors, with no password.',
+        'not_supported' => 'Lets works with sites on Shopify and WordPress (WooCommerce included). This site seems to run on something else, so no demo can be built from it.',
     ],
     'verify' => [
         'title' => 'Check your email',

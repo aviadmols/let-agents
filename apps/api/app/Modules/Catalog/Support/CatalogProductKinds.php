@@ -16,6 +16,9 @@ final class CatalogProductKinds implements ProductKinds
     /** A tag on more than this share of the products says nothing about kind ("כל המוצרים", the brand). */
     private const TAG_MAX_SHARE = 0.4;
 
+    /** A title's first word on more than this share of the products is the store's, not a kind ("מארז" in a gift shop). */
+    private const HEAD_MAX_SHARE = 0.6;
+
     /** A series may run through much of a small store ("אייקוני - כדורים פורחים" on half of it), never all of it. */
     private const SERIES_MAX_SHARE = 0.75;
 
@@ -32,6 +35,13 @@ final class CatalogProductKinds implements ProductKinds
 
         if ($own['type'] !== '') {
             return ['type:'.$own['type']];
+        }
+
+        // A Hebrew title opens with what the product is ("תיק גב", "נעלי סניקרס", "חולצת טי"): a kind when a few share
+        // it and it is not most of the store. Before the categories, which may be whom it is for ("גברים", "ילדים").
+        $heads = $counts['head'] ?? [];
+        if ($own['head'] !== '' && ($heads[$own['head']] ?? 0) >= 2 && ($heads[$own['head']] ?? 0) <= $counts['products'] * self::HEAD_MAX_SHARE) {
+            return ['head:'.$own['head']];
         }
 
         if ($own['categories'] !== []) {
@@ -111,18 +121,23 @@ final class CatalogProductKinds implements ProductKinds
 
         return [
             ...($own['type'] !== '' ? ['type:'.$own['type']] : []),
+            ...($own['head'] !== '' ? ['head:'.$own['head']] : []),
             ...array_map(fn (string $c): string => 'category:'.$c, $own['categories']),
             ...array_map(fn (string $t): string => 'tag:'.$t, $own['tags']),
         ];
     }
 
-    /** @return array{type: string, categories: list<string>, tags: list<string>, title: string} */
+    /** @return array{type: string, head: string, categories: list<string>, tags: list<string>, title: string} */
     private static function own(CatalogProduct $product): array
     {
         $clean = fn (mixed $v): string => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $v)));
+        // the title's first word, when it is Hebrew (an English title opens with its model, "Old Skool Backpack")
+        $first = (string) (preg_split('/[\s,\-–—|:]+/u', trim((string) $product->title), 2)[0] ?? '');
+        $head = preg_match('/^\p{Hebrew}{2,}$/u', $first) === 1 ? $first : '';
 
         return [
             'type' => $clean($product->payload['product_type'] ?? ''),
+            'head' => $head,
             'categories' => array_values(array_unique(array_filter(array_map(fn (array $path): string => $clean(end($path) ?: ''), $product->categoryPaths())))),
             'tags' => array_values(array_unique(array_filter(array_map($clean, (array) ($product->payload['tags'] ?? []))))),
             'title' => $clean($product->title),
@@ -132,15 +147,15 @@ final class CatalogProductKinds implements ProductKinds
     /**
      * How many active products carry each type, category and tag, kept until the catalog changes.
      *
-     * @return array{products: int, type: array<string, int>, category: array<string, int>, tag: array<string, int>}
+     * @return array{products: int, type: array<string, int>, head: array<string, int>, category: array<string, int>, tag: array<string, int>}
      */
     private function counts(string $shopId): array
     {
         $active = CatalogProduct::query()->whereNull('removed_at');
-        $version = $active->count().'|'.$active->max('updated_at');
+        $version = '2|'.$active->count().'|'.$active->max('updated_at');
 
         return Cache::remember('catalog:kinds:'.$shopId.':'.md5($version), now()->addHours(12), function (): array {
-            $counts = ['products' => 0, 'type' => [], 'category' => [], 'tag' => []];
+            $counts = ['products' => 0, 'type' => [], 'head' => [], 'category' => [], 'tag' => []];
 
             CatalogProduct::query()->whereNull('removed_at')->select(['id', 'title', 'payload'])->orderBy('id')
                 ->chunk(500, function ($products) use (&$counts): void {
@@ -149,6 +164,9 @@ final class CatalogProductKinds implements ProductKinds
                         $counts['products']++;
                         if ($own['type'] !== '') {
                             $counts['type'][$own['type']] = ($counts['type'][$own['type']] ?? 0) + 1;
+                        }
+                        if ($own['head'] !== '') {
+                            $counts['head'][$own['head']] = ($counts['head'][$own['head']] ?? 0) + 1;
                         }
                         foreach ($own['categories'] as $category) {
                             $counts['category'][$category] = ($counts['category'][$category] ?? 0) + 1;

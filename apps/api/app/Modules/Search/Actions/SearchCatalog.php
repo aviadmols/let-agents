@@ -45,6 +45,9 @@ final class SearchCatalog
 {
     public const GROUPS = ['answer', 'product', 'content', 'category'];
 
+    /** A title's first word on more than this share of the products is the store's, not a kind a search names. */
+    private const KIND_MAX_SHARE = 0.6;
+
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
 
@@ -402,6 +405,16 @@ final class SearchCatalog
             // "עגילי חישוק זהב צהוב עם אבנים שקופות": the colours named, each with its part, weigh as in a
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
             $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
+            // "תיק לבן": a word of the search that opens the titles of a kind of product here ("תיק גב", "תיק צד") says the
+            // kind asked for, and what is said with it ("לבן", "עם כיס") holds across every kind: only that kind is shown. A
+            // white keychain is no white bag: none, and the drawer offers the AI. A kind alone ("מדף") keeps what is very
+            // near it by meaning ("כוורת מדפים").
+            $kinds = $read === [] && ! str_contains(HebrewSearch::normalize($worded), ' ') ? [] : self::askedKinds($index, $worded);
+            if ($kinds !== []) {
+                $before = array_column($groups['product'], 'id');
+                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => isset($kinds[self::headOf((string) ($r['title'] ?? ''))])));
+                $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'kind');
+            }
             $before = array_column($groups['product'], 'id');
             if ($read !== []) {
                 // only what holds every value read: nothing else is shown as if it were asked for (the drawer then offers the AI)
@@ -414,7 +427,11 @@ final class SearchCatalog
             $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
             $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'action');
 
-            // The one product first, wherever the merge put it, and also when only its code found it.
+            // The one product first, wherever the merge put it, and also when only its code found it; not one of another
+            // kind than the search names (a keychain holding "תיק" and white is no white bag).
+            if ($single !== null && $kinds !== [] && ! isset($kinds[self::headOf((string) ($index['records'][$single['id']]['title'] ?? ''))])) {
+                $single = null;
+            }
             if ($single !== null) {
                 $groups['product'] = [
                     $index['records'][$single['id']],
@@ -444,6 +461,49 @@ final class SearchCatalog
             // and the drawer says so, with the AI one press away, rather than showing it as if it were what was asked for.
             return ['query' => $query, 'unknown' => $unknown, 'held' => count(self::whole($spelling)), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts];
         });
+    }
+
+    /** A title's kind word, as its stem: the Hebrew word it opens with ("תיק גב Old Skool" is "תק"); '' when none. */
+    private static function headOf(string $title): string
+    {
+        $first = explode(' ', HebrewSearch::normalize($title), 2)[0];
+
+        return preg_match('/^[א-ת]{2,}$/u', $first) === 1 ? HebrewSearch::stem($first) : '';
+    }
+
+    /**
+     * The kinds a search names, as title stems: its words that open the titles of at least two products here and
+     * not of most of them ("תיק" in "תיק לבן", "נעליים" for "נעלי סניקרס"). Counted once an index.
+     *
+     * @param  array{hash?: string, records: array<string, array<string, mixed>>}  $index
+     * @return array<string, true>
+     */
+    private static function askedKinds(array $index, string $query): array
+    {
+        static $heads = [];
+        $key = (string) ($index['hash'] ?? spl_object_id((object) $index));
+        if (! isset($heads[$key])) {
+            $count = ['products' => 0, 'heads' => []];
+            foreach ($index['records'] as $id => $record) {
+                if (str_starts_with((string) $id, 'p:')) {
+                    $count['products']++;
+                    $head = self::headOf((string) ($record['title'] ?? ''));
+                    $head !== '' && $count['heads'][$head] = ($count['heads'][$head] ?? 0) + 1;
+                }
+            }
+            $heads = [$key => $count];
+        }
+
+        $asked = [];
+        foreach (explode(' ', HebrewSearch::normalize($query)) as $word) {
+            $stem = preg_match('/^[א-ת]{2,}$/u', $word) === 1 ? HebrewSearch::stem($word) : '';
+            $n = $heads[$key]['heads'][$stem] ?? 0;
+            if ($stem !== '' && $n >= 2 && $n <= $heads[$key]['products'] * self::KIND_MAX_SHARE) {
+                $asked[$stem] = true;
+            }
+        }
+
+        return $asked;
     }
 
     /**

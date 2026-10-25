@@ -1717,8 +1717,8 @@ final class BuildPageBank
         $kinds = app(ProductKinds::class);
         $marks = $kinds->marks($product);
         $hasLike = $kinds->hasLike($product);
-        // The store says nothing of its kind: the type its scan approved does.
-        if ($marks === [] && $type !== null) {
+        // The store says nothing of its kind, or only by its title's first word: the type its scan approved does.
+        if (($marks === [] || str_starts_with($marks[0], 'head:')) && $type !== null) {
             $marks = ['fact:'.$type->value_text];
             $hasLike = $moreOfType !== [];
         }

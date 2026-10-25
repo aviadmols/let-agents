@@ -80,7 +80,7 @@ final class StartDemo
     /**
      * What stops a demo of this site, before anything is read or paid for: no public address, a store already on
      * Lets, the day's demos used up, this email's (when it asks for a new demo, not again for the same one), a site
-     * that does not answer. Null when nothing does.
+     * that does not answer, a site on neither Shopify nor WordPress (Lets could never connect it). Null when nothing does.
      */
     public static function siteProblem(string $host, ?string $email): ?string
     {
@@ -90,6 +90,7 @@ final class StartDemo
             DemoSite::query()->where('created_at', '>=', now()->startOfDay())->count() >= (int) Settings::get('demo.per_day') => 'busy',
             $email !== null && DemoSite::query()->where('email', $email)->where('created_at', '>=', now()->subDay())->count() >= (int) Settings::get('demo.per_email_per_day') => 'too_many',
             PublicSite::get($host, '/') === null => 'unreachable',
+            ! PublicSite::supported($host) => 'not_supported',
             default => null,
         };
     }
