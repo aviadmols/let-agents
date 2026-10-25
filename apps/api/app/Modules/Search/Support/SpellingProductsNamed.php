@@ -15,9 +15,15 @@ final class SpellingProductsNamed implements ProductsNamed
 
     public function among(string $shopId, string $question, array $externalIds): array
     {
-        $found = $this->search->handle($shopId, $question, ['product'], count: false, perGroup: self::ALL, meaning: false);
-        $named = array_flip(array_map('strval', array_column($found['groups']['product'], 'external_id')));
+        $named = array_flip($this->all($shopId, $question));
 
         return array_values(array_filter(array_map('strval', $externalIds), fn (string $id): bool => isset($named[$id])));
+    }
+
+    public function all(string $shopId, string $question): array
+    {
+        $found = $this->search->handle($shopId, $question, ['product'], count: false, perGroup: self::ALL, meaning: false);
+
+        return array_values(array_unique(array_map('strval', array_column($found['groups']['product'] ?? [], 'external_id'))));
     }
 }

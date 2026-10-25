@@ -18,4 +18,12 @@ interface ProductsNamed
      * @return list<string> those of them the words name; empty when none
      */
     public function among(string $shopId, string $question, array $externalIds): array;
+
+    /**
+     * Every product in the store the words name, the same way: "the cheapest ring with a diamond" is
+     * chosen from all the store's diamond rings, not from the few a shopper happened to be shown.
+     *
+     * @return list<string> external ids; empty when none
+     */
+    public function all(string $shopId, string $question): array;
 }

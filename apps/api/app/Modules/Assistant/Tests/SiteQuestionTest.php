@@ -492,7 +492,12 @@ final class SiteQuestionTest extends TestCase
         {
             public function among(string $shopId, string $question, array $externalIds): array
             {
-                return str_contains($question, 'עגילים') ? array_values(array_intersect($externalIds, ['801', '802', '804', '805'])) : [];
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return str_contains($question, 'עגילים') ? ['801', '802', '804', '805'] : [];
             }
         });
 
@@ -506,6 +511,38 @@ final class SiteQuestionTest extends TestCase
         // Nothing it names in the range: a model reads it, as before.
         $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => []]];
         $this->assertSame('model', $this->askWith('צמיד עד 500', ['803', '801'])->json('data.from'));
+    }
+
+    public function test_the_cheapest_of_what_the_question_names_is_chosen_from_the_whole_store_not_what_was_shown(): void
+    {
+        // Seen on Rocks (24.10): "איזו טבעת עם יהלום הכי זולה" with two products on screen; the model named the cheaper
+        // of the two, or said the site does not tell. The store has cheaper diamond rings than both.
+        $this->product('951', 'טבעת זהב ויהלומים 18K', 'טבעת.', [], ['price' => '6900.00', 'in_stock' => true]);
+        $this->product('952', 'טבעת סוליטר משובצת יהלום', 'טבעת.', [], ['price' => '4200.00', 'in_stock' => true]);
+        $this->product('953', 'טבעת וינטג׳ עדינה משובצת יהלומים, זהב 10K', 'טבעת.', [], ['price' => '890.00', 'in_stock' => true]);
+        $this->product('954', 'טבעת וינטאג משובצת יהלום, זהב 10K', 'טבעת.', [], ['price' => '1150.00', 'in_stock' => true]);
+        $this->product('955', 'טבעת יהלום שאזלה', 'טבעת.', [], ['price' => '600.00', 'in_stock' => false]);
+        $this->product('956', 'תליון משובץ יהלום', 'תליון.', [], ['price' => '700.00', 'in_stock' => true]);
+        // as the store's search reads the words: the diamond rings, whatever the shopper had on screen
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return str_contains($question, 'טבעת') ? ['951', '952', '953', '954', '955'] : [];
+            }
+        });
+
+        $data = $this->askWith('איזו טבעת עם יהלום הכי זולה שיש לכם?', ['951', '952'])->json('data');
+
+        $this->assertSame(['answered', 'code'], [$data['outcome'], $data['from']]);
+        $this->assertSame('953', $data['picks'][0]['external_id'], 'the cheapest diamond ring in stock in the store, not of the two shown; not the sold-out one, not the pendant');
+        $this->assertStringContainsString('טבעת וינטג׳ עדינה', $data['answer']);
+        $this->assertSame([], $this->calls, 'no model for arithmetic');
     }
 
     public function test_the_cheapest_with_no_product_named_is_the_whole_stores_merchandise(): void

@@ -1755,9 +1755,15 @@ final class AnswerSiteQuestion
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
         $named = self::named($question);
         $wholeStore = ! $followUp && $named === [] && in_array($asks, ['cheapest', 'most_expensive'], true);
+        // A question that names a product is answered from every product of the store the words name, as the
+        // store's search reads them (categories, stones, synonyms): "איזו טבעת עם יהלום הכי זולה" from all the
+        // diamond rings, never from the two a shopper had on screen (Rocks, 24.10: it named the cheaper of two).
+        $byName = (! $followUp && $named !== [] && $asks !== null && app()->bound(ProductsNamed::class)
+            ? app(ProductsNamed::class)->all($this->tenant->require(), $question)
+            : null) ?: null;
 
         $productsByRef = [];
-        foreach ($this->candidates($wholeStore ? $this->storeWide($asks, $min, $max) : $shown) as $i => $product) {
+        foreach ($this->candidates($wholeStore ? $this->storeWide($asks, $min, $max) : ($byName ?: $shown)) as $i => $product) {
             $productsByRef['p'.($i + 1)] = $product;
         }
 
@@ -1765,17 +1771,21 @@ final class AnswerSiteQuestion
             return null;
         }
 
-        // What the question names. With a price, as the store's search reads the words (categories,
-        // attributes, synonyms, plurals): hoops titled "חישוקי זהב" are earrings too, and a price
-        // must not narrow the kind further. Without one, the title must name it: "the cheapest
-        // drill" is never a drill bit.
-        $byWords = ! $wholeStore && ($min !== null || $max !== null) && app()->bound(ProductsNamed::class)
+        // What the question names. Found by the store's search: what it found (hoops titled "חישוקי זהב" are
+        // earrings too, "תכשיט" names a category, not a title), less what is only for it: "the cheapest drill"
+        // is never a bit "למברגה". Among what was shown, with a price, the same; without one, the title must
+        // name it.
+        $byWords = $byName === null && ! $wholeStore && ($min !== null || $max !== null) && app()->bound(ProductsNamed::class)
             ? array_flip(app(ProductsNamed::class)->among($this->tenant->require(), $question, array_column($productsByRef, 'external_id')))
             : null;
         $fit = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0
             && ($min === null || $p['price'] >= $min) && ($max === null || $p['price'] <= $max)
-            && ($byWords !== null ? isset($byWords[(string) $p['external_id']]) : ($named === [] || self::titleNames($p['title'], $named)))
+            && ($byName !== null || ($byWords !== null ? isset($byWords[(string) $p['external_id']]) : ($named === [] || self::titleNames($p['title'], $named))))
             && ($asks !== 'on_sale' || $p['on_sale']));
+
+        if ($byName !== null) {
+            $fit = array_filter($fit, fn (array $p): bool => ! self::onlyFor($p['title'], $named));
+        }
 
         if ($fit === []) {
             return null;
@@ -1862,6 +1872,24 @@ final class AnswerSiteQuestion
         foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($title), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
             foreach ($named as $stem) {
                 if (str_starts_with($word, $stem)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** Whether a title names it only as what it is for: "ביט למברגה", "קופסה לטבעת", never the thing itself. */
+    private static function onlyFor(string $title, array $named): bool
+    {
+        if ($named === [] || self::titleNames($title, $named)) {
+            return false;
+        }
+
+        foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($title), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            foreach ($named as $stem) {
+                if (str_starts_with($word, 'ל'.$stem) || str_starts_with($word, 'for'.$stem)) {
                     return true;
                 }
             }
