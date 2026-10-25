@@ -9,6 +9,8 @@ return [
     'similar' => 'פריטים דומים',
     'facet_type' => 'סוג מוצר',
     'facet_category' => 'קטגוריה',
+    'facet_audience' => 'למי',
+    'audience' => ['women' => 'נשים', 'men' => 'גברים', 'kids' => 'ילדים', 'babies' => 'תינוקות'],
     'facet_colour' => 'צבע',
     'facet_size' => 'מידה',
     'size_gone_banner' => 'המידה לא במלאי? לחצו על המידה להצגת פריטים דומים במידה המבוקשת',

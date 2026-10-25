@@ -102,16 +102,7 @@ final class CatalogProductKinds implements ProductKinds
      */
     public static function audience(CatalogProduct $product): ?string
     {
-        $text = mb_strtolower(implode(' ', [(string) $product->title, (string) ($product->payload['product_type'] ?? ''),
-            ...array_map('strval', (array) ($product->payload['tags'] ?? [])), ...array_map(fn (array $path): string => implode(' ', $path), $product->categoryPaths())]));
-        $said = [];
-        foreach (preg_split('/[^\p{L}]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
-            foreach (self::AUDIENCE as $audience => $pattern) {
-                if (preg_match($pattern, $word) === 1) {
-                    $said[$audience] = true;
-                }
-            }
-        }
+        $said = self::saidAudiences($product);
 
         if (isset($said['unisex']) || (isset($said['women']) && isset($said['men']))) {
             return null;
@@ -125,6 +116,37 @@ final class CatalogProductKinds implements ProductKinds
         }
 
         return null;
+    }
+
+    public function audiences(CatalogProduct $product): array
+    {
+        $said = self::saidAudiences($product);
+        // the young first: "סניקרס לילדים" in a men's category is a child's
+        if (isset($said['babies']) || isset($said['kids'])) {
+            return array_values(array_filter(['kids', 'babies'], fn (string $a): bool => isset($said[$a])));
+        }
+        if (isset($said['unisex'])) {
+            return ['women', 'men'];
+        }
+
+        return array_values(array_filter(['women', 'men'], fn (string $a): bool => isset($said[$a])));
+    }
+
+    /** @return array<string, true> every audience word its title, type, tags and categories say */
+    private static function saidAudiences(CatalogProduct $product): array
+    {
+        $text = mb_strtolower(implode(' ', [(string) $product->title, (string) ($product->payload['product_type'] ?? ''),
+            ...array_map('strval', (array) ($product->payload['tags'] ?? [])), ...array_map(fn (array $path): string => implode(' ', $path), $product->categoryPaths())]));
+        $said = [];
+        foreach (preg_split('/[^\p{L}]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            foreach (self::AUDIENCE as $audience => $pattern) {
+                if (preg_match($pattern, $word) === 1) {
+                    $said[$audience] = true;
+                }
+            }
+        }
+
+        return $said;
     }
 
     /**

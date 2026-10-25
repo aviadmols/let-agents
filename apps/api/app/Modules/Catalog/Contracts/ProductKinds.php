@@ -39,4 +39,12 @@ interface ProductKinds
      * @return array{tag: string, count: int}|null count: the other products that carry it
      */
     public function series(CatalogProduct $product): ?array;
+
+    /**
+     * Whom a product is for, as its title, type, categories and tags say: any of women, men, kids, babies; a unisex
+     * product, or one said to be for men and for women, is for both. Empty when the store says none.
+     *
+     * @return list<string>
+     */
+    public function audiences(CatalogProduct $product): array;
 }

@@ -206,6 +206,8 @@ final class BuildSearchIndex
         $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->map(fn (float $z, string $id): array => array_values(array_unique([$z, ...array_map('floatval', (array) ($offered[$id] ?? []))])))->all(), $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
+        // Whom each product is for, where the store says it of enough of them (clothes, shoes): "חולצה לגברים" reads it.
+        $audiences = $this->audienceFacet($facets['facets'], $this->locale($shopId));
         // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
         $tagFilters = $this->tagFacets($facets['facets'], $shopId, $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
@@ -228,7 +230,7 @@ final class BuildSearchIndex
             // The names of what the store's approved facts say it is ("אמרלד קאט", "קרנליאן", "ספר מודפס") are words it
             // is found by, whatever its own text calls them ("קרנליון"): a filter's name finds what the filter holds.
             $named = array_map(fn (int $code): string => (string) ($facets['facets'][intdiv($code, 1000)]['v'][$code % 1000]['l'] ?? ''), $read['f'] ?? []);
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($fields[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -789,6 +791,41 @@ final class BuildSearchIndex
      * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
      * @return array<string, list<int>> the codes of each product's categories, by product id
      */
+    /** Whom a product is for is a filter where the store says it of at least this share of its products. */
+    private const AUDIENCE_MIN_SHARE = 0.2;
+
+    /**
+     * Whom each product is for (women, men, kids, babies), as its own title, type, tags and categories say
+     * (ProductKinds::audiences), a filter of its own: a clothing store's "לגברים" narrows to men's, a unisex product
+     * among them. Only where the store says it of enough products and of two people or more.
+     *
+     * @return array<string, list<int>> codes by product id
+     */
+    private function audienceFacet(array &$facets, string $locale): array
+    {
+        $kinds = app(ProductKinds::class);
+        $of = [];
+        $total = 0;
+        foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
+            $total++;
+            if (($audiences = $kinds->audiences($product)) !== []) {
+                $of[(string) $product->id] = $audiences;
+            }
+        }
+        $present = array_values(array_filter(['women', 'men', 'kids', 'babies'], fn (string $a): bool => array_filter($of, fn (array $as): bool => in_array($a, $as, true)) !== []));
+
+        if (count($present) < 2 || $total === 0 || count($of) < $total * self::AUDIENCE_MIN_SHARE) {
+            return [];
+        }
+
+        $at = count($facets);
+        $code = array_flip($present);
+        $facets[] = ['k' => 'audience', 'l' => (string) __('search::storefront.facet_audience', [], $locale),
+            'v' => array_map(fn (string $a): array => ['k' => $a, 'l' => (string) __('search::storefront.audience.'.$a, [], $locale)], $present)];
+
+        return array_map(fn (array $as): array => array_map(fn (string $a): int => $at * 1000 + $code[$a], array_values(array_filter($as, fn (string $a): bool => isset($code[$a])))), $of);
+    }
+
     private function categoryFacet(array &$facets, string $locale): array
     {
         $used = DB::table('catalog_category_product as cp')

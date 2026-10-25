@@ -86,6 +86,23 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['3'], array_column($this->search('נעליים לבנות')['groups']['product'], 'external_id'), 'the white sneakers, filed as shoes; never the white shirt');
     }
 
+    public function test_whom_a_product_is_for_is_a_filter_read_from_the_words(): void
+    {
+        // Story: "חולצה לגברים" showed women's shirts too; the store says whom each is for in its titles and tags.
+        $this->catalog([
+            '1' => ['חולצה מכופתרת לגברים Mateo', 'ביגוד'],
+            '2' => ['חולצה מכופתרת לנשים Kayla', 'ביגוד'],
+            '3' => ['חולצה מכופתרת Rains', '_unisex'],
+            '4' => ['חולצה לילדים Mini', 'ביגוד_ילדים'],
+            '5' => ['מכנסיים לנשים Lou', 'ביגוד'],
+        ]);
+
+        $men = array_column($this->search('חולצה לגברים')['groups']['product'], 'external_id');
+        sort($men);
+        $this->assertSame(['1', '3'], $men, 'the man\'s shirt and the unisex one, never the woman\'s or the child\'s');
+        $this->assertSame(['4'], array_column($this->search('חולצה לילדים')['groups']['product'], 'external_id'));
+    }
+
     public function test_a_colour_is_one_word_whatever_its_gender(): void
     {
         // Gueta: "מברגה שחורה" showed two handles, holding "שחורה" and "הברגה" (threading), and none

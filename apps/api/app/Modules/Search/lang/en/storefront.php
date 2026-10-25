@@ -9,6 +9,8 @@ return [
     'similar' => 'Similar items',
     'facet_type' => 'Product type',
     'facet_category' => 'Category',
+    'facet_audience' => 'For',
+    'audience' => ['women' => 'Women', 'men' => 'Men', 'kids' => 'Kids', 'babies' => 'Babies'],
     'facet_colour' => 'Colour',
     'facet_size' => 'Size',
     'size_gone_banner' => 'Size out of stock? Tap the size to see similar items in it',
