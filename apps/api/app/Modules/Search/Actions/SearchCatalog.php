@@ -437,7 +437,7 @@ final class SearchCatalog
             $kinds = array_filter($kinds, fn (int $opens, string $stem): bool => ! DescribedProducts::subject($shopId, (string) $index['hash'], $stem, $opens), ARRAY_FILTER_USE_BOTH);
             if ($kinds !== []) {
                 $before = array_column($groups['product'], 'id');
-                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => isset($kinds[self::headOf((string) ($r['title'] ?? ''))])));
+                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => self::ofKinds($r, $kinds)));
                 $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'kind');
             }
             $before = array_column($groups['product'], 'id');
@@ -454,7 +454,7 @@ final class SearchCatalog
 
             // The one product first, wherever the merge put it, and also when only its code found it; not one of another
             // kind than the search names (a keychain holding "תיק" and white is no white bag).
-            if ($single !== null && $kinds !== [] && ! isset($kinds[self::headOf((string) ($index['records'][$single['id']]['title'] ?? ''))])) {
+            if ($single !== null && $kinds !== [] && ! self::ofKinds($index['records'][$single['id']] ?? [], $kinds)) {
                 $single = null;
             }
             if ($single !== null) {
@@ -529,6 +529,18 @@ final class SearchCatalog
         usort($externalIds, fn (string $a, string $b): int => $score[$b] <=> $score[$a]);
 
         return $externalIds;
+    }
+
+    /**
+     * Whether a product is of a kind the search names: its title opens with it, or the store files it under it (its type,
+     * categories or tags, BuildSearchIndex's kd): "נעלים לבנים" holds the white sneakers the store tags "נעליים".
+     *
+     * @param  array<string, mixed>  $record
+     * @param  array<string, int>  $kinds
+     */
+    private static function ofKinds(array $record, array $kinds): bool
+    {
+        return isset($kinds[self::headOf((string) ($record['title'] ?? ''))]) || array_intersect_key($kinds, array_flip((array) ($record['kd'] ?? []))) !== [];
     }
 
     private static function headOf(string $title): string

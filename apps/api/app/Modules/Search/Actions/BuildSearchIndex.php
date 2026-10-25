@@ -124,6 +124,32 @@ final class BuildSearchIndex
      * A size kept in the product's own fields (a Shopify metafield "custom.ring_size": "54"): a field
      * named for a size whose value is one number a size can be. Null when none.
      */
+    /** Of the store's own filing, at most this many word stems a product keeps for the kind a search names. */
+    private const KIND_STEMS = 16;
+
+    /**
+     * The Hebrew words the store files a product under, as stems: its type, its categories and its tags, each word on
+     * its own ("נעליים_נשים" is "נעליים" and "נשים"). Never its title or description: a keychain whose title says
+     * "תיק" is filed as a keychain.
+     *
+     * @return list<string>
+     */
+    private static function kindStems(CatalogProduct $product): array
+    {
+        $names = [(string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
+            ...$product->categories->pluck('name')->map(fn ($n): string => (string) $n)->all()];
+        $stems = [];
+        foreach ($names as $name) {
+            foreach (explode(' ', HebrewSearch::normalize(str_replace('_', ' ', $name))) as $word) {
+                if (preg_match('/^[א-ת]{2,}$/u', $word) === 1) {
+                    $stems[HebrewSearch::stem($word)] = true;
+                }
+            }
+        }
+
+        return array_slice(array_keys($stems), 0, self::KIND_STEMS);
+    }
+
     private static function metaSize(CatalogProduct $product): ?float
     {
         foreach ((array) ($product->payload['meta'] ?? []) as $key => $value) {
@@ -224,6 +250,9 @@ final class BuildSearchIndex
                 'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
                 // No product of its kind (ProductKinds): its similar items are none, so the drawer offers none.
                 'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,
+                // what the store files it as (its type, categories, tags), as word stems: a kind a search names holds it
+                // though its title opens with another word ("סניקרס" tagged "נעליים" is shoes)
+                'kd' => self::kindStems($product) ?: null,
                 // The code as the store writes it: a search for it shows this product alone.
                 'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.

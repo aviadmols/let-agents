@@ -72,6 +72,20 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['4'], array_column($this->search('נעליים לבנות')['groups']['product'], 'external_id'), 'the plural names the kind "נעלי" opens');
     }
 
+    public function test_a_kind_holds_what_the_store_files_under_it_whatever_its_title_opens_with(): void
+    {
+        // Story: "נעלים לבנים" kept only the titles opening with "נעלי", none white; the white sneakers the store tags
+        // "נעליים" were left out, and nothing was shown.
+        $this->catalog([
+            '1' => ['נעלי עקב לנשים Piper', 'נעליים'],
+            '2' => ['נעלי בובה לנשים Delia', 'נעליים'],
+            '3' => ['סניקרס לנשים Rife לבן', 'נעליים_נשים'],
+            '4' => ['חולצה לבנה לגברים', 'ביגוד_גברים'],
+        ]);
+
+        $this->assertSame(['3'], array_column($this->search('נעליים לבנות')['groups']['product'], 'external_id'), 'the white sneakers, filed as shoes; never the white shirt');
+    }
+
     public function test_a_colour_is_one_word_whatever_its_gender(): void
     {
         // Gueta: "מברגה שחורה" showed two handles, holding "שחורה" and "הברגה" (threading), and none
