@@ -103,6 +103,20 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['4'], array_column($this->search('חולצה לילדים')['groups']['product'], 'external_id'));
     }
 
+    public function test_a_latin_name_typed_in_hebrew_finds_it(): void
+    {
+        // Story: "תיק ליגו" found two bags, none of the Herschel LEGO ones.
+        $this->catalog([
+            '1' => ['תיק גב Herschel LEGO Classic', 'תיקים'],
+            '2' => ['תיק צד Orlanado', 'תיקים'],
+            '3' => ['כובע מצחייה Madison Logo Cap', 'כובעים'],
+        ]);
+
+        $this->assertSame(['1'], array_column($this->search('תיק ליגו')['groups']['product'], 'external_id'));
+        $this->assertSame(['1'], array_column($this->search('הרשל')['groups']['product'], 'external_id'));
+        $this->assertNotContains('3', array_column($this->search('ליגו')['groups']['product'], 'external_id'), '"Logo" is "לוגו", not "ליגו"');
+    }
+
     public function test_a_colour_is_one_word_whatever_its_gender(): void
     {
         // Gueta: "מברגה שחורה" showed two handles, holding "שחורה" and "הברגה" (threading), and none

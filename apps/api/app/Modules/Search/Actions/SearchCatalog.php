@@ -50,6 +50,9 @@ final class SearchCatalog
     /** A title's first word on more than this share of the products is the store's, not a kind a search names. */
     private const KIND_MAX_SHARE = 0.6;
 
+    /** Far by meaning and vouched for only by the store's own question: at most this many nearest products. */
+    private const ANSWERED_FEW = 4;
+
     /**
      * A similar item's place where looks lead: the pictures' own order, the share of their described words, and how
      * near the colour it shows most is (bySeenWords). Weights that add up to one.
@@ -291,8 +294,16 @@ final class SearchCatalog
             $pictures = $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)) ? $this->pictures($shopId, $query, $index['records']) : [];
             $this->trace?->step('pictures', ['ran' => $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)), 'words_found' => count($spelled)]);
             // a question about a need ("איך מחברים קרשים לדק?") is not held to it: its guide and what the guide names answer it
-            $weak = $byMeaning && ! $asks && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)
+            // ...unless the store itself answered a question holding the words ("לישון" in its own "מה טוב לישון?"): what
+            // it answered about is its own, and the nearest by meaning are shown as for that question
+            $answered = array_filter($spelling, fn (array $hit): bool => str_starts_with((string) $hit['id'], 'a:')) !== [];
+            $weak = $byMeaning && ! $asks && ! $answered && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)
                 && ($pictures === [] || ! HebrewSearch::visual($query));
+            // vouched for by the store's own question only (its answer may be a "no"): the few nearest, never a list
+            if ($answered && ! $asks && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)) {
+                $near['products'] = array_slice($near['products'], 0, self::ANSWERED_FEW);
+                $pictures = [];
+            }
             // Far by meaning, yet its own description says what was searched: "פטריה לקשב וריכוז" is .34 from the formula
             // that speaks of "מיקוד הקשב" and "ריכוז", where an unrelated search is .1. Those near ones are shown, alone.
             $said = $weak ? DescribedProducts::saying($shopId, (string) $index['hash'], $query, $near['products']) : [];

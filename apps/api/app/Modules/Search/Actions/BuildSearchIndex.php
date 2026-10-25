@@ -27,6 +27,7 @@ use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\ShownQuestion;
+use App\Modules\Search\Support\Transliterate;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
@@ -629,7 +630,8 @@ final class BuildSearchIndex
                 'asked' => (int) $a->asked_count,
                 // shown to other shoppers as a question of the store: its slips mended, written cleanly
                 'question' => ShownQuestion::text($a),
-                'answer' => mb_substr((string) $a->answer, 0, 400),
+                // as plain words: a writer's "**מיקו דרים**" showed its stars in the drawer's preview
+                'answer' => mb_substr(str_replace('**', '', (string) preg_replace('/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/us', '$2', (string) $a->answer)), 0, 400),
                 'sources' => $a->product !== null
                     ? [['title' => $a->product->title, 'url' => $a->product->url]]
                     : ($a->content !== null ? [['title' => $a->content->title, 'url' => $a->content->url]] : array_map(fn (array $s): array => self::source($s, $locale), (array) $a->sources)),
@@ -911,6 +913,8 @@ final class BuildSearchIndex
     private function productWords(CatalogProduct $product, array $learned = []): array
     {
         $words = array_filter([(string) $product->brand, (string) $product->sku]);
+        // its Latin name as a shopper types it in Hebrew ("תיק ליגו" for "Herschel LEGO"), first, before the long lists
+        array_push($words, ...Transliterate::hebrew($product->title.' '.$product->brand));
 
         foreach ($product->categories as $category) {
             $words[] = (string) $category->name;

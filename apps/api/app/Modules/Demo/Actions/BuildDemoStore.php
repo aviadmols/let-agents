@@ -110,6 +110,11 @@ final class BuildDemoStore
                 Features::override($key, $pictures, $shop->id);
             }
         }
+        // whoever tries a demo asks as much as they like (as Aviad asked, 2026-10-25): no visitor's own daily limit; the
+        // demo's daily questions, its month's answers and its budget still hold
+        if (app(FeatureRegistry::class)->has('assistant.visitor_limit')) {
+            Features::override('assistant.visitor_limit', false, $shop->id);
+        }
         // the wishlist a store would offer, a heart on each result: kept by us, and deleted with the demo's store
         if (app(FeatureRegistry::class)->has('shortlist.wishlist')) {
             Features::override('shortlist.wishlist', true, $shop->id);

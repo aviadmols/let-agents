@@ -9,6 +9,7 @@ use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -348,6 +349,15 @@ final class SearchFlowTest extends TestCase
         // Not a question about a need: the guide is shown, its products are not suggested. No product holds the words and
         // the meaning is weak (.41): none is shown as if found; a store that wants weaker meaning lowers its threshold.
         $this->assertSame([], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
+        // ...unless the store itself answered a question holding the words (Mycolivia: "לישון" in its own "מה טוב לישון?")
+        app(TenantContext::class)->run($this->shop->id, fn () => AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'question' => 'איך עושים חיבור קרשים לדק?', 'question_key' => 'kq',
+            'answer' => 'עם ברגי דק.', 'outcome' => AssistantAnswer::ANSWERED, 'prompt_version' => 1, 'last_asked_at' => now(), 'shared_at' => now()]));
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->assertSame(['102'], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'), 'the store answered about it: its nearest, a few');
+        app(TenantContext::class)->run($this->shop->id, fn () => AssistantAnswer::query()->where('question_key', 'kq')->delete());
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
         Settings::set('search.meaning_only_min_similarity', 0.4, $this->shop->id);
         $this->assertSame(['102'], array_column($this->search('חיבור קרשים לדק')->json('groups.product'), 'external_id'));
 
