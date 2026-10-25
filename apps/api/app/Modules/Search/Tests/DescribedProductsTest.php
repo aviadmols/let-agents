@@ -73,6 +73,8 @@ final class DescribedProductsTest extends TestCase
             $this->assertSame(['p:4'], DescribedProducts::saying($shop->id, $hash, 'פטריה לקשב וריכוז', $all), 'the subject aside, every other word said');
             $this->assertSame(['p:5'], DescribedProducts::saying($shop->id, $hash, 'mushroom for focus', $all), 'in English: "focusing" says "focus"');
             $this->assertSame([], DescribedProducts::saying($shop->id, $hash, 'פטריה', $all), 'nothing tells them apart');
+            // Mycolivia: "מה טוב ללישון" kept the one product whose description says "טוב"; a question's own words are no part of it
+            $this->assertSame(['p:2', 'p:4'], DescribedProducts::saying($shop->id, $hash, 'מה טוב לריכוז', $all));
         });
     }
 

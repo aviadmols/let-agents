@@ -33,6 +33,12 @@ final class HebrewSearch
         'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
         'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
 
+    /** Whether a normalized word only wraps a question around what it is about ("מה", "טוב", "best"). */
+    public static function isFiller(string $word): bool
+    {
+        return in_array($word, self::FILLER, true);
+    }
+
     /**
      * A colour is one word whatever its gender and number: "מברגה שחורה" finds a screwdriver whose
      * colour is "שחור". Normalized (no final letters). Brown is left out: "חומה" is also a wall.

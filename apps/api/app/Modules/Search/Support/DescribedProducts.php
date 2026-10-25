@@ -116,7 +116,8 @@ final class DescribedProducts
         $words = [];
 
         foreach (array_unique(explode(' ', HebrewSearch::normalize($query))) as $word) {
-            $forms = self::forms($word);
+            // what a question wraps around its subject ("מה טוב ל…") tells no product apart
+            $forms = HebrewSearch::isFiller($word) ? [] : self::forms($word);
             $said = $forms === [] || $stems === [] ? 0 : count(array_filter($stems, fn (array $own): bool => array_intersect_key($forms, $own) !== []));
             if ($said > 0 && $said <= count($stems) * self::SUBJECT_SHARE) {
                 $words[] = $forms;
