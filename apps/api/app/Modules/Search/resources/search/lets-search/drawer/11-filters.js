@@ -66,6 +66,31 @@
   }
   // A category (or a tag shown as a filter) is read from the words when its whole name is typed, or, for a name of
   // three words or more, all of it but one word and at least two: "ספרי מופת" is "ספרי מופת מתורגמים".
+  // Dates, as a day and a month: "7.10", "7/10", "שבעה באוקטובר", "ה-7 באוקטובר", "7 October". Each as "d.m", with
+  // where it was typed (the places of its words).
+  var MONTHS = { 'ינואר': 1, 'פברואר': 2, 'מרץ': 3, 'מרס': 3, 'אפריל': 4, 'מאי': 5, 'יוני': 6, 'יולי': 7, 'אוגוסט': 8, 'ספטמבר': 9, 'אוקטובר': 10, 'נובמבר': 11, 'דצמבר': 12,
+    january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+  var DAY_WORDS = { 'אחד': 1, 'אחת': 1, 'שניים': 2, 'שתיים': 2, 'שני': 2, 'שתי': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4, 'חמש': 5, 'חמישה': 5,
+    'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9, 'עשר': 10, 'עשרה': 10 };
+  function datesIn(text) {
+    var out = [], raw = String(text || ''), tw = wordsOf(raw), m, re = /(\d{1,2})\s*[.\/]\s*(\d{1,2})(?!\d)/g;
+    while ((m = re.exec(raw))) { if (+m[2] >= 1 && +m[2] <= 12) { out.push({ d: (+m[1]) + '.' + (+m[2]), at: [] }); } }
+    var month = function (w) { return MONTHS[w] || (/^[בלה]/.test(w) ? MONTHS[w.slice(1)] : null) || null; };
+    var day = function (w) { var x = w.replace(/^ה/, ''); return /^\d{1,2}$/.test(x) ? +x : (DAY_WORDS[x] || DAY_WORDS[w] || null); };
+    tw.forEach(function (w, i) {
+      var mo = month(w);
+      if (!mo) { return; }
+      if (i > 0 && day(tw[i - 1])) { out.push({ d: day(tw[i - 1]) + '.' + mo, at: [i - 1, i] }); }
+      else if (tw[i + 1] && day(tw[i + 1])) { out.push({ d: day(tw[i + 1]) + '.' + mo, at: [i, i + 1] }); }
+    });
+    return out;
+  }
+  function datedBy(text, label) {
+    var named = datesIn(label).map(function (x) { return x.d; });
+    if (!named.length) { return null; }
+    var hit = datesIn(text).filter(function (x) { return x.at.length && named.indexOf(x.d) >= 0; })[0];
+    return hit ? hit.at : null;
+  }
   function namesGroup(text, label) {
     var ws = wordsSaid(text, label);
     if (ws.of < 2) { return null; }
@@ -90,7 +115,8 @@
       // finds screws outside the screws category too. One of several words, said enough (namesGroup), is it.
       if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l)) { return; }
       var grouped = facet.k === 'category' || /^tag:/.test(facet.k);
-      var by = grouped ? namesGroup(q, value.l) : saidBy(q, value.l);
+      // a date said in words names the filter that writes it as a date: "שבעה באוקטובר" is "גבורה ותקומה אחרי 7.10" (Sela)
+      var by = (grouped ? namesGroup(q, value.l) : saidBy(q, value.l)) || datedBy(q, value.l);
       if (!by) { return; }
       // one value name in several attributes ("שחור" as a colour and as a coating): the one most results carry
       var k = value.l.toLowerCase();
@@ -166,13 +192,10 @@
       list.forEach(function (w) { wordForms(w).forEach(function (f) { set[f] = 1; }); });
       r._wf = set;
       r._ww = list;
-      r._wt = ' ' + list.join(' ') + ' ';
     }
     return r._wf;
   }
-  // a chip of two words holds where the product says them together, as typed or the first without its prefix letter
-  function saysPhrase(r, phrases) { recForms(r); return phrases.some(function (p) { return r._wt.indexOf(' ' + p + ' ') >= 0; }); }
-  function holdsChip(r, chip) { return chip.phrase ? saysPhrase(r, chip.phrase) : chip.colour ? holdsColour(r, chip.colour, chip.forms) : saysWord(r, chip.forms); }
+  function holdsChip(r, chip) { return chip.colour ? holdsColour(r, chip.colour, chip.forms) : saysWord(r, chip.forms); }
   // a product of a colour: one of its own colours (mc), or, where the index knows none of them, its words saying it
   function holdsColour(r, colour, forms) { return r.mc && r.mc.length ? r.mc.indexOf(colour) >= 0 : saysWord(r, forms); }
   // a word read as a chip holds in any of its forms, or (part typed, "לוג") as the start of a word of the product ("לוגו")
@@ -199,23 +222,8 @@
     var whole1 = words.length === 1 && (turn !== S.live || /\s$/.test(INPUT.value));
     if (!E || !E.normalize || !all.length || (words.length < 2 && !whole1)) { return; }
     var used = [];
-    // two words the products say together ("זהב צהוב", "כיס חזה"): one chip, in place of the first alone
-    words.forEach(function (w, i) {
-      var w2 = words[i + 1];
-      if (!w2 || Object.keys(c.words).length >= WORD_CHIPS || taken.indexOf(i) >= 0 || taken.indexOf(i + 1) >= 0 || used.indexOf(i) >= 0) { return; }
-      if (w.length < 2 || w2.length < 2 || STOP.test(w) || STOP.test(w2) || ASKS_ONLY.test(w) || ASKS_ONLY.test(w2) || WITHOUT_WORD.test(w)) { return; }
-      var n1 = E.normalize(w), n2 = E.normalize(w2), key = n1 + ' ' + n2;
-      if (c.no['w:' + key]) { return; }
-      var phrases = [key];
-      if (/^[והבלמשכ][א-ת]{3,}$/.test(n1)) { phrases.push(n1.slice(1) + ' ' + n2); }
-      var said = phrases.filter(function (p) { return all.some(function (r) { return saysPhrase(r, [p]); }); })[0];
-      if (!said) { return; }
-      var products = Object.keys(S.records).map(function (id) { return S.records[id]; }).filter(function (r) { return r && r.t === 'product'; });
-      var share = products.length ? products.filter(function (r) { return saysPhrase(r, phrases); }).length / products.length : 0;
-      if (share > SUBJECT_SHARE) { return; }
-      c.words[key] = { label: said === key ? w + ' ' + w2 : w.slice(1) + ' ' + w2, at: [i, i + 1], phrase: phrases, share: share };
-      used.push(i, i + 1);
-    });
+    // each word a chip of its own ("נעלי סניקרס": נעליים and סניקרס); a name of two words or more is the store's own only,
+    // read above as one of its filters, its categories or its tags ("זהב צהוב"), never made of words that come together
     words.forEach(function (w, i) {
       if (Object.keys(c.words).length >= WORD_CHIPS || used.indexOf(i) >= 0 || taken.indexOf(i) >= 0) { return; }
       // "בלי כפתורים": a chip that keeps away what says it
