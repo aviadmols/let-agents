@@ -22,6 +22,11 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    // The store's picture behind a demo (the Demo module). Without a key: the free tier, a few dozen a day.
+    'microlink' => [
+        'key' => env('MICROLINK_API_KEY'),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

@@ -52,6 +52,7 @@ return [
         'active' => 'פעילה',
         'paused' => 'מושהית',
         'disabled' => 'מושבתת',
+        'demo' => 'דמו',
     ],
     'locales' => [
         'he' => 'עברית',

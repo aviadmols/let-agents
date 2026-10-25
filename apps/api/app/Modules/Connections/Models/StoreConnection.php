@@ -95,9 +95,10 @@ class StoreConnection extends Model
             return null;
         }
 
-        // A paused shop (a Shopify store without a live subscription) serves no storefront.
+        // A paused shop (a Shopify store without a live subscription) serves no storefront. A demo does, on its demo
+        // page (the Demo module), until it ends.
         return app(TenantContext::class)->runUnscoped(fn () => static::query()->with('shop')->where('site_key', $siteKey)
-            ->whereHas('shop', fn ($shop) => $shop->where('status', 'active'))->first());
+            ->whereHas('shop', fn ($shop) => $shop->whereIn('status', ['active', 'demo']))->first());
     }
 
     /** Private key for preview links: the widget shows only to whoever opens such a link. */

@@ -3,6 +3,7 @@
 namespace App\Modules\Tenancy\Actions;
 
 use App\Modules\Tenancy\Contracts\CreatesShops;
+use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Str;
 
@@ -14,6 +15,11 @@ final class CreateShop implements CreatesShops
     public function handle(array $attributes): Shop
     {
         $attributes['domain'] = self::normalizeDomain($attributes['domain']);
+        // A store that connects for real while its demo lasts: the demo goes, with all it holds, and the domain is the
+        // store's. A demo is never made for a domain a real shop has (the Demo module).
+        if (($attributes['status'] ?? null) !== ShopStatus::Demo->value) {
+            Shop::query()->where('domain', $attributes['domain'])->where('status', ShopStatus::Demo->value)->get()->each->delete();
+        }
         // A slug asked for is kept as asked, unless it is taken or reserved: then it gets a suffix.
         $attributes['slug'] = $this->uniqueSlug(filled($attributes['slug'] ?? null) ? (string) $attributes['slug'] : $attributes['name'], $attributes['domain']);
 

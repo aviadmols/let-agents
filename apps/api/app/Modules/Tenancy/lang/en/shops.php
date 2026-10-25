@@ -52,6 +52,7 @@ return [
         'active' => 'Active',
         'paused' => 'Paused',
         'disabled' => 'Disabled',
+        'demo' => 'Demo',
     ],
     'locales' => [
         'he' => 'Hebrew',

@@ -13,6 +13,12 @@ enum ShopStatus: string
     /** Off until the operator turns it back on. */
     case Disabled = 'disabled';
 
+    /**
+     * A store someone asked to see Lets on (the Demo module): its storefront answers on the demo page, and no
+     * scheduled work touches it (every schedule takes active shops). Deleted, with all it holds, when the demo ends.
+     */
+    case Demo = 'demo';
+
     public function label(): string
     {
         return __("tenancy::shops.statuses.{$this->value}");
@@ -24,6 +30,7 @@ enum ShopStatus: string
             self::Active => 'success',
             self::Paused => 'warning',
             self::Disabled => 'danger',
+            self::Demo => 'info',
         };
     }
 
