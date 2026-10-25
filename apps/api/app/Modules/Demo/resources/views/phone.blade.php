@@ -44,7 +44,9 @@
     @if ($siteKey)
         <script>
             // the search speaks the store's language, as whoever asked chose it
-            window.LetsSearchConfig = { site: @json($siteKey), api: @json(url('/api/v1')), locale: @json($site->choices['language'] ?? app()->getLocale()), launcher: 'float' };
+            // demo: its cart adds to no real store, and a product's choices come from the demo's own copy of them
+            window.LetsSearchConfig = { site: @json($siteKey), api: @json(url('/api/v1')), locale: @json($site->choices['language'] ?? app()->getLocale()), launcher: 'float',
+                demo: { options: @json(url('/demo/'.$site->token.'/options').'/') } };
         </script>
         <script src="{{ route('api.search.lets-search') }}" defer></script>
     @endif

@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Actions\AlertDemos;
 use App\Modules\Demo\Actions\RetryDemo;
@@ -113,7 +114,7 @@ final class DemoFlowTest extends TestCase
         $this->assertSame('demo', $connection->platform);
         $this->assertContains(parse_url((string) config('app.url'), PHP_URL_HOST), $connection->site_info['hosts'], 'the drawer answers on our demo page');
         $this->assertNotNull(StoreConnection::forSite((string) $connection->site_key), 'a demo store has a storefront');
-        $this->assertEquals([300, (float) Settings::get('demo.budget_usd'), true, false, 'picture'],
+        $this->assertEquals([300, (float) Settings::get('demo.budget_usd'), true, true, 'picture'],
             [Settings::get('catalog.max_products', $shop->id), Settings::get('ai.shop_monthly_cap_usd', $shop->id), Settings::get('ai.shop_cap_stops_shoppers', $shop->id), Settings::get('search.show_cart', $shop->id), Settings::get('search.similar_by', $shop->id)]);
         $this->assertFalse(Features::enabled('enrichment.nightly', $shop->id), 'nothing a night would do');
         $this->assertTrue(Features::enabled('search.photos', $shop->id), 'looks matter: photo search');
@@ -131,7 +132,21 @@ final class DemoFlowTest extends TestCase
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-bar', false)->assertSee('/demo/'.$site->token.'/phone', false);
         $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee("launcher: 'float'", false)
             ->assertHeader('Content-Security-Policy', "frame-ancestors 'self';")
-            ->assertSee('<html lang="en" dir="ltr">', false)->assertSee('Try the search')->assertSee('locale: "he"', false)->assertDontSee('data-hint', false);
+            ->assertSee('<html lang="en" dir="ltr">', false)->assertSee('Try the search')->assertSee('locale: "he"', false)->assertDontSee('data-hint', false)
+            ->assertSee('demo: { options:', false);
+
+        // the demo's cart sheet: the product's choices from the demo's own copy, as the store's API gives them
+        app(TenantContext::class)->run($site->shop_id, fn () => CatalogProduct::query()->create([
+            'shop_id' => $site->shop_id, 'external_id' => '77', 'type' => 'variable', 'status' => 'publish', 'title' => 'נעלי סניקרס Old Skool', 'url' => 'https://store.test/p/77',
+            'in_stock' => true, 'purchasable' => true, 'hash' => 'h77', 'price' => 299,
+            'payload' => ['images' => [['url' => 'https://store.test/i/77.jpg']],
+                'attributes' => [['name' => 'מידה', 'values' => ['42', '43'], 'used_for_variations' => true]],
+                'variations' => [['external_id' => '771', 'attributes' => [['name' => 'מידה', 'value' => '42']], 'stock' => ['in_stock' => true]],
+                    ['external_id' => '772', 'attributes' => [['name' => 'מידה', 'value' => '43']], 'stock' => ['in_stock' => false]]]],
+        ]));
+        $this->getJson('/demo/'.$site->token.'/options/77')->assertOk()
+            ->assertJsonPath('attributes.0.terms.1.name', '43')->assertJsonPath('variations.1.available', false)->assertJsonPath('images.0.src', 'https://store.test/i/77.jpg');
+        $this->getJson('/demo/'.$site->token.'/options/nope')->assertNotFound();
 
         $this->travel(8)->days();
         app(SweepDemos::class)->handle();

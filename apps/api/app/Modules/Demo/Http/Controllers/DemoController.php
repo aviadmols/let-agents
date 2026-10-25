@@ -3,6 +3,7 @@
 namespace App\Modules\Demo\Http\Controllers;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Actions\FinishDemo;
 use App\Modules\Demo\Actions\RetryDemo;
@@ -29,6 +30,7 @@ use Illuminate\Routing\Controller;
  *                               done, the demo is ready (FinishDemo)
  *   POST /demo/{token}/again    after a problem: again, at the same address or a corrected one (RetryDemo)
  *   GET  /demo/{token}/phone    the demo in its phone: what it is and the floating search, framed by the demo page
+ *   GET  /demo/{token}/options/{id}  a product's choices for the demo's cart sheet (its cart adds to no real store)
  */
 final class DemoController extends Controller
 {
@@ -132,6 +134,35 @@ final class DemoController extends Controller
             ['key' => 'read', 'state' => $state($site->read_at !== null, true)],
             ['key' => 'scan', 'state' => $state($site->scan_at !== null, $site->read_at !== null)],
         ];
+    }
+
+    /**
+     * A product's choices for the demo's cart sheet, as the store's own API would give them (its options, its variants
+     * and which are in stock), read from what the scan kept: the demo adds to no real cart, so it asks no store.
+     */
+    public function options(string $token, string $id): JsonResponse
+    {
+        $site = $this->site($token);
+        abort_unless($site->status === DemoSite::READY && $site->live() && $site->shop_id !== null, 404);
+
+        $product = app(TenantContext::class)->run($site->shop_id, fn () => CatalogProduct::query()->whereNull('removed_at')->where('external_id', $id)->first());
+        abort_if($product === null, 404);
+        $payload = (array) $product->payload;
+
+        return response()->json([
+            'name' => $product->title,
+            'images' => array_values(array_map(fn (array $i): array => ['src' => (string) ($i['url'] ?? '')], array_slice(array_filter((array) ($payload['images'] ?? []), 'is_array'), 0, 1))),
+            'attributes' => array_values(array_map(fn (array $a): array => [
+                'name' => (string) $a['name'],
+                'has_variations' => (bool) ($a['used_for_variations'] ?? false),
+                'terms' => array_map(fn ($v): array => ['slug' => (string) $v, 'name' => (string) $v], array_values((array) ($a['values'] ?? []))),
+            ], array_filter((array) ($payload['attributes'] ?? []), fn ($a): bool => is_array($a) && isset($a['name'])))),
+            'variations' => array_values(array_map(fn (array $v): array => [
+                'id' => (string) ($v['external_id'] ?? ''),
+                'available' => (bool) ($v['stock']['in_stock'] ?? true),
+                'attributes' => array_values((array) ($v['attributes'] ?? [])),
+            ], array_filter((array) ($payload['variations'] ?? []), 'is_array'))),
+        ])->header('Cache-Control', 'private, max-age=300');
     }
 
     /** The demo in its phone: framed by the demo page, ours only. */

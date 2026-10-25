@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
  * scheduled ever touches it (every schedule takes active shops). Connected to its public site (platform "demo",
  * PublicStoreFeed), answering on our own demo page (the app's host among its hosts). Held to what a demo needs and
  * may cost: so many products and pages, a month's budget that stops shoppers too, so many answers and photo
- * searches, a few store questions answered ahead, no cart, nothing a night or a team would do (enrichment, reviews,
+ * searches, a few store questions answered ahead, a cart that only shows itself, nothing a night or a team would do (enrichment, reviews,
  * matching, posting). What matters in its search, as they said: the pictures (photo search, alike by picture) or
  * the content (no pictures read), or both.
  */
@@ -87,7 +87,8 @@ final class BuildDemoStore
             // each product's main picture only: its other pictures (side views) were most of a demo's scan time
             'retrieval.gallery_pictures' => 0,
             'assistant.post_knowledge_posts' => 20,
-            'search.show_cart' => false,
+            // the cart as a store has it: the drawer adds to no real cart in a demo (LetsSearchConfig.demo), only shows it
+            'search.show_cart' => true,
             'search.similar_by' => ['look' => 'picture', 'content' => 'meaning'][$matters] ?? 'both',
             'search.photo_match' => $matters === 'content' ? 'function' : 'look',
         ];

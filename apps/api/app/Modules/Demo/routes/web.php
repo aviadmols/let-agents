@@ -12,3 +12,4 @@ Route::post('demo/{token}/code', [DemoController::class, 'code'])->middleware('t
 Route::post('demo/{token}/again', [DemoController::class, 'again'])->middleware('throttle:demo-start')->name('demo.again');
 Route::get('demo/{token}/progress', [DemoController::class, 'progress'])->middleware('throttle:demo-page')->name('demo.progress');
 Route::get('demo/{token}/phone', [DemoController::class, 'phone'])->middleware('throttle:demo-page')->name('demo.phone');
+Route::get('demo/{token}/options/{id}', [DemoController::class, 'options'])->where('id', '[A-Za-z0-9_-]{1,64}')->middleware('throttle:demo-page')->name('demo.options');
