@@ -288,6 +288,16 @@ final class DemoFlowTest extends TestCase
         $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee('locale: "en"', false)->assertSee('<html lang="en" dir="ltr">', false);
     }
 
+    public function test_the_scan_screen_says_its_lines_in_the_demos_language_whatever_the_apps(): void
+    {
+        $site = $this->verified();
+        app()->setLocale('he');
+
+        $this->getJson('/demo/'.$site->token.'/progress')->assertOk();
+
+        $this->assertSame(DemoSite::LOCALE, app()->getLocale(), 'what the scan learned is said in English, as the rest of the demo');
+    }
+
     public function test_the_scan_screen_shows_each_step_of_the_preparation(): void
     {
         $site = $this->verified();

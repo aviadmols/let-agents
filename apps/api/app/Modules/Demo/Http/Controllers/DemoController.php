@@ -150,9 +150,11 @@ final class DemoController extends Controller
         return response((string) base64_decode($picture), 200, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, max-age=3600']);
     }
 
+    /** The demo its link names, and the demo's language for all it says (the scan's lines on /progress too). */
     private function site(string $token): DemoSite
     {
         abort_unless(preg_match('/^[A-Za-z0-9]{40}$/', $token) === 1, 404);
+        app()->setLocale(DemoSite::LOCALE);
 
         return DemoSite::query()->where('token', $token)->firstOrFail();
     }
