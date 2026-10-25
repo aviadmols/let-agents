@@ -151,8 +151,10 @@
                     row.className = 'row is-' + state;
                     // the bar: by count when the whole is known, a sweep while it runs when not
                     var meter = row.querySelector('[data-meter]');
-                    meter.classList.toggle('is-open', !r.of);
-                    meter.querySelector('i').style.width = r.of && state !== 'done' ? Math.min(100, Math.round(100 * r.n / r.of)) + '%' : '';
+                    // all counted but still at work (a further pass over the same pictures): a sweep, not a full bar standing still
+                    var counted = r.of && !(state === 'running' && r.n >= r.of);
+                    meter.classList.toggle('is-open', !counted);
+                    meter.querySelector('i').style.width = counted && state !== 'done' ? Math.min(100, Math.round(100 * r.n / r.of)) + '%' : '';
                     if (r.key === 'knowledge') { row.querySelector('[data-state]').textContent = states[state === 'wait' ? 'waiting' : state] || ''; return; }
                     row.querySelector('[data-n]').textContent = Number(r.n).toLocaleString();
                     if (r.of) { row.querySelector('[data-unit]').textContent = of.replace(':count', Number(r.of).toLocaleString()); }
