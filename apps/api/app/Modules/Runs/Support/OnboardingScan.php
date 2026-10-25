@@ -17,7 +17,7 @@ final class OnboardingScan implements ShopScan
         'products' => ['catalog', 'sample'],
         'images' => ['pictures'],
         'pages' => ['site', 'posts', 'pages'],
-        'tags' => ['structure', 'products', 'search', 'tags'],
+        'tags' => ['structure', 'products', 'search', 'tags', 'check'],
         'knowledge' => ['knowledge'],
     ];
 

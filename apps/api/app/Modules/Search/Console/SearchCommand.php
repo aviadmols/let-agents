@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\CheckStoreSearch;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
@@ -29,12 +30,13 @@ use Illuminate\Console\Command;
  *   search resolve --all                  what the schedule runs, for shops with the flag on
  *   search tags gueta-avigdor             write and check the tags the pages offer
  *   search tags --all                     what the schedule runs, for shops with the flag on
+ *   search check gueta-avigdor            try the search as shoppers will, mend what fails, report (a scan's last step)
  *   search prune                          drop counts older than search.keep_days
  */
 final class SearchCommand extends Command
 {
     protected $signature = 'search
-        {step : index, resolve, tags, try or prune}
+        {step : index, resolve, tags, check, try or prune}
         {target? : shop slug or ID}
         {query? : what to search, for try}
         {--all : every active shop}';
@@ -47,6 +49,7 @@ final class SearchCommand extends Command
             'index' => $this->index(),
             'resolve' => $this->resolve(),
             'tags' => $this->tags(),
+            'check' => $this->check(),
             'try' => $this->try(),
             'prune' => $this->prune(),
             default => $this->failWith('Unknown step.'),
@@ -114,6 +117,20 @@ final class SearchCommand extends Command
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function check(): int
+    {
+        $shop = $this->shop();
+
+        if ($shop === null) {
+            return $this->failWith('Shop not found.');
+        }
+
+        $run = app(CheckStoreSearch::class)->handle($shop->id);
+        $this->line("{$shop->slug}: ".$run->summary());
+
+        return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
     }
 
     private function try(): int

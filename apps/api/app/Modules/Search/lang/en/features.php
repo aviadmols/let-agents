@@ -97,4 +97,8 @@ return [
         'label' => 'Lets posts in search results',
         'description' => 'Posts Lets wrote and the store published live at Lets\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
     ],
+    'scan_check' => [
+        'label' => 'Search check after a scan',
+        'description' => 'At the end of every scan the search is tried on searches made from the products and on searches like a shopper\'s; what fails is mended for this store alone, and a report is sent.',
+    ],
 ];

@@ -28,6 +28,7 @@ return [
         'knowledge' => 'Learning about the store',
         'posts' => 'Reading posts and articles',
         'tags' => 'Tags for pages',
+        'check' => 'Trying the search as shoppers will, and mending what fails',
         'choices' => 'Reading sizes and options from product pages',
     ],
     'nothing_new' => 'Nothing to update in this step.',

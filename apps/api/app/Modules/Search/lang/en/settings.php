@@ -391,4 +391,44 @@ return [
         'description' => 'As the site: the page\'s language. Or always Hebrew, or always English.',
         'options' => ['site' => 'As the site', 'he' => 'עברית', 'en' => 'English'],
     ],
+    'scan_check_mode' => [
+        'label' => 'Search check after a scan: mend or only report',
+        'description' => 'After every scan the search is tried the way shoppers will search. "dry": a report only, nothing written. "apply": what fails is mended for this store alone (tags from the products\' descriptions, and searches one model matched and a model of the other family checked).',
+    ],
+    'scan_check_usd' => [
+        'label' => 'Cost cap of the search check after a scan',
+        'description' => 'For a store\'s whole check: writing shoppers\' searches, the mending and the questions to the assistant. What does not fit under it is not done.',
+    ],
+    'scan_check_searches' => [
+        'label' => 'Shoppers\' searches in the check',
+        'description' => 'How many searches like a shopper\'s (a need, a use, a feature) are written and tried, besides those code makes from the products.',
+    ],
+    'scan_check_questions' => [
+        'label' => 'Questions to the assistant in the check',
+        'description' => 'How many questions are asked of the assistant as a shopper would, to see that it answers.',
+    ],
+    'scan_check_report_to' => [
+        'label' => 'Where the search check report goes',
+        'description' => 'Email addresses, separated by commas. Empty: every operator.',
+    ],
+    'scan_check_provider' => [
+        'label' => 'Provider of the model that writes shoppers\' searches',
+        'description' => 'A small model, once a catalog.',
+    ],
+    'scan_check_model' => [
+        'label' => 'Model that writes shoppers\' searches',
+        'description' => 'The searches are only tried, never shown to shoppers.',
+    ],
+    'scan_check_input_usd_per_million' => [
+        'label' => 'Input price per million tokens: shoppers\' searches',
+        'description' => 'For the cost only.',
+    ],
+    'scan_check_output_usd_per_million' => [
+        'label' => 'Output price per million tokens: shoppers\' searches',
+        'description' => 'For the cost only.',
+    ],
+    'scan_check_max_output_tokens' => [
+        'label' => 'Longest answer: shoppers\' searches',
+        'description' => 'Enough for one set of searches and questions.',
+    ],
 ];

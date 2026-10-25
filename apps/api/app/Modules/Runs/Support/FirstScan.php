@@ -54,6 +54,8 @@ final class FirstScan
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
+        // The search tried as shoppers will try it, what fails mended for this store alone, and the team told (CheckStoreSearch).
+        'check' => ['search', ['step' => 'check', 'target' => '{shop}']],
         // Last, being slow (a pause between pages): what each product page says that the feed does not, a
         // ring's size and the choices before "add to cart". Only pages due; the search index follows by itself.
         'choices' => ['catalog:read-choices', ['shop' => '{shop}', '--continue' => true]],
@@ -66,7 +68,7 @@ final class FirstScan
      * what the store says about itself, its posts and the page tags are left to the night. The
      * whole chain again is the operator's (start(full: true)).
      */
-    public const CHANGES = ['catalog', 'site', 'pictures', 'products', 'pages', 'search', 'choices'];
+    public const CHANGES = ['catalog', 'site', 'pictures', 'products', 'pages', 'search', 'check', 'choices'];
 
     /**
      * The runs each step writes, by action: what a step says is its own, never what ran beside it
@@ -84,6 +86,7 @@ final class FirstScan
         'pages' => ['retrieval.build_index', 'retrieval.match_products'],
         'search' => ['search.build_index'],
         'tags' => ['search.write_tags'],
+        'check' => ['search.scan_check', 'search.resolve'],
         'choices' => ['catalog.read_choices'],
     ];
 

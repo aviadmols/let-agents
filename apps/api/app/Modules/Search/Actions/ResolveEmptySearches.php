@@ -64,19 +64,27 @@ final class ResolveEmptySearches
         private readonly SemanticSearch $semantic,
     ) {}
 
-    public function handle(string $shopId, RunTrigger $trigger = RunTrigger::Manual): Run
+    /**
+     * @param  list<string>|null  $queries  these searches instead of the shop's empty ones (the scan check's, CheckStoreSearch)
+     * @param  bool  $dry  decide, keep nothing: the run's items say what would have been written
+     */
+    public function handle(string $shopId, RunTrigger $trigger = RunTrigger::Manual, ?array $queries = null, bool $dry = false): Run
     {
         return $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
             trigger: $trigger,
-            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->resolve($run, $shopId)),
+            input: $queries === null ? [] : ['given' => count($queries), 'dry' => $dry],
+            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->resolve($run, $shopId, $queries, $dry)),
         );
     }
 
-    private function resolve(RunContext $run, string $shopId): void
+    /** @param list<string>|null $given */
+    private function resolve(RunContext $run, string $shopId, ?array $given = null, bool $dry = false): void
     {
+        // what came of each search, for the scan check's report: its words, what it shows now, the store's word for it
+        $items = [];
         $matcher = $this->role('resolve');
         $checker = $this->role('check');
         $stats = ['looked' => 0, 'resolved' => 0, 'none' => 0, 'refused' => 0, 'unchanged' => 0, 'stopped' => null];
@@ -97,7 +105,7 @@ final class ResolveEmptySearches
         $words = $this->storeWords();
         $proposals = [];
 
-        foreach ($this->queries($shopId) as $row) {
+        foreach ($given === null ? $this->queries($shopId) : array_map(fn (string $q): object => (object) ['query' => $q, 'empty' => 1, 'searches' => 1], $given) as $row) {
             $stats['looked']++;
             $query = HebrewSearch::normalize((string) $row->query);
             $candidates = $index === null ? [] : $this->candidates($shopId, $query, $index['records']);
@@ -111,7 +119,8 @@ final class ResolveEmptySearches
             }
 
             if ($candidates === []) {
-                $this->save($shopId, $query, $fingerprint, (int) $row->empty, [], [], null, SearchResolution::NONE, $matcher, null, 'no_candidates');
+                $dry || $this->save($shopId, $query, $fingerprint, (int) $row->empty, [], [], null, SearchResolution::NONE, $matcher, null, 'no_candidates');
+                $items[] = ['query' => $query, 'outcome' => SearchResolution::NONE];
                 $stats['none']++;
 
                 continue;
@@ -134,7 +143,8 @@ final class ResolveEmptySearches
             $proposal = $this->gate($query, $reply->data, $candidates, $index['records']);
 
             if ($proposal === null) {
-                $this->save($shopId, $query, $fingerprint, (int) $row->empty, [], [], null, SearchResolution::NONE, $matcher, null, mb_substr(trim((string) ($reply->data['reason'] ?? '')), 0, 300) ?: 'no_match');
+                $items[] = ['query' => $query, 'outcome' => SearchResolution::NONE];
+                $dry || $this->save($shopId, $query, $fingerprint, (int) $row->empty, [], [], null, SearchResolution::NONE, $matcher, null, mb_substr(trim((string) ($reply->data['reason'] ?? '')), 0, 300) ?: 'no_match');
                 $stats['none']++;
 
                 continue;
@@ -160,12 +170,13 @@ final class ResolveEmptySearches
                 $accepted = ($verdict['verdict'] ?? null) === 'accept';
                 $reason = mb_substr(trim((string) ($verdict['reason'] ?? ($verdicts === null ? 'unchecked' : 'no_verdict'))), 0, 300);
 
-                $this->save($shopId, $p['query'], $p['fingerprint'], $p['searches'], $p['products'], $p['content'], $p['synonym'], $accepted ? SearchResolution::RESOLVED : SearchResolution::REFUSED, $matcher, $checker, $reason, $p['candidates']);
+                $dry || $this->save($shopId, $p['query'], $p['fingerprint'], $p['searches'], $p['products'], $p['content'], $p['synonym'], $accepted ? SearchResolution::RESOLVED : SearchResolution::REFUSED, $matcher, $checker, $reason, $p['candidates']);
+                $items[] = ['query' => $p['query'], 'outcome' => $accepted ? SearchResolution::RESOLVED : SearchResolution::REFUSED, 'shows' => array_slice($p['titles'], 0, 4), 'synonym' => $p['synonym']];
                 $stats[$accepted ? 'resolved' : 'refused']++;
             }
         }
 
-        $run->output($stats + ['matcher' => $matcher['name'].' · '.$matcher['model'], 'checker' => $checker['name'].' · '.$checker['model']])
+        $run->output($stats + ['matcher' => $matcher['name'].' · '.$matcher['model'], 'checker' => $checker['name'].' · '.$checker['model']] + ($given === null ? [] : ['items' => $items, 'dry' => $dry]))
             ->summary('search::runs.resolved', [
                 'looked' => (string) $stats['looked'],
                 'resolved' => (string) $stats['resolved'],

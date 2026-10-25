@@ -25,4 +25,7 @@ return [
     'photo_rank' => 'Ordered :count products again by the photo',
     'photo_rank_spend_cap' => 'The monthly budget is spent: the results kept their order',
     'photo_rank_failed' => 'The second ordering failed (:reason): the results kept their order',
+    'scan_checked' => 'Search check: :tried searches tried, :failed did not find what they should, :mended mended.',
+    'scan_check_off' => 'The search check is off for this store.',
+    'scan_check_no_index' => 'Search check: there is no search index yet.',
 ];

@@ -111,6 +111,10 @@
         {
             "name": "lets_posts",
             "default": false
+        },
+        {
+            "name": "scan_check",
+            "default": true
         }
     ],
     "settings": [
@@ -939,6 +943,94 @@
             "max": 2,
             "scope": "shop",
             "unit": "weight"
+        },
+        {
+            "name": "scan_check_mode",
+            "type": "enum",
+            "options": [
+                "dry",
+                "apply"
+            ],
+            "default": "dry",
+            "scope": "shop"
+        },
+        {
+            "name": "scan_check_usd",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 5,
+            "scope": "shop",
+            "unit": "usd"
+        },
+        {
+            "name": "scan_check_searches",
+            "type": "int",
+            "default": 12,
+            "min": 0,
+            "max": 30,
+            "scope": "shop",
+            "unit": "searches"
+        },
+        {
+            "name": "scan_check_questions",
+            "type": "int",
+            "default": 3,
+            "min": 0,
+            "max": 10,
+            "scope": "shop",
+            "unit": "questions"
+        },
+        {
+            "name": "scan_check_report_to",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 500,
+            "scope": "global"
+        },
+        {
+            "name": "scan_check_provider",
+            "type": "string",
+            "default": "openai",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "scan_check_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "scan_check_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "scan_check_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "scan_check_max_output_tokens",
+            "type": "int",
+            "default": 2500,
+            "min": 500,
+            "max": 8000,
+            "scope": "global",
+            "unit": "tokens"
         }
     ],
     "agents": [
@@ -1066,6 +1158,33 @@
                     ]
                 }
             ]
+        },
+        {
+            "name": "scan_checker",
+            "action": "scan_check",
+            "when": "on_request",
+            "features": [
+                "scan_check"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "scan_check_provider",
+                    "model": "scan_check_model",
+                    "prices": [
+                        "scan_check_input_usd_per_million",
+                        "scan_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "scan_queries"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "search",
+                "step": "check",
+                "shop_argument": "target"
+            }
         }
     ]
 }

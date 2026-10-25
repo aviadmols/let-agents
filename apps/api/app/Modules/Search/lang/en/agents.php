@@ -5,4 +5,5 @@ return [
     'resolver' => 'Resolves searches that found nothing',
     'tagger' => 'Writes the page tags',
     'photo_reader' => 'Shopper photo reader',
+    'scan_checker' => 'Search checker after a scan',
 ];
