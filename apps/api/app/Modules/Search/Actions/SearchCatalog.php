@@ -563,17 +563,18 @@ final class SearchCatalog
      * @param  list<array<string, mixed>>  $facets
      * @return list<array<string, mixed>>
      */
-    private static function otherColour(array $records, ?array $own, array $facets): array
+    /** @param array<string, array<string, mixed>> $all every record of the index: how common a colour is in the store */
+    private static function otherColour(array $records, ?array $own, array $facets, array $all = []): array
     {
         if ($own === null) {
             return $records;
         }
         // a colour filter only (a stone's colour among them, "צבע האבן"), never the stone or its cut: the diamonds beside
         // an amethyst are on nearly every ring. And of its colours only those few of the alike share: the small clear
-        // stones around it are no colour of its own (Rocks: "another colour" left no ring at all)
+        // stones around it, on most of the store's products, are no colour of its own (Rocks: "another colour" left no ring at all)
         $looks = array_keys(array_filter($facets, fn (array $f): bool => preg_match('/colou?r|צבע/iu', (string) ($f['k'] ?? '').' '.(string) ($f['l'] ?? '')) === 1));
         $codes = array_values(array_filter((array) ($own['f'] ?? []), fn ($code): bool => in_array(intdiv((int) $code, 1000), $looks, true)
-            && count(array_filter($records, fn (array $r): bool => in_array($code, (array) ($r['f'] ?? []), true))) <= count($records) / 2));
+            && count(array_filter($all, fn (array $r): bool => in_array($code, (array) ($r['f'] ?? []), true))) <= count($all) / 2));
         if ($codes !== []) {
             return array_values(array_filter($records, fn (array $r): bool => array_intersect($codes, (array) ($r['f'] ?? [])) === []));
         }
@@ -702,12 +703,14 @@ final class SearchCatalog
             // As the shop chose (search.similar_by): by content, by picture, or both. A store whose covers look
             // alike (a bundle of books beside another bundle) asks by content alone.
             $by = (string) Settings::get('search.similar_by', $shopId);
-            $looks = $by === 'meaning' || ! $this->semantic->picturesReady() ? [] : array_map('strval', array_column($this->semantic->lookAlike($product->id, $limit * 4), 'external_id'));
-            $means = $by === 'picture' && $looks !== [] ? [] : array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $limit * 4), 'external_id'));
+            // in another colour, a wider pool: most of the nearest are of its own colour, and they go
+            $pool = $limit * ($otherColour ? 12 : 4);
+            $looks = $by === 'meaning' || ! $this->semantic->picturesReady() ? [] : array_map('strval', array_column($this->semantic->lookAlike($product->id, $pool), 'external_id'));
+            $means = $by === 'picture' && $looks !== [] ? [] : array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $pool), 'external_id'));
             // The tags by meaning it shares with others, where the shop has them (Taxonomy): what it is about, not how its
             // description reads. Those that share them first, the meaning (and the picture) ordering them among themselves;
             // when they are enough, only they. "חטוף" is like "מפגש עם עצמי בגיהינום", not like "דרקולה".
-            $tagged = app()->bound(RelatedByTags::class) ? array_column(app(RelatedByTags::class)->to($shopId, $externalId, $limit * 4), 'external_id') : [];
+            $tagged = app()->bound(RelatedByTags::class) ? array_column(app(RelatedByTags::class)->to($shopId, $externalId, $pool), 'external_id') : [];
             $rank = [];
             foreach ([[$tagged, self::TAG_SHARE], [$looks, 1.0], [$means, 1.0]] as [$list, $share]) {
                 foreach ($list as $at => $id) {
@@ -747,7 +750,7 @@ final class SearchCatalog
 
             // "in another colour" (Rocks: a ring like this amethyst one, with another stone): never one of its own colour
             if ($otherColour) {
-                $records = self::otherColour($records, $index['records']['p:'.$externalId] ?? null, (array) ($index['facets'] ?? []));
+                $records = self::otherColour($records, $index['records']['p:'.$externalId] ?? null, (array) ($index['facets'] ?? []), $index['records']);
             }
             usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
             // in stock first within each: those that share its tags still before the rest
