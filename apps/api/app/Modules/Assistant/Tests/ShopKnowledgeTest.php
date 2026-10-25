@@ -113,11 +113,11 @@ final class ShopKnowledgeTest extends TestCase
     {
         $prompts = __DIR__.'/../Prompts/';
 
-        $this->assertSame(file_get_contents($prompts.'answer_site.v13.md'), AnswerSiteQuestion::prompt('answer_site'), 'v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
+        $this->assertSame(file_get_contents($prompts.'answer_site.v14.md'), AnswerSiteQuestion::prompt('answer_site'), 'v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
         $this->assertStringContainsString('יש לנו', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertSame(file_get_contents($prompts.'verify_site.v9.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version: approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');
-        $this->assertSame(file_get_contents($prompts.'scope_site.v7.md'), AnswerSiteQuestion::prompt('scope_site'), 'v7: the scope check also reads what its own products and pages say nearest the question');
+        $this->assertSame(file_get_contents($prompts.'scope_site.v8.md'), AnswerSiteQuestion::prompt('scope_site'), 'v8: a reply written to stand alone; v7: the scope check also reads what its own products and pages say nearest the question');
     }
 
     public function test_the_merchant_sees_and_edits_what_the_assistant_knows(): void

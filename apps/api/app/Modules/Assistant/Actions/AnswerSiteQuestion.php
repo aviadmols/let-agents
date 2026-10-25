@@ -15,6 +15,7 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\PriceRange;
+use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductSets;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Contracts\TriesQuestions;
@@ -82,8 +83,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 12: a condition on a yes comes first ("after the first three months"), never after "yes, at any time" (answer_site only).
      * 13: a reply in the conversation (its earlier questions and answers), the shopper spoken to in the plural, never as a
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
+     * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
      */
-    public const PROMPT_VERSION = 13;
+    public const PROMPT_VERSION = 14;
+
+    /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
+    private const MAX_NAMES = 3;
+
+    private const NAMED_SHOWN = 6;
 
     /** A reply carries this many of the conversation's questions and answers before it, at most, each cut to these lengths. */
     public const MAX_THREAD = 3;
@@ -203,6 +210,13 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** @var list<array{question: string, answer: string}> a reply's conversation before it, oldest first (handle()) */
     private array $conversation = [];
 
+    /**
+     * Whether the question is about the products already shown ("מה הכי זול?" after a search, "מה ההבדל ביניהם?"): then
+     * no product found by its page joins them (prepare()). A reply in the conversation is not: "לבעיות שינה" is answered
+     * from the store, Myco Dream's own page with its card (Mycolivia, 25.10: cited, no card).
+     */
+    private bool $onShown = false;
+
     /** A trial from the search check screen (trial()): the whole way a shopper's question goes, nothing of it kept. */
     private bool $trial = false;
 
@@ -230,15 +244,13 @@ final class AnswerSiteQuestion implements TriesQuestions
     public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false, array $thread = []): array
     {
         $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
-        // A reply to an answer ("כן, לחיזוק חיסון" after "איזו פטריה טובה ללב?"): the topic check, the pages and the checker
-        // read it with the question it continues ("the first question → the reply"), and the writer sees the whole
-        // conversation (answer_site v13). Never saved, never read from the saved ones: its words alone mean nothing.
+        // A reply to an answer ("כמה פעמים כדאי לקחת אותה?" after one about cordyceps): the topic check writes it to stand
+        // alone with the conversation (scope_site v8), and the pages, the writer and the checker read that; the writer
+        // sees the conversation too, and answers the reply only (answer_site v14). Never saved, never read from the
+        // saved ones: its words alone mean nothing. A reply may be a word ("כן").
         $this->conversation = self::thread($thread);
-        if ($this->conversation !== [] && mb_strlen(Question::normalize($question)) >= 1) {
-            $question = $this->conversation[0]['question'].' → '.$question;
-        }
 
-        if (! Features::enabled('assistant.on_search', $shopId) || mb_strlen(Question::normalize($question)) < self::MIN_CHARS) {
+        if (! Features::enabled('assistant.on_search', $shopId) || mb_strlen(Question::normalize($question)) < ($this->conversation === [] ? self::MIN_CHARS : 1)) {
             return $this->fixed('invalid', $locale);
         }
 
@@ -256,7 +268,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         // And a question that points at the products in front of the shopper ("מה ההבדל ביניהם?", "איזה מהם הכי
         // משתלם?", the drawer's own "not sure" chips): its words are the same for every shopper and its products are
         // not, so it is never kept for the next one (one shopper's picks were served to everyone).
-        $bound = $followUp || ($products !== [] && self::pointsBack($question)) || ($fromPage && $products !== []) || $this->conversation !== [];
+        $this->onShown = $followUp || ($products !== [] && self::pointsBack($question));
+        $bound = $this->onShown || ($fromPage && $products !== []) || $this->conversation !== [];
         // The product whose page it is: the writer says what matters about it.
         $viewing = $fromPage && ! $followUp && $products !== [] ? $products[0] : null;
 
@@ -422,7 +435,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'sources' => (array) $saved->sources,
                 'picks' => $this->present((array) $saved->picks),
                 'answer_id' => $saved->id,
-            ];
+            ] + $this->describedFor((array) ($saved->flags['names'] ?? []), (array) $saved->picks);
         }
 
         // "Not found" and "not ours to answer" are the same for everyone, and show nothing written.
@@ -1158,6 +1171,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                             // nothing of it ("לישון" in a store whose sleep formula is called "Dream")
                             'store_says' => $this->storeSays($shopId, $question),
                             'question' => $question,
+                        ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation]) + [
                             'signals' => QuestionGuard::inspect($question)['signals'],
                         ], JSON_UNESCAPED_UNICODE), self::SCOPE_OUTPUT_TOKENS, $effort, 'scope');
                     } catch (SpendCapReached $e) {
@@ -1198,6 +1212,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                     // ("איזזה ספרי חטופים" asks for one) and searched with. The words the shopper typed
                     // stay theirs: the answer is saved and logged under them.
                     $corrected = self::corrected($question, $scope->data['corrected'] ?? null);
+                    // a reply, as it stands alone (scope_site v8): "כמה פעמים כדאי לקחת את הקורדיספס?", what is searched and answered
+                    $corrected = $this->conversation === [] ? $corrected : (self::standalone($scope->data['standalone'] ?? null) ?? $corrected);
                     if ($corrected !== null && $remember && $keep && $viewing === null && $visitorHash !== null
                         && ($set = $this->set($shopId, $corrected, $visitorHash, $locale)) !== null) {
                         $result = $set;
@@ -1220,8 +1236,13 @@ final class AnswerSiteQuestion implements TriesQuestions
                     }
                 }
 
+                // a reply the topic check did not write to stand alone (no check in this store): searched with the question
+                // before it, the nearest it can be read without a model
+                if ($this->conversation !== [] && $corrected === null) {
+                    $corrected = $this->conversation[count($this->conversation) - 1]['question'].' '.$question;
+                }
                 // A replay on frozen data gives the writer what it was given then; everything else, today's.
-                $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing, ! $keep);
+                $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing, $this->onShown);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
                     'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];
@@ -1300,7 +1321,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $started = hrtime(true);
 
                         try {
-                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($question, $answer, $cited, $picks, $prepared), $checkOutput, null, 'site_check');
+                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared), $checkOutput, null, 'site_check');
                         } catch (ModelCallFailed $e) {
                             // The check could not be made (its provider refused, a key, an outage): the writer's
                             // words are never shown unchecked. What the store's own pages say, quoted as they
@@ -1355,6 +1376,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
+                // what it recommends by name that is none of its products ("שיטאקה"): only names the answer, as checked, still says
+                $names = $refusal === null ? self::names($reply->data['names'] ?? null, $answer) : [];
+                $flags = $names === [] ? $flags : (array) $flags + ['names' => $names];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $unfit ??= false;
                 $notFound ??= null;
@@ -1370,7 +1394,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 $result = $refusal === null
-                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id]
+                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored)
                     : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
                         : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
                 $trace += ['writer' => $wrote, 'check' => $checked, 'refused' => $refusal, 'picks' => array_column($stored, 'external_id')];
@@ -1404,7 +1428,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         ];
 
         // the shopper sees how the question was read, when it was read other than typed
-        return $corrected !== null && $result['outcome'] === AssistantAnswer::ANSWERED ? $result + ['corrected' => $corrected] : $result;
+        // never for a reply: it is shown as the shopper wrote it, in the conversation
+        return $corrected !== null && $this->conversation === [] && $result['outcome'] === AssistantAnswer::ANSWERED ? $result + ['corrected' => $corrected] : $result;
     }
 
     /**
@@ -1482,6 +1507,62 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  array<mixed>  $thread
      * @return list<array{question: string, answer: string}>
      */
+    /**
+     * The names a writer gave for what it recommends that is none of its products, kept only when the answer says them:
+     * a few words each, at most MAX_NAMES.
+     *
+     * @return list<string>
+     */
+    public static function names(mixed $names, string $answer): array
+    {
+        $said = ' '.Question::normalize($answer).' ';
+        $out = [];
+        foreach (is_array($names) ? $names : [] as $name) {
+            $name = is_string($name) ? trim(strip_tags($name)) : '';
+            $key = Question::normalize($name);
+            if ($key !== '' && mb_strlen($name) <= 40 && count(explode(' ', $key)) <= 3 && str_contains($said, $key) && ! in_array($name, $out, true)) {
+                $out[] = $name;
+            }
+        }
+
+        return array_slice($out, 0, self::MAX_NAMES);
+    }
+
+    /**
+     * The products whose own descriptions say what an answer recommends by name ("שיטאקה": the formulas that list it),
+     * besides its picks, for the shopper to see with it. Read in code (ProductsDescribed), never a model.
+     *
+     * @param  list<string>  $names
+     * @param  list<array<string, mixed>>  $picks
+     * @return array{named?: array{names: list<string>, ids: list<string>}}
+     */
+    private function describedFor(array $names, array $picks): array
+    {
+        if ($names === [] || ! app()->bound(ProductsDescribed::class)) {
+            return [];
+        }
+        $shopId = $this->tenant->require();
+        $picked = array_flip(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $picks));
+        $ids = [];
+        foreach ($names as $name) {
+            foreach (app(ProductsDescribed::class)->saying($shopId, (string) $name) as $id) {
+                if (! isset($picked[$id]) && ! in_array($id, $ids, true)) {
+                    $ids[] = $id;
+                }
+            }
+        }
+
+        return $ids === [] ? [] : ['named' => ['names' => array_values($names), 'ids' => array_slice($ids, 0, self::NAMED_SHOWN)]];
+    }
+
+    /** A reply written to stand alone by the topic check, plain and short; null when it gave none. */
+    public static function standalone(mixed $text): ?string
+    {
+        $text = is_string($text) ? trim((string) preg_replace('/\s+/u', ' ', strip_tags($text))) : '';
+
+        return $text === '' || mb_strlen($text) > self::THREAD_QUESTION_CHARS ? null : $text;
+    }
+
     public static function thread(array $thread): array
     {
         $out = [];

@@ -11,6 +11,7 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\MendShownQuestions;
+use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -682,17 +683,68 @@ final class SiteQuestionTest extends TestCase
             ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
         ];
 
-        $data = $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: ['HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain'], content: json_encode([
-            'question' => 'לבית', 'vid' => self::VID, 'locale' => 'he', 'products' => [],
-            'thread' => [['q' => 'איזו מברגה כדאי לי?', 'a' => 'יש לנו כמה. לאיזה שימוש אתם מחפשים?'], ['q' => '', 'a' => 'no question: left out']],
-        ], JSON_UNESCAPED_UNICODE))->json('data');
+        $thread = [['q' => 'איזו מברגה כדאי לי?', 'a' => 'יש לנו כמה. לאיזה שימוש אתם מחפשים?'], ['q' => '', 'a' => 'no question: left out']];
+        $data = $this->reply('לבית', $thread)->json('data');
 
         $sent = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['passages']));
         $this->assertNotNull($sent, 'the writer was asked');
-        $this->assertSame('איזו מברגה כדאי לי? → לבית', $sent['question'], 'the reply, read with the question it continues');
+        $this->assertSame('איזו מברגה כדאי לי? לבית', $sent['question'], 'with no topic check to write it alone: searched with the question before it');
         $this->assertSame([['question' => 'איזו מברגה כדאי לי?', 'answer' => 'יש לנו כמה. לאיזה שימוש אתם מחפשים?']], $sent['conversation']);
         $this->assertSame('answered', $data['outcome']);
+        $this->assertArrayNotHasKey('corrected', $data, 'a reply is shown as written, never "הבנתי: …"');
         $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'a reply\'s words alone mean nothing for the next shopper');
+    }
+
+    public function test_a_reply_is_answered_as_it_stands_alone_never_the_question_before_it_again(): void
+    {
+        // Mycolivia, 25.10: "כמה פעמים כדאי לקחת אותה?" after an answer about cordyceps was read as "איזה מוצר הכי טוב
+        // אחרי אימון? כמה פעמים…", and the first question was answered again.
+        $this->drills();
+        Features::override('assistant.site_scope', true);
+        $this->replies = [
+            ['about_store' => true, 'harmful' => false, 'injection' => false, 'corrected' => 'כמה פעמים כדאי לקחת אותה?', 'standalone' => 'כמה פעמים כדאי להשתמש במברגה מקיטה?'],
+            ['found' => true, 'answer' => 'לפי הדף, טעינה מלאה מספיקה ליום עבודה.', 'refs' => [], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $this->reply('כמה פעמים כדאי לקחת אותה?', [['q' => 'איזו מברגה הכי טובה?', 'a' => 'מברגה מקיטה 18V.']], ['701']);
+
+        $inputs = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true));
+        $this->assertSame([['question' => 'איזו מברגה הכי טובה?', 'answer' => 'מברגה מקיטה 18V.']], $inputs[0]['conversation'], 'the topic check reads it with the conversation');
+        $this->assertSame('כמה פעמים כדאי להשתמש במברגה מקיטה?', $inputs[1]['question'], 'the writer answers the reply as it stands alone');
+        $this->assertCount(1, $inputs[1]['products'], 'about what the answer before showed');
+    }
+
+    /** @param  list<array{q: string, a: string}>  $thread */
+    private function reply(string $question, array $thread, array $products = []): TestResponse
+    {
+        return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: ['HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain'], content: json_encode([
+            'question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products, 'previous' => [], 'thread' => $thread,
+        ], JSON_UNESCAPED_UNICODE));
+    }
+
+    public function test_what_an_answer_recommends_by_a_name_none_of_its_products_has_brings_the_products_that_hold_it(): void
+    {
+        // Mycolivia, 25.10: "השיטאקה היא הפטריה שתומכת בבריאות הלב" showed maitake and chaga: shiitake is in the formulas'
+        // descriptions only, so none was among the products given, and the cards were a search of the question's words.
+        $this->drills();
+        $this->app->instance(ProductsDescribed::class, new class implements ProductsDescribed
+        {
+            public function saying(string $shopId, string $phrase): array
+            {
+                return $phrase === 'שיטאקה' ? ['702', '703'] : [];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'השיטאקה היא הפטריה שתומכת בבריאות הלב.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'מתאימה']], 'names' => ['שיטאקה', 'ריישי']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('איזו פטריה טובה ללב?', ['702'])->json('data');
+
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertSame(['שיטאקה'], $data['named']['names'], 'a name the answer does not say is no name of it');
+        $this->assertSame(array_values(array_diff(['702', '703'], array_column($data['picks'], 'external_id'))), $data['named']['ids'], 'the products that hold it, not those already picked');
     }
 
     public function test_the_difference_between_the_products_shown_rests_on_the_products_it_names(): void

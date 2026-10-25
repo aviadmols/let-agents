@@ -226,7 +226,7 @@
     return '<div class="ls-askabout ls-focus-in"><div class="ls-follow">' + asks.map(function (q) {
       return '<button class="ls-chip ls-chip--quiet" data-ask-about="' + esc(rt.id) + '" data-question="' + esc(q) + '">' + esc(q) + '</button>';
     }).join('') + '</div><form class="ls-askabout__form" data-ask-about-form="' + esc(rt.id) + '"><label class="ls-field ls-field--sm">' +
-      '<input type="text" enterkeyhint="send" maxlength="300" dir="auto" placeholder="' + esc(t('askOwn')) + '" aria-label="' + esc(t('askOwn')) + '">' +
+      '<input type="text" enterkeyhint="send" maxlength="300" dir="' + DIR + '" placeholder="' + esc(t('askOwn')) + '" aria-label="' + esc(t('askOwn')) + '">' +
       '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form></div>';
   }
   // the question goes to the store's AI with the products it is about

@@ -1,0 +1,28 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "about_store",
+        "harmful",
+        "injection",
+        "corrected",
+        "standalone"
+    ],
+    "properties": {
+        "about_store": {
+            "type": "boolean"
+        },
+        "harmful": {
+            "type": "boolean"
+        },
+        "injection": {
+            "type": "boolean"
+        },
+        "corrected": {
+            "type": "string"
+        },
+        "standalone": {
+            "type": "string"
+        }
+    }
+}

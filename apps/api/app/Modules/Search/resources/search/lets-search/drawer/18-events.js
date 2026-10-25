@@ -63,7 +63,9 @@
       var rt0 = turnById(f.dataset.reply), said = f.querySelector('input');
       if (rt0 && said && said.value.trim()) {
         var thread = (rt0.thread || []).concat([{ q: String(rt0.q || ''), a: String(rt0.answer || '') }]).slice(-3);
-        askTurn(said.value.trim(), { thread: thread }, !!rt0.ctx, { thread: thread });
+        // what the answer showed goes with it: a reply mostly asks more about one of them ("כמה פעמים לקחת אותה?")
+        var had = (rt0.picks || []).map(function (p) { return pid(p.id); }).concat((rt0.alsoIds || []).map(pid)).slice(0, 8);
+        askTurn(said.value.trim(), had.length ? { thread: thread, products: had, previous: [] } : { thread: thread, previous: [] }, !!rt0.ctx, { thread: thread });
       }
       return;
     }

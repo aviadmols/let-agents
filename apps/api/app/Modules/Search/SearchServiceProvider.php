@@ -11,6 +11,7 @@ use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Assistant\Contracts\PriceRange;
+use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
@@ -22,6 +23,7 @@ use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
+use App\Modules\Search\Support\DescribedProductsSaying;
 use App\Modules\Search\Support\HebrewPriceRange;
 use App\Modules\Search\Support\SearchFirstSteps;
 use App\Modules\Search\Support\SearchHome;
@@ -57,6 +59,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
         $this->app->bind(ProductsForQuery::class, SpellingProductsForQuery::class);
         $this->app->bind(PriceRange::class, HebrewPriceRange::class);
         $this->app->bind(ProductsNamed::class, SpellingProductsNamed::class);
+        $this->app->bind(ProductsDescribed::class, DescribedProductsSaying::class);
         Event::listen([CatalogUpdated::class, CatalogProductsChanged::class, FactsDecided::class], RebuildSearchIndex::class);
 
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))

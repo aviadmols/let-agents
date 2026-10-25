@@ -56,12 +56,16 @@
       // a whole set asked to see ("תציג לי את ספריית שיבולת"): every product of it as a grid, a question to narrow it by, and the search for more
       var set = d.set && d.set.ids && d.set.ids.length ? d.set : null;
       var setIds = set ? set.ids.map(function (id) { return pid(id); }).filter(function (id) { return !!rec(id); }) : null;
-      return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [])).then(function () {
+      // what the answer recommends by a name none of its picks has ("שיטאקה"): the products whose descriptions hold it
+      var named = d.named && d.named.ids && d.named.ids.length ? d.named : null;
+      var namedIds = named ? named.ids.map(function (id) { return pid(id); }) : [];
+      return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds)).then(function () {
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [],
-            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null });
+            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null,
+            alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null });
           announce(t('announceReady') + ': ' + d.answer);
-          if (!picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
+          if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           // the answer could not be checked: never shown; the store's own words, said to be that
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
@@ -129,10 +133,15 @@
       return products(ids.map(pid)).then(function () { update(turn, { alsoIds: ids.filter(function (id) { return !!rec(id); }) }); });
     }).catch(function () { /* the answer stands alone */ });
   }
+  function newestAnswer() {
+    for (var i = S.turns.length - 1; i >= 0; i--) { if (S.turns[i].kind === 'answer' && !S.turns[i].loading) { return S.turns[i]; } }
+    return null;
+  }
   function alsoHtml(turn) {
     var list = (turn.alsoIds || []).map(rec).filter(Boolean);
     if (!list.length) { return ''; }
-    return '<div class="ls-block__title" style="margin-top:14px">' + esc(t('alsoRelated')) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }), true) +
+    var title = turn.alsoNames && turn.alsoNames.length ? t('alsoWith', { w: turn.alsoNames.join(', ') }) : t('alsoRelated');
+    return '<div class="ls-block__title" style="margin-top:14px">' + esc(title) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }), true) +
       '<button class="ls-btn ls-btn--link ls-btn--sm" data-q="' + esc(turn.q) + '">' + esc(t('alsoAll')) + '</button>';
   }
   // two products the question's words name, in stock; inside the price it named, as the server read it (range), or none
@@ -181,9 +190,9 @@
     if (turn.general) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('general')) + '</span></div>'; }
     if (turn.follow && turn.follow.length) { html += '<div class="ls-follow">' + turn.follow.map(function (f) { return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(f) + '">' + esc(f) + '</button>'; }).join('') + '</div>'; }
     // the newest answer can be replied to ("לאיזו מטרה?" "לחיזוק חיסון"): the reply is asked with this conversation
-    if (S.turns[S.turns.length - 1] === turn && turn.answer) {
+    if (newestAnswer() === turn && turn.answer) {
       html += '<form class="ls-askabout__form ls-reply" data-reply="' + esc(turn.id) + '"><label class="ls-field ls-field--sm">' +
-        '<input type="text" enterkeyhint="send" maxlength="300" dir="auto" placeholder="' + esc(t('replyPh')) + '" aria-label="' + esc(t('replyPh')) + '">' +
+        '<input type="text" enterkeyhint="send" maxlength="300" dir="' + DIR + '" placeholder="' + esc(t('replyPh')) + '" aria-label="' + esc(t('replyPh')) + '">' +
         '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form>';
     }
     html += rateHtml(turn);
