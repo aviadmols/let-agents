@@ -80,7 +80,6 @@ final class BuildDemoStore
             'catalog.max_content_items' => (int) Settings::get('demo.max_content'),
             'ai.shop_monthly_cap_usd' => (float) Settings::get('demo.budget_usd'),
             'ai.shop_cap_stops_shoppers' => true,
-            'assistant.answers_per_month' => (int) Settings::get('demo.questions'),
             'search.photos_per_month' => (int) Settings::get('demo.photos'),
             'assistant.prepared_per_sync' => (int) Settings::get('demo.prepared_questions'),
             'enrichment.max_branches' => (int) Settings::get('demo.vocabulary_branches'),
@@ -110,8 +109,8 @@ final class BuildDemoStore
                 Features::override($key, $pictures, $shop->id);
             }
         }
-        // whoever tries a demo asks as much as they like (as Aviad asked, 2026-10-25): no visitor's own daily limit; the
-        // demo's daily questions, its month's answers and its budget still hold
+        // whoever tries a demo asks as much as they like (as Aviad asked, 2026-10-25): its questions are never counted
+        // (DailyQuestions), its budget still holds; the store's settings screen says so too
         if (app(FeatureRegistry::class)->has('assistant.visitor_limit')) {
             Features::override('assistant.visitor_limit', false, $shop->id);
         }

@@ -229,7 +229,7 @@
     if (d.retry) {
       var rt = S.turns.filter(function (x) { return x.id === d.retry; })[0];
       S.turns = S.turns.filter(function (x) { return x !== rt; });
-      if (rt.kind === 'answer') { askTurn(rt.q, null, !!rt.ctx); } else if (rt.kind === 'results') { searchTurn(rt.q); } else if (rt.kind === 'similar') { similarTurn(rt.of, rt.oos ? null : rt.size, rt.oos ? { whole: rt.oos.whole, want: rt.oos.want, size: rt.size } : null); }
+      if (rt.kind === 'answer') { askTurn(rt.q, null, !!rt.ctx); } else if (rt.kind === 'results') { searchTurn(rt.q); } else if (rt.kind === 'similar') { similarTurn(rt.of, rt.oos ? null : rt.size, rt.oos ? { whole: rt.oos.whole, want: rt.oos.want, size: rt.size } : null, rt.other, rt.asked); }
       return;
     }
     if (d.leadFlowNo) { var ln = turnById(d.leadFlowNo); if (ln && ln.leadFlow && !ln.leadFlow.busy) { leadStep(ln, { declined: true }); } return; }

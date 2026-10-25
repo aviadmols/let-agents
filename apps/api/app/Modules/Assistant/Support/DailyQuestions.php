@@ -5,6 +5,8 @@ namespace App\Modules\Assistant\Support;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Usage\MonthlyUsage;
+use App\Modules\Tenancy\Enums\ShopStatus;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -18,6 +20,9 @@ use Illuminate\Support\Facades\RateLimiter;
  *
  * Above the day, the month: assistant.answers_per_month (the shop's plan may hold it lower), counted
  * in MonthlyUsage only once the day's counts let the question through.
+ *
+ * A demo store is never counted (as Aviad asked, 2026-10-25): whoever tries it asks as much as they like. Its
+ * budget (demo.budget_usd, with ai.shop_cap_stops_shoppers) still stops it, and the route's asks per minute a bot.
  */
 final class DailyQuestions
 {
@@ -26,6 +31,10 @@ final class DailyQuestions
 
     public static function allow(string $shopId, string $visitorHash, ?string $ip): bool
     {
+        if (Shop::query()->whereKey($shopId)->where('status', ShopStatus::Demo->value)->exists()) {
+            return true;
+        }
+
         $each = Features::enabled('assistant.visitor_limit', $shopId);
         $limits = ["assistant:shop:{$shopId}" => (int) Settings::get('assistant.questions_per_shop_per_day', $shopId)];
 

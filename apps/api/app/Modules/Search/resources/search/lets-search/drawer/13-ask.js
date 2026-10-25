@@ -1,11 +1,12 @@
   // ---------------------------------------------------------------- ask turn
   // about: a question on this product (asked from its page's row, or from its questions): page=1
   // "יש טבעות דומות?", "משהו כמו זה בצבע אחר", "similar ones in another colour": asked about the product on its page, it
-  // asks for that product's like, which the similar items are (its picture and its words, no model): shown as they are
+  // asks for that product's like, which the similar items are (its picture and its words, no model): shown as they are.
+  // The question goes along: what else it asks of them ("עם יהלום והרבה יותר יקרה") the server reads in code and keeps to
   var LIKE_THIS = /(^|\s)(דומ(ה|ים|ות|י)|כמו\s+(זה|זו|זאת|הזה|הזאת)|מקביל|similar|alike|like\s+this|alternatives?)(\s|$|[?!.,])/i;
   var OTHER_COLOUR = /(צבע|בצע|גוון|אבן|אבנים|colou?r|stone)\s+(אחר|אחרת|אחרים|אחרות|שונה|שונים|different|other)|(other|different|another)\s+(colou?rs?|stones?)|בצבעים\s+אחרים|in\s+other\s+colou?rs/i;
   function askTurn(q, extra, about, mark) {
-    if (about && S.ctx && (LIKE_THIS.test(q) || OTHER_COLOUR.test(q))) { similarTurn(S.ctx, null, null, OTHER_COLOUR.test(q)); return; }
+    if (about && S.ctx && (LIKE_THIS.test(q) || OTHER_COLOUR.test(q))) { similarTurn(S.ctx, null, null, OTHER_COLOUR.test(q), q); return; }
     var prev = S.turns.slice().reverse().filter(function (x) { return x.kind === 'results' && x.ids; })[0];
     var turn = addTurn(Object.assign({ kind: 'answer', q: q, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
     announce(t('announceSearching'));

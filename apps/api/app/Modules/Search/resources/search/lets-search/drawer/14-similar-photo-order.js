@@ -2,21 +2,21 @@
   // size: { value, shown } from size help: only the similar items that have it in stock now
   // oos: from the product page's row for a product or a variant sold out ({ whole, want: [{ value, shown, size }], size }):
   // only the similar ones in stock, and in the option that is gone (the variant filters, asked of one variant in stock)
-  function similarTurn(id, size, oos, otherColour) {
+  function similarTurn(id, size, oos, otherColour, asked) {
     // on a desktop the similar items open large, like "show all": the product on top, filters, the full grid
     S.tab = 'chat'; S.wide = null;
     // the similar items stand alone at the top; the search they came from waits behind the dashed line
     S.turns.forEach(function (x) { x.prev = true; });
     S.showPrev = false; hideLive();
-    var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null });
+    var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null, other: !!otherColour, asked: asked || null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
     BODY.scrollTop = 0;
-    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '')).then(function (r) {
+    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : '')).then(function (r) {
       var ids = ((r.body && r.body.products) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id); });
       return products(ids.slice(0, 24).map(pid)).then(function () {
         if (oos) { update(turn, oosPatch(turn, ids, oos)); BODY.scrollTop = 0; return; }
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
-        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length) });
+        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked) });
         BODY.scrollTop = 0;
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -53,19 +53,29 @@
     });
     return out;
   }
+  // what the server understood the question to ask of the alike, in the shopper's words: "יהלום · יקר יותר"
+  function wantsOf(a) {
+    if (!a) { return null; }
+    var parts = (a.words || []).slice();
+    if (a.price) { parts.push(t(a.price === 'up' ? (a.much ? 'muchDearer' : 'dearer') : (a.much ? 'muchCheaper' : 'cheaper'))); }
+    return parts.length ? parts.join(' · ') : null;
+  }
   function oosNote(turn) {
     return turn && turn.oosNone ? '<p class="ls-noanswer__text" style="margin:12px 0 0">' + esc(t('oosNone', { v: turn.oosNone })) + '</p>' : '';
   }
   function similarHtml(turn) {
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
-    if (!(turn.ids || []).length) { return '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>'; }
+    if (!(turn.ids || []).length) {
+      // asked for more than its alike and none is all of it: said so, and its alike are a choice, never shown in its place
+      return turn.wants ? '<p class="ls-noanswer__text">' + esc(t('similarAskedNone', { w: turn.wants })) + '</p><button class="ls-btn ls-btn--secondary ls-btn--sm" data-similar="' + esc(turn.of) + '">' + esc(t('similarAll')) + '</button>' : '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>';
+    }
     var list = filtered(turn), n = gridN(turn);
     // like the results: how many, the order to show them in, and the filters (the large view has them in its head)
     var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(list.length === 1 ? t('oneProduct') : t('productsCount', { n: list.length })) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn);
     if (!list.length) { return head + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
-    return oosNote(turn) + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
+    return oosNote(turn) + (turn.wants ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarAsked', { w: turn.wants })) + '</p>' : '') + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
       (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '');
   }
 

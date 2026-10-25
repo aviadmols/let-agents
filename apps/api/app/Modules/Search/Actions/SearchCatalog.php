@@ -26,6 +26,7 @@ use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
 use App\Modules\Search\Support\SearchTrace;
+use App\Modules\Search\Support\SimilarWants;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -509,6 +510,22 @@ final class SearchCatalog
      * @param  list<string>  $externalIds
      * @return list<string>
      */
+    /**
+     * What a question asked on a product's page wants of its alike besides being alike (SimilarWants), read against
+     * the words the store says.
+     *
+     * @return array{words: list<string>, price: 'up'|'down'|null, much: bool}
+     */
+    public function similarWants(string $shopId, string $externalId, string $asked): array
+    {
+        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $asked): array {
+            $index = LoadedIndex::for($shopId);
+            $records = array_filter((array) ($index['records'] ?? []), fn ($r, $key): bool => is_array($r) && str_starts_with((string) $key, 'p:'), ARRAY_FILTER_USE_BOTH);
+
+            return SimilarWants::read($asked, $records, $records['p:'.$externalId] ?? null);
+        });
+    }
+
     private static function bySeenWords(CatalogProduct $product, array $externalIds): array
     {
         if (count($externalIds) < 2) {
@@ -688,9 +705,11 @@ final class SearchCatalog
      * @return list<array<string, mixed>>
      */
     /** @param bool $otherColour "in another colour": its alike, never of its own colour or stone */
-    public function similar(string $shopId, string $externalId, int $limit, bool $otherColour = false): array
+    public function similar(string $shopId, string $externalId, int $limit, bool $otherColour = false, ?array $wants = null): array
     {
-        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour): array {
+        $wants = $wants !== null && SimilarWants::any($wants) ? $wants : null;
+
+        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour, $wants): array {
             $index = LoadedIndex::for($shopId);
             $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'title', 'payload']);
 
@@ -704,7 +723,7 @@ final class SearchCatalog
             // alike (a bundle of books beside another bundle) asks by content alone.
             $by = (string) Settings::get('search.similar_by', $shopId);
             // in another colour, a wider pool: most of the nearest are of its own colour, and they go
-            $pool = $limit * ($otherColour ? 12 : 4);
+            $pool = $limit * ($otherColour || $wants !== null ? 12 : 4);
             $looks = $by === 'meaning' || ! $this->semantic->picturesReady() ? [] : array_map('strval', array_column($this->semantic->lookAlike($product->id, $pool), 'external_id'));
             $means = $by === 'picture' && $looks !== [] ? [] : array_map('strval', array_column($this->semantic->similarTo('product', $product->id, ['product'], $pool), 'external_id'));
             // The tags by meaning it shares with others, where the shop has them (Taxonomy): what it is about, not how its
@@ -751,6 +770,10 @@ final class SearchCatalog
             // "in another colour" (Rocks: a ring like this amethyst one, with another stone): never one of its own colour
             if ($otherColour) {
                 $records = self::otherColour($records, $index['records']['p:'.$externalId] ?? null, (array) ($index['facets'] ?? []), $index['records']);
+            }
+            // what else the question asked of them ("עם יהלום והרבה יותר יקרה"): only those that are all of it, or none
+            if ($wants !== null) {
+                $records = SimilarWants::apply($records, $wants, $index['records']['p:'.$externalId] ?? null);
             }
             usort($records, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
             // in stock first within each: those that share its tags still before the rest
@@ -1109,9 +1132,11 @@ final class SearchCatalog
         $colours = Colours::parts($description);
         $colourWeight = (float) Settings::get('search.photo_colour_weight', $shopId);
         $tint = [];
+        // what each picture is described with too ("אבן מרכזית ירוקה"): a title names its stone, not always its colour
+        $seenWords = $colours === [] ? collect() : RetrievalImage::query()->whereIn('external_id', array_map('strval', array_keys($members)))->pluck('caption_words', 'external_id');
         foreach (array_keys($members) as $id) {
             $record = $index['records']['p:'.$id] ?? [];
-            $tint[$id] = $colours === [] ? 0.0 : Colours::score($colours, trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '')));
+            $tint[$id] = $colours === [] ? 0.0 : Colours::score($colours, trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '').' '.implode(', ', array_map('strval', (array) ($seenWords[(string) $id] ?? [])))));
         }
         $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0) + $colourWeight * $tint[$id] - (isset($lacking[$id]) ? self::LACKS_PENALTY : 0.0)], array_keys($members));
 

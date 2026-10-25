@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Usage\MonthlyUsage;
 use App\Modules\Assistant\Support\DailyQuestions;
+use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -75,5 +76,20 @@ final class DailyQuestionsTest extends TestCase
             $allowed += DailyQuestions::allow($shop->id, 'v', '203.0.113.1') ? 1 : 0;
         }
         $this->assertSame(2, $allowed, 'a new day, but only two left of the month');
+    }
+
+    public function test_a_demo_store_is_never_counted(): void
+    {
+        $shop = Shop::factory()->create(['status' => ShopStatus::Demo]);
+        Settings::set('assistant.questions_per_visitor_per_day', 2, $shop->id);
+        Settings::set('assistant.questions_per_address_per_day', 2, $shop->id);
+        Settings::set('assistant.answers_per_month', 3, $shop->id);
+
+        $allowed = 0;
+        for ($i = 0; $i < 20; $i++) {
+            $allowed += DailyQuestions::allow($shop->id, 'same', '203.0.113.1') ? 1 : 0;
+        }
+
+        $this->assertSame(20, $allowed);
     }
 }

@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * GET /api/v1/search/{site}/similar?id=<product id>[&limit=1..24][&for=oos]
+ * GET /api/v1/search/{site}/similar?id=<product id>[&limit=1..24][&for=oos][&colour=other][&q=<the question asked>]
  *
  * Products like one in the results, for its "similar items" button. From stored vectors only:
  * no model is asked, so the same answer is cached for a few minutes.
@@ -18,6 +18,8 @@ use Illuminate\Http\Request;
 final class SimilarController
 {
     public const MAX_LIMIT = 24;
+
+    private const MAX_ASKED = 200;
 
     public function __invoke(Request $request, SearchCatalog $search, string $site): JsonResponse
     {
@@ -45,8 +47,11 @@ final class SimilarController
         // A bigger pool when the page will keep only some (the ones in a size that is gone here).
         $limit = $request->has('limit') ? max(1, min(self::MAX_LIMIT, (int) $request->query('limit'))) : (int) Settings::get('search.results_per_group', $shopId);
         // "colour=other": its alike in another colour or stone (a question asked on its page, "יש דומות בצבע אחר?")
-        $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other');
+        // "q": the question asked on its page, for what else it wants of them ("עם יהלום והרבה יותר יקרה"), read in code
+        $asked = mb_substr(trim((string) $request->query('q', '')), 0, self::MAX_ASKED);
+        $wants = $asked === '' ? null : $search->similarWants($shopId, $id, $asked);
+        $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other', $wants);
 
-        return response()->json(['products' => $products], 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return response()->json(['products' => $products] + ($wants === null ? [] : ['asked' => $wants]), 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }

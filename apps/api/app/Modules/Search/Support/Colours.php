@@ -21,7 +21,8 @@ final class Colours
     private const NEAR = 3;
 
     /**
-     * family => [group, stems]. A stem matches a word that starts with it ("שחור" holds "שחורה", "שחורים").
+     * family => [group, stems]. A stem matches a word that starts with it ("שחור" holds "שחורה", "שחורים"). A gem is
+     * its colour too ("אמרלד" is green, "רובי" red): a store names its stones, not their colours.
      *
      * @var array<string, array{0: string, 1: list<string>}>
      */
@@ -32,14 +33,14 @@ final class Colours
         'black' => [self::COLOUR, ['שחור', 'black']],
         'white' => [self::COLOUR, ['לבן', 'לבנ', 'שמנת', 'white', 'ivory', 'cream']],
         'clear' => [self::COLOUR, ['שקוף', 'שקופ', 'clear', 'transparent']],
-        'red' => [self::COLOUR, ['אדום', 'אדומ', 'בורדו', 'red', 'burgundy']],
-        'pink' => [self::COLOUR, ['ורוד', 'ורוד', 'pink']],
-        'blue' => [self::COLOUR, ['כחול', 'כחל', 'נייבי', 'blue', 'navy', 'denim']],
-        'light_blue' => [self::COLOUR, ['תכלת', 'טורקיז', 'light blue', 'turquoise', 'aqua']],
-        'green' => [self::COLOUR, ['ירוק', 'ירוק', 'זית', 'green', 'olive']],
-        'yellow' => [self::COLOUR, ['צהוב', 'צהב', 'חרדל', 'yellow', 'mustard']],
+        'red' => [self::COLOUR, ['אדום', 'אדומ', 'בורדו', 'red', 'burgundy', 'רובי', 'אודם', 'גרנט', 'גארנט', 'ruby', 'garnet']],
+        'pink' => [self::COLOUR, ['ורוד', 'ורוד', 'pink', 'מורגניט', 'morganite']],
+        'blue' => [self::COLOUR, ['כחול', 'כחל', 'נייבי', 'blue', 'navy', 'denim', 'ספיר', 'טנזנייט', 'טנזניט', 'לאפיס', 'sapphire', 'tanzanite', 'lapis']],
+        'light_blue' => [self::COLOUR, ['תכלת', 'טורקיז', 'אקוומרין', 'light blue', 'turquoise', 'aqua', 'aquamarine']],
+        'green' => [self::COLOUR, ['ירוק', 'ירוק', 'זית', 'green', 'olive', 'אמרלד', 'אזמרגד', 'ברקת', 'פרידוט', 'ירקן', 'emerald', 'peridot', 'jade']],
+        'yellow' => [self::COLOUR, ['צהוב', 'צהב', 'חרדל', 'yellow', 'mustard', 'ציטרין', 'citrine']],
         'orange' => [self::COLOUR, ['כתום', 'כתומ', 'orange']],
-        'purple' => [self::COLOUR, ['סגול', 'סגל', 'לילך', 'purple', 'lilac']],
+        'purple' => [self::COLOUR, ['סגול', 'סגל', 'לילך', 'purple', 'lilac', 'אמטיסט', 'amethyst']],
         'brown' => [self::COLOUR, ['חום', 'שוקולד', 'קאמל', 'brown', 'camel']],
         'beige' => [self::COLOUR, ['בז', 'beige', 'nude']],
         'grey' => [self::COLOUR, ['אפור', 'אפור', 'grey', 'gray']],
