@@ -28,6 +28,13 @@
         .go { display: block; padding: 10px 14px; border-radius: 999px; background: var(--ink); color: var(--bg); text-align: center; text-decoration: none; font-weight: 600; }
         .here { display: block; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); text-align: center; color: var(--muted); }
         .note { margin: 20px 0 0; color: var(--muted); font-size: 14px; }
+        .fit { margin: 0 0 24px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font-size: 14px; }
+        .fit p { margin: 0; }
+        .fit p + p { margin-top: 4px; }
+        .plan.is-fit { border: 2px solid var(--ink); }
+        .badge { align-self: flex-start; margin: 0 0 8px; padding: 2px 10px; border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 600; }
+        .short { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 13px; }
+        .short span { display: block; }
     </style>
 </head>
 <body>
@@ -37,10 +44,26 @@
     @if ($trial ?? null)
         <p class="trial" data-trial>{{ $trial }}</p>
     @endif
+    @php($size = $store ?? [])
+    @if (($size['products'] ?? null) !== null)
+        {{-- What the store is, and the plan that fits it (PlanFit): the same reading for every store. --}}
+        <div class="fit" data-fit>
+            <p>{{ ($size['pages'] ?? null) !== null
+                ? __('shopify::app.plans_store', ['products' => number_format($size['products']), 'pages' => number_format($size['pages'])])
+                : __('shopify::app.plans_store_products', ['products' => number_format($size['products'])]) }}</p>
+            @if (($size['answers'] ?? 0) > 0 || ($size['photos'] ?? 0) > 0)
+                <p>{{ __('shopify::app.plans_used', ['answers' => number_format($size['answers'] ?? 0), 'photos' => number_format($size['photos'] ?? 0)]) }}</p>
+            @endif
+            <p><strong>{{ ($fits ?? null) !== null ? __('shopify::app.plans_fits', ['plan' => $fits]) : __('shopify::app.plans_none_fits') }}</strong></p>
+        </div>
+    @endif
     <div class="plans">
         @foreach ($plans as $row)
             @php($plan = $row['plan'])
-            <section class="plan {{ $row['current'] ? 'is-current' : '' }}">
+            <section class="plan {{ $row['current'] ? 'is-current' : '' }} {{ ($row['fits'] ?? false) ? 'is-fit' : '' }}">
+                @if ($row['fits'] ?? false)
+                    <span class="badge" data-fits>{{ __('shopify::app.plans_fit_badge') }}</span>
+                @endif
                 <p class="name">{{ $plan->name }}</p>
                 <p class="price"><span dir="ltr">${{ number_format((float) $plan->price()) }}</span> <small>{{ __('shopify::app.plans_month') }}</small></p>
                 <ul>
@@ -48,6 +71,13 @@
                         <li>{{ $line }}</li>
                     @endforeach
                 </ul>
+                @if (($row['short'] ?? []) !== [])
+                    <p class="short" data-short>
+                        @foreach ($row['short'] as $over)
+                            <span>{{ __('shopify::app.plans_short_'.($over['what'] === 'photos' && $over['limit'] === 0 ? 'no_photos' : $over['what']), ['limit' => number_format($over['limit']), 'has' => number_format($over['has'])]) }}</span>
+                        @endforeach
+                    </p>
+                @endif
                 @if ($row['current'])
                     <span class="here">{{ __('shopify::app.plans_current') }}</span>
                 @else

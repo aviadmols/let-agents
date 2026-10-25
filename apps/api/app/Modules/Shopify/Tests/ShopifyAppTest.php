@@ -5,6 +5,7 @@ namespace App\Modules\Shopify\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Core\Usage\MonthlyUsage;
 use App\Modules\Admin\Actions\AskToDeleteShop;
 use App\Modules\Admin\Actions\EndShopPlan;
 use App\Modules\Admin\Contracts\ShopScan;
@@ -67,6 +68,11 @@ final class ShopifyAppTest extends TestCase
     /** What the fake store answers when the app writes its metafields. */
     private array $metafieldErrors = [];
 
+    /** How many products on sale and pages the fake store counts. */
+    private int $products = 3412;
+
+    private int $pages = 45;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -103,6 +109,7 @@ final class ShopifyAppTest extends TestCase
                 str_contains($query, 'activeSubscriptions') => ['currentAppInstallation' => ['activeSubscriptions' => $this->subscriptions], 'shop' => ['plan' => ['partnerDevelopment' => true]]],
                 str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => $this->metafieldErrors]],
                 str_contains($query, 'shopOwnerName') => ['shop' => ['shopOwnerName' => 'Dana Gueta']],
+                str_contains($query, 'productsCount') => ['productsCount' => ['count' => $this->products], 'pagesCount' => ['count' => $this->pages]],
                 str_contains($query, 'contactEmail') => ['shop' => ['id' => 'gid://shopify/Shop/7', 'name' => 'גואטה טסט', 'email' => 'Owner@Gueta.test', 'currencyCode' => 'ILS', 'ianaTimezone' => 'Asia/Jerusalem', 'primaryDomain' => ['host' => 'shop.gueta.test'], 'plan' => ['partnerDevelopment' => true]]],
                 default => ['shop' => ['id' => 'gid://shopify/Shop/7', 'plan' => ['partnerDevelopment' => true]]],
             }]);
@@ -734,6 +741,30 @@ final class ShopifyAppTest extends TestCase
         // The trial over: no trial line.
         $this->travel(11)->days();
         $this->get(ShopifyAppController::plansLink(self::SHOP, 'en'))->assertOk()->assertDontSee('free trial');
+    }
+
+    public function test_the_plans_page_says_which_plan_fits_the_store_and_why_a_smaller_one_does_not(): void
+    {
+        $install = $this->installed();
+
+        // 3,412 products on sale: more than Starter's 2,000, within Growth's 10,000.
+        $page = $this->get(ShopifyAppController::plansLink(self::SHOP, 'en'))->assertOk()
+            ->assertSee('Your store has 3,412 products and 45 pages.')
+            ->assertSee('The plan that fits your store: Growth.')
+            ->assertSee('Too small: up to 2,000 products, and the store has 3,412.');
+        $this->assertSame(1, substr_count((string) $page->getContent(), 'data-fits'), 'one plan fits: the smallest the store outgrows in nothing');
+        $this->get(ShopifyAppController::plansLink(self::SHOP, 'he'))->assertOk()->assertSee('התוכנית שמתאימה לחנות שלכם: Growth.');
+
+        // A small store that already asked more than Essentials' month of answers: Starter.
+        $this->products = 120;
+        Cache::forget('shopify:plan-fit:'.$install->id);
+        for ($i = 0; $i < 310; $i++) {
+            app(MonthlyUsage::class)->take((string) $install->shop_id, 'answers', 1000);
+        }
+        $this->get(ShopifyAppController::plansLink(self::SHOP, 'en'))->assertOk()
+            ->assertSee('This month so far: 310 AI answers and 0 photo searches.')
+            ->assertSee('The plan that fits your store: Starter.')
+            ->assertSee('Too small: 300 AI answers a month, and there were already 310 this month.');
     }
 
     /** An installed store paying for a plan whose current period ends at $periodEnd, active. */

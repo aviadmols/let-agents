@@ -11,6 +11,7 @@ use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\EmbeddedApp;
+use App\Modules\Shopify\Support\PlanFit;
 use App\Modules\Shopify\Support\ShopifyApi;
 use App\Modules\Shopify\Support\ShopifyApps;
 use App\Modules\Shopify\Support\ShopifySessionToken;
@@ -242,16 +243,22 @@ final class ShopifyAppController
     }
 
     /**
-     * The offered plans, each a signed link to approve it; the shop's own plan marked; and the free trial the store
-     * gets (shopify.trial_days, or what is left of it), where it is asked to pay at all. In the admin's language.
+     * The offered plans, each a signed link to approve it; the shop's own plan marked; the plan that fits the store
+     * (PlanFit: its products, its pages, this month's use) and what each smaller one is short of; and the free trial
+     * the store gets (shopify.trial_days, or what is left of it), where it is asked to pay at all. In the admin's language.
      */
     private function choosePlan(Request $request, ShopifyInstall $install): Response
     {
         $locale = $this->speak($request, $install);
         $current = $install->subscribed() ? Shop::query()->find($install->shop_id)?->plan : null;
-        $plans = Plan::query()->offered()->get()->map(fn (Plan $plan): array => [
+        $offered = Plan::query()->offered()->get();
+        $store = app(PlanFit::class)->store($install);
+        $fit = PlanFit::choose($offered, $store);
+        $plans = $offered->map(fn (Plan $plan): array => [
             'plan' => $plan,
             'current' => $plan->code === $current,
+            'fits' => $plan->code === $fit['fits'],
+            'short' => $fit['short'][$plan->code] ?? [],
             'lines' => $plan->lines(),
             'url' => self::planLink($install->shop_domain, $plan->code, $locale),
         ])->all();
@@ -264,7 +271,7 @@ final class ShopifyAppController
             $trial = trans_choice($whole ? 'shopify::app.plans_trial' : 'shopify::app.plans_trial_left', $left, ['days' => $left]);
         }
 
-        return response(view('shopify::plans', ['plans' => $plans, 'trial' => $trial, 'key' => ShopifyApps::key($install->client_id)]));
+        return response(view('shopify::plans', ['plans' => $plans, 'trial' => $trial, 'store' => $store, 'fits' => $offered->firstWhere('code', $fit['fits'])?->name, 'key' => ShopifyApps::key($install->client_id)]));
     }
 
     /**
