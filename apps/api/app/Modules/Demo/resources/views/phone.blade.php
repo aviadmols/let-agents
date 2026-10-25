@@ -17,6 +17,9 @@
         :root { --ink: #0b0b0c; --muted: #5f5f67; --lime: #e2ff78; --ground: #f6f6f7; --line: #e2e2e6; }
         * { box-sizing: border-box; }
         html, body { height: 100%; }
+        /* a phone shows no scrollbar */
+        html { scrollbar-width: none; }
+        html::-webkit-scrollbar { display: none; }
         body { margin: 0; background: var(--ground); color: var(--ink); font-family: "Google Sans", "Heebo", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
         .intro { min-height: 100%; display: flex; flex-direction: column; padding: 28px 24px 140px; }
         .head { position: relative; isolation: isolate; overflow: hidden; margin: -28px -24px 0; padding: 40px 24px 34px; background: var(--ink); color: #fff; }
