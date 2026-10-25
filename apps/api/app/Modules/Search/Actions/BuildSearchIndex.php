@@ -259,6 +259,9 @@ final class BuildSearchIndex
                 // what the store files it as (its type, categories, tags), as word stems: a kind a search names holds it
                 // though its title opens with another word ("סניקרס" tagged "נעליים" is shoes)
                 'kd' => self::kindStems($product) ?: null,
+                // its own colours, as a colour typed asks of it: the colour it is sold in (the store's colour filter) and
+                // the one its picture shows most, never a part's ("כפתורים שחורים" on an olive overshirt is no black shirt)
+                'mc' => self::mainColours((array) ($seen[$product->id] ?? []), $read['f'] ?? [], $facets['facets']) ?: null,
                 // The code as the store writes it: a search for it shows this product alone.
                 'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
@@ -333,6 +336,47 @@ final class BuildSearchIndex
                 'content' => (string) $counts['content'],
                 'categories' => (string) $counts['category'],
             ]);
+    }
+
+    /** A product's colours as its picture shows them: the first phrases of its picture's words that open with a colour. */
+    private const PICTURE_COLOURS = 2;
+
+    /**
+     * A product's own colours, each as the base word HebrewSearch reads colours by ("שחור", "ירוק"): those of the store's
+     * colour filter it carries, and those its picture's words open a phrase with, most shown first ("ירוק זית"), never one
+     * a part has ("כפתורים שחורים", "סוליה לבנה").
+     *
+     * @param  list<mixed>  $pictureWords
+     * @param  list<int>  $codes
+     * @param  list<array<string, mixed>>  $facets
+     * @return list<string>
+     */
+    private static function mainColours(array $pictureWords, array $codes, array $facets): array
+    {
+        $out = [];
+        foreach ($codes as $code) {
+            $facet = $facets[intdiv((int) $code, 1000)] ?? null;
+            if ($facet === null || preg_match('/colou?r|צבע/iu', (string) ($facet['k'] ?? '').' '.(string) ($facet['l'] ?? '')) !== 1) {
+                continue;
+            }
+            foreach (explode(' ', HebrewSearch::normalize((string) ($facet['v'][(int) $code % 1000]['l'] ?? ''))) as $word) {
+                if (($base = HebrewSearch::colorOf($word)) !== null) {
+                    $out[$base] = true;
+                }
+            }
+        }
+        $seen = 0;
+        foreach ($pictureWords as $phrase) {
+            $first = explode(' ', HebrewSearch::normalize(is_string($phrase) ? $phrase : ''))[0] ?? '';
+            if ($first !== '' && ($base = HebrewSearch::colorOf($first)) !== null) {
+                $out[$base] = true;
+                if (++$seen >= self::PICTURE_COLOURS) {
+                    break;
+                }
+            }
+        }
+
+        return array_keys($out);
     }
 
     /**

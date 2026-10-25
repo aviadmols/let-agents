@@ -927,6 +927,7 @@
     fromKeyboard: fromKeyboard,
     build: build,
     closeWords: closeWords,
+    colorOf: colorOf,
     search: search,
     isQuestion: isQuestion,
     codes: codes,

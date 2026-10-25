@@ -1208,7 +1208,11 @@ final class SearchCatalog
         $said = [];
         foreach ($records as $at => $record) {
             $text = (string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '');
-            $said[$at] = count(array_filter($forms, fn (array $fs): bool => array_any($fs, fn (string $f): bool => HebrewSearch::says($text, $f))));
+            // a colour counts as the product's own (mc), never a part's ("כפתורים שחורים" says no black shirt)
+            $own = (array) ($record['mc'] ?? []);
+            $said[$at] = count(array_filter($forms, fn (array $fs): bool => ($colour = HebrewSearch::colorOf($fs[0])) !== null && $own !== []
+                ? in_array($colour, $own, true)
+                : array_any($fs, fn (string $f): bool => HebrewSearch::says($text, $f))));
         }
         $order = array_keys($records);
         usort($order, fn (int $a, int $b): int => [$said[$b], $a] <=> [$said[$a], $b]);

@@ -48,7 +48,7 @@ final class HebrewSearch
     /** @var array<string, string>|null form => the family's first form */
     private static ?array $colorOf = null;
 
-    private static function colorOf(string $word): ?string
+    public static function colorOf(string $word): ?string
     {
         if (self::$colorOf === null) {
             self::$colorOf = [];

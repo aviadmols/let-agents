@@ -299,6 +299,24 @@ final class SearchFlowTest extends TestCase
         $this->assertSame('912', $this->search('white shirt with a small side pocket for men')->json('groups.product.0.external_id'), 'the same in English, "pocket" saying "pockets"');
     }
 
+    public function test_a_products_own_colours_are_what_it_is_sold_in_and_its_picture_shows_most_never_a_parts(): void
+    {
+        // Story: "חולצה שחורה עם כיס" showed an olive overshirt: its picture words say "כפתורים שחורים" (its buttons).
+        $this->inShop(function (): void {
+            foreach (['941' => ['חולצה מכופתרת Damien', ['חולצה מכופתרת', 'ירוק זית', 'כפתורים שחורים', 'כיס חזה']], '942' => ['חולצה Basic', ['חולצה', 'שחור', 'לבן', 'כיס']]] as $id => [$title, $words]) {
+                $product = $this->product($id, $title);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+        $records = $this->inShop(fn (): array => LoadedIndex::for($this->shop->id)['records']);
+
+        $this->assertSame(['ירוק'], $records['p:941']['mc'] ?? null, 'olive, its buttons\' black no colour of its own');
+        $this->assertSame(['שחור', 'לבנ'], $records['p:942']['mc'] ?? null, 'the two its picture opens with');
+    }
+
     public function test_a_colour_asked_for_shows_what_its_picture_shows_most_before_what_has_it_as_a_detail(): void
     {
         // Vans: "חולצה לבנה טי שירט" showed a black T-shirt sold as "Black-White" (its print) among the white ones.

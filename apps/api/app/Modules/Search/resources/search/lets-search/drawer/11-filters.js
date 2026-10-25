@@ -170,7 +170,9 @@
   }
   // a chip of two words holds where the product says them together, as typed or the first without its prefix letter
   function saysPhrase(r, phrases) { recForms(r); return phrases.some(function (p) { return r._wt.indexOf(' ' + p + ' ') >= 0; }); }
-  function holdsChip(r, chip) { return chip.phrase ? saysPhrase(r, chip.phrase) : saysWord(r, chip.forms); }
+  function holdsChip(r, chip) { return chip.phrase ? saysPhrase(r, chip.phrase) : chip.colour ? holdsColour(r, chip.colour, chip.forms) : saysWord(r, chip.forms); }
+  // a product of a colour: one of its own colours (mc), or, where the index knows none of them, its words saying it
+  function holdsColour(r, colour, forms) { return r.mc && r.mc.length ? r.mc.indexOf(colour) >= 0 : saysWord(r, forms); }
   // a word read as a chip holds in any of its forms, or (part typed, "לוג") as the start of a word of the product ("לוגו")
   function saysWord(r, forms, start) {
     var set = recForms(r);
@@ -221,7 +223,10 @@
       var n = E.normalize(word), key = (not ? '-' : '') + n;
       if (!n || c.no['w:' + key] || c.words[key]) { return; }
       var forms = wordForms(n);
-      var says = all.filter(function (r) { return saysWord(r, forms); }).length;
+      // a colour is the product's own (its index's mc: the colour it is sold in, the one its picture shows most), never
+      // a part's: "חולצה שחורה" is no olive overshirt with black buttons (Story, 26.10)
+      var colour = E.colorOf ? E.colorOf(n) : null;
+      var says = all.filter(function (r) { return colour ? holdsColour(r, colour, forms) : saysWord(r, forms); }).length;
       // part typed and no product says it whole: the word it starts ("לוג": "לוגו"), named as the store says it
       var whole = !says && !not && i === words.length - 1 ? completed(all, n) : null;
       // a word the store does not write, read by meaning as one it does (the server's near: "מפוספס" is "פסים")
@@ -238,7 +243,7 @@
       if (!not && share > SUBJECT_SHARE) { return; }
       // shown as the store writes it: "לפוקוס" is "פוקוס", "וריכוז" is "ריכוז" (its prefix letter left out)
       var bare = !whole && n.length > 3 && !all.some(function (r) { return recForms(r)[n]; }) && all.some(function (r) { return recForms(r)[n.slice(1)]; }) ? word.slice(1) : word;
-      c.words[key] = { label: not ? w + ' ' + bare : (whole || bare), at: not ? [i, i + 1] : [i], forms: useForms, not: !!not, share: share };
+      c.words[key] = { label: not ? w + ' ' + bare : (whole || bare), at: not ? [i, i + 1] : [i], forms: useForms, not: !!not, share: share, colour: whole ? null : colour };
       if (not) { used.push(i + 1); }
     });
     // never emptying: while nothing holds them all, the broadest goes first ("פטריה" before "פוקוס")
