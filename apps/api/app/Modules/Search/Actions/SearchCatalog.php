@@ -49,6 +49,9 @@ final class SearchCatalog
     /** A title's first word on more than this share of the products is the store's, not a kind a search names. */
     private const KIND_MAX_SHARE = 0.6;
 
+    /** How much the words a picture is described with move a similar item against the pictures' own order. */
+    private const SEEN_WORDS_SHARE = 0.35;
+
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
 
@@ -465,9 +468,10 @@ final class SearchCatalog
     }
 
     /**
-     * Products ordered by how many of the words their pictures are described with (colour, print, material, a detail)
-     * they share with the product's own, most first, the order given among equals. A word every one of them shares
-     * ("תיק גב") moves none; a product's own colour and print do.
+     * Products in the order given (the pictures' likeness), each moved a little by how much of what its picture is
+     * described with (colour, print, material, a detail) it shares with the product's own: the share of their words
+     * together, so a long description is no closer for being long. A beige suede shoe's alike stay the beige suede
+     * ones the pictures found first, not black shoes whose description also names a white sole and a black line.
      *
      * @param  list<string>  $externalIds
      * @return list<string>
@@ -488,11 +492,15 @@ final class SearchCatalog
         }
 
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
-        $shared = [];
+        $count = count($externalIds);
+        $score = [];
         foreach ($externalIds as $at => $id) {
-            $shared[$id] = [count(array_intersect($own, $words($theirs->get($id)))), $at];
+            $other = $words($theirs->get($id));
+            $together = count(array_unique([...$own, ...$other]));
+            $share = $together === 0 ? 0.0 : count(array_intersect($own, $other)) / $together;
+            $score[$id] = (1 - self::SEEN_WORDS_SHARE) * (1 - $at / $count) + self::SEEN_WORDS_SHARE * $share;
         }
-        usort($externalIds, fn (string $a, string $b): int => $shared[$b][0] <=> $shared[$a][0] ?: $shared[$a][1] <=> $shared[$b][1]);
+        usort($externalIds, fn (string $a, string $b): int => $score[$b] <=> $score[$a]);
 
         return $externalIds;
     }
@@ -667,7 +675,10 @@ final class SearchCatalog
             // shop filters by colour: a bookshop's covers are not a kind, and a black cover's alike are not black first.
             $own = $index['records']['p:'.$externalId] ?? null;
             $colours = array_filter((array) ($index['facets'] ?? []), fn (array $f): bool => preg_match(self::COLOUR_FILTER, (string) ($f['k'] ?? '').' '.(string) ($f['l'] ?? '')) === 1) !== [];
-            $records = $own === null || ! $colours ? $records : self::byColour($records, Colours::parts([trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''))]));
+            // Where looks lead, its colour as its title says it ("טבעת זהב צהוב"): its picture's words name every colour on
+            // it, a thin black line and a white sole too, and its pictures already found what is coloured like it.
+            $ownText = $looksLead ? (string) ($own['title'] ?? '') : trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''));
+            $records = $own === null || ! $colours ? $records : self::byColour($records, Colours::parts([$ownText]));
 
             return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
         });

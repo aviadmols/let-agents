@@ -108,6 +108,10 @@ final class BuildDemoStore
                 Features::override($key, $pictures, $shop->id);
             }
         }
+        // the wishlist a store would offer, a heart on each result: kept by us, and deleted with the demo's store
+        if (app(FeatureRegistry::class)->has('shortlist.wishlist')) {
+            Features::override('shortlist.wishlist', true, $shop->id);
+        }
 
         $site->forceFill(['shop_id' => $shop->id, 'status' => DemoSite::SCANNING])->save();
 
