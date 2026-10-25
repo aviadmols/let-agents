@@ -58,8 +58,11 @@ final class FindProductSet implements ProductSets
 
     public const ACTION = 'thinking.find_set';
 
-    /** find_set and check_set */
-    public const PROMPT_VERSION = 3;
+    /**
+     * find_set and check_set. 4: what is near is the nearest of the same kind, never a product that only shares a word
+     * (Sela, 26.10: "סיפור על מדע בדיוני" came near to books about science, not to a novel of another history).
+     */
+    public const PROMPT_VERSION = 4;
 
     /** Products a word is looked for in, at most, before code reads them. */
     private const LOOKED_AT = 400;

@@ -160,7 +160,9 @@
   var WITHOUT_WORD = /^(בלי|ללא|without|no)$/i;
   function recForms(r) {
     if (!r._wf) {
-      var set = {}, list = S.engine.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').filter(Boolean);
+      // its title, its words and its tags, as the search reads them ("חטופים", a tag of Omer Shem Tov's book)
+      var tags = Array.isArray(r.tg) ? r.tg.join(' ') : String(r.tg || '');
+      var set = {}, list = S.engine.normalize(decode(r.title || '') + ' ' + (r.kw || '') + ' ' + tags).split(' ').filter(Boolean);
       list.forEach(function (w) { wordForms(w).forEach(function (f) { set[f] = 1; }); });
       r._wf = set;
       r._ww = list;
@@ -243,7 +245,9 @@
       if (!not && share > SUBJECT_SHARE) { return; }
       // shown as the store writes it: "לפוקוס" is "פוקוס", "וריכוז" is "ריכוז" (its prefix letter left out)
       var bare = !whole && n.length > 3 && !all.some(function (r) { return recForms(r)[n]; }) && all.some(function (r) { return recForms(r)[n.slice(1)]; }) ? word.slice(1) : word;
-      c.words[key] = { label: not ? w + ' ' + bare : (whole || bare), at: not ? [i, i + 1] : [i], forms: useForms, not: !!not, share: share, colour: whole ? null : colour };
+      // a search of one word: its chip says how it was read, and narrows nothing (what it found is that word's already:
+      // "חטוף" hid the books its description and tags found)
+      c.words[key] = { label: not ? w + ' ' + bare : (whole || bare), at: not ? [i, i + 1] : [i], forms: useForms, not: !!not, share: share, colour: whole ? null : colour, shown: words.length === 1 };
       if (not) { used.push(i + 1); }
     });
     // never emptying: while nothing holds them all, the broadest goes first ("פטריה" before "פוקוס")

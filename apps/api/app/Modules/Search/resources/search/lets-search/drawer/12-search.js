@@ -167,7 +167,7 @@
       out = strict.length ? strict : pass(false);
     }
     // the words read as chips: what says each of them
-    var ws = Object.keys(c.words || {});
+    var ws = Object.keys(c.words || {}).filter(function (k) { return !c.words[k].shown; });
     if (ws.length) { out = out.filter(function (r) { return ws.every(function (k) { return holdsChip(r, c.words[k]) !== !!c.words[k].not; }); }); }
     if (onStock(c)) { out = out.filter(function (r) { return r.s === 1; }); }
     if (onSale(c)) { out = out.filter(function (r) { return r.sl === 1; }); }
