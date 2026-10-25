@@ -9,6 +9,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Search\Support\LoadedIndex;
@@ -156,6 +157,36 @@ final class SimilarItemsTest extends TestCase
 
         $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the one sharing its tags first, the meaning after, to fill');
         $this->assertSame(['302'], array_column($this->similar('301', 1)->json('products'), 'external_id'), 'enough share its tags: only they');
+    }
+
+    public function test_where_looks_matter_what_looks_alike_leads_and_its_own_colour_and_print_first(): void
+    {
+        // Vans: a grey sneaker's alike were every shoe of its collection, and a leopard backpack's a red bag first.
+        // Where looks matter, the pictures lead, not the tags; and among them what shares the picture's words.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        $this->app->instance(RelatedByTags::class, new class implements RelatedByTags
+        {
+            public function to(string $shopId, string $externalId, int $limit): array
+            {
+                return [['external_id' => '303', 'score' => 0.9]];
+            }
+        });
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->where('external_id', '302')->update(['in_stock' => true]);
+            foreach (['301' => ['נמר', 'חום', 'שחור'], '302' => ['אדום'], '303' => ['נמר', 'חום']] as $id => $words) {
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $product->title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        // the pictures put 302 before 303; the tags would have shown 303 alone. 303 shares its leopard: first, 302 after.
+        $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
+
+        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['כחול'])]));
+        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'nothing shared: the pictures\' order, never the tags alone');
     }
 
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void

@@ -14,6 +14,7 @@ use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Search\Models\SearchResolution;
@@ -463,6 +464,39 @@ final class SearchCatalog
         });
     }
 
+    /**
+     * Products ordered by how many of the words their pictures are described with (colour, print, material, a detail)
+     * they share with the product's own, most first, the order given among equals. A word every one of them shares
+     * ("תיק גב") moves none; a product's own colour and print do.
+     *
+     * @param  list<string>  $externalIds
+     * @return list<string>
+     */
+    private static function bySeenWords(CatalogProduct $product, array $externalIds): array
+    {
+        if (count($externalIds) < 2) {
+            return $externalIds;
+        }
+
+        $words = fn ($row): array => array_values(array_unique(array_filter(array_map(
+            fn ($w): string => is_string($w) ? HebrewSearch::stem(HebrewSearch::normalize($w)) : '',
+            array_merge(...array_map(fn ($w): array => is_string($w) ? explode(' ', $w) : [], (array) ($row?->caption_words ?? []))),
+        ), fn (string $w): bool => mb_strlen($w) > 1)));
+        $own = $words(RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words']));
+        if ($own === []) {
+            return $externalIds;
+        }
+
+        $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
+        $shared = [];
+        foreach ($externalIds as $at => $id) {
+            $shared[$id] = [count(array_intersect($own, $words($theirs->get($id)))), $at];
+        }
+        usort($externalIds, fn (string $a, string $b): int => $shared[$b][0] <=> $shared[$a][0] ?: $shared[$a][1] <=> $shared[$b][1]);
+
+        return $externalIds;
+    }
+
     private static function headOf(string $title): string
     {
         return HebrewSearch::head($title);
@@ -595,7 +629,14 @@ final class SearchCatalog
             }
             arsort($rank);
             $ids = array_map('strval', array_keys($rank));
-            if ($tagged !== []) {
+            // A store where looks matter (by picture, or both): what looks alike leads, in the pictures' own order among
+            // its own kind, and what they did not find follows by the tags and the meaning. A grey sneaker's alike are
+            // grey sneakers, not every shoe of its collection ("NEW COLLECTION", "גברים"). The tags lead in a store of content.
+            $looksLead = $by !== 'meaning' && $looks !== [];
+            if ($looksLead) {
+                $ids = array_values(array_unique([...$looks, ...$ids]));
+            }
+            if ($tagged !== [] && ! $looksLead) {
                 $sharing = array_flip(array_map('strval', $tagged));
                 $first = array_values(array_filter($ids, fn (string $id): bool => isset($sharing[$id])));
                 $ids = count($first) >= $limit ? $first : [...$first, ...array_values(array_filter($ids, fn (string $id): bool => ! isset($sharing[$id])))];
@@ -603,6 +644,9 @@ final class SearchCatalog
 
             // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids));
+            // Where looks matter, what its picture is described with shows most (its colour, its print, its material): a
+            // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
+            $ids = $looksLead ? self::bySeenWords($product, $ids) : $ids;
 
             $records = [];
 
