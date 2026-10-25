@@ -78,8 +78,9 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 4: the safety rules, the checker's safe and injection, and the topic check (scope_site).
      * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
      * 5 is the facts-only writer the bench tries, never released here).
+     * 11: the store speaks as itself, "יש לנו", never the shopper's "יש לכם" back (answer_site only).
      */
-    public const PROMPT_VERSION = 10;
+    public const PROMPT_VERSION = 11;
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
