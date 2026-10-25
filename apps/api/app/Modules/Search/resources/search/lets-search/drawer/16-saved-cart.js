@@ -214,6 +214,8 @@
     // a demo says it is one: added, as a store would show it, with no cart to go to
     box.innerHTML = CFG.demo ? '<div class="ls-added ls-focus-in">' + icon('cart', 'ls-icon--sm') + '<span style="flex:1">' + esc(t('demoAdded')) + '</span></div>'
       : '<div class="ls-added ls-focus-in" style="justify-content:space-between">' + icon('cart', 'ls-icon--sm') + '<span style="flex:1">' + esc(LANG === 'he' ? 'בעגלה שלכם' : 'In your cart') + '</span><a class="ls-btn ls-btn--link" href="' + esc(CFG.cartUrl) + '">' + esc(t('toCart')) + '</a></div>';
+    // a demo's store has no product page bank to suggest from
+    if (CFG.demo) { return; }
     json(API + '/widget/' + SITE + '/page?id=' + encodeURIComponent(id)).then(function (r) {
       var b = (r.body && (r.body.data || r.body)) || {}, comp = null;
       (b.sections || []).forEach(function (s) { if (s.candidate === 'complement' && s.products && s.products.length) { comp = s; } });
