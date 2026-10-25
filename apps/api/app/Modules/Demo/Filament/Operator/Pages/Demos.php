@@ -3,6 +3,7 @@
 namespace App\Modules\Demo\Filament\Operator\Pages;
 
 use App\Core\Facades\Settings;
+use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
 use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Models\DemoSite;
@@ -83,7 +84,7 @@ class Demos extends Page
         Notification::make()->title(__('demo::operator.extended'))->success()->send();
     }
 
-    /** The store's picture taken again (a page that came out broken, or a site that changed), for every demo showing it. */
+    /** The store's picture taken again: a page that came out broken, or a site that changed. */
     public function reshoot(string $id): void
     {
         $site = DemoSite::query()->find($id);
@@ -93,6 +94,31 @@ class Demos extends Page
         $site->forceFill(['screenshot' => null, 'screenshot_mobile' => null, 'shot_at' => null])->save();
         ShootDemoJob::dispatch($site->id);
         Notification::make()->title(__('demo::operator.reshooting'))->success()->send();
+    }
+
+    /** The demo gone from the list: its store deleted with all it read (when no other demo shows it), and its row. */
+    public function remove(string $id): void
+    {
+        $site = DemoSite::query()->find($id);
+        if ($site === null) {
+            return;
+        }
+        if ($site->status !== DemoSite::EXPIRED) {
+            SweepDemos::end($site);
+        }
+        $site->delete();
+        Notification::make()->title(__('demo::operator.deleted'))->success()->send();
+    }
+
+    /** The demo's store deleted with all it read, and the demo built and scanned anew (RetryDemo::again). */
+    public function rescan(string $id): void
+    {
+        $site = DemoSite::query()->find($id);
+        if ($site === null || $site->status === DemoSite::PENDING) {
+            return;
+        }
+        app(RetryDemo::class)->again($site);
+        Notification::make()->title(__('demo::operator.rescanning'))->success()->send();
     }
 
     public function endNow(string $id): void

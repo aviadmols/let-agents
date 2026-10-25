@@ -42,6 +42,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $shot_at
  * @property int $attempts
  * @property int $retries
+ * @property int|null $store_products
+ * @property int $pictures
  */
 class DemoSite extends Model
 {
@@ -83,6 +85,8 @@ class DemoSite extends Model
             'shot_at' => 'datetime',
             'attempts' => 'integer',
             'retries' => 'integer',
+            'store_products' => 'integer',
+            'pictures' => 'integer',
         ];
     }
 
@@ -97,9 +101,12 @@ class DemoSite extends Model
         return in_array($this->status, [self::SCANNING, self::READY], true) && ($this->expires_at === null || $this->expires_at->isFuture());
     }
 
-    /** Whether the demo reads its products' pictures: not when only the content matters to whoever asked. */
+    /**
+     * Whether the demo reads its products' pictures: every demo does while demo.pictures is on, so a search by how a
+     * product looks finds it whatever matters most to whoever asked (that sets how alike and photo search compare).
+     */
     public function readsPictures(): bool
     {
-        return ($this->choices['matters'] ?? 'both') !== 'content' && Features::enabled('demo.pictures');
+        return Features::enabled('demo.pictures');
     }
 }

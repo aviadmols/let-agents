@@ -43,7 +43,14 @@
                                     <x-filament::badge :color="['ready' => 'success', 'scanning' => 'info', 'pending' => 'gray', 'failed' => 'danger', 'expired' => 'gray'][$demo->status] ?? 'gray'">{{ $t('statuses.'.$demo->status) }}</x-filament::badge>
                                     @if ($demo->error)<div style="{{ $small }}">{{ $demo->error }}</div>@endif
                                 </td>
-                                <td style="{{ $cell }};white-space:nowrap">{{ $t('read_counts', ['products' => number_format($demo->products), 'pages' => number_format($demo->pages)]) }}</td>
+                                <td style="{{ $cell }};white-space:nowrap">
+                                    {{ $t('read_counts', ['products' => number_format($demo->products), 'pages' => number_format($demo->pages)]) }}
+                                    @if ($demo->store_products)<div style="{{ $small }}">{{ $t('of_store', ['total' => number_format($demo->store_products)]) }}</div>@endif
+                                    @if ($demo->status === 'ready')
+                                        {{-- whether its pictures were looked at: what a search by how a product looks needs --}}
+                                        <div style="{{ $small }}" data-pictures="{{ $demo->pictures }}">{{ $demo->pictures > 0 ? $t('pictures_read', ['count' => number_format($demo->pictures)]) : $t('pictures_none') }}</div>
+                                    @endif
+                                </td>
                                 <td style="{{ $cell }};white-space:nowrap" data-cost="{{ $demo->spent }}">
                                     @if ($demo->spent === null)
                                         —
@@ -67,6 +74,11 @@
                                         · <x-filament::link tag="button" size="sm" wire:click="reshoot('{{ $demo->id }}')">{{ $t('reshoot') }}</x-filament::link>
                                         · <x-filament::link tag="button" size="sm" color="danger" wire:click="endNow('{{ $demo->id }}')" wire:confirm="{{ $t('end_confirm') }}">{{ $t('end') }}</x-filament::link>
                                     @endif
+                                    @if (in_array($demo->status, ['scanning', 'ready', 'failed', 'expired'], true))
+                                        @if (in_array($demo->status, ['scanning', 'ready'], true)) · @endif
+                                        <x-filament::link tag="button" size="sm" color="warning" wire:click="rescan('{{ $demo->id }}')" wire:confirm="{{ $t('rescan_confirm') }}">{{ $t('rescan') }}</x-filament::link>
+                                    @endif
+                                    · <x-filament::link tag="button" size="sm" color="danger" wire:click="remove('{{ $demo->id }}')" wire:confirm="{{ $t('delete_confirm') }}">{{ $t('delete') }}</x-filament::link>
                                 </td>
                             </tr>
                         @endforeach

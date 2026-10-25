@@ -29,7 +29,7 @@ final class BuildDemoStore
 {
     /** Off in every demo store: work a night, a team or a live store does, never a demo. */
     private const OFF = [
-        'enrichment.nightly', 'enrichment.weekly_audit', 'enrichment.schema_auto_advance', 'enrichment.auto_highlights', 'enrichment.search_summary',
+        'enrichment.nightly', 'enrichment.weekly_audit', 'enrichment.auto_highlights', 'enrichment.search_summary',
         'enrichment.section_questions', 'enrichment.picture_suggestions', 'enrichment.web_lookup', 'enrichment.auto_review', 'enrichment.auto_publish_rules',
         'retrieval.ai_matching', 'catalog.sample_pages', 'catalog.page_choices', 'catalog.daily_sync', 'catalog.stock_checks', 'catalog.live_sync', 'catalog.refresh',
         'assistant.ask_review', 'assistant.team_drafts', 'assistant.search_whatsapp', 'assistant.on_products', 'assistant.on_content',

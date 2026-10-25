@@ -31,11 +31,15 @@ final class Screenshots
     private const SETTLE_MS = 5000;
 
     /** What fades or slides in on scroll is shown as it ends; nothing sticks out sideways. */
-    private const STYLES = 'html,body{overflow-x:hidden!important;max-width:100vw!important}'
-        .'[data-aos],.aos-init,.wow,.animate__animated,.reveal,[data-animate]{opacity:1!important;transform:none!important;visibility:visible!important}';
+    private const STYLES = '[data-aos],.aos-init,.wow,.animate__animated,.reveal,[data-animate]{opacity:1!important;transform:none!important;visibility:visible!important}';
 
-    /** Down the page and back, so pictures that load on scroll are loaded. */
-    private const SCRIPTS = 'window.scrollTo(0,document.body.scrollHeight);setTimeout(function(){window.scrollTo(0,0)},1500);';
+    /**
+     * Down the page and back, so pictures that load on scroll are loaded; and every video played, muted, so a video at
+     * the top of the page (often with no still picture of its own) shows a frame rather than a blank. Its sources'
+     * declared types are dropped first: a site that labels a WebM file as MP4 has it skipped by a browser without MP4.
+     */
+    private const SCRIPTS = 'document.querySelectorAll("video source[type]").forEach(function(s){s.removeAttribute("type")});'
+        .'document.querySelectorAll("video").forEach(function(v){v.muted=true;v.playsInline=true;v.load();var p=v.play();if(p&&p.catch){p.catch(function(){})}});';
 
     /** The picture, JPEG base64; null when none came. */
     public static function take(string $url): ?string
@@ -45,7 +49,8 @@ final class Screenshots
         try {
             $answer = Http::timeout(90)->withHeaders($key !== '' ? ['x-api-key' => $key] : [])
                 ->get($key !== '' ? self::PAID : self::FREE, [
-                    'url' => $url, 'screenshot' => 'true', 'meta' => 'false', 'type' => 'jpeg',
+                    // force: a fresh picture each time, never one Microlink kept of the page before
+                    'url' => $url, 'screenshot' => 'true', 'meta' => 'false', 'type' => 'jpeg', 'force' => 'true',
                     'waitUntil' => 'networkidle2', 'waitForTimeout' => self::SETTLE_MS,
                     'viewport.width' => self::WIDTH, 'viewport.height' => self::HEIGHT, 'viewport.isMobile' => 'true',
                     'viewport.hasTouch' => 'true', 'viewport.deviceScaleFactor' => 2,

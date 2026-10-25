@@ -72,7 +72,7 @@ final class PrepareDemoJob implements ShouldQueue
                 // the language the store's content is in: as whoever asked chose it, else as its own site says
                 'content_locale' => $language ?? (in_array($read['locale'], ['he', 'en'], true) ? $read['locale'] : null),
             ]))->save();
-            $site->forceFill(['platform' => $read['platform'], 'title' => $read['title'], 'read_at' => now()])->save();
+            $site->forceFill(['platform' => $read['platform'], 'title' => $read['title'], 'store_products' => $read['products'], 'read_at' => now()])->save();
         }
 
         if ($site->scan_at === null) {

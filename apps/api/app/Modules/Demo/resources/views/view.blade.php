@@ -57,9 +57,16 @@
         <aside class="side">
             <h1>{{ $t('view.side_title', ['site' => $site->title ?? $site->host]) }}</h1>
             <p>{{ $t('view.hint') }}</p>
-            @if ($site->products >= $limit)
-                <p class="partial" data-partial>{{ $t('view.partial', ['limit' => number_format($limit)]) }}.</p>
-            @endif
+            {{-- a demo, so maybe partial: how much of the store it read when the store says how much it has --}}
+            <p class="partial" data-partial>
+                {{ $t('view.demo_note') }}
+                @if ($site->store_products && $site->store_products > $site->products)
+                    {{ $t('view.demo_read', ['read' => number_format($site->products), 'total' => number_format($site->store_products)]) }}
+                @elseif ($site->products >= $limit)
+                    {{ $t('view.demo_limit', ['limit' => number_format($limit)]) }}
+                @endif
+                {{ $t('view.full_scan') }}
+            </p>
         </aside>
     </main>
 </body>

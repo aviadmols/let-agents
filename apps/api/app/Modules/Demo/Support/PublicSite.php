@@ -78,9 +78,10 @@ final class PublicSite
 
     /**
      * What the store runs on: Shopify when its public product feed answers, WooCommerce when its public store API does,
-     * else other (read by its sitemap). With its name, language and currency from the home page.
+     * else other (read by its sitemap). With its name, language and currency from the home page, and how many products
+     * it has in all when its feed says (WooCommerce's does, in X-WP-Total).
      *
-     * @return array{platform: string, title: string|null, locale: string|null, currency: string|null}|null null when the site does not answer
+     * @return array{platform: string, title: string|null, locale: string|null, currency: string|null, products: int|null}|null null when the site does not answer
      */
     public static function read(string $host): ?array
     {
@@ -91,11 +92,14 @@ final class PublicSite
         }
 
         $html = (string) $home->body();
+        $shopify = is_array(self::json($host, '/products.json', ['limit' => 1])['products'] ?? null);
+        $woo = $shopify ? null : self::get($host, '/wp-json/wc/store/v1/products', ['per_page' => 1]);
         $platform = match (true) {
-            is_array(self::json($host, '/products.json', ['limit' => 1])['products'] ?? null) => self::SHOPIFY,
-            is_array(self::json($host, '/wp-json/wc/store/v1/products', ['per_page' => 1])) => self::WOOCOMMERCE,
+            $shopify => self::SHOPIFY,
+            is_array($woo?->json()) => self::WOOCOMMERCE,
             default => self::OTHER,
         };
+        $total = $platform === self::WOOCOMMERCE ? (int) $woo?->header('X-WP-Total') : 0;
 
         preg_match('~<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)~i', $html, $site);
         preg_match('~<title[^>]*>(.*?)</title>~is', $html, $title);
@@ -108,6 +112,7 @@ final class PublicSite
             'title' => $name !== '' ? mb_substr($name, 0, 120) : null,
             'locale' => isset($lang[1]) ? strtolower($lang[1]) : null,
             'currency' => $currency[1] ?? null,
+            'products' => $total > 0 ? $total : null,
         ];
     }
 

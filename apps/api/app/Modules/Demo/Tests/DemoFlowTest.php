@@ -5,6 +5,7 @@ namespace App\Modules\Demo\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
@@ -18,6 +19,7 @@ use App\Modules\Demo\Support\PublicStoreFeed;
 use App\Modules\Tenancy\Contracts\CreatesShops;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -196,14 +198,83 @@ final class DemoFlowTest extends TestCase
         }
     }
 
-    public function test_a_demo_that_reads_no_pictures_shows_no_pictures_on_its_scan_screen(): void
+    public function test_every_demo_reads_its_pictures_and_its_vocabulary_advances_unless_pictures_are_off(): void
     {
         $content = $this->verified(['matters' => 'content']);
-        $this->get('/demo/'.$content->token)->assertOk()->assertDontSee('data-row="images"', false)->assertSee('data-row="knowledge"', false);
+        $this->get('/demo/'.$content->token)->assertOk()->assertSee('data-row="images"', false)->assertSee('data-row="knowledge"', false);
+        $this->assertTrue(Features::enabled('search.photos', $content->shop_id), 'a search by how a product looks finds it, whatever matters most');
+        $this->assertTrue(Features::enabled('enrichment.schema_auto_advance', $content->shop_id), 'its vocabulary is applied: filters and tags');
+        $this->assertSame('meaning', Settings::get('search.similar_by', $content->shop_id), 'what matters still sets how alike is compared');
 
+        Features::override('demo.pictures', false);
         $this->travel(1)->minutes();
-        $look = $this->verified(['url' => 'https://store.test', 'email' => 'other@store.test', 'matters' => 'look']);
-        $this->get('/demo/'.$look->token)->assertOk()->assertSee('data-row="images"', false);
+        $off = $this->verified(['url' => 'https://store.test', 'email' => 'other@store.test', 'matters' => 'look']);
+        $this->get('/demo/'.$off->token)->assertOk()->assertDontSee('data-row="images"', false);
+    }
+
+    public function test_a_woocommerce_stores_variants_come_with_their_colours_and_sizes_by_name(): void
+    {
+        Http::fake(['https://store.test/wp-json/wc/store/v1/products*' => Http::sequence()
+            ->push([[
+                'id' => 5, 'name' => 'Old Skool', 'type' => 'variable', 'permalink' => 'https://store.test/p/old-skool', 'is_in_stock' => true,
+                'prices' => ['price' => '29990', 'regular_price' => '29990', 'currency_code' => 'ILS', 'currency_minor_unit' => 2],
+                'attributes' => [
+                    ['name' => 'צבע', 'taxonomy' => 'pa_color', 'has_variations' => true, 'terms' => [['name' => 'Black/White', 'slug' => 'black-white']]],
+                    ['name' => 'מידה', 'taxonomy' => 'pa_size', 'has_variations' => true, 'terms' => [['name' => '42', 'slug' => '42'], ['name' => '42.5', 'slug' => '42-5']]],
+                ],
+                'variations' => [['id' => 51, 'attributes' => [['name' => 'צבע', 'value' => 'black-white'], ['name' => 'מידה', 'value' => '42-5']]]],
+            ]])
+            ->push([])]);
+        $connection = (new StoreConnection)->forceFill(['site_url' => 'https://store.test', 'site_info' => ['demo' => ['platform' => 'woocommerce']]]);
+
+        $record = iterator_to_array(app(PublicStoreFeed::class)->products($connection), false)[0][0];
+
+        $this->assertSame([['name' => 'צבע', 'value' => 'Black/White'], ['name' => 'מידה', 'value' => '42.5']], $record['variations'][0]['attributes']);
+        $this->assertSame(['51', '299.9', true], [$record['variations'][0]['external_id'], $record['variations'][0]['price']['price'], $record['variations'][0]['stock']['in_stock']]);
+    }
+
+    public function test_the_demo_says_it_is_a_demo_and_how_much_of_the_store_it_read_and_the_team_can_delete_it(): void
+    {
+        $site = $this->verified();
+        $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 300, 'store_products' => 1240, 'pictures' => 0])->save();
+
+        $this->get('/demo/'.$site->token)->assertOk()->assertSee('This is only a demo, so results may be partial.')
+            ->assertSee('It read 300 of the store&#039;s 1,240 products.', false);
+
+        $shop = $site->shop_id;
+        app(Demos::class)->remove($site->id);
+        $this->assertNull(DemoSite::query()->find($site->id), 'gone from the list');
+        $this->assertNull(Shop::query()->find($shop), 'with its store');
+    }
+
+    public function test_the_demos_list_shows_how_much_each_read_whether_its_pictures_were_looked_at_and_what_it_cost(): void
+    {
+        $site = $this->verified();
+        $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 300, 'store_products' => 1240, 'pictures' => 0])->save();
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+
+        foreach (['he', 'en'] as $locale) {
+            app()->setLocale($locale);
+            $this->get('/operator/demos')->assertOk()->assertSee('data-pictures="0"', false)->assertSee(number_format(1240))
+                ->assertSee(__('demo::operator.pictures_none'))->assertSee(__('demo::operator.rescan'))->assertSee(__('demo::operator.delete'));
+        }
+    }
+
+    public function test_the_team_scans_a_demo_again_from_the_start(): void
+    {
+        $site = $this->verified();
+        $old = $site->shop_id;
+        $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 12, 'read_at' => now(), 'scan_at' => now(), 'emailed_at' => now()])->save();
+        Queue::fake();
+
+        app(Demos::class)->rescan($site->id);
+
+        $site->refresh();
+        $this->assertSame([DemoSite::SCANNING, null, null, null], [$site->status, $site->read_at, $site->emailed_at, $site->expires_at]);
+        $this->assertNull(Shop::query()->find($old), 'its store went with all it read');
+        $this->assertNotSame($old, $site->shop_id);
+        Queue::assertPushed(PrepareDemoJob::class);
     }
 
     public function test_the_language_chosen_is_the_stores_and_its_searchs(): void

@@ -7,6 +7,6 @@ return [
     ],
     'pictures' => [
         'label' => 'Pictures in demos',
-        'description' => 'When the site owner said looks matter: the pictures are scanned, and photo search is open in the demo. Off: demos go by content alone, and cost less.',
+        'description' => 'In every demo: the pictures are scanned (colour, material, what they show), so a search by how a product looks finds it, and photo search is open. Off: demos go by content alone, and cost less.',
     ],
 ];

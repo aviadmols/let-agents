@@ -46,6 +46,7 @@ final class FinishDemo
             'status' => DemoSite::READY,
             'products' => $products,
             'pages' => $pages,
+            'pictures' => (int) ($progress['facts']['pictures_read'] ?? 0),
             'ready_at' => now(),
             'expires_at' => now()->addDays((int) Settings::get('demo.keep_days')),
         ])->save();

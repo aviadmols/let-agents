@@ -129,7 +129,10 @@ return [
         'side_title' => 'Lets search on :site',
         'hint' => 'Try the search: press the button, type anything, or snap a product.',
         'no_picture' => 'We could not take a picture of the home page, but the search works: press the button in the corner.',
-        'partial' => 'The demo knows up to :limit products, so some results may be missing',
+        'demo_note' => 'This is only a demo, so results may be partial.',
+        'demo_read' => 'It read :read of the store\'s :total products.',
+        'demo_limit' => 'It reads up to :limit products.',
+        'full_scan' => 'A full scan of the site reads all of it, and finds more tags, filters and ways to recognise products.',
     ],
     'ended' => [
         'title' => 'The demo has ended',

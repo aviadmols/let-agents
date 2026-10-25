@@ -216,11 +216,50 @@ final class PublicStoreFeed implements PlatformStoreFeed
             'price' => ['currency' => (string) ($prices['currency_code'] ?? 'ILS'), 'price' => $money($prices['price'] ?? null), 'regular_price' => $money($prices['regular_price'] ?? null), 'on_sale' => (bool) ($p['on_sale'] ?? false),
                 'min_price' => $money($prices['price_range']['min_amount'] ?? $prices['price'] ?? null), 'max_price' => $money($prices['price_range']['max_amount'] ?? $prices['price'] ?? null)],
             'stock' => ['in_stock' => (bool) ($p['is_in_stock'] ?? true), 'managed' => false, 'quantity' => null],
-            'variations' => [],
+            'variations' => self::wooVariations($p, $attributes, $money),
             'purchasable' => (bool) ($p['is_purchasable'] ?? true),
             'created_at' => null,
             'updated_at' => null,
         ];
+    }
+
+    /**
+     * A WooCommerce product's variants as its public store API lists them: each with its options (colour, size...) by
+     * their names, not the slugs the API gives (a variant's "checkerboard-true-white" is its attribute's term "Checkerboard
+     * True White"), so the colour and size filters read them as a store's own. The API gives no variant's own price or
+     * stock: the product's are theirs.
+     *
+     * @param  array<string, mixed>  $p
+     * @param  list<array<string, mixed>>  $attributes  the product's attributes, with their terms
+     * @return list<array<string, mixed>>
+     */
+    private static function wooVariations(array $p, array $attributes, callable $money): array
+    {
+        if (($p['type'] ?? '') !== 'variable') {
+            return [];
+        }
+
+        $names = [];
+        foreach ($attributes as $a) {
+            foreach ((array) ($a['terms'] ?? []) as $t) {
+                if (is_array($t) && isset($t['slug'], $t['name'])) {
+                    $names[(string) $a['name']][(string) $t['slug']] = html_entity_decode((string) $t['name'], ENT_QUOTES | ENT_HTML5);
+                }
+            }
+        }
+        $prices = (array) ($p['prices'] ?? []);
+        $inStock = (bool) ($p['is_in_stock'] ?? true);
+
+        return array_values(array_map(function (array $v) use ($names, $prices, $money, $inStock): array {
+            $options = array_values(array_filter(array_map(fn ($o): ?array => is_array($o) && isset($o['name'], $o['value']) && (string) $o['value'] !== ''
+                ? ['name' => (string) $o['name'], 'value' => $names[(string) $o['name']][(string) $o['value']] ?? (string) $o['value']] : null, (array) ($v['attributes'] ?? []))));
+
+            return [
+                'external_id' => (string) $v['id'], 'title' => implode(' / ', array_column($options, 'value')), 'sku' => null, 'attributes' => $options,
+                'price' => ['price' => $money($prices['price'] ?? null), 'regular_price' => $money($prices['regular_price'] ?? null), 'on_sale' => (bool) ($p['on_sale'] ?? false)],
+                'stock' => ['in_stock' => $inStock], 'purchasable' => $inStock,
+            ];
+        }, array_filter((array) ($p['variations'] ?? []), fn ($v): bool => is_array($v) && isset($v['id']))));
     }
 
     /** A product page's own product data (JSON-LD), for a site with no public feed; null when it carries none. */
