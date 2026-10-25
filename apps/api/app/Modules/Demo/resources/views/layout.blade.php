@@ -32,6 +32,8 @@
         label.field { display: block; margin-top: 20px; font-weight: 500; font-size: 14px; }
         .input { display: block; width: 100%; margin-top: 8px; height: 52px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--ground); font: inherit; font-size: 16px; color: var(--ink); outline: none; transition: border-color .2s, background .2s; }
         .input:focus { border-color: var(--ink); background: #fff; }
+        fieldset { border: 0; padding: 0; margin: 22px 0 0; min-width: 0; }
+        fieldset legend.field { margin: 0; padding: 0; }
         .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
         @media (max-width: 520px) { .choices { grid-template-columns: 1fr; } }
         .choice { position: relative; display: block; cursor: pointer; }

@@ -26,8 +26,8 @@
         <label class="field" for="demo-email">{{ $t('start.email') }}</label>
         <input class="input" id="demo-email" name="email" type="email" dir="ltr" required placeholder="you@your-store.co.il" value="{{ $old['email'] ?? '' }}" autocomplete="email">
 
-        <fieldset style="border: 0; padding: 0; margin: 0">
-            <legend class="field" style="padding: 0">{{ $t('start.kind') }}</legend>
+        <fieldset>
+            <legend class="field">{{ $t('start.kind') }}</legend>
             <div class="choices">
                 @foreach (['store', 'content', 'both'] as $kind)
                     <label class="choice"><input type="radio" name="kind" value="{{ $kind }}" required @checked(($old['kind'] ?? 'store') === $kind)><span><b>{{ $t('start.kinds.'.$kind.'.title') }}</b><small>{{ $t('start.kinds.'.$kind.'.text') }}</small></span></label>
@@ -35,8 +35,8 @@
             </div>
         </fieldset>
 
-        <fieldset style="border: 0; padding: 0; margin: 0">
-            <legend class="field" style="padding: 0">{{ $t('start.matters') }}</legend>
+        <fieldset>
+            <legend class="field">{{ $t('start.matters') }}</legend>
             <div class="choices">
                 @foreach (['look', 'content', 'both'] as $matters)
                     <label class="choice"><input type="radio" name="matters" value="{{ $matters }}" required @checked(($old['matters'] ?? 'both') === $matters)><span><b>{{ $t('start.matters_options.'.$matters.'.title') }}</b><small>{{ $t('start.matters_options.'.$matters.'.text') }}</small></span></label>
