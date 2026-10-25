@@ -154,7 +154,8 @@ final class DemoController extends Controller
             'images' => array_values(array_map(fn (array $i): array => ['src' => (string) ($i['url'] ?? '')], array_slice(array_filter((array) ($payload['images'] ?? []), 'is_array'), 0, 1))),
             'attributes' => array_values(array_map(fn (array $a): array => [
                 'name' => (string) $a['name'],
-                'has_variations' => (bool) ($a['used_for_variations'] ?? false),
+                // an option with one value is no choice (one colour): not asked
+                'has_variations' => (bool) ($a['used_for_variations'] ?? false) && count((array) ($a['values'] ?? [])) > 1,
                 'terms' => array_map(fn ($v): array => ['slug' => (string) $v, 'name' => (string) $v], array_values((array) ($a['values'] ?? []))),
             ], array_filter((array) ($payload['attributes'] ?? []), fn ($a): bool => is_array($a) && isset($a['name'])))),
             'variations' => array_values(array_map(fn (array $v): array => [
