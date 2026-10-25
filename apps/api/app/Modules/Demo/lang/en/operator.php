@@ -12,6 +12,8 @@ return [
     'cost_of_cap' => ':percent% of the :cap cap',
     'open' => 'Open',
     'extend' => 'Extend',
+    'reshoot' => 'Retake picture',
+    'reshooting' => 'The store\'s picture is being taken again; it is ready in about a minute.',
     'end' => 'End now',
     'end_confirm' => 'End this demo? Its store is deleted with everything read from the site.',
     'extended' => 'The demo was extended',

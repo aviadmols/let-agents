@@ -126,6 +126,7 @@ return [
         'until' => 'Available until :date',
         'cta' => 'Connect your store',
         'cta_url' => 'https://lets.co.il/#install',
+        'side_title' => 'Lets search on :site',
         'hint' => 'Try the search: press the button, type anything, or snap a product.',
         'no_picture' => 'We could not take a picture of the home page, but the search works: press the button in the corner.',
         'partial' => 'The demo knows up to :limit products, so some results may be missing',

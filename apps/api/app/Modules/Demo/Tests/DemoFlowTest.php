@@ -64,13 +64,13 @@ final class DemoFlowTest extends TestCase
     public function test_the_address_and_the_email_send_a_code_and_nothing_is_built_before_it(): void
     {
         $this->get('/demo')->assertOk()->assertSee('data-demo-start', false)->assertSee('See Lets on your store');
-        $this->get('/demo?lang=he')->assertOk()->assertSee('ראו את Lets על החנות שלכם', false);
+        $this->get('/demo?lang=he')->assertOk()->assertSee('See Lets on your store')->assertDontSee('ראו את Lets', false);
 
         $this->start()->assertRedirect();
 
         $site = DemoSite::query()->sole();
         $this->assertSame(['store.test', 'owner@store.test', DemoSite::PENDING, ['kind' => 'store', 'matters' => 'look', 'language' => 'he']], [$site->host, $site->email, $site->status, $site->choices]);
-        Mail::assertSent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'code' && $m->hasTo('owner@store.test') && preg_match('/^\d{6}$/', $m->data['code'] ?? '') === 1);
+        Mail::assertSent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'code' && $m->locale === 'en' && $m->hasTo('owner@store.test') && preg_match('/^\d{6}$/', $m->data['code'] ?? '') === 1);
         $this->assertSame(0, Shop::query()->count(), 'no store until the email is proven');
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-verify', false);
     }
@@ -115,7 +115,9 @@ final class DemoFlowTest extends TestCase
         $this->post('/demo/'.$site->token.'/verify', ['code' => Mail::sent(DemoMail::class)->first()->data['code']]);
         $site->refresh()->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 12])->save();
 
-        $this->get('/demo/'.$site->token)->assertOk()->assertSee("launcher: 'float'", false)->assertSee('data-demo-bar', false);
+        $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-bar', false)->assertSee('/demo/'.$site->token.'/phone', false);
+        $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee("launcher: 'float'", false)
+            ->assertHeader('Content-Security-Policy', "frame-ancestors 'self';");
 
         $this->travel(8)->days();
         app(SweepDemos::class)->handle();
@@ -212,7 +214,7 @@ final class DemoFlowTest extends TestCase
         $this->assertSame('en', $site->shop->content_locale);
 
         $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 3])->save();
-        $this->get('/demo/'.$site->token.'?lang=he')->assertOk()->assertSee('locale: "en"', false);
+        $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee('locale: "en"', false)->assertSee('<html lang="en" dir="ltr">', false);
     }
 
     public function test_the_scan_screen_shows_each_step_of_the_preparation(): void

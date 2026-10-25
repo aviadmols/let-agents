@@ -2,7 +2,6 @@
 
 namespace App\Modules\Demo\Http\Controllers;
 
-use App\Core\Localization\Locales;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Actions\FinishDemo;
@@ -29,7 +28,8 @@ use Illuminate\Routing\Controller;
  *   GET  /demo/{token}/progress the preparation and the scan so far, for the screen to draw, or the problem it hit;
  *                               done, the demo is ready (FinishDemo)
  *   POST /demo/{token}/again    after a problem: again, at the same address or a corrected one (RetryDemo)
- *   GET  /demo/{token}/shot/{which}  the store's picture, for a computer or a phone
+ *   GET  /demo/{token}/phone    the demo in its phone: the store's picture and the floating search, framed by the demo
+ *   GET  /demo/{token}/shot/{which}  the store's picture (a phone's; a computer's for a demo from before)
  */
 final class DemoController extends Controller
 {
@@ -53,7 +53,7 @@ final class DemoController extends Controller
     public function show(Request $request, string $token): Response
     {
         $site = $this->site($token);
-        app()->setLocale($site->locale);
+        app()->setLocale(DemoSite::LOCALE);
 
         return match ($site->status) {
             DemoSite::PENDING => response(view('demo::verify', ['site' => $site, 'result' => session('demo_result')])),
@@ -129,6 +129,17 @@ final class DemoController extends Controller
         ];
     }
 
+    /** The demo in its phone: framed by the demo page, ours only. */
+    public function phone(string $token): Response
+    {
+        $site = $this->site($token);
+        abort_unless($site->status === DemoSite::READY && $site->live(), 404);
+        app()->setLocale(DemoSite::LOCALE);
+
+        return response(view('demo::phone', ['site' => $site, 'siteKey' => $this->siteKey($site)]))
+            ->header('Content-Security-Policy', "frame-ancestors 'self';");
+    }
+
     public function shot(string $token, string $which): Response
     {
         $site = $this->site($token);
@@ -153,15 +164,13 @@ final class DemoController extends Controller
     }
 
     /**
-     * The page's language: as its link asks (?lang=he from lets.co.il's Hebrew pages), else English (as Aviad asked,
-     * 25.10). Never the browser's. The store's own language is read from its site (PrepareDemoJob), whatever this is.
+     * The demo speaks English, every page and email of it, whatever its link or the browser asks (as Aviad asked,
+     * 25.10). The search on the demo speaks the store's language, as whoever asked chose it.
      */
     private function speak(Request $request): string
     {
-        $asked = $request->query('lang', $request->input('lang'));
-        $locale = Locales::negotiate(is_string($asked) ? $asked : null) ?? 'en';
-        app()->setLocale($locale);
+        app()->setLocale(DemoSite::LOCALE);
 
-        return $locale;
+        return DemoSite::LOCALE;
     }
 }

@@ -6,10 +6,15 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
- * The store's home page as pictures, for the demo's background: a computer's width and a phone's, the whole page
- * down to a height. Taken by Microlink, which is given the store's public address and nothing else (no browser runs
- * on our servers); with a key (services.microlink.key) on its paid service, without one on its free one. Kept as
- * JPEG, scaled, base64: the container's disk does not outlast a deploy. Null when no picture came.
+ * The store's home page as a phone shows it, for the demo's background (shown in a phone, DemoController::phone).
+ * Taken by Microlink, which is given the store's public address and nothing else (no browser runs on our servers);
+ * with a key (services.microlink.key) on its paid service, without one on its free one.
+ *
+ * A tall phone screen, not the "whole page": a whole-page picture of a modern store comes out broken (a menu that
+ * slides in from the side caught open, the page shifted sideways, pictures that load on scroll still blank, parts
+ * that fade in on scroll never shown). So the page is read at a phone's width only, left to settle (its network
+ * quiet, then a few seconds more), scrolled down and back so its pictures load, with what fades in shown as is and
+ * nothing sticking out sideways. Kept as JPEG, scaled, base64: the container's disk does not outlast a deploy.
  */
 final class Screenshots
 {
@@ -17,26 +22,35 @@ final class Screenshots
 
     private const PAID = 'https://pro.microlink.io/';
 
-    /** The tallest picture kept: a long home page is cut there. */
-    private const MAX_HEIGHT = 5200;
+    /** A phone's width, and how much of the page the picture holds: a few screens. */
+    private const WIDTH = 390;
 
-    /** @return array{desktop: string|null, mobile: string|null} */
-    public static function take(string $url): array
-    {
-        return [
-            'desktop' => self::shot($url, ['viewport.width' => 1366, 'viewport.height' => 860], 1366),
-            'mobile' => self::shot($url, ['viewport.width' => 390, 'viewport.height' => 844, 'viewport.isMobile' => 'true', 'viewport.deviceScaleFactor' => 2], 780),
-        ];
-    }
+    private const HEIGHT = 2200;
 
-    /** @param array<string, scalar> $viewport */
-    private static function shot(string $url, array $viewport, int $width): ?string
+    /** How long the page is left to settle before its picture, in milliseconds. */
+    private const SETTLE_MS = 5000;
+
+    /** What fades or slides in on scroll is shown as it ends; nothing sticks out sideways. */
+    private const STYLES = 'html,body{overflow-x:hidden!important;max-width:100vw!important}'
+        .'[data-aos],.aos-init,.wow,.animate__animated,.reveal,[data-animate]{opacity:1!important;transform:none!important;visibility:visible!important}';
+
+    /** Down the page and back, so pictures that load on scroll are loaded. */
+    private const SCRIPTS = 'window.scrollTo(0,document.body.scrollHeight);setTimeout(function(){window.scrollTo(0,0)},1500);';
+
+    /** The picture, JPEG base64; null when none came. */
+    public static function take(string $url): ?string
     {
         $key = (string) config('services.microlink.key');
 
         try {
-            $answer = Http::timeout(60)->withHeaders($key !== '' ? ['x-api-key' => $key] : [])
-                ->get($key !== '' ? self::PAID : self::FREE, ['url' => $url, 'screenshot' => 'true', 'meta' => 'false', 'screenshot.fullPage' => 'true', 'waitForTimeout' => 1500, 'type' => 'jpeg'] + $viewport);
+            $answer = Http::timeout(90)->withHeaders($key !== '' ? ['x-api-key' => $key] : [])
+                ->get($key !== '' ? self::PAID : self::FREE, [
+                    'url' => $url, 'screenshot' => 'true', 'meta' => 'false', 'type' => 'jpeg',
+                    'waitUntil' => 'networkidle2', 'waitForTimeout' => self::SETTLE_MS,
+                    'viewport.width' => self::WIDTH, 'viewport.height' => self::HEIGHT, 'viewport.isMobile' => 'true',
+                    'viewport.hasTouch' => 'true', 'viewport.deviceScaleFactor' => 2,
+                    'styles' => self::STYLES, 'scripts' => self::SCRIPTS,
+                ]);
             $picture = (string) $answer->json('data.screenshot.url');
 
             if (! $answer->successful() || $picture === '') {
@@ -48,10 +62,10 @@ final class Screenshots
             return null;
         }
 
-        return self::jpeg($bytes, $width);
+        return self::jpeg($bytes, self::WIDTH * 2);
     }
 
-    /** The picture as JPEG at most $width wide and MAX_HEIGHT high, base64; null when it is no picture. */
+    /** The picture as JPEG at most $width wide, base64; null when it is no picture. */
     private static function jpeg(string $bytes, int $width): ?string
     {
         $image = $bytes !== '' ? @imagecreatefromstring($bytes) : false;
@@ -62,11 +76,11 @@ final class Screenshots
 
         $scale = min(1, $width / max(1, imagesx($image)));
         $w = (int) round(imagesx($image) * $scale);
-        $h = (int) min(self::MAX_HEIGHT, round(imagesy($image) * $scale));
+        $h = (int) round(imagesy($image) * $scale);
         $out = imagecreatetruecolor($w, $h);
-        imagecopyresampled($out, $image, 0, 0, 0, 0, $w, (int) round(imagesy($image) * $scale), imagesx($image), imagesy($image));
+        imagecopyresampled($out, $image, 0, 0, 0, 0, $w, $h, imagesx($image), imagesy($image));
         ob_start();
-        imagejpeg($out, null, 72);
+        imagejpeg($out, null, 76);
 
         return base64_encode((string) ob_get_clean());
     }

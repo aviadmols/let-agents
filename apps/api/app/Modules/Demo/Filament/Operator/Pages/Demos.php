@@ -4,6 +4,7 @@ namespace App\Modules\Demo\Filament\Operator\Pages;
 
 use App\Core\Facades\Settings;
 use App\Modules\Demo\Actions\SweepDemos;
+use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Models\DemoSite;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -80,6 +81,18 @@ class Demos extends Page
         $site->forceFill(['expires_at' => ($site->expires_at ?? now())->addDays((int) Settings::get('demo.keep_days'))])->save();
         DemoSite::query()->where('shop_id', $site->shop_id)->whereKeyNot($site->id)->update(['expires_at' => $site->expires_at]);
         Notification::make()->title(__('demo::operator.extended'))->success()->send();
+    }
+
+    /** The store's picture taken again (a page that came out broken, or a site that changed), for every demo showing it. */
+    public function reshoot(string $id): void
+    {
+        $site = DemoSite::query()->find($id);
+        if ($site === null || ! $site->live()) {
+            return;
+        }
+        $site->forceFill(['screenshot' => null, 'screenshot_mobile' => null, 'shot_at' => null])->save();
+        ShootDemoJob::dispatch($site->id);
+        Notification::make()->title(__('demo::operator.reshooting'))->success()->send();
     }
 
     public function endNow(string $id): void

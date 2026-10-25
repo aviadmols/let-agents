@@ -105,7 +105,7 @@ final class StartDemo
     private static function sendCode(DemoSite $site, string $code): void
     {
         try {
-            Mail::to($site->email)->locale($site->locale)->send(new DemoMail('code', $site, ['code' => $code]));
+            Mail::to($site->email)->locale(DemoSite::LOCALE)->send(new DemoMail('code', $site, ['code' => $code]));
         } catch (Throwable $e) {
             Log::warning('demo: the code could not be sent', ['demo' => $site->id, 'error' => $e->getMessage()]);
         }

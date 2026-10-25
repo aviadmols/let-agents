@@ -64,6 +64,7 @@
                                         @if ($demo->status === 'ready')
                                             · <x-filament::link tag="button" size="sm" wire:click="extend('{{ $demo->id }}')">{{ $t('extend') }}</x-filament::link>
                                         @endif
+                                        · <x-filament::link tag="button" size="sm" wire:click="reshoot('{{ $demo->id }}')">{{ $t('reshoot') }}</x-filament::link>
                                         · <x-filament::link tag="button" size="sm" color="danger" wire:click="endNow('{{ $demo->id }}')" wire:confirm="{{ $t('end_confirm') }}">{{ $t('end') }}</x-filament::link>
                                     @endif
                                 </td>

@@ -11,7 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Throwable;
 
 /**
- * The pictures of a demo's home page, for its background (Screenshots), taken while the store's scan runs. Done or
+ * The picture of a demo's home page, for its background (Screenshots), taken while the store's scan runs. Done or
  * given up on, shot_at says so: a demo without a picture still shows the search, and says why.
  */
 final class ShootDemoJob implements ShouldQueue
@@ -34,8 +34,8 @@ final class ShootDemoJob implements ShouldQueue
             return;
         }
 
-        $shots = Screenshots::take($site->url);
-        $site->forceFill(['screenshot' => $shots['desktop'], 'screenshot_mobile' => $shots['mobile'], 'shot_at' => now()])->save();
+        // a phone's picture only: the demo is shown in a phone, on a computer too
+        $site->forceFill(['screenshot' => null, 'screenshot_mobile' => Screenshots::take($site->url), 'shot_at' => now()])->save();
     }
 
     public function failed(?Throwable $e): void

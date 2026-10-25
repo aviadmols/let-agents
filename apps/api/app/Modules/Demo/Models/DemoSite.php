@@ -57,6 +57,9 @@ class DemoSite extends Model
 
     public const EXPIRED = 'expired';
 
+    /** The language of the demo's pages and emails; its search speaks the store's (choices.language). */
+    public const LOCALE = 'en';
+
     protected $guarded = [];
 
     protected $hidden = ['code_hash', 'screenshot', 'screenshot_mobile', 'ip_hash'];

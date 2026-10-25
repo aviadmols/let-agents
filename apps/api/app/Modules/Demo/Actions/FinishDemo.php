@@ -56,7 +56,7 @@ final class FinishDemo
 
         foreach (DemoSite::query()->where('shop_id', $site->shop_id)->where('status', DemoSite::READY)->whereNull('emailed_at')->get() as $ready) {
             try {
-                Mail::to($ready->email)->locale($ready->locale)->send(new DemoMail('ready', $ready));
+                Mail::to($ready->email)->locale(DemoSite::LOCALE)->send(new DemoMail('ready', $ready));
                 $ready->forceFill(['emailed_at' => now()])->save();
             } catch (Throwable $e) {
                 Log::warning('demo: the link could not be sent', ['demo' => $ready->id, 'error' => $e->getMessage()]);
