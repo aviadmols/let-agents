@@ -63,13 +63,23 @@ final class Colours
      * The colour a picture's words name first, the one it shows most ("צהוב בהיר" before the "לבן שבור" of its
      * buttons), with its tone: light, dark, or mid. Null when they name no colour.
      *
+     * With $colourFirst, a colour before a metal: a ring's words name its gold first ("זהב צהוב"), and its stone's colour is
+     * what its look is; the metal only when no colour is named.
+     *
      * @param  list<string>  $words  the picture's words, the most telling first
      * @return array{family: string, tone: string}|null
      */
-    public static function dominant(array $words): ?array
+    public static function dominant(array $words, bool $colourFirst = false): ?array
     {
+        if ($colourFirst) {
+            $colours = array_values(array_filter($words, fn ($phrase): bool => array_filter(self::mentions((string) $phrase), fn (array $m): bool => $m['group'] === self::COLOUR) !== []));
+            $words = $colours === [] ? $words : $colours;
+        }
         foreach ($words as $phrase) {
             $mentions = self::mentions((string) $phrase);
+            if ($colourFirst) {
+                $mentions = [...array_filter($mentions, fn (array $m): bool => $m['group'] === self::COLOUR), ...array_filter($mentions, fn (array $m): bool => $m['group'] !== self::COLOUR)];
+            }
             if ($mentions === []) {
                 continue;
             }

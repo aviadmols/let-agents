@@ -545,7 +545,7 @@ final class SearchCatalog
     private static function seenAlike(CatalogProduct $product, array $externalIds): array
     {
         $own = array_values((array) (RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words'])?->caption_words ?? []));
-        $colour = Colours::dominant($own);
+        $colour = Colours::dominant($own, colourFirst: true);
         if ($colour === null || $externalIds === []) {
             return $externalIds;
         }
@@ -555,7 +555,7 @@ final class SearchCatalog
         return array_values(array_filter($externalIds, function (string $id) use ($theirs, $colour, $printed): bool {
             $words = array_values((array) ($theirs->get($id)?->caption_words ?? []));
 
-            return Colours::near($colour, Colours::dominant($words)) >= self::SAME_COLOUR && self::patterned($words) === $printed;
+            return Colours::near($colour, Colours::dominant($words, colourFirst: true)) >= self::SAME_COLOUR && self::patterned($words) === $printed;
         }));
     }
 
