@@ -99,7 +99,8 @@ final class FirstScanTest extends TestCase
         Livewire::actingAs($operator)->test(FirstScanCard::class)->assertSee('סריקה מלאה מחדש');
 
         // The manager's card left the home with the first scan; they scan the changes from the scan summary.
-        $this->assertFalse(Livewire::actingAs($merchant)->test(FirstScanCard::class)->instance()::canView());
+        $this->actingAs($merchant);
+        $this->assertFalse(FirstScanCard::canView());
         app(ScansShops::class)->scanChanges($shop);
 
         Bus::assertChained(array_fill(0, count(FirstScan::CHANGES), FirstScanStep::class));
