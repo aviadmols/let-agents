@@ -62,6 +62,10 @@ return [
         'label' => 'When no product holds the words',
         'description' => 'When no product holds the search words ("science fiction" in a store with none), products by meaning are shown only if the nearest is at least this close. Otherwise the search says nothing was found and offers to ask the AI. A store whose names say little may set it lower.',
     ],
+    'check_questions_per_day' => [
+        'label' => 'AI questions a day from the search check',
+        'description' => 'How many questions to the AI the store\'s "Search check" screen may send a day. Each goes the whole way a shopper\'s question goes and costs as much; a search without the AI is not counted.',
+    ],
     'unknown_results' => [
         'label' => 'Products by meaning for an unknown word',
         'description' => 'When a search holds a word the catalogue has nothing close to ("shirt" in a jewellery store), at most this many products join by meaning or picture, and the drawer says the word was not found on the site. What is truly close ("a light beam": a pine plank) is still shown.',

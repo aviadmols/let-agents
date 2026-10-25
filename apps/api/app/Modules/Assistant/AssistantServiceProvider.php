@@ -14,6 +14,7 @@ use App\Modules\Admin\Contracts\ReadsContentAgain;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Admin\Contracts\TimelineSource;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\SuggestQuestions;
 use App\Modules\Assistant\Console\AnswerReportCommand;
@@ -28,6 +29,7 @@ use App\Modules\Assistant\Console\RetrievalBenchCommand;
 use App\Modules\Assistant\Console\ReviewAsksCommand;
 use App\Modules\Assistant\Console\WriterBenchCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
+use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Listeners\ReadShopKnowledge;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\AssistantDailySummaries;
@@ -58,6 +60,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         // What this module counted, for the first-run screens.
         $this->app->tag([AssistantShopFacts::class], ShopFacts::TAG);
         $this->app->bind(SuggestsQuestions::class, SuggestQuestions::class);
+        // A question asked from the search check screen (the Search module), nothing of it kept.
+        $this->app->bind(TriesQuestions::class, AnswerSiteQuestion::class);
         //
     }
 

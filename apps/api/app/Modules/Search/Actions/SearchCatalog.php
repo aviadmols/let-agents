@@ -23,6 +23,7 @@ use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
+use App\Modules\Search\Support\SearchTrace;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -128,6 +129,9 @@ final class SearchCatalog
     /** A filter about colour or metal ("מתכת", "צבע האבן", variant_color): the shop sorts by it. Not a name that looks like a colour. */
     private const COLOUR_FILTER = '/colou?r|metal|צבע|מתכת/iu';
 
+    /** What the search being explained did, stage by stage (explain()); null for a shopper's search. */
+    private ?SearchTrace $trace = null;
+
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly SemanticSearch $semantic,
@@ -136,6 +140,23 @@ final class SearchCatalog
         private readonly KeepPhotoSearch $keeper,
         private readonly RankPhotoResults $ranker,
     ) {}
+
+    /**
+     * One search as a shopper's Enter runs it, with what each stage did, for the search check screen: how each
+     * result was found and why what was found was left out. Never counted; nothing about it is kept.
+     *
+     * @return array{result: array<string, mixed>, trace: SearchTrace}
+     */
+    public function explain(string $shopId, string $query, int $perGroup): array
+    {
+        $trace = $this->trace = new SearchTrace;
+
+        try {
+            return ['result' => $this->handle($shopId, $query, null, false, $perGroup), 'trace' => $trace];
+        } finally {
+            $this->trace = null;
+        }
+    }
 
     /**
      * @param  list<string>|null  $only  groups to return; null for all
@@ -178,6 +199,10 @@ final class SearchCatalog
                 }
             }
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
+            $this->trace?->step('read', array_filter([
+                'short' => $index === null, 'min_price' => $minPrice, 'max_price' => $maxPrice, 'without' => $without,
+                'actions' => $actions['ids'], 'sentence' => $sentence === null ? null : $query, 'facets' => array_values(array_merge(...array_values($read ?: [[]]))),
+            ], fn ($v): bool => $v !== null && $v !== [] && $v !== false));
 
             if ($index === null || $query === '') {
                 return $empty;
@@ -207,6 +232,7 @@ final class SearchCatalog
             if ($spelling === [] && str_contains($query, ' ') && $asks) {
                 $about = HebrewSearch::aboutWords($index['engine'], $query);
                 $spelling = $about !== '' && $about !== $query ? HebrewSearch::search($index['engine'], $about) : [];
+                $this->trace?->step('read', ['about' => $about]);
             }
             // A guide or a page is a result only when it holds every word: one that shares a word of
             // "מברגה שחורה" is not about black screwdrivers. Products keep their wider net.
@@ -224,6 +250,15 @@ final class SearchCatalog
                 ? array_values(array_filter(DescribedProducts::find($shopId, (string) $index['hash'], $query), fn (string $id): bool => isset($index['records'][$id])))
                 : [];
             $describedIds = array_flip($described);
+            if ($this->trace !== null) {
+                $this->trace->step('read', array_filter(['question' => $asks, 'code' => $code, 'single' => $single['id'] ?? null]));
+                foreach ($spelling as $hit) {
+                    $this->trace->found($hit['id'], 'words', ['exact' => (bool) $hit['exact'], 'full' => (bool) ($hit['full'] ?? false)]);
+                }
+                foreach ($described as $id) {
+                    $this->trace->found($id, 'description');
+                }
+            }
             $byMeaning = $meaning && ! $code;
             // "חולצה עם האות M" in a jewellery store: a word the catalogue has nothing close to asks for what the store may not
             // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
@@ -239,13 +274,17 @@ final class SearchCatalog
             // The words found a few already and say nothing of how it looks: no cover is near "a story about captivity"
             // more than any other, and the pictures would only pad them ("השבט", "העדן" after the books about captivity).
             $pictures = $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)) ? $this->pictures($shopId, $query, $index['records']) : [];
+            $this->trace?->step('pictures', ['ran' => $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)), 'words_found' => count($spelled)]);
             // a question about a need ("איך מחברים קרשים לדק?") is not held to it: its guide and what the guide names answer it
             $weak = $byMeaning && ! $asks && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)
                 && ($pictures === [] || ! HebrewSearch::visual($query));
             if ($weak) {
+                $this->trace?->dropped([...$near['products'], ...$pictures], [], 'meaning_far');
+                $this->trace?->step('meaning', ['far' => true]);
                 $near['products'] = [];
                 $pictures = [];
             }
+            $this->trace?->step('read', ['unknown' => $unknown]);
             $meaning = $near['products'];
             // Guides and pages found by meaning are a group of their own, never a rank among products: an
             // old article never pushes a product down. What a guide about the need links to may still be
@@ -253,18 +292,25 @@ final class SearchCatalog
             $guides = $this->guides($shopId, $near['content'], $index['records']);
             if ($unknown !== []) {
                 $few = (int) Settings::get('search.unknown_results', $shopId);
+                $this->trace?->dropped([...$meaning, ...$pictures], [...array_slice($meaning, 0, $few), ...array_slice($pictures, 0, $few)], 'unknown_few');
                 $meaning = array_slice($meaning, 0, $few);
                 $pictures = array_slice($pictures, 0, $few);
             }
+            // what each filter below leaves out, for the check screen
+            $ids = function () use (&$spelling, &$meaning, &$pictures): array {
+                return $this->trace === null ? [] : [...array_column($spelling, 'id'), ...$meaning, ...$pictures];
+            };
 
             // "טבעת יהלום סוליטר בכסף": when products hold every word, only they are shown, however
             // close by meaning or by picture a gold solitaire or a silver zircon ring may be. The
             // search widens to products holding most of the words only when none holds them all.
             if (str_contains($query, ' ') && ($whole = self::whole($spelling)) !== []) {
+                $before = $ids();
                 $spelling = array_values(array_filter($spelling, fn (array $hit): bool => isset($whole[$hit['id']]) || ! str_starts_with($hit['id'], 'p:')));
                 $keep = fn (string $id): bool => isset($whole[$id]) || ! str_starts_with($id, 'p:');
                 $meaning = array_values(array_filter($meaning, fn (string $id): bool => $keep($id) || isset($describedIds[$id])));
                 $pictures = array_values(array_filter($pictures, $keep));
+                $this->trace?->dropped($before, $ids(), 'not_all_words');
             }
             // "טופז": one word that many products hold as typed is what the shopper asked for. The stones only close to
             // it by meaning or by picture (citrine, a yellow sapphire) are left out. When few hold it ("בטריה" in a store
@@ -277,9 +323,11 @@ final class SearchCatalog
                     }
                 }
                 if (count($typed) >= (int) Settings::get('search.word_enough', $shopId)) {
+                    $before = $ids();
                     $spelling = array_values(array_filter($spelling, fn (array $hit): bool => isset($typed[$hit['id']]) || ! str_starts_with($hit['id'], 'p:')));
                     $meaning = array_values(array_filter($meaning, fn (string $id): bool => isset($typed[$id]) || isset($describedIds[$id]) || ! str_starts_with($id, 'p:')));
                     $pictures = array_values(array_filter($pictures, fn (string $id): bool => isset($typed[$id]) || ! str_starts_with($id, 'p:')));
+                    $this->trace?->dropped($before, $ids(), 'word_enough');
                 }
             }
             // "עגילים עד 500": with a price, what the words name is decided before the price, never
@@ -289,14 +337,19 @@ final class SearchCatalog
             // is that cheap the stud earrings would be all that is left.
             $products = array_values(array_filter($spelling, fn (array $hit): bool => str_starts_with($hit['id'], 'p:')));
             if (($minPrice !== null || $maxPrice !== null) && $products !== []) {
+                $before = $ids();
                 $exact = array_values(array_filter($products, fn (array $hit): bool => $hit['exact']));
                 $held = array_flip(array_column($exact !== [] ? $exact : $products, 'id'));
                 $keep = fn (string $id): bool => isset($held[$id]) || ! str_starts_with($id, 'p:');
                 $spelling = array_values(array_filter($spelling, fn (array $hit): bool => $keep($hit['id'])));
                 $meaning = array_values(array_filter($meaning, $keep));
                 $pictures = array_values(array_filter($pictures, $keep));
+                $this->trace?->dropped($before, $ids(), 'price_words');
             }
             $pinned = $this->resolved($query, $index['records']);
+            foreach ($this->trace === null ? [] : $pinned as $id) {
+                $this->trace->found($id, 'resolved');
+            }
             // A question about a kind of product ("איזה עץ…") shows that kind first: products of the
             // categories named after it, before products that only mention the word (a bracket
             // "לעמודי עץ"). The assistant then picks from them too.
@@ -324,10 +377,14 @@ final class SearchCatalog
                 $type = $record['t'] ?? null;
 
                 if ($record !== null && $without !== [] && $type === 'product' && HebrewSearch::holdsAny($record['title'].' '.($record['kw'] ?? ''), $without)) {
+                    $this->trace?->left($id, 'without');
+
                     continue;
                 }
 
                 if ($record !== null && $type === 'product' && ! HebrewSearch::inRange($record['pr'] ?? null, $minPrice, $maxPrice)) {
+                    $this->trace?->left($id, 'price');
+
                     continue;
                 }
 
@@ -345,13 +402,17 @@ final class SearchCatalog
             // "עגילי חישוק זהב צהוב עם אבנים שקופות": the colours named, each with its part, weigh as in a
             // photo search: what agrees comes first, what says another metal or colour goes after the rest.
             $groups['product'] = self::byColour($groups['product'], Colours::parts([$priced]));
+            $before = array_column($groups['product'], 'id');
             if ($read !== []) {
                 // only what holds every value read: nothing else is shown as if it were asked for (the drawer then offers the AI)
                 $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $values, int $at): bool => self::holdsRead($r, $at, $values, (array) ($index['facets'] ?? [])))));
+                $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'facet');
             }
 
             // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
+            $before = array_column($groups['product'], 'id');
             $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
+            $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'action');
 
             // The one product first, wherever the merge put it, and also when only its code found it.
             if ($single !== null) {
@@ -421,7 +482,10 @@ final class SearchCatalog
         // "ספרים" and showed every book by its title after the books about captivity (Sela, 25.10).
         $inCategories = CatalogProduct::query()->active()->whereHas('categories', fn ($q) => $q->whereIn('external_id', $categories));
         $members = (clone $inCategories)->count();
+        $names = array_map(fn (string $id): string => (string) ($index['records']['k:'.$id]['title'] ?? $id), $categories);
         if ($members > self::SUBJECT_MAX_PRODUCTS && $members > self::SUBJECT_MAX_SHARE * CatalogProduct::query()->active()->count()) {
+            $this->trace?->step('subject', ['wide' => $names, 'members' => $members]);
+
             return [];
         }
 
@@ -430,8 +494,12 @@ final class SearchCatalog
             ->limit(200)->pluck('external_id')->map(fn ($id): string => 'p:'.$id)->all();
         $members = array_values(array_filter($members, fn (string $id): bool => isset($index['records'][$id])));
         $found = array_values(array_intersect(array_column($spelling, 'id'), $members));
+        $subject = array_slice(array_values(array_unique([...$found, ...$members])), 0, self::SUBJECT_PRODUCTS);
+        foreach ($this->trace === null ? [] : $subject as $id) {
+            $this->trace->found($id, 'subject', ['categories' => $names]);
+        }
 
-        return array_slice(array_values(array_unique([...$found, ...$members])), 0, self::SUBJECT_PRODUCTS);
+        return $subject;
     }
 
     /**
@@ -1151,6 +1219,8 @@ final class SearchCatalog
     private function meaning(string $shopId, string $query, array $records, array $spelled = []): array
     {
         if (! Features::enabled('search.semantic', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
+            $this->trace?->step('meaning', ['off' => true]);
+
             return ['products' => [], 'content' => [], 'best' => 0.0];
         }
 
@@ -1161,6 +1231,8 @@ final class SearchCatalog
         $floor = fn (string $id): float => count($found) >= self::SPELLED_ENOUGH && ! isset($found[$id]) ? $strict : $usual;
         // best: how near the nearest product is, whatever the floor
         $out = ['products' => [], 'content' => [], 'best' => 0.0];
+        // the nearest that stayed under the floor, for the check screen: what a lower floor would have let in
+        $below = [];
 
         foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {
             if ($hit['source'] !== 'product') {
@@ -1174,8 +1246,13 @@ final class SearchCatalog
 
             if ($hit['similarity'] >= $floor($id) && isset($records[$id])) {
                 $out['products'][] = $id;
+                $this->trace?->found($id, 'meaning', ['similarity' => round((float) $hit['similarity'], 3)]);
+            } elseif ($this->trace !== null && isset($records[$id]) && count($below) < 5) {
+                $below[] = ['id' => $id, 'title' => (string) $records[$id]['title'], 'similarity' => round((float) $hit['similarity'], 3), 'floor' => $floor($id)];
             }
         }
+
+        $this->trace?->step('meaning', ['best' => round($out['best'], 3), 'floor' => $usual, 'strict' => $strict, 'strict_used' => count($found) >= self::SPELLED_ENOUGH, 'below' => $below]);
 
         return $out;
     }
@@ -1258,6 +1335,7 @@ final class SearchCatalog
 
                 if ($id !== null && isset($records[$id]) && ! in_array($id, $ids, true)) {
                     $ids[] = $id;
+                    $this->trace?->found($id, 'guide', ['guide' => (string) ($records['c:'.$external]['title'] ?? '')]);
                 }
             }
         }
@@ -1286,6 +1364,7 @@ final class SearchCatalog
 
             if ($hit['similarity'] >= $floor && isset($records[$id])) {
                 $ids[] = $id;
+                $this->trace?->found($id, 'picture', ['similarity' => round((float) $hit['similarity'], 3)]);
             }
         }
 

@@ -655,6 +655,22 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(2, $this->calls, 'and the checker judged them like any pick');
     }
 
+    public function test_a_trial_from_the_search_check_goes_the_whole_way_and_keeps_nothing(): void
+    {
+        $this->replies = [
+            ['found' => true, 'answer' => 'למטר דק צריך כ-30 ברגים.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $tried = app(AnswerSiteQuestion::class)->trial($this->shop->id, 'כמה ברגים צריך למטר דק?', [], 'he');
+
+        $this->assertSame(['answered', 'model'], [$tried['outcome'], $tried['from']]);
+        $this->assertCount(2, $this->calls, 'written and checked, as a shopper\'s');
+        $this->assertSame('כמה ברגים צריך למטר דק', $tried['trial']['looks'][0]['pages'][0]['title'] ?? null, 'with what the writer was given');
+        $this->assertNotNull($tried['trial']['run_id'] ?? null, 'and its run, paid for and accounted');
+        $this->assertSame([0, 0], $this->inShop(fn (): array => [AssistantAnswer::query()->count(), AssistantSearchAsk::query()->count()]), 'no saved answer for the next shopper, no ask in the reports');
+    }
+
     public function test_a_question_from_a_product_page_is_about_that_product_never_a_saved_answer(): void
     {
         $this->drills();

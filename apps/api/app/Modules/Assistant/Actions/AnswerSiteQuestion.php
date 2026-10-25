@@ -16,6 +16,7 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductSets;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
@@ -42,6 +43,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 /**
  * Answers a question typed in the store's search box, about the whole site rather than one page,
@@ -64,7 +66,7 @@ use Illuminate\Support\Facades\Cache;
  * Every question asked is logged with what was shown and what came of it, for the shop's report
  * and the daily review. Every call asks SpendGuard first and records tokens and cost on one run.
  */
-final class AnswerSiteQuestion
+final class AnswerSiteQuestion implements TriesQuestions
 {
     public const AGENT = 'assistant.site_answerer';
 
@@ -185,6 +187,12 @@ final class AnswerSiteQuestion
     /** Whether the question being handled is within the day's questions, once asked (withinDailyLimits). */
     private ?bool $allowed = null;
 
+    /** A trial from the search check screen (trial()): the whole way a shopper's question goes, nothing of it kept. */
+    private bool $trial = false;
+
+    /** @var list<array<string, mixed>> in a trial, what each look gave the writer: the pages and the products */
+    private array $looked = [];
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -243,13 +251,36 @@ final class AnswerSiteQuestion
     }
 
     /**
+     * A question asked from the search check screen, the whole way a shopper's goes (the barrier, code, a set, the saved
+     * answers, the pages, the writer and the checker), as a new visitor. Nothing of it is kept: no saved answer written
+     * or counted, no ask logged, no visitor's daily questions used, no one marked an offender. Every model call is still
+     * paid for and accounted (SpendGuard, the ledger, the run). With what code saw on the way, for the screen.
+     *
+     * @param  list<string>  $products  external ids of the products the search showed, best first
+     * @return array<string, mixed> handle()'s result, with trial: the run, the models, the verdict, why not, and what each look gave the writer
+     */
+    public function trial(string $shopId, string $question, array $products, string $locale): array
+    {
+        $this->trial = true;
+        $this->looked = [];
+
+        try {
+            return $this->handle($shopId, $question, 'trial:'.Str::random(20), $locale, $products);
+        } finally {
+            $this->trial = false;
+            $this->looked = [];
+        }
+    }
+
+    /**
      * The barrier before everything else (see Barrier). Null when the question may go on.
      *
      * @return array<string, mixed>|null
      */
     private function guarded(string $shopId, string $question, string $visitorHash, string $locale): ?array
     {
-        $stop = Barrier::check($shopId, $question, $visitorHash, Barrier::ip(), $locale);
+        // a trial is no visitor: the team's own address is never marked an offender for what it tried
+        $stop = Barrier::check($shopId, $question, $visitorHash, $this->trial ? null : Barrier::ip(), $locale);
 
         if ($stop === null) {
             return null;
@@ -353,7 +384,9 @@ final class AnswerSiteQuestion
         // or the team approved it). Before that, only a visitor who already got it gets it again,
         // and asking again changes nothing; a new visitor is answered afresh, through every check.
         if ($answered && ($saved->isShared() || $saved->askedBy($visitorHash))) {
-            $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
+            if (! $this->trial) {
+                $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
+            }
 
             return [
                 'outcome' => AssistantAnswer::ANSWERED,
@@ -367,7 +400,9 @@ final class AnswerSiteQuestion
 
         // "Not found" and "not ours to answer" are the same for everyone, and show nothing written.
         if ($saved !== null && ! $answered) {
-            $saved->forceFill(['last_asked_at' => now()])->save();
+            if (! $this->trial) {
+                $saved->forceFill(['last_asked_at' => now()])->save();
+            }
             $outcome = $saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : ($products === [] ? 'no_info' : 'no_match');
 
             return $this->fixed($outcome, $locale, 'bank') + ['answer_id' => $saved->id]
@@ -1062,7 +1097,7 @@ final class AnswerSiteQuestion
                     if ($scoped['harmful'] || $scoped['injection']) {
                         // A rule broken: counted against the visitor, and nothing is saved, so the next
                         // asker is checked again.
-                        if ($remember && $visitorHash !== null) {
+                        if ($remember && $visitorHash !== null && ! $this->trial) {
                             Offenders::record($shopId, $visitorHash, Barrier::ip());
                         }
                         $reason = $scoped['harmful'] ? 'harmful' : 'injection';
@@ -1106,6 +1141,15 @@ final class AnswerSiteQuestion
                     'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];
                 $trace = ['context' => $context, 'debug' => $prepared['debug']];
                 $noAnswer = $shown === [] ? AssistantAnswer::NO_INFO : 'no_match';
+                // what the writer is given, for the check screen: the pages by name and kind, the products by name
+                if ($this->trial) {
+                    $this->looked[] = [
+                        'question' => $corrected ?? $question,
+                        'pages' => array_values(array_map(fn (array $p): array => array_filter(['title' => (string) ($p['title'] ?? ''), 'source' => $p['source'] ?? null, 'kind' => $p['kind'] ?? null, 'from' => $p['from'] ?? null]), $byRef)),
+                        'products' => array_values(array_map(fn (array $p): string => (string) ($p['title'] ?? ''), $productsByRef)),
+                        'chars' => mb_strlen($input),
+                    ];
+                }
 
                 if ($prepared['empty']) {
                     if ($remember && $keep) {
@@ -1206,7 +1250,7 @@ final class AnswerSiteQuestion
                         // An attempt to instruct the assistant counts against the visitor.
                         $flags['safe'] = $applied['safe'];
                         $flags['injection'] = $flags['injection'] || $applied['injection'];
-                        if ($flags['injection'] && $remember && $visitorHash !== null) {
+                        if ($flags['injection'] && $remember && $visitorHash !== null && ! $this->trial) {
                             Offenders::record($shopId, $visitorHash, Barrier::ip());
                         }
                     }
@@ -2155,6 +2199,18 @@ final class AnswerSiteQuestion
             return $result;
         }
 
+        // A trial is logged nowhere: what the ask would have said goes back to the check screen instead.
+        if ($this->trial) {
+            $answered = $this->answered ?? [];
+            $this->answered = null;
+
+            return $result + ['trial' => [
+                'reason' => $result['reason'] ?? null,
+                'failure' => AnswerFailure::classify((string) $result['outcome'], $result['reason'] ?? null, $answered['verdict'] ?? null, (array) ($answered['trace'] ?? [])),
+                'looks' => $this->looked,
+            ] + $answered, 'whatsapp' => $whatsapp] + ($result['outcome'] === AssistantAnswer::ANSWERED ? [] : ['no_answer' => NoAnswer::offer($shopId)]);
+        }
+
         $ask = AssistantSearchAsk::query()->create([
             'shop_id' => $shopId,
             'day' => now()->toDateString(),
@@ -2308,6 +2364,11 @@ final class AnswerSiteQuestion
     {
         // From a storefront request, its address counts too; from the console there is none. Asked
         // once a question: a set that found nothing hands the question on without counting it twice.
+        // a trial uses no visitor's questions (the check screen holds the shop to its own daily trials)
+        if ($this->trial) {
+            return true;
+        }
+
         return $this->allowed ??= DailyQuestions::allow($shopId, $visitorHash, app()->runningInConsole() && ! app()->runningUnitTests() ? null : request()->ip());
     }
 
@@ -2361,6 +2422,10 @@ final class AnswerSiteQuestion
      */
     private function save(string $question, string $outcome, ?string $answer, array $sources, array $picks, ?string $model, array $replies, RunContext $run, ?array $flags = null): ?AssistantAnswer
     {
+        // A trial is the team's, never the next shopper's.
+        if ($this->trial) {
+            return null;
+        }
         // A question about a product it named, not answered: never kept, so the next asker is answered afresh.
         if ($outcome !== AssistantAnswer::ANSWERED && $this->namedTitles !== []) {
             return null;
