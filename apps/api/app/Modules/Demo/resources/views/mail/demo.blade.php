@@ -11,7 +11,7 @@
         </div>
         <div style="padding:28px">
             <h1 style="margin:0 0 12px;font-size:22px;font-weight:500;letter-spacing:-.02em">{{ $t('title', ['site' => $name]) }}</h1>
-            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#3a3a40">{{ $t('lead', ['site' => $name, 'date' => $site->expires_at?->locale(app()->getLocale())->translatedFormat('j.n.Y') ?? '']) }}</p>
+            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#3a3a40">{{ $kind === 'alert' ? ($data['what'] ?? '') : $t('lead', ['site' => $name, 'date' => $site->expires_at?->locale(app()->getLocale())->translatedFormat('j.n.Y') ?? '']) }}</p>
             @if ($kind === 'code')
                 <p style="margin:0 0 20px;font-size:34px;font-weight:600;letter-spacing:.3em;direction:ltr;text-align:center;background:#0b0b0c;color:#e2ff78;border-radius:16px;padding:16px 0">{{ $data['code'] ?? '' }}</p>
                 <p style="margin:0;font-size:13px;color:#5f5f67;line-height:1.6">{{ $t('note') }}</p>

@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
+use App\Modules\Demo\Actions\AlertDemos;
 use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
 use App\Modules\Demo\Filament\Operator\Pages\Demos;
@@ -58,7 +59,7 @@ final class DemoFlowTest extends TestCase
     {
         $this->start($input);
         $site = DemoSite::query()->latest('id')->firstOrFail();
-        $this->post('/demo/'.$site->token.'/verify', ['code' => Mail::sent(DemoMail::class)->last()->data['code']]);
+        $this->post('/demo/'.$site->token.'/verify', ['code' => Mail::sent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'code' && $m->site->is($site))->last()->data['code']]);
 
         return $site->refresh();
     }
@@ -260,6 +261,26 @@ final class DemoFlowTest extends TestCase
                 ->assertSee(__('demo::operator.pictures_none'))->assertSee(__('demo::operator.rescan'))->assertSee(__('demo::operator.delete'))
                 ->assertSee('model-calls?shop='.$site->shop_id, false)->assertSee('data-runs', false);
         }
+    }
+
+    public function test_the_team_is_told_once_by_email_of_a_demo_that_failed_or_a_scan_that_stopped(): void
+    {
+        $operator = User::factory()->operator()->create();
+        $failed = $this->verified();
+        $failed->forceFill(['status' => DemoSite::FAILED, 'error' => 'unreachable'])->save();
+
+        $this->travel(1)->minutes();
+        Http::fake(['https://other.test/' => Http::response('<html><title>Other</title></html>')]);
+        $stalled = $this->verified(['url' => 'https://other.test', 'email' => 'other@store.test']);
+        $stalled->forceFill(['scan_at' => now()])->save();
+
+        $this->assertSame(1, app(AlertDemos::class)->handle(), 'the failed one; the other has only just begun');
+        Mail::assertSent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'alert' && $m->hasTo($operator->email) && str_contains($m->data['what'], 'Your site did not answer us'));
+
+        $this->travel(AlertDemos::STALLED_MINUTES + 1)->minutes();
+        $this->assertSame(1, app(AlertDemos::class)->handle(), 'the stalled one now; the failed one was told already');
+        $this->assertSame(0, app(AlertDemos::class)->handle(), 'each problem once');
+        $this->assertSame(2, Mail::sent(DemoMail::class, fn (DemoMail $m): bool => $m->kind === 'alert')->count());
     }
 
     public function test_the_team_scans_a_demo_again_from_the_start(): void

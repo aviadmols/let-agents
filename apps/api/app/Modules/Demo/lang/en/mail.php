@@ -14,4 +14,14 @@ return [
         'button' => 'Open the demo',
         'note' => 'The demo is available until :date, then deleted with everything read from the site.',
     ],
+    'alert' => [
+        'subject' => 'Lets demo: :site needs a look',
+        'title' => 'The demo of :site needs a look',
+        'button' => 'Open the demos list',
+        'note' => 'Told once for this problem. The demos list has its cost, agent log and a button to scan it again.',
+    ],
+    'problems' => [
+        'failed' => 'The demo of :site failed: :error.',
+        'stalled' => 'The scan of :site has done nothing for :minutes minutes (last at :at). A step may have been cut off or be held.',
+    ],
 ];

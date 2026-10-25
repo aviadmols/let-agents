@@ -56,6 +56,12 @@ final class VerifyDemo
             return;
         }
 
+        // a demo of the same store that failed or ended still holds its store (the sweep deletes it a day on): it
+        // goes now, or the new store would not be built on the same address
+        DemoSite::query()->where('host', $site->host)->whereKeyNot($site->id)->whereNotNull('shop_id')
+            ->whereIn('status', [DemoSite::FAILED, DemoSite::EXPIRED, DemoSite::SCANNING, DemoSite::READY])->get()
+            ->each(fn (DemoSite $old) => SweepDemos::end($old));
+
         $this->build->handle($site);
         PrepareDemoJob::dispatch($site->id)->onQueue('long');
     }

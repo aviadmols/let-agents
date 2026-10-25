@@ -10,8 +10,9 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * To whoever asked for a demo, in the language they asked in: the code that proves the email is theirs ('code'), or
- * the link to their store's demo once it is ready, and until when it lasts ('ready').
+ * To whoever asked for a demo, in the demo's language: the code that proves the email is theirs ('code'), or the
+ * link to their store's demo once it is ready, and until when it lasts ('ready'). To the team, in the panel's
+ * language: a demo that needs them, what happened and a link to the demos list ('alert', AlertDemos).
  */
 final class DemoMail extends Mailable
 {
@@ -32,6 +33,6 @@ final class DemoMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'demo::mail.demo', with: ['link' => route('demo.show', $this->site->token)]);
+        return new Content(view: 'demo::mail.demo', with: ['link' => $this->data['link'] ?? route('demo.show', $this->site->token)]);
     }
 }

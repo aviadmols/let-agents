@@ -24,7 +24,9 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 /**
  * The second vector of every scanned picture: what it shows. A model that sees pictures writes a
@@ -70,7 +72,6 @@ final class CaptionImages implements CaptionsPictures
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
-        private readonly VisionModel $vision,
         private readonly Embedder $embedder,
         private readonly SpendGuard $spend,
     ) {}
@@ -183,39 +184,33 @@ final class CaptionImages implements CaptionsPictures
             $described = [];
 
             try {
+                // The batch's pictures read side by side (retrieval.caption_parallel at once), SpendGuard first for all.
+                $this->spend->assertCanSpend($batch->count() * (self::PHOTO_TOKENS * $in + $maxOutput * $out) / 1_000_000);
+                $read = $this->readAll($shopId, $batch, $reader, $model, $system, $language, $maxOutput, $in, $out);
+
                 foreach ($batch as $image) {
-                    $picture = $this->fetch($image);
+                    $reply = $read[$image->id] ?? ['outcome' => 'error'];
 
-                    if ($picture === null) {
-                        $stats['skipped']++;
-
-                        continue;
-                    }
-
-                    $this->spend->assertCanSpend((self::PHOTO_TOKENS * $in + $maxOutput * $out) / 1_000_000);
-                    try {
-                        // The store's name for it, so the description uses the store's words ("רובי" for a red stone).
-                        $user = 'The store calls this product: '.mb_substr((string) $image->title, 0, 300).'
-'.($language === 'Hebrew' ? '' : "The store's language: {$language}.\n").'Describe this product photo.';
-                        $reply = $this->vision->jsonWithImage($reader, $model, $system, $user, $picture['mime'], $picture['data'], $maxOutput, 'low');
-                    } catch (ModelCallFailed $e) {
+                    if ($reply['outcome'] === 'refused') {
                         // One picture the model will not read (too big, a format it refuses) is passed
                         // over for good, so the next run does not pay again for the ones before it.
-                        report($e);
                         RetrievalImage::query()->whereKey($image->id)->update(['caption_key' => self::key($image->url_hash, $model, $language), 'caption_model' => $text->model, 'caption' => null, 'captioned_at' => now()]);
+                    }
+
+                    if ($reply['outcome'] !== 'read') {
                         $stats['skipped']++;
 
                         continue;
                     }
-                    $cost = $reply->costUsd($in, $out);
-                    $run->usage($reader->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $cost);
-                    $stats['cost_usd'] += $cost;
 
-                    $caption = trim(mb_substr((string) ($reply->data['caption'] ?? ''), 0, 500));
+                    $run->usage($reader->value, $model, $reply['input'], $reply['output'], 0, $reply['cost']);
+                    $stats['cost_usd'] += $reply['cost'];
+
+                    $caption = trim(mb_substr((string) ($reply['data']['caption'] ?? ''), 0, 500));
                     // A stone's name is never a look: a word that names one is left out, whatever the model wrote.
                     $words = array_values(array_unique(array_filter(array_map(
                         fn ($w): string => trim(mb_substr(is_string($w) ? $w : '', 0, 40)),
-                        array_slice((array) ($reply->data['words'] ?? []), 0, self::MAX_WORDS),
+                        array_slice((array) ($reply['data']['words'] ?? []), 0, self::MAX_WORDS),
                     ), fn (string $w): bool => $w !== '' && preg_match(self::STONE_NAMES, $w) !== 1)));
 
                     if ($caption === '' && $words === []) {
@@ -328,6 +323,79 @@ final class CaptionImages implements CaptionsPictures
                     $stats['embedded_again']++;
                 }
             }
+        }
+    }
+
+    /**
+     * A batch's pictures, each fetched and read by the vision model, retrieval.caption_parallel at once: one at a
+     * time, 300 pictures were a quarter of an hour. Side by side each in a process of its own (Concurrency), which
+     * is handed only the picture's id, never its bytes, and fetches it itself; at 1, one after another here.
+     *
+     * @param  Collection<int, RetrievalImage>  $batch
+     * @return array<int|string, array{outcome: string, data?: array<string, mixed>, input?: int, output?: int, cost?: float}> by picture id
+     */
+    private function readAll(string $shopId, Collection $batch, AiProviderName $reader, string $model, string $system, string $language, int $maxOutput, float $in, float $out): array
+    {
+        $tasks = [];
+        foreach ($batch as $image) {
+            // The store's name for it, so the description uses the store's words ("רובי" for a red stone).
+            $user = 'The store calls this product: '.mb_substr((string) $image->title, 0, 300).'
+'.($language === 'Hebrew' ? '' : "The store's language: {$language}.\n").'Describe this product photo.';
+            $id = $image->id;
+            $provider = $reader->value;
+            $tasks[$id] = static fn (): array => self::readOne($shopId, $id, $provider, $model, $system, $user, $maxOutput, $in, $out);
+        }
+
+        $parallel = max(1, (int) Settings::get('retrieval.caption_parallel'));
+        if ($parallel === 1) {
+            return array_map(fn (callable $task): array => $task(), $tasks);
+        }
+
+        $read = [];
+        foreach (array_chunk($tasks, $parallel, true) as $chunk) {
+            try {
+                $read += Concurrency::run($chunk);
+            } catch (Throwable $e) {
+                // the side-by-side reading itself failed (no process could start): these pictures wait for the next run
+                report($e);
+            }
+        }
+
+        return $read;
+    }
+
+    /**
+     * One picture fetched and read, where it runs (a process of its own, or here): read, not there to read, refused by
+     * the model (passed over for good), or an error of the moment (tried again next time). What it cost is counted by
+     * the run that asked.
+     *
+     * @return array{outcome: string, data?: array<string, mixed>, input?: int, output?: int, cost?: float}
+     */
+    public static function readOne(string $shopId, int|string $imageId, string $provider, string $model, string $system, string $user, int $maxOutput, float $in, float $out): array
+    {
+        try {
+            return app(TenantContext::class)->run($shopId, function () use ($imageId, $provider, $model, $system, $user, $maxOutput, $in, $out): array {
+                $image = RetrievalImage::query()->find($imageId);
+                $picture = $image === null ? null : app(self::class)->fetch($image);
+
+                if ($picture === null) {
+                    return ['outcome' => 'no_picture'];
+                }
+
+                try {
+                    $reply = app(VisionModel::class)->jsonWithImage(AiProviderName::from($provider), $model, $system, $user, $picture['mime'], $picture['data'], $maxOutput, 'low');
+                } catch (ModelCallFailed $e) {
+                    report($e);
+
+                    return ['outcome' => 'refused'];
+                }
+
+                return ['outcome' => 'read', 'data' => $reply->data, 'input' => $reply->inputTokens, 'output' => $reply->outputTokens, 'cost' => $reply->costUsd($in, $out)];
+            });
+        } catch (Throwable $e) {
+            report($e);
+
+            return ['outcome' => 'error'];
         }
     }
 

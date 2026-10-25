@@ -143,6 +143,10 @@ return [
         'label' => 'Description output price (USD per million)',
         'description' => 'For the cost.',
     ],
+    'caption_parallel' => [
+        'label' => 'Pictures described at once',
+        'description' => 'How many pictures are read by the model side by side, each in a process of its own. One at a time, 300 pictures took a quarter of an hour; 6 at once, a few minutes. 1: one after another.',
+    ],
     'caption_max_output_tokens' => [
         'label' => 'Longest description',
         'description' => 'In tokens, the model\'s thinking included: Haiku 5.5 thinks before it answers, and a reply cut short is not read.',
