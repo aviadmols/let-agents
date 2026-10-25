@@ -35,6 +35,9 @@
       readTags(S.live);
       clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer);
       liveTimer = setTimeout(function () { liveServer(q); }, 60);
+    } else if (/\s$/.test(INPUT.value)) {
+      // the same words, now whole ("ריישי "): read again, so one word shows its chip
+      readTags(S.live);
     }
     renderLive(isNew);
     announce(isQuestion(q) ? t('announceQuestion') : t('announceResults', { n: filtered(S.live).length }));

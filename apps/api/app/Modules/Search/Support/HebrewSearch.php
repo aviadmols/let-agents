@@ -654,6 +654,19 @@ final class HebrewSearch
         return preg_match('/^[א-ת]{2,}$/u', $first) === 1 ? self::stem($first) : '';
     }
 
+    /**
+     * A word's consonants: its first letter, then the rest without the letters that stand for vowels (א ו י, and a last ה; a ה within is a sound: "צהוב"), as Hebrew
+     * typed fast drops, adds or swaps them ("ראישי", "ריישי": רש). The same in the browser (skeleton).
+     */
+    public static function skeleton(string $word): string
+    {
+        if (preg_match('/^[א-ת]+$/u', $word) !== 1) {
+            return $word;
+        }
+
+        return mb_substr($word, 0, 1).preg_replace(['/[אוי]/u', '/ה$/u'], '', mb_substr($word, 1));
+    }
+
     /** ברגים and בורג are both ברג. */
     public static function stem(string $word): string
     {
@@ -808,6 +821,12 @@ final class HebrewSearch
                     $score = max($score, 0.85);
                 } elseif (mb_strlen($candidate) > 3 && preg_match('/^[והבלמשכ]/u', $candidate) && mb_substr($candidate, 1) === $variant) {
                     $score = max($score, 0.85);
+                }
+                // the letters of its sounds the same, its vowel letters typed otherwise: "ראישי" is "ריישי", "צגה" is "צאגה"; never
+                // a word the store has as typed ("ראש" is a head), the nearer in length first ("ריישי" before "ראש" for "ראישי")
+                if ($length >= 3 && $candidate !== $variant && abs(mb_strlen($candidate) - $length) <= 2 && ! isset($index['holders'][$variant])
+                    && mb_strlen(self::skeleton($variant)) >= 2 && self::skeleton($candidate) === self::skeleton($variant)) {
+                    $score = max($score, 0.87 - 0.02 * abs(mb_strlen($candidate) - $length));
                 }
 
                 if ($colour !== null && self::colorOf($candidate) === $colour) {

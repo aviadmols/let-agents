@@ -47,6 +47,14 @@
       .trim();
   }
 
+  // a word's consonants: its first letter, then the rest without the letters that stand for vowels (א ו י, and a last ה; a ה within is a sound: "צהוב"), as Hebrew
+  // typed fast drops, adds or swaps them. The same on the server (HebrewSearch::skeleton).
+  function skeleton(word) {
+    if (!HEBREW_WORD.test(word)) {
+      return word;
+    }
+    return word.charAt(0) + word.slice(1).replace(/[אוי]/g, '').replace(/ה$/, '');
+  }
   function stem(word) {
     if (!HEBREW_WORD.test(word) || word.length < 3) {
       return word;
@@ -222,6 +230,11 @@
           score = Math.max(score, 0.85);
         } else if (candidate.length > 3 && PREFIX_LETTER.test(candidate) && candidate.slice(1) === variant) {
           score = Math.max(score, 0.85);
+        }
+        // the letters of its sounds the same, its vowel letters typed otherwise: "ראישי" is "ריישי", "צגה" is "צאגה"; never a
+        // word the store has as typed ("ראש" is a head), the nearer in length first ("ריישי" before "ראש" for "ראישי")
+        if (length >= 3 && candidate !== variant && Math.abs(candidate.length - length) <= 2 && !Object.prototype.hasOwnProperty.call(index.holders, variant) && skeleton(variant).length >= 2 && skeleton(candidate) === skeleton(variant)) {
+          score = Math.max(score, 0.87 - 0.02 * Math.abs(candidate.length - length));
         }
         if (colour !== null && colorOf(candidate) === colour) {
           score = Math.max(score, 0.95);

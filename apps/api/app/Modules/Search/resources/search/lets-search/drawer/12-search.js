@@ -168,7 +168,7 @@
     }
     // the words read as chips: what says each of them
     var ws = Object.keys(c.words || {});
-    if (ws.length) { out = out.filter(function (r) { return ws.every(function (k) { return saysWord(r, c.words[k].forms) !== !!c.words[k].not; }); }); }
+    if (ws.length) { out = out.filter(function (r) { return ws.every(function (k) { return holdsChip(r, c.words[k]) !== !!c.words[k].not; }); }); }
     if (onStock(c)) { out = out.filter(function (r) { return r.s === 1; }); }
     if (onSale(c)) { out = out.filter(function (r) { return r.sl === 1; }); }
     var so = sortOf(c);

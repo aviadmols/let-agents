@@ -164,9 +164,13 @@
       list.forEach(function (w) { wordForms(w).forEach(function (f) { set[f] = 1; }); });
       r._wf = set;
       r._ww = list;
+      r._wt = ' ' + list.join(' ') + ' ';
     }
     return r._wf;
   }
+  // a chip of two words holds where the product says them together, as typed or the first without its prefix letter
+  function saysPhrase(r, phrases) { recForms(r); return phrases.some(function (p) { return r._wt.indexOf(' ' + p + ' ') >= 0; }); }
+  function holdsChip(r, chip) { return chip.phrase ? saysPhrase(r, chip.phrase) : saysWord(r, chip.forms); }
   // a word read as a chip holds in any of its forms, or (part typed, "לוג") as the start of a word of the product ("לוגו")
   function saysWord(r, forms, start) {
     var set = recForms(r);
@@ -187,8 +191,27 @@
     var c = C(turn), E = S.engine;
     c.words = {};
     var words = wordsOf(turn.q);
-    if (!E || !E.normalize || !all.length || words.length < 2) { return; }
+    // one word is read once it is whole: its space typed ("ריישי "), or the search sent
+    var whole1 = words.length === 1 && (turn !== S.live || /\s$/.test(INPUT.value));
+    if (!E || !E.normalize || !all.length || (words.length < 2 && !whole1)) { return; }
     var used = [];
+    // two words the products say together ("זהב צהוב", "כיס חזה"): one chip, in place of the first alone
+    words.forEach(function (w, i) {
+      var w2 = words[i + 1];
+      if (!w2 || Object.keys(c.words).length >= WORD_CHIPS || taken.indexOf(i) >= 0 || taken.indexOf(i + 1) >= 0 || used.indexOf(i) >= 0) { return; }
+      if (w.length < 2 || w2.length < 2 || STOP.test(w) || STOP.test(w2) || ASKS_ONLY.test(w) || ASKS_ONLY.test(w2) || WITHOUT_WORD.test(w)) { return; }
+      var n1 = E.normalize(w), n2 = E.normalize(w2), key = n1 + ' ' + n2;
+      if (c.no['w:' + key]) { return; }
+      var phrases = [key];
+      if (/^[והבלמשכ][א-ת]{3,}$/.test(n1)) { phrases.push(n1.slice(1) + ' ' + n2); }
+      var said = phrases.filter(function (p) { return all.some(function (r) { return saysPhrase(r, [p]); }); })[0];
+      if (!said) { return; }
+      var products = Object.keys(S.records).map(function (id) { return S.records[id]; }).filter(function (r) { return r && r.t === 'product'; });
+      var share = products.length ? products.filter(function (r) { return saysPhrase(r, phrases); }).length / products.length : 0;
+      if (share > SUBJECT_SHARE) { return; }
+      c.words[key] = { label: said === key ? w + ' ' + w2 : w.slice(1) + ' ' + w2, at: [i, i + 1], phrase: phrases, share: share };
+      used.push(i, i + 1);
+    });
     words.forEach(function (w, i) {
       if (Object.keys(c.words).length >= WORD_CHIPS || used.indexOf(i) >= 0 || taken.indexOf(i) >= 0) { return; }
       // "בלי כפתורים": a chip that keeps away what says it
