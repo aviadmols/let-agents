@@ -14,7 +14,6 @@ use App\Modules\Enrichment\Models\EnrichmentContentProduct;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\PictureContent;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
-use App\Modules\Retrieval\Contracts\TermVectors;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Contracts\RelatedByTags;
@@ -28,6 +27,7 @@ use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
 use App\Modules\Search\Support\SearchTrace;
 use App\Modules\Search\Support\SimilarWants;
+use App\Modules\Search\Support\WordMeanings;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -68,7 +68,7 @@ final class SearchCatalog
     /** A filter of whom a product is for: kept when a search that found nothing is loosened (loosened()). */
     private const WHOM_FACETS = ['audience', 'gender', 'for_whom', 'target_audience', 'age_group'];
 
-    /** Words a search does not know, read by meaning as the store's nearest (search.word_vectors), at most. */
+    /** Words a search does not know, read as the store's word they mean (search.word_meanings), at most. */
     private const NEAR_WORDS = 2;
 
     /** A search that found nothing is tried again without one word, this many words at most (loosened()). */
@@ -173,6 +173,9 @@ final class SearchCatalog
     /** A filter about colour or metal ("מתכת", "צבע האבן", variant_color): the shop sorts by it. Not a name that looks like a colour. */
     private const COLOUR_FILTER = '/colou?r|metal|צבע|מתכת/iu';
 
+    /** A shopper's own search (handle's readWords): only then is a word the store does not write read by a model. */
+    private bool $readWords = false;
+
     /** What the search being explained did, stage by stage (explain()); null for a shopper's search. */
     private ?SearchTrace $trace = null;
 
@@ -209,11 +212,18 @@ final class SearchCatalog
     /**
      * @param  bool  $meaning  false while a shopper is still typing: spelling only, code only, no vector
      */
-    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true, array $visit = []): array
+    public function handle(string $shopId, string $raw, ?array $only = null, bool $count = true, ?int $perGroup = null, bool $meaning = true, array $visit = [], bool $readWords = false): array
     {
-        $result = $this->searchOnce($shopId, $raw, $only, $count, $perGroup, $meaning, $visit);
+        // a word the store does not write is read by a model (WordMeanings) for a shopper's own search only: never for the
+        // searches the store's checks and writers make of it
+        $this->readWords = $readWords;
+        try {
+            $result = $this->searchOnce($shopId, $raw, $only, $count, $perGroup, $meaning, $visit);
 
-        return ($result['total'] ?? 0) === 0 ? $this->loosened($shopId, $raw, $only, $perGroup, $meaning, $result) : $result;
+            return ($result['total'] ?? 0) === 0 ? $this->loosened($shopId, $raw, $only, $perGroup, $meaning, $result) : $result;
+        } finally {
+            $this->readWords = false;
+        }
     }
 
     /**
@@ -433,16 +443,15 @@ final class SearchCatalog
             // have. What is nearest by meaning or picture may still be it ("קורה בהירה": a pine plank) or may not (link chains):
             // a few of them, and the drawer says the word was not found (unknown) rather than showing dozens as if it were.
             $unknown = $byMeaning ? HebrewSearch::unknownWords($index['engine'], $query) : [];
-            // a word the store does not write, read as the one it does nearest in meaning ("מפוספס": "פסים"): at a pause or
-            // on Enter only, one vector per word, kept. What says that word is found with the rest, and the word is no
-            // longer "not found".
+            // a word the store does not write, read as the store's word it means ("מפוספס": "פסים", "נעלי ספורט": "סניקרס"),
+            // by a small model among the store's own words, once per word (WordMeanings): at a pause or on Enter only.
+            // What says that word is found with the rest, and the word is no longer "not found".
             $nearWords = [];
-            if ($unknown !== [] && Features::enabled('search.word_vectors', $shopId) && app()->bound(TermVectors::class)) {
-                $floor = (float) Settings::get('search.word_vector_min', $shopId);
+            if ($unknown !== [] && $this->readWords && Features::enabled('search.word_meanings', $shopId)) {
                 foreach (array_slice($unknown, 0, self::NEAR_WORDS) as $word) {
-                    $best = app(TermVectors::class)->nearest($shopId, HebrewSearch::withFinals((string) $word), 1, $floor)[0] ?? null;
-                    if ($best !== null && HebrewSearch::normalize($best['term']) !== $word) {
-                        $nearWords[(string) $word] = (string) $best['term'];
+                    $term = app(WordMeanings::class)->read($shopId, $index, HebrewSearch::withFinals((string) $word));
+                    if ($term !== null) {
+                        $nearWords[(string) $word] = $term;
                     }
                 }
                 $unknown = array_values(array_diff($unknown, array_keys($nearWords)));

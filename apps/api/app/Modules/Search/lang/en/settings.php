@@ -395,14 +395,16 @@ return [
         'label' => 'Search check after a scan: mend or only report',
         'description' => 'After every scan the search is tried the way shoppers will search. "dry": a report only, nothing written. "apply": what fails is mended for this store alone (tags from the products\' descriptions, and searches one model matched and a model of the other family checked).',
     ],
-    'word_vector_min' => [
-        'label' => 'Least likeness for a word by meaning',
-        'description' => 'How near in meaning a typed word must be to a word of the store to be read as it.',
-    ],
     'vocabulary_terms' => [
-        'label' => 'Store words kept by meaning',
-        'description' => 'How many of the words the products say are kept as vectors, at every index build (only new ones cost).',
+        'label' => 'Store words',
+        'description' => 'How many of the words the products say (titles, tags, picture words) are looked at when a shopper\'s word is not found.',
     ],
+    'word_reader_daily_max' => ['label' => 'New words by meaning a day', 'description' => 'How many new shopper words are read by the model a day for a store. A word already read is not counted.'],
+    'word_reader_provider' => ['label' => 'Provider for words by meaning', 'description' => 'The provider of the model that matches a shopper\'s word to the store\'s.'],
+    'word_reader_model' => ['label' => 'Model for words by meaning', 'description' => 'A small, cheap model: once per new word, kept.'],
+    'word_reader_input_usd_per_million' => ['label' => 'Input price per million tokens (words by meaning)', 'description' => 'For the cost and the cap.'],
+    'word_reader_output_usd_per_million' => ['label' => 'Output price per million tokens (words by meaning)', 'description' => 'For the cost and the cap.'],
+    'word_reader_max_output_tokens' => ['label' => 'Most output (words by meaning)', 'description' => 'A one-word answer.'],
     'scan_check_usd' => [
         'label' => 'Cost cap of the search check after a scan',
         'description' => 'For a store\'s whole check: writing shoppers\' searches, the mending and the questions to the assistant. What does not fit under it is not done.',

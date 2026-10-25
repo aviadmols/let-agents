@@ -4,9 +4,11 @@ namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\ChatModel;
+use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
-use App\Modules\Retrieval\Contracts\TermVectors;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Support\HebrewSearch;
@@ -129,35 +131,47 @@ final class FocusSearchTest extends TestCase
         $this->assertArrayNotHasKey('loosened', $this->search('חולצה לגברים'), 'found as asked: nothing loosened');
     }
 
-    public function test_a_word_the_store_does_not_write_is_read_by_meaning_as_one_it_does(): void
+    public function test_a_word_the_store_does_not_write_is_read_as_the_store_word_it_means(): void
     {
-        // "חולצה מפוספסת" in a store that writes "פסים": the striped shirt, and the word is not "not found".
-        $this->app->instance(TermVectors::class, new class implements TermVectors
+        // "חולצה מפוספסת" in a store that writes "פסים": the striped shirts, and the word is not "not found". The model
+        // chooses among the store's own words, once per word; a word it names that the store does not say is no answer.
+        $asked = [];
+        $this->app->instance(ChatModel::class, new class($asked) implements ChatModel
         {
-            public function remember(string $shopId, array $terms): int
-            {
-                return 0;
-            }
+            /** @param list<string> $asked */
+            public function __construct(private array &$asked) {}
 
-            public function nearest(string $shopId, string $word, int $limit, float $floor): array
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                return str_starts_with($word, 'מפוספס') ? [['term' => 'פסים', 'similarity' => 0.82]] : [];
+                $input = json_decode($user, true);
+                $this->asked[] = $input['word'];
+
+                return new ModelReply(['term' => match (true) {
+                    str_starts_with((string) $input['word'], 'מפוספס') => in_array('פסים', $input['store_words'], true) ? 'פסים' : '',
+                    default => 'מילה שאין בחנות',
+                }], 400, 5);
             }
         });
         $this->catalog([
             '1' => ['חולצה מכופתרת Striped פסים', 'ביגוד'],
-            '2' => ['חולצה מכופתרת Plain', 'ביגוד'],
-            '3' => ['מכנסיים Lou', 'ביגוד'],
+            '2' => ['חולצה ארוכה Breton פסים', 'ביגוד'],
+            '3' => ['חולצה מכופתרת Plain', 'ביגוד'],
+            '4' => ['מכנסיים Lou', 'ביגוד'],
         ]);
 
-        $found = $this->search('חולצה מפוספסת');
+        $found = $this->shopperSearch('חולצה מפוספסת');
 
-        $this->assertSame('1', $found['groups']['product'][0]['external_id'] ?? null);
+        $this->assertContains($found['groups']['product'][0]['external_id'] ?? null, ['1', '2']);
         $this->assertSame([['word' => 'מפוספסת', 'term' => 'פסים']], $found['near'] ?? null, 'read as the store writes it');
         $this->assertNotContains('מפוספסת', (array) $found['unknown']);
+        $this->shopperSearch('חולצה מפוספסת');
+        $this->assertSame(['מפוספסת'], $asked, 'asked once, kept');
 
-        Features::override('search.word_vectors', false, $this->shop->id);
-        $this->assertArrayNotHasKey('near', $this->search('חולצה מפוספסת'), 'off for the store: never asked');
+        $this->assertArrayNotHasKey('near', $this->shopperSearch('חולצה בגוון קרמל'), 'a word the store does not say is no answer');
+
+        Features::override('search.word_meanings', false, $this->shop->id);
+        $this->assertArrayNotHasKey('near', $this->shopperSearch('חולצה מקושקשת'), 'off for the store: never asked');
+        $this->assertNotContains('מקושקשת', $asked);
     }
 
     public function test_a_latin_name_typed_in_hebrew_finds_it(): void
@@ -275,5 +289,11 @@ final class FocusSearchTest extends TestCase
     private function search(string $query): array
     {
         return app(SearchCatalog::class)->handle($this->shop->id, $query, count: false);
+    }
+
+    /** @return array<string, mixed> a search as a shopper's own, from the storefront (words read by meaning) */
+    private function shopperSearch(string $query): array
+    {
+        return app(SearchCatalog::class)->handle($this->shop->id, $query, count: false, readWords: true);
     }
 }

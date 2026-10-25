@@ -8,7 +8,6 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\CheckStoreSearch;
-use App\Modules\Search\Actions\RememberStoreWords;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
@@ -73,11 +72,6 @@ final class SearchCommand extends Command
             $run = app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
             $this->line("{$shop->slug}: ".$run->summary());
             $failed += $run->status->value === 'succeeded' ? 0 : 1;
-            // and its words by meaning, the new ones only (RememberStoreWords): the build itself stays code only
-            $words = $run->status->value === 'succeeded' ? app(RememberStoreWords::class)->handle($shop->id) : 0;
-            if ($words > 0) {
-                $this->line("{$shop->slug}: {$words} new words by meaning");
-            }
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;

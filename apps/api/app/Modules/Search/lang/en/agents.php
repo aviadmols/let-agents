@@ -6,4 +6,5 @@ return [
     'tagger' => 'Writes the page tags',
     'photo_reader' => 'Shopper photo reader',
     'scan_checker' => 'Search checker after a scan',
+    'word_reader' => 'Words by meaning reader',
 ];

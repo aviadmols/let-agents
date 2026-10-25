@@ -47,7 +47,7 @@ final class SearchController
         // keeps it), still not counted. Never on a page opening.
         $meaning = ! $spelling || ($typing && $request->boolean('meaning'));
         $visit = Visit::from($request, ['sid' => $request->query('sid'), 'page' => $request->query('page'), 'ref' => $request->query('ref')]);
-        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: $meaning, visit: $visit);
+        $result = $search->handle($connection->shop_id, $query, count: ! $typing && ! $request->boolean('counted'), meaning: $meaning, visit: $visit, readWords: true);
 
         return response()->json($result, 200, ['Cache-Control' => 'no-store'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

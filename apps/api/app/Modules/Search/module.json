@@ -17,7 +17,7 @@
     "provider": "SearchServiceProvider",
     "features": [
         {
-            "name": "word_vectors",
+            "name": "word_meanings",
             "default": true
         },
         {
@@ -959,12 +959,56 @@
             "scope": "shop"
         },
         {
-            "name": "word_vector_min",
+            "name": "word_reader_daily_max",
+            "type": "int",
+            "default": 300,
+            "min": 0,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "items"
+        },
+        {
+            "name": "word_reader_provider",
+            "type": "string",
+            "default": "openai",
+            "min": 1,
+            "max": 40,
+            "scope": "global"
+        },
+        {
+            "name": "word_reader_model",
+            "type": "string",
+            "default": "gpt-5.4-nano",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "word_reader_input_usd_per_million",
             "type": "float",
-            "default": 0.6,
-            "min": 0.3,
-            "max": 0.95,
-            "scope": "shop"
+            "default": 0.05,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "word_reader_output_usd_per_million",
+            "type": "float",
+            "default": 0.4,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "word_reader_max_output_tokens",
+            "type": "int",
+            "default": 200,
+            "min": 50,
+            "max": 2000,
+            "scope": "global",
+            "unit": "tokens"
         },
         {
             "name": "vocabulary_terms",
@@ -1055,6 +1099,28 @@
         }
     ],
     "agents": [
+        {
+            "name": "word_reader",
+            "action": "read_words",
+            "when": "live",
+            "features": [
+                "word_meanings"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "word_reader_provider",
+                    "model": "word_reader_model",
+                    "prices": [
+                        "word_reader_input_usd_per_million",
+                        "word_reader_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "word_meaning"
+                    ]
+                }
+            ]
+        },
         {
             "name": "tagger",
             "action": "write_tags",
