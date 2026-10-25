@@ -12,7 +12,7 @@
       return '<div class="ls-saved-item"><label class="ls-check-row" title="' + esc(t('pickToCompare')) + '"><input type="checkbox" data-pick="' + esc(id) + '"' + (on ? ' checked' : '') + ' aria-label="' + esc(t('pickToCompare')) + '"></label>' +
         '<a class="ls-saved-item__media" href="' + esc(r.url) + '" tabindex="-1"><img src="' + esc(r.img) + '" alt="">' + pic2(r) + '</a>' +
         '<div class="ls-saved-item__body"><a class="ls-saved-item__t" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a><div class="ls-saved-item__price">' + priceHtml(r) + (r.s === 0 ? ' <span class="ls-stock">' + esc(t('outStock')) + '</span>' : '') + '</div>' +
-          '<div class="ls-saved-item__actions">' + buyBtn(r, 'ls-btn--sm') + (r.s === 0 ? '' : '<button class="ls-btn ls-btn--ghost ls-btn--sm ls-saved-item__sim" data-similar="' + esc(id) + '">' + icon('grid', 'ls-icon--sm') + esc(t('similar')) + '</button>') + '</div><div data-after="' + esc(id) + '"></div></div>' +
+          '<div class="ls-saved-item__actions">' + buyBtn(r, 'ls-btn--sm') + (r.s === 0 || r.ns === 1 ? '' : '<button class="ls-btn ls-btn--ghost ls-btn--sm ls-saved-item__sim" data-similar="' + esc(id) + '">' + icon('grid', 'ls-icon--sm') + esc(t('similar')) + '</button>') + '</div><div data-after="' + esc(id) + '"></div></div>' +
         '<button class="ls-ibtn ls-ibtn--sm ls-saved-item__x" aria-label="' + esc(t('remove')) + '" data-heart="' + esc(id) + '">' + icon('x', 'ls-icon--sm') + '</button></div>';
     }).join('') + '</div>';
     var n = S.pick.length;

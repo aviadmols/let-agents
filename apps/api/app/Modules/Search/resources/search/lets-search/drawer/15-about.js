@@ -108,11 +108,13 @@
     return '';
   }
   // a row of products that slides: arrows at its sides, a drag with the mouse, a swipe on touch
-  function miniRow(list) {
+  // buy: each with its own add to cart under it (the products an answer names: bought where they are read about)
+  function miniRow(list, buy) {
     return '<div class="ls-slider"><button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--prev" type="button" data-slide="-1" aria-label="' + esc(t('slidePrev')) + '" disabled>' + icon('back', 'ls-icon--sm') + '</button>' +
       '<div class="ls-mini-row">' + list.slice(0, 6).map(function (p) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, pr: p.price };
-        return '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" decoding="async" draggable="false">' + pic2(r) + '<span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
+        var card = '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" decoding="async" draggable="false">' + pic2(r) + '<span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
+        return buy && rec(p.id) ? '<div class="ls-mini-buy">' + card + buyBtn(r, 'ls-btn--sm') + '</div>' : card;
       }).join('') + '</div>' +
       '<button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--next" type="button" data-slide="1" aria-label="' + esc(t('slideNext')) + '">' + icon('fwd', 'ls-icon--sm') + '</button></div>';
   }

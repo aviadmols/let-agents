@@ -126,7 +126,7 @@
   function alsoHtml(turn) {
     var list = (turn.alsoIds || []).map(rec).filter(Boolean);
     if (!list.length) { return ''; }
-    return '<div class="ls-block__title" style="margin-top:14px">' + esc(t('alsoRelated')) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) +
+    return '<div class="ls-block__title" style="margin-top:14px">' + esc(t('alsoRelated')) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }), true) +
       '<button class="ls-btn ls-btn--link ls-btn--sm" data-q="' + esc(turn.q) + '">' + esc(t('alsoAll')) + '</button>';
   }
   // two products the question's words name, in stock; inside the price it named, as the server read it (range), or none

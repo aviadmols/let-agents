@@ -13,6 +13,7 @@ use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\AgentCatalog;
+use App\Modules\Search\Support\Looks;
 use App\Modules\Tenancy\Models\Shop;
 use DateTimeZone;
 use Illuminate\Http\JsonResponse;
@@ -54,8 +55,8 @@ final class SearchIndexController
             'selector' => (string) Settings::get('search.input_selector', $shopId),
             // The store's own search page shows our regular results over it.
             'resultsPage' => Features::enabled('search.results_page', $shopId),
-            // The camera shows only where the shop's pictures already have vectors.
-            'photos' => Features::enabled('search.photos', $shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
+            // The camera shows only where the shop's pictures already have vectors, and how a product looks matters.
+            'photos' => Features::enabled('search.photos', $shopId) && Looks::matter($shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
             'photoMaxKb' => (int) Settings::get('search.photo_max_kb'),
             // A question may be sent to the assistant, only when the shopper presses Enter.
             'ask' => Features::enabled('assistant.on_search', $shopId),

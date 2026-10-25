@@ -44,6 +44,9 @@
   // a long answer in one block, a sentence a line, and a sentence of parts joined by ";" a list of them
   function answerBlocks(text) {
     var item = /^(?:[-•*]|\d{1,2}[.)])\s+/;
+    // a writer's markdown is no markup here: "**חיזוק הגוף**" reads as its words (answers kept from before the server
+    // took it off too)
+    text = String(text || '').replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2').replace(/\*\*/g, '');
     var lines = String(text || '').split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
     if (lines.length === 1 && lines[0].length > 200) {
       lines = lines[0].replace(/([.!?])\s+(?=\S)/g, '$1\n').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);

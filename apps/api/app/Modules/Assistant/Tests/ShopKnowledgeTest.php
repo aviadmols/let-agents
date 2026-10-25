@@ -117,7 +117,7 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertStringContainsString('יש לנו', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertSame(file_get_contents($prompts.'verify_site.v9.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version: approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');
-        $this->assertSame(file_get_contents($prompts.'scope_site.v6.md'), AnswerSiteQuestion::prompt('scope_site'), 'the scope check also writes the question again without its typing mistakes');
+        $this->assertSame(file_get_contents($prompts.'scope_site.v7.md'), AnswerSiteQuestion::prompt('scope_site'), 'v7: the scope check also reads what its own products and pages say nearest the question');
     }
 
     public function test_the_merchant_sees_and_edits_what_the_assistant_knows(): void

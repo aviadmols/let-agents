@@ -8,6 +8,7 @@ use App\Core\Http\Visit;
 use App\Core\Usage\MonthlyUsage;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Http\StorefrontSite;
+use App\Modules\Search\Support\Looks;
 use finfo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,7 +38,7 @@ final class SearchPhotoController
 
         $shopId = $connection->shop_id;
 
-        if (! Features::enabled('search.storefront', $shopId) || ! Features::enabled('search.photos', $shopId)) {
+        if (! Features::enabled('search.storefront', $shopId) || ! Features::enabled('search.photos', $shopId) || ! Looks::matter($shopId)) {
             return response()->json(['error' => 'photos_off'], 404);
         }
 

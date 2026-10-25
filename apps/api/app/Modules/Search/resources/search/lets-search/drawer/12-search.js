@@ -214,7 +214,7 @@
       '<div class="ls-card__media"><a class="ls-card__link" href="' + esc(r.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || '') + '" alt="">' + pic2(r) + '</a>' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
       '<span class="ls-card__heart">' + heartBtn(id, saved, true) + '</span></div>' +
       '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' +
-      '<div class="ls-card__row">' + priceHtml(r) + '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button></div>' +
+      '<div class="ls-card__row">' + priceHtml(r) + (r.ns === 1 ? '' : '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button>') + '</div>' +
       buyBtn(r, 'ls-btn--sm ls-btn--block') + '<div data-after="' + esc(id) + '"></div></article>';
   }
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
@@ -224,7 +224,8 @@
     var id = pid(r.id);
     // no cart: the product's page is the card's one action, as strong as "add to cart" where there is one
     if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--primary ' + cls + '" href="' + esc(r.url) + '">' + esc(t('orderPage')) + '</a>' : ''; }
-    if (r.s === 0) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-similar="' + esc(id) + '">' + esc(t('similarInStock')) + '</button>'; }
+    // sold out: its like in stock, or (none of its kind here) only that it is sold out
+    if (r.s === 0) { return r.ns === 1 ? '<button class="ls-btn ls-btn--secondary ' + cls + '" disabled>' + esc(t('outStock')) + '</button>' : '<button class="ls-btn ls-btn--secondary ' + cls + '" data-similar="' + esc(id) + '">' + esc(t('similarInStock')) + '</button>'; }
     if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + esc(t('options')) + '</button>'; }
     return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
   }

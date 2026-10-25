@@ -117,6 +117,8 @@ final class SimilarItemsTest extends TestCase
 
     public function test_similar_items_are_of_its_own_kind_or_none(): void
     {
+        // a catalogue changes after the index was built, not in the same second: the kinds are counted again
+        $this->travel(2)->seconds();
         $type = fn (string $id, string $kind) => app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', $id)->update(['payload' => ['product_type' => $kind]]));
         $type('301', 'Sneakers');
         $type('302', 'Socks');
@@ -132,6 +134,8 @@ final class SimilarItemsTest extends TestCase
 
     public function test_without_types_the_tags_only_some_products_carry_say_its_kind(): void
     {
+        // a catalogue changes after the index was built, not in the same second: the kinds are counted again
+        $this->travel(2)->seconds();
         // A Shopify store with tags only: every product is in "כל המוצרים", which says nothing.
         $tags = fn (string $id, array $tags) => app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', $id)->update(['payload' => ['tags' => $tags]]));
         $tags('301', ['כל המוצרים', 'חיתולי במבוק']);

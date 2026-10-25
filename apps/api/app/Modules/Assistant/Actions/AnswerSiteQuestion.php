@@ -559,6 +559,41 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $picks;
     }
 
+    /**
+     * The products whose own page an answer cites, picked when they are not yet, in the order cited, up to the picks'
+     * limit. Only of the products the writer was given; each goes to the checker like any pick, with no reason of
+     * its own (the checker writes one, or drops it).
+     *
+     * @param  list<string>  $cited
+     * @param  array<string, array<string, mixed>>  $byRef
+     * @param  list<array{ref: string, external_id: string, title: string, why: string}>  $picks
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @return list<array{ref: string, external_id: string, title: string, why: string}>
+     */
+    public static function citedProducts(array $cited, array $byRef, array $picks, array $productsByRef): array
+    {
+        $refOf = [];
+        foreach ($productsByRef as $ref => $product) {
+            $refOf[(string) $product['external_id']] = (string) $ref;
+        }
+        $picked = array_flip(array_column($picks, 'external_id'));
+
+        foreach ($cited as $s) {
+            $passage = $byRef[$s] ?? null;
+            $id = (string) ($passage['external_id'] ?? '');
+            if (count($picks) >= self::MAX_PICKS) {
+                break;
+            }
+            if (($passage['source'] ?? null) !== 'product' || $id === '' || isset($picked[$id]) || ! isset($refOf[$id])) {
+                continue;
+            }
+            $picked[$id] = true;
+            $picks[] = ['ref' => $refOf[$id], 'external_id' => $id, 'title' => (string) $productsByRef[$refOf[$id]]['title'], 'why' => ''];
+        }
+
+        return $picks;
+    }
+
     /** A title as other text names it: before its subtitle or its code ("חטוף - אלי שרעבי" is "חטוף"). */
     private static function titleCore(string $title): string
     {
@@ -1097,6 +1132,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $this->spend->assertCanSpend(forShopper: $forShopper, estimatedUsd: (800 * $this->price('scope_input') + self::SCOPE_OUTPUT_TOKENS * $this->price('scope_output')) / 1_000_000);
                         $scope = $this->call($run, $scoper, 'scope_site', (string) json_encode([
                             'store' => $this->storeBrief($shopId),
+                            // what the store writes nearest the question (scope_site v7): its names and categories may say
+                            // nothing of it ("לישון" in a store whose sleep formula is called "Dream")
+                            'store_says' => $this->storeSays($shopId, $question),
                             'question' => $question,
                             'signals' => QuestionGuard::inspect($question)['signals'],
                         ], JSON_UNESCAPED_UNICODE), self::SCOPE_OUTPUT_TOKENS, $effort, 'scope');
@@ -1216,6 +1254,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                     // like any pick: nothing reaches the shopper unchecked.
                     if ($answer !== '') {
                         $picks = self::namedInAnswer($answer, $picks, $prepared['productsByRef']);
+                        // and every product whose own page it rests on: "מתוך: פטריית קורדיספס" under an answer about
+                        // cordyceps, with no card to buy it from (Mycolivia, 25.10)
+                        $picks = self::citedProducts($cited, $byRef, $picks, $prepared['productsByRef']);
                     }
                     // Sentences code took out (a number the pages do not have), the rest kept.
                     $checked['trimmed'] = $screened['trimmed'];
@@ -1454,7 +1495,7 @@ final class AnswerSiteQuestion implements TriesQuestions
     public function screen(array $data, array $prepared, string $question, string $mode): array
     {
         ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'forModel' => $forModel] = $prepared;
-        $answer = self::withoutRefs(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS));
+        $answer = self::withoutRefs(self::withoutMarkdown(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS)));
         // a ref as a writer gives it: "s1", or now and then {"ref": "s1"}
         $cited = array_values(array_unique(array_filter(array_map(fn ($ref): string => is_array($ref) ? (string) ($ref['ref'] ?? $ref['id'] ?? '') : (string) $ref, (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
         $picks = $this->picks((array) ($data['picks'] ?? []), $productsByRef);
@@ -1640,6 +1681,14 @@ final class AnswerSiteQuestion implements TriesQuestions
         $text = (string) preg_replace('~(?<=\s)[-–—:]\s*[ps]\d{1,2}(?=[\s.,;!?]|$)~iu', '', $text);
 
         return trim((string) preg_replace('/[ \t]{2,}/u', ' ', $text));
+    }
+
+    /** A writer's bold and italics as plain words: "**חיזוק הגוף**" showed its stars to the shopper (Mycolivia, 25.10). */
+    public static function withoutMarkdown(string $text): string
+    {
+        $text = (string) preg_replace('/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/us', '$2', $text);
+
+        return str_replace('**', '', $text);
     }
 
     /** Whether a text still shows an internal ref ("p5", "s2") to the shopper. */
@@ -2630,6 +2679,28 @@ final class AnswerSiteQuestion implements TriesQuestions
             'name' => (string) Shop::query()->whereKey($shopId)->value('name'),
             'categories' => CatalogCategory::query()->whereNull('removed_at')->orderByDesc('product_count')->limit(40)->pluck('name')->all(),
         ];
+    }
+
+    /** Of the store's own words nearest a question, how many the topic check reads, and how much of each. */
+    private const SAYS_PIECES = 3;
+
+    private const SAYS_CHARS = 160;
+
+    /**
+     * The store's own products and pages nearest the question by meaning, at the writer's floor, a short piece of
+     * each: what the topic check reads beside the store's name and categories. The question's vector is the one the
+     * writer's passages use next (QueryVectors), so nothing more is embedded.
+     *
+     * @return list<array{title: string, text: string}>
+     */
+    private function storeSays(string $shopId, string $question): array
+    {
+        $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
+
+        return array_values(array_map(
+            fn (array $p): array => ['title' => (string) $p['title'], 'text' => mb_substr(trim((string) preg_replace('/\s+/u', ' ', (string) $p['text'])), 0, self::SAYS_CHARS)],
+            array_filter($this->passages->near($shopId, $question, ['product', 'content'], self::SAYS_PIECES), fn (array $p): bool => $p['similarity'] >= $floor),
+        ));
     }
 
     /**

@@ -140,12 +140,9 @@
     var newest = Object.keys(fresh).length, keep = BODY.scrollTop;
     FLOW.innerHTML = '<div class="ls-turns">' + html + '</div>' + prevHtml;
     fresh = {};
-    if (isPhone()) {
-      var first = BODY.querySelector('.ls-turns > .ls-turn');
-      // the newest turn is last on a phone (oldest first): with the view's height it can come up to the top
-      if (first && list.length > 1) { first.style.minHeight = Math.max(0, BODY.clientHeight - 16) + 'px'; }
-      BODY.scrollTop = newest && first ? Math.max(0, first.offsetTop - 8) : keep;
-    } else { BODY.scrollTop = newest ? 0 : keep; }
+    // the newest turn first, on a phone too (as Aviad asked, 2026-10-25): a question asked under the results comes up
+    // to the top with its answer, and the search it was asked about goes down below it
+    BODY.scrollTop = newest ? 0 : keep;
   }
   function credit() { return '<div class="ls-credit">' + mark() + '<a href="https://lets.co.il/" target="_blank" rel="noopener">' + esc(t('powered')) + '</a></div>'; }
   // On a product page the questions go with the product, invisibly: the field says so, nothing else does.

@@ -22,6 +22,7 @@ use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\DescribedProducts;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
+use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
 use App\Modules\Search\Support\SearchTrace;
@@ -1526,7 +1527,8 @@ final class SearchCatalog
      */
     private function pictures(string $shopId, string $query, array $records): array
     {
-        if (! Features::enabled('search.pictures', $shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
+        // a store where looks do not matter finds nothing for words by its pictures (Looks)
+        if (! Features::enabled('search.pictures', $shopId) || ! Looks::matter($shopId) || mb_strlen($query) < (int) Settings::get('search.semantic_min_chars')) {
             return [];
         }
 

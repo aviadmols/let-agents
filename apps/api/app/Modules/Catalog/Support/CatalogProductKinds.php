@@ -41,7 +41,9 @@ final class CatalogProductKinds implements ProductKinds
         $counts = $this->counts((string) $product->shop_id);
         $own = self::own($product);
 
-        if ($own['type'] !== '') {
+        // A type no other product has is the product's name, not its kind (Mycolivia types each formula by itself:
+        // "Dream", "Joy", "Focus"; as kinds, no product had a like). Its kind is then read as if it had none.
+        if ($own['type'] !== '' && ($counts['type'][$own['type']] ?? 0) >= 2) {
             return ['type:'.$own['type']];
         }
 

@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Enums\ColorFamily;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -193,6 +194,7 @@ final class BuildSearchIndex
         // What each product is about by meaning, from its tags, where the shop has tags in search: found by
         // them as by its own words, never instead of them ("ספרי חטופים" finds a book whose text says "נחטף")
         $tagged = app()->bound(ProductTags::class) ? app(ProductTags::class)->tagsByProduct($shopId) : [];
+        $kinds = app(ProductKinds::class);
         $faceted = 0;
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
@@ -220,6 +222,8 @@ final class BuildSearchIndex
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
                 'pr' => $product->price === null ? null : (int) round((float) $product->price),
                 'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
+                // No product of its kind (ProductKinds): its similar items are none, so the drawer offers none.
+                'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,
                 // The code as the store writes it: a search for it shows this product alone.
                 'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
