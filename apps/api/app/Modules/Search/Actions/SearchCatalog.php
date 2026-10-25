@@ -120,6 +120,11 @@ final class SearchCatalog
      */
     private const SPELLED_ENOUGH = 4;
 
+    /** A question's subject category is too wide above this share of the store's products and this many (subjectProducts()). */
+    private const SUBJECT_MAX_SHARE = 0.3;
+
+    private const SUBJECT_MAX_PRODUCTS = 24;
+
     /** A filter about colour or metal ("מתכת", "צבע האבן", variant_color): the shop sorts by it. Not a name that looks like a colour. */
     private const COLOUR_FILTER = '/colou?r|metal|צבע|מתכת/iu';
 
@@ -231,7 +236,9 @@ final class SearchCatalog
             // How near is near enough is the store's (search.meaning_only_min_similarity).
             // A search that says how the thing looks keeps what the pictures find ("קורה בהירה": a pine plank); any other
             // search leans on the meaning alone, since every cover is about as near to a genre as any other (.6 to .7).
-            $pictures = $byMeaning ? $this->pictures($shopId, $query, $index['records']) : [];
+            // The words found a few already and say nothing of how it looks: no cover is near "a story about captivity"
+            // more than any other, and the pictures would only pad them ("השבט", "העדן" after the books about captivity).
+            $pictures = $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)) ? $this->pictures($shopId, $query, $index['records']) : [];
             // a question about a need ("איך מחברים קרשים לדק?") is not held to it: its guide and what the guide names answer it
             $weak = $byMeaning && ! $asks && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)
                 && ($pictures === [] || ! HebrewSearch::visual($query));
@@ -410,8 +417,15 @@ final class SearchCatalog
             return [];
         }
 
-        $members = CatalogProduct::query()->active()
-            ->whereHas('categories', fn ($q) => $q->whereIn('external_id', $categories))
+        // A category that holds most of the store names nothing: "סיפור על השבי" in a bookshop read "סיפור" as its
+        // "ספרים" and showed every book by its title after the books about captivity (Sela, 25.10).
+        $inCategories = CatalogProduct::query()->active()->whereHas('categories', fn ($q) => $q->whereIn('external_id', $categories));
+        $members = (clone $inCategories)->count();
+        if ($members > self::SUBJECT_MAX_PRODUCTS && $members > self::SUBJECT_MAX_SHARE * CatalogProduct::query()->active()->count()) {
+            return [];
+        }
+
+        $members = $inCategories
             ->orderByDesc('in_stock')->orderBy('title')
             ->limit(200)->pluck('external_id')->map(fn ($id): string => 'p:'.$id)->all();
         $members = array_values(array_filter($members, fn (string $id): bool => isset($index['records'][$id])));

@@ -67,4 +67,33 @@ final class QuestionSearchTest extends TestCase
         $this->assertTrue($result['subject']);
         $this->assertSame('קורה מוקצעת 7x7 אורן', $result['groups']['product'][0]['title'], 'the wood asked about comes before a bracket that mentions wood');
     }
+
+    public function test_a_category_that_holds_most_of_the_store_is_no_subject(): void
+    {
+        // Sela, 25.10: "סיפור על השבי" read "סיפור" as the bookshop's "ספרים" and showed every book after the ones about captivity.
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create();
+        Features::override('search.semantic', false, $shop->id);
+        Features::override('search.pictures', false, $shop->id);
+        app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $shop->id, 'site_url' => 'https://www.store.test', 'access_token' => 'lat_'.str_repeat('g', 48)]));
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            $books = CatalogCategory::query()->create(['shop_id' => $shop->id, 'external_id' => 'k1', 'name' => 'ספרים', 'path' => ['ספרים'], 'depth' => 0, 'hash' => 'k1', 'product_count' => 40]);
+            $titles = ['חטוף - סיפור השבי', 'מפגש עם עצמי בשבי'];
+            for ($i = 0; $i < 38; $i++) {
+                $titles[] = 'ספר כלכלה מספר '.($i + 1);
+            }
+            foreach ($titles as $i => $title) {
+                CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) ($i + 1), 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/$i", 'price' => '80', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h$i", 'payload' => []])
+                    ->categories()->attach($books->id);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($shop->id);
+
+        $result = app(SearchCatalog::class)->handle($shop->id, 'סיפור על השבי', count: false, meaning: false);
+
+        $this->assertFalse($result['subject'], 'every book is no subject');
+        foreach (array_column($result['groups']['product'], 'title') as $title) {
+            $this->assertStringNotContainsString('כלכלה', $title, 'not the whole bookshop after the books about captivity');
+        }
+    }
 }
