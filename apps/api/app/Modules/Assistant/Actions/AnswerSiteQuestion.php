@@ -79,8 +79,9 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 6: who wrote each passage, and the store team's own word answers first (answer_site only;
      * 5 is the facts-only writer the bench tries, never released here).
      * 11: the store speaks as itself, "יש לנו", never the shopper's "יש לכם" back (answer_site only).
+     * 12: a condition on a yes comes first ("after the first three months"), never after "yes, at any time" (answer_site only).
      */
-    public const PROMPT_VERSION = 11;
+    public const PROMPT_VERSION = 12;
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';

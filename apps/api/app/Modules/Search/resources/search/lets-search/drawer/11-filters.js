@@ -13,7 +13,15 @@
     return parts.length > 0 && parts.every(function (w) { return new RegExp(' [והבלמשכ]?' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ים|ות|ה|י|ת)? ').test(hay); });
   }
   // which typed words name the label, one for each of its words; null when one of them is not said
-  function saidBy(text, label) { var ws = wordsSaid(text, label); return ws.of > 0 && ws.n === ws.of ? ws.at : null; }
+  function saidBy(text, label) { var ws = wordsSaid(text, label); return ws.of > 0 && ws.n === ws.of ? ws.at : sizedBy(text, label); }
+  // "חולצה מידה M", "size S": a value right after the word for size is that size, however short (as on the server,
+  // HebrewSearch::facets); "M" alone is said by too much to be read
+  function sizedBy(text, label) {
+    var tw = wordsOf(text), v = String(label || '').toLowerCase().trim();
+    if (!v || /\s/.test(v)) { return null; }
+    for (var i = 1; i < tw.length; i++) { if (tw[i] === v && /^(?:[ובה]?מיד[הת]|size)$/.test(tw[i - 1])) { return [i - 1, i]; } }
+    return null;
+  }
   // How many of the label's words the typed words say (n of of), and which typed words say them (at). A name of several
   // words is said by words close together, in its order, at most one other word between any two of them, each typed
   // word naming one of its words: "עגילים בזהב צהוב עם אבן אדומה" says "זהב צהוב" and "אדום", never "זהב אדום", and
