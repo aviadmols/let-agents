@@ -10,6 +10,7 @@ use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Tests\StorefrontLockTest;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Shopify\Models\ShopifyInstall;
@@ -38,6 +39,9 @@ final class ShopifyStoreFeedTest extends TestCase
 
     private bool $locked = false;
 
+    /** The storefront answers with its password page (StorefrontLock). */
+    private bool $passwordPage = false;
+
     /** @var list<array<string, mixed>> what the store answers when asked what changed */
     private array $changed = [];
 
@@ -61,10 +65,13 @@ final class ShopifyStoreFeedTest extends TestCase
             'installed_at' => now(),
         ]);
 
-        Http::fake(fn (Request $request) => str_contains($request->url(), '/pages/')
+        Http::fake(fn (Request $request) => match (true) {
+            // A store behind its password shows the password page at every storefront address.
+            str_contains($request->url(), '/pages/') && $this->passwordPage => Http::response(StorefrontLockTest::SHOPIFY_PASSWORD, 200, ['Content-Type' => 'text/html']),
             // The storefront page a theme builds from sections: its text is only on the page itself.
-            ? Http::response('<html><body><header>תפריט</header><main><h1>ביטול עסקה</h1><p>ניתן לבטל עסקה תוך 14 יום.</p><form><input name="id"><button>שליחה</button></form></main><footer>זכויות</footer></body></html>', 200, ['Content-Type' => 'text/html'])
-            : $this->respond($request));
+            str_contains($request->url(), '/pages/') => Http::response('<html><body><header>תפריט</header><main><h1>ביטול עסקה</h1><p>ניתן לבטל עסקה תוך 14 יום.</p><form><input name="id"><button>שליחה</button></form></main><footer>זכויות</footer></body></html>', 200, ['Content-Type' => 'text/html']),
+            default => $this->respond($request),
+        });
     }
 
     public function test_a_shopify_store_syncs_into_the_catalog_like_a_woocommerce_one(): void
@@ -188,6 +195,20 @@ final class ShopifyStoreFeedTest extends TestCase
         $this->assertSame(RunStatus::Succeeded, $run->status, (string) $run->error);
         $this->assertSame(4, $run->output['products']['created'], 'every published product, none left out for a missing address');
         $this->inShop(fn () => $this->assertSame('https://kli.co.il/products/circular-saw', CatalogProduct::query()->where('external_id', '8001')->sole()->url));
+    }
+
+    public function test_a_page_the_theme_builds_is_not_read_from_the_password_page_of_a_locked_store(): void
+    {
+        $this->locked = true;
+        $this->passwordPage = true;
+
+        app(SyncCatalog::class)->handle($this->shop->id);
+
+        $this->inShop(function (): void {
+            $built = CatalogContent::query()->where('external_id', '5002')->sole();
+            $this->assertSame(['ביטול עסקה', ''], [$built->title, (string) $built->body], 'its title from Shopify, and no word of the password page');
+            $this->assertSame("אחריות לשנתיים.\nעל כל כלי.", CatalogContent::query()->where('external_id', '5001')->value('body'), 'a page with its own body is read from Shopify as before');
+        });
     }
 
     public function test_custom_fields_options_barcodes_and_weights_are_read_like_the_plugin_sends_them(): void

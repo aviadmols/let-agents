@@ -17,4 +17,10 @@ final class SiteSuggestions extends OperatorSiteSuggestions
     protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
     protected static ?int $navigationSort = 60;
+
+    /** The screen's name, as the menu says it; the tab says which page. */
+    public function getTitle(): string
+    {
+        return __('admin::panels.screens.inbox');
+    }
 }

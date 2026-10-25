@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
@@ -29,7 +30,9 @@ use Throwable;
  * Slow and sparing, once a day: a few hundred pages at most, a pause between two, and a page is
  * read again only when it is due: never read; its product changed; it asks for choices and was
  * read a day ago; it asks for none and was read a week ago. A page whose form did not change is
- * not read into fields again. A run is written only when something changed. Code only.
+ * not read into fields again. A run is written only when something changed, or when the storefront
+ * is closed to visitors (StorefrontLock): then nothing is read, every page stays due, and the run says
+ * so. Code only.
  *
  * On every platform (catalog.page_sizes), the size the page says the product itself is: a ring of one
  * size kept outside its variants ("מידה נוכחית: 54"), for search to read as the product's size.
@@ -50,6 +53,9 @@ final class ReadPageChoices
     private const MAX_FAILURES = 5;
 
     private const TIMEOUT_SECONDS = 20;
+
+    /** The lock the last page read showed (StorefrontLock), or null. */
+    private ?string $lock = null;
 
     /** @var Closure(int): void */
     private Closure $pause;
@@ -81,8 +87,9 @@ final class ReadPageChoices
         $delay = (int) Settings::get('catalog.page_choices_delay_ms', $shopId);
         $counts = ['read' => 0, 'same' => 0, 'changed' => 0, 'with_choices' => 0, 'failed' => 0];
         $changed = [];
+        $locked = null;
 
-        $this->tenant->run($shopId, function () use ($shopId, $limit, $delay, $forms, $sizes, $until, &$counts, &$changed): void {
+        $this->tenant->run($shopId, function () use ($shopId, $limit, $delay, $forms, $sizes, $until, &$counts, &$changed, &$locked): void {
             $down = 0;
 
             foreach ($this->due($limit) as $i => [$product, $row]) {
@@ -96,6 +103,13 @@ final class ReadPageChoices
                 }
 
                 $outcome = $this->read($product, $row, $forms, $sizes);
+
+                // A locked storefront shows the same lock page at every address: stop, every page stays due.
+                if ($outcome === 'locked') {
+                    $locked = $this->lock;
+
+                    break;
+                }
 
                 // The site answers with errors, or not at all, again and again: it struggles; stop and let it be.
                 $down = $outcome === 'down' ? $down + 1 : 0;
@@ -119,6 +133,26 @@ final class ReadPageChoices
             // Counted here, not in SQL: a json column has no equality in Postgres.
             $counts['with_choices'] = CatalogProductChoice::query()->get(['fields'])->filter(fn (CatalogProductChoice $c): bool => $c->fields !== [])->count();
         });
+
+        if ($locked !== null) {
+            StorefrontLock::seen($shopId, $locked);
+            // A page read before locks were told apart was the lock page, which asks for nothing: every such
+            // reading is due again, so the store is read anew once it opens. Nothing is read while it is locked.
+            $this->tenant->run($shopId, fn () => CatalogProductChoice::query()->whereNull('form_hash')->whereNotNull('checked_at')->update(['checked_at' => null]));
+            $platform = $connection?->platform === 'shopify' ? 'Shopify' : 'WooCommerce';
+
+            return $this->runs->track(
+                agent: self::AGENT,
+                action: self::ACTION,
+                shopId: $shopId,
+                trigger: $trigger,
+                work: fn (RunContext $run) => $run->output($counts + ['locked' => $locked])->summary('catalog::runs.locked.choices', ['platform' => $platform]),
+            );
+        }
+
+        if ($counts['read'] > $counts['failed']) {
+            StorefrontLock::open($shopId);
+        }
 
         if ($changed === []) {
             return null;
@@ -179,7 +213,7 @@ final class ReadPageChoices
         return array_map(fn (array $one): array => [$one[1], $one[2]], array_slice($due, 0, max(0, $limit)));
     }
 
-    /** @return 'same'|'changed'|'failed'|'down' down: the site struggles (StoreRest), not this page */
+    /** @return 'same'|'changed'|'failed'|'down'|'locked' down: the site struggles (StoreRest), not this page; locked: the storefront is closed (StorefrontLock) */
     private function read(CatalogProduct $product, ?CatalogProductChoice $row, bool $forms = true, bool $sizes = false): string
     {
         $row ??= new CatalogProductChoice(['product_id' => $product->id, 'fields' => []]);
@@ -191,7 +225,14 @@ final class ReadPageChoices
             $response = null;
         }
 
-        if ($response === null || ! $response->successful()) {
+        $this->lock = StorefrontLock::of($response);
+
+        // Nothing of a lock page is read; the product's row is left as it was, still due.
+        if (StorefrontLock::wide($this->lock)) {
+            return 'locked';
+        }
+
+        if ($response === null || ! $response->successful() || $this->lock !== null) {
             $row->fill(['failures' => $row->failures + 1, 'checked_at' => now()])->save();
 
             return StoreRest::struggling($response) ? 'down' : 'failed';

@@ -81,7 +81,7 @@ class LeaveDetails extends Page
             'key' => (string) $f['key'], 'type' => (string) $f['type'], 'label' => (string) ($f['label'] ?? $f['key']), 'required' => (bool) ($f['required'] ?? false),
         ], $flow === null ? LeadFields::defaults($locale) : LeadFields::clean($flow->asked(), $this->known($flow), $locale));
         $this->data['title'] = LeadFields::title($this->shopId(), $locale);
-        $this->data['promise'] = trim((string) $flow?->promise) ?: LeadFields::promise($locale);
+        $this->data['promise'] = LeadFields::promise($locale, $flow?->promise);
     }
 
     protected function checkMore(): void
@@ -102,7 +102,7 @@ class LeaveDetails extends Page
 
         // The built-in heading stays the built-in one (and follows its wording); only the shop's own is kept.
         $title = trim((string) ($this->data['title'] ?? ''));
-        if ($title === '' || $title === (string) __('leads::form.title', [], $locale)) {
+        if ($title === '' || LeadFields::builtIn($title, 'leads::form.title')) {
             Settings::clear('leads.form_title', $shopId);
         } else {
             Settings::set('leads.form_title', $title, $shopId);
@@ -112,6 +112,8 @@ class LeaveDetails extends Page
             $current = LeadFlow::inForce($shopId);
             $fields = LeadFields::clean((array) $this->data['fields'], $this->known($current), $locale);
             $promise = mb_substr(trim((string) ($this->data['promise'] ?? '')), 0, 120) ?: null;
+            // The built-in promise is not kept as the shop's own: it follows the shop's language.
+            $promise = $promise !== null && LeadFields::builtIn($promise, 'leads::form.promise') ? null : $promise;
 
             if ($current !== null && $current->asked() == $fields && trim((string) $current->promise) === (string) $promise) {
                 return;

@@ -18,4 +18,13 @@ final class PhotoSearches extends OperatorPhotoSearches
     protected static string|UnitEnum|null $navigationGroup = 'inbox';
 
     protected static ?int $navigationSort = 40;
+
+    /** Nothing is approved here: the screen's hint about approving answers is not shown. */
+    public static ?string $sectionHint = null;
+
+    /** The screen's name, as the menu says it; the tab says which page. */
+    public function getTitle(): string
+    {
+        return __('admin::panels.screens.inbox');
+    }
 }

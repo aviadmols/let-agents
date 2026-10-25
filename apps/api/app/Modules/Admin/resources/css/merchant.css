@@ -763,7 +763,10 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-flag[data-tone='bad'] { background: var(--lp-coral); }
 .fi-panel-merchant .lp-thumb-lg { width: 88px; height: 88px; border-radius: 14px; }
 .fi-panel-merchant .lp-thumb-xl { width: 190px; height: 190px; border-radius: 16px; }
-.fi-panel-merchant .lp-detail-head { display: flex; gap: 14px; align-items: flex-start; margin-block-end: 8px; }
+/* the title keeps room to read: the buttons go under it rather than squeeze it (English is longer than Hebrew) */
+.fi-panel-merchant .lp-detail-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; margin-block-end: 8px; }
+.fi-panel-merchant .lp-detail-head > .lp-grow { flex: 1 1 220px; }
+.fi-panel-merchant .lp-detail-head h2 { overflow-wrap: anywhere; }
 .fi-panel-merchant .lp-detail-head h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--la-ink); }
 .fi-panel-merchant .lp-sub-t { margin-block: 22px 10px; }
 .fi-panel-merchant .lp-tag { position: relative; padding: 0; }
@@ -833,24 +836,29 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-set-label { font-size: 13px; color: var(--la-muted); margin: 16px 0 6px; }
 .fi-panel-merchant .lp-set-label:first-child { margin-top: 0; }
 
-.fi-panel-merchant .lp-set-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-block-end: 1px solid var(--la-line); }
+/* a row's control goes under its title when both do not fit side by side (chips in English, a narrow screen): never a title a letter a line */
+.fi-panel-merchant .lp-set-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 0; border-block-end: 1px solid var(--la-line); }
+.fi-panel-merchant .lp-set-row > .lp-grow { flex: 1 1 180px; }
 .fi-panel-merchant .lp-set-row:last-child { border-block-end: 0; }
 .fi-panel-merchant .lp-set-t { font-size: 14px; color: var(--la-ink); font-weight: 500; }
 .fi-panel-merchant .lp-set-s { font-size: 13px; color: var(--la-muted); margin-top: 2px; line-height: 1.5; }
-.fi-panel-merchant .lp-set-control { flex: none; display: flex; align-items: center; gap: 8px; }
+.fi-panel-merchant .lp-set-control { flex: 0 1 auto; max-width: 100%; min-width: 0; margin-inline-start: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .fi-panel-merchant .lp-toggle { flex: none; position: relative; width: 40px; height: 24px; border: 0; padding: 0; border-radius: 999px; background: var(--la-axis); cursor: pointer; transition: background-color 160ms ease; }
-.fi-panel-merchant .lp-toggle::after { content: ''; position: absolute; top: 3px; inset-inline-end: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--la-paper); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: inset-inline-end 160ms ease; }
+.fi-panel-merchant .lp-toggle::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--la-paper); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: inset-inline-start 160ms ease; }
 .fi-panel-merchant .lp-toggle.is-on { background: var(--la-accent); }
-.fi-panel-merchant .lp-toggle.is-on::after { inset-inline-end: 19px; }
+/* on: the knob at the end of the line, as a switch reads in either direction (right in English, left in Hebrew) */
+.fi-panel-merchant .lp-toggle.is-on::after { inset-inline-start: 19px; }
 .fi-panel-merchant .lp-toggle:focus-visible { outline: 2px solid var(--la-ink); outline-offset: 2px; }
+.fi-panel-merchant .lp-toggle:disabled { opacity: .45; cursor: not-allowed; }
 
 .fi-panel-merchant .lp-chip .lp-chip-check { width: 14px; height: 14px; display: none; }
 .fi-panel-merchant .lp-chip.is-on .lp-chip-check { display: inline; }
 .fi-panel-merchant .lp-chip-plus { background: var(--la-sunk); box-shadow: none; }
 
-.fi-panel-merchant .lp-opts { display: grid; grid-template-columns: repeat(var(--lp-opts, 2), minmax(0, 1fr)); gap: 10px; }
-.fi-panel-merchant .lp-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: 0; border-radius: 16px; background: var(--la-paper); box-shadow: inset 0 0 0 1.5px var(--la-line); text-align: start; font: inherit; color: inherit; cursor: pointer; }
+/* at most --lp-opts in a row, and fewer when a card would be narrower than its words (a half-width card, English) */
+.fi-panel-merchant .lp-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(min(100%, 140px), calc((100% - (var(--lp-opts, 2) - 1) * 10px) / var(--lp-opts, 2))), 1fr)); gap: 10px; }
+.fi-panel-merchant .lp-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: 0; border-radius: 16px; background: var(--la-paper); box-shadow: inset 0 0 0 1.5px var(--la-line); text-align: start; font: inherit; color: inherit; cursor: pointer; min-width: 0; overflow-wrap: break-word; }
 .fi-panel-merchant .lp-opt b { font-size: 14px; font-weight: 600; color: var(--la-ink); }
 .fi-panel-merchant .lp-opt > span { font-size: 12.5px; color: var(--la-muted); line-height: 1.5; }
 .fi-panel-merchant .lp-opt.is-on { box-shadow: inset 0 0 0 2px var(--la-ink); }

@@ -29,4 +29,5 @@ return [
     'prepared' => 'Ready answers: :questions questions about the store, :answered answered and checked, :skipped already ready with their pages unchanged.',
     'checker_compared' => 'The answer check compared on :cases fixed cases.',
     'review_done_bank' => 'Daily report for :day: :asks questions, score :score. In the question bank: :in, left out for a low score: :out.',
+    'knowledge_locked' => 'What every product page says: the store is closed to visitors, so it is read once the store opens; until then the assistant answers from what comes from :platform. Lines cleared that were read from the closed page: :cleared.',
 ];

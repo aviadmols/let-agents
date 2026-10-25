@@ -5,6 +5,7 @@ namespace App\Core\Filament;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Settings\InvalidSettingValue;
+use App\Core\Settings\ValueSource;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\DB;
  *
  * A page lists its fields in fields(): 'name' => 'feature:search.photos' or 'setting:search.image_fit'.
  * Fields of its own (a shop column, a list) it loads in loadMore() and saves in saveMore().
+ *
+ * The form always shows what the shop really has: a switch the shop's plan holds off is off and cannot be
+ * turned on here ($held, read by the switch), and after a save every field is read back as it now resolves.
  */
 trait EditsShopSettings
 {
@@ -27,19 +31,32 @@ trait EditsShopSettings
     /** @var array<string, string> what was wrong, by field */
     public array $problems = [];
 
+    /** @var list<string> the fields the shop's plan holds off (a feature) or lower (a setting): shown as they are, not to be changed */
+    public array $held = [];
+
     /** @return array<string, string> field => 'feature:<key>' or 'setting:<key>' */
     abstract protected function fields(): array;
 
     public function mount(): void
     {
+        $this->readFields();
+        $this->loadMore();
+    }
+
+    /** Every field as it resolves for the shop now (its own word, the default, its plan's ceiling), and which the plan holds. */
+    private function readFields(): void
+    {
         $shop = $this->shopId();
+        $this->held = [];
 
         foreach ($this->fields() as $field => $source) {
             [$kind, $key] = explode(':', $source, 2);
             $this->data[$field] = $kind === 'feature' ? Features::enabled($key, $shop) : Settings::get($key, $shop);
-        }
 
-        $this->loadMore();
+            if ($shop !== '' && ($kind === 'feature' ? Features::source($key, $shop) : Settings::source($key, $shop)) === ValueSource::Plan) {
+                $this->held[] = $field;
+            }
+        }
     }
 
     public function save(): void
@@ -91,6 +108,8 @@ trait EditsShopSettings
             $this->saveMore();
         });
 
+        // read back as saved: a switch the plan holds off shows off again, not what was clicked
+        $this->readFields();
         $this->saved();
         Notification::make()->success()->title(__('admin::shop_settings.saved'))->send();
     }

@@ -225,13 +225,27 @@ class ConnectionSettings extends Page
             return $t('plan_waiting');
         }
 
-        $name = is_string($facts['plan'] ?? null) && $facts['plan'] !== '' ? $facts['plan'] : $t('plan_default');
+        // the shop's plan by name (Essentials, Starter, Growth, Pro): the platform's word first, else the shop's own
+        $named = is_string($facts['plan'] ?? null) && $facts['plan'] !== '' ? $facts['plan'] : $shop->currentPlan()?->name;
+        $name = $named ?? $t('plan_default');
+        $with = fn (string $line): string => $named === null ? $line : $named.' · '.$line;
 
-        return match (true) {
-            ($facts['trial_ends'] ?? null) instanceof CarbonInterface => $t('plan_trial', ['plan' => $name, 'date' => $date($facts['trial_ends'])]),
-            ($facts['renews'] ?? null) instanceof CarbonInterface => $t('plan_renews', ['plan' => $name, 'date' => $date($facts['renews'])]),
-            default => $name,
-        };
+        // a free trial, the platform's (Shopify's, before the first bill) or one the team gave the shop: the days left
+        $trial = ($facts['trial_ends'] ?? null) instanceof CarbonInterface ? $facts['trial_ends']
+            : ($shop->trial_ends_at !== null && $shop->trial_ends_at->isFuture() ? $shop->trial_ends_at : null);
+
+        if ($trial !== null) {
+            $days = max(1, (int) ceil(now()->diffInHours($trial, false) / 24));
+
+            return $with(trans_choice('admin::shop_settings.connection.plan_trial_left', $days, ['count' => $days]));
+        }
+
+        // charging is off for the store: it pays nothing
+        if (($facts['plan_free'] ?? false) === true) {
+            return $named === null ? $t('plan_free') : $t('plan_free_named', ['plan' => $named]);
+        }
+
+        return ($facts['renews'] ?? null) instanceof CarbonInterface ? $t('plan_renews', ['plan' => $name, 'date' => $date($facts['renews'])]) : $name;
     }
 
     /**

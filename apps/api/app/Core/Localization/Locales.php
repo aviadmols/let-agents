@@ -44,6 +44,23 @@ final class Locales
         return $written;
     }
 
+    /**
+     * The language a shop's built-in words are read in, from its content language (shops.content_locale): its own
+     * when the words exist in it, else English; Hebrew for a shop that never said. A French or an Arabic store
+     * reads English defaults, never Hebrew ones.
+     */
+    public static function forShop(?string $contentLocale): string
+    {
+        $language = strtolower(explode('-', str_replace('_', '-', trim((string) $contentLocale)))[0]);
+        $language = $language === 'iw' ? 'he' : $language;
+
+        return match (true) {
+            $language === '' => self::isSupported('he') ? 'he' : self::fallback(),
+            self::isSupported($language) => $language,
+            default => self::isSupported('en') ? 'en' : self::fallback(),
+        };
+    }
+
     public static function isSupported(?string $locale): bool
     {
         return $locale !== null && in_array($locale, self::supported(), true);

@@ -49,7 +49,7 @@ return [
     ],
     'index' => [
         'heading' => 'Search update',
-        'status' => 'Updated :when: :products products, :content guides and pages, :categories categories.',
+        'status' => 'Updated :when: :products {products:product/products}, :content {content:guide or page/guides and pages}, :categories {categories:category/categories}.',
         'never' => 'Search has not been updated for this shop yet.',
         'build_now' => 'Update search now',
         'built' => 'Search updated',
@@ -170,7 +170,7 @@ return [
         'subheading' => 'The photos shoppers searched with, what was seen in each and what they got. Mark right or wrong: the marked photos are the check set, and every change to photo search is measured against it.',
         'measure' => 'Measure',
         'measure_about' => 'How many searches were right by your marks, and how many the reader of today gets on the marked set.',
-        'asks' => ':count searches in the last :days days',
+        'asks' => ':count {count:search/searches} in the last :days days',
         'found_nothing' => ':count with no results',
         'marked' => ':count marked, :right right',
         'checked' => 'Last check: :right of :count right (:when)',

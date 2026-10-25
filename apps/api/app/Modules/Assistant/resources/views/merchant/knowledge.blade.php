@@ -9,7 +9,7 @@
         <section class="lp-card" data-add-info>
             <div class="lp-card-t"><h2>{{ $t('add.title') }}</h2><span class="lp-note">{{ $t('add.note') }}</span></div>
             <form wire:submit="addInfo" class="lp-stack">
-                <textarea class="lp-textarea" wire:model="newInfo" rows="3" maxlength="600" placeholder="{{ $t('add.placeholder') }}" aria-label="{{ $t('add.title') }}"></textarea>
+                <textarea class="lp-textarea" wire:model="newInfo" rows="3" maxlength="600" placeholder="{{ $t('add.placeholder', ['price' => \App\Core\Localization\Money::price(8, (string) (\Filament\Facades\Filament::getTenant()?->currency ?: 'ILS'))]) }}" aria-label="{{ $t('add.title') }}"></textarea>
                 <div class="lp-actions">
                     <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary" wire:loading.attr="disabled" wire:target="addInfo"><svg class="lp-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>{{ $t('add.button') }}</button>
                     <span class="lp-note">{{ $t('add.checked') }}</span>

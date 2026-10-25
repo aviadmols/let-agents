@@ -9,6 +9,6 @@ return [
     'night' => [
         'title' => 'The night\'s scan',
         'all' => 'All :count steps finished.',
-        'some' => ':failed steps did not finish and try again tonight.',
+        'some' => ':failed {failed:step did/steps did} not finish and {failed:tries/try} again tonight.',
     ],
 ];

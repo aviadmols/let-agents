@@ -19,7 +19,7 @@
             <div class="lp-set-label">{{ $t('where') }}</div>
             <x-lp::row :title="$t('on_products')" :sub="$t('on_products_sub')"><x-lp::toggle model="data.on_products" :label="$t('on_products')" /></x-lp::row>
             <x-lp::row :title="$t('on_content')" :sub="$t('on_content_sub')"><x-lp::toggle model="data.on_content" :label="$t('on_content')" /></x-lp::row>
-            <x-lp::row :title="$t('on_search')" :sub="$t('on_search_sub')"><x-lp::toggle model="data.on_search" :label="$t('on_search')" /></x-lp::row>
+            <x-lp::row :title="$t('on_search')" :sub="$t('on_search_sub', ['example' => $t('on_search_example.'.(\Filament\Facades\Filament::getTenant()?->inIsrael() ? 'israel' : 'abroad'))])"><x-lp::toggle model="data.on_search" :label="$t('on_search')" /></x-lp::row>
         </div>
 
         <div class="lp-set-label">{{ $t('limits') }}</div>

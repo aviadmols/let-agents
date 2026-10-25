@@ -91,6 +91,32 @@ final class ProfileSettingsTest extends TestCase
         $this->assertTrue(Hash::check('new-password-1', (string) $this->me->fresh()?->password));
     }
 
+    /** A Shopify store's own account: its name was the store's, its email owner@{store}.myshopify.com. Neither is shown as theirs. */
+    public function test_the_installs_stand_ins_are_not_shown_as_the_persons_own_and_are_asked_for(): void
+    {
+        $shop = Shop::factory()->create(['name' => 'lets-sell-book']);
+        $own = User::factory()->create(['name' => 'lets-sell-book', 'email' => 'owner@lets-sell-book.myshopify.com', 'locale' => 'en']);
+        $own->attachShop($shop, ShopRole::Owner);
+        $this->actingAs($own);
+        app()->setLocale('en');
+        Filament::setTenant($shop);
+
+        $page = Livewire::test(ProfileSettings::class)
+            ->assertSet('data.name', '')
+            ->assertSet('data.email', '')
+            ->assertSee('Add your name, so the team sees who did what.')
+            ->assertSee('Add your email, to get the account\'s messages and to sign in with it.')
+            ->assertDontSee('owner@lets-sell-book.myshopify.com');
+
+        // Saved without them (the display mode only): the stand-ins stay, nothing is refused.
+        $page->set('data.theme', 'dark')->call('save')->assertNotified('Saved');
+        $this->assertSame(['lets-sell-book', 'owner@lets-sell-book.myshopify.com', 'dark'], [$own->fresh()?->name, $own->fresh()?->email, $own->fresh()?->theme]);
+
+        // Their own, once given, is theirs and shown.
+        $page->set('data.name', 'Dana Gueta')->set('data.email', 'dana@example.com')->call('save');
+        Livewire::test(ProfileSettings::class)->assertSet('data.name', 'Dana Gueta')->assertSet('data.email', 'dana@example.com')->assertDontSee('Add your name');
+    }
+
     public function test_an_email_of_someone_else_is_refused(): void
     {
         User::factory()->create(['email' => 'taken@example.com']);

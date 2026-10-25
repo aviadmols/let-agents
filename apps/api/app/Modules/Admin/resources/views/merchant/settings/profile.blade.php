@@ -5,11 +5,13 @@
     <x-lp::card :title="$t('title')" style="max-width: 640px" data-profile>
         <div class="lp-acct-form">
             <label>{{ $t('name') }}
-                <x-lp::field model="data.name" autocomplete="name" />
+                <x-lp::field model="data.name" autocomplete="name" :placeholder="$t('name_placeholder')" />
+                @if ($this->missing('name') && ! $this->problem('name'))<span class="lp-sample" data-missing="name">{{ $t('name_missing') }}</span>@endif
                 @if ($this->problem('name'))<span class="lp-set-error" role="alert">{{ $this->problem('name') }}</span>@endif
             </label>
             <label>{{ $t('email') }}
-                <x-lp::field model="data.email" type="email" ltr autocomplete="email" />
+                <x-lp::field model="data.email" type="email" ltr autocomplete="email" placeholder="name@example.com" />
+                @if ($this->missing('email') && ! $this->problem('email'))<span class="lp-sample" data-missing="email">{{ $t('email_missing') }}</span>@endif
                 @if ($this->problem('email'))<span class="lp-set-error" role="alert">{{ $this->problem('email') }}</span>@endif
             </label>
             <div class="lp-acct-full" style="grid-column: auto"><span>{{ $t('locale') }}</span><x-lp::chips model="data.locale" :options="__('admin::panels.locale.names')" /></div>

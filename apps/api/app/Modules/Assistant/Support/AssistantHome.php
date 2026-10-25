@@ -13,7 +13,6 @@ use App\Modules\Admin\Contracts\ModuleFigure;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Assistant\Filament\Merchant\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
-use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 
@@ -29,7 +28,8 @@ final class AssistantHome implements FirstSteps, HomeCards, HomeSource
     public function statuses(Shop $shop): array
     {
         $on = Features::enabled('assistant.on_search', $shop->id) || Features::enabled('assistant.on_products', $shop->id);
-        $week = AssistantSearchAsk::query()->where('created_at', '>=', now()->subDays(7))->count();
+        // the questions of the last 7 days, counted as the card and the analytics screen count them
+        $week = QuestionCounts::between(now()->subDays(7), now())['all'];
 
         return [new HomeStatus(
             key: 'assistant',
@@ -69,7 +69,7 @@ final class AssistantHome implements FirstSteps, HomeCards, HomeSource
 
     public function figures(Shop $shop, CarbonInterface $since, CarbonInterface $until, CarbonInterface $before): array
     {
-        $asks = fn (CarbonInterface $from, CarbonInterface $to): int => AssistantSearchAsk::query()->where('created_at', '>=', $from)->where('created_at', '<', $to)->count();
+        $asks = fn (CarbonInterface $from, CarbonInterface $to): int => QuestionCounts::between($from, $to)['all'];
 
         return [new ModuleFigure(
             key: 'assistant',
@@ -82,27 +82,21 @@ final class AssistantHome implements FirstSteps, HomeCards, HomeSource
     }
 
     /**
-     * The questions shoppers asked in the period: every question in the search box, and every
-     * question on a product or an article page last asked in it (a question asked again counts once
-     * there: those keep one row each). With how many were answered from what the store knows.
+     * The questions shoppers asked in the period, as the analytics screen counts them (QuestionCounts),
+     * with how many were answered from what the store knows.
      */
     public function cards(Shop $shop, CarbonInterface $since, CarbonInterface $until, CarbonInterface $before): array
     {
-        $box = fn (CarbonInterface $from, CarbonInterface $to) => AssistantSearchAsk::query()->where('created_at', '>=', $from)->where('created_at', '<', $to);
-        $page = fn (CarbonInterface $from, CarbonInterface $to) => AssistantAnswer::query()->where(fn ($q) => $q->whereNotNull('product_id')->orWhereNotNull('content_id'))
-            ->where('last_asked_at', '>=', $from)->where('last_asked_at', '<', $to);
-
-        $now = $box($since, $until)->count() + $page($since, $until)->count();
-        $before = $box($before, $since)->count() + $page($before, $since)->count();
-        $answered = $box($since, $until)->where('outcome', AssistantAnswer::ANSWERED)->count() + $page($since, $until)->where('outcome', AssistantAnswer::ANSWERED)->count();
+        $now = QuestionCounts::between($since, $until);
+        $earlier = QuestionCounts::between($before, $since);
 
         return [new HomeCard(
             key: 'questions',
             order: 10,
             label: __('assistant::home.card.label'),
-            value: number_format($now),
-            note: __('assistant::home.card.answered', ['count' => number_format($answered)]),
-            change: [$now, $before],
+            value: number_format($now['all']),
+            note: __('assistant::home.card.answered', ['count' => number_format($now['answered'])]),
+            change: [$now['all'], $earlier['all']],
             url: ShopQuestions::getUrl(panel: 'merchant', tenant: $shop),
         )];
     }

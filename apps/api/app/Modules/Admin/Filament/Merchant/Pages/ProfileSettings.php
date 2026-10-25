@@ -67,9 +67,11 @@ class ProfileSettings extends Page
         $user = $this->user();
         $this->hosted = HostedPanel::inside();
 
+        // What the platform's install wrote in for want of the person's own (the store's name, owner@the-store.myshopify.com)
+        // is not shown as theirs: the field is empty, with a word asking for it.
         $this->data = [
-            'name' => (string) $user->name,
-            'email' => (string) $user->email,
+            'name' => self::stoodIn($user, 'name') ? '' : (string) $user->name,
+            'email' => self::stoodIn($user, 'email') ? '' : (string) $user->email,
             'locale' => $user->preferredLocale() ?? app()->getLocale(),
             'theme' => $user->preferredTheme() ?? 'system',
             'current' => '',
@@ -83,6 +85,25 @@ class ProfileSettings extends Page
         return $this->problems[$field] ?? null;
     }
 
+    /** Whether the person's name or email is still the install's stand-in, not their own: shown empty, asked for. */
+    public function missing(string $field): bool
+    {
+        return self::stoodIn($this->user(), $field);
+    }
+
+    /**
+     * The install's stand-ins (Shopify\Actions\InstallStore): a name that is one of the person's stores' names,
+     * and the owner@{store}.myshopify.com address a store's own account gets when its owner's email is an operator's.
+     */
+    private static function stoodIn(User $user, string $field): bool
+    {
+        return match ($field) {
+            'email' => preg_match('/^owner@[a-z0-9][a-z0-9-]*\.myshopify\.com$/', mb_strtolower((string) $user->email)) === 1,
+            'name' => trim((string) $user->name) === '' || $user->shops()->where('shops.name', (string) $user->name)->exists(),
+            default => false,
+        };
+    }
+
     public function save(): void
     {
         $user = $this->user();
@@ -94,6 +115,10 @@ class ProfileSettings extends Page
         $locale = Locales::isSupported((string) ($this->data['locale'] ?? '')) ? (string) $this->data['locale'] : app()->getLocale();
         $theme = in_array($this->data['theme'] ?? null, User::THEMES, true) ? (string) $this->data['theme'] : 'system';
         $password = $this->hosted ? '' : (string) ($this->data['password'] ?? '');
+
+        // Left empty where the install's stand-in is: the stand-in stays until they give their own.
+        $name = $name === '' && self::stoodIn($user, 'name') ? (string) $user->name : $name;
+        $email = $email === '' && self::stoodIn($user, 'email') ? (string) $user->email : $email;
 
         if (mb_strlen($name) < 2) {
             $this->problems['name'] = $t('name_short');

@@ -18,7 +18,7 @@ return [
         'missing' => 'Products missing details',
         'to_missing' => 'To missing details',
         'contents' => 'Pages and posts',
-        'contents_note' => ':pages pages · :posts posts',
+        'contents_note' => ':pages {pages:page/pages} · :posts {posts:post/posts}',
     ],
     'find_product' => 'Search a product, SKU or tag',
     'find_page' => 'Search a page or post',

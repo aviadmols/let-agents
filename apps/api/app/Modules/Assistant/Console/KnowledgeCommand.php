@@ -37,7 +37,8 @@ final class KnowledgeCommand extends Command
 
                 return $read;
             });
-            $this->line("{$shop->slug}: {$read['sentences']} sentences from {$read['pages']} pages");
+            // A storefront closed to visitors (StorefrontLock) is not read; the run says so.
+            $this->line(isset($read['locked']) ? "{$shop->slug}: the storefront is locked ({$read['locked']}), nothing read" : "{$shop->slug}: {$read['sentences']} sentences from {$read['pages']} pages");
         }
 
         return self::SUCCESS;

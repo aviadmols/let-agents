@@ -115,7 +115,7 @@ final class CreateTaskFile
 
             if ($count === 0) {
                 $batch->delete();
-                $run->output(['requests' => 0])->summary('enrichment::runs.nothing_to_do', ['task' => $type->label()]);
+                $run->output(['requests' => 0])->summary('enrichment::runs.nothing_to_do', ['task' => 'enrichment::enrichment.tasks.'.$type->value]);
 
                 return null;
             }
@@ -129,7 +129,8 @@ final class CreateTaskFile
                 'system_prompt_chars' => mb_strlen($system),
                 'prompt_version' => $batch->prompt_version,
             ])->summary('enrichment::runs.task_file_created', [
-                'task' => $type->label(),
+                // the task's name, read in the reader's language (Run::summary)
+                'task' => 'enrichment::enrichment.tasks.'.$type->value,
                 'count' => number_format($count),
                 'chars' => number_format($textChars),
             ]);

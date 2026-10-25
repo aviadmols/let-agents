@@ -14,6 +14,7 @@ use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -200,6 +201,10 @@ final class SimilarItemsTest extends TestCase
         // When the team answers WhatsApp, read in the browser; and whether a name and a way back can be left instead.
         $this->assertCount(7, $config['hours']['days']);
         $this->assertSame('Asia/Jerusalem', $config['hours']['timezone']);
+        // by the shop's own clock (shops.timezone), as the product page's hours (AnsweringZone)
+        $this->shop->forceFill(['timezone' => 'America/New_York'])->save();
+        Cache::flush();
+        $this->assertSame('America/New_York', $this->get('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index')->json('config.hours.timezone'));
         $this->assertTrue($config['callbacks']);
 
         Features::override('search.similar', false, $this->shop->id);

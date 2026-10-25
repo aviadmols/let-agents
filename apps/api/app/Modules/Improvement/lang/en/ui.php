@@ -2,7 +2,7 @@
 
 return [
     'title' => 'Suggestions for the site',
-    'subheading' => 'Every day Let Agents looks at what shoppers searched and asked and did not find on the site. The suggestions that came of it wait here, each with the searches and questions behind it.',
+    'subheading' => 'Every day Lets looks at what shoppers searched and asked and did not find on the site. The suggestions that came of it wait here, each with the searches and questions behind it.',
     'no_shop' => 'No shop yet.',
     'review_now' => 'Check now',
     'reviewed' => 'The check is done',
@@ -61,7 +61,7 @@ return [
         'writing_now' => 'Writing a draft… it takes about a minute.',
         'title' => 'Title',
         'body' => 'The post (you can edit it; subheadings on a line starting with ##)',
-        'products' => 'Mentions :count products from the store, shown at the end of the post.',
+        'products' => 'Mentions :count {count:product/products} from the store, shown at the end of the post.',
         'problems' => 'The checking model found things to fix before publishing:',
         'checked_ok' => 'The checking model found no problem. Read it before publishing all the same.',
         'open' => 'Open the post',
@@ -80,7 +80,7 @@ return [
     ],
     'daily' => [
         'label' => 'The site\'s daily check',
-        'headline' => ':proposed proposals · :applied applied',
+        'headline' => ':proposed {proposed:proposal/proposals} · :applied applied',
         'waiting' => 'Waiting for your approval (:count)',
         'done' => 'Already on the site (:count)',
     ],

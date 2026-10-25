@@ -4,8 +4,10 @@ namespace App\Modules\Widget\Filament\Merchant\Pages;
 
 use App\Core\Facades\Settings;
 use App\Core\Filament\EditsShopSettings;
+use App\Modules\Widget\Support\AnsweringZone;
 use App\Modules\Widget\Support\OpeningHours as Week;
 use App\Modules\Widget\Support\PageCache;
+use App\Modules\Widget\Support\ShopWeek;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -13,7 +15,7 @@ use UnitEnum;
 
 /**
  * Settings · Answering hours, as the designer's panel lays it out: a day at a time, a switch and two
- * times, an off day closed. The week is measured in the shop's WhatsApp timezone. The product pages
+ * times, an off day closed. The week is measured by the shop's clock (AnsweringZone). The product pages
  * carry the hours (WhatsApp now, details after), so their cache is forgotten on save. The shop comes
  * from the address and is never a choice here.
  */
@@ -56,9 +58,11 @@ class OpeningHours extends Page
     protected function loadMore(): void
     {
         $shop = $this->shopId();
+        // A week the shop never set is the usual one where its clock runs: Sunday to Thursday in Israel, Monday to Friday elsewhere.
+        $week = ShopWeek::for($shop);
 
         foreach (Week::DAYS as $day) {
-            $ends = Week::split((string) Settings::get("widget.hours_{$day}", $shop));
+            $ends = Week::split($week[$day]);
             $this->data['days'][$day] = [
                 'open' => $ends['from'] !== null,
                 'from' => $ends['from'] ?? '09:00',
@@ -66,7 +70,7 @@ class OpeningHours extends Page
             ];
         }
 
-        $this->data['timezone'] = (string) Settings::get('widget.whatsapp_timezone', $shop);
+        $this->data['timezone'] = AnsweringZone::for($shop);
     }
 
     protected function checkMore(): void
@@ -82,14 +86,15 @@ class OpeningHours extends Page
     protected function saveMore(): void
     {
         $shop = $this->shopId();
+        $zone = AnsweringZone::for($shop);
 
         foreach (Week::DAYS as $day) {
             $row = (array) ($this->data['days'][$day] ?? []);
             $value = ($row['open'] ?? false) ? Week::compose($row['from'] ?? null, $row['until'] ?? null) : '';
 
-            // The shop's own word only where it differs from the default week.
+            // The shop's own word only where it differs from the usual week where its clock runs.
             Settings::clear("widget.hours_{$day}", $shop);
-            if ($value !== Settings::get("widget.hours_{$day}", $shop)) {
+            if ($value !== ShopWeek::day($day, $shop, $zone)) {
                 Settings::set("widget.hours_{$day}", $value, $shop);
             }
         }

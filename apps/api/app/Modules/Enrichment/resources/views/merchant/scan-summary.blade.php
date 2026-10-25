@@ -27,7 +27,7 @@
                             <button type="button" @class(['lp-prow', 'is-on' => $p !== null && $p['id'] === $row['id']]) wire:click="select('{{ $row['id'] }}')">
                                 <span class="lp-flag" data-tone="{{ $row['flag'] }}"></span>
                                 <span class="lp-thumb">@if ($row['thumb'])<img src="{{ $row['thumb'] }}" alt="" loading="lazy">@else<svg><use href="#lp-i-doc"/></svg>@endif</span>
-                                <span class="lp-grow"><span class="lp-row-t lp-clip">{{ $row['title'] }}</span><span class="lp-row-s">{{ $row['line'] }}</span></span>
+                                <span class="lp-grow"><span class="lp-row-t lp-clip" dir="auto">{{ $row['title'] }}</span><span class="lp-row-s">{{ $row['line'] }}</span></span>
                             </button>
                         @empty
                             <p class="lp-empty">{{ $t('none') }}</p>
@@ -43,7 +43,7 @@
                         <div class="lp-detail-head">
                             <span class="lp-thumb lp-thumb-lg">@if ($p['thumb'])<img src="{{ $p['thumb'] }}" alt="">@else<svg><use href="#lp-i-doc"/></svg>@endif</span>
                             <div class="lp-grow">
-                                <h2>{{ $p['title'] }}</h2>
+                                <h2 dir="auto">{{ $p['title'] }}</h2>
                                 <span class="lp-row-s">{{ collect([
                                     $p['sku'] ? $t('sku', ['sku' => $p['sku']]) : null,
                                     $this->price($p['price']),
@@ -165,7 +165,7 @@
                             <button type="button" @class(['lp-prow', 'is-on' => $c !== null && $c['id'] === $row['id']]) wire:click="select('{{ $row['id'] }}')">
                                 <span class="lp-flag" data-tone="{{ $row['flag'] }}"></span>
                                 <span class="lp-thumb">@if ($row['thumb'])<img src="{{ $row['thumb'] }}" alt="" loading="lazy">@else<svg><use href="#lp-i-doc"/></svg>@endif</span>
-                                <span class="lp-grow"><span class="lp-row-t lp-clip">{{ $row['title'] }}</span><span class="lp-row-s">{{ $row['line'] }}</span></span>
+                                <span class="lp-grow"><span class="lp-row-t lp-clip" dir="auto">{{ $row['title'] }}</span><span class="lp-row-s">{{ $row['line'] }}</span></span>
                             </button>
                         @empty
                             <p class="lp-empty">{{ $t('none') }}</p>
@@ -180,7 +180,7 @@
                         <div class="lp-detail-head">
                             <span class="lp-thumb lp-thumb-lg">@if ($c['thumb'])<img src="{{ $c['thumb'] }}" alt="">@else<svg><use href="#lp-i-doc"/></svg>@endif</span>
                             <div class="lp-grow">
-                                <h2>{{ $c['title'] }}</h2>
+                                <h2 dir="auto">{{ $c['title'] }}</h2>
                                 <span class="lp-row-s">{{ collect([
                                     $t('kinds.'.$c['type']),
                                     $c['published'] ? $t('published', ['date' => $c['published']]) : null,

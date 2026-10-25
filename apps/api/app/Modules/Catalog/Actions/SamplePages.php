@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Actions;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Support\PageSignals;
 use App\Modules\Catalog\Support\StoreRest;
@@ -25,6 +26,8 @@ use Throwable;
  * other versions linked as products of their own (PageSignals::siblings), a subscription (Shopify's
  * selling plans, an app such as Recharge, WooCommerce's subscription products) and choices asked on
  * the page only. Gently: a pause between pages, and a store that struggles is left alone (StoreRest).
+ * A storefront closed to visitors (Shopify's password page, a maintenance page: StorefrontLock) is not
+ * read at all: the first such page stops the sampling, and the products stay as the platform sent them.
  * No model.
  */
 final class SamplePages
@@ -65,6 +68,7 @@ final class SamplePages
                 $delay = (int) Settings::get('catalog.page_choices_delay_ms', $shopId);
                 $found = ['read' => 0, 'failed' => 0, 'siblings' => [], 'plans' => [], 'apps' => [], 'fields' => []];
                 $down = 0;
+                $locked = null;
 
                 foreach ($picked->values() as $i => $product) {
                     if ($i > 0) {
@@ -72,6 +76,17 @@ final class SamplePages
                     }
 
                     $page = $this->get((string) $product->url, 'text/html');
+                    // Every address of a locked storefront is the same lock page: nothing more to read.
+                    if (($lock = StorefrontLock::of($page)) !== null) {
+                        if (StorefrontLock::wide($lock)) {
+                            $locked = $lock;
+
+                            break;
+                        }
+                        $found['failed']++;
+
+                        continue;
+                    }
                     if ($page === null || ! $page->successful()) {
                         $found['failed']++;
                         $down = StoreRest::struggling($page) ? $down + 1 : 0;
@@ -104,6 +119,17 @@ final class SamplePages
                             $found['plans'][$title] = $plans['required'];
                         }
                     }
+                }
+
+                if ($locked !== null) {
+                    StorefrontLock::seen($shopId, $locked);
+                    $run->output(['sampled' => $picked->count(), 'kinds' => $kinds, 'read' => 0, 'locked' => $locked])
+                        ->summary('catalog::runs.locked.sample', ['platform' => $shopify ? 'Shopify' : 'WooCommerce']);
+
+                    return;
+                }
+                if ($found['read'] > 0) {
+                    StorefrontLock::open($shopId);
                 }
 
                 // WooCommerce says a product is a subscription in its type: every one counted, not only the pages read.

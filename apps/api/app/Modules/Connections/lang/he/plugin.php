@@ -2,7 +2,7 @@
 
 return [
     'title' => 'התוסף לחנויות',
-    'subheading' => 'תוסף WooCommerce שמחבר חנות ל־Let Agents. הקובץ נבנה מאותה גרסה של הקוד שרצה כאן.',
+    'subheading' => 'תוסף WooCommerce שמחבר חנות ל־Lets. הקובץ נבנה מאותה גרסה של הקוד שרצה כאן.',
     'download' => 'הורדת התוסף',
     'download_version' => 'הורדת התוסף :version',
     'missing' => 'קובץ התוסף לא נמצא בשרת. בפריסה הוא נבנה אוטומטית. בסביבת פיתוח מריצים: php artisan connections:bundle-plugin',

@@ -11,7 +11,7 @@ return [
     ],
     'input_selector' => [
         'label' => 'Search boxes on the site',
-        'description' => 'CSS selector of the search fields Let Agents search attaches to. Several, separated by commas.',
+        'description' => 'CSS selector of the search fields Lets search attaches to. Several, separated by commas.',
     ],
     'field_filter_min_percent' => [
         'label' => 'A field is a filter from this share of products',

@@ -76,7 +76,7 @@ final class FirstScan
         'catalog' => ['catalog.sync'],
         'sample' => ['catalog.sample_pages'],
         'site' => ['catalog.read_site_pages'],
-        'knowledge' => ['enrichment.read_promises', 'enrichment.read_content', 'assistant.check_own_knowledge'],
+        'knowledge' => ['assistant.read_repeated', 'enrichment.read_promises', 'enrichment.read_content', 'assistant.check_own_knowledge'],
         'posts' => ['assistant.read_posts', 'enrichment.match_article_products', 'enrichment.audit_content'],
         'pictures' => ['retrieval.build_image_index', 'retrieval.caption_images'],
         'structure' => ['enrichment.build_structure', 'enrichment.propose_schema', 'enrichment.discover_schema', 'enrichment.score_schema', 'enrichment.import_vocabulary'],

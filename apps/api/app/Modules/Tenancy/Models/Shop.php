@@ -47,6 +47,9 @@ class Shop extends Model
     /** Names a shop's address may not take: the platform's own addresses. */
     public const RESERVED_SLUGS = ['www', 'app', 'api', 'admin', 'operator', 'merchant', 'mail', 'static', 'assets', 'cdn', 'status', 'help', 'docs', 'agents'];
 
+    /** The time zones that are Israel's clock. */
+    public const ISRAEL_ZONES = ['Asia/Jerusalem', 'Asia/Tel_Aviv'];
+
     /** @use HasFactory<ShopFactory> */
     use HasFactory;
 
@@ -152,6 +155,18 @@ class Shop extends Model
     public function leaving(): bool
     {
         return $this->deletion_due_at !== null;
+    }
+
+    /** Whether a clock is Israel's: its week (Sunday to Thursday), its numbers and places in examples. */
+    public static function israeli(?string $timezone): bool
+    {
+        return in_array((string) $timezone, self::ISRAEL_ZONES, true);
+    }
+
+    /** Whether the shop runs on Israel's clock (shops.timezone, as its platform gave it). */
+    public function inIsrael(): bool
+    {
+        return self::israeli($this->timezone);
     }
 
     /** "rtl" or "ltr" for the language visitors see. */

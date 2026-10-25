@@ -3,6 +3,7 @@
 namespace App\Modules\Shopify\Feed;
 
 use App\Core\Text\HtmlText;
+use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
 use App\Modules\Connections\Contracts\ReadsChangedProducts;
 use App\Modules\Connections\Contracts\ReadsStock;
@@ -857,7 +858,10 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts,
         }
     }
 
-    /** The text of the main part of a storefront page, or empty when it cannot be read. */
+    /**
+     * The text of the main part of a storefront page, or empty when it cannot be read, or when the
+     * storefront answers with its password page (StorefrontLock): the page's body from the API stands.
+     */
     private static function shown(string $url): string
     {
         try {
@@ -866,7 +870,7 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts,
             return '';
         }
 
-        if (! $response->successful()) {
+        if (! $response->successful() || StorefrontLock::of($response) !== null) {
             return '';
         }
 

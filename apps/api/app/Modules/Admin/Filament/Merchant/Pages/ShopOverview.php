@@ -63,7 +63,12 @@ final class ShopOverview extends Page
 
     public function getTitle(): string
     {
-        $hour = (int) now()->timezone('Asia/Jerusalem')->format('G');
+        // by the shop's own clock (shops.timezone): a store in New York is greeted by its morning
+        try {
+            $hour = (int) now()->timezone((string) $this->shop()->timezone ?: 'Asia/Jerusalem')->format('G');
+        } catch (\Throwable) {
+            $hour = (int) now()->timezone('Asia/Jerusalem')->format('G');
+        }
         $part = $hour < 5 ? 'night' : ($hour < 12 ? 'morning' : ($hour < 17 ? 'noon' : ($hour < 21 ? 'evening' : 'night')));
         // The first name, past a title ("Mr.", "ד״ר").
         $name = (string) collect(explode(' ', trim((string) Auth::user()?->name)))->first(fn (string $part): bool => $part !== '' && ! str_ends_with($part, '.') && ! in_array($part, ['ד״ר', 'דר', 'פרופ׳'], true));

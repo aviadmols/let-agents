@@ -113,9 +113,13 @@ final class MerchantNavigation
             return new HtmlString('');
         }
 
+        // The screen's hint, unless the page names its own, or none ($sectionHint): "approve here" only where something is approved.
+        $hint = property_exists($current, 'sectionHint') ? $current::$sectionHint : $key;
+
         return new HtmlString(view('admin::panel.merchant-section', [
             'key' => $key,
-            'hint' => __("admin::panels.hints.{$key}"),
+            'hint' => $hint === null ? null : __("admin::panels.hints.{$hint}"),
+            'hintKey' => $hint,
             'tabs' => count($pages) > 1,
             'side' => in_array($key, self::SIDE, true),
             'label' => __("admin::panels.screens.{$key}"),

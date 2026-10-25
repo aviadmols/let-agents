@@ -3,7 +3,7 @@
 return [
     'title' => 'Timeline',
     'subheading' => 'Everything that happened in the shop, by day: scans, products that came in, pages and posts read, what users did, insight reviews and leads. Each with what it cost in AI.',
-    'days' => ':n days',
+    'days' => ':n {n:day/days}',
     'cost' => 'AI cost in the period: $:usd',
     'cost_help' => 'the sum of every model call shown here',
     'all' => 'All',

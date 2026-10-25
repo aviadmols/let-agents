@@ -3,6 +3,7 @@
 namespace App\Modules\Catalog\Jobs;
 
 use App\Modules\Catalog\Actions\ReadPageChoices;
+use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Support\StoreRest;
 use App\Modules\Runs\Enums\RunTrigger;
 use Illuminate\Bus\Queueable;
@@ -50,8 +51,8 @@ final class ReadPageChoicesJob implements ShouldBeUnique, ShouldQueue
     {
         $read->handle($this->shopId, PHP_INT_MAX, RunTrigger::Manual, now()->addMinutes(self::MINUTES));
 
-        // A site resting after errors (StoreRest) is not asked again by the next part: the night reads it.
-        if ($this->part + 1 < self::MAX_PARTS && ! StoreRest::resting($this->shopId) && $read->anyDue($this->shopId)) {
+        // A site resting after errors (StoreRest), or closed to visitors (StorefrontLock), is not asked again by the next part: the night reads it.
+        if ($this->part + 1 < self::MAX_PARTS && ! StoreRest::resting($this->shopId) && StorefrontLock::state($this->shopId) === null && $read->anyDue($this->shopId)) {
             self::dispatch($this->shopId, $this->part + 1);
         }
     }

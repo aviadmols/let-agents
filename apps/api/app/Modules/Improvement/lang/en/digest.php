@@ -1,10 +1,10 @@
 <?php
 
 return [
-    'title' => 'Let Agents · Daily summary · :shop · :date',
-    'searches' => 'Yesterday: :searches searches, :empty with no results, :clicks clicks on results.',
+    'title' => 'Lets · Daily summary · :shop · :date',
+    'searches' => 'Yesterday: :searches {searches:search/searches}, :empty with no results, :clicks {clicks:click/clicks} on results.',
     'new_products' => 'New products that came into the system in the last day: :count (:read of them already read and described). In the catalog: :total.',
-    'evidence' => 'Reviewed: :empty searches that found nothing, :unclicked searches nobody clicked, :questions questions the site did not answer.',
+    'evidence' => 'Reviewed: :empty {empty:search that found/searches that found} nothing, :unclicked {unclicked:search/searches} nobody clicked, :questions {questions:question/questions} the site did not answer.',
     'quiet' => 'Nothing new today.',
     'waiting' => 'The next review comes after :left more searches (:searches of :needed since the last review).',
     'proposals' => 'Suggestions: :proposed, of which :accepted passed the check and :applied already joined search.',

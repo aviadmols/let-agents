@@ -1,10 +1,10 @@
 <?php
 
 return [
-    'title' => 'Let Agents · סיכום יומי · :shop · :date',
-    'searches' => 'אתמול: :searches חיפושים, :empty בלי תוצאות, :clicks לחיצות על תוצאות.',
+    'title' => 'Lets · סיכום יומי · :shop · :date',
+    'searches' => 'אתמול: :searches {searches:חיפוש/חיפושים}, :empty בלי תוצאות, :clicks {clicks:לחיצה/לחיצות} על תוצאות.',
     'new_products' => 'מוצרים חדשים שנכנסו למערכת ביממה האחרונה: :count (מהם :read כבר נקראו ותוארו). סך הכול בקטלוג: :total.',
-    'evidence' => 'נבדקו: :empty חיפושים שלא מצאו כלום, :unclicked חיפושים שאף אחד לא לחץ עליהם, :questions שאלות בלי תשובה באתר.',
+    'evidence' => 'נבדקו: :empty {empty:חיפוש שלא מצא/חיפושים שלא מצאו} כלום, :unclicked {unclicked:חיפוש שאף אחד לא לחץ עליו/חיפושים שאף אחד לא לחץ עליהם}, :questions {questions:שאלה/שאלות} בלי תשובה באתר.',
     'quiet' => 'אין משהו חדש היום.',
     'waiting' => 'הבדיקה הבאה אחרי עוד :left חיפושים (:searches מתוך :needed הצטברו מאז הבדיקה הקודמת).',
     'proposals' => 'הצעות: :proposed, מהן :accepted עברו בדיקה ו־:applied כבר נכנסו לחיפוש.',

@@ -15,7 +15,7 @@ return [
     ],
     'subheading' => ':shop · what happened :period',
     'period' => 'Period',
-    'days' => ':n days',
+    'days' => ':n {n:day/days}',
     'dates' => 'Dates…',
     'presets' => [
         'today' => 'Today',
@@ -61,6 +61,7 @@ return [
     ],
     'notices' => [
         'title' => 'Notices and insights',
+        'tab' => 'Notices',
         'subheading' => 'Everything the system found, scanned or asks of you, in one place. What needs action first.',
         'all' => 'All (:count)',
         'none' => 'No notices right now.',

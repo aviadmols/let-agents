@@ -10,7 +10,7 @@ return [
     ],
     'sections' => [
         'connection' => 'Connection details',
-        'connection_help' => 'Let Agents reads the catalog through the Let Agents plugin installed in the store. The plugin issues the token; it is stored here encrypted.',
+        'connection_help' => 'Lets reads the catalog through the Let Agents plugin installed in the store. The plugin issues the token; it is stored here encrypted.',
         'site' => 'Site status',
     ],
     'fields' => [

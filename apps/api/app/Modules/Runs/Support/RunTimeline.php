@@ -21,7 +21,7 @@ final class RunTimeline implements TimelineSource
     private const MAX = 400;
 
     /** A summary line the shop does not see: a model, a cost, tokens, or the machinery under the scan. */
-    private const NOT_FOR_SHOP = '/\$|\btokens?\b|gpt-|claude|gemini|openai|anthropic|מודל|model|וקטור|vector|batch|באצ|בקשות|prompt|פרומפט/iu';
+    private const NOT_FOR_SHOP = '/\$|\btokens?\b|gpt-|claude|gemini|openai|anthropic|מודל|model|וקטור|vector|batch|באצ|בקשות|\brequests?\b|characters|תווים|prompt|פרומפט/iu';
 
     /** The kind an action's runs are shown as, by the longest matching prefix. */
     private const KINDS = [

@@ -24,8 +24,8 @@ use UnitEnum;
 /**
  * Settings · Users, as the designer's panel lays it out: who signs in to the shop's panel (each with
  * their role and when they last came in, invitations still waiting), and a form to invite someone as an
- * owner, the team or a viewer. The invited person gets an email with a link and sets their own password.
- * Only an owner invites and removes.
+ * owner, the team or a viewer. The invited person gets an email with a link and sets their own password;
+ * when the email cannot go, the link is shown here to copy and pass on. Only an owner invites and removes.
  */
 class UsersSettings extends Page
 {
@@ -46,6 +46,9 @@ class UsersSettings extends Page
 
     /** @var array<string, string> what was wrong, by field */
     public array $problems = [];
+
+    /** @var array{email: string, link: string}|null the last invitation that could not be emailed, its link to copy */
+    public ?array $handOver = null;
 
     public static function getNavigationLabel(): string
     {
@@ -137,6 +140,12 @@ class UsersSettings extends Page
         return $this->problems[$field] ?? null;
     }
 
+    /** Whether an invitation goes by email; when not, its link is shown to copy. */
+    public function mails(): bool
+    {
+        return InviteToShop::canMail();
+    }
+
     public function canManage(): bool
     {
         $user = Auth::user();
@@ -171,8 +180,10 @@ class UsersSettings extends Page
             return;
         }
 
+        $invite = app(InviteToShop::class);
+
         try {
-            app(InviteToShop::class)->handle($this->shop(), $this->me(), $email, $name, $role, $locale);
+            $invite->handle($this->shop(), $this->me(), $email, $name, $role, $locale);
         } catch (Throwable $e) {
             report($e);
             Notification::make()->danger()->title(__('admin::shop_settings.users.not_sent'))->send();
@@ -181,7 +192,17 @@ class UsersSettings extends Page
         }
 
         $this->data = ['name' => '', 'email' => '', 'role' => ShopRole::Member->value, 'locale' => $locale];
-        Notification::make()->success()->title(__('admin::shop_settings.users.invited'))->send();
+        $this->told($email, $invite->link, 'invited');
+    }
+
+    /** Emailed, or not: then its link is shown here to copy and pass on, never a silent "sent". */
+    private function told(string $email, ?string $link, string $sent): void
+    {
+        $this->handOver = $link === null ? null : ['email' => $email, 'link' => $link];
+
+        $link === null
+            ? Notification::make()->success()->title(__('admin::shop_settings.users.'.$sent))->send()
+            : Notification::make()->warning()->title(__('admin::shop_settings.users.not_emailed'))->send();
     }
 
     public function resend(string $id): void
@@ -196,8 +217,10 @@ class UsersSettings extends Page
             return;
         }
 
+        $invite = app(InviteToShop::class);
+
         try {
-            app(InviteToShop::class)->resend($invitation, $this->me());
+            $invite->resend($invitation, $this->me());
         } catch (Throwable $e) {
             report($e);
             Notification::make()->danger()->title(__('admin::shop_settings.users.not_sent'))->send();
@@ -205,7 +228,7 @@ class UsersSettings extends Page
             return;
         }
 
-        Notification::make()->success()->title(__('admin::shop_settings.users.resent'))->send();
+        $this->told($invitation->email, $invite->link, 'resent');
     }
 
     public function remove(int $id): void

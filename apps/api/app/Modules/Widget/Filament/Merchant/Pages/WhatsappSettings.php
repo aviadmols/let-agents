@@ -4,8 +4,12 @@ namespace App\Modules\Widget\Filament\Merchant\Pages;
 
 use App\Core\Facades\Settings;
 use App\Core\Filament\EditsShopSettings;
+use App\Core\Localization\Locales;
+use App\Modules\Tenancy\Models\Shop;
+use App\Modules\Widget\Support\AnsweringZone;
 use App\Modules\Widget\Support\PageCache;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -67,7 +71,8 @@ class WhatsappSettings extends Page
         $this->data['number'] = (string) (Settings::overrideFor('widget.whatsapp_number', $shop) ?? '');
 
         foreach (self::TEXTS as $name) {
-            $this->data[$name] = trim((string) Settings::get("widget.whatsapp_{$name}", $shop)) ?: $this->usual($name);
+            $own = trim((string) Settings::get("widget.whatsapp_{$name}", $shop));
+            $this->data[$name] = $own === '' || in_array($own, $this->usual($name, every: true), true) ? $this->usual($name) : $own;
         }
     }
 
@@ -99,11 +104,10 @@ class WhatsappSettings extends Page
 
         foreach (self::TEXTS as $name) {
             $text = $this->text($name);
-            // The usual wording, or nothing, follows the usual wording.
-            $text === '' || $text === $this->usual($name)
-                ? Settings::clear("widget.whatsapp_{$name}", $shop)
-                : Settings::set("widget.whatsapp_{$name}", $text, $shop);
-            $this->data[$name] = $text === '' ? $this->usual($name) : $text;
+            // The usual wording (in any language), or nothing, follows the usual wording.
+            $usual = $text === '' || in_array($text, $this->usual($name, every: true), true);
+            $usual ? Settings::clear("widget.whatsapp_{$name}", $shop) : Settings::set("widget.whatsapp_{$name}", $text, $shop);
+            $this->data[$name] = $usual ? $this->usual($name) : $text;
         }
     }
 
@@ -131,14 +135,33 @@ class WhatsappSettings extends Page
         return $digits;
     }
 
+    /** An example number where the shop's clock runs: an Israeli mobile in Israel, an international one elsewhere. */
+    public function numberExample(): string
+    {
+        return Shop::israeli(AnsweringZone::for($this->shopId())) ? '050-0000000' : '+1 555 0100';
+    }
+
     private function text(string $name): string
     {
         return (string) preg_replace('/^\s+|\s+$/u', '', (string) ($this->data[$name] ?? ''));
     }
 
-    private function usual(string $name): string
+    /**
+     * The usual wording in the shop's language, what its shoppers read (or in every language, to tell it
+     * from the shop's own): one line, as the field shows it, the usual message breaking before the page's address.
+     *
+     * @return ($every is true ? list<string> : string)
+     */
+    private function usual(string $name, bool $every = false): string|array
     {
-        // One line, as the field shows it: the usual message breaks before the page's address.
-        return (string) preg_replace('/\s*\R\s*/u', ' ', (string) __("widget::bank.contact.{$name}"));
+        $line = fn (string $locale): string => (string) preg_replace('/\s*\R\s*/u', ' ', (string) __("widget::bank.contact.{$name}", [], $locale));
+
+        if ($every) {
+            return array_map($line, Locales::supported());
+        }
+
+        $shop = Filament::getTenant();
+
+        return $line(Locales::forShop($shop instanceof Shop ? (string) $shop->content_locale : null));
     }
 }

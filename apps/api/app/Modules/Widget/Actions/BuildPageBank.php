@@ -31,9 +31,11 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Tenancy\Models\Shop;
 use App\Modules\Widget\Models\WidgetCuration;
+use App\Modules\Widget\Support\AnsweringZone;
 use App\Modules\Widget\Support\GuideRelevance;
 use App\Modules\Widget\Support\OpeningHours;
 use App\Modules\Widget\Support\ProductCard;
+use App\Modules\Widget\Support\ShopWeek;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -1411,8 +1413,13 @@ final class BuildPageBank
             return null;
         }
 
-        $text = fn (string $name): string => trim((string) Settings::get("widget.whatsapp_{$name}", $shopId))
-            ?: (string) __("widget::bank.contact.{$name}", [], $this->locale);
+        // The shop's own words; the usual ones in the shopper's language, also when saved as the usual ones in another.
+        $text = function (string $name) use ($shopId): string {
+            $own = trim((string) Settings::get("widget.whatsapp_{$name}", $shopId));
+            $usual = fn (string $locale): string => (string) preg_replace('/\s*\R\s*/u', ' ', (string) __("widget::bank.contact.{$name}", [], $locale));
+
+            return $own === '' || in_array($own, array_map($usual, self::LOCALES), true) ? (string) __("widget::bank.contact.{$name}", [], $this->locale) : $own;
+        };
         $offline = (string) Settings::get('widget.whatsapp_when_offline', $shopId);
 
         return [
@@ -1426,12 +1433,9 @@ final class BuildPageBank
             // of WhatsApp, 'show' keeps the button with the offline note, 'hide' shows nothing.
             'when_offline' => $offline,
             'hide_when_offline' => $offline === 'hide',
-            'timezone' => (string) Settings::get('widget.whatsapp_timezone', $shopId),
+            'timezone' => AnsweringZone::for($shopId),
             // One entry per day, Sunday first. "09:00-18:00", or empty on a day the shop is closed.
-            'hours' => OpeningHours::fromDays(array_map(
-                fn (string $day): string => (string) Settings::get("widget.hours_{$day}", $shopId),
-                OpeningHours::DAYS,
-            ))->toList(),
+            'hours' => OpeningHours::fromDays(ShopWeek::for($shopId))->toList(),
             'online_label' => (string) __('widget::bank.contact.online', [], $this->locale),
             'offline_label' => (string) __('widget::bank.contact.offline', [], $this->locale),
         ];

@@ -171,12 +171,28 @@ final class InstallStore
             return;
         }
 
-        $user = User::query()->firstOrCreate(['email' => $install->owner_email], [
-            'name' => $shop->name,
+        $user = User::query()->where('email', $install->owner_email)->first() ?? User::query()->create([
+            'email' => $install->owner_email,
+            'name' => $this->ownerName($install) ?? $shop->name,
             'password' => Str::random(40),
         ]);
         $user->attachShop($shop, ShopRole::Owner);
         $this->manager($install);
+    }
+
+    /**
+     * The store owner's own name as Shopify keeps it (shop.shopOwnerName, no scope of its own), for an account
+     * made now; null when Shopify does not say, and the store's name stands in (the profile asks for theirs).
+     */
+    private function ownerName(ShopifyInstall $install): ?string
+    {
+        try {
+            $name = trim((string) ($this->api->query($install, 'query { shop { shopOwnerName } }')['shop']['shopOwnerName'] ?? ''));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $name === '' ? null : mb_substr($name, 0, 120);
     }
 
     /** The store's owner account, never an operator's; nothing is made when there is none. */
@@ -206,8 +222,9 @@ final class InstallStore
             return $owner;
         }
 
-        $own = User::query()->firstOrCreate(['email' => 'owner@'.$install->shop_domain], [
-            'name' => $shop->name,
+        $own = User::query()->where('email', 'owner@'.$install->shop_domain)->first() ?? User::query()->create([
+            'email' => 'owner@'.$install->shop_domain,
+            'name' => $this->ownerName($install) ?? $shop->name,
             'password' => Str::random(40),
         ]);
         $own->attachShop($shop, ShopRole::Owner);

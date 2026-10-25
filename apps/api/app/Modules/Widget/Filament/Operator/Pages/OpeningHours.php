@@ -5,7 +5,9 @@ namespace App\Modules\Widget\Filament\Operator\Pages;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Widget\Support\AnsweringZone;
 use App\Modules\Widget\Support\OpeningHours as Week;
+use App\Modules\Widget\Support\ShopWeek;
 use BackedEnum;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -71,14 +73,16 @@ class OpeningHours extends Page implements HasForms
     {
         $shop = $this->shopId();
         $state = [
-            'timezone' => $shop === null ? 'Asia/Jerusalem' : (string) Settings::get('widget.whatsapp_timezone', $shop),
+            'timezone' => $shop === null ? 'Asia/Jerusalem' : AnsweringZone::for($shop),
             // The shop's own number only, never one saved for every shop.
             'number' => $shop === null ? '' : (string) (Settings::overrideFor('widget.whatsapp_number', $shop) ?? ''),
             'whatsapp' => $shop !== null && Features::enabled('widget.whatsapp', $shop),
         ];
 
+        $week = $shop === null ? [] : ShopWeek::for($shop);
+
         foreach (Week::DAYS as $day) {
-            $value = $shop === null ? '' : (string) Settings::get("widget.hours_{$day}", $shop);
+            $value = $week[$day] ?? '';
             $ends = Week::split($value);
 
             $state["open_{$day}"] = $ends['from'] !== null;
@@ -145,14 +149,11 @@ class OpeningHours extends Page implements HasForms
             return null;
         }
 
-        $week = Week::fromDays(array_map(
-            fn (string $day): string => (string) Settings::get("widget.hours_{$day}", $shop),
-            Week::DAYS,
-        ));
+        $week = Week::fromDays(ShopWeek::for($shop));
 
         return $week->alwaysClosed()
             ? null
-            : $week->openAt(Carbon::now()->toDateTimeImmutable(), (string) Settings::get('widget.whatsapp_timezone', $shop));
+            : $week->openAt(Carbon::now()->toDateTimeImmutable(), AnsweringZone::for($shop));
     }
 
     public function save(): void
@@ -165,7 +166,12 @@ class OpeningHours extends Page implements HasForms
             return;
         }
 
-        Settings::set('widget.whatsapp_timezone', (string) ($this->data['timezone'] ?? 'Asia/Jerusalem'), $shop);
+        // the shop's own clock unless the operator chose another: only a different zone is kept as the shop's word
+        Settings::clear('widget.whatsapp_timezone', $shop);
+        $zone = (string) ($this->data['timezone'] ?? '');
+        if ($zone !== '' && $zone !== AnsweringZone::for($shop)) {
+            Settings::set('widget.whatsapp_timezone', $zone, $shop);
+        }
         $number = (string) preg_replace('/[^\d+]/', '', (string) ($this->data['number'] ?? ''));
         $number === '' ? Settings::clear('widget.whatsapp_number', $shop) : Settings::set('widget.whatsapp_number', mb_substr($number, 0, 20), $shop);
         Features::override('widget.whatsapp', (bool) ($this->data['whatsapp'] ?? false) && $number !== '', $shop);

@@ -4,6 +4,7 @@ namespace App\Modules\Search\Http\Controllers;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Settings\ValueSource;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsPopularity;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
@@ -13,6 +14,7 @@ use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\AgentCatalog;
 use App\Modules\Tenancy\Models\Shop;
+use DateTimeZone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -66,8 +68,8 @@ final class SearchIndexController
                 ?: (string) __('search::storefront.wa_message', [], $locale),
             // When the shop answers its WhatsApp, one range a day from Sunday ("09:00-18:00", empty: closed),
             // read in the browser at the shop's time: this answer is cached.
-            'hours' => ['timezone' => (string) Settings::get('widget.whatsapp_timezone', $shopId),
-                'days' => array_map(fn (string $day): string => trim((string) Settings::get('widget.hours_'.$day, $shopId)), ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'])],
+            'hours' => ['timezone' => $zone = self::answeringZone($shopId),
+                'days' => array_map(fn (string $day): string => self::answeringDay($day, $shopId, $zone), ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'])],
             // Without a WhatsApp, or after hours: the chat asks for a name and a way back, kept as a callback.
             'callbacks' => Features::enabled('shoppers.callbacks', $shopId),
             // What a question with no answer is offered (assistant.no_answer as far as the shop can keep it):
@@ -322,6 +324,43 @@ final class SearchIndexController
     private static function words(string $text): array
     {
         return array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($text)) ?: [], fn (string $w): bool => $w !== ''));
+    }
+
+    /**
+     * The clock the answering hours run by, the on-page module's rule (Widget's AnsweringZone), read by key:
+     * a zone the team set for the hours on purpose, else the shop's own time zone.
+     */
+    private static function answeringZone(string $shopId): string
+    {
+        if (Settings::source('widget.whatsapp_timezone', $shopId) === ValueSource::Shop) {
+            return (string) Settings::get('widget.whatsapp_timezone', $shopId);
+        }
+
+        $zone = (string) Shop::query()->whereKey($shopId)->value('timezone');
+
+        try {
+            return $zone !== '' ? (new DateTimeZone($zone))->getName() : (string) Settings::get('widget.whatsapp_timezone', $shopId);
+        } catch (\Exception) {
+            return (string) Settings::get('widget.whatsapp_timezone', $shopId);
+        }
+    }
+
+    /**
+     * One day of the answering week, the on-page module's rule (Widget's ShopWeek), read by key: the shop's own,
+     * else the usual week where its clock runs (Israel Sunday to Thursday, elsewhere Monday to Friday).
+     */
+    private static function answeringDay(string $day, string $shopId, string $zone): string
+    {
+        $key = 'widget.hours_'.$day;
+
+        if (Settings::source($key, $shopId) === ValueSource::Shop || Shop::israeli($zone)) {
+            return trim((string) Settings::get($key, $shopId));
+        }
+
+        return match ($day) {
+            'saturday', 'sunday' => '',
+            default => trim((string) Settings::get($key, $shopId)) ?: trim((string) Settings::get('widget.hours_monday', $shopId)),
+        };
     }
 
     /** The number the on-page module offers, read from the same settings; null when the shop has none. */

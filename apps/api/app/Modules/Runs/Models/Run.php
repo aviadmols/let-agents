@@ -52,6 +52,9 @@ class Run extends Model
 
     private const SECRET_KEY_PATTERN = '/token|secret|password|api[_-]?key|authorization|credential/i';
 
+    /** A summary parameter that names a translation ("module::file.key"): read in the reader's language. */
+    public const TRANSLATION_PARAM = '/^[a-z][a-z0-9_]*::[a-z0-9_]+(\.[a-z0-9_]+)+$/';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -117,7 +120,13 @@ class Run extends Model
             return null;
         }
 
-        return __($this->summary_key, $this->summary_params ?? []);
+        // A name kept as its key (a task's) is read when the line is, so a line a job wrote reads in whoever reads it.
+        $params = array_map(
+            fn ($value) => is_string($value) && preg_match(self::TRANSLATION_PARAM, $value) === 1 && Lang::has($value) ? __($value) : $value,
+            $this->summary_params ?? [],
+        );
+
+        return __($this->summary_key, $params);
     }
 
     public function agentLabel(): string

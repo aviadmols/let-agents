@@ -41,8 +41,22 @@
                     </label>
                     <div class="lp-acct-full"><span class="lp-acct-label">{{ $t('role') }}</span><x-lp::opts model="data.role" :options="$this->roles()" :columns="3" /></div>
                     <div class="lp-acct-full"><span class="lp-acct-label">{{ $t('locale') }}</span><x-lp::chips model="data.locale" :options="__('admin::panels.locale.names')" /></div>
-                    <div class="lp-acct-full"><x-lp::save :label="$t('send')" :note="$t('send_note')" action="invite" /></div>
+                    <div class="lp-acct-full"><x-lp::save :label="$t('send')" :note="$t($this->mails() ? 'send_note' : 'send_note_link')" action="invite" /></div>
                 </div>
+                @if ($handOver)
+                    {{-- Not emailed: the link, to copy and send yourself. --}}
+                    <div class="lp-fact" style="flex-direction: column; margin-top: 12px" data-hand-over x-data="{ copied: false }" wire:key="hand-over-{{ md5($handOver['link']) }}">
+                        <b>{{ $t('hand_over', ['email' => $handOver['email']]) }}</b>
+                        <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%">
+                            <span class="lp-set-field lp-set-wide" style="flex: 1; min-width: 220px"><input type="text" readonly dir="ltr" value="{{ $handOver['link'] }}" x-ref="link" x-on:focus="$event.target.select()" aria-label="{{ $t('hand_over_link') }}"></span>
+                            <button type="button" class="lp-btn lp-btn-primary lp-btn-sm"
+                                x-on:click="navigator.clipboard?.writeText($refs.link.value).then(() => copied = true).catch(() => { $refs.link.select(); document.execCommand('copy'); copied = true })">
+                                <span x-show="! copied">{{ $t('copy') }}</span><span x-show="copied" x-cloak>{{ $t('copied') }}</span>
+                            </button>
+                        </span>
+                        <span class="lp-sample">{{ $t('hand_over_note') }}</span>
+                    </div>
+                @endif
             @else
                 <p class="lp-set-help" style="margin: 0">{{ __('admin::shop_settings.owners_only') }}</p>
             @endif

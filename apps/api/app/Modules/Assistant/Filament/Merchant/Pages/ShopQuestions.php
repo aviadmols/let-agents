@@ -35,6 +35,12 @@ final class ShopQuestions extends OperatorShopQuestions
 
     protected string $view = 'assistant::merchant.questions';
 
+    /** The screen's name, as the menu says it; the tab says which page. */
+    public function getTitle(): string
+    {
+        return __('admin::panels.screens.inbox');
+    }
+
     /** all, open (no answer), answered, off (not about the store) */
     #[Url]
     public string $show = 'all';

@@ -8,6 +8,6 @@ return [
     'categories' => 'קטגוריות',
     'built' => 'נבנה',
     'not_built' => 'החיפוש עוד לא נבנה',
-    'tags_title' => 'תגיות לדפים · :pages דפים, :tags תגיות שונות',
-    'tag_pages' => 'ב־:count דפים',
+    'tags_title' => 'תגיות לדפים · :pages {pages:דף/דפים}, :tags {tags:תגית/תגיות שונות}',
+    'tag_pages' => 'ב־:count {count:דף/דפים}',
 ];

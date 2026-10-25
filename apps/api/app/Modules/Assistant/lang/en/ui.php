@@ -273,7 +273,7 @@ Answer: :answer',
         'add' => [
             'title' => 'Add information',
             'note' => 'Joins "General information" as a line',
-            'placeholder' => 'For example: boards are cut to size in the store only, ₪8 a cut, up to 20 cuts an order.',
+            'placeholder' => 'For example: boards are cut to size in the store only, :price a cut, up to 20 cuts an order.',
             'button' => 'Add',
             'checked' => 'Lets checks that it does not contradict what the site says',
         ],

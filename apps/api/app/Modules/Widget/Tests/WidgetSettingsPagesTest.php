@@ -14,6 +14,7 @@ use App\Modules\Widget\Filament\Merchant\Pages\OpeningHours;
 use App\Modules\Widget\Filament\Merchant\Pages\ProductPage;
 use App\Modules\Widget\Filament\Merchant\Pages\ProductWidgetSettings;
 use App\Modules\Widget\Filament\Merchant\Pages\WhatsappSettings;
+use App\Modules\Widget\Support\AnsweringZone;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -166,6 +167,56 @@ final class WidgetSettingsPagesTest extends TestCase
         $this->assertSame('', Settings::get('widget.hours_monday', $shop));
         $this->assertSame('07:00-13:00', Settings::get('widget.hours_friday', $shop));
         $this->assertNull(Settings::overrideFor('widget.hours_tuesday', $shop), 'a day left as the default is not the shop\'s word');
+    }
+
+    /** The hours run by the shop's own clock, not Israel's default: a zone set for them on purpose still wins. */
+    public function test_the_hours_run_by_the_shops_own_clock(): void
+    {
+        $this->shop->forceFill(['timezone' => 'America/New_York'])->save();
+        app()->setLocale('en');
+
+        Livewire::test(OpeningHours::class)
+            ->assertSet('data.timezone', 'America/New_York')
+            ->assertSee('By the clock of America/New_York')
+            ->assertDontSee('Asia/Jerusalem');
+        $this->assertSame('America/New_York', AnsweringZone::for($this->shop->id));
+
+        Settings::set('widget.whatsapp_timezone', 'Europe/London', $this->shop->id);
+        $this->assertSame('Europe/London', AnsweringZone::for($this->shop->id), 'the team chose another clock for the hours');
+
+        Settings::clear('widget.whatsapp_timezone', $this->shop->id);
+        $this->shop->forceFill(['timezone' => 'Not/AZone'])->save();
+        $this->assertSame('Asia/Jerusalem', AnsweringZone::for($this->shop->id), 'a zone that is not one falls back to the default');
+    }
+
+    /**
+     * A switch shows what the shop really has: on by default is on (the knob at the end of the line, in English
+     * and in Hebrew), and a place the shop's plan holds off is off, out of reach, and stays off after a save.
+     */
+    public function test_the_switches_show_the_shops_real_state_and_what_the_plan_holds(): void
+    {
+        $screen = Livewire::test(ProductWidgetSettings::class)
+            ->assertSet('data.on', true)
+            ->assertSet('data.on_products', true)
+            ->assertSet('held', []);
+        $this->assertTrue(Features::enabled('widget.on_products', $this->shop->id));
+
+        // Starter: "about this product" comes with Growth and up
+        $this->shop->forceFill(['plan' => 'starter'])->save();
+        $this->assertFalse(Features::enabled('widget.on_products', $this->shop->id));
+        $screen = Livewire::test(ProductWidgetSettings::class)
+            ->assertSet('data.on_products', false)
+            ->assertSet('data.on', true)
+            ->assertSet('held', ['on_products'])
+            ->assertSeeHtml('lp-toggle');
+        $screen->set('data.on_products', true)->call('save')
+            ->assertSet('data.on_products', false);
+        $this->assertFalse(Features::enabled('widget.on_products', $this->shop->id), 'the plan still holds it');
+
+        // the switch's knob: off at the start of the line, on at its end, never by a physical side
+        $css = (string) file_get_contents(app_path('Modules/Admin/resources/css/merchant.css'));
+        $this->assertStringContainsString('.lp-toggle.is-on::after { inset-inline-start: 19px; }', $css);
+        $this->assertStringNotContainsString('.lp-toggle.is-on::after { inset-inline-end', $css);
     }
 
     public function test_the_settings_menu_has_the_new_pages_and_not_the_page_editor(): void

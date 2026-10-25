@@ -102,6 +102,7 @@ final class ShopifyAppTest extends TestCase
                 str_contains($query, 'appSubscriptionCreate') => ['appSubscriptionCreate' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'PENDING'], 'confirmationUrl' => 'https://gueta-test.myshopify.com/admin/charges/confirm', 'userErrors' => []]],
                 str_contains($query, 'activeSubscriptions') => ['currentAppInstallation' => ['activeSubscriptions' => $this->subscriptions], 'shop' => ['plan' => ['partnerDevelopment' => true]]],
                 str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => $this->metafieldErrors]],
+                str_contains($query, 'shopOwnerName') => ['shop' => ['shopOwnerName' => 'Dana Gueta']],
                 str_contains($query, 'contactEmail') => ['shop' => ['id' => 'gid://shopify/Shop/7', 'name' => 'גואטה טסט', 'email' => 'Owner@Gueta.test', 'currencyCode' => 'ILS', 'ianaTimezone' => 'Asia/Jerusalem', 'primaryDomain' => ['host' => 'shop.gueta.test'], 'plan' => ['partnerDevelopment' => true]]],
                 default => ['shop' => ['id' => 'gid://shopify/Shop/7', 'plan' => ['partnerDevelopment' => true]]],
             }]);
@@ -132,6 +133,7 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame(['shopify', 'https://shop.gueta.test'], [$connection->platform, $connection->site_url]);
         $this->assertTrue($connection->allowsOrigin('https://gueta-test.myshopify.com'), 'the search runs at the myshopify address too');
         $this->assertTrue(User::query()->where('email', 'owner@gueta.test')->sole()->shops()->whereKey($shop->id)->exists(), 'the store owner manages the shop');
+        $this->assertSame('Dana Gueta', User::query()->where('email', 'owner@gueta.test')->sole()->name, 'the owner\'s own name, as Shopify keeps it, not the store\'s');
 
         $metafields = collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'metafieldsSet'));
         $this->assertSame($connection->site_key, $metafields['variables']['metafields'][0]['value'], 'the theme embed reads the site key from the store');

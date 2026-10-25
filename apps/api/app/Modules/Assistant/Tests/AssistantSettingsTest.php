@@ -56,7 +56,7 @@ final class AssistantSettingsTest extends TestCase
             ->assertSee('העוזר')
             ->assertSee('העוזר עונה לגולשים מתוך דפי האתר ומרכז הידע, ומצטט מאיפה התשובה.')
             ->assertSee('פועל')
-            ->assertSee('3 שאלות ב-30 יום · 1 נענו מהידע · 1 מחכות לכם')
+            ->assertSee('3 שאלות ב-30 יום · 1 נענתה מהידע · 1 מחכה לכם')
             ->assertSee('איפה הגולשים יכולים לשאול')
             ->assertSee('בחלון החיפוש')
             ->assertSee('גבולות, כדי שהמכסה החודשית תספיק')

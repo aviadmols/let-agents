@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Core\Text\HtmlText;
+use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Support\StoreRest;
 use App\Modules\Runs\Contracts\RecordsRuns;
@@ -28,6 +29,10 @@ use Throwable;
  * an FAQ, delivery terms, opening hours, on any store, without anyone pointing at the page.
  *
  * Only the store's own host, only public addresses, a bounded number of pages a run.
+ *
+ * A lock page (Shopify's password page, a maintenance or coming-soon page: StorefrontLock) is never
+ * kept. While the storefront is locked nothing leaves the catalogue for not being seen, the pages
+ * come from the platform's feed, and a page kept earlier from a lock page is cleared.
  */
 final class ReadSitePages
 {
@@ -76,7 +81,8 @@ final class ReadSitePages
     {
         $shop = Shop::query()->findOrFail($shopId);
         $host = strtolower((string) preg_replace('~^https?://|/.*$~i', '', (string) $shop->domain));
-        $counts = ['listed' => 0, 'read' => 0, 'new' => 0, 'changed' => 0, 'same' => 0, 'skipped' => 0, 'removed' => 0, 'failed' => 0];
+        $counts = ['listed' => 0, 'read' => 0, 'new' => 0, 'changed' => 0, 'same' => 0, 'skipped' => 0, 'removed' => 0, 'failed' => 0, 'cleared' => 0];
+        $this->locked = null;
 
         if ($host === '' || ! self::public($host)) {
             $run->output($counts + ['why' => 'no_public_host'])->summary('catalog::runs.site_pages_none');
@@ -121,6 +127,14 @@ final class ReadSitePages
             $page = $this->page($url, $host);
             $counts['read']++;
 
+            if ($page === null && $this->lock !== null) {
+                // A lock page: nothing kept, and no sign the site struggles.
+                $this->locked ??= StorefrontLock::wide($this->lock) ? $this->lock : null;
+                $counts['failed']++;
+
+                continue;
+            }
+
             if ($page === null) {
                 $counts['failed']++;
                 // The site struggles, again and again: stop reading it and let it be (StoreRest).
@@ -152,16 +166,38 @@ final class ReadSitePages
             $counts[$had === null ? 'new' : 'changed']++;
         }
 
-        // A page that left the site leaves the catalogue; one not read this run because of the bound stays.
         foreach ($mine as $id => $page) {
-            if (! isset($seen[$id]) && $page->removed_at === null) {
+            if ($page->removed_at !== null) {
+                continue;
+            }
+
+            // Kept before locks were told apart: a lock page's words are no page of the store.
+            if (StorefrontLock::text($page->title."\n".$page->body)) {
+                $page->forceFill(['removed_at' => now()])->save();
+                $counts['cleared']++;
+            } elseif (! isset($seen[$id]) && $this->locked === null) {
+                // A page that left the site leaves the catalogue; one not read this run because of the bound
+                // stays, and so does every page while the storefront is locked (its sitemap is not seen).
                 $page->forceFill(['removed_at' => now()])->save();
                 $counts['removed']++;
             }
         }
 
+        if ($this->locked !== null) {
+            StorefrontLock::seen($shopId, $this->locked);
+            $run->output($counts + ['locked' => $this->locked])->summary('catalog::runs.locked.site', [
+                'platform' => $shop->platform === ShopPlatform::Shopify ? 'Shopify' : 'WooCommerce', 'cleared' => (string) $counts['cleared'],
+            ]);
+
+            return;
+        }
+
+        if ($counts['new'] + $counts['changed'] + $counts['same'] > 0) {
+            StorefrontLock::open($shopId);
+        }
+
         $run->output($counts)->summary('catalog::runs.site_pages', [
-            'new' => (string) $counts['new'], 'changed' => (string) $counts['changed'], 'removed' => (string) $counts['removed'],
+            'new' => (string) $counts['new'], 'changed' => (string) $counts['changed'], 'removed' => (string) ($counts['removed'] + $counts['cleared']),
         ]);
     }
 
@@ -185,6 +221,13 @@ final class ReadSitePages
 
             $done[$map] = true;
             $xml = $this->fetch($map, $host);
+
+            // A locked storefront answers its sitemap with the lock page: its pages cannot be listed.
+            if ($xml === null && StorefrontLock::wide($this->lock)) {
+                $this->locked ??= $this->lock;
+
+                break;
+            }
 
             if ($xml === null || preg_match_all('~<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]]+?)\s*(?:\]\]>)?\s*</loc>~iu', $xml, $m) < 1) {
                 continue;
@@ -241,9 +284,16 @@ final class ReadSitePages
     /** The last fetch found the site struggling (StoreRest): no answer, a server error, or "too many requests". */
     private bool $down = false;
 
+    /** The lock the last fetch answered with (StorefrontLock), or null. */
+    private ?string $lock = null;
+
+    /** The lock that closes the whole storefront, found this run. */
+    private ?string $locked = null;
+
     private function fetch(string $url, string $host): ?string
     {
         $this->down = false;
+        $this->lock = null;
 
         try {
             $response = Http::timeout(15)->withHeaders(['Accept' => 'text/html,application/xml', 'User-Agent' => 'LetAgents/1.0 (+site pages)'])
@@ -256,6 +306,11 @@ final class ReadSitePages
         } catch (Throwable) {
             $this->down = true;
 
+            return null;
+        }
+
+        // Shopify's password page, a maintenance page (a 503 too): never read as the store's.
+        if (($this->lock = StorefrontLock::of($response)) !== null) {
             return null;
         }
 

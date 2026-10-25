@@ -19,7 +19,7 @@ return [
     'test' => 'A test message',
     'test_phone' => 'Mobile number',
     'test_send' => 'Send a test',
-    'test_text' => 'A test from Let Agents: the SMS account is connected.',
+    'test_text' => 'A test from Lets: the SMS account is connected.',
     'test_sent' => 'Sent. Check the phone.',
     'test_failed' => 'Not sent',
     'month' => 'This month, by shop',

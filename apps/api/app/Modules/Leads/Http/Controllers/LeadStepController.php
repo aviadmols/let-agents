@@ -71,7 +71,7 @@ final class LeadStepController
             default => 'product',
         };
         // What the form says above its fields: the shop's offer on its pages, its heading for leaving details.
-        $offer = $callback ? LeadFields::title($shopId, $locale) : $flow->offer;
+        $offer = $callback || LeadFields::builtIn((string) $flow->offer, 'leads::form.title') ? LeadFields::title($shopId, $locale) : $flow->offer;
         $pageId = (string) ($body['id'] ?? '');
 
         if (preg_match(self::ID_PATTERN, $pageId) !== 1) {
@@ -92,7 +92,7 @@ final class LeadStepController
             if (! $checked['ok']) {
                 return response()->json(['data' => [
                     'state' => FlowMachine::FIELD,
-                    'field' => $field,
+                    'field' => LeadFields::said($field, $locale),
                     'error' => $checked['reason'],
                 ]]);
             }
@@ -105,7 +105,7 @@ final class LeadStepController
         // A no to the consent itself, or from a widget that does not say where, keeps nothing.
         if (($body['declined'] ?? false) === true) {
             if (($body['at'] ?? null) === FlowMachine::FIELD && FlowMachine::reaches($flow, $given)) {
-                return response()->json(['data' => FlowMachine::next($flow, $given, enough: true) + ['offer' => $offer, 'consent' => $flow->consent, 'enough' => true]]);
+                return response()->json(['data' => self::said(FlowMachine::next($flow, $given, enough: true), $locale) + ['offer' => $offer, 'consent' => LeadFields::consent((string) $flow->consent, $locale), 'enough' => true]]);
             }
 
             return response()->json(['data' => FlowMachine::next($flow, $given, declined: true)]);
@@ -115,7 +115,7 @@ final class LeadStepController
         $next = FlowMachine::next($flow, $given, consented: $consented, enough: ($body['enough'] ?? false) === true);
 
         if ($next['state'] !== FlowMachine::DONE) {
-            return response()->json(['data' => $next + ['offer' => $offer, 'consent' => $flow->consent]]);
+            return response()->json(['data' => self::said($next, $locale) + ['offer' => $offer, 'consent' => LeadFields::consent((string) $flow->consent, $locale)]]);
         }
 
         $visitor = (string) ($body['vid'] ?? '');
@@ -141,7 +141,18 @@ final class LeadStepController
             'done' => $next['total'],
             'total' => $next['total'],
             // Leaving details always ends with a promise: the shop's, or the built-in one.
-            'promise' => trim((string) $flow->promise) ?: ($callback ? LeadFields::promise($locale) : null),
+            'promise' => $callback ? LeadFields::promise($locale, $flow->promise) : (trim((string) $flow->promise) ?: null),
         ]])->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * @param  array<string, mixed>  $step  FlowMachine::next()
+     * @return array<string, mixed> the field asked in the shopper's language, when it is a built-in one
+     */
+    private static function said(array $step, string $locale): array
+    {
+        $step['field'] = LeadFields::said(is_array($step['field'] ?? null) ? $step['field'] : null, $locale);
+
+        return $step;
     }
 }

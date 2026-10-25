@@ -60,4 +60,29 @@ final class RunTimelineTest extends TestCase
             ->assertDontSee('cURL')
             ->assertDontSee('$0.42');
     }
+
+    public function test_a_line_reads_in_its_readers_language_and_the_machinery_stays_off_the_shops_timeline_in_english_too(): void
+    {
+        $shop = Shop::factory()->create();
+        $merchant = User::factory()->locale('en')->create();
+        $merchant->attachShop($shop);
+        // Written by a job that ran in Hebrew, the task's name kept as its key.
+        $file = Run::query()->create(['shop_id' => $shop->id, 'agent' => 'enrichment.task_files', 'action' => 'enrichment.create_task_file', 'status' => 'succeeded', 'trigger' => 'schedule',
+            'started_at' => now()->subHours(2), 'summary_key' => 'enrichment::runs.task_file_created', 'summary_params' => ['task' => 'enrichment::enrichment.tasks.section_questions', 'count' => '3', 'chars' => '1,129']]);
+        Run::query()->create(['shop_id' => $shop->id, 'agent' => 'catalog.sync', 'action' => 'catalog.sync', 'status' => 'succeeded', 'trigger' => 'schedule',
+            'started_at' => now()->subHour(), 'summary_key' => 'catalog::runs.synced', 'summary_params' => ['products' => 1, 'created' => 1, 'updated' => 0, 'removed' => 0, 'categories' => 1, 'content' => 1]]);
+
+        app()->setLocale('en');
+        $this->assertSame('Questions each page section answers: 3 requests ready, 1,129 characters in total.', $file->summary());
+        app()->setLocale('he');
+        $this->assertStringStartsWith('שאלות שכל קטע בעמוד עונה עליהן:', (string) $file->summary());
+
+        $this->actingAs($merchant)->withHeader('Accept-Language', 'en')
+            ->get("/merchant/{$shop->slug}/timeline")
+            ->assertOk()
+            ->assertSee('1 product read: 1 new, 0 changed, 0 no longer published. 1 category, 1 article.')
+            ->assertDontSee('data-timeline-entry="run.'.$file->id.'"', false)
+            ->assertDontSee('requests ready')
+            ->assertDontSee('שאלות שכל קטע');
+    }
 }

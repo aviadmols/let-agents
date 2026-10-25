@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 /**
  * Invites someone to the shop's panel, or sends their invitation again: a new token every time (the
@@ -21,10 +22,22 @@ use RuntimeException;
  * language their panel will have. The person sets their own password when they open it. Not past
  * admin.max_team_members (the shop's plan may hold it lower): its users and the invitations still
  * waiting count.
+ *
+ * When the email cannot go (no mailer that delivers, or sending failed), the invitation is kept all the
+ * same and its link is handed back ($link), for the person inviting to pass on by hand.
  */
 final class InviteToShop
 {
+    /** The link of the last invitation that was not emailed, to copy; null when it was emailed. */
+    public ?string $link = null;
+
     public function __construct(private readonly TenantContext $tenant) {}
+
+    /** Whether an email can reach anyone: the "log" mailer only writes it to the log. */
+    public static function canMail(): bool
+    {
+        return ! in_array((string) config('mail.default'), ['log', ''], true);
+    }
 
     public function handle(Shop $shop, ?User $by, string $email, string $name, ShopRole $role, string $locale): ShopInvitation
     {
@@ -79,10 +92,23 @@ final class InviteToShop
         $this->tenant->run((string) $shop->id, fn () => $invitation->save());
 
         $link = URL::temporarySignedRoute('admin.invitation', $expires, ['invitation' => $invitation->id, 'token' => $token]);
+        $this->link = null;
 
-        Mail::to($invitation->email)
-            ->locale($invitation->locale)
-            ->send(new ShopInvitationMail($shop->name, $by?->name ?: null, $invitation->role, $link, $expires->copy()));
+        if (! self::canMail()) {
+            $this->link = $link;
+
+            return $invitation;
+        }
+
+        try {
+            Mail::to($invitation->email)
+                ->locale($invitation->locale)
+                ->send(new ShopInvitationMail($shop->name, $by?->name ?: null, $invitation->role, $link, $expires->copy()));
+        } catch (Throwable $e) {
+            // The invitation stands; its link is passed on by hand.
+            report($e);
+            $this->link = $link;
+        }
 
         return $invitation;
     }

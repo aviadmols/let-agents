@@ -2,7 +2,7 @@
 
 return [
     'title' => 'Store plugin',
-    'subheading' => 'The WooCommerce plugin that connects a store to Let Agents. The file is built from the same version of the code running here.',
+    'subheading' => 'The WooCommerce plugin that connects a store to Lets. The file is built from the same version of the code running here.',
     'download' => 'Download plugin',
     'download_version' => 'Download plugin :version',
     'missing' => 'The plugin file is not on the server. Deploys build it automatically. In development run: php artisan connections:bundle-plugin',

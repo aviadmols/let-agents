@@ -34,12 +34,12 @@ final class DescribeLeadForm implements DescribesLeadForm
             'fields' => array_map(fn (array $field): array => [
                 'key' => (string) $field['key'],
                 'type' => (string) $field['type'],
-                'label' => (string) ($field['label'] ?? $field['key']),
+                'label' => (string) (LeadFields::said($field, $locale)['label'] ?? $field['key']),
                 'required' => (bool) ($field['required'] ?? false),
             ], $flow->asked()),
             'title' => LeadFields::title($shopId, $locale),
-            'promise' => trim((string) $flow->promise) ?: LeadFields::promise($locale),
-            'consent' => (string) $flow->consent,
+            'promise' => LeadFields::promise($locale, $flow->promise),
+            'consent' => LeadFields::consent((string) $flow->consent, $locale),
         ];
     }
 }

@@ -4,7 +4,7 @@
 
     <x-lp::card :title="$t('title')" :help="$t('help')" master="data.whatsapp">
         <x-lp::kv>
-            <x-lp::kv-row :label="$t('number')" :error="$this->problem('number')"><x-lp::field model="data.number" ltr :width="260" placeholder="050-0000000" type="tel" /></x-lp::kv-row>
+            <x-lp::kv-row :label="$t('number')" :error="$this->problem('number')"><x-lp::field model="data.number" ltr :width="260" :placeholder="$this->numberExample()" type="tel" /></x-lp::kv-row>
             <x-lp::kv-row :label="$t('heading')" :error="$this->problem('title')"><x-lp::field model="data.title" maxlength="120" /></x-lp::kv-row>
             <x-lp::kv-row :label="$t('button')" :error="$this->problem('button')"><x-lp::field model="data.button" :width="260" maxlength="60" /></x-lp::kv-row>
             <x-lp::kv-row :label="$t('message')" :tip="$t('message_tip')" :error="$this->problem('message')">

@@ -47,9 +47,14 @@ final class ShopifyConnectionFacts implements ConnectionFacts
         }
 
         $trial = $install->trial_ends_at !== null && $install->trial_ends_at->isFuture() ? $install->trial_ends_at : null;
+        $free = $install->subscription_status === ShopifyInstall::FREE;
 
         return $facts + [
-            'plan' => $shop->currentPlan()?->billingName() ?? (string) Settings::get('shopify.plan_name'),
+            // the shop's plan by its name ("Growth"); a store charged nothing has no subscription name to fall back
+            // to, and one subscription from before the plans is named by shopify.plan_name, as Shopify bills it
+            'plan' => $shop->currentPlan()?->name ?? ($free ? null : (string) Settings::get('shopify.plan_name')),
+            // charging is off for this store (shopify.charge, or the app made for it alone): it pays nothing
+            'plan_free' => $free,
             'trial_ends' => $trial,
             'renews' => $install->subscription_status === ShopifyInstall::ACTIVE ? self::renews($trial ?? $install->subscribed_at) : null,
         ];

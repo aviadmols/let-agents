@@ -152,6 +152,49 @@ final class LeaveDetailsTest extends TestCase
         $this->step([])->assertForbidden();
     }
 
+    public function test_the_defaults_follow_the_shops_language_also_after_saving_them_in_another(): void
+    {
+        // A Hebrew store keeps Hebrew; saved untouched, nothing of the built-in words is kept as its own.
+        Livewire::test(LeaveDetails::class)->call('save')->assertHasNoErrors();
+        $this->assertNull($this->flow()->promise, 'the built-in promise is not the shop\'s own');
+        $this->assertSame(['טלפון', 'שם'], array_column($this->flow()->asked(), 'label'));
+
+        // The store is English now (its language changed, or the install read it so): the saved Hebrew defaults read English.
+        $this->shop->forceFill(['content_locale' => 'en'])->save();
+        Filament::setTenant($this->shop->fresh());
+        app()->setLocale('en');
+
+        Livewire::test(LeaveDetails::class)
+            ->assertSet('data.title', 'We\'ll get back to you with an answer')
+            ->assertSet('data.promise', 'The team gets back within a business day')
+            ->assertSet('data.fields', [
+                ['key' => 'phone', 'type' => 'phone', 'label' => 'Phone', 'required' => true],
+                ['key' => 'name', 'type' => 'name', 'label' => 'Name', 'required' => false],
+            ])
+            ->assertSee('Kind of project');
+
+        $form = app(DescribesLeadForm::class)->forShop($this->shop->id, 'en');
+        $this->assertSame(['Phone', 'Name'], array_column($form['fields'], 'label'));
+        $this->assertSame('The team gets back within a business day', $form['promise']);
+        $this->assertStringStartsWith('I agree that the details I leave', $form['consent'], 'the built-in consent in the shopper\'s language');
+
+        // A label of the shop's own stays as it wrote it, in any language.
+        Livewire::test(LeaveDetails::class)
+            ->set('data.fields', [['key' => 'phone', 'type' => 'phone', 'label' => 'נייד', 'required' => true]])
+            ->call('save');
+        $this->assertSame(['נייד'], array_column(app(DescribesLeadForm::class)->forShop($this->shop->id, 'en')['fields'], 'label'));
+    }
+
+    public function test_a_store_in_a_language_without_these_words_reads_english_never_hebrew(): void
+    {
+        $this->shop->forceFill(['content_locale' => 'fr'])->save();
+        Filament::setTenant($this->shop->fresh());
+
+        Livewire::test(LeaveDetails::class)
+            ->assertSet('data.title', 'We\'ll get back to you with an answer')
+            ->assertSet('data.fields.0.label', 'Phone');
+    }
+
     private function flow(): LeadFlow
     {
         return app(TenantContext::class)->run($this->shop->id, fn (): LeadFlow => LeadFlow::inForce($this->shop->id));

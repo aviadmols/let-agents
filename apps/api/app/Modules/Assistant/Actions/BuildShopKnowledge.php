@@ -6,8 +6,14 @@ use App\Core\Facades\Settings;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\RepeatedText;
+use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Runs\Contracts\RecordsRuns;
+use App\Modules\Runs\Contracts\RunContext;
+use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Tenancy\Enums\ShopPlatform;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
@@ -23,9 +29,17 @@ use Throwable;
  *
  * Each is a content row of the shop, so it is also cut into passages and found by meaning. No
  * model is called here. Inside the shop's tenant.
+ *
+ * A storefront closed to visitors (Shopify's password page, a maintenance page: StorefrontLock)
+ * shows the same lock page at every address; its words are never the store's. The reading stops at
+ * the first, says so on a run, and clears what an earlier reading took from lock pages.
  */
 final class BuildShopKnowledge
 {
+    public const AGENT = 'assistant.page_reader';
+
+    public const ACTION = 'assistant.read_repeated';
+
     public const REPEATED = CatalogContent::OWN_PREFIX.'knowledge-repeated';
 
     public const OWN = CatalogContent::OWN_PREFIX.'knowledge-own';
@@ -45,15 +59,21 @@ final class BuildShopKnowledge
     /** One line the team adds. */
     public const MAX_OWN = 600;
 
+    /** The lock the last page answered with (StorefrontLock), or null. */
+    private ?string $lock = null;
+
+    public function __construct(private readonly RecordsRuns $runs) {}
+
     /**
      * Reads the shop's product pages and keeps what most of them repeat.
      *
-     * @return array{tried: int, pages: int, sentences: int}
+     * @return array{tried: int, pages: int, sentences: int, locked?: string}
      */
     public function repeated(string $shopId): array
     {
         $urls = $this->sample((int) Settings::get('assistant.knowledge_pages', $shopId));
         $pages = [];
+        $locked = null;
 
         foreach ($urls as $at => $url) {
             // A page at a time, a moment apart: stores (Shopify above all) refuse a burst from one address.
@@ -61,12 +81,31 @@ final class BuildShopKnowledge
                 usleep(app()->runningUnitTests() ? 0 : self::PAUSE_MS * 1000);
             }
 
-            if (($html = $this->page($url)) !== null) {
+            $html = $this->page($url);
+
+            // Every address of a locked storefront is the same lock page: nothing more to read.
+            if (StorefrontLock::wide($this->lock)) {
+                $locked = $this->lock;
+
+                break;
+            }
+
+            if ($html !== null) {
                 $pages[] = RepeatedText::sentences($html);
             }
         }
 
+        if ($locked !== null) {
+            return $this->locked($shopId, $locked, count($urls));
+        }
+
+        if ($pages !== []) {
+            StorefrontLock::open($shopId);
+        }
+
         if (count($pages) < 3) {
+            $this->clearLockReading();
+
             return ['tried' => count($urls), 'pages' => count($pages), 'sentences' => 0];
         }
 
@@ -76,7 +115,7 @@ final class BuildShopKnowledge
         // no longer the store's word: left out, as the team would hide it
         $found = array_values(array_filter(
             RepeatedText::repeated($pages, (float) Settings::get('assistant.knowledge_share')),
-            fn (array $s): bool => ! in_array(RepeatedText::key($s['text']), $hidden, true) && ! Dated::past($s['text']),
+            fn (array $s): bool => ! in_array(RepeatedText::key($s['text']), $hidden, true) && ! Dated::past($s['text']) && ! StorefrontLock::text($s['text']),
         ));
 
         $this->put(self::REPEATED, 'repeated', implode("\n", array_map(fn (array $s): string => '- '.$s['text'], $found)), [
@@ -90,6 +129,54 @@ final class BuildShopKnowledge
         ]);
 
         return ['tried' => count($urls), 'pages' => count($pages), 'sentences' => count($found)];
+    }
+
+    /**
+     * The storefront is locked: nothing read, an earlier reading of its lock pages cleared, and a run
+     * that says so (the reading is otherwise quiet).
+     *
+     * @return array{tried: int, pages: int, sentences: int, locked: string}
+     */
+    private function locked(string $shopId, string $kind, int $tried): array
+    {
+        StorefrontLock::seen($shopId, $kind);
+        $cleared = $this->clearLockReading();
+        $shopify = Shop::query()->whereKey($shopId)->value('platform') === ShopPlatform::Shopify->value;
+
+        $this->runs->track(
+            agent: self::AGENT,
+            action: self::ACTION,
+            shopId: $shopId,
+            trigger: RunTrigger::System,
+            work: fn (RunContext $run) => $run->output(['tried' => $tried, 'locked' => $kind, 'cleared' => $cleared])
+                ->summary('assistant::runs.knowledge_locked', ['platform' => $shopify ? 'Shopify' : 'WooCommerce', 'cleared' => (string) $cleared]),
+        );
+
+        return ['tried' => $tried, 'pages' => 0, 'sentences' => 0, 'locked' => $kind];
+    }
+
+    /**
+     * What an earlier reading took from lock pages ("Enter store password", repeated on every page of a
+     * locked store) removed: the whole reading, since every page it read was the lock page. The team's
+     * hidden sentences stay hidden. A reading of the open store is left as it is. Returns the lines removed.
+     */
+    private function clearLockReading(): int
+    {
+        $row = $this->row(self::REPEATED);
+
+        if ($row === null || $row->removed_at !== null) {
+            return 0;
+        }
+
+        $lines = array_values(array_filter(explode("\n", (string) $row->body), fn (string $line): bool => trim($line) !== ''));
+
+        if (array_filter($lines, fn (string $line): bool => StorefrontLock::text($line)) === []) {
+            return 0;
+        }
+
+        $this->put(self::REPEATED, 'repeated', '', ['hidden' => (array) ($row->terms['hidden'] ?? [])]);
+
+        return count($lines);
     }
 
     /** A sentence the team does not want read as the store's: left out now and at every later reading. */
@@ -331,12 +418,19 @@ final class BuildShopKnowledge
     /** A product page as the store shows it, or null when it does not answer. */
     private function page(string $url): ?string
     {
+        $this->lock = null;
+
         foreach ([0, self::RETRY_MS] as $wait) {
             usleep(app()->runningUnitTests() ? 0 : $wait * 1000);
 
             try {
                 $response = Http::timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
             } catch (Throwable) {
+                return null;
+            }
+
+            // Shopify's password page, a maintenance page (a 503 too): no page of the store.
+            if (($this->lock = StorefrontLock::of($response)) !== null) {
                 return null;
             }
 

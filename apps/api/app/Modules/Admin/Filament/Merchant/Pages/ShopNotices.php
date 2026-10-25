@@ -33,9 +33,13 @@ final class ShopNotices extends Page
     #[Url]
     public string $kind = 'all';
 
+    /** Nothing is approved here: the screen's hint about approving answers is not shown. */
+    public static ?string $sectionHint = null;
+
+    /** Its tab under the screen of the same name. */
     public static function getNavigationLabel(): string
     {
-        return __('admin::home.notices.title');
+        return __('admin::home.notices.tab');
     }
 
     /** What waits for the manager: things to do and to set up. */
@@ -54,7 +58,7 @@ final class ShopNotices extends Page
 
     public function getTitle(): string
     {
-        return __('admin::home.notices.title');
+        return __('admin::panels.screens.inbox');
     }
 
     public function getSubheading(): ?string

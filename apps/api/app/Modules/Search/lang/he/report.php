@@ -2,7 +2,7 @@
 
 // The search's part of the analytics screen (Search\Support\SearchReport).
 return [
-    'searches' => ':n חיפושים',
+    'searches' => ':n {n:חיפוש/חיפושים}',
     'last' => 'לאחרונה :when',
     'people' => ':n גולשים שונים',
     'results' => ':n תוצאות',
@@ -14,7 +14,7 @@ return [
     'yesterday' => 'אתמול',
     'days_ago' => 'לפני :n ימים',
     'ip_top' => ':n פניות ביום הכי עמוס',
-    'ip_split' => ':searches חיפושים, :clicks לחיצות',
+    'ip_split' => ':searches {searches:חיפוש/חיפושים}, :clicks {clicks:לחיצה/לחיצות}',
     'ip_days' => ':n ימים ברצף',
     'ip_bot' => 'כנראה בוט',
     'ip_blocked_on' => 'נחסם :date',

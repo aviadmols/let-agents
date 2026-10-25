@@ -140,6 +140,48 @@ final class UsersSettingsTest extends TestCase
         $this->get($links[1])->assertOk()->assertSee('תוקף ההזמנה פג');
     }
 
+    public function test_without_email_the_invitation_link_is_shown_to_copy_never_a_silent_sent(): void
+    {
+        Mail::fake();
+        config(['mail.default' => 'log']);
+
+        $page = Livewire::test(UsersSettings::class)
+            ->assertSee('המייל עוד לא מחובר: קישור ההזמנה יופיע כאן, להעתיק ולשלוח להם')
+            ->set('data.email', 'dan@agency.co.il')
+            ->call('invite')
+            ->assertNotified('ההזמנה מוכנה, אבל לא נשלחה במייל: העתיקו את הקישור ושלחו אותו בעצמכם')
+            ->assertSee('קישור ההזמנה של dan@agency.co.il')
+            ->assertSee('להעתיק');
+
+        Mail::assertNothingSent();
+        $link = (string) $page->get('handOver.link');
+        $this->assertStringContainsString('signature=', $link);
+        $this->assertSame('dan@agency.co.il', $page->get('handOver.email'));
+
+        // Sent again: a new link, the old one stops; the link works for the person it was given to.
+        $page->call('resend', ShopInvitation::query()->sole()->id)->assertNotified('ההזמנה מוכנה, אבל לא נשלחה במייל: העתיקו את הקישור ושלחו אותו בעצמכם');
+        $again = (string) $page->get('handOver.link');
+        $this->assertNotSame($link, $again);
+
+        Auth::logout();
+        $this->get($link)->assertOk()->assertSee('הקישור לא נמצא');
+        $this->get($again)->assertOk()->assertSee('הצטרפות ל-Rocks and Gold');
+    }
+
+    public function test_an_email_that_fails_to_go_hands_the_link_over_too(): void
+    {
+        Mail::shouldReceive('to')->andThrow(new \RuntimeException('Connection could not be established with host smtp'));
+
+        Livewire::test(UsersSettings::class)
+            ->set('data.email', 'dan@agency.co.il')
+            ->call('invite')
+            ->assertNotified('ההזמנה מוכנה, אבל לא נשלחה במייל: העתיקו את הקישור ושלחו אותו בעצמכם')
+            ->assertSee('קישור ההזמנה של dan@agency.co.il')
+            ->assertDontSee('smtp');
+
+        $this->assertSame(1, ShopInvitation::query()->count(), 'the invitation stands');
+    }
+
     public function test_someone_with_an_account_joins_without_a_new_password(): void
     {
         Mail::fake();

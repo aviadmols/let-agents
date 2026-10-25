@@ -10,7 +10,7 @@ return [
     ],
     'sections' => [
         'connection' => 'פרטי החיבור',
-        'connection_help' => 'Let Agents קוראת את הקטלוג דרך תוסף Let Agents שמותקן בחנות. הטוקן נוצר בתוסף ונשמר כאן מוצפן.',
+        'connection_help' => 'Lets קוראת את הקטלוג דרך תוסף Let Agents שמותקן בחנות. הטוקן נוצר בתוסף ונשמר כאן מוצפן.',
         'site' => 'מצב האתר',
     ],
     'fields' => [

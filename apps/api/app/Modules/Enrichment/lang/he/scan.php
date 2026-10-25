@@ -18,7 +18,7 @@ return [
         'missing' => 'מוצרים עם פרטים חסרים',
         'to_missing' => 'לפרטים החסרים',
         'contents' => 'דפים ופוסטים',
-        'contents_note' => ':pages דפים · :posts פוסטים',
+        'contents_note' => ':pages {pages:דף/דפים} · :posts {posts:פוסט/פוסטים}',
     ],
     'find_product' => 'חיפוש מוצר, מק"ט או תגית',
     'find_page' => 'חיפוש דף או פוסט',

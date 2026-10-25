@@ -8,6 +8,6 @@ return [
     'categories' => 'Categories',
     'built' => 'Built',
     'not_built' => 'The search is not built yet',
-    'tags_title' => 'Page tags · :pages pages, :tags different tags',
-    'tag_pages' => 'on :count pages',
+    'tags_title' => 'Page tags · :pages {pages:page/pages}, :tags {tags:tag/different tags}',
+    'tag_pages' => 'on :count {count:page/pages}',
 ];

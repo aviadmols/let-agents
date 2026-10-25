@@ -12,7 +12,7 @@
     })
 
     @php($f = $this->figures())
-    @php($q = $f['questions'] ?? ['all' => 0, 'answered' => 0, 'unanswered' => 0, 'off' => 0])
+    @php($q = ($f['questions'] ?? []) + ['all' => 0, 'answered' => 0, 'unanswered' => 0, 'off' => 0, 'search' => 0])
     @php($adds = $f['adds'] ?? ['all' => 0, 'search' => 0, 'widget' => 0, 'page' => 0])
     @php($orders = $f['orders'] ?? ['n' => 0, 'revenue' => 0, 'currency' => (string) (\Filament\Facades\Filament::getTenant()?->currency ?: 'ILS')])
     @php($views = (int) ($f['views'] ?? 0))
@@ -31,8 +31,9 @@
             @if ($daily !== [])
                 @php($top = max(1, max(array_column($daily, 'n'))))
                 @php($n = count($daily))
-                {{-- right to left, as Hebrew reads: the first day at the right edge, the last at the left --}}
-                @php($xy = collect($daily)->values()->map(fn (array $d, int $i): array => ['x' => round($n > 1 ? 100 - (100 * $i / ($n - 1)) : 50, 3), 'y' => round(100 - 88 * $d['n'] / $top, 2), 'label' => $d['label'], 'n' => $d['n']])->all())
+                {{-- time runs as the panel's language reads: in Hebrew the first day at the right edge, in English at the left --}}
+                @php($rtl = \App\Core\Localization\Locales::direction(app()->getLocale()) === 'rtl')
+                @php($xy = collect($daily)->values()->map(fn (array $d, int $i): array => ['x' => round($n > 1 ? ($rtl ? 100 - (100 * $i / ($n - 1)) : 100 * $i / ($n - 1)) : 50, 3), 'y' => round(100 - 88 * $d['n'] / $top, 2), 'label' => $d['label'], 'n' => $d['n']])->all())
                 @php($points = collect($xy)->map(fn (array $p): string => ($p['x'] * 6).','.($p['y'] * 1.6))->implode(' '))
                 @php($ticks = collect($xy)->filter(fn (array $p, int $i): bool => $n <= 8 || $i % (int) ceil($n / 7) === 0 || $i === $n - 1))
                 <div class="lp-card-t" style="margin: 18px 0 6px">
@@ -94,7 +95,7 @@
         </div>
 
         <div class="lp-grid-2">
-            @foreach (['words' => number_format((int) ($f['searches'] ?? 0)), 'questions' => number_format($q['all'])] as $key => $count)
+            @foreach (['words' => number_format((int) ($f['searches'] ?? 0)), 'questions' => number_format($q['search'])] as $key => $count)
                 @if ($this->has($key))
                     @php($list = $this->rows($key))
                     <section class="lp-card" data-card-list="{{ $key }}">

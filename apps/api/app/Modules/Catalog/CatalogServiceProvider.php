@@ -4,6 +4,7 @@ namespace App\Modules\Catalog;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeCards;
+use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\TimelineSource;
@@ -25,6 +26,7 @@ use App\Modules\Catalog\Support\CatalogProductKinds;
 use App\Modules\Catalog\Support\CatalogScanDetails;
 use App\Modules\Catalog\Support\CatalogShopFacts;
 use App\Modules\Catalog\Support\CatalogTimeline;
+use App\Modules\Catalog\Support\StorefrontHome;
 use App\Modules\Connections\Events\StoreAddressMoved;
 use App\Modules\Runs\Enums\RunTrigger;
 use Illuminate\Console\Scheduling\Schedule;
@@ -36,6 +38,8 @@ final class CatalogServiceProvider extends ModuleServiceProvider
     {
         $this->app->tag([CatalogHome::class], HomeCards::CARDS_TAG);
         $this->app->tag([CatalogTimeline::class], TimelineSource::TAG);
+        // A storefront closed to visitors (StorefrontLock), told in the notices while it stays so.
+        $this->app->tag([StorefrontHome::class], HomeSource::TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([CatalogScanDetails::class], ScanDetails::TAG);
         // What this module counted, for the first-run screens.

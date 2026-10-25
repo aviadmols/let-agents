@@ -34,8 +34,9 @@ return [
     'lists' => [
         'adds' => ['title' => 'Popular products', 'note' => 'By adds to cart, most first', 'sub' => 'By adds to cart :period'],
         'wish' => ['title' => 'Wishlist', 'sub' => 'The products saved most :period'],
-        'words' => ['title' => 'Top search words', 'note' => ':n searches', 'sub' => 'Every word searched :period'],
-        'questions' => ['title' => 'Top customer questions', 'note' => ':n questions', 'sub' => 'Every question asked :period'],
+        'words' => ['title' => 'Top search words', 'note' => ':n {n:search/searches}', 'sub' => 'Every word searched :period'],
+        // the list is the search window's questions; the "Questions" figure above adds those asked on product pages
+        'questions' => ['title' => 'Top customer questions', 'note' => 'In the search window: :n', 'sub' => 'Every question asked in the search window :period'],
         'empty' => ['title' => 'Searches with no results', 'sub' => 'Words searched that found no product :period'],
         'noclick' => ['title' => 'Results, but no click', 'sub' => 'Searches that showed products nobody clicked :period'],
         'ips' => ['title' => 'IP addresses with many requests a day', 'note' => 'Over :n requests a day from one address · requests from a blocked address are not counted', 'sub' => 'Addresses with many requests a day :period'],

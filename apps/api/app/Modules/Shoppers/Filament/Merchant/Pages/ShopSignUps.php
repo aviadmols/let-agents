@@ -19,5 +19,14 @@ final class ShopSignUps extends OperatorShopSignUps
 
     protected static ?int $navigationSort = 30;
 
+    /** Nothing is approved here: the screen's hint about approving answers is not shown. */
+    public static ?string $sectionHint = null;
+
+    /** The screen's name, as the menu says it; the tab says which page. */
+    public function getTitle(): string
+    {
+        return __('admin::panels.screens.inbox');
+    }
+
     /** Off the menu: reached from where it belongs (the analytics tabs, or the operator). */
 }

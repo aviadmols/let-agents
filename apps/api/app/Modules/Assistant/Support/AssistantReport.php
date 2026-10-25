@@ -6,6 +6,7 @@ use App\Modules\Admin\Contracts\ReportRow;
 use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Assistant\Actions\TeamAnswers;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
@@ -13,48 +14,39 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The questions' part of the shop's analytics screen: how many were asked in the period (in the search
- * window and on product pages) and how they ended, and the questions asked most, each with whether the
- * store's own information answered it. Counts only.
+ * window and on product pages, the home's count: QuestionCounts) and how they ended, and the questions
+ * asked most in the search window, each with whether the store's own information answered it. Counts only.
  */
 final class AssistantReport implements ShopReport
 {
-    private const ANSWERED = ['answered'];
+    private const ANSWERED = QuestionCounts::ANSWERED;
 
-    private const UNANSWERED = ['no_info', 'no_match'];
+    private const UNANSWERED = QuestionCounts::UNANSWERED;
 
-    private const OFF = ['out_of_scope'];
+    private const OFF = QuestionCounts::OFF;
 
     /** The most asked questions a list reads, before what the team handled is taken out. */
     private const MOST = 2000;
 
     public function figures(Shop $shop, CarbonInterface $since, CarbonInterface $until): array
     {
-        $search = AssistantSearchAsk::query()->where('day', '>=', $since->toDateString())->where('day', '<', $until->copy()->subSecond()->addDay()->toDateString())
-            ->selectRaw('outcome, count(*) as n')->groupBy('outcome')->pluck('n', 'outcome')->map(fn ($n): int => (int) $n);
-        $pages = AssistantAnswer::query()->where(fn ($q) => $q->whereNotNull('product_id')->orWhereNotNull('content_id'))
-            ->where('last_asked_at', '>=', $since)->where('last_asked_at', '<', $until)
-            ->selectRaw('outcome, count(*) as n')->groupBy('outcome')->pluck('n', 'outcome')->map(fn ($n): int => (int) $n);
-        $sum = fn (array $outcomes): int => (int) collect($outcomes)->sum(fn (string $o): int => ($search[$o] ?? 0) + ($pages[$o] ?? 0));
-
-        return ['questions' => [
-            'all' => (int) ($search->sum() + $pages->sum()),
-            'answered' => $sum(self::ANSWERED),
-            'unanswered' => $sum(self::UNANSWERED),
-            'off' => $sum(self::OFF),
-        ], 'series' => ['questions' => $this->series($since, $until)]];
+        return ['questions' => QuestionCounts::between($since, $until), 'series' => ['questions' => $this->series($since, $until)]];
     }
 
     /**
-     * Questions asked in the search box through the period, at the chart's scale (ReportSeries).
+     * Questions asked through the period, at the chart's scale (ReportSeries), counted as the figure is
+     * (QuestionCounts): each in the search window when it was asked, each on a page when it was last asked.
      *
      * @return array<string, int>
      */
     private function series(CarbonInterface $since, CarbonInterface $until): array
     {
         $format = ReportSeries::scale($since, $until)['format'];
+        $search = AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)->pluck('created_at');
+        $pages = AssistantAnswer::query()->where(fn ($q) => $q->whereNotNull('product_id')->orWhereNotNull('content_id'))
+            ->where('last_asked_at', '>=', $since)->where('last_asked_at', '<', $until)->pluck('last_asked_at');
 
-        return AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)->get(['created_at'])
-            ->countBy(fn (AssistantSearchAsk $ask): string => ReportSeries::key($ask->created_at, $format))->all();
+        return $search->concat($pages)->countBy(fn ($at): string => ReportSeries::key($at, $format))->all();
     }
 
     public function lists(): array
@@ -64,7 +56,8 @@ final class AssistantReport implements ShopReport
 
     public function rows(Shop $shop, string $list, CarbonInterface $since, CarbonInterface $until, int $limit, string $search = '', string $sort = 'value'): array
     {
-        $asks = AssistantSearchAsk::query()->where('day', '>=', $since->toDateString())->where('day', '<', $until->copy()->subSecond()->addDay()->toDateString())
+        // the same period, by the same clock, as the count above (QuestionCounts)
+        $asks = AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)
             ->select('question')->selectRaw('count(*) as n')->groupBy('question');
 
         if (($words = trim($search)) !== '') {

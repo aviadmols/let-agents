@@ -19,7 +19,7 @@ return [
     'test' => 'הודעת בדיקה',
     'test_phone' => 'מספר נייד',
     'test_send' => 'לשלוח בדיקה',
-    'test_text' => 'בדיקה מ־Let Agents: חשבון ה־SMS מחובר.',
+    'test_text' => 'בדיקה מ־Lets: חשבון ה־SMS מחובר.',
     'test_sent' => 'נשלחה. בדקו את הטלפון.',
     'test_failed' => 'לא נשלחה',
     'month' => 'החודש, לפי חנות',
