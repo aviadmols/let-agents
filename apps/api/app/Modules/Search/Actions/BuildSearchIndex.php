@@ -190,7 +190,10 @@ final class BuildSearchIndex
 
         // What each product is, from the shop's approved facts: the filters beside the results. Then the
         // colours and sizes its variants come in, two filters of their own.
-        $facets = $this->facets($shopId);
+        // Whom each product is for, as the store says it (read before the vocabulary's filters: where the store says it,
+        // its own words are the one "for whom" filter, never a model's reading of fewer products beside it)
+        $whom = $this->whom();
+        $facets = $this->facets($shopId, $whom !== null);
         // A product's own size where the shop has no size attribute: what its page says (a ring's "מידה
         // נוכחית: 54", ReadPageChoices), else a size-like custom field of its feed. Sizes from facts come first.
         $pageSizes = CatalogProductChoice::query()->whereNotNull('size')->pluck('size', 'product_id')->map(fn ($z): float => round((float) $z, 6));
@@ -208,7 +211,7 @@ final class BuildSearchIndex
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
         // Whom each product is for, where the store says it of enough of them (clothes, shoes): "חולצה לגברים" reads it.
-        $audiences = $this->audienceFacet($facets['facets'], $this->locale($shopId));
+        $audiences = $whom === null ? [] : $this->audienceFacet($facets['facets'], $this->locale($shopId), $whom);
         // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
         $tagFilters = $this->tagFacets($facets['facets'], $shopId, $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
@@ -341,7 +344,11 @@ final class BuildSearchIndex
      *
      * @return array{facets: list<array{k: string, l: string, v: list<array{k: string, l: string}>}>, size: array{k: string, l: string}|null, products: array<string, array{f?: list<int>, z?: float}>}
      */
-    private function facets(string $shopId): array
+    /** A vocabulary's own attribute of whom products are for: none beside the store's own (whom()). */
+    private const WHOM_KEYS = ['audience', 'gender', 'for_whom', 'target_audience', 'age_group'];
+
+    /** @param bool $whom the store says whom its products are for: its vocabulary's own such attribute is no filter */
+    private function facets(string $shopId, bool $whom = false): array
     {
         $locale = $this->locale($shopId);
         $facets = [];
@@ -356,7 +363,7 @@ final class BuildSearchIndex
             $lists = [['type', 'type', array_map(fn (array $t): string => (string) $t['key'], $definition->productTypes())]];
             foreach ($definition->attributes() as $attribute) {
                 $kind = $attribute['type'] ?? 'number';
-                if ($variantColours && in_array((string) $attribute['key'], self::COLOUR_KEYS, true)) {
+                if (($variantColours && in_array((string) $attribute['key'], self::COLOUR_KEYS, true)) || ($whom && in_array((string) $attribute['key'], self::WHOM_KEYS, true))) {
                     continue;
                 }
                 if ($kind === 'enum') {
@@ -803,7 +810,13 @@ final class BuildSearchIndex
      *
      * @return array<string, list<int>> codes by product id
      */
-    private function audienceFacet(array &$facets, string $locale): array
+    /**
+     * Whom each product is for, as the store says it (ProductKinds::audiences), where it says it of enough products and
+     * of two people or more; null where it does not.
+     *
+     * @return array{of: array<string, list<string>>, present: list<string>}|null
+     */
+    private function whom(): ?array
     {
         $kinds = app(ProductKinds::class);
         $of = [];
@@ -816,10 +829,13 @@ final class BuildSearchIndex
         }
         $present = array_values(array_filter(['women', 'men', 'kids', 'babies'], fn (string $a): bool => array_filter($of, fn (array $as): bool => in_array($a, $as, true)) !== []));
 
-        if (count($present) < 2 || $total === 0 || count($of) < $total * self::AUDIENCE_MIN_SHARE) {
-            return [];
-        }
+        return count($present) < 2 || $total === 0 || count($of) < $total * self::AUDIENCE_MIN_SHARE ? null : ['of' => $of, 'present' => $present];
+    }
 
+    /** @param array{of: array<string, list<string>>, present: list<string>} $whom */
+    private function audienceFacet(array &$facets, string $locale, array $whom): array
+    {
+        ['of' => $of, 'present' => $present] = $whom;
         $at = count($facets);
         $code = array_flip($present);
         $facets[] = ['k' => 'audience', 'l' => (string) __('search::storefront.facet_audience', [], $locale),
