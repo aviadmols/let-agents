@@ -17,7 +17,7 @@ use UnitEnum;
 /**
  * Settings · The search window, as the designer's panel lays it out: whether Lets search runs on the
  * site at all (the card's switch), whether it takes over the theme's own search box, whether a new shopper is
- * invited to try it once, and what the drawer offers: photos, questions, similar items, prices, the cart, the wishlist and compare, "Helpful?" under
+ * invited to try it once, the round button at the bottom of the screen (shown or not, its side and height), and what the drawer offers: photos, questions, similar items, prices, the cart, the wishlist and compare, "Helpful?" under
  * an answer, the product page's row when a product or a size is sold out, and whether the posts Lets wrote
  * are search results. Each is a feature or a setting the drawer reads (SearchIndexController).
  */
@@ -62,6 +62,9 @@ class SearchWindowSettings extends Page
             'take_over' => 'feature:search.take_over_field',
             'nudge' => 'feature:search.nudge',
             'nudge_at' => 'setting:search.nudge_at',
+            'float' => 'setting:search.float_button',
+            'float_side' => 'setting:search.float_side',
+            'float_bottom' => 'setting:search.float_bottom',
             'photos' => 'feature:search.photos',
             'ask' => 'feature:assistant.on_search',
             'similar' => 'feature:search.similar',
@@ -105,11 +108,11 @@ class SearchWindowSettings extends Page
         return app(TenantContext::class)->run($this->shopId(), fn (): bool => app(SemanticSearch::class)->picturesReady());
     }
 
-    /** @return array{min: int, max: int} the bounds of results per group, as declared */
-    public function perGroupBounds(): array
+    /** @return array{min: int, max: int} a number's bounds, as its setting declares them (results per group, the button's height) */
+    public function bounds(string $setting): array
     {
-        $definition = app(SettingRegistry::class)->get('search.results_per_group');
+        $definition = app(SettingRegistry::class)->get($setting);
 
-        return ['min' => (int) ($definition->min ?? 1), 'max' => (int) ($definition->max ?? 48)];
+        return ['min' => (int) ($definition->min ?? 0), 'max' => (int) ($definition->max ?? 0)];
     }
 }

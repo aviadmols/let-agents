@@ -84,7 +84,8 @@
     hintEl.querySelector('span').textContent = t('saveHint'); hintEl.querySelector('button').textContent = t('saveView');
     var r = b.getBoundingClientRect(), below = r.bottom + 60 < win.innerHeight;
     hintEl.style.top = below ? (r.bottom + 10) + 'px' : (r.top - 54) + 'px';
-    if (DIR === 'rtl') { hintEl.style.left = Math.max(12, r.left - 8) + 'px'; hintEl.style.right = 'auto'; } else { hintEl.style.right = Math.max(12, win.innerWidth - r.right - 8) + 'px'; hintEl.style.left = 'auto'; }
+    // toward the middle of the screen, whichever side the launcher is on (the floating one may be on either, search.float_side)
+    if (r.left + r.width / 2 < win.innerWidth / 2) { hintEl.style.left = Math.max(12, r.left - 8) + 'px'; hintEl.style.right = 'auto'; } else { hintEl.style.right = Math.max(12, win.innerWidth - r.right - 8) + 'px'; hintEl.style.left = 'auto'; }
     requestAnimationFrame(function () { hintEl.classList.add('is-on'); });
     clearTimeout(hintTimer); hintTimer = setTimeout(function () { hintEl.classList.remove('is-on'); }, 3200);
   }

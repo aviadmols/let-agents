@@ -115,6 +115,7 @@
     hookFields();
   }
   // the launcher: in the header when there's room, floating otherwise
+  var FLOATS = false, FLOAT = null;
   function hookLauncher() {
     if (CFG.launcher === 'none') { return; }
     var into = CFG.launcher !== 'float' && (CFG.launcherInto ? doc.querySelector(CFG.launcherInto) : (doc.querySelector('[data-search-open]') || {}).parentNode);
@@ -123,7 +124,36 @@
       var l = makeLauncher(false);
       if (mobileToggle) { mobileToggle.style.display = 'none'; into.insertBefore(l, mobileToggle); } else { into.insertBefore(l, into.firstChild); }
     } else {
-      doc.body.appendChild(makeLauncher(true));
+      FLOATS = true;
+      placeFloat();
     }
+  }
+  // The floating launcher as the shop set it (search.float_button, float_side, float_bottom), from the look this browser
+  // kept and again from the fresh one: on the screen's left or right whatever the page's direction ('auto': the page's
+  // end, as before), as high as the shop chose. Hidden only while the page has another way in that a shopper can see:
+  // a store with no search icon or box of its own keeps the button, so the search can always be opened.
+  function placeFloat() {
+    if (!FLOATS) { return; }
+    if (LOOK.float === false && opensElsewhere()) {
+      if (FLOAT) { LAUNCHERS.splice(LAUNCHERS.indexOf(FLOAT.shadowRoot.querySelector('button')), 1); FLOAT.remove(); FLOAT = null; }
+      return;
+    }
+    if (!FLOAT) { FLOAT = makeLauncher(true); doc.body.appendChild(FLOAT); refreshLauncher(); }
+    var btn = FLOAT.shadowRoot.querySelector('button');
+    btn.classList.toggle('ls-launch--left', LOOK.floatSide === 'left');
+    btn.classList.toggle('ls-launch--right', LOOK.floatSide === 'right');
+    btn.style.setProperty('--ls-float-y', floatY(LOOK.floatBottom) + 'px');
+  }
+  // its height from the bottom of the screen, in pixels: 20 unless the shop chose (0 to 200, as the setting allows)
+  function floatY(v) {
+    var n = v == null || v === '' ? NaN : Math.round(Number(v));
+    return isFinite(n) && n >= 0 ? Math.min(n, 200) : 20;
+  }
+  // a way in to the search on this page that a shopper can see, besides the floating button: the theme's own search
+  // icon or box (while we take its search over), a button or field the theme marked for us, the store's own named ones
+  function opensElsewhere() {
+    var sel = OWN_TRIGGERS + ', ' + OWN_FIELDS + (CFG.openSelectors ? ', ' + CFG.openSelectors : '') + (CFG.takeOver !== false ? ', ' + SEARCH_TRIGGERS + ', ' + CFG.fieldSelector : ''), found = [];
+    try { found = [].slice.call(doc.querySelectorAll(sel)); } catch (e) { found = [].slice.call(doc.querySelectorAll(OWN_TRIGGERS + ', ' + OWN_FIELDS)); /* a selector the browser cannot read */ }
+    return found.some(function (n) { return !n.closest('[data-lets-launcher]') && n.getClientRects().length > 0; });
   }
 

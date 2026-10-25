@@ -61,14 +61,15 @@
     return json(API + '/search/' + SITE + '/look').then(function (r) { if (r.ok && r.body && r.body.theme) { applyLook(r.body); return true; } return false; }).catch(function () { return false; /* the last look stays */ });
   }
   function applyLook(l) {
-    var keep = { theme: l.theme, lang: l.lang || null, assistant: l.assistant || '', takeOver: l.takeOver !== false, rate: l.rate !== false, oosSimilar: l.oosSimilar === true, nudge: l.nudge === true, nudgeAt: String(l.nudgeAt || ''), enabled: l.enabled !== false };
+    var keep = { theme: l.theme, lang: l.lang || null, assistant: l.assistant || '', takeOver: l.takeOver !== false, rate: l.rate !== false, oosSimilar: l.oosSimilar === true, nudge: l.nudge === true, nudgeAt: String(l.nudgeAt || ''), enabled: l.enabled !== false,
+      float: l.float !== false, floatSide: l.floatSide === 'left' || l.floatSide === 'right' ? l.floatSide : 'auto', floatBottom: floatY(l.floatBottom) };
     if (!CFG.preview) { try { win.localStorage.setItem(LOOK_KEY, JSON.stringify(keep)); } catch (e) { /* storage blocked: read again next page */ } }
     LOOK = keep;
     if (keep.assistant && lookWins('assistant')) { CFG.assistant = keep.assistant; }
     if (lookWins('theme') && !URLQ.lsTheme) { setTheme(keep.theme === 'store' ? 'store' : 'lets'); }
     if (lookWins('locale') && !URLQ.lsLang) { setLang(/^en/i.test(String(keep.lang || SITE_LOCALE || '')) ? 'en' : 'he'); }
     if (CFG.takeOver !== keep.takeOver) { CFG.takeOver = keep.takeOver; rehook(); }
-    if (BOOTED) { outOfStockRow(); }
+    if (BOOTED) { placeFloat(); outOfStockRow(); }
     if (D) { render(); }
   }
   // every host of ours carries the look: the drawer, the launchers, the product page's rows

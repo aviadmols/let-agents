@@ -155,7 +155,7 @@ final class SearchIndexController
     /**
      * The shop's choices on its "how it looks" and "search window" settings, as the drawer reads them.
      *
-     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool, nudge: bool, nudgeAt: string}
+     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool, nudge: bool, nudgeAt: string, float: bool, floatSide: string, floatBottom: int}
      */
     public static function lookFor(TenantContext $tenant, string $shopId): array
     {
@@ -179,6 +179,11 @@ final class SearchIndexController
             'nudge' => Features::enabled('search.nudge', $shopId),
             // what it points at: the site's own search icon, when the shop named it; '' = the drawer finds it
             'nudgeAt' => self::nudgeAt((string) Settings::get('search.nudge_at', $shopId)),
+            // the round button at the bottom of the screen (where Lets found no place in the header): shown or not, on which
+            // side ('auto': the page's end, as its direction), and how high, clear of the site's own floating buttons
+            'float' => (bool) Settings::get('search.float_button', $shopId),
+            'floatSide' => (string) Settings::get('search.float_side', $shopId),
+            'floatBottom' => (int) Settings::get('search.float_bottom', $shopId),
         ];
     }
 

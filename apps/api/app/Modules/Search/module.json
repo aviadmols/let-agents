@@ -131,6 +131,32 @@
             "scope": "shop"
         },
         {
+            "name": "float_button",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "float_side",
+            "type": "enum",
+            "options": [
+                "auto",
+                "left",
+                "right"
+            ],
+            "default": "auto",
+            "scope": "shop"
+        },
+        {
+            "name": "float_bottom",
+            "type": "int",
+            "default": 20,
+            "min": 0,
+            "max": 200,
+            "scope": "shop",
+            "unit": "pixels"
+        },
+        {
             "name": "size_attribute",
             "type": "string",
             "default": "",

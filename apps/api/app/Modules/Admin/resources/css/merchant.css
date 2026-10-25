@@ -871,6 +871,12 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-mini-b { width: 30px; height: 14px; border-radius: 999px; background: var(--la-ink); flex: none; }
 .fi-panel-merchant .lp-mini[data-mini='site'] { font-family: Heebo, sans-serif; }
 .fi-panel-merchant .lp-mini[data-mini='site'] .lp-mini-b { background: #d23c3c; border-radius: 3px; }
+/* the floating search button on a phone's screen (search window settings): its side and its height, as the shop set them */
+.fi-panel-merchant .lp-float-prev { position: relative; display: block; width: 64px; height: 112px; margin-top: 10px; border-radius: 12px; background: var(--la-plane); box-shadow: inset 0 0 0 1.5px var(--la-line); overflow: hidden; }
+.fi-panel-merchant .lp-float-prev-bar { position: absolute; top: 8px; left: 8px; right: 8px; height: 6px; border-radius: 3px; background: var(--la-axis); }
+.fi-panel-merchant .lp-float-prev-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--la-ink); transition: bottom 160ms ease, left 160ms ease, right 160ms ease; }
+.fi-panel-merchant .lp-float-prev-dot.is-auto { background: transparent; box-shadow: inset 0 0 0 1.5px var(--la-ink); }
+@media (prefers-reduced-motion: reduce) { .fi-panel-merchant .lp-float-prev-dot { transition: none; } }
 
 .fi-panel-merchant .lp-num { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: var(--la-sunk); }
 .fi-panel-merchant .lp-num button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--la-paper); color: var(--la-ink); font-size: 16px; line-height: 1; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }

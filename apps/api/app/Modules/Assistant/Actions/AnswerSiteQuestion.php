@@ -221,7 +221,10 @@ final class AnswerSiteQuestion
         // question about the turn before, no saved answer is read or written, since the same words are
         // about another product on the next page (and a refusal saved before the product was synced
         // would answer every product).
-        $bound = $followUp || ($fromPage && $products !== []);
+        // And a question that points at the products in front of the shopper ("מה ההבדל ביניהם?", "איזה מהם הכי
+        // משתלם?", the drawer's own "not sure" chips): its words are the same for every shopper and its products are
+        // not, so it is never kept for the next one (one shopper's picks were served to everyone).
+        $bound = $followUp || ($products !== [] && self::pointsBack($question)) || ($fromPage && $products !== []);
         // The product whose page it is: the writer says what matters about it.
         $viewing = $fromPage && ! $followUp && $products !== [] ? $products[0] : null;
 
@@ -1828,6 +1831,14 @@ final class AnswerSiteQuestion
             ->take(self::MAX_COMPUTED)->map(fn (CatalogProduct $p): string => (string) $p->external_id)->values()->all();
     }
 
+    /** Whether a question points at products already in front of the shopper: "מהם", "ביניהם", "these". */
+    public static function pointsBack(string $question): bool
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(Question::normalize($question)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_intersect($words, self::REFERS) !== [];
+    }
+
     /**
      * Whether a question is about the products the conversation just showed: it points back at them
      * ("איזה מהם"), or names no product at all ("מה הכי זול?"). Not when it asks about the whole
@@ -2405,14 +2416,18 @@ final class AnswerSiteQuestion
     }
 
     /**
-     * What the scan has learned of the shop's products, in short: how many tags it holds and of how many
-     * kinds. Read again each night, the same tags give the same mark; a new kind (a book's genre) changes it.
+     * What the scan has learned of the shop's products, in short: how many different things it can say (kinds of
+     * tag, and different values among them). A new kind or a new value (a book's genre, "פנטזיה") changes it; the
+     * same tags read again at night, or put on one more product, do not, so a "not on the site" is not paid for again
+     * every day (a product added already reopens it on its own).
      */
     private static function learned(): string
     {
-        $facts = EnrichmentFact::query()->whereNotNull('product_id')->where('status', FactStatus::Approved);
+        $row = EnrichmentFact::query()->whereNotNull('product_id')->where('status', FactStatus::Approved)
+            ->selectRaw("count(distinct key) as kinds, count(distinct (key || ':' || coalesce(value_text, cast(value_number as text), ''))) as said")
+            ->toBase()->first();
 
-        return $facts->count().':'.(clone $facts)->distinct()->count('key');
+        return (int) ($row->kinds ?? 0).':'.(int) ($row->said ?? 0);
     }
 
     /** What the store is, for the topic check: its name and what it sells. */

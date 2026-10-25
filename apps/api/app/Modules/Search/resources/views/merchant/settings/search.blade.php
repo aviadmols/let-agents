@@ -1,7 +1,8 @@
 <x-filament-panels::page>
     {{-- Settings · The search window (SearchWindowSettings), as the designer's panel lays it out. --}}
     @php($t = fn (string $key, array $params = []) => __('search::shop_settings.search.'.$key, $params))
-    @php($bounds = $this->perGroupBounds())
+    @php($bounds = $this->bounds('search.results_per_group'))
+    @php($height = $this->bounds('search.float_bottom'))
 
     <x-lp::card :title="$t('title')" :help="$t('help')" master="data.storefront">
         <x-lp::row :title="$t('field')" :sub="$t('field_sub')" :tip="$t('field_tip')"><x-lp::toggle model="data.take_over" :label="$t('field')" /></x-lp::row>
@@ -9,6 +10,23 @@
         <x-lp::row :title="$t('nudge_at')" :sub="$t('nudge_at_sub')" :tip="$t('nudge_at_tip')" x-data x-show="$wire.data.nudge">
             <x-lp::field model="data.nudge_at" :ltr="true" :width="240" placeholder="header__search-link" :aria-label="$t('nudge_at')" />
             @if ($this->problem('nudge_at'))<span class="lp-set-error" role="alert">{{ $this->problem('nudge_at') }}</span>@endif
+        </x-lp::row>
+        <x-lp::row :title="$t('float')" :sub="$t('float_sub')" :tip="$t('float_tip')"><x-lp::toggle model="data.float" :label="$t('float')" /></x-lp::row>
+        <x-lp::row :title="$t('float_side')" x-data x-show="$wire.data.float">
+            {{-- a phone's screen with the button where the shop put it: left and right are the screen's, whatever the panel's language --}}
+            <x-slot:below>{{ $t('float_side_sub') }}
+                <span class="lp-float-prev" dir="ltr" role="img" aria-label="{{ $t('float_preview') }}">
+                    <i class="lp-float-prev-bar"></i>
+                    <i class="lp-float-prev-dot" x-bind:class="{ 'is-auto': $wire.data.float_side === 'auto' }" x-bind:style="{ bottom: (4 + (+$wire.data.float_bottom || 0) * .18) + 'px', left: $wire.data.float_side === 'right' ? 'auto' : '6px', right: $wire.data.float_side === 'right' ? '6px' : 'auto' }"></i>
+                    <i class="lp-float-prev-dot is-auto" x-show="$wire.data.float_side === 'auto'" x-bind:style="{ bottom: (4 + (+$wire.data.float_bottom || 0) * .18) + 'px', right: '6px' }"></i>
+                </span>
+            </x-slot:below>
+            <x-lp::chips model="data.float_side" :options="$t('float_sides')" :sm="true" :label="$t('float_side')" />
+        </x-lp::row>
+        <x-lp::row :title="$t('float_bottom')" :sub="$t('float_bottom_sub')" x-data x-show="$wire.data.float">
+            <x-lp::num model="data.float_bottom" :min="$height['min']" :max="$height['max']" :step="10" :label="$t('float_bottom')" />
+            <span class="lp-set-s">{{ $t('float_px') }}</span>
+            @if ($this->problem('float_bottom'))<span class="lp-set-error" role="alert">{{ $this->problem('float_bottom') }}</span>@endif
         </x-lp::row>
         <x-lp::row :title="$t('photos')" :tip="$t('photos_tip')">
             {{-- the pictures' state once they matter: ready, or still scanning while photo search is on --}}

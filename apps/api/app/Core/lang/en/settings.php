@@ -31,6 +31,7 @@ return [
         'visitors' => 'visitors',
         'values' => 'values',
         'points' => 'points',
+        'pixels' => 'px',
     ],
     'errors' => [
         'not_integer' => 'Enter a whole number.',

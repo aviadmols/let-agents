@@ -513,6 +513,23 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('model', $this->askWith('צמיד עד 500', ['803', '801'])->json('data.from'));
     }
 
+    public function test_a_question_about_the_products_in_front_of_the_shopper_is_never_kept_for_the_next_one(): void
+    {
+        // The drawer's "not sure" chips ("מה ההבדל ביניהם?") are the same words for every shopper; their products are not.
+        $this->drills();
+        $this->replies = [
+            ['found' => true, 'answer' => 'הראשונה חזקה יותר.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'חזקה יותר']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $this->askWith('מה ההבדל ביניהם?', ['701', '702']);
+
+        $this->assertSame(0, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->count()), 'not kept: the next shopper has other products in front of them');
+        $this->assertTrue(AnswerSiteQuestion::pointsBack('איזה מהם הכי משתלם?'));
+        $this->assertTrue(AnswerSiteQuestion::pointsBack('מה הכי מתאים לי מביניהם?'));
+        $this->assertFalse(AnswerSiteQuestion::pointsBack('מה מדיניות ההחזרות?'));
+    }
+
     public function test_the_cheapest_of_what_the_question_names_is_chosen_from_the_whole_store_not_what_was_shown(): void
     {
         // Seen on Rocks (24.10): "איזו טבעת עם יהלום הכי זולה" with two products on screen; the model named the cheaper

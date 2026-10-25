@@ -181,6 +181,64 @@ final class SearchSettingsPagesTest extends TestCase
         $this->assertFalse($this->look()['enabled']);
     }
 
+    public function test_the_floating_button_is_shown_placed_and_raised_as_the_shop_sets_it(): void
+    {
+        $this->product('1', 'טבעת סוליטר');
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        // what every shop has until it chooses: shown, at the page's end, 20 pixels up (the drawer as it was)
+        $page = Livewire::test(SearchWindowSettings::class)
+            ->assertOk()
+            ->assertSee('כפתור חיפוש צף')
+            ->assertSee('כפתור עגול בתחתית המסך שפותח את החיפוש')
+            ->assertSee('הגולשים פותחים את החיפוש מאייקון החיפוש או מתיבת החיפוש של האתר', false)
+            ->assertSee('צד המסך')
+            ->assertSee('אוטומטי: בסוף העמוד, שמאל באתר בעברית וימין באתר באנגלית')
+            ->assertSee('ימין')
+            ->assertSee('שמאל')
+            ->assertSee('גובה מהתחתית')
+            ->assertSee('איפה הכפתור יושב על מסך של טלפון')
+            ->assertSet('data.float', true)
+            ->assertSet('data.float_side', 'auto')
+            ->assertSet('data.float_bottom', 20);
+
+        $look = $this->look();
+        $this->assertSame([true, 'auto', 20], [$look['float'], $look['floatSide'], $look['floatBottom']]);
+        $this->assertSame([true, 'auto', 20], [$this->config()['float'], $this->config()['floatSide'], $this->config()['floatBottom']], 'the index carries the look too');
+
+        $page->set('data.float', false)->set('data.float_side', 'left')->set('data.float_bottom', 120)->call('save');
+        $this->assertFalse(Settings::get('search.float_button', $this->shop->id));
+        $this->assertSame('left', Settings::get('search.float_side', $this->shop->id));
+        $this->assertSame(120, Settings::get('search.float_bottom', $this->shop->id));
+        $look = $this->look();
+        $this->assertSame([false, 'left', 120], [$look['float'], $look['floatSide'], $look['floatBottom']]);
+
+        // higher than the setting allows (the − and + stop at its bounds): nothing is saved, the field is marked
+        $page->set('data.float_side', 'right')->set('data.float_bottom', 500)->call('save');
+        $this->assertArrayHasKey('float_bottom', $page->get('problems'));
+        $this->assertSame('left', Settings::get('search.float_side', $this->shop->id));
+        $this->assertSame(120, Settings::get('search.float_bottom', $this->shop->id));
+
+        // back to what it was: nothing of the shop's own is kept
+        $page->set('data.float', true)->set('data.float_side', 'auto')->set('data.float_bottom', 20)->call('save');
+        $this->assertNull(Settings::overrideFor('search.float_button', $this->shop->id));
+        $this->assertNull(Settings::overrideFor('search.float_side', $this->shop->id));
+        $this->assertNull(Settings::overrideFor('search.float_bottom', $this->shop->id));
+
+        app()->setLocale('en');
+        Livewire::test(SearchWindowSettings::class)
+            ->assertOk()
+            ->assertSee('Floating search button')
+            ->assertSee('Side of the screen')
+            ->assertSee('Automatic')
+            ->assertSee('Left')
+            ->assertSee('Right')
+            ->assertSee('Height from the bottom')
+            ->assertSee('Raise it if it covers the site&#039;s own floating buttons: accessibility, chat or cookies', false)
+            ->set('data.float_side', 'right')->set('data.float_bottom', 80)->call('save');
+        $this->assertSame(['right', 80], [$this->look()['floatSide'], $this->look()['floatBottom']]);
+    }
+
     public function test_the_manual_connection_keeps_the_shops_own_selector(): void
     {
         StoreConnection::query()->withoutGlobalScopes()->update(['site_info' => json_encode(['plugin' => ['version' => '0.10.0']]), 'status' => 'connected']);

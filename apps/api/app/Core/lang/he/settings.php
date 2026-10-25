@@ -31,6 +31,7 @@ return [
         'visitors' => 'גולשים',
         'values' => 'ערכים',
         'points' => 'נקודות',
+        'pixels' => 'פיקסלים',
     ],
     'errors' => [
         'not_integer' => 'יש להזין מספר שלם.',

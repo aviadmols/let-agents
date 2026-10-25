@@ -9,6 +9,19 @@ return [
         'label' => 'The search invitation points at',
         'description' => 'The class (or CSS selector) of the site\'s own search icon that the "Try our new search" invitation sits beside. Empty: automatic, the Lets button in the header, then the theme\'s search icon, then the floating button and the search box.',
     ],
+    'float_button' => [
+        'label' => 'Floating search button',
+        'description' => 'The round Lets button at the bottom of the screen, on pages where Lets did not place its button in the header. Off: shoppers open the search from the site\'s own search icon or box; on a page with neither, the button still shows, so the search can always be opened.',
+    ],
+    'float_side' => [
+        'label' => 'Floating button side',
+        'description' => 'Left or right of the screen, whatever the site\'s language. Automatic: the end of the page, left on a Hebrew site and right on an English one.',
+        'options' => ['auto' => 'Automatic', 'left' => 'Left', 'right' => 'Right'],
+    ],
+    'float_bottom' => [
+        'label' => 'Floating button height',
+        'description' => 'Its distance from the bottom of the screen, so it does not cover the site\'s own floating buttons (accessibility, chat, cookies).',
+    ],
     'input_selector' => [
         'label' => 'Search boxes on the site',
         'description' => 'CSS selector of the search fields Lets search attaches to. Several, separated by commas.',
