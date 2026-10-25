@@ -570,3 +570,6 @@
 .ls-askabout__form { margin-top: 10px; }
 .ls-askabout__form .ls-field { min-height: 44px; background: var(--ls-bg); }
 .ls-askabout__form input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; color: inherit; outline: none; padding-inline: 12px 4px; }
+
+/* a reply to the newest answer, under it */
+.ls-reply { margin-top: 14px; }

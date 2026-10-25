@@ -673,6 +673,28 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'an answer about one conversation is not the next shopper\'s');
     }
 
+    public function test_a_reply_to_an_answer_is_read_with_the_conversation_and_never_kept(): void
+    {
+        // Mycolivia, 25.10: "אם תרצו, נכוון אתכם לפי המטרה" left the shopper no way to answer it.
+        $this->drills();
+        $this->replies = [
+            ['found' => true, 'answer' => 'לבית, מברגה איינהל.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'מתאימה לבית']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: ['HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain'], content: json_encode([
+            'question' => 'לבית', 'vid' => self::VID, 'locale' => 'he', 'products' => [],
+            'thread' => [['q' => 'איזו מברגה כדאי לי?', 'a' => 'יש לנו כמה. לאיזה שימוש אתם מחפשים?'], ['q' => '', 'a' => 'no question: left out']],
+        ], JSON_UNESCAPED_UNICODE))->json('data');
+
+        $sent = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['passages']));
+        $this->assertNotNull($sent, 'the writer was asked');
+        $this->assertSame('איזו מברגה כדאי לי? → לבית', $sent['question'], 'the reply, read with the question it continues');
+        $this->assertSame([['question' => 'איזו מברגה כדאי לי?', 'answer' => 'יש לנו כמה. לאיזה שימוש אתם מחפשים?']], $sent['conversation']);
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'a reply\'s words alone mean nothing for the next shopper');
+    }
+
     public function test_the_difference_between_the_products_shown_rests_on_the_products_it_names(): void
     {
         // Sela, 25.10: "מה ההבדל ביניהם?" about six books was answered from their descriptions, citing no page, and dropped.

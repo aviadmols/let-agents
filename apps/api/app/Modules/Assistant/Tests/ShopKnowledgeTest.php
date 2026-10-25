@@ -113,7 +113,7 @@ final class ShopKnowledgeTest extends TestCase
     {
         $prompts = __DIR__.'/../Prompts/';
 
-        $this->assertSame(file_get_contents($prompts.'answer_site.v12.md'), AnswerSiteQuestion::prompt('answer_site'), 'v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
+        $this->assertSame(file_get_contents($prompts.'answer_site.v13.md'), AnswerSiteQuestion::prompt('answer_site'), 'v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
         $this->assertStringContainsString('יש לנו', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertSame(file_get_contents($prompts.'verify_site.v9.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version: approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');

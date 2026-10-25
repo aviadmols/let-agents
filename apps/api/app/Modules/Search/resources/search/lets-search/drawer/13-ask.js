@@ -180,6 +180,12 @@
     }
     if (turn.general) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('general')) + '</span></div>'; }
     if (turn.follow && turn.follow.length) { html += '<div class="ls-follow">' + turn.follow.map(function (f) { return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(f) + '">' + esc(f) + '</button>'; }).join('') + '</div>'; }
+    // the newest answer can be replied to ("לאיזו מטרה?" "לחיזוק חיסון"): the reply is asked with this conversation
+    if (S.turns[S.turns.length - 1] === turn && turn.answer) {
+      html += '<form class="ls-askabout__form ls-reply" data-reply="' + esc(turn.id) + '"><label class="ls-field ls-field--sm">' +
+        '<input type="text" enterkeyhint="send" maxlength="300" dir="auto" placeholder="' + esc(t('replyPh')) + '" aria-label="' + esc(t('replyPh')) + '">' +
+        '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form>';
+    }
     html += rateHtml(turn);
     html += leadFlowHtml(turn);
     var h = hours(), link = S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);

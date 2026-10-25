@@ -80,8 +80,17 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 5 is the facts-only writer the bench tries, never released here).
      * 11: the store speaks as itself, "יש לנו", never the shopper's "יש לכם" back (answer_site only).
      * 12: a condition on a yes comes first ("after the first three months"), never after "yes, at any time" (answer_site only).
+     * 13: a reply in the conversation (its earlier questions and answers), the shopper spoken to in the plural, never as a
+     * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      */
-    public const PROMPT_VERSION = 12;
+    public const PROMPT_VERSION = 13;
+
+    /** A reply carries this many of the conversation's questions and answers before it, at most, each cut to these lengths. */
+    public const MAX_THREAD = 3;
+
+    private const THREAD_QUESTION_CHARS = 300;
+
+    private const THREAD_ANSWER_CHARS = 700;
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
@@ -191,6 +200,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** Whether the question being handled is within the day's questions, once asked (withinDailyLimits). */
     private ?bool $allowed = null;
 
+    /** @var list<array{question: string, answer: string}> a reply's conversation before it, oldest first (handle()) */
+    private array $conversation = [];
+
     /** A trial from the search check screen (trial()): the whole way a shopper's question goes, nothing of it kept. */
     private bool $trial = false;
 
@@ -210,13 +222,21 @@ final class AnswerSiteQuestion implements TriesQuestions
     /**
      * @param  list<string>  $products  external ids of the products the shopper was shown, best first
      * @param  list<string>  $previous  external ids of the products the conversation's turn before showed
+     * @param  list<array{q?: mixed, a?: mixed}>  $thread  a reply to an answer: the questions and answers before it, oldest first
      * @return array<string, mixed> outcome: answered, no_match, no_info, out_of_scope, invalid, limit or
      *                              unavailable; from: bank, model or none; with sources, picks, ask_id and whatsapp;
      *                              context: "previous" when the question was answered about the turn before
      */
-    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false): array
+    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false, array $thread = []): array
     {
         $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
+        // A reply to an answer ("כן, לחיזוק חיסון" after "איזו פטריה טובה ללב?"): the topic check, the pages and the checker
+        // read it with the question it continues ("the first question → the reply"), and the writer sees the whole
+        // conversation (answer_site v13). Never saved, never read from the saved ones: its words alone mean nothing.
+        $this->conversation = self::thread($thread);
+        if ($this->conversation !== [] && mb_strlen(Question::normalize($question)) >= 1) {
+            $question = $this->conversation[0]['question'].' → '.$question;
+        }
 
         if (! Features::enabled('assistant.on_search', $shopId) || mb_strlen(Question::normalize($question)) < self::MIN_CHARS) {
             return $this->fixed('invalid', $locale);
@@ -236,7 +256,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // And a question that points at the products in front of the shopper ("מה ההבדל ביניהם?", "איזה מהם הכי
         // משתלם?", the drawer's own "not sure" chips): its words are the same for every shopper and its products are
         // not, so it is never kept for the next one (one shopper's picks were served to everyone).
-        $bound = $followUp || ($products !== [] && self::pointsBack($question)) || ($fromPage && $products !== []);
+        $bound = $followUp || ($products !== [] && self::pointsBack($question)) || ($fromPage && $products !== []) || $this->conversation !== [];
         // The product whose page it is: the writer says what matters about it.
         $viewing = $fromPage && ! $followUp && $products !== [] ? $products[0] : null;
 
@@ -912,11 +932,12 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         $input = (string) json_encode([
             'question' => $question,
-        ] + (is_string($viewingRef) ? ['viewing' => $viewingRef] : []) + [
-            'products' => $forModel,
-            'analysis' => $analysis,
-            'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
-        ], JSON_UNESCAPED_UNICODE);
+        ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation])
+            + (is_string($viewingRef) ? ['viewing' => $viewingRef] : []) + [
+                'products' => $forModel,
+                'analysis' => $analysis,
+                'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
+            ], JSON_UNESCAPED_UNICODE);
 
         return ['type' => $type, 'empty' => $counts['found'] === 0 && $counts['shown'] === 0] + $counts
             + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug');
@@ -1454,6 +1475,27 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /** The version of a prompt prompt() reads: the newest file there is, the bench's v5 aside. */
+    /**
+     * The conversation a reply carries, as the storefront sent it: the last MAX_THREAD questions with their answers,
+     * each cut short, plain text; a turn without both is left out.
+     *
+     * @param  array<mixed>  $thread
+     * @return list<array{question: string, answer: string}>
+     */
+    public static function thread(array $thread): array
+    {
+        $out = [];
+        foreach (array_slice(array_values($thread), -self::MAX_THREAD) as $turn) {
+            $q = is_array($turn) && is_string($turn['q'] ?? null) ? trim(strip_tags($turn['q'])) : '';
+            $a = is_array($turn) && is_string($turn['a'] ?? null) ? trim(strip_tags($turn['a'])) : '';
+            if ($q !== '' && $a !== '') {
+                $out[] = ['question' => mb_substr($q, 0, self::THREAD_QUESTION_CHARS), 'answer' => mb_substr($a, 0, self::THREAD_ANSWER_CHARS)];
+            }
+        }
+
+        return $out;
+    }
+
     public static function promptVersion(string $name): ?int
     {
         for ($version = self::PROMPT_VERSION; $version > 0; $version--) {

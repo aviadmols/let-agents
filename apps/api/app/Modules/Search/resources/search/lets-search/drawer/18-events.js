@@ -58,6 +58,15 @@
       return;
     }
     if (f.matches('[data-shop-lead]')) { var st = turnById(f.dataset.shopLead); if (st) { sendShopLead(st, f); } return; }
+    if (f.matches('[data-reply]')) {
+      // a reply to an answer: asked with the questions and answers before it (the server reads it with them, never saved)
+      var rt0 = turnById(f.dataset.reply), said = f.querySelector('input');
+      if (rt0 && said && said.value.trim()) {
+        var thread = (rt0.thread || []).concat([{ q: String(rt0.q || ''), a: String(rt0.answer || '') }]).slice(-3);
+        askTurn(said.value.trim(), { thread: thread }, !!rt0.ctx, { thread: thread });
+      }
+      return;
+    }
     if (f.matches('[data-ask-about-form]')) { var at = turnById(f.dataset.askAboutForm), own = f.querySelector('input'); if (at && own && own.value.trim()) { askAbout(at, own.value); } return; }
     if (f.matches('[data-lead-flow]')) {
       var lt = turnById(f.dataset.leadFlow), lf = lt && lt.leadFlow;
