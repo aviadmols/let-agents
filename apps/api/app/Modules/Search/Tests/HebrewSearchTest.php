@@ -210,4 +210,12 @@ final class HebrewSearchTest extends TestCase
         // With no other word, a generic word is the query.
         $this->assertContains('p:2', array_column(HebrewSearch::search($engine, HebrewSearch::normalize('כלים')), 'id'));
     }
+
+    public function test_the_words_a_vector_reads_end_in_their_final_letters(): void
+    {
+        // Mycolivia: "פטריה שטובה ללישון" reached the meaning search as "ללישונ", no word at all (.45 fell to .18).
+        $this->assertSame('פטריה שטובה ללישון', HebrewSearch::withFinals(HebrewSearch::normalize('פטריה שטובה ללישון')));
+        $this->assertSame('כמון נענע קרשים חוף ארץ', HebrewSearch::withFinals('כמונ נענע קרשימ חופ ארצ'));
+        $this->assertSame('sleep well 7', HebrewSearch::withFinals('sleep well 7'), 'English as it is');
+    }
 }

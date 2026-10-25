@@ -242,7 +242,7 @@ final class SearchFlowTest extends TestCase
         $this->assertTrue($result['semantic']);
         $this->assertSame(['102'], array_column($result['groups']['product'], 'external_id'), 'below the similarity floor, or not published, it stays out');
         $this->assertSame(['500'], array_column($result['groups']['content'], 'external_id'));
-        $this->assertSame([['text' => 'משהו לחבר קרשימ', 'sources' => ['product', 'content']]], $this->meaningAsked, 'asked once, with the normalized words');
+        $this->assertSame([['text' => 'משהו לחבר קרשים', 'sources' => ['product', 'content']]], $this->meaningAsked, 'asked once, with the words as written, finals at their ends');
 
         $this->meaningAsked = [];
         $this->search('בו')->assertOk();

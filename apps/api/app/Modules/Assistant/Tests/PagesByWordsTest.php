@@ -63,4 +63,31 @@ final class PagesByWordsTest extends TestCase
         $this->assertSame(['Refund policy'], $found['english']);
         $this->assertSame(['ביטול עסקה'], $found['cancel']);
     }
+
+    public function test_the_article_a_question_names_and_the_meaning_found_is_read_whole_in_place_of_its_pieces(): void
+    {
+        // Mycolivia: "מה הכי טוב לסרטן?" was given two pieces of the article "פטריות מרפא וסרטן" (2,300 of its 5,400
+        // letters) and answered in general words; the article itself says which mushrooms and why.
+        $shop = Shop::factory()->create();
+        $body = 'פטריות מרפא וסרטן. '.str_repeat('ריישי וטרמטס נחקרו לצד טיפולים. ', 150).'סוף המאמר.';
+
+        $found = app(TenantContext::class)->run($shop->id, function () use ($shop, $body): array {
+            $page = CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => 'post', 'external_id' => 'a1', 'title' => 'פטריות מרפא וסרטן', 'body' => $body, 'hash' => 'h1']);
+            $english = CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => 'post', 'external_id' => 'a2', 'title' => 'Medicinal mushrooms and cancer', 'body' => 'Mushrooms and cancer. '.str_repeat('Reishi and turkey tail were studied. ', 150).'The end.', 'hash' => 'h2']);
+            $piece = fn (CatalogContent $c): array => ['source' => 'content', 'source_id' => (string) $c->id, 'external_id' => null, 'title' => $c->title, 'text' => 'a piece', 'similarity' => 0.5];
+            $method = new ReflectionMethod(AnswerSiteQuestion::class, 'pagesByWords');
+            $answers = app(AnswerSiteQuestion::class);
+
+            return [
+                'he' => $method->invoke($answers, 'מה הכי טוב לסרטן?', [$piece($page), $piece($page)]),
+                'en' => $method->invoke($answers, 'What is best for cancer?', [$piece($english)]),
+                'words_only' => $method->invoke($answers, 'מה הכי טוב לסרטן?', []),
+            ];
+        });
+
+        $this->assertCount(1, $found['he'], 'the article once, its pieces gone');
+        $this->assertStringEndsWith('סוף המאמר.', $found['he'][0]['text'], 'read to its end');
+        $this->assertStringEndsWith('The end.', $found['en'][0]['text'], 'in English the same');
+        $this->assertSame(1500, mb_strlen($found['words_only'][0]['text']), 'a page only its title found: its opening, as before');
+    }
 }

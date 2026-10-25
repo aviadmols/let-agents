@@ -628,6 +628,16 @@ final class HebrewSearch
     }
 
     /**
+     * Normalized words written as Hebrew writes them: each final letter back at the end of its word ("ללישונ" is
+     * "ללישון", "קרשימ" "קרשים"). A Hebrew word never ends in the plain form, so this is exact; for what reads words
+     * as words (a vector of the meaning), never for matching, which compares the plain forms.
+     */
+    public static function withFinals(string $text): string
+    {
+        return (string) preg_replace_callback('/([כמנפצ])(?=$|[^\p{L}\p{N}])/u', fn (array $m): string => array_flip(self::FINALS)[$m[1]], $text);
+    }
+
+    /**
      * What a Hebrew title says the product is, as a stem: the word it opens with ("תיק גב Old Skool" is "תק",
      * "נעלי סניקרס" and "נעליים" both "נעל"); '' when it opens with no Hebrew word (an English title opens with a model).
      */

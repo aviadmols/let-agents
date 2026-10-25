@@ -50,6 +50,32 @@ final class DescribedProductsTest extends TestCase
         $this->assertNull(DescribedProducts::pattern('א'), 'too short to mean anything');
     }
 
+    public function test_the_store_subject_is_no_kind_and_what_a_description_says_tells_products_apart(): void
+    {
+        // Mycolivia: "פטריה" opens a few titles ("פטריית ריישי") and every formula is made of mushrooms ("מיקו דרים"):
+        // "פטריה לשינה" locked to the titles opening with it, and showed none. "קשב וריכוז" is in one description.
+        $shop = $this->books([
+            '1' => ['פטריית ריישי', 'פטריה לרוגע.'],
+            '2' => ['פטריית קורדיספס', 'פטריות לאנרגיה וריכוז.'],
+            '3' => ['מיקו דרים', 'פורמולת פטריות לשינה טובה.'],
+            '4' => ['מיקו באלאנס', 'פטריות לשיפור הקשב והריכוז.'],
+            '5' => ['Myco Focus', 'Mushrooms for focusing and attention.'],
+            '6' => ['Myco Calm', 'Mushrooms for a calm mind.'],
+        ]);
+        $hash = 'test';
+        $all = ['p:1', 'p:2', 'p:3', 'p:4', 'p:5', 'p:6'];
+
+        app(TenantContext::class)->run($shop->id, function () use ($shop, $hash, $all): void {
+            $this->assertTrue(DescribedProducts::subject($shop->id, $hash, 'פטריה', 2), 'opens 2 titles, said by 4 of 6');
+            $this->assertFalse(DescribedProducts::subject($shop->id, $hash, 'פטריה', 3), 'said by hardly more than the titles it opens: a kind');
+            $this->assertFalse(DescribedProducts::subject($shop->id, $hash, 'שינה', 0), 'said by one');
+
+            $this->assertSame(['p:4'], DescribedProducts::saying($shop->id, $hash, 'פטריה לקשב וריכוז', $all), 'the subject aside, every other word said');
+            $this->assertSame(['p:5'], DescribedProducts::saying($shop->id, $hash, 'mushroom for focus', $all), 'in English: "focusing" says "focus"');
+            $this->assertSame([], DescribedProducts::saying($shop->id, $hash, 'פטריה', $all), 'nothing tells them apart');
+        });
+    }
+
     /** @param array<string, array{0: string, 1: string}> $books */
     private function books(array $books): Shop
     {

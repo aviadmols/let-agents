@@ -424,6 +424,12 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     private const PAGES_BY_WORDS = 3;
 
+    /** Of the products whose own page the question found by meaning, how many join those the search showed. */
+    private const FROM_PASSAGES = 3;
+
+    /** How much of a page whose title the question names is read: the article whole, not the piece the meaning found. */
+    private const ARTICLE_CHARS = 6000;
+
     /** Of the team's answers, how many like the question are read; and how much of an entry. */
     private const TEAM_PAIRS = 4;
 
@@ -584,15 +590,23 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         arsort($scores);
-        $have = array_map(fn (array $p): string => $p['source'].'|'.$p['source_id'], $found);
+        $ids = array_slice(array_map('strval', array_keys($scores)), 0, self::PAGES_BY_WORDS);
+        $read = CatalogContent::query()->whereIn('id', $ids)->get(['id', 'title', 'body'])->keyBy(fn (CatalogContent $c): string => (string) $c->id);
         $pages = [];
 
-        foreach (CatalogContent::query()->whereIn('id', array_slice(array_keys($scores), 0, self::PAGES_BY_WORDS))->get(['id', 'title', 'body']) as $page) {
-            if (in_array('content|'.$page->id, $have, true)) {
+        // A page the question names by its title and the meaning found too is read whole, once ("מה הכי טוב לסרטן?" reads
+        // the article "פטריות מרפא וסרטן", not the two pieces of it the meaning found), in place of its pieces; a page only
+        // the words found ("טוב" in a title) as far as its opening, and one the meaning found too after the first by its pieces.
+        $whole = false;
+        foreach ($ids as $id) {
+            $pieces = array_filter($found, fn (array $p): bool => $p['source'] === 'content' && (string) $p['source_id'] === $id);
+            if (($page = $read->get($id)) === null || ($whole && $pieces !== [])) {
                 continue;
             }
-
-            $pages[] = ['source' => 'content', 'source_id' => (string) $page->id, 'external_id' => null, 'title' => (string) $page->title, 'text' => mb_substr(trim((string) $page->body), 0, 1500), 'similarity' => 1.0, 'kind' => 'title'];
+            $chars = $pieces !== [] ? self::ARTICLE_CHARS : 1500;
+            $whole = $whole || $pieces !== [];
+            $found = array_values(array_filter($found, fn (array $p): bool => ! ($p['source'] === 'content' && (string) $p['source_id'] === $id)));
+            $pages[] = ['source' => 'content', 'source_id' => $id, 'external_id' => null, 'title' => (string) $page->title, 'text' => mb_substr(trim((string) $page->body), 0, $chars), 'similarity' => 1.0, 'kind' => 'title'];
         }
 
         return [...$pages, ...$found];
@@ -793,7 +807,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<string>  $shown
      * @return array{type: string, empty: bool, found: int, shown: int, byRef: array<string, array<string, mixed>>, productsByRef: array<string, array<string, mixed>>, analysis: array<string, mixed>, forModel: list<array<string, mixed>>, input: string, debug: array<string, mixed>|null}
      */
-    private function prepare(string $shopId, string $question, array $shown, string $mode, ?string $viewing = null): array
+    private function prepare(string $shopId, string $question, array $shown, string $mode, ?string $viewing = null, bool $followUp = false): array
     {
         // A question about a product it names ("על מה הספר החטוף?"): that product, when the search before it
         // showed none of those it names; a question about what was shown stays about what was shown.
@@ -819,6 +833,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         // Before all: what the store says about itself on every product page, in its team's words,
         // and the team's answers to questions like this one.
         $found = $this->knowledge($question, $shopId, $found);
+        // A product whose own page the question found by meaning ("מיקו דרים" for "לישון ממש טוב?") is one the answer may
+        // show, before what the search showed: named in the answer without its card, it sent the shopper looking for it.
+        if ($viewing === null && ! $followUp && $named === []) {
+            $byText = array_map(fn (array $p): string => (string) $p['external_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'product' && (string) ($p['external_id'] ?? '') !== ''));
+            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$shown]));
+        }
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         $type = AnswerContext::type($question);
         $counts = ['found' => count($found), 'shown' => count($candidates)];
@@ -1141,7 +1161,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 // A replay on frozen data gives the writer what it was given then; everything else, today's.
-                $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing);
+                $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing, ! $keep);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
                     'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];

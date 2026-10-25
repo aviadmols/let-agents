@@ -292,6 +292,16 @@ final class SearchCatalog
             // a question about a need ("איך מחברים קרשים לדק?") is not held to it: its guide and what the guide names answer it
             $weak = $byMeaning && ! $asks && self::whole($spelling) === [] && (float) $near['best'] < (float) Settings::get('search.meaning_only_min_similarity', $shopId)
                 && ($pictures === [] || ! HebrewSearch::visual($query));
+            // Far by meaning, yet its own description says what was searched: "פטריה לקשב וריכוז" is .34 from the formula
+            // that speaks of "מיקוד הקשב" and "ריכוז", where an unrelated search is .1. Those near ones are shown, alone.
+            $said = $weak ? DescribedProducts::saying($shopId, (string) $index['hash'], $query, $near['products']) : [];
+            if ($said !== []) {
+                $this->trace?->dropped([...$near['products'], ...$pictures], $said, 'meaning_far');
+                $this->trace?->step('meaning', ['far' => true, 'said' => $said]);
+                $near['products'] = $said;
+                $pictures = [];
+                $weak = false;
+            }
             if ($weak) {
                 $this->trace?->dropped([...$near['products'], ...$pictures], [], 'meaning_far');
                 $this->trace?->step('meaning', ['far' => true]);
@@ -421,6 +431,9 @@ final class SearchCatalog
             // white keychain is no white bag: none, and the drawer offers the AI. A kind alone ("מדף") keeps what is very
             // near it by meaning ("כוורת מדפים").
             $kinds = $read === [] && ! str_contains(HebrewSearch::normalize($worded), ' ') ? [] : self::askedKinds($index, $worded);
+            // ...unless most of the store says it: "פטריה" opens a few titles of a mushroom store ("פטריית ריישי") and is
+            // what every one of its formulas is made of ("מיקו דרים"); the store's subject is no kind among its products
+            $kinds = array_filter($kinds, fn (int $opens, string $stem): bool => ! DescribedProducts::subject($shopId, (string) $index['hash'], $stem, $opens), ARRAY_FILTER_USE_BOTH);
             if ($kinds !== []) {
                 $before = array_column($groups['product'], 'id');
                 $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => isset($kinds[self::headOf((string) ($r['title'] ?? ''))])));
@@ -527,7 +540,7 @@ final class SearchCatalog
      * not of most of them ("תיק" in "תיק לבן", "נעליים" for "נעלי סניקרס"). Counted once an index.
      *
      * @param  array{hash?: string, records: array<string, array<string, mixed>>}  $index
-     * @return array<string, true>
+     * @return array<string, int> each stem and how many titles it opens
      */
     private static function askedKinds(array $index, string $query): array
     {
@@ -550,7 +563,7 @@ final class SearchCatalog
             $stem = preg_match('/^[א-ת]{2,}$/u', $word) === 1 ? HebrewSearch::stem($word) : '';
             $n = $heads[$key]['heads'][$stem] ?? 0;
             if ($stem !== '' && $n >= 2 && $n <= $heads[$key]['products'] * self::KIND_MAX_SHARE) {
-                $asked[$stem] = true;
+                $asked[$stem] = $n;
             }
         }
 
@@ -1393,7 +1406,9 @@ final class SearchCatalog
         // the nearest that stayed under the floor, for the check screen: what a lower floor would have let in
         $below = [];
 
-        foreach ($this->semantic->nearText($shopId, $query, ['product', 'content'], $limit) as $hit) {
+        // the words as written, final letters at their ends ("לישון", never "לישונ"): a vector reads words, and a word
+        // without its final letter is no word (a shop's sleep product fell from .45 to .18)
+        foreach ($this->semantic->nearText($shopId, HebrewSearch::withFinals($query), ['product', 'content'], $limit) as $hit) {
             if ($hit['source'] !== 'product') {
                 $out['content'][] = ['external_id' => (string) $hit['external_id'], 'similarity' => (float) $hit['similarity']];
 
@@ -1518,7 +1533,7 @@ final class SearchCatalog
         $floor = (float) Settings::get('search.picture_min_similarity');
         $ids = [];
 
-        foreach ($this->semantic->picturesNearText($shopId, $query, (int) Settings::get('search.semantic_results')) as $hit) {
+        foreach ($this->semantic->picturesNearText($shopId, HebrewSearch::withFinals($query), (int) Settings::get('search.semantic_results')) as $hit) {
             $id = 'p:'.$hit['external_id'];
 
             if ($hit['similarity'] >= $floor && isset($records[$id])) {

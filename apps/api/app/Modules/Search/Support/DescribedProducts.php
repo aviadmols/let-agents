@@ -81,6 +81,115 @@ final class DescribedProducts
         return '/ '.implode(' ', $parts).' /u';
     }
 
+    /**
+     * Whether a word that opens $opens titles is the store's subject rather than a kind among its products: most of
+     * the products say it in their title or description, in any form ("פטריה" is said by "פטריות", "הפטריה"), and far
+     * more of them than the titles it opens. "פטריה" opens 7 titles of a mushroom store and is said by nearly all of
+     * its 46 products ("מיקו דרים" is mushrooms too); "תיק" opens the bags' titles and few others say it.
+     */
+    public static function subject(string $shopId, string $hash, string $word, int $opens): bool
+    {
+        $stems = self::stems($shopId, $hash);
+        $forms = self::forms($word);
+
+        if ($stems === [] || $forms === []) {
+            return false;
+        }
+
+        $said = count(array_filter($stems, fn (array $own): bool => array_intersect_key($forms, $own) !== []));
+
+        return $said > count($stems) * self::SUBJECT_SHARE && $said >= 2 * $opens;
+    }
+
+    /**
+     * Of the products given, those whose title or description says every word of the search that tells products
+     * apart: not a word most of the store says (its subject, "פטריה" in a mushroom store), nor one none says. "פטריה
+     * לקשב וריכוז" is held by the formula whose description speaks of "מיקוד הקשב" and "ריכוז", in the order given.
+     * Empty when no word tells products apart.
+     *
+     * @param  list<string>  $ids  record ids ("p:<external id>")
+     * @return list<string>
+     */
+    public static function saying(string $shopId, string $hash, string $query, array $ids): array
+    {
+        $stems = self::stems($shopId, $hash);
+        $words = [];
+
+        foreach (array_unique(explode(' ', HebrewSearch::normalize($query))) as $word) {
+            $forms = self::forms($word);
+            $said = $forms === [] || $stems === [] ? 0 : count(array_filter($stems, fn (array $own): bool => array_intersect_key($forms, $own) !== []));
+            if ($said > 0 && $said <= count($stems) * self::SUBJECT_SHARE) {
+                $words[] = $forms;
+            }
+        }
+
+        if ($words === []) {
+            return [];
+        }
+
+        return array_values(array_filter($ids, fn (string $id): bool => isset($stems[$id])
+            && array_all($words, fn (array $forms): bool => array_intersect_key($forms, $stems[$id]) !== [])));
+    }
+
+    /** Past this share of the products, a word is the store's subject, not what tells its products apart. */
+    public const SUBJECT_SHARE = 0.5;
+
+    /** English words that only join the others: never what tells products apart. */
+    private const JOINING = ['the', 'and', 'for', 'with', 'from', 'that', 'this', 'your', 'you', 'are', 'what', 'which', 'some', 'any', 'best', 'good', 'help', 'helps'];
+
+    /**
+     * @return array<string, true> a word's stems: a Hebrew one with and without the prefix letters before it ("לקשב":
+     *                             קשב), an English one without its ending ("mushrooms", "mushroom": mushroom; "focusing": focus)
+     */
+    private static function forms(string $word): array
+    {
+        if (preg_match('/^[a-z]{3,}$/', $word) === 1) {
+            return in_array($word, self::JOINING, true) ? [] : [self::english($word) => true];
+        }
+        if (preg_match('/^[א-ת]{2,}$/u', $word) !== 1) {
+            return [];
+        }
+
+        $forms = [HebrewSearch::stem($word) => true];
+        for ($cut = 1; $cut <= 2 && mb_strlen($word) - $cut >= 3 && preg_match('/^'.self::PREFIX.'$/u', mb_substr($word, $cut - 1, 1)) === 1; $cut++) {
+            $forms[HebrewSearch::stem(mb_substr($word, $cut))] = true;
+        }
+
+        return $forms;
+    }
+
+    /** "sleeping", "sleeps", "sleep": sleep; "remedies": remedy. Only an ending that leaves four letters or more. */
+    private static function english(string $word): string
+    {
+        foreach (['ies' => 'y', 'ing' => '', 'ed' => '', 'es' => '', 's' => ''] as $ending => $instead) {
+            if (str_ends_with($word, $ending) && strlen($word) - strlen($ending) >= 4 && ! str_ends_with($word, 'ss')) {
+                return substr($word, 0, -strlen($ending)).$instead;
+            }
+        }
+
+        return $word;
+    }
+
+    /** @return array<string, array<string, true>> record id => the stems of its title and description words */
+    private static function stems(string $shopId, string $hash): array
+    {
+        return Cache::remember('search:described-stems:'.$shopId.':'.$hash, now()->addDay(), function (): array {
+            $stems = [];
+
+            foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
+                $payload = (array) $product->payload;
+                $raw = html_entity_decode(strip_tags((string) $product->title.' '.(string) ($payload['short_description'] ?? '').' '.(string) ($payload['description'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $own = [];
+                foreach (array_unique(explode(' ', HebrewSearch::normalize(mb_substr($raw, 0, self::CHARS)))) as $word) {
+                    $own += self::forms($word);
+                }
+                $stems['p:'.$product->external_id] = $own;
+            }
+
+            return $stems;
+        });
+    }
+
     /** @return array<string, string> record id => its description, normalized and padded with spaces */
     private static function texts(string $shopId, string $hash): array
     {
