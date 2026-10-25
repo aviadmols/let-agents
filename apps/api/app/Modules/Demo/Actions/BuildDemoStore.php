@@ -84,6 +84,8 @@ final class BuildDemoStore
             'search.photos_per_month' => (int) Settings::get('demo.photos'),
             'assistant.prepared_per_sync' => (int) Settings::get('demo.prepared_questions'),
             'enrichment.max_branches' => (int) Settings::get('demo.vocabulary_branches'),
+            // each product's main picture only: its other pictures (side views) were most of a demo's scan time
+            'retrieval.gallery_pictures' => 0,
             'assistant.post_knowledge_posts' => 20,
             'search.show_cart' => false,
             'search.similar_by' => ['look' => 'picture', 'content' => 'meaning'][$matters] ?? 'both',

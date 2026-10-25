@@ -102,6 +102,22 @@ class DemoSite extends Model
     }
 
     /**
+     * How long a demo's scan takes, from what the last ones took (the code to ready), rounded up to five minutes;
+     * 15 before any demo finished. What the scan screen tells whoever waits.
+     */
+    public static function typicalMinutes(): int
+    {
+        $took = self::query()->whereNotNull('ready_at')->whereNotNull('verified_at')->latest('ready_at')->limit(10)->get(['verified_at', 'ready_at'])
+            ->map(fn (self $d): float => $d->verified_at->diffInMinutes($d->ready_at, true))->sort()->values();
+
+        if ($took->isEmpty()) {
+            return 15;
+        }
+
+        return max(5, (int) ceil((float) $took[intdiv($took->count(), 2)] / 5) * 5);
+    }
+
+    /**
      * Whether the demo reads its products' pictures: every demo does while demo.pictures is on, so a search by how a
      * product looks finds it whatever matters most to whoever asked (that sets how alike and photo search compare).
      */

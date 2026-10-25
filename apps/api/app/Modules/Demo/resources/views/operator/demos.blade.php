@@ -45,7 +45,7 @@
                                 <td style="{{ $cell }};white-space:nowrap">
                                     {{ $t('read_counts', ['products' => number_format($demo->products), 'pages' => number_format($demo->pages)]) }}
                                     @if ($demo->store_products)<div style="{{ $small }}">{{ $t('of_store', ['total' => number_format($demo->store_products)]) }}</div>@endif
-                                    @if ($demo->status === 'ready')
+                                    @if (in_array($demo->status, ['ready', 'scanning'], true))
                                         {{-- whether its pictures were looked at: what a search by how a product looks needs --}}
                                         <div style="{{ $small }}" data-pictures="{{ $demo->pictures }}">{{ $demo->pictures > 0 ? $t('pictures_read', ['count' => number_format($demo->pictures)]) : $t('pictures_none') }}</div>
                                     @endif
@@ -54,7 +54,13 @@
                                     @if ($demo->spent === null)
                                         —
                                     @else
-                                        <div style="font-weight:600" dir="ltr">${{ number_format((float) $demo->spent, 3) }}</div>
+                                        @if ($demo->spent_parts !== null)
+                                            {{-- every model call its store made, and every agent run, in the logs filtered to it --}}
+                                            <a href="{{ route('filament.operator.pages.model-calls', ['shop' => $demo->shop_id]) }}" style="font-weight:600;text-decoration:underline;text-underline-offset:3px" dir="ltr" data-calls>${{ number_format((float) $demo->spent, 3) }}</a>
+                                            <a href="{{ route('filament.operator.resources.runs.index', ['tableFilters' => ['shop' => ['value' => $demo->shop_id]]]) }}" style="{{ $small }};margin-inline-start:6px;text-decoration:underline" data-runs>{{ $t('agent_log') }}</a>
+                                        @else
+                                            <div style="font-weight:600" dir="ltr">${{ number_format((float) $demo->spent, 3) }}</div>
+                                        @endif
                                         @if ($demo->spent_parts !== null)
                                             <div style="{{ $small }}">{{ $t('cost_parts', ['build' => '$'.number_format($demo->spent_parts['build'], 3), 'visitors' => '$'.number_format($demo->spent_parts['visitors'], 3)]) }}</div>
                                             @if ($demo->earlier > 0)

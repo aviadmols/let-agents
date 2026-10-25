@@ -14,6 +14,7 @@ return [
     'cost_parts' => 'building :build · visitors :visitors',
     'cost_of_cap' => ':percent% of the :cap cap',
     'cost_earlier' => 'earlier scans :usd',
+    'agent_log' => 'Agent log',
     'open' => 'Open',
     'extend' => 'Extend',
     'reshoot' => 'Retake picture',

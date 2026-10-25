@@ -61,8 +61,12 @@ return [
         'lede' => 'The scan is running now, as it does for a real store that connects. Stay and watch, or close the page: we email you when the demo is ready.',
         'title' => 'Lets is getting to know the store',
         'lead' => 'Reading what the site publishes, and building the search from it.',
-        'wait' => 'It usually takes a few minutes. When it is ready we send a link to :email.',
+        'wait' => 'This takes about :minutes minutes. You can close this page: when the demo is ready we email a link to :email.',
         'of' => 'of :count',
+        'now' => 'Now: :what',
+        'finishing' => 'Finishing up',
+        'updated_now' => 'updated just now',
+        'updated_ago' => 'updated :seconds seconds ago',
         'getting_ready' => 'Getting ready',
         'scanning' => 'The scan',
         'steps' => [

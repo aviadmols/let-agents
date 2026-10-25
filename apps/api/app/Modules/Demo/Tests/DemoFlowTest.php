@@ -257,7 +257,8 @@ final class DemoFlowTest extends TestCase
         foreach (['he', 'en'] as $locale) {
             app()->setLocale($locale);
             $this->get('/operator/demos')->assertOk()->assertSee('data-pictures="0"', false)->assertSee(number_format(1240))
-                ->assertSee(__('demo::operator.pictures_none'))->assertSee(__('demo::operator.rescan'))->assertSee(__('demo::operator.delete'));
+                ->assertSee(__('demo::operator.pictures_none'))->assertSee(__('demo::operator.rescan'))->assertSee(__('demo::operator.delete'))
+                ->assertSee('model-calls?shop='.$site->shop_id, false)->assertSee('data-runs', false);
         }
     }
 
@@ -301,6 +302,9 @@ final class DemoFlowTest extends TestCase
     public function test_the_scan_screen_shows_each_step_of_the_preparation(): void
     {
         $site = $this->verified();
+        $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-live', false)->assertSee('Now: Reading the site')
+            ->assertSee('This takes about 15 minutes', false);
+        $this->getJson('/demo/'.$site->token.'/progress')->assertJsonPath('now', 'read')->assertJsonPath('since', $site->verified_at->toIso8601String());
         $this->getJson('/demo/'.$site->token.'/progress')->assertOk()
             ->assertJsonPath('steps', [['key' => 'read', 'state' => 'running'], ['key' => 'scan', 'state' => 'waiting']])
             ->assertJsonPath('slow', false)->assertJsonPath('error', null);

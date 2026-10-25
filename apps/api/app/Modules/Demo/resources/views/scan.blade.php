@@ -28,6 +28,15 @@
         .row.is-failed .ic { background: #fdecec; color: #8a1c1c; }
         .row.is-failed .rn { color: #8a1c1c; }
         @keyframes pulse { 50% { opacity: .45; } }
+        .eta { margin-top: 20px; padding: 14px 16px; border-radius: 18px; background: var(--lime); color: var(--ink); font-size: 15px; line-height: 1.45; }
+        .eta b { font-weight: 500; }
+        .live { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 20px; padding: 14px 16px 18px; border-radius: 18px; background: var(--ink); color: #fff; overflow: hidden; }
+        .live b { font-weight: 500; }
+        .live__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 0 rgb(226 255 120 / .6); animation: beat 1.6s ease-out infinite; flex: none; }
+        .live__meta { margin-inline-start: auto; color: var(--on-ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+        .live__bar { position: absolute; inset-inline: 0; bottom: 0; height: 3px; background: rgb(255 255 255 / .12); }
+        .live__bar i { position: absolute; inset-block: 0; width: 30%; background: var(--lime); animation: sweep 1.6s ease-in-out infinite; }
+        @keyframes beat { 70% { box-shadow: 0 0 0 9px rgb(226 255 120 / 0); } 100% { box-shadow: 0 0 0 0 rgb(226 255 120 / 0); } }
         /* a bar a row: how far by count when the whole is known, else a sweep while it runs */
         .meter { position: relative; height: 4px; margin-top: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
         .meter i { position: absolute; inset-block: 0; inset-inline-start: 0; width: 0; border-radius: inherit; background: var(--ink); transition: width .6s cubic-bezier(.23, 1, .32, 1); }
@@ -53,7 +62,7 @@
         .fact svg { width: 26px; height: 26px; padding: 5px; border-radius: 50%; background: var(--lime); color: var(--ink); flex: none; fill: none; stroke: currentColor; stroke-width: 3; }
         .fact b { display: block; font-weight: 600; margin-bottom: 2px; }
         @keyframes in { from { opacity: 0; transform: translateY(6px); } }
-        @media (prefers-reduced-motion: reduce) { .mark.is-think, .mark.is-think i, .fact, .row.is-running .ic, .row.is-running .meter.is-open i { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .mark.is-think, .mark.is-think i, .fact, .row.is-running .ic, .row.is-running .meter.is-open i, .live__dot, .live__bar i { animation: none; } }
     </style>
 @endpush
 @section('body')
@@ -77,6 +86,18 @@
                 <p class="lead">{{ $t('scan.lead') }}</p>
             </div>
         </div>
+
+        @unless ($failed)
+            {{-- how long it takes, from what the last demos took, and that they need not wait for it --}}
+            <div class="eta" data-eta><b>{{ $t('scan.wait', ['minutes' => \App\Modules\Demo\Models\DemoSite::typicalMinutes(), 'email' => $site->email]) }}</b></div>
+            {{-- the live line: what is at work now, for how long, and when the screen last heard from the scan --}}
+            <div class="live" data-live data-since="{{ $site->verified_at?->toIso8601String() }}" aria-live="polite">
+                <span class="live__dot" aria-hidden="true"></span>
+                <b data-now>{{ $t('scan.now', ['what' => $t('scan.steps.read.title')]) }}</b>
+                <span class="live__meta"><span data-clock></span> · <span data-beat>{{ $t('scan.updated_now') }}</span></span>
+                <span class="live__bar" aria-hidden="true"><i></i></span>
+            </div>
+        @endunless
 
         @if ($problem !== null)
             <div class="problem" role="alert" data-problem="{{ $problem }}">
@@ -125,7 +146,6 @@
             @endforeach
         </div>
         <div class="learned" data-learned></div>
-        <p class="note">{{ $t('scan.wait', ['email' => $site->email]) }}</p>
     </section>
 
     <script>
@@ -134,9 +154,24 @@
             var of = @json($t('scan.of')), titles = @json(__('demo::page.scan.learned')), states = @json(__('demo::page.scan.states')), seen = {};
             var check = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>';
             if (box.getAttribute('data-status') === 'failed') { return; }
+            // the live line: what is at work, the time since the code, and the seconds since the scan was last heard from
+            var live = box.querySelector('[data-live]'), heard = Date.now();
+            var doing = Object.assign({}, @json(collect(__('demo::page.scan.rows'))->map(fn ($r) => $r['title'])), @json(collect(__('demo::page.scan.steps'))->map(fn ($s) => $s['title'])));
+            var nowText = @json($t('scan.now', ['what' => '%s'])), finishing = @json($t('scan.finishing')), beatNow = @json($t('scan.updated_now')), beatAgo = @json($t('scan.updated_ago', ['seconds' => '%s']));
+            var since = Date.parse(live.getAttribute('data-since')) || Date.now();
+            function tick() {
+                var s = Math.max(0, Math.floor((Date.now() - since) / 1000)), ago = Math.floor((Date.now() - heard) / 1000);
+                live.querySelector('[data-clock]').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+                live.querySelector('[data-beat]').textContent = ago < 3 ? beatNow : beatAgo.replace('%s', ago);
+            }
+            tick();
+            setInterval(tick, 1000);
             function draw(d) {
                 // ready shows the demo; a problem is drawn by the page itself, with what to do about it
                 if (d.status === 'ready' || d.status === 'failed' || d.status === 'expired') { location.reload(); return false; }
+                heard = Date.now();
+                if (d.since) { since = Date.parse(d.since) || since; }
+                live.querySelector('[data-now]').textContent = d.now && doing[d.now] ? nowText.replace('%s', doing[d.now]) : finishing;
                 (d.steps || []).forEach(function (s) {
                     var row = box.querySelector('[data-step="' + s.key + '"]');
                     if (!row) { return; }

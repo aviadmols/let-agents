@@ -87,11 +87,17 @@ final class DemoController extends Controller
     {
         $site = $finish->handle($this->site($token));
         $progress = $site->shop !== null && in_array($site->status, [DemoSite::SCANNING, DemoSite::READY], true) ? DemoProgress::of($site->shop, $site->readsPictures()) : null;
+        $steps = self::steps($site);
+
+        // what is at work now, for the screen's live line: a step of the preparation, else the scan's first part running
+        $now = collect($steps)->firstWhere('state', 'running')['key'] ?? collect($progress['rows'] ?? [])->firstWhere('state', 'running')['key'] ?? null;
 
         return response()->json([
             'status' => $site->status,
             'error' => $site->status === DemoSite::FAILED ? ($site->error ?? 'other') : null,
-            'steps' => self::steps($site),
+            'now' => $now,
+            'since' => $site->verified_at?->toIso8601String(),
+            'steps' => $steps,
             // the scan not begun a while after the code: said, so no one waits on a screen that looks still
             'slow' => $site->status === DemoSite::SCANNING && $site->scan_at === null && $site->verified_at?->lt(now()->subMinutes(2)) === true,
             'rows' => $progress['rows'] ?? [],

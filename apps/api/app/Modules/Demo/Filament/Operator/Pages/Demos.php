@@ -7,6 +7,7 @@ use App\Modules\Demo\Actions\RetryDemo;
 use App\Modules\Demo\Actions\SweepDemos;
 use App\Modules\Demo\Jobs\ShootDemoJob;
 use App\Modules\Demo\Models\DemoSite;
+use App\Modules\Demo\Support\DemoProgress;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -67,6 +68,13 @@ class Demos extends Page
                 $d->setAttribute('spent_parts', $live);
                 $d->setAttribute('earlier', $live !== null ? (float) $d->cost_usd : 0.0);
                 $d->setAttribute('cap', $live !== null ? (float) Settings::get('ai.shop_monthly_cap_usd', $d->shop_id) : 0.0);
+                // a scan under way: what it read so far, not the counts kept when it is done
+                if ($d->status === DemoSite::SCANNING && $d->shop !== null) {
+                    $facts = DemoProgress::of($d->shop, $d->readsPictures())['facts'];
+                    $d->setAttribute('products', (int) ($facts['products'] ?? 0));
+                    $d->setAttribute('pages', (int) ($facts['pages'] ?? 0));
+                    $d->setAttribute('pictures', (int) ($facts['pictures_read'] ?? 0));
+                }
             });
     }
 
