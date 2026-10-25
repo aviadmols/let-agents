@@ -120,7 +120,8 @@ final class DemoFlowTest extends TestCase
 
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-bar', false)->assertSee('/demo/'.$site->token.'/phone', false);
         $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee("launcher: 'float'", false)
-            ->assertHeader('Content-Security-Policy', "frame-ancestors 'self';");
+            ->assertHeader('Content-Security-Policy', "frame-ancestors 'self';")
+            ->assertSee('<html lang="he" dir="rtl">', false)->assertSee(__('demo::page.view.hint', [], 'he'));
 
         $this->travel(8)->days();
         app(SweepDemos::class)->handle();

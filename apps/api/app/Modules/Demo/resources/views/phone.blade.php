@@ -1,6 +1,5 @@
 {{-- The demo in its phone (DemoController::phone): the store's home page as a phone shows it, scrolling, with Lets'
      floating search on it, in the store's own language. Framed by the demo page; on a phone it fills the screen. --}}
-@php($t = fn (string $key, array $params = []) => __('demo::page.'.$key, $params))
 @php($language = $site->choices['language'] ?? app()->getLocale())
 <!doctype html>
 <html lang="{{ $language }}" dir="{{ $language === 'he' ? 'rtl' : 'ltr' }}">
@@ -22,10 +21,11 @@
     @if ($site->screenshot_mobile || $site->screenshot)
         <img class="site" src="{{ route('demo.shot', [$site->token, $site->screenshot_mobile ? 'mobile' : 'desktop']) }}" alt="{{ $site->title ?? $site->host }}">
     @else
-        <div class="empty"><div><h2 style="color: #0b0b0c; font-weight: 500">{{ $site->title ?? $site->host }}</h2><p>{{ $t('view.no_picture') }}</p></div></div>
+        <div class="empty"><div><h2 style="color: #0b0b0c; font-weight: 500">{{ $site->title ?? $site->host }}</h2><p>{{ __('demo::page.view.no_picture', [], $language) }}</p></div></div>
     @endif
 
-    <div class="hint" data-hint dir="{{ app()->getLocale() === 'he' ? 'rtl' : 'ltr' }}">{{ $t('view.hint') }}</div>
+    {{-- in the store's language and its direction, as the search beside it: its arrow at the button --}}
+    <div class="hint" data-hint>{{ __('demo::page.view.hint', [], $language) }}</div>
 
     @if ($siteKey)
         <script>
