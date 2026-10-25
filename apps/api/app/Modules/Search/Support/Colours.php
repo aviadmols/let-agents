@@ -48,6 +48,62 @@ final class Colours
     /** Colours a shopper does not tell apart on a stone: a "white" diamond is a clear one. */
     private const ALIKE = [['white', 'clear']];
 
+    /** Families that are light, or dark, when no word with them says which: as a shopper sees a colour's tone. */
+    private const LIGHT = ['white', 'clear', 'beige', 'yellow', 'light_blue', 'pink', 'gold_white'];
+
+    private const DARK = ['black', 'brown', 'blue', 'purple', 'red', 'green'];
+
+    /** Words that make a colour light, or dark ("צהוב בהיר", "ירוק כהה", "pale yellow"). */
+    private const LIGHTER = '/בהיר|פסטל|חלבי|שמנת|light|pale|pastel|cream/iu';
+
+    private const DARKER = '/כהה|עמוק|dark|deep/iu';
+
+    /**
+     * The colour a picture's words name first, the one it shows most ("צהוב בהיר" before the "לבן שבור" of its
+     * buttons), with its tone: light, dark, or mid. Null when they name no colour.
+     *
+     * @param  list<string>  $words  the picture's words, the most telling first
+     * @return array{family: string, tone: string}|null
+     */
+    public static function dominant(array $words): ?array
+    {
+        foreach ($words as $phrase) {
+            $mentions = self::mentions((string) $phrase);
+            if ($mentions === []) {
+                continue;
+            }
+            $family = $mentions[0]['family'];
+            $tone = match (true) {
+                preg_match(self::LIGHTER, (string) $phrase) === 1 => 'light',
+                preg_match(self::DARKER, (string) $phrase) === 1 => 'dark',
+                in_array($family, self::LIGHT, true) => 'light',
+                in_array($family, self::DARK, true) => 'dark',
+                default => 'mid',
+            };
+
+            return ['family' => $family, 'tone' => $tone];
+        }
+
+        return null;
+    }
+
+    /**
+     * How near two pictures' colours look: the same colour 1 (its tone apart .8), another colour of the same tone
+     * .5 (a pale yellow shirt beside a white one, not a dark green one), else 0; 0 when either names none.
+     *
+     * @param  array{family: string, tone: string}|null  $a
+     * @param  array{family: string, tone: string}|null  $b
+     */
+    public static function near(?array $a, ?array $b): float
+    {
+        return match (true) {
+            $a === null || $b === null => 0.0,
+            $a['family'] === $b['family'] => $a['tone'] === $b['tone'] ? 1.0 : 0.8,
+            $a['tone'] === $b['tone'] && $a['tone'] !== 'mid' => 0.5,
+            default => 0.0,
+        };
+    }
+
     /** Words for one part: a stone is a stone whatever the store calls it. */
     private const PART_ALIASES = [
         ['אבן', 'אבנ', 'יהלום', 'זירקון', 'קריסטל', 'סוליטר', 'stone', 'diamond', 'zircon', 'crystal'],

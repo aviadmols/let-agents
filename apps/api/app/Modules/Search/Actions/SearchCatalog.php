@@ -49,8 +49,15 @@ final class SearchCatalog
     /** A title's first word on more than this share of the products is the store's, not a kind a search names. */
     private const KIND_MAX_SHARE = 0.6;
 
-    /** How much the words a picture is described with move a similar item against the pictures' own order. */
-    private const SEEN_WORDS_SHARE = 0.35;
+    /**
+     * A similar item's place where looks lead: the pictures' own order, the share of their described words, and how
+     * near the colour it shows most is (bySeenWords). Weights that add up to one.
+     */
+    private const SEEN_ORDER = 0.4;
+
+    private const SEEN_WORDS = 0.2;
+
+    private const SEEN_COLOUR = 0.4;
 
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
@@ -468,10 +475,11 @@ final class SearchCatalog
     }
 
     /**
-     * Products in the order given (the pictures' likeness), each moved a little by how much of what its picture is
-     * described with (colour, print, material, a detail) it shares with the product's own: the share of their words
-     * together, so a long description is no closer for being long. A beige suede shoe's alike stay the beige suede
-     * ones the pictures found first, not black shoes whose description also names a white sole and a black line.
+     * Products in the order given (the pictures' likeness), moved by how they look beside the product as their
+     * pictures are described: the colour each shows most, and its tone (Colours::dominant; a pale yellow shirt's alike
+     * are light ones before dark green ones), and the share of their described words together (print, material, a
+     * detail; a long description is no closer for being long). A beige suede shoe's alike are the beige suede ones,
+     * not black shoes whose description also names a white sole and a black line.
      *
      * @param  list<string>  $externalIds
      * @return list<string>
@@ -486,19 +494,23 @@ final class SearchCatalog
             fn ($w): string => is_string($w) ? HebrewSearch::stem(HebrewSearch::normalize($w)) : '',
             array_merge(...array_map(fn ($w): array => is_string($w) ? explode(' ', $w) : [], (array) ($row?->caption_words ?? []))),
         ), fn (string $w): bool => mb_strlen($w) > 1)));
-        $own = $words(RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words']));
+        $ownRow = RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words']);
+        $own = $words($ownRow);
         if ($own === []) {
             return $externalIds;
         }
+        $ownColour = Colours::dominant(array_values((array) $ownRow->caption_words));
 
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
         $count = count($externalIds);
         $score = [];
         foreach ($externalIds as $at => $id) {
-            $other = $words($theirs->get($id));
+            $row = $theirs->get($id);
+            $other = $words($row);
             $together = count(array_unique([...$own, ...$other]));
             $share = $together === 0 ? 0.0 : count(array_intersect($own, $other)) / $together;
-            $score[$id] = (1 - self::SEEN_WORDS_SHARE) * (1 - $at / $count) + self::SEEN_WORDS_SHARE * $share;
+            $colour = Colours::near($ownColour, Colours::dominant(array_values((array) ($row?->caption_words ?? []))));
+            $score[$id] = self::SEEN_ORDER * (1 - $at / $count) + self::SEEN_WORDS * $share + self::SEEN_COLOUR * $colour;
         }
         usort($externalIds, fn (string $a, string $b): int => $score[$b] <=> $score[$a]);
 

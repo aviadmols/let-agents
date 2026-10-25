@@ -135,13 +135,22 @@ final class CatalogProductKinds implements ProductKinds
         ];
     }
 
+    /** A Hebrew noun without its plural or construct ending: "חולצת", "חולצה", "חולצות" are "חולצ"; "נעלי", "נעליים" "נעל". */
+    private static function base(string $word): string
+    {
+        $word = (string) preg_replace('/(?:יים|ים|ות)$/u', '', $word);
+
+        return mb_strlen($word) > 3 ? (string) preg_replace('/[יהת]$/u', '', $word) : $word;
+    }
+
     /** @return array{type: string, head: string, categories: list<string>, tags: list<string>, title: string} */
     private static function own(CatalogProduct $product): array
     {
         $clean = fn (mixed $v): string => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $v)));
-        // the title's first word, when it is Hebrew (an English title opens with its model, "Old Skool Backpack")
+        // the title's first word, when it is Hebrew (an English title opens with its model, "Old Skool Backpack"), as
+        // its base: a plural or a construct form is the same kind ("חולצת טי" and "חולצה", "נעלי" and "נעליים")
         $first = (string) (preg_split('/[\s,\-–—|:]+/u', trim((string) $product->title), 2)[0] ?? '');
-        $head = preg_match('/^\p{Hebrew}{2,}$/u', $first) === 1 ? $first : '';
+        $head = preg_match('/^\p{Hebrew}{2,}$/u', $first) === 1 ? self::base($first) : '';
 
         return [
             'type' => $clean($product->payload['product_type'] ?? ''),
@@ -160,7 +169,7 @@ final class CatalogProductKinds implements ProductKinds
     private function counts(string $shopId): array
     {
         $active = CatalogProduct::query()->whereNull('removed_at');
-        $version = '2|'.$active->count().'|'.$active->max('updated_at');
+        $version = '3|'.$active->count().'|'.$active->max('updated_at');
 
         return Cache::remember('catalog:kinds:'.$shopId.':'.md5($version), now()->addHours(12), function (): array {
             $counts = ['products' => 0, 'type' => [], 'head' => [], 'category' => [], 'tag' => []];
