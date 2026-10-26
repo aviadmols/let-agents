@@ -61,7 +61,8 @@ final class FeedRecord
             'image_url' => self::nullableString($images[0]['url'] ?? null),
             'variations_count' => count((array) ($record['variations'] ?? [])),
             'source_updated_at' => self::date($record['updated_at'] ?? null),
-            'hash' => self::hash($payload),
+            // how many it sold changes with every order and is no change to the product: never in its hash
+            'hash' => self::hash(array_diff_key($payload, ['sales' => true])),
             'payload' => $payload,
         ];
     }

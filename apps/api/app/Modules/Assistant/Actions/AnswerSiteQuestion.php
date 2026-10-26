@@ -18,6 +18,7 @@ use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductSets;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -85,7 +86,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
      */
-    public const PROMPT_VERSION = 14;
+    public const PROMPT_VERSION = 15;
 
     /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
     private const MAX_NAMES = 3;
@@ -947,6 +948,11 @@ final class AnswerSiteQuestion implements TriesQuestions
             $byText = array_map(fn (array $p): string => (string) $p['external_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'product' && (string) ($p['external_id'] ?? '') !== ''));
             $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$shown]));
         }
+        // "What is recommended most": the store's most popular, before the rest, and kept through the choice below. What
+        // its customers buy, open and add to the cart, never a model's taste (as Aviad asked, 26.10).
+        $popular = self::asksPopular($question) ? $this->popularFor($shopId, $question) : [];
+        $popularTop = $viewing === null && ! $followUp ? array_slice(array_map('strval', array_keys($popular)), 0, (int) Settings::get('assistant.popular_products', $shopId)) : [];
+        $shown = array_values(array_unique([...$popularTop, ...$shown]));
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         $type = AnswerContext::type($question);
         $counts = ['found' => count($found), 'shown' => count($candidates)];
@@ -958,6 +964,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $selection = $this->context->select($shopId, $question, $type, $candidates, $found);
                 [$candidates, $found, $debug] = [$selection['products'], $selection['passages'], $selection['debug']];
             }
+        }
+        $kept = array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $candidates);
+        $missing = array_values(array_diff($popularTop, $kept));
+        if ($missing !== []) {
+            $candidates = [...$candidates, ...$this->candidates($missing)];
         }
 
         $byRef = [];
@@ -972,7 +983,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // Code reads the results before the model: price order among what is in stock, what
         // is on sale, the brands, and whether the question asks for the cheapest or the dearest.
         // The model gets ranks, never prices: the page shows the current price.
-        $analysis = self::analysis($question, $productsByRef);
+        $analysis = self::analysis($question, $productsByRef, $popular);
         $forModel = $this->forModel($productsByRef, $analysis);
 
         if ($mode === AnswerContext::DYNAMIC) {
@@ -2017,29 +2028,64 @@ final class AnswerSiteQuestion implements TriesQuestions
     /**
      * What code can say about the products found, so the model need not guess: which are in stock
      * from the cheapest up, which are on sale, which brands, and what the question asks for. A
-     * superlative is computed here, never by a model.
+     * superlative is computed here, never by a model. "The most recommended" is what the store's
+     * customers choose most (ProductsPopular): its order, of the products found, when it asks so.
      *
      * @param  array<string, array{price: float|null, in_stock: bool, on_sale: bool, brand: string|null}>  $productsByRef
-     * @return array{asks: string|null, in_stock_cheapest_first: list<string>, out_of_stock: list<string>, on_sale: list<string>, brands: list<string>}
+     * @param  array<string, float>  $popular  external id => how popular (ProductsPopular), read only when it asks so
+     * @return array{asks: string|null, in_stock_cheapest_first: list<string>, out_of_stock: list<string>, on_sale: list<string>, brands: list<string>, popular_first?: list<string>}
      */
-    public static function analysis(string $question, array $productsByRef): array
+    public static function analysis(string $question, array $productsByRef, array $popular = []): array
     {
         $priced = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0);
         uasort($priced, fn (array $a, array $b): int => $a['price'] <=> $b['price']);
         $text = mb_strtolower($question);
-
-        return [
-            'asks' => match (true) {
-                preg_match('/זול|במחיר\s+נמוך|הכי\s+משתלם|cheap|budget/u', $text) === 1 => 'cheapest',
-                preg_match('/יקר|expensive/u', $text) === 1 => 'most_expensive',
-                preg_match('/מבצע|הנחה|sale|discount/u', $text) === 1 => 'on_sale',
-                default => null,
-            },
+        $asks = match (true) {
+            preg_match('/זול|במחיר\s+נמוך|הכי\s+משתלם|cheap|budget/u', $text) === 1 => 'cheapest',
+            preg_match('/יקר|expensive/u', $text) === 1 => 'most_expensive',
+            preg_match('/מבצע|הנחה|sale|discount/u', $text) === 1 => 'on_sale',
+            self::asksPopular($text) => 'popular',
+            default => null,
+        };
+        $out = [
+            'asks' => $asks,
             'in_stock_cheapest_first' => array_keys($priced),
             'out_of_stock' => array_keys(array_filter($productsByRef, fn (array $p): bool => ! $p['in_stock'])),
             'on_sale' => array_keys(array_filter($productsByRef, fn (array $p): bool => $p['on_sale'] && $p['in_stock'])),
             'brands' => array_values(array_unique(array_filter(array_map(fn (array $p): ?string => $p['brand'] ?: null, $productsByRef)))),
         ];
+        if ($asks === 'popular') {
+            $ranked = array_filter($productsByRef, fn (array $p): bool => ($popular[(string) $p['external_id']] ?? 0) > 0);
+            uasort($ranked, fn (array $a, array $b): int => $popular[(string) $b['external_id']] <=> $popular[(string) $a['external_id']]);
+            $out['popular_first'] = array_keys($ranked);
+        }
+
+        return $out;
+    }
+
+    /** "מה הספר הכי מומלץ", "הכי נמכר", "רב מכר", "best seller": what the store's customers choose most. */
+    private const POPULAR = '/הכי\s+מומל[צץ]\S*|מומל[צץ]\S*\s+ביותר|הכי\s+פופולר\S*|פופולרי\S*\s+ביותר|רב[\s\-־]?מכר\S*|הכי\s+נמכר\S*|נמכר\S*\s+ביותר|הכי\s+(?:קונים|אוהבים|מבוקש\S*)|best[\s-]?sell\w*|most\s+(?:popular|recommended|sold)/u';
+
+    public static function asksPopular(string $question): bool
+    {
+        return preg_match(self::POPULAR, mb_strtolower($question)) === 1;
+    }
+
+    /**
+     * The store's most popular products a question asks for (ProductsPopular), of the kind its other words name ("מה
+     * הספר הכי מומלץ": its books), else of the whole store; with each one's score.
+     *
+     * @return array<string, float>
+     */
+    private function popularFor(string $shopId, string $question): array
+    {
+        if (! app()->bound(ProductsPopular::class)) {
+            return [];
+        }
+        $kind = trim((string) preg_replace(self::POPULAR, ' ', mb_strtolower($question)));
+        $named = $kind !== '' && app()->bound(ProductsNamed::class) ? app(ProductsNamed::class)->all($shopId, $kind) : [];
+
+        return app(ProductsPopular::class)->scores($shopId, $named === [] ? null : $named);
     }
 
     /**
@@ -2059,6 +2105,10 @@ final class AnswerSiteQuestion implements TriesQuestions
     private function computed(string $question, string $locale, array $shown, bool $followUp = false): ?array
     {
         $asks = self::analysis($question, [])['asks'];
+        // what is recommended most: the writer picks it by what the store's customers choose (analysis' popular_first)
+        if ($asks === 'popular') {
+            return null;
+        }
         ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
         // A range with another wish ("the biggest diamond", "the best for a gift") is not answered by price alone:

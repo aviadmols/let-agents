@@ -126,6 +126,8 @@ final class ProductExporter {
 				'weight_unit'    => (string) get_option( 'woocommerce_weight_unit' ),
 				'dimension_unit' => (string) get_option( 'woocommerce_dimension_unit' ),
 			),
+			// how many were sold in all (WooCommerce's own count): what the shop's assistant calls popular
+			'sales'             => (int) $product->get_total_sales(),
 			'rating'            => array(
 				'average' => (float) $product->get_average_rating(),
 				'count'   => (int) $product->get_review_count(),

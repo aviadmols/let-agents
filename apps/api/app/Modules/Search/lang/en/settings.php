@@ -399,6 +399,7 @@ return [
         'label' => 'Store words',
         'description' => 'How many of the words the products say (titles, tags, picture words) are looked at when a shopper\'s word is not found.',
     ],
+    'popular_days' => ['label' => 'Days that decide what is popular', 'description' => 'How many days back what shoppers opened and added to the cart from search is read, when the assistant is asked what it recommends most.'],
     'learn_days' => ['label' => 'Days search learns from', 'description' => 'How many days back what shoppers did with searches is read; older weighs less.'],
     'learn_min_visitors' => ['label' => 'Different shoppers to learn', 'description' => 'How many different shoppers must do the same for the store to learn it. One shopper or a bot teaches nothing.'],
     'family_words_max' => ['label' => 'Most words in a family', 'description' => 'How many words a family the team creates or fixes can hold.'],

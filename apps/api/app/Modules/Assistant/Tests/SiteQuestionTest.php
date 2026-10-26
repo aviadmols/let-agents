@@ -13,6 +13,7 @@ use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\MendShownQuestions;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\Question;
@@ -922,6 +923,34 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('₪240', $input['products'][2]['price'], 'the price as the store shows it, so a shopper who asks what it costs is told');
         $this->assertStringContainsString('"price_rank":2', $this->calls[1]['user'], 'the checker sees the measure the why rests on');
         $this->assertStringContainsString('"price":"₪240"', $this->calls[1]['user'], 'and the price it holds the answer to');
+    }
+
+    public function test_what_is_recommended_most_is_what_the_stores_customers_choose(): void
+    {
+        // Sela, 26.10: "מה הספר הכי מומלץ" was the writer's taste; it is what the store's customers buy and add to the cart
+        $this->drills();
+        $this->app->instance(ProductsPopular::class, new class implements ProductsPopular
+        {
+            public function scores(string $shopId, ?array $among = null): array
+            {
+                return ['702' => 1.0, '701' => 0.4];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'המברגה של איינהל היא מה שהלקוחות שלנו בוחרים הכי הרבה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'הלקוחות בוחרים בה הכי הרבה']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('איזו מברגה הכי מומלצת?', ['704'])->json('data');
+
+        $input = json_decode($this->calls[0]['user'], true);
+        $this->assertSame('popular', $input['analysis']['asks']);
+        $this->assertSame(['p1', 'p2'], $input['analysis']['popular_first'], 'the most popular first, though the shopper was shown only a bit');
+        $this->assertSame('מקדחה/מברגה איינהל', $input['products'][0]['title']);
+        $this->assertSame(['702'], array_column($data['picks'], 'external_id'));
+        $this->assertStringContainsString('popular_first', $this->calls[1]['user'], 'the checker holds "the most popular" to it');
+        $this->assertFalse(AnswerSiteQuestion::asksPopular('איזו מברגה הכי זולה?'));
+        $this->assertTrue(AnswerSiteQuestion::asksPopular('what is your best seller?'));
     }
 
     public function test_a_product_whose_own_page_the_answer_cites_is_shown_though_it_was_not_given(): void

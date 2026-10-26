@@ -967,6 +967,15 @@
             "scope": "shop"
         },
         {
+            "name": "popular_days",
+            "type": "int",
+            "default": 90,
+            "min": 7,
+            "max": 365,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
             "name": "learn_days",
             "type": "int",
             "default": 60,
