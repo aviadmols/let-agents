@@ -61,9 +61,9 @@ final class SearchCatalog
      * near the colour it shows most is (bySeenWords). Weights that add up to one: the picture first, as a photo's search
      * reads it; a ring of its shape with another stone before a ring of its stone in another shape (Rocks, 26.10).
      */
-    private const SEEN_ORDER = 0.6;
+    private const SEEN_ORDER = 0.45;
 
-    private const SEEN_WORDS = 0.25;
+    private const SEEN_WORDS = 0.4;
 
     private const SEEN_COLOUR = 0.15;
 
@@ -754,37 +754,89 @@ final class SearchCatalog
         return preg_match(self::PATTERNED, implode(' ', array_filter($words, 'is_string'))) === 1;
     }
 
-    private static function bySeenWords(CatalogProduct $product, array $externalIds): array
+    /**
+     * Its alike in the order a shopper reads them: where its picture put them, how much of what sets it apart they say
+     * too, and how near the colour it shows most is. What sets it apart are its words (its title and its picture's, as
+     * the index holds them) the store's other products say least: a wide ring's "רחבה" counts, "טבעת" and "זהב" next to
+     * nothing (wordWeights). Rocks, 26.10: green rings of other shapes came before the wide rings its photo's search found.
+     *
+     * @param  list<string>  $externalIds
+     * @param  array<string, mixed>  $index
+     * @return list<string>
+     */
+    private static function bySeenWords(CatalogProduct $product, array $externalIds, array $index): array
     {
         if (count($externalIds) < 2) {
             return $externalIds;
         }
-
-        $words = fn ($row): array => array_values(array_unique(array_filter(array_map(
-            fn ($w): string => is_string($w) ? HebrewSearch::stem(HebrewSearch::normalize($w)) : '',
-            array_merge(...array_map(fn ($w): array => is_string($w) ? explode(' ', $w) : [], (array) ($row?->caption_words ?? []))),
-        ), fn (string $w): bool => mb_strlen($w) > 1)));
+        $weights = self::wordWeights($index);
+        $own = self::ownWords($index['records']['p:'.$product->external_id] ?? []);
+        $ownWeight = array_sum(array_map(fn (string $w): float => $weights[$w] ?? 0.0, $own));
         $ownRow = RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words']);
-        $own = $words($ownRow);
-        if ($own === []) {
+        if ($ownWeight <= 0.0 && $ownRow === null) {
             return $externalIds;
         }
-        $ownColour = Colours::dominant(array_values((array) $ownRow->caption_words));
+        $ownColour = Colours::dominant(array_values((array) ($ownRow?->caption_words ?? [])));
 
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
         $count = count($externalIds);
         $score = [];
         foreach ($externalIds as $at => $id) {
-            $row = $theirs->get($id);
-            $other = $words($row);
-            $together = count(array_unique([...$own, ...$other]));
-            $share = $together === 0 ? 0.0 : count(array_intersect($own, $other)) / $together;
-            $colour = Colours::near($ownColour, Colours::dominant(array_values((array) ($row?->caption_words ?? []))));
+            $other = array_flip(self::ownWords($index['records']['p:'.$id] ?? []));
+            $shared = array_sum(array_map(fn (string $w): float => isset($other[$w]) ? ($weights[$w] ?? 0.0) : 0.0, $own));
+            $share = $ownWeight > 0.0 ? $shared / $ownWeight : 0.0;
+            $colour = Colours::near($ownColour, Colours::dominant(array_values((array) ($theirs->get($id)?->caption_words ?? []))));
             $score[$id] = self::SEEN_ORDER * (1 - $at / $count) + self::SEEN_WORDS * $share + self::SEEN_COLOUR * $colour;
         }
         usort($externalIds, fn (string $a, string $b): int => $score[$b] <=> $score[$a]);
 
         return $externalIds;
+    }
+
+    /** @var array<string, array<string, float>> index hash => each word's weight (wordWeights) */
+    private static array $wordWeights = [];
+
+    /**
+     * How much each word of a store's products tells one apart: the fewer of them say it, the more (log of products over
+     * those that say it); a word most of them say, next to nothing. Once per index.
+     *
+     * @param  array<string, mixed>  $index
+     * @return array<string, float>
+     */
+    private static function wordWeights(array $index): array
+    {
+        $key = (string) ($index['hash'] ?? '');
+        if (! isset(self::$wordWeights[$key])) {
+            $said = [];
+            $products = 0;
+            foreach ((array) ($index['records'] ?? []) as $record) {
+                if (! is_array($record) || ($record['t'] ?? null) !== 'product') {
+                    continue;
+                }
+                $products++;
+                foreach (self::ownWords($record) as $word) {
+                    $said[$word] = ($said[$word] ?? 0) + 1;
+                }
+            }
+            self::$wordWeights = [$key => array_map(fn (int $n): float => max(0.0, log(($products + 1) / ($n + 1))), $said)];
+        }
+
+        return self::$wordWeights[$key];
+    }
+
+    /**
+     * A product's words as stems: its title and its words (its picture's among them), letters only, never a colour: its
+     * colour is weighed apart (SEEN_COLOUR), and where the shop filters by none it orders nothing (a book's black cover).
+     *
+     * @param  array<string, mixed>  $record
+     * @return list<string>
+     */
+    private static function ownWords(array $record): array
+    {
+        $text = HebrewSearch::normalize((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? ''));
+
+        return array_values(array_unique(array_map(fn (string $w): string => HebrewSearch::stem($w), array_filter(explode(' ', $text),
+            fn (string $w): bool => mb_strlen($w) > 1 && preg_match('/^\p{L}+$/u', $w) === 1 && HebrewSearch::colorOf($w) === null))));
     }
 
     /**
@@ -944,7 +996,7 @@ final class SearchCatalog
 
         return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour, $wants, &$others): array {
             $index = LoadedIndex::for($shopId);
-            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'title', 'payload']);
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'external_id', 'title', 'payload']);
 
             if ($index === null || $product === null || $limit < 1) {
                 return [];
@@ -998,7 +1050,7 @@ final class SearchCatalog
             $left = $wants === null ? array_values($left) : SimilarWants::apply(array_values($left), $wants, $index['records']['p:'.$externalId] ?? null);
             usort($left, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
             $others = array_map(fn (array $r): array => $this->present($r), array_slice($left, 0, $limit));
-            $ids = $looksLead ? self::bySeenWords($product, $ids) : $ids;
+            $ids = $looksLead ? self::bySeenWords($product, $ids, $index) : $ids;
 
             $records = [];
 

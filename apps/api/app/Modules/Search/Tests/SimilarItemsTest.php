@@ -218,6 +218,22 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
     }
 
+    public function test_what_sets_it_apart_said_by_another_puts_that_one_first_whatever_its_picture_order(): void
+    {
+        // Rocks, 26.10: a wide ring's alike were rings of other shapes the pictures put first; "רחבה" is what sets it
+        // apart in a store of rings, "טבעת" and "משובצת" nothing
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach (['301' => 'טבעת רחבה משובצת', '302' => 'טבעת משובצת אמרלד', '303' => 'טבעת רחבה משובצת יהלומים'] as $id => $title) {
+                CatalogProduct::query()->where('external_id', $id)->update(['title' => $title, 'in_stock' => true]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the wide ring first, though its picture came after');
+    }
+
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void
     {
         // A bookshop whose bundles look alike: by content alone, the pictures never asked.
