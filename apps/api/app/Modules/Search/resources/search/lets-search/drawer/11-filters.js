@@ -229,6 +229,15 @@
     });
     return out;
   }
+  // the store's word closest to one it does not write, as the search's typo reading scores it, when close enough to be a slip
+  var SLIP_SCORE = 0.8;
+  function typoOf(n) {
+    var E = S.engine;
+    if (!E || !E.closeWords || !S.built) { return null; }
+    var close = E.closeWords(S.built, n), best = null, top = 0;
+    (close.words || []).forEach(function (w) { var s = close.score[w] || 0; if (w !== n && s > top) { top = s; best = w; } });
+    return top >= SLIP_SCORE ? best : null;
+  }
   function nearTerm(turn, n) {
     var hit = (turn.near || []).filter(function (x) { return x && x.word === n; })[0];
     return hit ? String(hit.term) : null;
@@ -264,6 +273,9 @@
         var nf = wordForms(E.normalize(near));
         if (all.some(function (r) { return saysWord(r, nf); })) { whole = near; }
       }
+      // typed with a slip: the store's word the search read it as ("ראישי": "ריישי", Mycolivia 26.10)
+      var slip = !says && !whole ? typoOf(n) : null;
+      if (slip && all.some(function (r) { return saysWord(r, wordForms(slip)); })) { whole = slip; }
       if (!says && !whole) { return; }
       if (not && says === all.length) { return; }
       var useForms = whole ? wordForms(whole) : forms, share = storeShare(useForms);
