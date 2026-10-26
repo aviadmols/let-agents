@@ -148,7 +148,9 @@
           var v = valueOf(o);
           return !v || !v.value || !wordsOf(v.value.l).every(function (w) { return asked.indexOf(w) >= 0; });
         });
-        return !own && plainlySays(r.title + ' ' + (r.kw || ''), x.value.l);
+        // its own name saying it plainly is it, whatever else the attribute lists: "טבעת דיאנה משובצת יהלומים ואמרלד" is a
+        // ring with diamonds though its stone filter names the emerald alone (Rocks, 26.10: 4 of the store's rings left)
+        return plainlySays(decode(r.title || ''), x.value.l) || (!own && plainlySays(r.title + ' ' + (r.kw || ''), x.value.l));
       };
       // Values of one attribute read together from the words are asked together: "טבעת טופז עם יהלומים" is a ring
       // with both stones, not either. Values the shopper picks are any of them; and when nothing holds all that was
