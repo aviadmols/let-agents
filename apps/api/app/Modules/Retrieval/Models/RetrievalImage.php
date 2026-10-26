@@ -24,6 +24,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $error why the picture could not be read: too_big, not_image, unreachable
  * @property Carbon|null $embedded_at
  * @property string|null $embedding
+ * @property list<string>|null $caption_words
+ * @property list<string>|null \ what is drawn, printed or written on the product, apart from its words (caption v8)
+ * @property array{name?: string, covers: string}|null $caption_pattern the print on it and how much it covers: all, most, part, detail, none (caption v8)
  */
 class RetrievalImage extends Model
 {
@@ -44,6 +47,8 @@ class RetrievalImage extends Model
             'embedded_at' => 'datetime',
             'captioned_at' => 'datetime',
             'caption_words' => 'array',
+            'caption_depicted' => 'array',
+            'caption_pattern' => 'array',
         ];
     }
 

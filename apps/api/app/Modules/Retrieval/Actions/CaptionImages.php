@@ -48,14 +48,20 @@ final class CaptionImages implements CaptionsPictures
      * 5: more of how it looks: the metal's colour in two words, every colour as a word of its own,
      * the finish and the style; up to 18 words.
      * 6: the same care for clothes, shoes, bags and accessories, furniture and the rest.
-     */
-    public const PROMPT_VERSION = 6;
-
-    /**
      * 7: v6 in the store's language, for a store that does not write in Hebrew (an English one): its
-     * titles are what the words are matched against. A Hebrew store stays on v6, its pictures as described.
+     *    titles are what the words are matched against.
+     * 8: v7 for every language, and two more things the picture says: what is only drawn, printed or written on the
+     *    product, apart from its words (a T-shirt with a drawing of a shoe was found for "נעלי משבצות", Vans 26.10);
+     *    and the print on it and how much of it the print covers ("משבצות", most), so "נעלי משבצות" shows the shoes
+     *    covered in checks before the ones with checks on a logo.
      */
-    public const OTHER_LANGUAGE_VERSION = 7;
+    public const PROMPT_VERSION = 8;
+
+    /** The version for a store that does not write in Hebrew: one prompt serves every language since 8. */
+    public const OTHER_LANGUAGE_VERSION = 8;
+
+    /** How much of a product the describer may say its print covers (Search reads them as Patterns). */
+    public const COVERS = ['all', 'most', 'part', 'detail', 'none'];
 
     private const BATCH = 16;
 
@@ -63,6 +69,8 @@ final class CaptionImages implements CaptionsPictures
     private const LOCK_SECONDS = 1500;
 
     private const MAX_WORDS = 18;
+
+    private const MAX_DEPICTED = 12;
 
     /** A picture of about 1000px is about this many input tokens, for the spend estimate. */
     private const PHOTO_TOKENS = 1600;
@@ -120,6 +128,41 @@ final class CaptionImages implements CaptionsPictures
         return $language === 'Hebrew'
             ? hash('sha256', $urlHash.'|'.self::PROMPT_VERSION.'|'.$model)
             : hash('sha256', $urlHash.'|'.self::OTHER_LANGUAGE_VERSION.'|'.$model.'|'.$language);
+    }
+
+    /**
+     * What is only drawn, printed or written on the product, as the describer listed it apart (v8): short names, at most
+     * MAX_DEPICTED; an empty list when it listed none, null when it said nothing that reads.
+     *
+     * @return list<string>|null
+     */
+    public static function depicted(mixed $said): ?array
+    {
+        if (! is_array($said)) {
+            return null;
+        }
+
+        return array_values(array_unique(array_filter(array_map(fn ($w): string => trim(mb_substr(is_string($w) ? $w : '', 0, 40)), array_slice($said, 0, self::MAX_DEPICTED)), fn (string $w): bool => $w !== '')));
+    }
+
+    /**
+     * The print on the product and how much of it the print covers, as the describer said it (v8): a name and one of
+     * COVERS; a plain product is ['covers' => 'none']; null when it said nothing that reads.
+     *
+     * @return array{name?: string, covers: string}|null
+     */
+    public static function pattern(mixed $said): ?array
+    {
+        if (! is_array($said)) {
+            return null;
+        }
+        $covers = strtolower(trim(is_string($said['covers'] ?? null) ? $said['covers'] : ''));
+        $name = trim(mb_substr(is_string($said['name'] ?? null) ? $said['name'] : '', 0, 40));
+        if (! in_array($covers, self::COVERS, true)) {
+            return null;
+        }
+
+        return $covers === 'none' || $name === '' ? ['covers' => 'none'] : ['name' => $name, 'covers' => $covers];
     }
 
     /**
@@ -219,7 +262,7 @@ final class CaptionImages implements CaptionsPictures
                         continue;
                     }
 
-                    $described[] = ['image' => $image, 'caption' => $caption, 'words' => $words];
+                    $described[] = ['image' => $image, 'caption' => $caption, 'words' => $words, 'depicted' => self::depicted($reply['data']['depicted'] ?? null), 'pattern' => self::pattern($reply['data']['pattern'] ?? null)];
                 }
 
                 if ($described === []) {
@@ -252,6 +295,8 @@ final class CaptionImages implements CaptionsPictures
                 RetrievalImage::query()->whereKey($d['image']->id)->update([
                     'caption' => $d['caption'],
                     'caption_words' => json_encode($d['words'], JSON_UNESCAPED_UNICODE),
+                    'caption_depicted' => $d['depicted'] === null ? null : json_encode($d['depicted'], JSON_UNESCAPED_UNICODE),
+                    'caption_pattern' => $d['pattern'] === null ? null : json_encode($d['pattern'], JSON_UNESCAPED_UNICODE),
                     'caption_key' => self::key($d['image']->url_hash, $model, $language),
                     'caption_model' => $text->model,
                     'caption_embedding' => VectorSearch::column($vector),

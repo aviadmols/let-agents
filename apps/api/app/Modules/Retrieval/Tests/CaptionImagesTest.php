@@ -47,8 +47,8 @@ final class CaptionImagesTest extends TestCase
                 $this->users[] = $user;
 
                 return new ModelReply($this->calls === 1
-                    ? ['caption' => 'מברגה נטענת כחולה עם סוללה', 'words' => ['מברגה', 'סוללה']]
-                    : ['caption' => 'ארגז כלים מפלסטיק שחור', 'words' => ['ארגז כלים']], 1600, 40);
+                    ? ['caption' => 'מברגה נטענת כחולה עם סוללה', 'words' => ['מברגה', 'סוללה'], 'depicted' => [], 'pattern' => ['covers' => 'none']]
+                    : ['caption' => 'ארגז כלים מפלסטיק שחור', 'words' => ['ארגז כלים'], 'depicted' => ['לוגו מקיטה', '', 'לוגו מקיטה'], 'pattern' => ['name' => 'פסים', 'covers' => 'Part']], 1600, 40);
             }
         };
         $embedder = new class implements Embedder
@@ -73,6 +73,11 @@ final class CaptionImagesTest extends TestCase
         $this->assertSame('מברגה נטענת כחולה עם סוללה', $drill->caption);
         $this->assertSame(['מברגה', 'סוללה'], $drill->caption_words);
         $this->assertNotNull($drill->captioned_at);
+        $this->assertSame([], $drill->caption_depicted, 'nothing drawn on it');
+        $this->assertSame(['covers' => 'none'], $drill->caption_pattern, 'plain');
+        $box = app(TenantContext::class)->run($shop->id, fn () => RetrievalImage::query()->where('external_id', '2')->sole());
+        $this->assertSame(['לוגו מקיטה'], $box->caption_depicted, 'what is only printed on it, once, apart from its words');
+        $this->assertSame(['name' => 'פסים', 'covers' => 'part'], $box->caption_pattern, 'how much the print covers, as one of the words the describer may use');
         $this->assertSame(3, DB::table('ai_usage')->count(), 'two descriptions and one embedding call, each accounted');
         $this->assertStringContainsString('The store calls this product: מקדחה', $vision->users[0], 'the describer gets the store\x27s name for it');
 
@@ -89,6 +94,10 @@ final class CaptionImagesTest extends TestCase
         $kept = array_values(array_filter($words, fn (string $w): bool => preg_match(CaptionImages::STONE_NAMES, $w) !== 1));
 
         $this->assertSame(['טבעת', 'אבן אדומה', 'אבן לבנה חלבית', 'זהב צהוב', 'רוביקון'], $kept, 'by colour and look; a word that only starts like a stone stays');
-        $this->assertSame(6, CaptionImages::PROMPT_VERSION, 'every picture is described again in plain words');
+        $this->assertSame(8, CaptionImages::PROMPT_VERSION, 'every picture is described again: what is only drawn on it, and how much its print covers');
+        $this->assertSame(8, CaptionImages::OTHER_LANGUAGE_VERSION, 'one prompt for every language');
+        $this->assertNull(CaptionImages::pattern(['name' => 'משבצות', 'covers' => 'half']), 'a word the describer was not given is nothing');
+        $this->assertSame(['covers' => 'none'], CaptionImages::pattern(['name' => '', 'covers' => 'most']), 'a print without a name is no print');
+        $this->assertNull(CaptionImages::depicted('logo'), 'a list, or nothing');
     }
 }

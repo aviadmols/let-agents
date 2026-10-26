@@ -218,6 +218,45 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
     }
 
+    public function test_covered_in_a_print_its_alike_covered_in_it_come_before_those_with_it_on_a_logo(): void
+    {
+        // Vans: a checkered slide's alike should be the shoes covered in checks first, and the ones with checks on a logo
+        // last, whatever order the pictures put them in.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->where('external_id', '302')->update(['in_stock' => true]);
+            foreach (['301' => 'most', '302' => 'detail', '303' => 'all'] as $id => $covers) {
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $product->title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => ['נעלי ספורט', 'משבצות', 'שחור'], 'caption_pattern' => ['name' => 'משבצות', 'covers' => $covers]]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'covered in checks before checks on a logo, though the pictures put 302 first');
+    }
+
+    public function test_what_is_drawn_on_it_is_part_of_what_sets_it_apart_for_its_alike(): void
+    {
+        // Vans: a T-shirt with a drawing of a shoe is like the other T-shirts with that drawing before a plain one the
+        // pictures put first; the drawing is no word of it in a search for words, and still its own for its alike.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->where('external_id', '302')->update(['in_stock' => true]);
+            foreach (['301' => ['חולצת טי', ['חולצת טי', 'לבן', 'איור נעל ספורט']], '302' => ['חולצת טי Basic', ['חולצת טי', 'לבן']], '303' => ['חולצת טי Trip', ['חולצת טי', 'לבן', 'איור נעל ספורט']]] as $id => [$title, $words]) {
+                CatalogProduct::query()->where('external_id', $id)->update(['title' => $title]);
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the shirt with the same drawing first, though the pictures put the plain one before it');
+    }
+
     public function test_what_sets_it_apart_said_by_another_puts_that_one_first_whatever_its_picture_order(): void
     {
         // Rocks, 26.10: a wide ring's alike were rings of other shapes the pictures put first; "רחבה" is what sets it

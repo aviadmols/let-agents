@@ -332,6 +332,59 @@ final class SearchFlowTest extends TestCase
         $this->assertSame(['931', '932'], array_column($this->search('חולצת טי לבנה')->json('groups.product'), 'external_id'), 'the white one, then the black one with white on it');
     }
 
+    public function test_what_is_only_drawn_on_a_product_is_no_word_of_it(): void
+    {
+        // Vans: "נעלי משבצות" showed a white T-shirt ("Dirt Trip") after the checkered slides: its picture's words say
+        // "איור נעל ספורט", "משבצות", "הדפס קטן" of the drawing on its chest, so it held both words as the shoes do.
+        // What is drawn or printed on a product is no word of it: as the phrase says it ("איור נעל ספורט") for pictures
+        // described before, and as the describer lists it apart (caption v8) from now on.
+        $this->inShop(function (): void {
+            foreach ([
+                '981' => ['UY SK8-Low', ['נעלי ספורט', 'נעל נמוכה', 'כחול', 'משבצות שחור-לבן', 'סוליה לבנה'], null],
+                '982' => ['כפכפי סלייד La Costa', ['כפכפים', 'משבצות', 'אדום'], null],
+                '983' => ['חולצת טי קצרה Dirt Trip', ['חולצת טי', 'לבן', 'איור נעל ספורט', 'הדפס קטן', 'משבצות', 'כותנה'], null],
+                '984' => ['חולצת טי Checkerboard Logo', ['חולצת טי', 'שחור', 'לבן', 'נעלי ספורט', 'משבצות'], ['נעלי ספורט', 'משבצות']],
+            ] as $id => [$title, $words, $depicted]) {
+                $product = $this->product($id, $title, ['payload' => ['tags' => ['Vans']]]);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words, 'caption_depicted' => $depicted]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $near = fn (string $id, float $similarity): array => ['source' => 'product', 'source_id' => 's'.$id, 'external_id' => $id, 'title' => '', 'similarity' => $similarity];
+        $this->meaning = [$near('983', 0.62), $near('984', 0.61), $near('982', 0.6), $near('981', 0.55)];
+
+        $this->assertSame(['981'], array_column($this->search('נעלי משבצות')->json('groups.product'), 'external_id'), 'the shoe whose picture shows checks; never a T-shirt with a drawing of one, by the phrase or by the describer\'s own list');
+        $this->assertSame(['983', '984'], array_column($this->search('חולצת טי')->json('groups.product'), 'external_id'), 'the shirts are still shirts');
+        // and the drawing stays with the product, apart from its words, for a photo of it to find (dw)
+        LoadedIndex::forget();
+        $records = $this->inShop(fn (): array => LoadedIndex::for($this->shop->id)['records']);
+        $this->assertStringNotContainsString('נעל', (string) $records['p:983']['kw'], 'no shoe among its words');
+        $this->assertSame('איור נעל ספורט', $records['p:983']['dw'] ?? null, 'the drawing, kept apart');
+        $this->assertSame('נעלי ספורט משבצות', $records['p:984']['dw'] ?? null, 'as the describer listed it');
+        $this->assertArrayNotHasKey('dw', $records['p:981'], 'nothing drawn on a shoe');
+    }
+
+    public function test_a_print_asked_for_shows_what_is_covered_in_it_before_what_has_it_on_a_logo(): void
+    {
+        // Vans: "נעלי משבצות" should show the shoes covered in checks first, and the ones with checks on a logo or a
+        // label only last. The picture says how much of each the print covers (caption v8); one described before
+        // that stays where the search put it, between the two.
+        $this->inShop(function (): void {
+            foreach (['951' => ['detail', ['name' => 'משבצות', 'covers' => 'detail']], '952' => ['part', ['name' => 'משבצות', 'covers' => 'part']], '953' => ['none', ['covers' => 'none']], '954' => ['old', null], '955' => ['all', ['name' => 'משבצות', 'covers' => 'all']]] as $id => [$name, $pattern]) {
+                $product = $this->product($id, "נעלי סניקרס {$name} משבצות");
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $product->title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => ['נעלי ספורט', 'שחור', 'לבן'], 'caption_pattern' => $pattern]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $this->assertSame(['955', '952', '954', '951', '953'], array_column($this->search('נעלי משבצות')->json('groups.product'), 'external_id'), 'all of it, a part, not said, a detail, plain');
+        // "הדפס" is a word none holds: the nearest by meaning are shown, and a print of any kind counts every print
+        $this->meaning = array_map(fn (string $id): array => ['source' => 'product', 'source_id' => 's'.$id, 'external_id' => $id, 'title' => '', 'similarity' => 0.6], ['951', '952', '953', '954', '955']);
+        $this->assertSame(['955', '952', '954', '951', '953'], array_column($this->search('נעליים עם הדפס')->json('groups.product'), 'external_id'), 'a print of any kind counts every print');
+    }
+
     public function test_one_word_many_products_hold_as_typed_shows_only_them(): void
     {
         // Rocks: "טופז" found 93 topaz rings and, by meaning, citrine and yellow sapphire after them.

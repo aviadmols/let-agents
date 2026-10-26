@@ -24,6 +24,7 @@ use App\Modules\Search\Support\DescribedProducts;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\Looks;
+use App\Modules\Search\Support\Patterns;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
 use App\Modules\Search\Support\SearchTrace;
@@ -635,6 +636,9 @@ final class SearchCatalog
             if ($scattered !== null && ! $asks && $pinned === [] && $subject === []) {
                 $groups['product'] = self::bySaidWords($groups['product'], $scattered);
             }
+            // "נעלי משבצות": what its picture shows covered in the print asked for first, what has it on one part next, what
+            // has it on a logo or a label only after the rest (Patterns; a picture that has not said stays between)
+            $groups['product'] = Patterns::tiered($groups['product'], Patterns::asked($worded));
             // "תיק לבן": a word of the search that opens the titles of a kind of product here ("תיק גב", "תיק צד") says the
             // kind asked for, and what is said with it ("לבן", "עם כיס") holds across every kind: only that kind is shown. A
             // white keychain is no white bag: none, and the drawer offers the AI. A kind alone ("מדף") keeps what is very
@@ -825,7 +829,8 @@ final class SearchCatalog
     }
 
     /**
-     * A product's words as stems: its title and its words (its picture's among them), letters only, never a colour: its
+     * A product's words as stems: its title, its words (its picture's among them) and what is drawn or printed on it (dw:
+     * a T-shirt with a drawing of a shoe is like the other T-shirts with that drawing), letters only, never a colour: its
      * colour is weighed apart (SEEN_COLOUR), and where the shop filters by none it orders nothing (a book's black cover).
      *
      * @param  array<string, mixed>  $record
@@ -833,7 +838,7 @@ final class SearchCatalog
      */
     private static function ownWords(array $record): array
     {
-        $text = HebrewSearch::normalize((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? ''));
+        $text = HebrewSearch::normalize(self::photoText($record));
 
         return array_values(array_unique(array_map(fn (string $w): string => HebrewSearch::stem($w), array_filter(explode(' ', $text),
             fn (string $w): bool => mb_strlen($w) > 1 && preg_match('/^\p{L}+$/u', $w) === 1 && HebrewSearch::colorOf($w) === null))));
@@ -1083,6 +1088,8 @@ final class SearchCatalog
             // it, a thin black line and a white sole too, and its pictures already found what is coloured like it.
             $ownText = $looksLead ? (string) ($own['title'] ?? '') : trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''));
             $records = $own === null || ! $colours ? $records : self::byColour($records, Colours::parts([$ownText]));
+            // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
+            $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
 
             return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
         });
@@ -1522,7 +1529,7 @@ final class SearchCatalog
         $seenWords = $colours === [] ? collect() : RetrievalImage::query()->whereIn('external_id', array_map('strval', array_keys($members)))->pluck('caption_words', 'external_id');
         foreach (array_keys($members) as $id) {
             $record = $index['records']['p:'.$id] ?? [];
-            $tint[$id] = $colours === [] ? 0.0 : Colours::score($colours, trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '').' '.implode(', ', array_map('strval', (array) ($seenWords[(string) $id] ?? [])))));
+            $tint[$id] = $colours === [] ? 0.0 : Colours::score($colours, trim(self::photoText($record).' '.implode(', ', array_map('strval', (array) ($seenWords[(string) $id] ?? [])))));
         }
         $candidates = array_map(fn ($id): array => ['external_id' => (string) $id, 'similarity' => (float) ($similarity[$id] ?? 0.0) + $wordsWeight * ($named[$id] ?? 0.0) + $colourWeight * $tint[$id] - (isset($lacking[$id]) ? self::LACKS_PENALTY : 0.0)], array_keys($members));
 
@@ -1643,7 +1650,7 @@ final class SearchCatalog
 
         foreach ($ids as $id) {
             $record = $index['records']['p:'.$id] ?? [];
-            $own = self::withoutPrefix(PhotoPlacer::words(trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? ''))));
+            $own = self::withoutPrefix(PhotoPlacer::words(self::photoText($record)));
 
             foreach ($wanted as $key => $forms) {
                 foreach ($own as $word) {
@@ -1723,7 +1730,7 @@ final class SearchCatalog
         foreach ($ids as $id) {
             $record = $index['records']['p:'.$id] ?? [];
 
-            if (HebrewSearch::holdsAny((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? ''), $stems)) {
+            if (HebrewSearch::holdsAny(self::photoText($record), $stems)) {
                 $out[(string) $id] = true;
             }
         }
@@ -1735,6 +1742,18 @@ final class SearchCatalog
      * @param  list<string>  $a  a word's forms
      * @param  list<string>  $b  another's
      */
+    /**
+     * A product's words as a photo of it shows them: its title, its words, and what is only drawn, printed or written on
+     * it (dw), which a search for words leaves out (BuildSearchIndex::shown) and a photo of a T-shirt with a drawing of
+     * a shoe shows all the same.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function photoText(array $record): string
+    {
+        return trim((string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '').' '.(string) ($record['dw'] ?? ''));
+    }
+
     private static function sameWord(array $a, array $b): bool
     {
         if (array_intersect($a, $b) !== []) {

@@ -153,6 +153,59 @@ final class BuildSearchIndex
         return array_slice(array_keys($stems), 0, self::KIND_STEMS);
     }
 
+    /**
+     * A picture's word that says what is drawn, printed or written on the product, not what the product is or how it
+     * looks: "איור נעל ספורט" and "לוגו משבצות" on a white T-shirt (Vans, 26.10: the shirt was found for "נעלי משבצות").
+     * The word that opens such a phrase, in Hebrew and English, and a print only when it says of what ("הדפס של נעל"):
+     * a word alone ("הדפס", "לוגו", "משבצות") and "הדפס קטן" still say the product has one, which is its own.
+     */
+    private const DEPICTED = '/^(?:(?:איור|ציור|לוגו|גרפיקה|סמל|כיתוב|כתובת|תמונה|דמות|illustration|drawing|logo|artwork|lettering|text|image|picture)(?:\s+של)?|(?:הדפס|הדפסה|print|printed|graphic)\s+(?:של|of))\s+\S/iu';
+
+    /**
+     * What a picture shows of the product itself: its words less those that only say what is drawn or printed on it,
+     * as the describer lists them apart (caption v8, caption_depicted) or as the phrase says it (DEPICTED). A shirt with
+     * a drawing of a shoe is no shoe; a search for the drawing finds it by meaning, not by the shoe's name.
+     *
+     * @return list<string>
+     */
+    public static function shown(RetrievalImage $picture): array
+    {
+        $depicted = array_map(fn ($w): string => HebrewSearch::normalize((string) $w), (array) ($picture->caption_depicted ?? []));
+
+        return array_values(array_filter(array_map('strval', (array) $picture->caption_words), fn (string $word): bool => $word !== ''
+            && preg_match(self::DEPICTED, trim($word)) !== 1 && ! in_array(HebrewSearch::normalize($word), $depicted, true)));
+    }
+
+    /**
+     * What is only drawn, printed or written on the product, as one text: its picture's words that shown() leaves out.
+     * Null when nothing is.
+     */
+    private static function drawn(?RetrievalImage $picture): ?string
+    {
+        if ($picture === null) {
+            return null;
+        }
+        $drawn = array_diff(array_map('strval', (array) $picture->caption_words), self::shown($picture));
+
+        return $drawn === [] ? null : mb_substr(implode(' ', array_unique(array_filter(array_map('trim', $drawn)))), 0, self::MAX_KEYWORDS);
+    }
+
+    /**
+     * The print its picture shows and how much of it the print covers, as the index keeps it for Patterns: ['n' => the
+     * name, 'c' => all | most | part | detail], ['c' => 'none'] for a plain product, null when the picture has not said.
+     *
+     * @return array{n?: string, c: string}|null
+     */
+    private static function pattern(?RetrievalImage $picture): ?array
+    {
+        $said = $picture?->caption_pattern;
+        if (! is_array($said) || ! is_string($said['covers'] ?? null)) {
+            return null;
+        }
+
+        return is_string($said['name'] ?? null) && $said['name'] !== '' && $said['covers'] !== 'none' ? ['n' => $said['name'], 'c' => $said['covers']] : ['c' => 'none'];
+    }
+
     private static function metaSize(CatalogProduct $product): ?float
     {
         foreach ((array) ($product->payload['meta'] ?? []) as $key => $value) {
@@ -188,7 +241,9 @@ final class BuildSearchIndex
         $counts = ['product' => 0, 'content' => 0, 'category' => 0, 'synonyms' => count($own)];
 
         // What each product's picture shows, in words, joins its words: found by what it looks like.
-        $seen = RetrievalImage::query()->whereNotNull('caption_words')->pluck('caption_words', 'product_id')->map(fn ($w): array => is_array($w) ? $w : (array) json_decode((string) $w, true));
+        // what each product's picture shows (CaptionImages): its words, less what is only drawn or printed on it, and the print on it
+        $pictures = RetrievalImage::query()->whereNotNull('caption_words')->get(['product_id', 'caption_words', 'caption_depicted', 'caption_pattern'])->keyBy('product_id');
+        $seen = $pictures->map(fn (RetrievalImage $i): array => self::shown($i));
 
         // What each product is, from the shop's approved facts: the filters beside the results. Then the
         // colours and sizes its variants come in, two filters of their own.
@@ -261,6 +316,12 @@ final class BuildSearchIndex
                 // what the store files it as (its type, categories, tags), as word stems: a kind a search names holds it
                 // though its title opens with another word ("סניקרס" tagged "נעליים" is shoes)
                 'kd' => self::kindStems($product) ?: null,
+                // the print its picture shows and how much of it the print covers (Patterns): "נעלי משבצות" shows what is
+                // covered in checks before what has checks on a logo
+                'pt' => self::pattern($pictures->get($product->id)),
+                // what is only drawn, printed or written on it (shown leaves it out of its words): no word a search for words
+                // finds it by, and still what a photo of it shows, so a photo search reads it beside its words (photoText)
+                'dw' => self::drawn($pictures->get($product->id)),
                 // its own colours, as a colour typed asks of it: the colour it is sold in (the store's colour filter) and
                 // the one its picture shows most, never a part's ("כפתורים שחורים" on an olive overshirt is no black shirt)
                 'mc' => self::mainColours((array) ($seen[$product->id] ?? []), $read['f'] ?? [], $facets['facets']) ?: null,

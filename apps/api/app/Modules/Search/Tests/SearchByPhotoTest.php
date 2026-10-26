@@ -533,6 +533,28 @@ final class SearchByPhotoTest extends TestCase
         $this->assertGreaterThan(0, $result['groups']['product'][0]['words']);
     }
 
+    public function test_what_is_drawn_on_a_product_is_what_a_photo_of_it_shows_though_no_word_of_it(): void
+    {
+        // Vans: a T-shirt's picture says "איור נעל ספורט" of the drawing on its chest. A search for words leaves it out
+        // (the shirt is no shoe), a photo of the shirt shows the drawing: among white T-shirts alike, the one with it first.
+        $this->inShop(function (): void {
+            $shirts = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k8', 'name' => 'חולצות', 'path' => ['חולצות'], 'depth' => 0, 'hash' => 'k8', 'product_count' => 3]);
+            foreach (['91' => ['חולצת טי לבנה Basic', ['חולצת טי', 'לבן', 'כותנה']], '92' => ['חולצת טי לבנה Dirt Trip', ['חולצת טי', 'לבן', 'איור נעל ספורט', 'הדפס קטן']], '93' => ['חולצת טי לבנה Logo', ['חולצת טי', 'לבן', 'לוגו']]] as $id => [$title, $words]) {
+                $this->shirt($id, $title, [0.9, 0.1, 0.4]);
+                RetrievalImage::query()->where('external_id', $id)->update(['caption_words' => json_encode($words, JSON_UNESCAPED_UNICODE)]);
+            }
+            CatalogProduct::query()->whereIn('external_id', ['91', '92', '93'])->get()->each(fn (CatalogProduct $p) => $p->categories()->attach($shirts->id));
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'חולצת טי לבנה', 'also' => ['חולצה'], 'details' => ['איור נעל ספורט'], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame('92', $result['groups']['product'][0]['external_id'], 'the shirt with the drawing of a shoe, by the drawing');
+        $this->assertGreaterThan(0, $result['groups']['product'][0]['words']);
+    }
+
     public function test_a_plain_band_puts_rings_with_stones_after_the_rest(): void
     {
         $this->inShop(function (): void {

@@ -123,6 +123,13 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   sharing one scope; edit the part, never the built file. It is served at
   `/api/v1/search/lets-search.js` and at the old `/search/let-agents-search.js` address. The index (`search_indexes`) is rebuilt at
   02:40 and on demand; synonyms are applied at build time, never at query time.
+- A picture's words are the product's words in the search for words, less what is only drawn, printed or written on
+  it (`BuildSearchIndex::shown`: the describer's `depicted` list since caption v8, and before it a phrase that opens
+  with "איור", "לוגו", "הדפס של"…): a T-shirt with a drawing of a shoe is no shoe. What is drawn stays in the index
+  as `dw` and counts for a photo search and for similar items (`SearchCatalog::photoText`), where it is what the photo
+  shows and part of what sets the product apart. Similar items stay of the product's own kind (`ProductKinds::sameKind`).
+  A print asked for (`Support/Patterns`) orders by how much of each product its picture says the print covers (caption
+  v8's `pattern`), in the search and in similar items; a picture described before v8 keeps its place.
 - `SearchCatalog` merges spelling (exact matches first), meaning (`SemanticSearch::nearText`) and
   pictures (`picturesNearText`) by reciprocal rank. `CountSearch` counts once per tab; query text
   only, nothing about the shopper. Day columns: compare with `whereDate` (SQLite stores a time).
