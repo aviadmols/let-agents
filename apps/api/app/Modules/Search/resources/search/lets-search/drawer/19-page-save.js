@@ -41,7 +41,7 @@
   // the dot on every launcher while something is saved, and the launcher's label with the count
   function refreshLauncher() {
     var n = S.saved.length, label = n ? t('launcherSaved', { n: n }) : t('open');
-    LAUNCHERS.forEach(function (b) { var badge = b.querySelector('.ls-launch__badge'); if (badge) { badge.hidden = n === 0; } b.setAttribute('aria-label', label); b.setAttribute('title', label); });
+    LAUNCHERS.forEach(function (b) { var badge = b.querySelector('.ls-launch__badge'); if (badge) { badge.hidden = n === 0; } b.classList.toggle('has-saved', n > 0); b.setAttribute('aria-label', label); b.setAttribute('title', label); });
   }
   function receiveOnLauncher(b) {
     if (!b || REDUCED) { return; }

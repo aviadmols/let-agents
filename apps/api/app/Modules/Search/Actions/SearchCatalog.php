@@ -58,13 +58,14 @@ final class SearchCatalog
 
     /**
      * A similar item's place where looks lead: the pictures' own order, the share of their described words, and how
-     * near the colour it shows most is (bySeenWords). Weights that add up to one.
+     * near the colour it shows most is (bySeenWords). Weights that add up to one: the picture first, as a photo's search
+     * reads it; a ring of its shape with another stone before a ring of its stone in another shape (Rocks, 26.10).
      */
-    private const SEEN_ORDER = 0.4;
+    private const SEEN_ORDER = 0.6;
 
-    private const SEEN_WORDS = 0.2;
+    private const SEEN_WORDS = 0.25;
 
-    private const SEEN_COLOUR = 0.4;
+    private const SEEN_COLOUR = 0.15;
 
     /** A filter of whom a product is for: kept when a search that found nothing is loosened (loosened()). */
     private const WHOM_FACETS = ['audience', 'gender', 'for_whom', 'target_audience', 'age_group'];
@@ -80,9 +81,6 @@ final class SearchCatalog
 
     /** A colour asked for: the pictures of this many products read for the colour they show most (byPictureColour). */
     private const PICTURE_COLOUR_READ = 120;
-
-    /** Where looks matter, its alike are of its colour: the same family, whatever the tone (Colours::near). */
-    private const SAME_COLOUR = 0.8;
 
     /** Where looks matter, this many pictures and meanings are read for its alike: few of the nearest are of its colour. */
     private const LOOKS_POOL = 150;
@@ -730,8 +728,10 @@ final class SearchCatalog
     }
 
     /**
-     * Of a product's alike, those that look like it by its picture's words: of the colour it shows most (Colours::dominant,
-     * the same family) and printed as it is, or plain as it is. Its picture naming no colour (no words read): all of them.
+     * Of a product's alike, those printed as it is, or plain as it is, by its picture's words: a striped shirt is no plain
+     * overshirt's alike (Story). Its colour orders them (bySeenWords), never leaves one out: a wide ring with green stones
+     * is like the same ring with white ones, more than a green ring of another shape (Rocks, 26.10). Its picture read
+     * with no words: all of them.
      *
      * @param  list<string>  $externalIds
      * @return list<string>
@@ -739,18 +739,13 @@ final class SearchCatalog
     private static function seenAlike(CatalogProduct $product, array $externalIds): array
     {
         $own = array_values((array) (RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words'])?->caption_words ?? []));
-        $colour = Colours::dominant($own, colourFirst: true);
-        if ($colour === null || $externalIds === []) {
+        if ($own === [] || $externalIds === []) {
             return $externalIds;
         }
         $printed = self::patterned($own);
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
 
-        return array_values(array_filter($externalIds, function (string $id) use ($theirs, $colour, $printed): bool {
-            $words = array_values((array) ($theirs->get($id)?->caption_words ?? []));
-
-            return Colours::near($colour, Colours::dominant($words, colourFirst: true)) >= self::SAME_COLOUR && self::patterned($words) === $printed;
-        }));
+        return array_values(array_filter($externalIds, fn (string $id): bool => self::patterned(array_values((array) ($theirs->get($id)?->caption_words ?? []))) === $printed));
     }
 
     /** @param  list<mixed>  $words */

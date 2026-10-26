@@ -25,7 +25,10 @@
     var heart = '<path class="ls-mini-heart" d="M10.5 13.6s-3.3-2-3.3-4.4a1.8 1.8 0 0 1 3.3-1 1.8 1.8 0 0 1 3.3 1c0 2.4-3.3 4.4-3.3 4.4z" fill="currentColor"/>';
     // the heart sits in the lens: the smaller lens of the icons with something beside it is lower and to the left
     var at = { spark: '-1 1.5', sparks: '-1 1.5', badge: '-1 1.5', bubble: '-1 0' }[key];
-    if (at) { heart = '<g transform="translate(' + at + ')">' + heart + '</g>'; }
+    // the saved dot sits in the lens too, where the heart lands: the heart takes its place for a moment (is-receiving).
+    // The mark's lens holds the mark, so its dot stays at the corner (the badge below)
+    var dot = key === 'mark' ? '' : '<circle class="ls-lens-dot" cx="10.5" cy="10.5" r="2.3" fill="currentColor"/>';
+    if (at) { heart = '<g transform="translate(' + at + ')">' + heart + dot + '</g>'; } else { heart += dot; }
     return '<svg viewBox="0 0 24 24" aria-hidden="true">' + LAUNCHER_ICONS[key] + heart + '</svg>' +
       '<span class="ls-launch__badge" hidden aria-hidden="true"></span>';
   }

@@ -207,13 +207,15 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
 
         app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['נמר', 'כחול'])]));
-        $this->assertSame([], $this->similar('301', 2)->json('products'), 'a blue leopard is of another colour: none, never padded');
-        // and the shopper is offered, apart, what of its kind its look left out ("אולי אלה יעניינו אתכם")
-        $this->assertEqualsCanonicalizing(['302', '303'], array_column($this->similar('301', 2)->json('others'), 'external_id'));
+        // a blue leopard is its alike in another colour: its colour orders, never leaves out (Rocks, 26.10: a wide ring with
+        // white stones is like the same ring with green ones)
+        $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'of its print in another colour');
+        // and the shopper is offered, apart, what of its kind its look left out ("אולי אלה יעניינו אתכם"): the plain bag
+        $this->assertSame(['302'], array_column($this->similar('301', 2)->json('others'), 'external_id'));
 
-        // its picture names no colour: nothing to keep to, the pictures' order, never the tags alone
+        // its picture names no colour: its print still keeps the plain bag apart
         app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => json_encode(['נמר'])]));
-        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
+        $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
     }
 
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void
