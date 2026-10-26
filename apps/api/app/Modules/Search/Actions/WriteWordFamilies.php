@@ -66,6 +66,8 @@ final class WriteWordFamilies
             return null;
         }
         [$words, $hash] = StoreWords::of($shopId, $index);
+        // the words and the groups code hands with them: a better grouping writes every store's families again, once
+        $hash = substr(hash('sha256', $hash.'|'.json_encode(self::alike($words), JSON_UNESCAPED_UNICODE)), 0, 20);
         $saved = $this->tenant->run($shopId, fn (): ?SearchWordFamily => SearchWordFamily::query()->first());
         if (count($words) < 10 || ($saved !== null && $saved->words_hash === $hash && $saved->prompt_version === self::PROMPT_VERSION)) {
             return null;
@@ -209,10 +211,28 @@ final class WriteWordFamilies
             if (str_contains($plain, ' ') || preg_match('/^[א-ת]{3,}$/u', $plain) !== 1) {
                 continue;
             }
-            $groups[HebrewSearch::skeleton(HebrewSearch::stem($plain))][] = $word;
+            $root = HebrewSearch::skeleton(HebrewSearch::stem($plain));
+            $groups[$root][] = $word;
+            // and without a letter a form of a root begins with ("מנומר" of "נמר", "הדפס" of "דפוס"): the writer tells
+            // a form from a word that only starts so ("מכנס" is no "כנס")
+            if (preg_match('/^[מתה](.{3,})$/u', $root, $m) === 1) {
+                $groups[$m[1]][] = $word;
+            }
+        }
+        // a group only of words some other group holds as well adds nothing
+        $groups = array_values(array_filter($groups, fn (array $g): bool => count($g) >= 2 && count($g) <= self::FAMILY_MAX));
+        $kept = [];
+        foreach ($groups as $i => $group) {
+            foreach ($groups as $j => $other) {
+                $inside = array_diff($group, $other) === [];
+                if ($i !== $j && $inside && (count($other) > count($group) || (count($other) === count($group) && $j < $i))) {
+                    continue 2;
+                }
+            }
+            $kept[] = $group;
         }
 
-        return array_slice(array_values(array_filter($groups, fn (array $g): bool => count($g) >= 2 && count($g) <= self::FAMILY_MAX)), 0, self::ALIKE_MAX);
+        return array_slice($kept, 0, self::ALIKE_MAX);
     }
 
     /** @return array{provider: AiProviderName|null, name: string, model: string} */

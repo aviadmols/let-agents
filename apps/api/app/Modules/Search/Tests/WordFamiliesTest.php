@@ -92,6 +92,16 @@ final class WordFamiliesTest extends TestCase
         $this->assertContains('4', $checks, 'the shirt that says "משובצות" found by "משבצות"');
     }
 
+    public function test_words_of_one_root_are_handed_together_with_a_letter_a_form_begins_with(): void
+    {
+        // Vans, 26.10: "נמר" and "מנומרות" found different shoes
+        $groups = array_map(fn (array $g): array => (sort($g) ? $g : $g), WriteWordFamilies::alike(['נמר', 'מנומרות', 'מנומר', 'משבצות', 'משובץ', 'סניקרס']));
+
+        $this->assertContains(['מנומר', 'מנומרות', 'נמר'], $groups);
+        $this->assertContains(['משבצות', 'משובץ'], $groups);
+        $this->assertNotContains(['מנומר', 'מנומרות'], $groups, 'a group another holds all of adds nothing');
+    }
+
     public function test_a_stores_words_read_its_tags_as_words_not_as_their_weights(): void
     {
         // a record's tags as the index writes them: [its words, how central] (Sela's "חטופים ושבי")

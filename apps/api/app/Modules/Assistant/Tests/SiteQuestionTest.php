@@ -207,6 +207,25 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('no_info', $this->ask('יש לכם ברגים?')->json('data.outcome'));
     }
 
+    public function test_an_answer_that_recommends_products_is_written_again_once_a_product_is_added(): void
+    {
+        $answer = fn (): array => [
+            ['found' => true, 'answer' => 'לדק כדאי בורג נירוסטה.', 'refs' => ['s2'], 'picks' => [['ref' => 'p1', 'why' => 'מתאים לדק']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->replies = $answer();
+        $this->assertSame('model', $this->ask('איזה בורג מתאים לדק?')->json('data.from'));
+        $this->assertSame('bank', $this->ask('איזה בורג מתאים לדק?')->json('data.from'), 'saved: the next shopper costs nothing');
+
+        // a store's info answer stays; one that recommends products is asked again, once, when a product joins
+        $this->travel(1)->minutes();
+        $this->product('31600', 'בורג נירוסטה לדק 5X60', 'בורג ארוך לעץ קשה.', []);
+        $this->travel(1)->minutes();
+        $this->replies = $answer();
+        $this->assertSame('model', $this->ask('איזה בורג מתאים לדק?')->json('data.from'), 'a new product may answer it better');
+        $this->assertSame('bank', $this->ask('איזה בורג מתאים לדק?')->json('data.from'));
+    }
+
     public function test_the_writers_refs_never_reach_the_shopper(): void
     {
         // Seen on Gueta: "(p5)" beside a product's name, kept by the checker and shown. The ref is
@@ -903,6 +922,23 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('₪240', $input['products'][2]['price'], 'the price as the store shows it, so a shopper who asks what it costs is told');
         $this->assertStringContainsString('"price_rank":2', $this->calls[1]['user'], 'the checker sees the measure the why rests on');
         $this->assertStringContainsString('"price":"₪240"', $this->calls[1]['user'], 'and the price it holds the answer to');
+    }
+
+    public function test_a_product_whose_own_page_the_answer_cites_is_shown_though_it_was_not_given(): void
+    {
+        // Sela, 26.10: "ספרים על חיים טובים?" recommended "12 כללים לחיים" from its page, and showed no card of it
+        $this->drills();
+        $einhell = $this->inShop(fn () => CatalogProduct::query()->where('external_id', '702')->value('id'));
+        $this->passages = [['source' => 'product', 'source_id' => $einhell, 'external_id' => '702', 'title' => 'מקדחה/מברגה איינהל', 'text' => 'מברגה רוטטת, טובה לבית.', 'similarity' => 0.7]];
+        $this->replies = [
+            ['found' => true, 'answer' => 'לבית כדאי מברגה רוטטת, כמו של איינהל.', 'refs' => ['s1'], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('מברגה לבית?', ['701', '704'])->json('data');
+
+        $this->assertSame(['702'], array_column($data['picks'], 'external_id'), 'the product of the page it rests on, as a card');
+        $this->assertStringContainsString('"why":"","brand":"Einhell"', $this->calls[1]['user'], 'and the checker judged it as any pick');
     }
 
     private function drills(): void

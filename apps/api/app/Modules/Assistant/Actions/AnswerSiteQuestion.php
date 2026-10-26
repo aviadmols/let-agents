@@ -628,6 +628,40 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $picks;
     }
 
+    /**
+     * The products an answer may show, with those whose own page it cites that it was not given, each under a new ref:
+     * the checker reads them as any pick. Within a price the question asks, as the rest.
+     *
+     * @param  list<string>  $cited
+     * @param  array<string, array<string, mixed>>  $byRef
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @return array<string, array<string, mixed>>
+     */
+    private function withCited(string $question, array $cited, array $byRef, array $productsByRef): array
+    {
+        $given = array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef);
+        $missing = [];
+        foreach ($cited as $ref) {
+            $id = ($byRef[$ref]['source'] ?? null) === 'product' ? (string) ($byRef[$ref]['external_id'] ?? '') : '';
+            if ($id !== '' && ! in_array($id, $given, true) && ! in_array($id, $missing, true)) {
+                $missing[] = $id;
+            }
+        }
+        if ($missing === []) {
+            return $productsByRef;
+        }
+        ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        $n = count($productsByRef);
+        foreach ($this->candidates($missing) as $product) {
+            if (($min !== null || $max !== null) && ! ($product['price'] !== null && $product['price'] > 0 && ($min === null || $product['price'] >= $min) && ($max === null || $product['price'] <= $max))) {
+                continue;
+            }
+            $productsByRef['p'.(++$n)] = $product;
+        }
+
+        return $productsByRef;
+    }
+
     /** A title as other text names it: before its subtitle or its code ("חטוף - אלי שרעבי" is "חטוף"). */
     private static function titleCore(string $title): string
     {
@@ -775,12 +809,17 @@ final class AnswerSiteQuestion implements TriesQuestions
             return true;
         }
 
-        // An answer stands until a page it was written from, or a product it picked, changes: never for good.
+        // An answer stands until a page it was written from, or a product it picked, changes: never for good. One that
+        // recommends products (its cards, or the products' pages it rests on) is written again once a product is added
+        // after it: a new book may answer "ספרים על חיים טובים?" better (as Aviad asked, 26.10). On being asked, never before.
         if ($saved->outcome === AssistantAnswer::ANSWERED) {
             $picked = array_values(array_filter(array_map(fn ($p): string => is_array($p) ? (string) ($p['external_id'] ?? '') : '', (array) $saved->picks)));
             $changed = $picked === [] ? null : CatalogProduct::query()->whereIn('external_id', $picked)->max('updated_at');
+            $products = $picked !== [] || in_array('product', array_column(array_filter((array) $saved->sources, 'is_array'), 'type'), true);
+            $added = $products ? CatalogProduct::query()->active()->max('created_at') : null;
+            $after = fn (mixed $at): bool => $at !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($at));
 
-            return $this->pagesChangedSince($saved) || ($changed !== null && $saved->updated_at !== null && $saved->updated_at->lt(Carbon::parse($changed)));
+            return $this->pagesChangedSince($saved) || $after($changed) || $after($added);
         }
 
         // "Not ours to answer" is looked at again after the days a "not found" waits.
@@ -1296,6 +1335,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                     // is a card too. Only of the products the writer was given, and before the checker, which judges them
                     // like any pick: nothing reaches the shopper unchecked.
                     if ($answer !== '') {
+                        // a product whose own page the answer cites is one it shows, given to the writer or not (Sela,
+                        // 26.10: "12 כללים לחיים" recommended from its page, left out of the products: no card)
+                        $prepared['productsByRef'] = $this->withCited($question, $cited, $byRef, $prepared['productsByRef']);
                         $picks = self::namedInAnswer($answer, $picks, $prepared['productsByRef']);
                         // and every product whose own page it rests on: "מתוך: פטריית קורדיספס" under an answer about
                         // cordyceps, with no card to buy it from (Mycolivia, 25.10)

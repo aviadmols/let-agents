@@ -43,7 +43,35 @@ final class ProductKindsTest extends TestCase
         app(TenantContext::class)->run($shop->id, function () use ($kinds, $products): void {
             $this->assertSame(['head:תיק'], $kinds->marks($products['pink']));
             $this->assertSame(['2'], $kinds->sameKind($products['pink'], ['3', '4', '2', '5']), 'a bag, not the kids\' sneakers or the beanie of its category');
-            $this->assertSame(['category:ילדים'], $kinds->marks($products[4]), 'an English title names no kind: its categories do');
+            $this->assertSame([], $kinds->marks($products[4]), 'an English title names no kind, nor does a category of whom it is for');
+        });
+    }
+
+    public function test_a_category_of_whom_or_of_a_campaign_makes_no_bag_like_skate_shoes(): void
+    {
+        // Vans, 26.10: "נעליי סקייט Skate Rowan" (its yod doubled) was read by its categories, and a backpack shares "גברים"
+        $shop = Shop::factory()->create();
+        $category = fn (string ...$names): array => array_map(fn (string $n): array => ['id' => $n, 'name' => $n, 'path' => [$n]], $names);
+        $products = app(TenantContext::class)->run($shop->id, function () use ($shop, $category): array {
+            $make = fn (string $id, string $title, array $categories): CatalogProduct => CatalogProduct::query()->create([
+                'shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'price' => 100,
+                'payload' => ['categories' => $categories],
+            ]);
+
+            return [
+                'rowan' => $make('1', 'נעליי סקייט Skate Rowan', $category('גברים', 'נעליים', 'כל מה שחם', 'SS26')),
+                $make('2', 'נעלי סניקרס Old Skool', $category('גברים', 'נעליים')),
+                $make('3', 'נעלי סניקרס Authentic', $category('גברים', 'נעליים')),
+                $make('4', 'תיק גב Old Skool Classic', $category('גברים', 'תיקים', 'כל מה שחם', 'SS26')),
+                $make('5', 'תיק צד Lawler', $category('גברים', 'תיקים')),
+            ];
+        });
+
+        app(TenantContext::class)->run($shop->id, function () use ($products): void {
+            $kinds = app(ProductKinds::class);
+            $this->assertSame(['head:נעל'], $kinds->marks($products['rowan']), 'a doubled yod is one: shoes, by its title');
+            $this->assertSame(['2', '3'], $kinds->sameKind($products['rowan'], ['4', '2', '5', '3']), 'never a bag');
         });
     }
 

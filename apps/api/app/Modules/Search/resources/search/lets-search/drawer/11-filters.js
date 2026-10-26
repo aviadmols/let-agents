@@ -218,6 +218,17 @@
     all.forEach(function (r) { recForms(r); r._ww.forEach(function (w) { if (w.length > start.length && w.indexOf(start) === 0) { n[w] = (n[w] || 0) + 1; } }); });
     return Object.keys(n).sort(function (a, b) { return n[b] - n[a]; })[0] || null;
   }
+  // A word's forms with those of its store family's single words, as the search reads them ("נמר": "מנומרות"; "משובץ":
+  // "משבצות"): its chip narrows to what the search found by them, never back to one spelling (Vans, 26.10). A name of two
+  // words in the family is offered beside it instead (suggestFor).
+  function withFamily(forms) {
+    var out = forms.slice(), fams = (S.index && S.index.families) || [];
+    fams.forEach(function (fam) {
+      if (!fam.some(function (m) { return wordForms(m).some(function (f) { return forms.indexOf(f) >= 0; }); })) { return; }
+      fam.forEach(function (m) { if (!/\s/.test(m)) { wordForms(m).forEach(function (f) { if (out.indexOf(f) < 0) { out.push(f); } }); } });
+    });
+    return out;
+  }
   function nearTerm(turn, n) {
     var hit = (turn.near || []).filter(function (x) { return x && x.word === n; })[0];
     return hit ? String(hit.term) : null;
@@ -240,7 +251,7 @@
       if (word.length < 3 || STOP.test(word) || ASKS_ONLY.test(word) || /\d/.test(word)) { return; }
       var n = E.normalize(word), key = (not ? '-' : '') + n;
       if (!n || c.no['w:' + key] || c.words[key] || noChip(word)) { return; }
-      var forms = wordForms(n);
+      var forms = withFamily(wordForms(n));
       // a colour is the product's own (its index's mc: the colour it is sold in, the one its picture shows most), never
       // a part's: "חולצה שחורה" is no olive overshirt with black buttons (Story, 26.10)
       var colour = E.colorOf ? E.colorOf(n) : null;
@@ -281,7 +292,8 @@
     var c = C(turn), E = S.engine, out = {}, fams = (S.index && S.index.families) || [];
     if (!E || !E.normalize || !all.length) { return out; }
     var typed = {}, shown = {};
-    words.forEach(function (w) { wordForms(E.normalize(w)).forEach(function (f) { typed[f] = 1; }); });
+    // a typed word's family's single words are in its chip already (withFamily): nothing to offer of them
+    words.forEach(function (w) { withFamily(wordForms(E.normalize(w))).forEach(function (f) { typed[f] = 1; }); });
     Object.keys(c.words || {}).forEach(function (k) { shown[E.normalize(c.words[k].label)] = 1; });
     // the chip of the typed word an offered one stands for: chosen, the offered word takes its place ("מדע בדיוני" shows
     // the science fiction, not what says both it and "פנטזיה")

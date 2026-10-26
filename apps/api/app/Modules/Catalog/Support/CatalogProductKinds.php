@@ -54,8 +54,11 @@ final class CatalogProductKinds implements ProductKinds
             return ['head:'.$own['head']];
         }
 
-        if ($own['categories'] !== []) {
-            return array_map(fn (string $c): string => 'category:'.$c, $own['categories']);
+        // the categories that say what it is: never whom it is for ("גברים") or a campaign ("כל מה שחם", "SS26"), which a
+        // backpack shares with skate shoes (Vans, 26.10)
+        $categories = array_values(array_filter($own['categories'], fn (string $c): bool => ! $this->campaign($c) && ! $this->onlyWhom($c)));
+        if ($categories !== []) {
+            return array_map(fn (string $c): string => 'category:'.$c, $categories);
         }
 
         $limit = max(2, (int) floor($counts['products'] * self::TAG_MAX_SHARE));
@@ -223,7 +226,8 @@ final class CatalogProductKinds implements ProductKinds
     /** A Hebrew noun without its plural or construct ending: "חולצת", "חולצה", "חולצות" are "חולצ"; "נעלי", "נעליים" "נעל". */
     private static function base(string $word): string
     {
-        $word = (string) preg_replace('/(?:יים|ים|ות)$/u', '', $word);
+        // a doubled yod is a spelling of one ("נעליי" is "נעלי")
+        $word = (string) preg_replace('/(?:יים|ים|ות)$/u', '', (string) preg_replace('/יי$/u', 'י', $word));
 
         return mb_strlen($word) > 3 ? (string) preg_replace('/[יהת]$/u', '', $word) : $word;
     }
