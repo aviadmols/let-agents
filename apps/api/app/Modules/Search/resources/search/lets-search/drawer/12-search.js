@@ -167,8 +167,13 @@
       out = strict.length ? strict : pass(false);
     }
     // the words read as chips: what says each of them
-    var ws = Object.keys(c.words || {}).filter(function (k) { return !c.words[k].shown; });
+    // a typed word's chip gives way to the store's word chosen in its place
+    var instead = givenWay(c);
+    var ws = Object.keys(c.words || {}).filter(function (k) { return !c.words[k].shown && !instead[k]; });
     if (ws.length) { out = out.filter(function (r) { return ws.every(function (k) { return holdsChip(r, c.words[k]) !== !!c.words[k].not; }); }); }
+    // the store's words a shopper chose from what was offered ("מדע בדיוני" beside "פנטזיה")
+    var picked = Object.keys(c.picked || {});
+    if (picked.length) { out = out.filter(function (r) { return picked.every(function (k) { return holdsChip(r, c.picked[k]); }); }); }
     if (onStock(c)) { out = out.filter(function (r) { return r.s === 1; }); }
     if (onSale(c)) { out = out.filter(function (r) { return r.sl === 1; }); }
     var so = sortOf(c);
@@ -197,14 +202,24 @@
       stock: all.some(function (r) { return r.s === 0; }) && all.some(function (r) { return r.s === 1; }),
       sale: all.some(function (r) { return r.sl === 1; }) && all.some(function (r) { return r.sl !== 1; }) };
   }
-  function activeFilters(c) { return codesOn(c).length + Object.keys(c.words || {}).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
+  // the chips of typed words a store's word chosen in their place stands for
+  function givenWay(c) {
+    var out = {};
+    Object.keys(c.picked || {}).forEach(function (k) { (c.picked[k].instead || []).forEach(function (w) { out[w] = 1; }); });
+    return out;
+  }
+  function activeFilters(c) { return codesOn(c).length + Object.keys(c.words || {}).length + Object.keys(c.picked || {}).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
   function chipRow(turn) {
     var fc = facetChips(turn, 4), c = C(turn), act = activeFilters(c);
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
     if (fc.stock || onStock(c)) { chips += chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock && !!c.saidStock); }
     if (fc.sale || onSale(c)) { chips += chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale); }
     fc.codes.forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(f, v)); });
-    Object.keys(c.words || {}).forEach(function (k) { chips += chip(c.words[k].label, true, 'w:' + k, turn.id, true); });
+    var gave = givenWay(c);
+    Object.keys(c.words || {}).forEach(function (k) { chips += chip(c.words[k].label, !gave[k], 'w:' + k, turn.id, true); });
+    // chosen from what was offered, then what is offered: the store's words close to what was typed
+    Object.keys(c.picked || {}).forEach(function (k) { chips += chip(c.picked[k].label, true, 'g:' + k, turn.id, false); });
+    Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(c.suggest[k].label, false, 'g:' + k, turn.id, false); } });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }
   function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '" data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">' + count + '</span>' : '') + '</button>'; }

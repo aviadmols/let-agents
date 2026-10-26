@@ -40,6 +40,7 @@
     Object.keys(c.no).forEach(function (k) { n.no[k] = true; });
     Object.keys(c.auto).forEach(function (k) { n.no[k] = true; });
     Object.keys(c.words || {}).forEach(function (k) { n.no['w:' + k] = true; });
+    n.suggest = c.suggest || {};
     if (c.autoStock) { n.no.stock = true; }
     if (c.autoSale) { n.no.sale = true; }
     if (withSort) { n.no.sort = true; } else { n.sort = c.sort; n.autoSort = c.autoSort; }
@@ -52,6 +53,11 @@
       if (c.autoStock) { c.autoStock = false; c.no.stock = true; if (c.saidStock) { words = saidAt(turn.q, /^במלאי$/, ['in', 'stock']); } } else { c.stock = !c.stock; }
     } else if (key === 'sale') {
       if (c.autoSale) { c.autoSale = false; c.no.sale = true; words = saidAt(turn.q, /^ב?מבצע$/, ['on', 'sale']); } else { c.sale = !c.sale; }
+    } else if (key.indexOf('g:') === 0) {
+      // a store's word offered beside the typed one, chosen or let go: a filter of its own, the search's words untouched
+      var g = key.slice(2);
+      c.picked = c.picked || {};
+      if (c.picked[g]) { delete c.picked[g]; } else if (c.suggest && c.suggest[g]) { c.picked[g] = c.suggest[g]; signalEvent('chip_on', turn.q, c.suggest[g].label); }
     } else if (key.indexOf('w:') === 0) {
       // a word read as a chip, taken off: out of the search too, as a filter read from the words is
       var wd = c.words && c.words[key.slice(2)];

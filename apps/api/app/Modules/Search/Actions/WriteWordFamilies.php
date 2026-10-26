@@ -35,7 +35,7 @@ final class WriteWordFamilies
 
     public const ACTION = 'search.write_families';
 
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     private const PROMPTS = __DIR__.'/../Prompts/';
 
@@ -97,7 +97,7 @@ final class WriteWordFamilies
         $language = (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he');
 
         try {
-            $written = $this->ask($run, $writer, 'word_families', ['language' => $language, 'store_words' => $words]);
+            $written = $this->ask($run, $writer, 'word_families', ['language' => $language, 'store_words' => $words, 'alike' => self::alike($words)]);
         } catch (SpendCapReached|ModelCallFailed $e) {
             $run->fail('search::runs.families_failed', [], $e->getMessage());
 
@@ -181,6 +181,31 @@ final class WriteWordFamilies
         $run->usage($role['name'], $role['model'], $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($in, $out));
 
         return $reply;
+    }
+
+    /** At most this many groups of words that share a root are handed to the writer. */
+    private const ALIKE_MAX = 200;
+
+    /**
+     * The store's single words grouped by their letters' root (HebrewSearch::stem, then its consonants): most groups are
+     * forms of one word ("משובץ", "משובצת", "משבצות"), some only look alike ("עגיל", "עגול"); the writer tells which, so a
+     * form is never missed among hundreds of words.
+     *
+     * @param  list<string>  $words
+     * @return list<list<string>>
+     */
+    public static function alike(array $words): array
+    {
+        $groups = [];
+        foreach ($words as $word) {
+            $plain = HebrewSearch::normalize($word);
+            if (str_contains($plain, ' ') || preg_match('/^[א-ת]{3,}$/u', $plain) !== 1) {
+                continue;
+            }
+            $groups[HebrewSearch::skeleton(HebrewSearch::stem($plain))][] = $word;
+        }
+
+        return array_slice(array_values(array_filter($groups, fn (array $g): bool => count($g) >= 2 && count($g) <= self::FAMILY_MAX)), 0, self::ALIKE_MAX);
     }
 
     /** @return array{provider: AiProviderName|null, name: string, model: string} */

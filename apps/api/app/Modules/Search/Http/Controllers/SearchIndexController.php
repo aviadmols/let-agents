@@ -125,6 +125,8 @@ final class SearchIndexController
             'actions' => $data['actions'] ?? [],
             // words this store's shoppers take off as chips (LearnFromSearches): read as none
             'nochips' => $data['nochips'] ?? null,
+            // its word families, offered to choose beside a word of one
+            'families' => $data['families'] ?? null,
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 

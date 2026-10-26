@@ -200,7 +200,9 @@
     }
     return r._wf;
   }
-  function holdsChip(r, chip) { return chip.colour ? holdsColour(r, chip.colour, chip.forms) : saysWord(r, chip.forms); }
+  function holdsChip(r, chip) { return chip.phrase ? saysPhrase(r, chip.phrase) : chip.colour ? holdsColour(r, chip.colour, chip.forms) : saysWord(r, chip.forms); }
+  // a name of two words, said together by the product ("מדע בדיוני")
+  function saysPhrase(r, phrase) { recForms(r); return (' ' + r._ww.join(' ') + ' ').indexOf(' ' + phrase + ' ') >= 0; }
   // a product of a colour: one of its own colours (mc), or, where the index knows none of them, its words saying it
   function holdsColour(r, colour, forms) { return r.mc && r.mc.length ? r.mc.indexOf(colour) >= 0 : saysWord(r, forms); }
   // a word read as a chip holds in any of its forms, or (part typed, "לוג") as the start of a word of the product ("לוגו")
@@ -266,6 +268,35 @@
     // never emptying: while nothing holds them all, the broadest goes first ("פטריה" before "פוקוס")
     var keys = Object.keys(c.words).sort(function (a, b) { return c.words[b].share - c.words[a].share; });
     while (keys.length && !filtered(turn).length) { delete c.words[keys.shift()]; }
+    c.suggest = suggestFor(turn, all, words);
+  }
+  // Close, not the same: the store's own words a shopper may have meant, offered to choose, never read for them (as Aviad
+  // asked, 2026-10-26): the words of a typed word's family ("פנטזיה": מדע בדיוני; "כפתור": כפתורים) and the store's word
+  // the server read a word it does not know as (near). Only those some of the results say; at most SUGGESTED.
+  var SUGGESTED = 3;
+  var FINAL_OF = { 'כ': 'ך', 'מ': 'ם', 'נ': 'ן', 'פ': 'ף', 'צ': 'ץ' };
+  function withFinals(text) { return String(text).replace(/([כמנפצ])(?=\s|$)/g, function (m) { return FINAL_OF[m]; }); }
+  function suggestFor(turn, all, words) {
+    var c = C(turn), E = S.engine, out = {}, fams = (S.index && S.index.families) || [];
+    if (!E || !E.normalize || !all.length) { return out; }
+    var typed = {}, shown = {};
+    words.forEach(function (w) { wordForms(E.normalize(w)).forEach(function (f) { typed[f] = 1; }); });
+    Object.keys(c.words || {}).forEach(function (k) { shown[E.normalize(c.words[k].label)] = 1; });
+    // the chip of the typed word an offered one stands for: chosen, the offered word takes its place ("מדע בדיוני" shows
+    // the science fiction, not what says both it and "פנטזיה")
+    var chipOf = function (fam) {
+      return Object.keys(c.words || {}).filter(function (k) { return fam.some(function (m) { return wordForms(m).some(function (f) { return (c.words[k].forms || []).indexOf(f) >= 0; }); }); });
+    };
+    var offer = function (member, instead) {
+      if (Object.keys(out).length >= SUGGESTED || typed[member] || shown[member] || out[member] || noChip(member)) { return; }
+      // a form of a typed word is that word, already read ("כפתורים" beside "כפתור"): nothing to choose
+      if (wordForms(member).some(function (f) { return typed[f]; })) { return; }
+      var chip = /\s/.test(member) ? { phrase: member } : { forms: wordForms(member) };
+      if (all.some(function (r) { return holdsChip(r, chip); })) { chip.label = withFinals(member); chip.instead = instead || []; out[member] = chip; }
+    };
+    fams.forEach(function (fam) { if (fam.some(function (m) { return typed[m]; })) { var instead = chipOf(fam); fam.forEach(function (m) { offer(m, instead); }); } });
+    (turn.near || []).forEach(function (x) { if (x && x.term) { offer(E.normalize(x.term)); } });
+    return out;
   }
   // how much of the store says a word: of every product in the index
   var SUBJECT_SHARE = 0.5;
@@ -328,6 +359,7 @@
     var c = C(turn), pills = [];
     codesOn(c).forEach(function (code) { var x = valueOf(code); if (x && x.value) { pills.push({ key: 'f:' + code, label: chipText(x.facet, x.value), auto: !c.f[code], sw: swatch(x.facet, x.value) }); } });
     Object.keys(c.words || {}).forEach(function (k) { pills.push({ key: 'w:' + k, label: c.words[k].label, auto: true }); });
+    Object.keys(c.picked || {}).forEach(function (k) { pills.push({ key: 'g:' + k, label: c.picked[k].label, auto: false }); });
     if (onStock(c)) { pills.push({ key: 'stock', label: t('inStock'), auto: !c.stock && !!c.saidStock }); }
     if (onSale(c)) { pills.push({ key: 'sale', label: t('onSale'), auto: !c.sale }); }
     if (!pills.length) { return ''; }

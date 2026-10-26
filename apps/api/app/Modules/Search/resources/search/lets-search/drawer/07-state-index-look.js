@@ -10,7 +10,7 @@
     expanded: !!store('local', 'ls_expanded'), live: null, menu: ''
   };
   // at: for each filter read from the words, which of the typed words named it (their places in wordsOf(q))
-  function blankC() { return { f: {}, sort: '', stock: false, sale: false, no: {}, auto: {}, at: {}, words: {} }; }
+  function blankC() { return { f: {}, sort: '', stock: false, sale: false, no: {}, auto: {}, at: {}, words: {}, suggest: {}, picked: {} }; }
   if (WISH.wish.length) { S.saved = WISH.wish.slice(); } else if (S.saved.length) { WISH.wish = S.saved.slice(); WISH.pending = S.saved.slice(); wishSave(); }
   // what was asked on earlier pages is kept, but hidden on this one until asked for (the dashed line at the bottom)
   S.turns.forEach(function (x) { x.prev = true; });

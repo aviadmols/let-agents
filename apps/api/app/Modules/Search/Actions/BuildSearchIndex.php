@@ -323,6 +323,8 @@ final class BuildSearchIndex
         $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'],
             // words this store's shoppers take off as chips (LearnFromSearches): the drawer reads them as none
             'nochips' => array_values(SearchLearned::query()->where('kind', 'no_chip')->pluck('value')->all()) ?: null,
+            // the store's word families (WriteWordFamilies): the drawer offers a word's family to choose ("פנטזיה": מדע בדיוני)
+            'families' => array_map(fn ($f): array => array_values(array_map(fn ($w): string => HebrewSearch::normalize((string) $w), (array) $f)), (array) (SearchWordFamily::query()->first(['families'])?->families ?? [])) ?: null,
             'actions' => self::actions($this->locale($shopId), $facets['size'] !== null || $sized, in_array(self::VARIANT_SIZE, array_column($facets['facets'], 'k'), true))], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
