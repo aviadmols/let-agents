@@ -223,8 +223,9 @@
         }
         if (candidate === variant) {
           score = 1;
-        // "מק" while typing is "מקדחה"; "לב", a word the catalogue has, is a heart, never "לבן"
-        } else if (length >= 2 && candidate.indexOf(variant) === 0 && (length >= 3 || !Object.prototype.hasOwnProperty.call(index.holders, variant))) {
+        // "מק" while typing is "מקדחה"; a word the catalogue has as typed is that word, never the start of a longer
+        // one: "לב" is a heart, never "לבן"; "שבי" is captivity, never "שביל" (Sela, 26.10)
+        } else if (length >= 2 && candidate.indexOf(variant) === 0 && !Object.prototype.hasOwnProperty.call(index.holders, variant)) {
           score = Math.max(score, 0.9 - 0.02 * (candidate.length - length));
         } else if (length >= 3 && stem(candidate) === base) {
           score = Math.max(score, 0.85);
@@ -274,15 +275,18 @@
 
   // a word of three letters or more anywhere in the words; a shorter one only as a word of its own, maybe after a
   // prefix letter ("לב", "בלב", never "לבן"). The server's holdsToken.
-  function holdsToken(hay, token) {
+  // a word the catalogue has whole is held as a word, a prefix letter or two before it and an ending after it, never inside a
+  // longer one: "שבי" is not in "שביל" (Sela, 26.10); any other is held as the start of one, as it is typed (the server's)
+  function holdsToken(hay, token, whole) {
+    if (whole) { return new RegExp('(?:^| )[והבלמשכ]{0,2}' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ות|ה|י|ת)?(?: |$)').test(hay); }
     if (token.length >= 3) { return hay.indexOf(token) !== -1; }
     return new RegExp('(?:^| )[והבלמשכ]?' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?: |$)').test(hay);
   }
 
-  function exactTier(record, query, tokens) {
+  function exactTier(record, query, tokens, whole) {
     var i;
     for (i = 0; i < tokens.length; i++) {
-      if (!holdsToken(record.hay, tokens[i])) {
+      if (!holdsToken(record.hay, tokens[i], !!whole && Object.prototype.hasOwnProperty.call(whole, tokens[i]))) {
         return -1;
       }
     }
@@ -423,7 +427,7 @@
 
     for (var r = 0; r < index.items.length; r++) {
       var record = index.items[r];
-      var tier = exactTier(record, query, tokens);
+      var tier = exactTier(record, query, tokens, index.holders);
       if (tier < 0 && (hits[r] || 0) < needed) {
         continue;
       }

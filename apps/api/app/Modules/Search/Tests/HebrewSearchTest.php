@@ -41,6 +41,20 @@ final class HebrewSearchTest extends TestCase
         $this->assertSame($expected, $hits[0]['id'], "\"{$query}\" found {$hits[0]['title']} first");
     }
 
+    public function test_a_word_the_catalogue_has_whole_is_never_the_start_of_a_longer_one(): void
+    {
+        // Sela: "שבי" (captivity) found "שביל הזהב" first, as the start of "שביל".
+        $index = HebrewSearch::build([
+            ['id' => 'p:1', 'title' => 'שביל הזהב', 'keywords' => 'טיולים'],
+            ['id' => 'p:2', 'title' => 'מפגש עם עצמי בגיהינום', 'keywords' => 'חטופים ושבי'],
+            ['id' => 'p:3', 'title' => 'מקדחה Makita', 'keywords' => ''],
+        ]);
+
+        $this->assertSame(['p:2'], array_column(HebrewSearch::search($index, 'שבי'), 'id'), 'held whole, with its prefix letter ("ושבי")');
+        $this->assertSame(['p:1'], array_column(HebrewSearch::search($index, 'שביל'), 'id'));
+        $this->assertSame(['p:3'], array_column(HebrewSearch::search($index, 'מקד'), 'id'), 'a part no product has whole still starts a word, as typed');
+    }
+
     public function test_hebrew_is_normalized_before_anything_is_compared(): void
     {
         $this->assertSame('מברגה', HebrewSearch::normalize('מְבַרְגָה'), 'niqqud goes');

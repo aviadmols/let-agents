@@ -814,8 +814,9 @@ final class HebrewSearch
 
                 if ($candidate === $variant) {
                     $score = 1;
-                    // "מק" while typing is "מקדחה"; "לב", a word the catalogue has, is a heart, never "לבן"
-                } elseif ($length >= 2 && str_starts_with($candidate, $variant) && ($length >= 3 || ! isset($index['holders'][$variant]))) {
+                    // "מק" while typing is "מקדחה"; a word the catalogue has as typed is that word, never the start of a longer
+                    // one: "לב" is a heart, never "לבן"; "שבי" is captivity, never "שביל" (Sela, 26.10)
+                } elseif ($length >= 2 && str_starts_with($candidate, $variant) && ! isset($index['holders'][$variant])) {
                     $score = max($score, 0.9 - 0.02 * (mb_strlen($candidate) - $length));
                 } elseif ($length >= 3 && self::stem($candidate) === $base) {
                     $score = max($score, 0.85);
@@ -891,16 +892,26 @@ final class HebrewSearch
     }
 
     /** A word of three letters or more anywhere in the words ("פרגולה" in "פרגולות"); a shorter one only as a word of its own, maybe after a prefix letter ("לב", "בלב", never "לבן"). */
-    private static function holdsToken(string $hay, string $token): bool
+    private static function holdsToken(string $hay, string $token, bool $whole = false): bool
     {
+        // a word the catalogue has whole is held as a word, a prefix letter or two before it and an ending after it, never
+        // inside a longer one: "שבי" is not in "שביל" (Sela, 26.10); any other is held as the start of one, as it is typed
+        if ($whole) {
+            return preg_match('/(?:^| )[והבלמשכ]{0,2}'.preg_quote($token, '/').'(?:ימ|ות|ה|י|ת)?(?: |$)/u', $hay) === 1;
+        }
+
         return mb_strlen($token) >= 3 ? str_contains($hay, $token) : preg_match('/(?:^| )[והבלמשכ]?'.preg_quote($token, '/').'(?: |$)/u', $hay) === 1;
     }
 
-    /** 0 (best) to 5 when the record holds every word as typed; -1 when it does not. */
-    public static function exactTier(array $record, string $query, array $tokens): int
+    /**
+     * 0 (best) to 5 when the record holds every word as typed; -1 when it does not.
+     *
+     * @param  array<string, mixed>  $whole  the words the catalogue has whole (the index's holders)
+     */
+    public static function exactTier(array $record, string $query, array $tokens, array $whole = []): int
     {
         foreach ($tokens as $token) {
-            if (! self::holdsToken($record['hay'], $token)) {
+            if (! self::holdsToken($record['hay'], $token, isset($whole[$token]))) {
                 return -1;
             }
         }
@@ -974,7 +985,7 @@ final class HebrewSearch
         }
 
         foreach ($index['items'] as $at => $record) {
-            $tier = self::exactTier($record, $query, $tokens);
+            $tier = self::exactTier($record, $query, $tokens, $index['holders'] ?? []);
 
             if ($tier < 0 && ($hits[$at] ?? 0) < $needed) {
                 continue;
