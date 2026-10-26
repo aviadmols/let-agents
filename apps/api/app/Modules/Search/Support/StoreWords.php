@@ -63,7 +63,8 @@ final class StoreWords
             }
             $products++;
             // its tags too, each word and each tag whole: a store's topics live there ("חטופים ושבי" on Sela's books)
-            $tags = array_values(array_filter(array_map('strval', is_array($item['tg'] ?? null) ? $item['tg'] : [(string) ($item['tg'] ?? '')])));
+            // a tag is [its words, how central] (BuildSearchIndex), read for its words
+            $tags = array_values(array_filter(array_map(fn ($tag): string => (string) (is_array($tag) ? ($tag[0] ?? '') : $tag), is_array($item['tg'] ?? null) ? $item['tg'] : [(string) ($item['tg'] ?? '')])));
             foreach (array_unique(explode(' ', HebrewSearch::normalize((string) ($item['title'] ?? '').' '.(string) ($item['kw'] ?? '').' '.implode(' ', $tags)))) as $word) {
                 if (mb_strlen($word) >= 3 && preg_match('/^\p{L}+$/u', $word) === 1 && ! HebrewSearch::isFiller($word)) {
                     $said[$word] = ($said[$word] ?? 0) + 1;

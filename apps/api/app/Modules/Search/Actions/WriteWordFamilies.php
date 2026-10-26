@@ -35,9 +35,12 @@ final class WriteWordFamilies
 
     public const ACTION = 'search.write_families';
 
-    public const PROMPT_VERSION = 2;
+    public const PROMPT_VERSION = 3;
 
     private const PROMPTS = __DIR__.'/../Prompts/';
+
+    /** What the checker may say holds a family together; anything else (its "wrong") and the family goes. */
+    private const KINDS = ['forms', 'same_thing', 'genres'];
 
     /** At most this many words a family, and this many families. */
     private const FAMILY_MAX = 8;
@@ -126,7 +129,9 @@ final class WriteWordFamilies
             }
         }
 
-        // the other family checks: a family wrong as a whole goes, a word wrong in it is taken out
+        // the other family checks, a family at a time: what holds it together and the words it keeps; a family it calls
+        // wrong, or does not answer for, goes (a list of what to take out read as one of what to keep: v2 lost "משבצות")
+        $kinds = [];
         if ($families !== []) {
             try {
                 $checked = $this->ask($run, $checker, 'word_families_check', ['language' => $language,
@@ -136,16 +141,18 @@ final class WriteWordFamilies
 
                 return;
             }
-            foreach ((array) ($checked->data['drop'] ?? []) as $id) {
-                unset($families[(string) $id]);
-            }
-            foreach ((array) ($checked->data['remove'] ?? []) as $out) {
-                $id = (string) ($out['id'] ?? '');
-                if (isset($families[$id])) {
-                    $families[$id] = array_values(array_filter($families[$id], fn (string $w): bool => HebrewSearch::normalize($w) !== HebrewSearch::normalize((string) ($out['word'] ?? ''))));
+            $kept = [];
+            foreach ((array) ($checked->data['families'] ?? []) as $answer) {
+                $id = (string) ($answer['id'] ?? '');
+                $kind = (string) ($answer['kind'] ?? 'wrong');
+                if (! isset($families[$id]) || isset($kept[$id]) || ! in_array($kind, self::KINDS, true)) {
+                    continue;
                 }
+                $keep = array_map(fn ($w): string => HebrewSearch::normalize(is_string($w) ? $w : ''), (array) ($answer['keep'] ?? []));
+                $kept[$id] = array_values(array_filter($families[$id], fn (string $w): bool => in_array(HebrewSearch::normalize($w), $keep, true)));
+                $kinds[$kind] = ($kinds[$kind] ?? 0) + 1;
             }
-            $families = array_filter($families, fn (array $f): bool => count($f) >= 2);
+            $families = array_filter($kept, fn (array $f): bool => count($f) >= 2);
         }
 
         SearchWordFamily::query()->updateOrCreate(['shop_id' => $shopId], [
@@ -154,7 +161,7 @@ final class WriteWordFamilies
             'prompt_version' => self::PROMPT_VERSION,
             'model' => $writer['model'],
         ]);
-        $run->output(['families' => count($families), 'words' => array_sum(array_map('count', $families)), 'sample' => array_slice(array_values($families), 0, 12)])
+        $run->output(['families' => count($families), 'words' => array_sum(array_map('count', $families)), 'kinds' => $kinds, 'sample' => array_slice(array_values($families), 0, 12)])
             ->summary('search::runs.families', ['count' => (string) count($families)]);
     }
 

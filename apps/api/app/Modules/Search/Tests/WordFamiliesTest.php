@@ -12,6 +12,7 @@ use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WriteWordFamilies;
 use App\Modules\Search\Models\SearchWordFamily;
 use App\Modules\Search\Support\LoadedIndex;
+use App\Modules\Search\Support\StoreWords;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -46,8 +47,12 @@ final class WordFamiliesTest extends TestCase
                 return $provider === AiProviderName::OpenAi
                     // the writer: a family of hostages, one of checks, a word the store does not say, a word twice, and a wrong one
                     ? new ModelReply(['families' => [['שבי', 'חטופים', 'חטוף', 'אסירים'], ['משובצות', 'משבצות', 'חטופים'], ['ספר', 'מחברת']]], 900, 200)
-                    // the checker: the notebook is no book
-                    : new ModelReply(['drop' => ['f3'], 'remove' => []], 300, 20);
+                    // the checker, a family at a time: the notebook is no book
+                    : new ModelReply(['families' => [
+                        ['id' => 'f1', 'kind' => 'same_thing', 'keep' => ['שבי', 'חטופים', 'חטוף']],
+                        ['id' => 'f2', 'kind' => 'forms', 'keep' => ['משובצות', 'משבצות']],
+                        ['id' => 'f3', 'kind' => 'wrong', 'keep' => ['ספר', 'מחברת']],
+                    ]], 300, 20);
             }
         });
     }
@@ -85,6 +90,18 @@ final class WordFamiliesTest extends TestCase
         $this->assertContains('3', $hostages);
         $checks = array_column(app(SearchCatalog::class)->handle($this->shop->id, 'משבצות', count: false)['groups']['product'], 'external_id');
         $this->assertContains('4', $checks, 'the shirt that says "משובצות" found by "משבצות"');
+    }
+
+    public function test_a_stores_words_read_its_tags_as_words_not_as_their_weights(): void
+    {
+        // a record's tags as the index writes them: [its words, how central] (Sela's "חטופים ושבי")
+        $book = fn (string $title): array => ['t' => 'product', 'title' => $title, 'kw' => '', 'tg' => [['חטופים ושבי', 1], ['שבי חמאס', 0.9]]];
+        $words = StoreWords::vocabulary([$book('חטוף'), $book('מפגש עם עצמי בגיהינום'), ['t' => 'product', 'title' => 'כלכלה', 'kw' => '', 'tg' => null], ['t' => 'product', 'title' => 'אחר', 'kw' => '', 'tg' => null], ['t' => 'product', 'title' => 'עוד', 'kw' => '', 'tg' => null]], [], 100);
+
+        $this->assertContains('חטופים', $words);
+        $this->assertContains('שבי', $words);
+        $this->assertContains('חטופים ושבי', $words, 'a tag of two words, whole');
+        $this->assertNotContains('Array', $words);
     }
 
     /** @param array<string, array{0: string, 1: string}> $products */

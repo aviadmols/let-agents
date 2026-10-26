@@ -192,7 +192,8 @@
   function recForms(r) {
     if (!r._wf) {
       // its title, its words and its tags, as the search reads them ("חטופים", a tag of Omer Shem Tov's book)
-      var tags = Array.isArray(r.tg) ? r.tg.join(' ') : String(r.tg || '');
+      // a tag is [its words, how central], read for its words
+      var tags = Array.isArray(r.tg) ? r.tg.map(function (t) { return Array.isArray(t) ? t[0] : t; }).join(' ') : String(r.tg || '');
       var set = {}, list = S.engine.normalize(decode(r.title || '') + ' ' + (r.kw || '') + ' ' + tags).split(' ').filter(Boolean);
       list.forEach(function (w) { wordForms(w).forEach(function (f) { set[f] = 1; }); });
       r._wf = set;
