@@ -816,7 +816,7 @@ final class HebrewSearch
                     $score = 1;
                     // "מק" while typing is "מקדחה"; a word the catalogue has as typed is that word, never the start of a longer
                     // one: "לב" is a heart, never "לבן"; "שבי" is captivity, never "שביל" (Sela, 26.10)
-                } elseif ($length >= 2 && str_starts_with($candidate, $variant) && ! isset($index['holders'][$variant])) {
+                } elseif ($length >= 2 && str_starts_with($candidate, $variant) && ! self::heldWhole($index['holders'], $variant)) {
                     $score = max($score, 0.9 - 0.02 * (mb_strlen($candidate) - $length));
                 } elseif ($length >= 3 && self::stem($candidate) === $base) {
                     $score = max($score, 0.85);
@@ -892,6 +892,25 @@ final class HebrewSearch
     }
 
     /** A word of three letters or more anywhere in the words ("פרגולה" in "פרגולות"); a shorter one only as a word of its own, maybe after a prefix letter ("לב", "בלב", never "לבן"). */
+    /**
+     * Whether the catalogue has a word whole: as it is, or after a prefix letter ("ושבי" in "חטופים ושבי" has "שבי").
+     *
+     * @param  array<string, mixed>  $holders
+     */
+    public static function heldWhole(array $holders, string $word): bool
+    {
+        if (isset($holders[$word])) {
+            return true;
+        }
+        foreach (['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'] as $prefix) {
+            if (isset($holders[$prefix.$word])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function holdsToken(string $hay, string $token, bool $whole = false): bool
     {
         // a word the catalogue has whole is held as a word, a prefix letter or two before it and an ending after it, never
@@ -911,7 +930,7 @@ final class HebrewSearch
     public static function exactTier(array $record, string $query, array $tokens, array $whole = []): int
     {
         foreach ($tokens as $token) {
-            if (! self::holdsToken($record['hay'], $token, isset($whole[$token]))) {
+            if (! self::holdsToken($record['hay'], $token, self::heldWhole($whole, $token))) {
                 return -1;
             }
         }

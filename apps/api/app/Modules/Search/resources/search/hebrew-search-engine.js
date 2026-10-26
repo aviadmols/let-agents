@@ -225,7 +225,7 @@
           score = 1;
         // "מק" while typing is "מקדחה"; a word the catalogue has as typed is that word, never the start of a longer
         // one: "לב" is a heart, never "לבן"; "שבי" is captivity, never "שביל" (Sela, 26.10)
-        } else if (length >= 2 && candidate.indexOf(variant) === 0 && !Object.prototype.hasOwnProperty.call(index.holders, variant)) {
+        } else if (length >= 2 && candidate.indexOf(variant) === 0 && !heldWhole(index.holders, variant)) {
           score = Math.max(score, 0.9 - 0.02 * (candidate.length - length));
         } else if (length >= 3 && stem(candidate) === base) {
           score = Math.max(score, 0.85);
@@ -277,6 +277,11 @@
   // prefix letter ("לב", "בלב", never "לבן"). The server's holdsToken.
   // a word the catalogue has whole is held as a word, a prefix letter or two before it and an ending after it, never inside a
   // longer one: "שבי" is not in "שביל" (Sela, 26.10); any other is held as the start of one, as it is typed (the server's)
+  // whether the catalogue has a word whole: as it is, or after a prefix letter ("ושבי" has "שבי"). The server's heldWhole.
+  function heldWhole(holders, word) {
+    var has = function (w) { return Object.prototype.hasOwnProperty.call(holders, w); };
+    return has(word) || ['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'].some(function (p) { return has(p + word); });
+  }
   function holdsToken(hay, token, whole) {
     if (whole) { return new RegExp('(?:^| )[והבלמשכ]{0,2}' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ות|ה|י|ת)?(?: |$)').test(hay); }
     if (token.length >= 3) { return hay.indexOf(token) !== -1; }
@@ -286,7 +291,7 @@
   function exactTier(record, query, tokens, whole) {
     var i;
     for (i = 0; i < tokens.length; i++) {
-      if (!holdsToken(record.hay, tokens[i], !!whole && Object.prototype.hasOwnProperty.call(whole, tokens[i]))) {
+      if (!holdsToken(record.hay, tokens[i], !!whole && heldWhole(whole, tokens[i]))) {
         return -1;
       }
     }
