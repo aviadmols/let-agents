@@ -35,6 +35,65 @@ final class StoreWords
         return self::$read[$key];
     }
 
+    /** Rare forms read beside a store's words, at most. */
+    private const RARE_MAX = 200;
+
+    /**
+     * The words one product alone says that share a root with the store's words (rootKeys): "נמר" on Vans' one leopard
+     * sneaker beside the "מנומר" of three. Too rare to be the store's words, a form of one all the same: its families
+     * read them (WriteWordFamilies), so a search for either finds both.
+     *
+     * @param  array<string, mixed>  $index  the loaded index
+     * @param  list<string>  $words  the store's words (of)
+     * @return list<string>
+     */
+    public static function rareForms(array $index, array $words): array
+    {
+        $roots = [];
+        foreach ($words as $word) {
+            foreach (self::rootKeys(HebrewSearch::normalize($word)) as $key) {
+                $roots[$key] = true;
+            }
+        }
+        $known = array_flip(array_map(fn (string $w): string => HebrewSearch::normalize($w), $words));
+        $said = [];
+        foreach ((array) ($index['records'] ?? []) as $item) {
+            if (! is_array($item) || ($item['t'] ?? null) !== 'product') {
+                continue;
+            }
+            foreach (array_unique(explode(' ', HebrewSearch::normalize((string) ($item['title'] ?? '').' '.(string) ($item['kw'] ?? '')))) as $word) {
+                $said[$word] = ($said[$word] ?? 0) + 1;
+            }
+        }
+        $out = [];
+        foreach ($said as $word => $n) {
+            $word = (string) $word;
+            if ($n === 1 && ! isset($known[$word]) && preg_match('/^[א-ת]{3,}$/u', $word) === 1 && ! HebrewSearch::isFiller($word)
+                && array_filter(self::rootKeys($word), fn (string $key): bool => isset($roots[$key])) !== []) {
+                $out[] = HebrewSearch::withFinals($word);
+            }
+        }
+        sort($out, SORT_STRING);
+
+        return array_slice($out, 0, self::RARE_MAX);
+    }
+
+    /**
+     * A single Hebrew word's root as letters (HebrewSearch::stem, then its consonants), and without a letter a form of a
+     * root begins with ("מנומר": מנמר and נמר; "הדפס": הדפס and דפס). Forms of one word share one; some words only look alike.
+     *
+     * @return list<string>
+     */
+    public static function rootKeys(string $plain): array
+    {
+        if (str_contains($plain, ' ') || preg_match('/^[א-ת]{3,}$/u', $plain) !== 1) {
+            return [];
+        }
+        $root = HebrewSearch::skeleton(HebrewSearch::stem($plain));
+
+        return preg_match('/^[מתה](.{3,})$/u', $root, $m) === 1 ? [$root, $m[1]] : [$root];
+    }
+
     /**
      * @param  list<array<string, mixed>>  $items  index records (t, title, kw)
      * @param  list<array<string, mixed>>  $facets

@@ -102,6 +102,16 @@ final class WordFamiliesTest extends TestCase
         $this->assertNotContains(['מנומר', 'מנומרות'], $groups, 'a group another holds all of adds nothing');
     }
 
+    public function test_a_form_one_product_alone_says_is_read_beside_the_stores_word_of_its_root(): void
+    {
+        // Vans, 26.10: "נמר" on one sneaker, "מנומר" on three: never a family, "נמר" found one, "מנומרות" four
+        $record = fn (string $title, string $kw): array => ['t' => 'product', 'title' => $title, 'kw' => $kw];
+        $index = ['records' => ['p:1' => $record('נעלי סניקרס LX', 'נמר חום'), 'p:2' => $record('נעלי סניקרס Authentic', 'מנומר'), 'p:3' => $record('תיק גב', 'מנומר'),
+            'p:4' => $record('מכנס ג\'ינס', 'מנומרת כחול'), 'p:5' => $record('כובע', 'פסים מרופט')]];
+
+        $this->assertSame(['מנומרת', 'נמר'], StoreWords::rareForms($index, ['מנומר', 'חום', 'פסים']), 'forms of the store\'s word; "מרופט", alone and of no root of the store\'s, is not');
+    }
+
     public function test_a_stores_words_read_its_tags_as_words_not_as_their_weights(): void
     {
         // a record's tags as the index writes them: [its words, how central] (Sela's "חטופים ושבי")

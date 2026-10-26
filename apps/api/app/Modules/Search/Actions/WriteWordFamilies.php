@@ -66,6 +66,8 @@ final class WriteWordFamilies
             return null;
         }
         [$words, $hash] = StoreWords::of($shopId, $index);
+        // with the forms one product alone says of the store's words ("נמר" beside "מנומר")
+        $words = [...$words, ...StoreWords::rareForms($index, $words)];
         // the words and the groups code hands with them: a better grouping writes every store's families again, once
         $hash = substr(hash('sha256', $hash.'|'.json_encode(self::alike($words), JSON_UNESCAPED_UNICODE)), 0, 20);
         $saved = $this->tenant->run($shopId, fn (): ?SearchWordFamily => SearchWordFamily::query()->first());
@@ -206,17 +208,11 @@ final class WriteWordFamilies
     public static function alike(array $words): array
     {
         $groups = [];
+        // by root, and without a letter a form of a root begins with ("מנומר" of "נמר", "הדפס" of "דפוס"): the writer
+        // tells a form from a word that only starts so ("מכנס" is no "כנס")
         foreach ($words as $word) {
-            $plain = HebrewSearch::normalize($word);
-            if (str_contains($plain, ' ') || preg_match('/^[א-ת]{3,}$/u', $plain) !== 1) {
-                continue;
-            }
-            $root = HebrewSearch::skeleton(HebrewSearch::stem($plain));
-            $groups[$root][] = $word;
-            // and without a letter a form of a root begins with ("מנומר" of "נמר", "הדפס" of "דפוס"): the writer tells
-            // a form from a word that only starts so ("מכנס" is no "כנס")
-            if (preg_match('/^[מתה](.{3,})$/u', $root, $m) === 1) {
-                $groups[$m[1]][] = $word;
+            foreach (StoreWords::rootKeys(HebrewSearch::normalize($word)) as $key) {
+                $groups[$key][] = $word;
             }
         }
         // a group only of words some other group holds as well adds nothing
