@@ -26,9 +26,9 @@ use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchSynonym;
-use App\Modules\Search\Models\SearchWordFamily;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\ShownQuestion;
+use App\Modules\Search\Support\StoreFamilies;
 use App\Modules\Search\Support\Transliterate;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\DB;
@@ -324,7 +324,7 @@ final class BuildSearchIndex
             // words this store's shoppers take off as chips (LearnFromSearches): the drawer reads them as none
             'nochips' => array_values(SearchLearned::query()->where('kind', 'no_chip')->pluck('value')->all()) ?: null,
             // the store's word families (WriteWordFamilies): the drawer offers a word's family to choose ("פנטזיה": מדע בדיוני)
-            'families' => array_map(fn ($f): array => array_values(array_map(fn ($w): string => HebrewSearch::normalize((string) $w), (array) $f)), (array) (SearchWordFamily::query()->first(['families'])?->families ?? [])) ?: null,
+            'families' => array_map(fn (array $f): array => array_values(array_map(fn ($w): string => HebrewSearch::normalize((string) $w), $f)), StoreFamilies::all()) ?: null,
             'actions' => self::actions($this->locale($shopId), $facets['size'] !== null || $sized, in_array(self::VARIANT_SIZE, array_column($facets['facets'], 'k'), true))], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
@@ -1056,21 +1056,15 @@ final class BuildSearchIndex
     }
 
     /**
-     * The word families every shop shares (HebrewSearch::FAMILIES), as synonyms: "גינה" is added
-     * to whatever says "גינון", so a shopper's garden finds the store's gardening.
-     *
-     * @return list<array{0: string, 1: list<string>}>
-     */
-    /**
-     * The store's own word families (WriteWordFamilies), as synonyms: each word of a family means each other, a name of
-     * two words by both its words ("מדע בדיוני" for a book that says "פנטזיה", and the other way round).
+     * The store's own word families (StoreFamilies: its team's, then the written ones), as synonyms: each word of a family
+     * means each other, a name of two words by both its words ("מדע בדיוני" for a book that says "פנטזיה", and back).
      *
      * @return list<array{0: string, 1: list<string>}>
      */
     private function storeFamilies(): array
     {
         $out = [];
-        foreach ((array) (SearchWordFamily::query()->first(['families'])?->families ?? []) as $family) {
+        foreach (StoreFamilies::all() as $family) {
             $words = array_values(array_unique(array_filter(array_map(fn ($w): string => HebrewSearch::normalize(is_string($w) ? $w : ''), (array) $family))));
             foreach ($words as $term) {
                 foreach ($words as $other) {
@@ -1084,6 +1078,12 @@ final class BuildSearchIndex
         return $out;
     }
 
+    /**
+     * The word families every shop shares (HebrewSearch::FAMILIES), as synonyms: "גינה" is added
+     * to whatever says "גינון", so a shopper's garden finds the store's gardening.
+     *
+     * @return list<array{0: string, 1: list<string>}>
+     */
     private static function families(): array
     {
         $out = [];

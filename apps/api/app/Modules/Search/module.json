@@ -984,6 +984,31 @@
             "scope": "shop"
         },
         {
+            "name": "family_words_max",
+            "type": "int",
+            "default": 12,
+            "min": 2,
+            "max": 30,
+            "scope": "shop"
+        },
+        {
+            "name": "families_open_days",
+            "type": "int",
+            "default": 30,
+            "min": 1,
+            "max": 365,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
+            "name": "families_open_shown",
+            "type": "int",
+            "default": 40,
+            "min": 5,
+            "max": 200,
+            "scope": "shop"
+        },
+        {
             "name": "families_max_output_tokens",
             "type": "int",
             "default": 6000,
