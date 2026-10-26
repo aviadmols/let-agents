@@ -25,6 +25,7 @@ use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchSynonym;
+use App\Modules\Search\Models\SearchWordFamily;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Search\Support\Transliterate;
@@ -180,8 +181,8 @@ final class BuildSearchIndex
     private function build(RunContext $run, string $shopId): void
     {
         $own = $this->synonyms();
-        // The shop's own, then the word families every shop shares; only its own are counted.
-        $synonyms = [...$own, ...self::families()];
+        // The shop's own, then its own word families (WriteWordFamilies), then those every shop shares; only its own are counted.
+        $synonyms = [...$own, ...$this->storeFamilies(), ...self::families()];
         $items = [];
         $counts = ['product' => 0, 'content' => 0, 'category' => 0, 'synonyms' => count($own)];
 
@@ -1054,6 +1055,29 @@ final class BuildSearchIndex
      *
      * @return list<array{0: string, 1: list<string>}>
      */
+    /**
+     * The store's own word families (WriteWordFamilies), as synonyms: each word of a family means each other, a name of
+     * two words by both its words ("מדע בדיוני" for a book that says "פנטזיה", and the other way round).
+     *
+     * @return list<array{0: string, 1: list<string>}>
+     */
+    private function storeFamilies(): array
+    {
+        $out = [];
+        foreach ((array) (SearchWordFamily::query()->first(['families'])?->families ?? []) as $family) {
+            $words = array_values(array_unique(array_filter(array_map(fn ($w): string => HebrewSearch::normalize(is_string($w) ? $w : ''), (array) $family))));
+            foreach ($words as $term) {
+                foreach ($words as $other) {
+                    if ($other !== $term) {
+                        $out[] = [$term, explode(' ', $other)];
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
     private static function families(): array
     {
         $out = [];

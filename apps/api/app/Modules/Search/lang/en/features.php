@@ -97,6 +97,10 @@ return [
         'label' => 'Lets posts in search results',
         'description' => 'Posts Lets wrote and the store published live at Lets\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
     ],
+    'word_families' => [
+        'label' => 'Word families',
+        'description' => 'The store\'s words a shopper means as one ("checkered", "checks"; "captivity", "hostages") find each other. One model writes them, a model of the other family checks, only when the store\'s words change.',
+    ],
     'word_meanings' => [
         'label' => 'Words by meaning',
         'description' => 'A word the store does not write ("striped", "sport shoes") is read as one it does ("stripes", "sneakers"), and shown as a filter. A small model, once per word.',

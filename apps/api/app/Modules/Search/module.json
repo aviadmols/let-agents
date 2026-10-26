@@ -17,6 +17,10 @@
     "provider": "SearchServiceProvider",
     "features": [
         {
+            "name": "word_families",
+            "default": true
+        },
+        {
             "name": "word_meanings",
             "default": true
         },
@@ -959,6 +963,15 @@
             "scope": "shop"
         },
         {
+            "name": "families_max_output_tokens",
+            "type": "int",
+            "default": 6000,
+            "min": 500,
+            "max": 16000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
             "name": "word_reader_daily_max",
             "type": "int",
             "default": 300,
@@ -1099,6 +1112,40 @@
         }
     ],
     "agents": [
+        {
+            "name": "family_writer",
+            "action": "write_families",
+            "when": "02:40",
+            "features": [
+                "word_families"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "resolve_provider",
+                    "model": "resolve_model",
+                    "prices": [
+                        "resolve_input_usd_per_million",
+                        "resolve_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "word_families"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "check_provider",
+                    "model": "check_model",
+                    "prices": [
+                        "check_input_usd_per_million",
+                        "check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "word_families_check"
+                    ]
+                }
+            ]
+        },
         {
             "name": "word_reader",
             "action": "read_words",

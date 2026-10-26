@@ -11,6 +11,7 @@ use App\Modules\Search\Actions\CheckStoreSearch;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
+use App\Modules\Search\Actions\WriteWordFamilies;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Models\SearchShare;
@@ -72,6 +73,14 @@ final class SearchCommand extends Command
             $run = app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
             $this->line("{$shop->slug}: ".$run->summary());
             $failed += $run->status->value === 'succeeded' ? 0 : 1;
+            // its word families, once its words change (WriteWordFamilies): written, the index is built again to read them
+            $families = $run->status->value === 'succeeded' ? app(WriteWordFamilies::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual) : null;
+            if ($families !== null) {
+                $this->line("{$shop->slug}: ".$families->summary());
+                if ($families->status->value === 'succeeded') {
+                    app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
+                }
+            }
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
@@ -93,6 +102,14 @@ final class SearchCommand extends Command
             $run = app(ResolveEmptySearches::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
             $this->line("{$shop->slug}: ".$run->summary());
             $failed += $run->status->value === 'succeeded' ? 0 : 1;
+            // its word families, once its words change (WriteWordFamilies): written, the index is built again to read them
+            $families = $run->status->value === 'succeeded' ? app(WriteWordFamilies::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual) : null;
+            if ($families !== null) {
+                $this->line("{$shop->slug}: ".$families->summary());
+                if ($families->status->value === 'succeeded') {
+                    app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
+                }
+            }
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
@@ -114,6 +131,14 @@ final class SearchCommand extends Command
             $run = app(WritePageTags::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
             $this->line("{$shop->slug}: ".$run->summary());
             $failed += $run->status->value === 'succeeded' ? 0 : 1;
+            // its word families, once its words change (WriteWordFamilies): written, the index is built again to read them
+            $families = $run->status->value === 'succeeded' ? app(WriteWordFamilies::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual) : null;
+            if ($families !== null) {
+                $this->line("{$shop->slug}: ".$families->summary());
+                if ($families->status->value === 'succeeded') {
+                    app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
+                }
+            }
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
