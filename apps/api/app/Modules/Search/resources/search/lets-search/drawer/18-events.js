@@ -184,10 +184,10 @@
     if (d.recent) { e.preventDefault(); submit(d.recent, 'search', false, true); return; }
     if (d.photo !== undefined) { e.preventDefault(); photoPick(); return; }
     if (d.focus !== undefined) { INPUT.focus(); return; }
-    if (d.q) { e.preventDefault(); submit(d.q, 'search'); return; }
+    if (d.q) { e.preventDefault(); if (d.loose) { signalEvent('loose_pick', d.loose, d.q); } submit(d.q, 'search'); return; }
     if (d.notSure) { e.preventDefault(); notSure(turnById(d.notSure)); return; }
     if (d.askAbout) { e.preventDefault(); askAbout(turnById(d.askAbout), d.question); return; }
-    if (d.ask) { e.preventDefault(); submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
+    if (d.ask) { e.preventDefault(); if (d.askcard !== undefined && d.from) { signalEvent('ask_after', d.from, ''); } submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
     if (d.savedAnswer) {
       e.preventDefault();
       var a = S.records[d.savedAnswer];

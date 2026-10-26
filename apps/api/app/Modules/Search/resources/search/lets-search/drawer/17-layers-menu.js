@@ -55,10 +55,13 @@
     } else if (key.indexOf('w:') === 0) {
       // a word read as a chip, taken off: out of the search too, as a filter read from the words is
       var wd = c.words && c.words[key.slice(2)];
-      if (wd) { delete c.words[key.slice(2)]; c.no[key] = true; words = wd.at.slice(); }
+      if (wd) { delete c.words[key.slice(2)]; c.no[key] = true; words = wd.at.slice(); signalEvent('chip_off', turn.q, wd.label); }
     } else {
       var code = Number(key.split(':')[1]);
       if (c.auto[code] && !c.f[code] && c.at && c.at[code] && c.at[code].length) { words = c.at[code]; }
+      var named = valueOf(code), label = named && named.value ? named.value.l : '';
+      // read from the words and taken off, or put on by hand: what the store learns of its chips
+      if (c.auto[code] && !c.f[code]) { signalEvent('chip_off', turn.q, label); } else if (!c.f[code]) { signalEvent('chip_on', turn.q, label); }
       if (c.auto[code] || c.f[code]) { delete c.auto[code]; delete c.f[code]; c.no[code] = true; } else { c.f[code] = true; delete c.no[code]; }
     }
     if (words && words.length && turn.q && (turn === S.live || turn.kind === 'results')) { dropWords(turn, words); return true; }

@@ -17,6 +17,10 @@
     "provider": "SearchServiceProvider",
     "features": [
         {
+            "name": "learning",
+            "default": true
+        },
+        {
             "name": "word_families",
             "default": true
         },
@@ -960,6 +964,23 @@
                 "apply"
             ],
             "default": "dry",
+            "scope": "shop"
+        },
+        {
+            "name": "learn_days",
+            "type": "int",
+            "default": 60,
+            "min": 7,
+            "max": 365,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
+            "name": "learn_min_visitors",
+            "type": "int",
+            "default": 3,
+            "min": 2,
+            "max": 100,
             "scope": "shop"
         },
         {

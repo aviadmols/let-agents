@@ -106,6 +106,11 @@
       return E.stem(a) === E.stem(b) || (b.length >= 4 && !!E.sound && E.sound(a) === E.sound(b));
     } catch (e) { return false; }
   }
+  // a word this store's shoppers keep taking off as a chip (the index's nochips, LearnFromSearches): read as none
+  function noChip(label) {
+    var list = S.index && S.index.nochips, E = S.engine;
+    return !!(list && list.length && E && E.normalize && list.indexOf(E.normalize(String(label))) >= 0);
+  }
   function readTags(turn) {
     var c = C(turn), q = turn.q || '', all = (turn.ids || []).map(rec).filter(Boolean), counts = {}, best = {}, said = {}, part = {};
     all.forEach(function (r) { (r.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; }); });
@@ -113,7 +118,7 @@
       var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
       // a category (or a tag shown as a filter) of one word is chosen by the shopper, never read from the words: "ברגים"
       // finds screws outside the screws category too. One of several words, said enough (namesGroup), is it.
-      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l)) { return; }
+      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l) || noChip(value.l)) { return; }
       var grouped = facet.k === 'category' || /^tag:/.test(facet.k);
       // a date said in words names the filter that writes it as a date: "שבעה באוקטובר" is "גבורה ותקומה אחרי 7.10" (Sela)
       var by = (grouped ? namesGroup(q, value.l) : saidBy(q, value.l)) || datedBy(q, value.l);
@@ -231,7 +236,7 @@
       var word = not ? words[i + 1] : w;
       if (word.length < 3 || STOP.test(word) || ASKS_ONLY.test(word) || /\d/.test(word)) { return; }
       var n = E.normalize(word), key = (not ? '-' : '') + n;
-      if (!n || c.no['w:' + key] || c.words[key]) { return; }
+      if (!n || c.no['w:' + key] || c.words[key] || noChip(word)) { return; }
       var forms = wordForms(n);
       // a colour is the product's own (its index's mc: the colour it is sold in, the one its picture shows most), never
       // a part's: "חולצה שחורה" is no olive overshirt with black buttons (Story, 26.10)

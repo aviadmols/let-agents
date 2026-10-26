@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\CheckStoreSearch;
+use App\Modules\Search\Actions\LearnFromSearches;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Actions\WritePageTags;
@@ -48,6 +49,7 @@ final class SearchCommand extends Command
     {
         return $tenant->runUnscoped(fn (): int => match ($this->argument('step')) {
             'index' => $this->index(),
+            'learn' => $this->learn(),
             'resolve' => $this->resolve(),
             'tags' => $this->tags(),
             'check' => $this->check(),
@@ -84,6 +86,24 @@ final class SearchCommand extends Command
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function learn(): int
+    {
+        $shops = $this->option('all')
+            ? Shop::query()->whereIn('status', [ShopStatus::Active, ShopStatus::Demo])->orderBy('slug')->get()
+            : collect([$this->shop()])->filter();
+
+        if ($shops->isEmpty() && ! $this->option('all')) {
+            return $this->failWith('Shop not found.');
+        }
+
+        foreach ($shops as $shop) {
+            $run = app(LearnFromSearches::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
+            $this->line("{$shop->slug}: ".($run?->summary() ?? 'off'));
+        }
+
+        return self::SUCCESS;
     }
 
     private function resolve(): int

@@ -81,6 +81,15 @@ final class SearchServiceProvider extends ModuleServiceProvider
         // After the catalogue sync (02:30), so the box searches what the store publishes today.
         // The counts are kept for search.keep_days and then dropped.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            // what each store's shoppers did with its searches, learned before its index is built (LearnFromSearches)
+            $schedule->command('search learn --all')
+                ->dailyAt('02:30')
+                ->timezone('Asia/Jerusalem')
+                ->name('search:learn')
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->runInBackground();
+
             $schedule->command('search index --all')
                 ->dailyAt('02:40')
                 ->timezone('Asia/Jerusalem')

@@ -399,6 +399,8 @@ return [
         'label' => 'Store words',
         'description' => 'How many of the words the products say (titles, tags, picture words) are looked at when a shopper\'s word is not found.',
     ],
+    'learn_days' => ['label' => 'Days search learns from', 'description' => 'How many days back what shoppers did with searches is read; older weighs less.'],
+    'learn_min_visitors' => ['label' => 'Different shoppers to learn', 'description' => 'How many different shoppers must do the same for the store to learn it. One shopper or a bot teaches nothing.'],
     'families_max_output_tokens' => ['label' => 'Most output (word families)', 'description' => 'One store\'s list of families.'],
     'word_reader_daily_max' => ['label' => 'New words by meaning a day', 'description' => 'How many new shopper words are read by the model a day for a store. A word already read is not counted.'],
     'word_reader_provider' => ['label' => 'Provider for words by meaning', 'description' => 'The provider of the model that matches a shopper\'s word to the store\'s.'],

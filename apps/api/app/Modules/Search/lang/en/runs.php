@@ -3,6 +3,7 @@
 return [
     'indexed' => 'Search index: :products {products:product/products}, :content {content:guide or page/guides and pages}, :categories {categories:category/categories}.',
     'resolved' => 'Resolving searches: :looked looked at, :resolved resolved, :none with no match, :refused refused by the check.',
+    'learned' => 'Search learned from shoppers: a new order for :searches searches, :chips words no longer read as filters.',
     'families' => 'Word families: :count families of words a shopper means as one.',
     'families_failed' => 'Word families: not written (the model did not answer, or the budget ran out).',
     'resolve_no_provider' => 'Resolving searches: an unknown provider in one of the roles.',

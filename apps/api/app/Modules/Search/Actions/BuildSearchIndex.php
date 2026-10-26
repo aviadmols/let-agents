@@ -24,6 +24,7 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Models\SearchWordFamily;
 use App\Modules\Search\Support\HebrewSearch;
@@ -319,7 +320,10 @@ final class BuildSearchIndex
             $counts['answer']++;
         }
 
-        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'], 'actions' => self::actions($this->locale($shopId), $facets['size'] !== null || $sized, in_array(self::VARIANT_SIZE, array_column($facets['facets'], 'k'), true))], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'],
+            // words this store's shoppers take off as chips (LearnFromSearches): the drawer reads them as none
+            'nochips' => array_values(SearchLearned::query()->where('kind', 'no_chip')->pluck('value')->all()) ?: null,
+            'actions' => self::actions($this->locale($shopId), $facets['size'] !== null || $sized, in_array(self::VARIANT_SIZE, array_column($facets['facets'], 'k'), true))], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = substr(hash('sha256', $json), 0, 20);
 
         SearchIndex::query()->updateOrCreate(['shop_id' => $shopId], [

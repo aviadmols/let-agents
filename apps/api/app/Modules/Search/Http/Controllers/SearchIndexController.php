@@ -123,6 +123,8 @@ final class SearchIndexController
             'facets' => $data['facets'] ?? [],
             'size' => $data['size'] ?? null,
             'actions' => $data['actions'] ?? [],
+            // words this store's shoppers take off as chips (LearnFromSearches): read as none
+            'nochips' => $data['nochips'] ?? null,
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 

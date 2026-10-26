@@ -25,6 +25,9 @@ use Illuminate\Http\Response;
  *                                                           opened from the search, within a week
  *   {"type":"ask_rate","q":"…","ask_id":"…","rating":"up"|"down"}  "Helpful?" under the assistant's
  *                                                           answer; the last press counts
+ *   {"type":"chip_off"|"chip_on"|"loose_pick","q":"…","value":"…"}  a chip read from the words taken off, a filter put
+ *                                                           on, a looser search chosen ("value": its words)
+ *   {"type":"ask_after","q":"…"}                         the store's AI asked after the search
  *
  * With them, "vid": the anonymous id the storefront scripts keep, only so an order by the same
  * visitor is attributed to the search; stored as a hash salted per shop. Nothing else about the
@@ -55,8 +58,12 @@ final class SearchEventsController
 
                 match ($event['type'] ?? null) {
                     'search' => $count->search($connection->shop_id, $event['q'], (int) ($event['results'] ?? 0), $visit),
-                    'click' => $count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visit),
-                    'add_to_cart' => $count->added($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visitor, (string) ($event['path'] ?? '/')),
+                    'click' => [$count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visit),
+                        $count->signal($connection->shop_id, 'click', $event['q'], (string) ($event['id'] ?? ''), $visitor)],
+                    'add_to_cart' => [$count->added($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visitor, (string) ($event['path'] ?? '/')),
+                        $count->signal($connection->shop_id, 'add', $event['q'], (string) ($event['id'] ?? ''), $visitor)],
+                    // what the store learns from (LearnFromSearches): chips, looser searches, the AI asked after the search
+                    'chip_off', 'chip_on', 'loose_pick', 'ask_after' => $count->signal($connection->shop_id, (string) $event['type'], $event['q'], (string) ($event['value'] ?? ''), $visitor),
                     'ask_whatsapp' => self::onAsk($event, fn (AssistantSearchAsk $ask) => $ask->forceFill(['whatsapp_clicked' => true])->save()),
                     'ask_pick' => self::onAsk($event, function (AssistantSearchAsk $ask) use ($event): void {
                         $id = (string) ($event['id'] ?? '');

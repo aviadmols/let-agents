@@ -75,8 +75,16 @@
     var events = [];
     if (!isCounted(n)) { markCounted(n); events.push({ type: 'search', q: n, results: shown || 0 }); }
     events.push({ type: 'click', q: n, id: item.id, title: item.title });
-    sendEvents(events);
+    // with the shopper's anonymous id: the store learns from what different shoppers open (LearnFromSearches)
+    sendEvents(events, true);
     rememberFound(n, item);
+  }
+  // what a shopper did with a search, for the store to learn from: a chip taken off or put on, a looser search chosen,
+  // the AI asked after it (the server counts each shopper once a day)
+  function signalEvent(kind, query, value) {
+    var n = norm(query);
+    if (!n) { return; }
+    sendEvents([{ type: kind, q: n, value: String(value == null ? '' : value).slice(0, 200) }], true);
   }
   function countAdd(query, item) {
     var n = norm(query);

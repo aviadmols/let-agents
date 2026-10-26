@@ -17,6 +17,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Contracts\RelatedByTags;
+use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\DescribedProducts;
@@ -669,6 +670,9 @@ final class SearchCatalog
                 ];
             }
 
+            // What different shoppers of this store opened and added to the cart for these very words, first, among what
+            // was found (LearnFromSearches): never a product the words did not find
+            $groups['product'] = self::learnedFirst($raw, $groups['product'], $shopId);
             // Every product found, in order, for the quick filters and the pages beyond the first.
             $all = $only === null || in_array('product', $only, true) ? array_slice(array_column($groups['product'], 'id'), 0, (int) Settings::get('search.all_ids')) : [];
             $counts = array_map('count', $groups);
@@ -1182,6 +1186,26 @@ final class SearchCatalog
      * @param  list<array<string, mixed>>  $records
      * @return list<array<string, mixed>>
      */
+    /**
+     * @param  list<array<string, mixed>>  $records
+     * @return list<array<string, mixed>>
+     */
+    private static function learnedFirst(string $raw, array $records, string $shopId): array
+    {
+        if (count($records) < 2 || ! Features::enabled('search.learning', $shopId)) {
+            return $records;
+        }
+        $query = mb_substr(HebrewSearch::normalize(mb_substr($raw, 0, 300)), 0, CountSearch::MAX_QUERY);
+        $weights = SearchLearned::query()->where('kind', 'boost')->where('query', $query)->pluck('weight', 'value')->all();
+        if ($weights === []) {
+            return $records;
+        }
+        $first = array_values(array_filter($records, fn (array $r): bool => isset($weights[(string) $r['id']])));
+        usort($first, fn (array $a, array $b): int => $weights[(string) $b['id']] <=> $weights[(string) $a['id']]);
+
+        return [...$first, ...array_values(array_filter($records, fn (array $r): bool => ! isset($weights[(string) $r['id']])))];
+    }
+
     private static function bySaidWords(array $records, string $query): array
     {
         $words = array_values(array_filter(array_unique(explode(' ', HebrewSearch::normalize($query))), fn (string $w): bool => mb_strlen($w) >= 2 && ! HebrewSearch::isFiller($w)));

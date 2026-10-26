@@ -6,8 +6,10 @@ use App\Core\Http\Visit;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Search\Models\SearchClick;
 use App\Modules\Search\Models\SearchLog;
+use App\Modules\Search\Models\SearchSignal;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\HebrewSearch;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -141,6 +143,35 @@ final class CountSearch
             'occurred_at' => now(),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * What a shopper did with a search, for the store to learn from (LearnFromSearches): its kind (SearchSignal::KINDS),
+     * the search, and what it was done to (a product's id, a chip's words). Counted, and the shopper once a day: by a hash
+     * of their anonymous id kept only until the day ends, never stored with it.
+     */
+    public function signal(string $shopId, string $kind, string $raw, string $value, ?string $visitorId): void
+    {
+        $query = $this->query($raw);
+        $value = mb_substr(trim(strip_tags($value)), 0, 200);
+        if ($query === '' || ! in_array($kind, SearchSignal::KINDS, true) || ($value === '' && $kind !== 'ask_after')) {
+            return;
+        }
+        $day = now()->toDateString();
+        SearchSignal::query()->insertOrIgnore([
+            'id' => (string) Str::ulid(),
+            'shop_id' => $shopId,
+            'day' => $day,
+            'kind' => $kind,
+            'query' => $query,
+            'value' => $value,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $first = $visitorId !== null && preg_match('/^anon-[A-Za-z0-9_-]{16,64}$/', $visitorId) === 1
+            && Cache::add('search:signal:'.hash('sha256', $shopId.'|'.$visitorId.'|'.$kind.'|'.$query.'|'.$value.'|'.$day), 1, now()->endOfDay());
+        SearchSignal::query()->whereDate('day', $day)->where('kind', $kind)->where('query', $query)->where('value', $value)
+            ->incrementEach(['count' => 1] + ($first ? ['visitors' => 1] : []), ['updated_at' => now()]);
     }
 
     private function query(string $raw): string

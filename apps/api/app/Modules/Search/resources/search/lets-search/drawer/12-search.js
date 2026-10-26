@@ -286,7 +286,7 @@
     // nothing as asked: the server searched looser, and says what it left out; the other way it found is a press away
     if (turn.loosened && turn.loosened.left && turn.loosened.left.length) {
       return '<div data-unknown><p class="ls-note__text">' + esc(t('loosened', { q: turn.q, w: turn.loosened.left.join(' ') })) + '</p>' +
-        ((turn.loosened.also || []).length ? '<div class="ls-chips" style="margin:6px 0 10px">' + turn.loosened.also.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' : '') + '</div>';
+        ((turn.loosened.also || []).length ? '<div class="ls-chips" style="margin:6px 0 10px">' + turn.loosened.also.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '" data-loose="' + esc(turn.q) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' : '') + '</div>';
     }
     var text = missing.length && shownList.length && rest.length ? t('noneSaid', { gone: missing.join(' '), kept: rest.join(' ') })
       : typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
@@ -333,7 +333,7 @@
   // ("שאלו את … / the words"). It reads the whole catalogue for them ("תראה לי …": the set finder).
   function askCardHtml(q, text) {
     return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') +
-      '<div class="ls-note"><button class="ls-ask" data-askcard data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"><span class="ls-ask__mark">' + mark() + '</span>' +
+      '<div class="ls-note"><button class="ls-ask" data-askcard data-from="' + esc(q) + '" data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"><span class="ls-ask__mark">' + mark() + '</span>' +
       '<span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(q) + '</span></span>' +
       '<span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
   }

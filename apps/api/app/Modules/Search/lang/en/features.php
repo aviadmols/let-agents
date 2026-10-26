@@ -97,6 +97,10 @@ return [
         'label' => 'Lets posts in search results',
         'description' => 'Posts Lets wrote and the store published live at Lets\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
     ],
+    'learning' => [
+        'label' => 'Search learns from shoppers',
+        'description' => 'Every night, for each store alone: the products different shoppers opened and added to the cart for a search come first for it, and a word shoppers keep taking off as a filter is read as one no more. In code, no model.',
+    ],
     'word_families' => [
         'label' => 'Word families',
         'description' => 'The store\'s words a shopper means as one ("checkered", "checks"; "captivity", "hostages") find each other. One model writes them, a model of the other family checks, only when the store\'s words change.',

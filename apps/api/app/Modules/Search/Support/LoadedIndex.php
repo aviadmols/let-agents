@@ -61,6 +61,8 @@ final class LoadedIndex
             'actions' => is_array($data['actions'] ?? null) ? $data['actions'] : [],
             // What the shop's vocabulary says products are (metal, karat, stone…), for the photo placer.
             'facets' => is_array($data['facets'] ?? null) ? $data['facets'] : [],
+            // words this store's shoppers take off as chips (LearnFromSearches)
+            'nochips' => is_array($data['nochips'] ?? null) ? $data['nochips'] : [],
         ];
     }
 
