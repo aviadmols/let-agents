@@ -344,6 +344,8 @@ final class SearchFlowTest extends TestCase
                 '982' => ['כפכפי סלייד La Costa', ['כפכפים', 'משבצות', 'אדום'], null],
                 '983' => ['חולצת טי קצרה Dirt Trip', ['חולצת טי', 'לבן', 'איור נעל ספורט', 'הדפס קטן', 'משבצות', 'כותנה'], null],
                 '984' => ['חולצת טי Checkerboard Logo', ['חולצת טי', 'שחור', 'לבן', 'נעלי ספורט', 'משבצות'], ['נעלי ספורט', 'משבצות']],
+                // as Vans' describer wrote the Dirt Trip shirt under v8: the drawing in its words too, inside what it lists apart
+                '985' => ['חולצת טי קצרה Dirt Trip 2', ['חולצת טי', 'לבן', 'הדפס קטן', 'משבצות', 'לוגו', 'נעל ספורט', 'חזה'], ['איור נעל ספורט', 'משבצות', 'לוגו VANS', 'כיתוב Street Style']],
             ] as $id => [$title, $words, $depicted]) {
                 $product = $this->product($id, $title, ['payload' => ['tags' => ['Vans']]]);
                 RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
@@ -352,16 +354,20 @@ final class SearchFlowTest extends TestCase
         });
         app(BuildSearchIndex::class)->handle($this->shop->id);
         $near = fn (string $id, float $similarity): array => ['source' => 'product', 'source_id' => 's'.$id, 'external_id' => $id, 'title' => '', 'similarity' => $similarity];
-        $this->meaning = [$near('983', 0.62), $near('984', 0.61), $near('982', 0.6), $near('981', 0.55)];
+        $this->meaning = [$near('983', 0.62), $near('984', 0.61), $near('985', 0.6), $near('982', 0.59), $near('981', 0.55)];
 
         $this->assertSame(['981'], array_column($this->search('נעלי משבצות')->json('groups.product'), 'external_id'), 'the shoe whose picture shows checks; never a T-shirt with a drawing of one, by the phrase or by the describer\'s own list');
-        $this->assertSame(['983', '984'], array_column($this->search('חולצת טי')->json('groups.product'), 'external_id'), 'the shirts are still shirts');
+        $this->assertEqualsCanonicalizing(['983', '984', '985'], array_column($this->search('חולצת טי')->json('groups.product'), 'external_id'), 'the shirts are still shirts');
+        $this->assertEqualsCanonicalizing(['984', '985'], array_column($this->search('חולצה עם לוגו')->json('groups.product'), 'external_id'), '"לוגו" alone is the shirt\'s own word, whatever the logo shows');
         // and the drawing stays with the product, apart from its words, for a photo of it to find (dw)
         LoadedIndex::forget();
         $records = $this->inShop(fn (): array => LoadedIndex::for($this->shop->id)['records']);
         $this->assertStringNotContainsString('נעל', (string) $records['p:983']['kw'], 'no shoe among its words');
         $this->assertSame('איור נעל ספורט', $records['p:983']['dw'] ?? null, 'the drawing, kept apart');
         $this->assertSame('נעלי ספורט משבצות', $records['p:984']['dw'] ?? null, 'as the describer listed it');
+        $this->assertStringNotContainsString('נעל', (string) $records['p:985']['kw'], 'a word inside what is listed apart ("נעל ספורט" in "איור נעל ספורט") is drawn too');
+        $this->assertSame('משבצות נעל ספורט', $records['p:985']['dw'] ?? null);
+        $this->assertStringContainsString('לוגו', (string) $records['p:985']['kw'], 'and "לוגו" alone stays its own');
         $this->assertArrayNotHasKey('dw', $records['p:981'], 'nothing drawn on a shoe');
     }
 

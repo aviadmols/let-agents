@@ -161,19 +161,32 @@ final class BuildSearchIndex
      */
     private const DEPICTED = '/^(?:(?:איור|ציור|לוגו|גרפיקה|סמל|כיתוב|כתובת|תמונה|דמות|illustration|drawing|logo|artwork|lettering|text|image|picture)(?:\s+של)?|(?:הדפס|הדפסה|print|printed|graphic)\s+(?:של|of))\s+\S/iu';
 
+    /** A word that only says a product carries something drawn ("לוגו", "הדפס"): its own, whatever is drawn. */
+    private const DRAWN_WORDS = '/^(?:איור|ציור|הדפס|הדפסה|לוגו|גרפיקה|סמל|כיתוב|כתובת|תמונה|דמות|טקסט|illustration|drawing|print|logo|graphic|artwork|lettering|text|image|picture)$/iu';
+
     /**
      * What a picture shows of the product itself: its words less those that only say what is drawn or printed on it,
-     * as the describer lists them apart (caption v8, caption_depicted) or as the phrase says it (DEPICTED). A shirt with
-     * a drawing of a shoe is no shoe; a search for the drawing finds it by meaning, not by the shoe's name.
+     * as the describer lists them apart (caption v8, caption_depicted: the word itself, or a word inside what it lists,
+     * "נעל ספורט" in "איור נעל ספורט", as the describer writes it in both lists) or as the phrase says it (DEPICTED). A colour
+     * is the product's own whatever is drawn in it, and so is a word that only says it carries a drawing ("לוגו"). A shirt
+     * with a drawing of a shoe is no shoe; a search for the drawing finds it by meaning, not by the shoe's name.
      *
      * @return list<string>
      */
     public static function shown(RetrievalImage $picture): array
     {
-        $depicted = array_map(fn ($w): string => HebrewSearch::normalize((string) $w), (array) ($picture->caption_depicted ?? []));
+        $depicted = array_values(array_filter(array_map(fn ($w): string => HebrewSearch::normalize((string) $w), (array) ($picture->caption_depicted ?? []))));
+        $drawn = function (string $word) use ($depicted): bool {
+            $plain = HebrewSearch::normalize($word);
+            if ($plain === '' || HebrewSearch::colorOf($plain) !== null || preg_match(self::DRAWN_WORDS, $plain) === 1) {
+                return false;
+            }
+
+            return array_any($depicted, fn (string $d): bool => $d === $plain || preg_match('/(?:^| )'.preg_quote($plain, '/').'(?: |$)/u', $d) === 1);
+        };
 
         return array_values(array_filter(array_map('strval', (array) $picture->caption_words), fn (string $word): bool => $word !== ''
-            && preg_match(self::DEPICTED, trim($word)) !== 1 && ! in_array(HebrewSearch::normalize($word), $depicted, true)));
+            && preg_match(self::DEPICTED, trim($word)) !== 1 && ! $drawn($word)));
     }
 
     /**
