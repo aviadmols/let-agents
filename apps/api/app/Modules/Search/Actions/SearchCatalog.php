@@ -129,8 +129,12 @@ final class SearchCatalog
     /** The reader's words for the object are read from at most this many of their first words. */
     private const OBJECT_WORDS = 4;
 
-    /** Products the object's words name, put first in a photo's results. */
-    private const OBJECT_NAMED = 24;
+    /**
+     * Products the object's words name, put first in a photo's results, all of them, their pictures ordering them: the
+     * first 24 the words found, cut before the picture was read, left Rocks' emerald halo ring after all of the 24 others
+     * (26.10). Bounded as a category's whole is.
+     */
+    private const OBJECT_NAMED = self::PHOTO_CATEGORY_ALL;
 
     /** How much more the detail that tells the object apart most counts than any other detail. */
     private const KEY_DETAIL_WEIGHT = 2.0;

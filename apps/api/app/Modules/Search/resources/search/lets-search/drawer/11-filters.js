@@ -97,14 +97,23 @@
     return ws.n === ws.of || (ws.of >= 3 && ws.n >= 2 && ws.n >= ws.of - 1) ? ws.at : null;
   }
   // The same word as the search engine reads it, through a spelling slip: "לבין" is "לבן", "אדומה" is "אדום"
-  // (its stem, or how it sounds once its look-alike letters are one). Short words must be exact.
+  // (its stem, or how it sounds once its look-alike letters are one). Short words must be exact. A word the store writes
+  // as it is typed is that word, never another that sounds like it: "מרכזית" (its rings' "אבן מרכזית") is no "מרקיזה"
+  // (Rocks, 26.10), as the search reads it (heldWhole).
   function alike(x, w) {
     var E = S.engine;
     if (!E || !E.normalize || !E.stem || x.length < 3 || w.length < 3) { return false; }
     try {
       var a = E.normalize(x), b = E.normalize(w);
-      return E.stem(a) === E.stem(b) || (b.length >= 4 && !!E.sound && E.sound(a) === E.sound(b));
+      return E.stem(a) === E.stem(b) || (b.length >= 4 && !!E.sound && E.sound(a) === E.sound(b) && !storeWrites(a));
     } catch (e) { return false; }
+  }
+  var written = {}, writtenOf = null;
+  function storeWrites(n) {
+    var E = S.engine;
+    if (writtenOf !== S.built) { written = {}; writtenOf = S.built; }
+    if (!(n in written)) { written[n] = !!(E && E.closeWords && S.built && (E.closeWords(S.built, n).score || {})[n] >= 1); }
+    return written[n];
   }
   // a word this store's shoppers keep taking off as a chip (the index's nochips, LearnFromSearches): read as none
   function noChip(label) {

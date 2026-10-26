@@ -491,6 +491,28 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame('2000', $result['groups']['product'][0]['external_id'], 'the whole category is weighed, not its first rows');
     }
 
+    public function test_of_many_products_the_objects_words_name_the_picture_chooses_never_the_first_found(): void
+    {
+        // Rocks, 26.10: the emerald halo ring, likest by its picture, its words and its colour, came after the 24 other
+        // halo rings the words found first
+        $this->inShop(function (): void {
+            $rings = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => 31]);
+            foreach (range(1, 30) as $i) {
+                $this->shirt((string) (1000 + $i), 'טבעת הילה דיאנה '.$i, [0.2, 1.0, 0.1]);
+            }
+            $this->shirt('2000', 'טבעת הילה דיאנה אמרלד', [0.9, 0.1, 0.4]);
+            CatalogProduct::query()->whereIn('external_id', [...array_map(fn (int $i): string => (string) (1000 + $i), range(1, 30)), '2000'])->get()
+                ->each(fn (CatalogProduct $p) => $p->categories()->attach($rings->id));
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'טבעת הילה', 'also' => ['טבעת'], 'details' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $result = $this->upload()->assertOk()->json();
+
+        $this->assertSame('2000', $result['groups']['product'][0]['external_id'], 'all the halo rings weighed by their pictures');
+    }
+
     public function test_a_product_named_with_the_words_seen_in_the_photo_comes_before_a_lookalike(): void
     {
         $this->inShop(function (): void {
