@@ -530,7 +530,10 @@ final class HebrewSearch
             $stripped = self::withoutSaid($stripped, $value['said']) ?? $stripped;
         }
 
-        if ($stripped === '' || $stripped === $query) {
+        // nothing left but words that join the rest ("עם", "של"): as nothing left. "טבעות עם יהלום" with "טבעות" and
+        // "יהלום" read as filters searched "עם" and found the 27 rings whose words say it, of 973 (Rocks, 26.10)
+        $left = array_filter(explode(' ', self::normalize($stripped)), fn (string $w): bool => $w !== '' && ! self::isFiller($w));
+        if ($left === [] || $stripped === $query) {
             return $query;
         }
 

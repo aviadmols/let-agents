@@ -204,6 +204,9 @@ final class QueryActionsTest extends TestCase
         $this->assertSame('טבעת יהלום', HebrewSearch::withoutFacetWords($index, 'טבעת יהלום זהב לבן'), 'rings marked white gold exist: the metal is a filter, not a word');
         $this->assertSame('עגילי זהב צהוב', HebrewSearch::withoutFacetWords($index, 'עגילי זהב צהוב'), 'no earrings are marked yellow gold: the words stay words');
         $this->assertSame('טבעת יהלום', HebrewSearch::withoutFacetWords($index, 'טבעת יהלום'));
+        // Rocks, 26.10: the filters read, only "עם" was left, and the rings whose words say "עם" were all that was found
+        $this->assertSame('טבעת עם', HebrewSearch::withoutFacetWords($index, 'טבעת עם זהב לבן'), 'a word of its own left: the metal a filter');
+        $this->assertSame('עם זהב לבן', HebrewSearch::withoutFacetWords($index, 'עם זהב לבן'), 'nothing left but a joining word: searched as typed');
     }
 
     /** @return array<string, mixed> the index as built and stored */
