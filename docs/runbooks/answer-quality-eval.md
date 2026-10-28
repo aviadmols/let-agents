@@ -49,3 +49,17 @@ php artisan assistant:quality-baseline compare --runs=as-is,checker-low
 - A change is released when the run with it passes no fewer cases, keeps `supported` and `answered` within a point,
   and is faster or cheaper; or when it fixes cases that failed and breaks none. The run's label and numbers go in
   the commit message.
+
+## What the first runs taught (Rocks, 2026-10-28)
+
+- **Measure the noise first.** Two identical `as-is` runs on 27 real questions differed on 3 cases, 15 points of
+  `supported` and a second of p50: the writer and the checker are not deterministic. A change that moves fewer
+  cases than that proved nothing. Run `as-is` twice, then each candidate twice, and read the medians.
+- **The deterministic signal is in the cases with expectations.** "ומה עם עד 5000?" after a budget question fails
+  as-is (no products, the reply alone means nothing) and passes with scope_site v9 on every run; that is a mechanism,
+  not noise. An expectation must fit the store's words: a ring "משובצת יהלומים" says "יהלום" (final letters are
+  folded), but a ring whose page never says its colour cannot be expected to say "צהוב".
+- **Run `--live` runs detached.** A `--set` is put back when the run ends; a run killed by a dropped ssh session
+  never ends, and the setting stays on the store. A live run of thirty cases is long: start it so it survives the
+  session, and check `Settings::overrideFor` afterwards.
+- `--kind=regression` runs only the cases with expectations (fast, deterministic criteria); `--kind=all` both.

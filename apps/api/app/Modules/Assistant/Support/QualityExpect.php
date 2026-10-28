@@ -115,8 +115,9 @@ final class QualityExpect
         return array_values(array_filter(array_map(fn ($w): string => self::norm((string) $w), (array) $words), fn (string $w): bool => $w !== ''));
     }
 
+    /** Lower case, one space, and each final letter in its regular form: "יהלום" is found in "יהלומים". */
     private static function norm(string $text): string
     {
-        return mb_strtolower((string) preg_replace('/\s+/u', ' ', preg_replace('/^\s+|\s+$/u', '', $text) ?? ''));
+        return strtr(mb_strtolower((string) preg_replace('/\s+/u', ' ', preg_replace('/^\s+|\s+$/u', '', $text) ?? '')), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
     }
 }
