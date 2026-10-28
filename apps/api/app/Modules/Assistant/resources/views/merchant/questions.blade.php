@@ -55,6 +55,57 @@
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('shown_instead') }}</span><p>{{ $row['answer'] }}</p></div>
                     @endif
 
+                    {{-- what the team linked the question to: its answer is chosen among these products first --}}
+                    @if ($row['link'] ?? null)
+                        <p class="lp-note" style="margin: 8px 0 0" data-linked>
+                            {{ $t('linked_to') }} <b style="color: var(--la-ink); font-weight: 500" dir="auto">{{ implode(' · ', $row['link']['names']) }}</b>@if ($row['link']['products'] > 0){{ $row['link']['names'] !== [] ? ' · ' : '' }}{{ trans_choice('assistant::ui.inbox.linked_products', $row['link']['products'], ['n' => $row['link']['products']]) }}@endif
+                        </p>
+                    @endif
+
+                    @if ($this->linking === $row['id'])
+                        @php($choices = $this->linkChoices())
+                        <div class="lp-stack" style="margin-top: 12px; padding: 16px; border-radius: 14px; background: var(--la-sunk); gap: 14px" data-link-panel>
+                            <p class="lp-note" style="margin: 0">{{ $t('link_help') }}</p>
+                            @if ($choices['categories'] !== [])
+                                <div style="display: grid; gap: 6px">
+                                    <b style="font-size: 13px; font-weight: 600">{{ $t('link_categories') }}</b>
+                                    <div class="lp-chips">
+                                        @foreach ($choices['categories'] as $c)
+                                            <button type="button" wire:click="toggleLink('categories', @js($c['id']))" @class(['lp-chip', 'is-on' => in_array($c['id'], $link['categories'], true)]) dir="auto">{{ $c['name'] }} <span class="lp-note">{{ $c['n'] }}</span></button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                            @if ($choices['tags'] !== [])
+                                <div style="display: grid; gap: 6px">
+                                    <b style="font-size: 13px; font-weight: 600">{{ $t('link_tags') }}</b>
+                                    <div class="lp-chips">
+                                        @foreach ($choices['tags'] as $tag)
+                                            <button type="button" wire:click="toggleLink('tags', @js($tag['name']))" @class(['lp-chip', 'is-on' => in_array($tag['name'], $link['tags'], true)]) dir="auto">{{ $tag['name'] }} <span class="lp-note">{{ $tag['n'] }}</span></button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                            <div style="display: grid; gap: 6px">
+                                <b style="font-size: 13px; font-weight: 600">{{ $t('link_products') }}</b>
+                                <span class="lp-field" style="max-width: 420px"><svg aria-hidden="true"><use href="#lp-i-search"/></svg><input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="productFind" placeholder="{{ $t('link_find') }}" aria-label="{{ $t('link_find') }}"></span>
+                                <div style="display: grid; gap: 4px">
+                                    @foreach ($this->productChoices() as $p)
+                                        <button type="button" wire:click="toggleLink('products', @js($p['id']))" style="all: unset; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 4px; border-radius: 8px; {{ $p['chosen'] ? 'background: var(--la-paper); box-shadow: inset 0 0 0 1.5px var(--la-ink);' : '' }}">
+                                            <span style="width: 36px; height: 36px; flex: none; border-radius: 6px; overflow: hidden; background: var(--la-paper)">@if ($p['image'])<img src="{{ $p['image'] }}" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover">@endif</span>
+                                            <span dir="auto" style="flex: 1; font-size: 13.5px">{{ $p['title'] }}</span>
+                                            <span class="lp-note">{{ $p['chosen'] ? '✓' : '+' }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div class="lp-actions">
+                                <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="saveLink" wire:loading.attr="disabled" wire:target="saveLink" data-save-link>{{ $t('link_save') }}</button>
+                                <button type="button" class="lp-link" wire:click="cancelLink">{{ $t('cancel') }}</button>
+                            </div>
+                        </div>
+                    @endif
+
                     {{-- the products shown with the answer, those the shopper opened or added marked --}}
                     @if (($row['products'] ?? []) !== [])
                         <div style="display: grid; gap: 6px; margin-top: 10px" data-answer-products>
@@ -94,6 +145,9 @@
                                 <button type="button" class="lp-btn lp-btn-sm" wire:click="post(@js($row['id']))">{{ $t('post') }}</button>
                             @endif
                             <button type="button" class="lp-btn lp-btn-sm" wire:click="writeOwn(@js($row['id']))">{{ $row['state'] === 'open' ? $t('own') : $t('own_instead') }}</button>
+                            @if (str_starts_with($row['id'], 's:') && $this->mayLink() && $this->linking !== $row['id'])
+                                <button type="button" class="lp-btn lp-btn-sm" wire:click="startLink(@js($row['id']))" data-start-link>{{ ($row['link'] ?? null) ? $t('link_edit') : $t('link') }}</button>
+                            @endif
                             <button type="button" class="lp-link" wire:click="setAside(@js($row['id']))" wire:confirm="{{ $t('aside_confirm') }}">{{ $t('aside') }}</button>
                         </div>
                     @endif

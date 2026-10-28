@@ -62,7 +62,7 @@
       return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds)).then(function () {
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [],
-            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null,
+            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [],
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null });
           announce(t('announceReady') + ': ' + d.answer);
           if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
@@ -144,6 +144,13 @@
     return '<div class="ls-block__title" style="margin-top:14px">' + esc(title) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }), true) +
       '<button class="ls-btn ls-btn--link ls-btn--sm" data-q="' + esc(turn.q) + '">' + esc(t('alsoAll')) + '</button>';
   }
+  // the store's categories and tags the question is about (the team's link, else what its products say): each a search
+  function relatedHtml(turn) {
+    var list = (turn.related || []).filter(function (g) { return g && g.name; });
+    if (!list.length) { return ''; }
+    return '<div class="ls-block__title" style="margin-top:14px">' + esc(t('relatedGroups')) + '</div><div class="ls-chips" style="margin-bottom:6px">' +
+      list.map(function (g) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(g.name) + '" dir="auto">' + esc(g.name) + '</button>'; }).join('') + '</div>';
+  }
   // two products the question's words name, in stock; inside the price it named, as the server read it (range), or none
   // (Rocks, 25.10: rings at 1,000 suggested for "between 2000 and 2500")
   function related(q, range) {
@@ -182,6 +189,7 @@
     }
     html += setHtml(turn);
     html += alsoHtml(turn);
+    html += relatedHtml(turn);
     // a page the shopper can open, never what Lets gathered of the store with no page of its own ("מה שהפוסטים…")
     var src = (turn.sources || []).filter(function (s) { return s && ((s.title && s.url) || s.product); });
     if (src.length) {

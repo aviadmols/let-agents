@@ -5,14 +5,19 @@ namespace App\Modules\Assistant\Filament\Merchant\Pages;
 use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\WritesPosts;
+use App\Modules\Admin\Models\User;
 use App\Modules\Assistant\Filament\Operator\Pages\ShopQuestions as OperatorShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
+use App\Modules\Assistant\Models\AssistantQuestionLink;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\Question;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Tenancy\Models\Shop;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use UnitEnum;
 
@@ -102,6 +107,8 @@ final class ShopQuestions extends OperatorShopQuestions
             }
 
             $rows = [];
+            // what the team linked each question to (its categories, tags, products), by the question's key
+            $links = AssistantQuestionLink::query()->get()->keyBy('question_key');
 
             // The search window: each question once, with its latest answer and score.
             $asks = AssistantSearchAsk::query()->with('answer:id,answer,source,status')->where('created_at', '>=', $since)->latest('created_at')->orderByDesc('id')->limit(2000)->get();
@@ -125,6 +132,7 @@ final class ShopQuestions extends OperatorShopQuestions
                     'note' => $score['note'] ?? null,
                     // the products shown with the answer that time, those the shopper opened or added marked
                     'products' => self::shownWith($latest),
+                    'link' => isset($links[$key]) && ! $links[$key]->empty() ? self::linkSummary($links[$key]) : null,
                 ];
             }
 
@@ -145,6 +153,7 @@ final class ShopQuestions extends OperatorShopQuestions
                     'score' => null,
                     'note' => null,
                     'products' => [],
+                    'link' => null,
                 ];
             }
 
@@ -244,6 +253,152 @@ final class ShopQuestions extends OperatorShopQuestions
     public static function ago(?Carbon $at): string
     {
         return $at === null ? '' : $at->locale(app()->getLocale())->diffForHumans();
+    }
+
+    // ------------------------------------------------------------------ linking a question to its products
+
+    /** The row whose links are being chosen. */
+    public ?string $linking = null;
+
+    /** @var array{categories: list<string>, tags: list<string>, products: list<string>} what is chosen for it */
+    public array $link = ['categories' => [], 'tags' => [], 'products' => []];
+
+    /** Words to find a product to link by hand. */
+    public string $productFind = '';
+
+    /** The most categories and tags offered to link: the most used. */
+    private const LINK_CHOICES = 60;
+
+    public function startLink(string $row): void
+    {
+        $question = collect($this->rows())->firstWhere('id', $row)['question'] ?? null;
+        if ($question === null || ! str_starts_with($row, 's:') || $this->shop === null) {
+            return;
+        }
+        $have = app(TenantContext::class)->run($this->shop, fn () => AssistantQuestionLink::query()->where('question_key', Question::key((string) $question))->first());
+        $this->link = [
+            'categories' => array_values(array_map('strval', (array) ($have?->categories ?? []))),
+            'tags' => array_values(array_map('strval', (array) ($have?->tags ?? []))),
+            'products' => array_values(array_map('strval', (array) ($have?->products ?? []))),
+        ];
+        $this->productFind = '';
+        $this->linking = $row;
+    }
+
+    /** Who may link a question to products: who edits the shop (a viewer only looks), or an operator. */
+    public function mayLink(): bool
+    {
+        $user = auth()->user();
+        $shop = $this->shop === null ? null : Shop::query()->find($this->shop);
+
+        return $user instanceof User && $shop !== null && ($user->is_operator || $user->canEditShop($shop));
+    }
+
+    public function cancelLink(): void
+    {
+        $this->linking = null;
+    }
+
+    public function toggleLink(string $kind, string $value): void
+    {
+        if (! in_array($kind, ['categories', 'tags', 'products'], true)) {
+            return;
+        }
+        $list = (array) ($this->link[$kind] ?? []);
+        $this->link[$kind] = in_array($value, $list, true) ? array_values(array_diff($list, [$value])) : [...$list, $value];
+    }
+
+    /** Saved for the question and every question worded like it; nothing chosen takes the link away. */
+    public function saveLink(): void
+    {
+        $question = collect($this->rows())->firstWhere('id', (string) $this->linking)['question'] ?? null;
+        if ($question === null || $this->shop === null || ! $this->mayLink()) {
+            return;
+        }
+        app(TenantContext::class)->run($this->shop, function () use ($question): void {
+            $chosen = array_map(fn ($list): array => array_values(array_unique(array_filter(array_map('strval', (array) $list)))), $this->link);
+            $key = Question::key((string) $question);
+            if ($chosen['categories'] === [] && $chosen['tags'] === [] && $chosen['products'] === []) {
+                AssistantQuestionLink::query()->where('question_key', $key)->delete();
+
+                return;
+            }
+            AssistantQuestionLink::query()->updateOrCreate(['shop_id' => $this->shop, 'question_key' => $key], [
+                'question' => mb_substr((string) $question, 0, 500), 'categories' => $chosen['categories'], 'tags' => $chosen['tags'],
+                'products' => $chosen['products'], 'created_by' => auth()->id(),
+            ]);
+        });
+        $this->linking = null;
+        Notification::make()->success()->title(__('assistant::ui.inbox.link_saved'))->send();
+    }
+
+    /**
+     * What a question can be linked to: the store's categories and tags, the most used first.
+     *
+     * @return array{categories: list<array{id: string, name: string, n: int}>, tags: list<array{name: string, n: int}>}
+     */
+    public function linkChoices(): array
+    {
+        if ($this->shop === null) {
+            return ['categories' => [], 'tags' => []];
+        }
+
+        return app(TenantContext::class)->run($this->shop, function (): array {
+            $counts = DB::table('catalog_category_product as cp')->join('catalog_products as p', 'p.id', '=', 'cp.product_id')
+                ->where('p.shop_id', $this->shop)->whereNull('p.removed_at')
+                ->select('cp.category_id')->selectRaw('count(*) as n')->groupBy('cp.category_id')->pluck('n', 'category_id');
+            $categories = CatalogCategory::query()->whereIn('id', $counts->keys()->all())->get(['id', 'external_id', 'name'])
+                ->map(fn (CatalogCategory $c): array => ['id' => (string) $c->external_id, 'name' => (string) $c->name, 'n' => (int) ($counts[$c->id] ?? 0)])
+                ->sortByDesc('n')->take(self::LINK_CHOICES)->values()->all();
+            $tags = [];
+            foreach (CatalogProduct::query()->active()->get(['payload']) as $product) {
+                foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
+                    if ($tag !== '' && mb_strlen($tag) <= 40) {
+                        $tags[$tag] = ($tags[$tag] ?? 0) + 1;
+                    }
+                }
+            }
+            arsort($tags);
+
+            return ['categories' => $categories, 'tags' => array_map(fn (string $t, int $n): array => ['name' => $t, 'n' => $n], array_keys(array_slice($tags, 0, self::LINK_CHOICES, true)), array_values(array_slice($tags, 0, self::LINK_CHOICES, true)))];
+        });
+    }
+
+    /**
+     * Products to link by hand: those chosen, then those whose title holds the words typed.
+     *
+     * @return list<array{id: string, title: string, image: string|null, chosen: bool}>
+     */
+    public function productChoices(): array
+    {
+        if ($this->shop === null) {
+            return [];
+        }
+
+        return app(TenantContext::class)->run($this->shop, function (): array {
+            $chosen = (array) ($this->link['products'] ?? []);
+            $out = CatalogProduct::query()->active()->whereIn('external_id', $chosen)->get(['external_id', 'title', 'image_url'])
+                ->map(fn (CatalogProduct $p): array => ['id' => (string) $p->external_id, 'title' => (string) $p->title, 'image' => $p->image_url, 'chosen' => true])->all();
+            $words = trim($this->productFind);
+            if (mb_strlen($words) >= 2) {
+                $found = CatalogProduct::query()->active()->where('title', 'like', '%'.$words.'%')->whereNotIn('external_id', $chosen)->limit(8)->get(['external_id', 'title', 'image_url']);
+                $out = [...$out, ...$found->map(fn (CatalogProduct $p): array => ['id' => (string) $p->external_id, 'title' => (string) $p->title, 'image' => $p->image_url, 'chosen' => false])->all()];
+            }
+
+            return $out;
+        });
+    }
+
+    /**
+     * A link in a line: the names of its categories and tags, and how many products by hand.
+     *
+     * @return array{names: list<string>, products: int}
+     */
+    private static function linkSummary(AssistantQuestionLink $link): array
+    {
+        $categories = CatalogCategory::query()->whereIn('external_id', (array) $link->categories)->pluck('name')->map(fn ($n): string => (string) $n)->all();
+
+        return ['names' => [...$categories, ...array_map('strval', (array) $link->tags)], 'products' => count((array) $link->products)];
     }
 
     /** When it was asked, to the minute, as the shop reads the time: "28.10.2026 11:39". */

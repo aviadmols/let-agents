@@ -32,6 +32,8 @@ use App\Modules\Assistant\Support\Offenders;
 use App\Modules\Assistant\Support\Privacy;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\QuestionGuard;
+use App\Modules\Assistant\Support\QuestionLinks;
+use App\Modules\Assistant\Support\RelatedGroups;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -202,6 +204,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** @var list<string> the named products' titles, as text that speaks of them must hold (prepare()) */
     private array $namedTitles = [];
 
+    /** @var list<string> the products the store's team linked the question being answered to (QuestionLinks), external ids */
+    private array $linked = [];
+
     /** True in the second look: the question was already found to be the store's. */
     private bool $scoped = false;
 
@@ -286,6 +291,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             // The price the question names, as code read it: what the storefront suggests beside "not found" keeps to it.
             $range = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
             $result += $range['min'] === null && $range['max'] === null ? [] : ['range' => $range];
+            // The store's categories and tags the question is about, as chips under the answer to search by.
+            $related = $result['outcome'] === AssistantAnswer::ANSWERED && ! $bound && ! isset($result['set']) ? $this->relatedChips($shopId, $question) : [];
+            $result += $related === [] ? [] : ['related' => $related];
 
             return $this->logged($shopId, $question, $products, $result);
         });
@@ -427,6 +435,19 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($answered && ($saved->isShared() || $saved->askedBy($visitorHash))) {
             if (! $this->trial) {
                 $saved->countVisitor($visitorHash, (int) Settings::get('assistant.share_after_visitors', $shopId));
+            }
+
+            // the team's own words, with the products the team linked the question to (QuestionLinks): those are its picks
+            $link = $saved->source === 'team' ? QuestionLinks::for($question) : null;
+            $linked = $link === null ? [] : QuestionLinks::products($link);
+            if ($linked !== []) {
+                $titles = CatalogProduct::query()->whereIn('external_id', $linked)->pluck('title', 'external_id');
+                $picks = array_map(fn (string $id): array => ['external_id' => $id, 'title' => (string) ($titles[$id] ?? ''), 'why' => ''], array_slice($linked, 0, self::MAX_PICKS));
+
+                return [
+                    'outcome' => AssistantAnswer::ANSWERED, 'answer' => (string) $saved->answer, 'from' => 'bank', 'sources' => (array) $saved->sources,
+                    'picks' => $this->present($picks), 'answer_id' => $saved->id,
+                ] + (count($linked) > self::MAX_PICKS ? ['named' => ['names' => [], 'ids' => array_slice($linked, self::MAX_PICKS, self::NAMED_SHOWN)]] : []);
             }
 
             return [
@@ -806,6 +827,12 @@ final class AnswerSiteQuestion implements TriesQuestions
             return false;
         }
 
+        // the team linked the question to its products since: written again among them
+        $link = QuestionLinks::for((string) $saved->question);
+        if ($link !== null && $saved->updated_at !== null && $saved->updated_at->lt($link->updated_at)) {
+            return true;
+        }
+
         if ($saved->prompt_version < self::PROMPT_VERSION) {
             return true;
         }
@@ -953,6 +980,18 @@ final class AnswerSiteQuestion implements TriesQuestions
         $popular = self::asksPopular($question) ? $this->popularFor($shopId, $question) : [];
         $popularTop = $viewing === null && ! $followUp ? array_slice(array_map('strval', array_keys($popular)), 0, (int) Settings::get('assistant.popular_products', $shopId)) : [];
         $shown = array_values(array_unique([...$popularTop, ...$shown]));
+        // What the store's team linked this question to (its categories, its tags, products by hand: QuestionLinks): the
+        // answer is chosen among them first, across their prices. A broad question ("טבעת נישואין") then sees the range
+        // the store means, not the three products whose words came nearest.
+        $link = $viewing === null && ! $followUp && $named === [] ? QuestionLinks::for($question) : null;
+        $linked = $link === null ? [] : QuestionLinks::products($link);
+        // None linked: the store's categories and tags whose products say the question (RelatedGroups), by code. "טבעות
+        // נישואין" brings the solitaire and plain band rings whose descriptions say נישואין, whatever the search showed.
+        if ($linked === [] && $viewing === null && ! $followUp && $named === [] && self::aboutProducts($question)) {
+            $linked = RelatedGroups::for($shopId, $question)['ids'];
+        }
+        $this->linked = $linked;
+        $shown = array_values(array_unique([...$linked, ...$shown]));
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         $type = AnswerContext::type($question);
         $counts = ['found' => count($found), 'shown' => count($candidates)];
@@ -2589,6 +2628,36 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $answer;
+    }
+
+    /** Kinds of question about the store or about named products, not about a kind of product: no group is theirs. */
+    private const NOT_ABOUT_PRODUCTS = ['store', 'comparison', 'price_exact'];
+
+    /** Whether a question may be about a kind of the store's products ("טבעות נישואין"), not its shipping or one product's price. */
+    private static function aboutProducts(string $question): bool
+    {
+        return ! in_array(AnswerContext::type($question), self::NOT_ABOUT_PRODUCTS, true);
+    }
+
+    /**
+     * The chips under an answer: the categories and tags the team linked the question to, else those the question's
+     * words find in the store's products (RelatedGroups). Each searched by its name.
+     *
+     * @return list<array{name: string}>
+     */
+    private function relatedChips(string $shopId, string $question): array
+    {
+        $link = QuestionLinks::for($question);
+        if ($link !== null) {
+            $categories = (array) $link->categories === [] ? [] : CatalogCategory::query()->whereIn('external_id', array_map('strval', (array) $link->categories))->whereNull('removed_at')->pluck('name')->all();
+            $names = array_values(array_unique(array_filter(array_map('strval', [...$categories, ...(array) $link->tags]))));
+
+            return array_map(fn (string $name): array => ['name' => $name], array_slice($names, 0, RelatedGroups::MAX));
+        }
+
+        return self::aboutProducts($question)
+            ? array_map(fn (array $g): array => ['name' => $g['name']], RelatedGroups::for($shopId, $question)['groups'])
+            : [];
     }
 
     /** The most products of an answer's set kept with its ask: what the team reads, not the whole list. */
