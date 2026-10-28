@@ -36,6 +36,7 @@ return [
         'wish' => ['title' => 'רשימת משאלות', 'sub' => 'המוצרים שנשמרו הכי הרבה :period'],
         'words' => ['title' => 'המילים המובילות בחיפוש', 'note' => ':n {n:חיפוש/חיפושים}', 'sub' => 'כל המילים שחיפשו :period'],
         // the list is the search window's questions; the "שאלות" figure above adds those asked on product pages
+        'asked' => ['title' => 'כל השאלות, לפי ימים', 'note' => 'נשאלו: :n', 'sub' => 'כל שאלה ששאלו בחלון החיפוש :period, ומה הגולש קיבל'],
         'questions' => ['title' => 'השאלות המובילות של הלקוחות', 'note' => 'בחלון החיפוש: :n', 'sub' => 'כל השאלות ששאלו בחלון החיפוש :period'],
         'empty' => ['title' => 'חיפושים בלי תוצאות', 'sub' => 'מילים שחיפשו ולא קיבלו שום מוצר :period'],
         'noclick' => ['title' => 'היו תוצאות, לא לחצו', 'sub' => 'חיפושים שהציגו מוצרים ואף אחד לא נלחץ :period'],
@@ -58,6 +59,8 @@ return [
     'by_count' => 'לפי כמות',
     'by_name' => 'לפי שם',
     'by_date' => 'לפי תאריך',
+    'asked_tabs' => ['top' => 'הנשאלות ביותר', 'days' => 'לפי ימים', 'open' => 'כל השאלות, לפי ימים'],
+    'items_shown' => 'המוצרים שהוצגו',
     'shown' => ':shown מתוך :all',
     'more' => 'לטעון עוד',
     'synonym' => 'מילה נרדפת',

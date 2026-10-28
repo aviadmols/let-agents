@@ -89,6 +89,13 @@ final class AssistantHomeTest extends TestCase
         $this->assertSame(['משלוח לאילת?', 'יש עגילים מזהב לבן?', 'מה מזג האוויר?'], $rows('date'));
         $this->assertSame('Last asked 18.10.2026 15:00', app(AssistantReport::class)->rows($shop, 'questions', $since, now(), 10, '', 'date')['rows'][0]->sub);
 
+        // every question by the day it was asked, the latest first, each with what the shopper got
+        $asked = app(AssistantReport::class)->rows($shop, 'asked', $since, now(), 10);
+        $this->assertSame(4, $asked['total'], 'each time it was asked, in the period');
+        $this->assertSame(['משלוח לאילת?', 'משלוח לאילת?', 'יש עגילים מזהב לבן?', 'מה מזג האוויר?'], array_map(fn ($r): string => $r->title, $asked['rows']));
+        $this->assertSame(['Sunday, 18.10.2026', '15:00'], [$asked['rows'][0]->group, $asked['rows'][0]->sub]);
+        $this->assertSame('The shopper got no answer.', $asked['rows'][2]->detail, 'said plainly when nothing was shown');
+
         // the analytics screen, by its address (the Analytics module is not this one's to import)
         $this->withHeader('Accept-Language', 'en')->get("/merchant/{$shop->slug}/analytics")
             ->assertOk()

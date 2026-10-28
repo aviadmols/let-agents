@@ -36,6 +36,7 @@ return [
         'wish' => ['title' => 'Wishlist', 'sub' => 'The products saved most :period'],
         'words' => ['title' => 'Top search words', 'note' => ':n {n:search/searches}', 'sub' => 'Every word searched :period'],
         // the list is the search window's questions; the "Questions" figure above adds those asked on product pages
+        'asked' => ['title' => 'Every question, by day', 'note' => 'Asked: :n', 'sub' => 'Each question asked in the search window :period, and what the shopper got'],
         'questions' => ['title' => 'Top customer questions', 'note' => 'In the search window: :n', 'sub' => 'Every question asked in the search window :period'],
         'empty' => ['title' => 'Searches with no results', 'sub' => 'Words searched that found no product :period'],
         'noclick' => ['title' => 'Results, but no click', 'sub' => 'Searches that showed products nobody clicked :period'],
@@ -58,6 +59,8 @@ return [
     'by_count' => 'By count',
     'by_name' => 'By name',
     'by_date' => 'By date',
+    'asked_tabs' => ['top' => 'Asked most', 'days' => 'By day', 'open' => 'Every question, by day'],
+    'items_shown' => 'Products shown',
     'shown' => ':shown of :all',
     'more' => 'Load more',
     'synonym' => 'Synonym',

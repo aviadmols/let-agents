@@ -102,6 +102,7 @@
                         <div class="lp-card-t"><h2>{{ $t('lists.'.$key.'.title') }}</h2><span class="lp-note">{{ $t('lists.'.$key.'.note', ['n' => $count]) }}</span></div>
                         @forelse ($list['rows'] as $r){!! $row($key, $r) !!}@empty<p class="lp-empty">{{ $t('none') }}</p>@endforelse
                         @if ($list['total'] > count($list['rows']))<button type="button" class="lp-link lp-all" wire:click="open('{{ $key }}')">{{ $t('all', ['n' => number_format($list['total'])]) }}</button>@endif
+                        @if ($key === 'questions' && $list['total'] > 0)<button type="button" class="lp-link lp-all" wire:click="open('asked')" data-open-asked>{{ $t('asked_tabs.open') }}</button>@endif
                     </section>
                 @endif
             @endforeach
@@ -155,7 +156,14 @@
                             <button type="button" wire:click="open('noclick')" @class(['is-on' => $this->list === 'noclick'])>{{ $t('failed.noclick') }}</button>
                         </div>
                     @endif
-                    <div class="lp-tabs lp-tabs-sm" role="group" aria-label="{{ $t('sort') }}">
+                    {{-- the questions asked most, or every question by the day it was asked, with what the shopper got --}}
+                    @if (in_array($this->list, ['questions', 'asked'], true))
+                        <div class="lp-tabs lp-tabs-sm" role="group" data-questions-tabs>
+                            <button type="button" wire:click="open('questions')" @class(['is-on' => $this->list === 'questions'])>{{ $t('asked_tabs.top') }}</button>
+                            <button type="button" wire:click="open('asked')" @class(['is-on' => $this->list === 'asked'])>{{ $t('asked_tabs.days') }}</button>
+                        </div>
+                    @endif
+                    <div class="lp-tabs lp-tabs-sm" role="group" aria-label="{{ $t('sort') }}" @if ($this->list === 'asked') hidden @endif>
                         <button type="button" wire:click="sortBy('value')" @class(['is-on' => $this->sort === 'value'])>{{ $t('by_count') }}</button>
                         <button type="button" wire:click="sortBy('name')" @class(['is-on' => $this->sort === 'name'])>{{ $t('by_name') }}</button>
                         @if (in_array($this->list, \App\Modules\Analytics\Filament\Merchant\Pages\ShopAnalytics::BY_DATE, true))
@@ -165,6 +173,10 @@
                     <span class="lp-note">{{ $t('shown', ['shown' => number_format(count($found['rows'])), 'all' => number_format($found['total'])]) }}</span>
                 </div>
                 @forelse ($found['rows'] as $i => $r)
+                    {{-- a list read by day: the day's heading where it changes --}}
+                    @if ($r->group !== '' && ($i === 0 || $found['rows'][$i - 1]->group !== $r->group))
+                        <h3 style="margin: 22px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--la-axis); font-size: 14px; font-weight: 700; color: var(--la-ink)" data-day>{{ $r->group }}</h3>
+                    @endif
                     {!! $row($this->list, $r, in_array($this->list, ['empty', 'noclick', 'ips'], true) ? $i + 1 : null, true) !!}
                 @empty
                     <p class="lp-empty">{{ $t('none') }}</p>

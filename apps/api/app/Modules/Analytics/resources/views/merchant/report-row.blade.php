@@ -16,14 +16,26 @@
         @else
             <span class="lp-row-t" @if ($r->ltr) dir="ltr" style="text-align: end" @endif>{{ $r->title }}</span>
         @endif
-        @if ($r->sub !== '' || ($r->pill !== null && $list !== 'questions'))
-            <span class="lp-row-s">{{ $r->sub }}@if ($r->pill !== null && $list !== 'questions' && ! in_array('block', $r->actions, true) && ! in_array('unblock', $r->actions, true))@if ($r->sub !== '') · @endif<span class="lp-pill" data-tone="{{ $r->tone }}">{{ $r->pill }}</span>@endif</span>
+        @php($asks = in_array($list, ['questions', 'asked'], true))
+        @if ($r->sub !== '' || ($r->pill !== null && ! $asks))
+            <span class="lp-row-s">{{ $r->sub }}@if ($r->pill !== null && ! $asks && ! in_array('block', $r->actions, true) && ! in_array('unblock', $r->actions, true))@if ($r->sub !== '') · @endif<span class="lp-pill" data-tone="{{ $r->tone }}">{{ $r->pill }}</span>@endif</span>
         @endif
-        @if ($list === 'questions' && $r->pill !== null)
+        @if ($asks && $r->pill !== null)
             <span class="lp-row-s"><span class="lp-pill" data-tone="{{ $r->tone }}"><i></i>{{ $r->pill }}</span></span>
         @endif
         @if ($full && $r->detail !== '')
             <div class="lp-ask-answer">@if ($r->detailLabel !== '')<span class="lp-note">{{ $r->detailLabel }}</span>@endif<p>{{ $r->detail }}</p></div>
+        @endif
+        {{-- what came with it: the products the shopper was shown, those they opened or added marked --}}
+        @if ($full && $r->items !== [])
+            <div style="display: grid; gap: 6px; margin-top: 8px" data-row-items>
+                <span class="lp-note">{{ $t('items_shown') }}</span>
+                <div class="lp-chips">
+                    @foreach ($r->items as $item)
+                        <span class="lp-chip" style="cursor: default; min-height: 30px; font-size: 13px; {{ isset($item['note']) ? 'box-shadow: inset 0 0 0 1.5px var(--la-ink);' : '' }}">{{ $item['title'] }}@isset($item['note'])<b style="font-weight: 600">· {{ $item['note'] }}</b>@endisset</span>
+                    @endforeach
+                </div>
+            </div>
         @endif
         @if (in_array('synonym', $r->actions, true))
             <form class="lp-inline" x-show="asking" x-cloak x-on:submit.prevent="$wire.act(@js($list), @js($r->key), 'synonym', means); asking = false; means = ''">
@@ -57,7 +69,7 @@
         <button type="button" class="lp-btn lp-btn-sm" wire:click="act(@js($list), @js($r->key), 'block')" wire:confirm="{{ $t('block_confirm', ['ip' => $r->title]) }}">{{ $t('block') }}</button>
     @elseif (in_array('unblock', $r->actions, true))
         <button type="button" class="lp-link" wire:click="act(@js($list), @js($r->key), 'unblock')">{{ $t('unblock') }}</button>
-    @elseif ($list !== 'ips')
+    @elseif (! in_array($list, ['ips', 'asked'], true))
         <span class="lp-v">{{ number_format($r->value) }}</span>
     @endif
 </div>

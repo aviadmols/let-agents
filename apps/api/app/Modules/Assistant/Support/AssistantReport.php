@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Assistant\Actions\TeamAnswers;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -52,11 +53,15 @@ final class AssistantReport implements ShopReport
 
     public function lists(): array
     {
-        return ['questions'];
+        return ['questions', 'asked'];
     }
 
     public function rows(Shop $shop, string $list, CarbonInterface $since, CarbonInterface $until, int $limit, string $search = '', string $sort = 'value'): array
     {
+        if ($list === 'asked') {
+            return $this->asked($since, $until, $limit, $search);
+        }
+
         // the same period, by the same clock, as the count above (QuestionCounts)
         $asks = AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)
             ->select('question')->selectRaw('count(*) as n, max(created_at) as last_at')->groupBy('question');
@@ -105,6 +110,58 @@ final class AssistantReport implements ShopReport
         })->all();
 
         return ['rows' => $rows, 'total' => $asked->count()];
+    }
+
+    /**
+     * Every question asked in the search window through the period, the latest first, under the day it was asked: each
+     * with its hour, how it ended, the answer the shopper read, and the products they were shown, those they opened or
+     * added marked; WhatsApp when it was offered. What the shopper got, as they got it.
+     *
+     * @return array{rows: list<ReportRow>, total: int}
+     */
+    private function asked(CarbonInterface $since, CarbonInterface $until, int $limit, string $search): array
+    {
+        $asks = AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)
+            ->when(trim($search) !== '', fn ($q) => $q->where('question', 'like', '%'.trim($search).'%'));
+        $total = (clone $asks)->count();
+        $shown = $asks->with('answer:id,answer')->latest('created_at')->orderByDesc('id')->limit($limit)
+            ->get(['id', 'question', 'outcome', 'answer', 'answer_id', 'products', 'picks', 'picked', 'whatsapp_shown', 'whatsapp_clicked', 'created_at']);
+
+        // the products shown by their names, as the store has them now
+        $ids = $shown->flatMap(fn (AssistantSearchAsk $a): array => array_map('strval', (array) $a->products))->unique()->values()->all();
+        $titles = $ids === [] ? collect() : CatalogProduct::query()->whereIn('external_id', $ids)->pluck('title', 'external_id');
+        $zone = (string) config('app.display_timezone', 'Asia/Jerusalem');
+
+        $rows = $shown->map(function (AssistantSearchAsk $a) use ($titles, $zone): ReportRow {
+            $outcome = (string) $a->outcome;
+            [$pill, $tone] = match (true) {
+                in_array($outcome, self::ANSWERED, true) => [__('assistant::report.answered'), 'good'],
+                in_array($outcome, self::UNANSWERED, true) => [__('assistant::report.unanswered'), 'bad'],
+                in_array($outcome, self::OFF, true) => [__('assistant::report.off'), ''],
+                default => [null, ''],
+            };
+            $answer = trim((string) ($a->getRelation('answer')?->getAttribute('answer') ?? $a->getAttributes()['answer'] ?? ''));
+            $picked = array_flip(array_map('strval', (array) $a->picked));
+            $picks = array_values(array_filter((array) $a->picks, 'is_array'));
+            $items = $picks !== []
+                ? array_map(fn (array $p): array => ['title' => trim((string) ($p['title'] ?? $titles[(string) ($p['external_id'] ?? '')] ?? ''))] + (isset($picked[(string) ($p['external_id'] ?? '')]) ? ['note' => __('assistant::report.opened')] : []), $picks)
+                : array_map(fn (string $id): array => ['title' => (string) ($titles[$id] ?? '')] + (isset($picked[$id]) ? ['note' => __('assistant::report.opened')] : []), array_map('strval', (array) $a->products));
+            $at = Carbon::parse($a->created_at)->timezone($zone);
+
+            return new ReportRow(
+                key: (string) $a->id, title: (string) $a->question, value: 0, pill: $pill, tone: $tone,
+                sub: implode(' · ', array_filter([
+                    $at->format('H:i'),
+                    $a->whatsapp_shown ? __($a->whatsapp_clicked ? 'assistant::report.whatsapp_clicked' : 'assistant::report.whatsapp_shown') : null,
+                ])),
+                detail: $answer !== '' ? $answer : __('assistant::report.got_no_answer'),
+                detailLabel: $answer === '' ? '' : __(in_array($outcome, self::ANSWERED, true) ? 'assistant::report.answer_given' : 'assistant::report.shown_instead'),
+                group: $at->locale(app()->getLocale())->translatedFormat('l, j.n.Y'),
+                items: array_values(array_filter($items, fn (array $i): bool => $i['title'] !== '')),
+            );
+        })->all();
+
+        return ['rows' => $rows, 'total' => $total];
     }
 
     /** The team answers a question in their own words, or sets it aside; either way it leaves the list. */

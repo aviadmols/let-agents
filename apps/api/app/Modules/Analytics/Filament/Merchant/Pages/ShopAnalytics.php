@@ -42,7 +42,8 @@ final class ShopAnalytics extends Page
     /** The chart's measures, each a series a module gives (ReportSeries). */
     public const MEASURES = ['searches', 'opens', 'questions', 'adds'];
 
-    public const SHOWN = ['adds' => 5, 'wish' => 3, 'words' => 6, 'questions' => 5, 'empty' => 5, 'noclick' => 5, 'ips' => 4];
+    // asked: every question by day, opened from the questions' list (a tab beside it), never a card of its own
+    public const SHOWN = ['adds' => 5, 'wish' => 3, 'words' => 6, 'questions' => 5, 'asked' => 5, 'empty' => 5, 'noclick' => 5, 'ips' => 4];
 
     private const PAGE = 50;
 
