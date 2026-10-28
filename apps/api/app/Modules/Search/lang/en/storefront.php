@@ -11,6 +11,7 @@ return [
     'facet_category' => 'Category',
     'facet_audience' => 'For',
     'facet_tags' => 'Tags',
+    'facet_brand' => 'Brand',
     'facet_length' => 'Length',
     'length' => ['1' => '1 day', '2-5' => '2 to 5 days', '6-9' => '6 to 9 days', '10-14' => '10 to 14 days', '15+' => '15 days or more'],
     'audience' => ['women' => 'Women', 'men' => 'Men', 'kids' => 'Kids', 'babies' => 'Babies'],

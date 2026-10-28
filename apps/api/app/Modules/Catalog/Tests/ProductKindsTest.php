@@ -111,4 +111,38 @@ final class ProductKindsTest extends TestCase
             $this->assertSame(['men'], $kinds->audiences($products[2]), 'a title that says none: its tags do');
         });
     }
+
+    public function test_a_title_that_opens_with_its_brand_and_a_season_for_a_type_still_say_what_it_is(): void
+    {
+        // Chozen, 28.10: titles open with the brand in Hebrew ("נורתפייס נעלי בית") and every product is typed "חורף 26":
+        // a slipper's alike were a fleece jacket and a bag.
+        $shop = Shop::factory()->create();
+        $products = app(TenantContext::class)->run($shop->id, function () use ($shop): array {
+            $make = fn (string $id, string $title, string $brand, string $type = 'חורף 26'): CatalogProduct => CatalogProduct::query()->create([
+                'shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'brand' => $brand,
+                'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'price' => 100,
+                'payload' => ['product_type' => $type, 'tags' => []],
+            ]);
+
+            return [
+                'mules' => $make('1', 'נורתפייס נעלי בית THERMOBALL V TRACTION MULES לנשים', 'THE NORTH FACE'),
+                $make('2', 'נורתפייס מעיל פליס CRAGMONT לנשים', 'THE NORTH FACE'),
+                $make('3', 'נורתפייס נעלי בית THERMOBALL TRACTION לנשים', 'THE NORTH FACE'),
+                $make('4', 'נורתפייס תיק גב BOREALIS', 'THE NORTH FACE'),
+                $make('5', 'בראוני נעלי בובה לנשים', 'BROWNIE', 'NOT SALE'),
+                $make('6', 'בראוני תיק צד לנשים', 'BROWNIE', 'NOT SALE'),
+                $make('7', 'בראוני חגורה לנשים', 'BROWNIE', 'NOT SALE'),
+                'jacket' => $make('8', "אול סיינטס ג'קט עור לנשים", 'ALL SAINTS'),
+                $make('9', "אול סיינטס ג'קט ג'ינס לנשים", 'ALL SAINTS'),
+                $make('10', 'אול סיינטס טישירט לנשים', 'ALL SAINTS'),
+            ];
+        });
+
+        $kinds = app(ProductKinds::class);
+        app(TenantContext::class)->run($shop->id, function () use ($kinds, $products): void {
+            $this->assertSame(['head:נעל'], $kinds->marks($products['mules']), 'what follows the brand, not the brand or the season');
+            $this->assertSame(['3', '5'], $kinds->sameKind($products['mules'], ['2', '3', '4', '5', '6']), "shoes, of any brand; never its brand's fleece or bag");
+            $this->assertSame(['9'], $kinds->sameKind($products['jacket'], ['9', '10', '2']), 'a brand of two words, and a geresh in the kind');
+        });
+    }
 }

@@ -306,8 +306,11 @@ final class BuildSearchIndex
         $audiences = $whom === null ? [] : $this->audienceFacet($facets['facets'], $this->locale($shopId), $whom);
         // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
         $tagFilters = $this->tagFacets($facets['facets'], $shopId, $this->locale($shopId));
-        // The store's own tags, and how many days each offer lasts, where the shop asks for them (a content site).
-        $storeTags = $this->storeTagFacet($facets['facets'], $this->locale($shopId));
+        // The brands, where the store sells several (Chozen: THE NORTH FACE, ADIDAS, TOUS).
+        $brands = $this->brandFacet($facets['facets'], $this->locale($shopId));
+        // The store's own tags, where the shop asks for them (a content site) or where it has no categories to narrow by
+        // (Chozen files its products by tags alone: "נעליים", "סניקרס", "תיקים"); and how many days each offer lasts.
+        $storeTags = $this->storeTagFacet($facets['facets'], $this->locale($shopId), $categories === []);
         $lengths = $this->lengthFacet($facets['facets'], $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
         // Their values are words of the products either way: "הספר של עומר שם טוב" finds his book, whose title does not say him.
@@ -329,7 +332,7 @@ final class BuildSearchIndex
             // The names of what the store's approved facts say it is ("אמרלד קאט", "קרנליאן", "ספר מודפס") are words it
             // is found by, whatever its own text calls them ("קרנליון"): a filter's name finds what the filter holds.
             $named = array_map(fn (int $code): string => (string) ($facets['facets'][intdiv($code, 1000)]['v'][$code % 1000]['l'] ?? ''), $read['f'] ?? []);
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($storeTags[$product->id] ?? []), ...($lengths['codes'][$product->id] ?? []), ...($fields[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($brands[$product->id] ?? []), ...($storeTags[$product->id] ?? []), ...($lengths['codes'][$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -1120,17 +1123,20 @@ final class BuildSearchIndex
     /**
      * The tags the store gives its products (WooCommerce's, WordPress's, Shopify's), a filter of their own: each on two
      * products or more, never one already offered under the same name (its category "Spain" and its tag "Spain"), nor
-     * one on nearly every product. The most used first, as many as the categories. Only where the shop asks for it
-     * (search.store_tag_filter: a content site).
+     * one on nearly every product, nor a campaign ("החדשים", "NOT SALE") or whom it is for alone ("נשים/יוניסקס", the
+     * audience filter's). The most used first, as many as the categories. Where the shop asks for it
+     * (search.store_tag_filter: a content site), or where the store has no categories to narrow by.
      *
      * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
      * @return array<string, list<int>> the codes of each product's tags, by product id
      */
-    private function storeTagFacet(array &$facets, string $locale): array
+    private function storeTagFacet(array &$facets, string $locale, bool $noCategories = false): array
     {
-        if (! Settings::get('search.store_tag_filter', $this->tenant->id())) {
+        $asked = (bool) Settings::get('search.store_tag_filter', $this->tenant->id());
+        if (! $asked && ! $noCategories) {
             return [];
         }
+        $kinds = app(ProductKinds::class);
 
         $offered = [];
         foreach ($facets as $facet) {
@@ -1146,7 +1152,8 @@ final class BuildSearchIndex
             $total++;
             foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
                 $key = mb_strtolower($tag);
-                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true)) {
+                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true)
+                    || (! $asked && ($kinds->campaign($tag) || $kinds->onlyWhom(str_replace(['/', '_', '-'], ' ', $tag))))) {
                     continue;
                 }
                 $names[$key] ??= $tag;
@@ -1333,5 +1340,62 @@ final class BuildSearchIndex
         }
 
         return $out;
+    }
+
+    /** A brand is a filter value where it is on at least this many products. */
+    private const BRAND_MIN_PRODUCTS = 2;
+
+    /**
+     * The store's brands, a filter of their own, where it sells two or more of two products or more and none is nearly
+     * all of it: never where another filter already names them (a bookshop's publisher). The most products first, as
+     * many as the categories.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     * @return array<string, list<int>> each product's brand code, by product id
+     */
+    private function brandFacet(array &$facets, string $locale): array
+    {
+        $byBrand = [];
+        $names = [];
+        $total = 0;
+        foreach (CatalogProduct::query()->active()->orderBy('id')->get(['id', 'brand']) as $product) {
+            $total++;
+            $brand = trim((string) $product->brand);
+            if ($brand === '') {
+                continue;
+            }
+            $key = mb_strtolower($brand);
+            $names[$key] ??= $brand;
+            $byBrand[$key][] = (string) $product->id;
+        }
+        $byBrand = array_filter($byBrand, fn (array $ids): bool => count($ids) >= self::BRAND_MIN_PRODUCTS);
+        if (count($byBrand) < 2 || max(array_map('count', $byBrand)) / max(1, $total) >= self::CATEGORY_MAX_SHARE) {
+            return [];
+        }
+
+        $offered = [];
+        foreach ($facets as $facet) {
+            foreach ($facet['v'] ?? [] as $value) {
+                $offered[mb_strtolower(trim((string) $value['l']))] = true;
+            }
+        }
+        if (count(array_intersect_key($byBrand, $offered)) * 2 >= count($byBrand)) {
+            return [];
+        }
+
+        uksort($byBrand, fn (string $a, string $b): int => [count($byBrand[$b]), $a] <=> [count($byBrand[$a]), $b]);
+        $byBrand = array_slice($byBrand, 0, max(2, (int) Settings::get('search.category_filter_max', $this->tenant->id()) ?: self::MAX_CATEGORIES), true);
+        $at = count($facets);
+        $values = [];
+        $codes = [];
+        foreach ($byBrand as $key => $ids) {
+            foreach ($ids as $id) {
+                $codes[$id][] = $at * 1000 + count($values);
+            }
+            $values[] = ['k' => 'brand:'.$key, 'l' => $names[$key]];
+        }
+        $facets[] = ['k' => 'brand', 'l' => (string) __('search::storefront.facet_brand', [], $locale), 'v' => $values];
+
+        return $codes;
     }
 }

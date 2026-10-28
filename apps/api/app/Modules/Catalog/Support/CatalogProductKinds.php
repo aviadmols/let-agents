@@ -24,9 +24,10 @@ final class CatalogProductKinds implements ProductKinds
 
     /**
      * A campaign, not a kind: a sale, a season, a date, a collection, what is new or in fashion ("sale 20%", "july20",
-     * "חזרה לגן", "Top 10", "חדש באתר", "CLUB 20%", "כל מה שחם", "BACK TO SCHOOL", "טרנדים").
+     * "חזרה לגן", "Top 10", "חדש באתר", "CLUB 20%", "כל מה שחם", "BACK TO SCHOOL", "טרנדים"), a season ("חורף 26") or a stock
+     * code ("NOS").
      */
-    private const CAMPAIGN = '/\d|%|\b(sale|off|new|top|last|chance|outlet|clearance|black friday|club|back to school|trend\w*|collection)\b|מבצע|הנחה|סייל|חדש|חזרה ל|כל מה ש|טרנד|קולקצי/iu';
+    private const CAMPAIGN = '/\d|%|\b(sale|off|new|top|last|chance|outlet|clearance|black friday|club|back to school|trend\w*|collection|nos|winter|summer|spring|autumn|fall|season\w*)\b|מבצע|הנחה|סייל|חדש|חזרה ל|כל מה ש|טרנד|קולקצי|חורף|קיץ|אביב|סתיו|עונה|עונת/iu';
 
     public function campaign(string $name): bool
     {
@@ -39,11 +40,13 @@ final class CatalogProductKinds implements ProductKinds
     public function marks(CatalogProduct $product): array
     {
         $counts = $this->counts((string) $product->shop_id);
-        $own = self::own($product);
+        $own = self::own($product, $counts['prefix']);
 
         // A type no other product has is the product's name, not its kind (Mycolivia types each formula by itself:
         // "Dream", "Joy", "Focus"; as kinds, no product had a like). Its kind is then read as if it had none.
-        if ($own['type'] !== '' && ($counts['type'][$own['type']] ?? 0) >= 2) {
+        // A season or a campaign typed as the type is none (Chozen types its products "חורף 26": a slipper and a fleece
+        // were one kind).
+        if ($own['type'] !== '' && ($counts['type'][$own['type']] ?? 0) >= 2 && ! $this->campaign($own['type'])) {
             return ['type:'.$own['type']];
         }
 
@@ -78,14 +81,15 @@ final class CatalogProductKinds implements ProductKinds
             return $externalIds;
         }
 
-        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $externalIds)->get(['id', 'external_id', 'title', 'payload'])
+        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $externalIds)->get(['id', 'external_id', 'title', 'brand', 'payload'])
             ->keyBy(fn (CatalogProduct $p): string => (string) $p->external_id);
         $audience = self::audience($product);
+        $prefixes = $this->counts((string) $product->shop_id)['prefix'];
 
-        return array_values(array_filter($externalIds, function (string $id) use ($others, $marks, $audience): bool {
+        return array_values(array_filter($externalIds, function (string $id) use ($others, $marks, $audience, $prefixes): bool {
             $other = $others->get($id);
 
-            return $other !== null && ($marks === [] || array_intersect($marks, self::allMarks($other)) !== []) && self::sameAudience($audience, self::audience($other));
+            return $other !== null && ($marks === [] || array_intersect($marks, self::allMarks($other, $prefixes)) !== []) && self::sameAudience($audience, self::audience($other));
         }));
     }
 
@@ -200,7 +204,7 @@ final class CatalogProductKinds implements ProductKinds
     public function series(CatalogProduct $product): ?array
     {
         $counts = $this->counts((string) $product->shop_id);
-        $own = self::own($product);
+        $own = self::own($product, $counts['prefix']);
         $limit = max(2, min($counts['products'] - 1, (int) floor($counts['products'] * self::SERIES_MAX_SHARE)));
         $best = null;
 
@@ -224,9 +228,9 @@ final class CatalogProductKinds implements ProductKinds
      *
      * @return list<string>
      */
-    private static function allMarks(CatalogProduct $product): array
+    private static function allMarks(CatalogProduct $product, array $prefixes): array
     {
-        $own = self::own($product);
+        $own = self::own($product, $prefixes);
 
         return [
             ...($own['type'] !== '' ? ['type:'.$own['type']] : []),
@@ -245,14 +249,24 @@ final class CatalogProductKinds implements ProductKinds
         return mb_strlen($word) > 3 ? (string) preg_replace('/[יהת]$/u', '', $word) : $word;
     }
 
-    /** @return array{type: string, head: string, categories: list<string>, tags: list<string>, title: string} */
-    private static function own(CatalogProduct $product): array
+    /**
+     * @param  array<string, string>  $prefixes  the words each brand's titles open with (brandPrefixes)
+     * @return array{type: string, head: string, categories: list<string>, tags: list<string>, title: string}
+     */
+    private static function own(CatalogProduct $product, array $prefixes = []): array
     {
         $clean = fn (mixed $v): string => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $v)));
         // the title's first word, when it is Hebrew (an English title opens with its model, "Old Skool Backpack"), as
         // its base: a plural or a construct form is the same kind ("חולצת טי" and "חולצה", "נעלי" and "נעליים")
-        $first = (string) (preg_split('/[\s,\-–—|:]+/u', trim((string) $product->title), 2)[0] ?? '');
-        $head = preg_match('/^\p{Hebrew}{2,}$/u', $first) === 1 ? self::base($first) : '';
+        // A title that opens with its brand ("נורתפייס נעלי בית", "אול סיינטס טישירט": Chozen) says what it is after it.
+        $title = trim((string) $product->title);
+        $prefix = $prefixes[mb_strtolower(trim((string) $product->brand))] ?? '';
+        if ($prefix !== '' && str_starts_with($title.' ', $prefix.' ')) {
+            $title = trim(mb_substr($title, mb_strlen($prefix)));
+        }
+        $first = (string) (preg_split('/[\s,\-–—|:]+/u', $title, 2)[0] ?? '');
+        // a geresh is a letter of a Hebrew word ("ג'קט")
+        $head = preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})?$/u", $first) === 1 ? self::base($first) : '';
 
         return [
             'type' => $clean($product->payload['product_type'] ?? ''),
@@ -266,20 +280,21 @@ final class CatalogProductKinds implements ProductKinds
     /**
      * How many active products carry each type, category and tag, kept until the catalog changes.
      *
-     * @return array{products: int, type: array<string, int>, head: array<string, int>, category: array<string, int>, tag: array<string, int>}
+     * @return array{products: int, type: array<string, int>, head: array<string, int>, category: array<string, int>, tag: array<string, int>, prefix: array<string, string>}
      */
     private function counts(string $shopId): array
     {
         $active = CatalogProduct::query()->whereNull('removed_at');
-        $version = '3|'.$active->count().'|'.$active->max('updated_at');
+        $version = '4|'.$active->count().'|'.$active->max('updated_at');
 
         return Cache::remember('catalog:kinds:'.$shopId.':'.md5($version), now()->addHours(12), function (): array {
-            $counts = ['products' => 0, 'type' => [], 'head' => [], 'category' => [], 'tag' => []];
+            $prefixes = self::brandPrefixes();
+            $counts = ['products' => 0, 'type' => [], 'head' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
 
-            CatalogProduct::query()->whereNull('removed_at')->select(['id', 'title', 'payload'])->orderBy('id')
-                ->chunk(500, function ($products) use (&$counts): void {
+            CatalogProduct::query()->whereNull('removed_at')->select(['id', 'title', 'brand', 'payload'])->orderBy('id')
+                ->chunk(500, function ($products) use (&$counts, $prefixes): void {
                     foreach ($products as $product) {
-                        $own = self::own($product);
+                        $own = self::own($product, $prefixes);
                         $counts['products']++;
                         if ($own['type'] !== '') {
                             $counts['type'][$own['type']] = ($counts['type'][$own['type']] ?? 0) + 1;
@@ -298,5 +313,69 @@ final class CatalogProductKinds implements ProductKinds
 
             return $counts;
         });
+    }
+
+    /** A brand's titles open with its name when this share of them do. */
+    private const PREFIX_SHARE = 0.8;
+
+    /**
+     * The words each brand's titles open with, where the store writes its brand first ("נורתפייס", "אול סיינטס",
+     * "טואוס": Chozen): of a store of two brands or more, a brand of three products or more, the longest opening of up
+     * to three words that most of its titles have and no other brand's title opens with. A word other brands' titles
+     * open with too ("נעלי") is what the products are, never a brand's name; a store of one brand has none.
+     *
+     * @return array<string, string> lower-case brand => the words, as its titles write them
+     */
+    private static function brandPrefixes(): array
+    {
+        $titles = [];
+        CatalogProduct::query()->whereNull('removed_at')->whereNotNull('brand')->select(['id', 'title', 'brand'])->orderBy('id')
+            ->chunk(1000, function ($products) use (&$titles): void {
+                foreach ($products as $product) {
+                    $brand = mb_strtolower(trim((string) $product->brand));
+                    if ($brand !== '') {
+                        $titles[$brand][] = preg_split('/\s+/u', trim((string) $product->title), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                    }
+                }
+            });
+        if (count($titles) < 2) {
+            return [];
+        }
+
+        $opens = fn (array $words, array $prefix): bool => count($words) > count($prefix) && array_slice($words, 0, count($prefix)) === $prefix;
+        $out = [];
+        foreach ($titles as $brand => $list) {
+            if (count($list) < 3) {
+                continue;
+            }
+            for ($k = 3; $k >= 1; $k--) {
+                $seen = [];
+                foreach ($list as $words) {
+                    if (count($words) > $k) {
+                        $key = implode(' ', array_slice($words, 0, $k));
+                        $seen[$key] = ($seen[$key] ?? 0) + 1;
+                    }
+                }
+                if ($seen === []) {
+                    continue;
+                }
+                arsort($seen);
+                $key = (string) array_key_first($seen);
+                if ($seen[$key] < count($list) * self::PREFIX_SHARE) {
+                    continue;
+                }
+                $prefix = explode(' ', $key);
+                foreach ($titles as $other => $theirs) {
+                    if ($other !== $brand && array_filter($theirs, fn (array $w): bool => $opens($w, $prefix)) !== []) {
+                        continue 2;
+                    }
+                }
+                $out[(string) $brand] = $key;
+                break;
+            }
+        }
+        ksort($out);
+
+        return $out;
     }
 }
