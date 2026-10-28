@@ -112,8 +112,19 @@
     }
   };
   var T = WORDS[LANG];
+  // A site that tells about what it offers (its cards say "Read more": tours, courses, events) offers items, not
+  // products: every "product" of the drawer's own words says "item" there, its words only, never a title put into them.
+  // Both are masculine in Hebrew ("מוצר אחד", "פריט אחד"), so a sentence stays as it was said.
+  function itemized(s) {
+    return String(s)
+      .replace(/(^|[^א-ת])([והבלמשכ]{0,2})מוצר(ים)?(?![א-ת])/g, '$1$2פריט$3')
+      .replace(/\b([Aa]) product\b/g, function (m, a) { return (a === 'A' ? 'An' : 'an') + ' item'; })
+      .replace(/\bproducts\b/g, 'items').replace(/\bProducts\b/g, 'Items')
+      .replace(/\bproduct\b/g, 'item').replace(/\bProduct\b/g, 'Item');
+  }
   function t(key, vars) {
     var s = T[key] == null ? key : T[key];
+    if (typeof S !== 'undefined' && S.config && S.config.cardAction === 'read_more') { s = itemized(s); }
     if (vars) { Object.keys(vars).forEach(function (k) { var v = vars[k]; if (k === 'name' || k === 'shop') { v = '\u2068' + v + '\u2069'; } s = s.split(':' + k).join(v); }); }
     return s;
   }

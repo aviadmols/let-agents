@@ -269,7 +269,7 @@
     if (d.phoneStart !== undefined) { S.phoneStep = 'num'; render(); var pi = BODY.querySelector('#lsph'); if (pi) { pi.focus(); } return; }
     if (d.why !== undefined) { toast(t('whyShownText')); return; }
     if (d.cmpViewed && viewedBefore()) { S.pick = [viewedBefore().id, pid(S.ctx)]; compare(); return; }
-    if (d.cmpViewed) { submit(LANG === 'he' ? 'מה ההבדל בין המוצר הזה לבין מה שראיתי קודם?' : 'How does this compare with what I viewed?', 'ask', true); return; }
+    if (d.cmpViewed) { submit((S.config && S.config.cardAction === 'read_more' ? itemized : String)(LANG === 'he' ? 'מה ההבדל בין המוצר הזה לבין מה שראיתי קודם?' : 'How does this compare with what I viewed?'), 'ask', true); return; }
     if (d.goto && el.tagName === 'A') { remember(INPUT.value.trim() || ''); }
   });
   // on a phone the search field slides away while scrolling down, and comes back on the way up (or at the top);
