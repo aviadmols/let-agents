@@ -694,7 +694,9 @@ final class HebrewSearch
 
     /** A day said in words before a month: its ordinal and its number, as normalized (no final letters). */
     private const DAY_WORDS = ['ראשונ' => 1, 'אחד' => 1, 'שני' => 2, 'שניימ' => 2, 'שנימ' => 2, 'שלישי' => 3, 'שלושה' => 3, 'רביעי' => 4, 'ארבעה' => 4, 'חמישי' => 5, 'חמישה' => 5,
-        'שישי' => 6, 'שישה' => 6, 'שביעי' => 7, 'שבעה' => 7, 'שמיני' => 8, 'שמונה' => 8, 'תשיעי' => 9, 'תשעה' => 9, 'עשירי' => 10, 'עשרה' => 10];
+        'שישי' => 6, 'שישה' => 6, 'שביעי' => 7, 'שבעה' => 7, 'שמיני' => 8, 'שמונה' => 8, 'תשיעי' => 9, 'תשעה' => 9, 'עשירי' => 10, 'עשרה' => 10,
+        // and as a date is said ("השבע באוקטובר"): the number in its feminine form
+        'אחת' => 1, 'שתיימ' => 2, 'שתי' => 2, 'שלוש' => 3, 'ארבע' => 4, 'חמש' => 5, 'שש' => 6, 'שבע' => 7, 'תשע' => 9, 'עשר' => 10];
 
     /** What a number before a point is not a date in front of: a measure ("4.5 ממ"), a size, a product of sizes. */
     private const NOT_A_DATE = '(?!\s*(?:ממ|סמ|מטר|מל|ליטר|קג|גרמ|גר|אינצ|מ|mm|cm|m|kg|g|ml|l|in|x|×|\*)(?:\s|$))';
