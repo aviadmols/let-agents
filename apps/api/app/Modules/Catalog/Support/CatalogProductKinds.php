@@ -86,12 +86,27 @@ final class CatalogProductKinds implements ProductKinds
         $audience = self::audience($product);
         $prefixes = $this->counts((string) $product->shop_id)['prefix'];
 
-        return array_values(array_filter($externalIds, function (string $id) use ($others, $marks, $audience, $prefixes): bool {
+        $kept = array_values(array_filter($externalIds, function (string $id) use ($others, $marks, $audience, $prefixes): bool {
             $other = $others->get($id);
 
             return $other !== null && ($marks === [] || array_intersect($marks, self::allMarks($other, $prefixes)) !== []) && self::sameAudience($audience, self::audience($other));
         }));
+
+        // Of shoes, home slippers ("נעלי בית"), never running shoes ("נעלי ריצה") or flats ("נעלי בובה") (Chozen, 28.10):
+        // where its title names it by two words and enough of the rest are named by them too, only those.
+        $sub = self::own($product, $prefixes)['sub'];
+        if ($sub !== '') {
+            $named = array_values(array_filter($kept, fn (string $id): bool => $id !== (string) $product->external_id && self::own($others->get($id), $prefixes)['sub'] === $sub));
+            if (count($named) >= self::SUB_KIND_MIN) {
+                $kept = array_values(array_filter($kept, fn (string $id): bool => $id === (string) $product->external_id || in_array($id, $named, true)));
+            }
+        }
+
+        return $kept;
     }
+
+    /** A kind named by two words ("נעלי בית") is the alike's only where this many others are named by them. */
+    private const SUB_KIND_MIN = 3;
 
     /** Words that say whom a product is for, as the store writes them in its titles, tags and categories. */
     private const AUDIENCE = [
@@ -251,7 +266,7 @@ final class CatalogProductKinds implements ProductKinds
 
     /**
      * @param  array<string, string>  $prefixes  the words each brand's titles open with (brandPrefixes)
-     * @return array{type: string, head: string, categories: list<string>, tags: list<string>, title: string}
+     * @return array{type: string, head: string, sub: string, categories: list<string>, tags: list<string>, title: string}
      */
     private static function own(CatalogProduct $product, array $prefixes = []): array
     {
@@ -264,13 +279,18 @@ final class CatalogProductKinds implements ProductKinds
         if ($prefix !== '' && str_starts_with($title.' ', $prefix.' ')) {
             $title = trim(mb_substr($title, mb_strlen($prefix)));
         }
-        $first = (string) (preg_split('/[\s,\-–—|:]+/u', $title, 2)[0] ?? '');
+        [$first, $second] = array_pad(preg_split('/[\s,\-–—|:]+/u', $title, 3) ?: [], 2, '');
+        $first = (string) $first;
+        $second = (string) $second;
         // a geresh is a letter of a Hebrew word ("ג'קט")
         $head = preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})?$/u", $first) === 1 ? self::base($first) : '';
 
         return [
             'type' => $clean($product->payload['product_type'] ?? ''),
             'head' => $head,
+            // a plural's construct form opens a kind of two words ("נעלי בית", "כפכפי סליידס"), never by whom or what colour
+            'sub' => $head !== '' && preg_match('/י$/u', $first) === 1 && preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})$/u", $second) === 1
+                && self::saidIn($second) === [] && ! ColorWords::knows($second) ? $head.' '.self::base($second) : '',
             'categories' => array_values(array_unique(array_filter(array_map(fn (array $path): string => $clean(end($path) ?: ''), $product->categoryPaths())))),
             'tags' => array_values(array_unique(array_filter(array_map($clean, (array) ($product->payload['tags'] ?? []))))),
             'title' => $clean($product->title),
@@ -321,8 +341,8 @@ final class CatalogProductKinds implements ProductKinds
     /**
      * The words each brand's titles open with, where the store writes its brand first ("נורתפייס", "אול סיינטס",
      * "טואוס": Chozen): of a store of two brands or more, a brand of three products or more, the longest opening of up
-     * to three words that most of its titles have and no other brand's title opens with. A word other brands' titles
-     * open with too ("נעלי") is what the products are, never a brand's name; a store of one brand has none.
+     * to three words that most of its titles have and no other brand's title opens with, up to a word other brands'
+     * titles say too ("סניקרס", "כפכפי"), which is what the products are, never a brand's name. A store of one brand has none.
      *
      * @return array<string, string> lower-case brand => the words, as its titles write them
      */
@@ -343,6 +363,23 @@ final class CatalogProductKinds implements ProductKinds
         }
 
         $opens = fn (array $words, array $prefix): bool => count($words) > count($prefix) && array_slice($words, 0, count($prefix)) === $prefix;
+        // the words each brand's titles say, and so those other brands' titles say
+        $said = [];
+        foreach ($titles as $brand => $list) {
+            foreach ($list as $words) {
+                foreach ($words as $word) {
+                    $said[$word][$brand] = true;
+                }
+            }
+        }
+        $elsewhere = [];
+        foreach ($said as $word => $brands) {
+            foreach (array_keys($titles) as $brand) {
+                if (count($brands) > (isset($brands[$brand]) ? 1 : 0)) {
+                    $elsewhere[$brand][$word] = true;
+                }
+            }
+        }
         $out = [];
         foreach ($titles as $brand => $list) {
             if (count($list) < 3) {
@@ -364,7 +401,19 @@ final class CatalogProductKinds implements ProductKinds
                 if ($seen[$key] < count($list) * self::PREFIX_SHARE) {
                     continue;
                 }
-                $prefix = explode(' ', $key);
+                // its name ends before a word other brands' titles say too: "בירקנשטוק כפכפי סליידס" is בירקנשטוק and what
+                // all its products are ("וג'ה סניקרס", "פלדיום מגפיים"), and what they are is the kind
+                $prefix = [];
+                foreach (explode(' ', $key) as $word) {
+                    if (isset($elsewhere[$brand][$word])) {
+                        break;
+                    }
+                    $prefix[] = $word;
+                }
+                if ($prefix === []) {
+                    break;
+                }
+                $key = implode(' ', $prefix);
                 foreach ($titles as $other => $theirs) {
                     if ($other !== $brand && array_filter($theirs, fn (array $w): bool => $opens($w, $prefix)) !== []) {
                         continue 2;

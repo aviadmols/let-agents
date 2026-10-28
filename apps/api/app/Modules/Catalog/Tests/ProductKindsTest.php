@@ -144,5 +144,15 @@ final class ProductKindsTest extends TestCase
             $this->assertSame(['3', '5'], $kinds->sameKind($products['mules'], ['2', '3', '4', '5', '6']), "shoes, of any brand; never its brand's fleece or bag");
             $this->assertSame(['9'], $kinds->sameKind($products['jacket'], ['9', '10', '2']), 'a brand of two words, and a geresh in the kind');
         });
+
+        // and a kind of two words, where enough are named by them: home slippers, never running shoes or flats
+        $more = app(TenantContext::class)->run($shop->id, fn (): array => array_map(fn (array $p): CatalogProduct => CatalogProduct::query()->create([
+            'shop_id' => $shop->id, 'external_id' => $p[0], 'type' => 'simple', 'status' => 'publish', 'title' => $p[1], 'brand' => $p[2],
+            'url' => 'https://www.store.test/p/'.$p[0], 'in_stock' => true, 'purchasable' => true, 'hash' => 'h'.$p[0], 'price' => 100, 'payload' => ['tags' => []],
+        ]), [['11', 'הוקה נעלי ריצה Mach 7 לנשים', 'HOKA'], ['12', 'הוקה נעלי ריצה Clifton 11 לנשים', 'HOKA'], ['13', 'הוקה נעלי ריצה Kawana 3 לנשים', 'HOKA'], ['14', 'הוקה נעלי ריצה Challenger 8 לנשים', 'HOKA']]));
+        app(TenantContext::class)->run($shop->id, function () use ($kinds, $products, $more): void {
+            $this->assertSame(['12', '13', '14'], $kinds->sameKind($more[0], ['1', '3', '5', '12', '13', '14']), 'running shoes, of running shoes');
+            $this->assertSame(['3', '5', '11'], $kinds->sameKind($products['mules'], ['3', '5', '11']), 'too few home slippers: any shoe');
+        });
     }
 }
