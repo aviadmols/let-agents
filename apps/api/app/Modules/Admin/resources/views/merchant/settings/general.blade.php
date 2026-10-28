@@ -9,6 +9,9 @@
             <x-lp::kv-row :label="$t('kind')" :tip="$t('kind_tip')">
                 <x-lp::chips model="data.kind" :options="__('admin::shop_settings.general.kinds')" />
             </x-lp::kv-row>
+            <x-lp::kv-row :label="$t('matters')" :tip="$t('matters_tip')">
+                <x-lp::chips model="data.matters" :options="__('admin::shop_settings.general.matters_kinds')" />
+            </x-lp::kv-row>
             <x-lp::kv-row :label="$t('languages')">
                 {{-- the first is the main one: the language the store's content is read in --}}
                 <div class="lp-chips" x-data="{ v: $wire.entangle('data.languages'), adding: false, names: @js($languages) }">

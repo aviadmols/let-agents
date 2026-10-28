@@ -3,6 +3,7 @@
 namespace App\Modules\Tenancy\Filament\Operator\Resources\Shops\Schemas;
 
 use App\Core\Localization\Locales;
+use App\Modules\Tenancy\Enums\SearchMatters;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Plan;
@@ -70,6 +71,15 @@ final class ShopForm
                             ->placeholder(__('tenancy::plans.none'))
                             ->helperText(__('tenancy::shops.fields.plan_help')),
                         // A new shop may start on a trial (StartTrial); later, the shops table starts and ends one.
+                        // What matters in its search: the look reads its pictures (search by photo, alike by look),
+                        // the content reads none. Later the shop changes it in Settings · General.
+                        Select::make('matters')
+                            ->label(__('tenancy::shops.fields.matters'))
+                            ->options(SearchMatters::options())
+                            ->default(SearchMatters::Content->value)
+                            ->helperText(__('tenancy::shops.fields.matters_help'))
+                            ->visibleOn('create')
+                            ->required(),
                         Toggle::make('trial')
                             ->label(__('tenancy::shops.fields.start_trial'))
                             ->helperText(fn (): string => __('tenancy::shops.fields.start_trial_help', TrialLimits::words()))

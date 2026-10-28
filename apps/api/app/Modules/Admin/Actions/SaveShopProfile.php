@@ -2,11 +2,13 @@
 
 namespace App\Modules\Admin\Actions;
 
+use App\Modules\Tenancy\Enums\SearchMatters;
 use App\Modules\Tenancy\Models\Shop;
 
 /**
  * What the shop says about itself: its name, whether it is a store, a content site or both, its languages
- * (the first is the main one, the language its content is read in) and what it sells, in its own words.
+ * (the first is the main one, the language its content is read in), what it sells, in its own words, and what
+ * matters in its search (SearchMatters: the look, the content, or both).
  * Read and saved the same way wherever the manager edits it (Settings · General, the first-run screens).
  */
 final class SaveShopProfile
@@ -18,7 +20,7 @@ final class SaveShopProfile
 
     private const MAX_SELLS = 12;
 
-    /** @return array{name: string, kind: string, languages: list<string>, sells: list<string>} the form, as the shop has it */
+    /** @return array{name: string, kind: string, languages: list<string>, sells: list<string>, matters: string} the form, as the shop has it */
     public function load(Shop $shop): array
     {
         $profile = (array) ($shop->profile ?? []);
@@ -28,6 +30,7 @@ final class SaveShopProfile
             'kind' => in_array($profile['kind'] ?? null, self::KINDS, true) ? $profile['kind'] : 'store',
             'languages' => array_values(array_unique([(string) $shop->content_locale, ...array_map('strval', (array) ($profile['languages'] ?? []))])),
             'sells' => array_values(array_map('strval', (array) ($profile['sells'] ?? []))),
+            'matters' => SearchMatters::of($shop)->value,
         ];
     }
 
@@ -47,6 +50,10 @@ final class SaveShopProfile
         $languages = $languages === [] ? [(string) $shop->content_locale] : $languages;
         $sells = array_values(array_unique(array_filter(array_map(fn ($s): string => mb_substr((string) preg_replace('/^\s+|\s+$/u', '', (string) $s), 0, 60), (array) ($data['sells'] ?? [])), fn (string $s): bool => $s !== '')));
 
+        // what matters changes the shop's pictures only when the manager changed it
+        $before = SearchMatters::of($shop);
+        $matters = SearchMatters::tryFrom((string) ($data['matters'] ?? '')) ?? $before;
+
         $shop->forceFill([
             'name' => mb_substr(trim((string) $data['name']), 0, 120),
             'content_locale' => $languages[0],
@@ -56,7 +63,12 @@ final class SaveShopProfile
                 'kind' => in_array($data['kind'] ?? null, self::KINDS, true) ? $data['kind'] : 'store',
                 'languages' => array_slice($languages, 1),
                 'sells' => array_slice($sells, 0, self::MAX_SELLS),
+                'matters' => $matters->value,
             ],
         ])->save();
+
+        if ($matters !== $before) {
+            $matters->apply($shop);
+        }
     }
 }

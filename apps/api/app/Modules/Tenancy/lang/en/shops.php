@@ -26,6 +26,13 @@ return [
         'start_trial' => 'Start on a trial',
         'start_trial_help' => 'Up to :products products, :questions questions a day, :pictures, for :days days.',
         'trial_days' => 'Trial days',
+        'matters' => 'What matters in the search',
+        'matters_help' => 'The look reads each product\'s picture: search by photo, similar items that look alike. The content reads no picture. The shop can change it in Settings · General.',
+    ],
+    'matters' => [
+        'look' => 'The look (search by photo)',
+        'content' => 'The content (no search by photo)',
+        'both' => 'Both (search by photo)',
     ],
     'trial' => [
         'left' => ':days days left',

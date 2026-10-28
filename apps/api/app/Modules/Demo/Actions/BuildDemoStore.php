@@ -56,7 +56,8 @@ final class BuildDemoStore
                 'content_locale' => $site->choices['language'] ?? $site->locale,
                 'status' => ShopStatus::Demo->value,
             ]);
-            $shop->forceFill(['profile' => ['kind' => (string) ($site->choices['kind'] ?? 'store')]])->save();
+            // what matters, as they said: a content site's demo keeps it (ContentSite reads it before choosing the content)
+            $shop->forceFill(['profile' => ['kind' => (string) ($site->choices['kind'] ?? 'store'), 'matters' => (string) ($site->choices['matters'] ?? 'both')]])->save();
 
             $this->tenant->runUnscoped(function () use ($shop, $site): void {
                 $connection = new StoreConnection;

@@ -142,7 +142,7 @@ final class OnboardingTest extends TestCase
         // Postgres keeps a jsonb object's keys in its own order (SQLite as written): the keys in any order, each list in its own
         $profile = (array) $shop?->profile;
         ksort($profile);
-        $this->assertSame(['kind' => 'content', 'languages' => ['he'], 'sells' => ['ספרים', 'בגדים']], $profile);
+        $this->assertSame(['kind' => 'content', 'languages' => ['he'], 'matters' => 'content', 'sells' => ['ספרים', 'בגדים']], $profile, 'no pictures read yet: the content matters, as it is set');
         $this->assertSame(1, $scan->started);
     }
 

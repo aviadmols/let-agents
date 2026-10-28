@@ -32,7 +32,7 @@ use Illuminate\Support\Carbon;
  * @property ?Vertical $vertical
  * @property int $vertical_confidence
  * @property bool $vertical_locked
- * @property array{kind?: string, languages?: list<string>, sells?: list<string>}|null $profile what the shop said about itself: a store, a content site or both; its other languages; what it sells
+ * @property array{kind?: string, languages?: list<string>, sells?: list<string>, matters?: string}|null $profile what the shop said about itself: a store, a content site or both; its other languages; what it sells; what matters in its search (SearchMatters)
  * @property Carbon|null $trial_ends_at while set the shop is on trial (StartTrial), and stays limited past the date until the trial is ended
  * @property array<string, array{0: string, 1: mixed}>|null $trial_saved the shop's own settings from before the trial
  * @property ?string $plan the code of the plan the shop pays for (Plan); null: no plan holds it

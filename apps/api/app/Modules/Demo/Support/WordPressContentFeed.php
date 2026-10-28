@@ -3,7 +3,7 @@
 namespace App\Modules\Demo\Support;
 
 use App\Modules\Connections\Contracts\ContentSiteFeed;
-use App\Modules\Tenancy\Models\Shop;
+use App\Modules\Demo\Jobs\ReadContentSiteCurrencyJob;
 use Generator;
 
 /**
@@ -69,11 +69,9 @@ final class WordPressContentFeed implements ContentSiteFeed
 
     public function settle(string $shopId, string $siteUrl): void
     {
+        // its search set at once; its currency read in the background (reading it reads the site)
         ContentSite::settle($shopId);
-        $currency = WordPressSite::read(self::host($siteUrl))['currency'] ?? null;
-        if (is_string($currency) && preg_match('/^[A-Z]{3}$/', $currency) === 1) {
-            Shop::query()->whereKey($shopId)->update(['currency' => $currency]);
-        }
+        ReadContentSiteCurrencyJob::dispatch($shopId, self::host($siteUrl));
     }
 
     /**

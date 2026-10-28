@@ -10,6 +10,7 @@ use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\PluginStoreFeed;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Demo\Jobs\ReadContentSiteCurrencyJob;
 use App\Modules\Demo\Support\ContentSite;
 use App\Modules\Demo\Support\PublicSite;
 use App\Modules\Demo\Support\PublicStoreFeed;
@@ -20,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -87,6 +89,21 @@ final class ContentSiteTest extends TestCase
         Settings::set('search.guides_after', 0, $shop->id);
         app(TestStoreConnection::class)->handle($connection);
         $this->assertSame(0, Settings::get('search.guides_after', $shop->id));
+    }
+
+    public function test_connect_answers_at_once_and_the_currency_is_read_in_the_background(): void
+    {
+        // Gil Travel, 28.10: "Connect" read the whole site for its currency and looked like it did nothing
+        Queue::fake();
+        $shop = Shop::factory()->create();
+        $connection = app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $shop->id, 'site_url' => 'https://tours.test', 'access_token' => 'lat_'.str_repeat('7', 48)]));
+
+        app(TestStoreConnection::class)->handle($connection);
+
+        $this->assertSame('read_more', Settings::get('search.card_action', $shop->id), 'its search set at once');
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/let-agents/v1/status'));
+        Queue::assertPushed(ReadContentSiteCurrencyJob::class, fn (ReadContentSiteCurrencyJob $job): bool => $job->shopId === $shop->id && $job->host === 'tours.test');
     }
 
     public function test_a_store_with_woocommerce_is_read_from_its_plugin_as_it_always_was(): void

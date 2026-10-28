@@ -54,6 +54,9 @@ final class Onboarding extends Page
     /** WooCommerce's store chose the Shopify card: how a Shopify store connects. */
     public bool $otherPlatform = false;
 
+    /** The WordPress site card: a site with no store (tours, courses, articles), connected by the same plugin and key. */
+    public bool $contentSite = false;
+
     /** @var array<string, mixed> the form: name, kind, languages, sells */
     public array $data = [];
 
@@ -89,6 +92,14 @@ final class Onboarding extends Page
     {
         $this->step = $this->firstStep();
         $this->data = app(SaveShopProfile::class)->load($this->shop());
+        $this->contentSite = $this->data['kind'] === 'content';
+    }
+
+    /** A platform card: Shopify, WooCommerce, or a WordPress site with no store. */
+    public function choose(string $platform): void
+    {
+        $this->otherPlatform = $platform === 'shopify';
+        $this->contentSite = $platform === 'content';
     }
 
     /** A tab or a step: a Shopify store has nothing to connect. */
@@ -198,6 +209,12 @@ final class Onboarding extends Page
             Notification::make()->warning()->title(__($answers === null ? 'admin::onboarding.connect.no_token' : 'admin::onboarding.connect.not_yet'))->send();
 
             return;
+        }
+
+        // the WordPress site card: what the site is, as the manager said (Settings · General shows it, and can change it)
+        if ($this->contentSite && $this->data['kind'] !== 'content') {
+            $this->data['kind'] = 'content';
+            app(SaveShopProfile::class)->handle($this->shop(), $this->data);
         }
 
         $this->startScan();

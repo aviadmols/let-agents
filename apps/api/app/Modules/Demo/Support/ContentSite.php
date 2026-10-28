@@ -6,6 +6,8 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Features\FeatureRegistry;
 use App\Core\Settings\SettingRegistry;
+use App\Modules\Tenancy\Enums\SearchMatters;
+use App\Modules\Tenancy\Models\Shop;
 
 /**
  * How a demo of a content site (WordPress with no store: tours, courses, events and articles about them) searches:
@@ -32,6 +34,24 @@ final class ContentSite
         }
         if (app(FeatureRegistry::class)->has('search.content_by_meaning')) {
             Features::override('search.content_by_meaning', true, $shopId);
+        }
+
+        // what the site is, as Settings · General shows it: a content site, unless the shop already said otherwise; and
+        // what matters in its search, its content (no picture read, no search by photo: Gil Travel, 28.10, opened with a
+        // camera it had no use for), unless the shop or the operator already chose
+        $shop = Shop::query()->find($shopId);
+        if ($shop === null) {
+            return;
+        }
+        $profile = (array) ($shop->profile ?? []);
+        $chose = SearchMatters::tryFrom((string) ($profile['matters'] ?? '')) !== null;
+        $shop->forceFill(['profile' => [
+            ...$profile,
+            'kind' => in_array($profile['kind'] ?? 'store', ['store'], true) ? 'content' : $profile['kind'],
+            'matters' => $chose ? $profile['matters'] : SearchMatters::Content->value,
+        ]])->save();
+        if (! $chose) {
+            SearchMatters::Content->apply($shop);
         }
     }
 }
