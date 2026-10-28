@@ -27,6 +27,7 @@ use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\Patterns;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
+use App\Modules\Search\Support\RankSheet;
 use App\Modules\Search\Support\SearchTrace;
 use App\Modules\Search\Support\SimilarWants;
 use App\Modules\Search\Support\WordMeanings;
@@ -1198,8 +1199,18 @@ final class SearchCatalog
             $records = $own === null || ! $colours ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
+            $products = array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
 
-            return array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
+            // Where the shop orders its photo results by a model that sees them (search.photo_rank), its alike are
+            // ordered so too, its own picture above them: what a shopper sees as alike is what the model sees, in the
+            // store's search by photo and beside a product the same (Rocks, 28.10: the same ring's alike and its photo's
+            // results differed, and the photo's looked more alike). Asked once per picture and candidates, kept 30 days.
+            if ($looksLead && ! $otherColour && $wants === null && count($products) >= 2 && Features::enabled('search.photo_rank', $shopId) && RankPhotoResults::available()
+                && ($photo = RankSheet::photo((string) ($own['img'] ?? ''))) !== null) {
+                $products = $this->ranker->handle($shopId, $photo, null, $products);
+            }
+
+            return $products;
         });
     }
 

@@ -5,6 +5,9 @@ namespace App\Modules\Search\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\VisionModel;
+use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -17,6 +20,7 @@ use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -30,6 +34,9 @@ final class SimilarItemsTest extends TestCase
     use RefreshDatabase;
 
     private const TOKEN = 'lat_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+    /** a one-pixel JPEG, every picture the sheet fetches */
+    private const JPEG = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAA//EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AN//Z';
 
     public bool $pictures = true;
 
@@ -374,6 +381,40 @@ final class SimilarItemsTest extends TestCase
 
         $this->similar('303')->assertOk();
         $this->assertSame(['picture' => 1, 'text' => 3], $this->asked, 'a sneaker: its picture asked, as the shop chose');
+    }
+
+    public function test_where_the_shop_orders_photo_results_by_a_model_that_sees_them_its_alike_are_ordered_so_too(): void
+    {
+        // Rocks, 28.10: the same ring's alike and its photo's results differed, and the photo's looked more alike: the
+        // photo's were ordered by a model that sees them, the alike by code alone.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        Settings::set('search.photo_rank_provider', 'anthropic');
+        Settings::set('search.photo_rank_model', 'claude-haiku-5-5');
+        $this->travel(2)->seconds();
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->whereIn('external_id', ['301', '302', '303'])->get()->each(fn (CatalogProduct $p) => $p->update(['image_url' => 'https://www.store.test/i/'.$p->external_id.'.jpg'])));
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        Http::fake(['*' => Http::response(base64_decode(self::JPEG), 200, ['Content-Type' => 'image/jpeg'])]);
+        $vision = new class implements VisionModel
+        {
+            public int $sheets = 0;
+
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->sheets++;
+
+                return new ModelReply(['order' => [2, 1], 'same' => null], 1700, 20);
+            }
+        };
+        $this->app->instance(VisionModel::class, $vision);
+
+        $this->assertSame(['303', '302'], array_column($this->similar('301')->json('products'), 'external_id'), 'by code, until the shop turns the ordering on');
+        $this->assertSame(0, $vision->sheets);
+
+        Features::override('search.photo_rank', true, $this->shop->id);
+        $this->assertSame(['302', '303'], array_column($this->similar('301')->json('products'), 'external_id'), 'as the model that saw them put them');
+        $this->similar('301')->assertOk();
+        $this->assertSame(1, $vision->sheets, 'asked once for the same picture and candidates');
     }
 
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void

@@ -114,6 +114,22 @@ final class RankSheet
     }
 
     /** A store picture asked for small where the store's server can make it so (Shopify's can). */
+    /** A product's own picture, as the photo above its alike; null when it cannot be fetched or is no picture. */
+    public static function photo(string $url): ?string
+    {
+        if (preg_match('#^https?://#i', $url) !== 1) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(6)->connectTimeout(3)->get(self::small($url));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $response->successful() && @imagecreatefromstring($response->body()) !== false ? $response->body() : null;
+    }
+
     private static function small(string $url): string
     {
         if (! str_contains($url, 'cdn.shopify.com') && ! str_contains($url, '/cdn/shop/')) {
