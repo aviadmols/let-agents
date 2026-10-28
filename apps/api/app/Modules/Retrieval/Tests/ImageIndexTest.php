@@ -14,6 +14,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalGalleryImage;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Retrieval\Support\MatchCheck;
+use App\Modules\Retrieval\Support\PictureTrim;
 use App\Modules\Retrieval\Tests\Concerns\BuildsShop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -107,6 +108,32 @@ final class ImageIndexTest extends TestCase
 
         $this->assertSame(4, $this->pictures->images, 'a new picture is embedded');
         $this->assertSame(1, $again->output['removed'], 'a product the store stopped publishing takes its row with it');
+    }
+
+    public function test_a_new_trimming_embeds_again_only_the_pictures_it_cuts_differently(): void
+    {
+        // a ring on a grey sweep, darker above: left whole by the first trimming, cut by the second
+        $sweep = PictureTrimTest::sweep(600, 340);
+        imagefilledrectangle($sweep, 260, 140, 340, 190, imagecolorallocate($sweep, 40, 50, 110));
+        ob_start();
+        imagejpeg($sweep, null, 95);
+        $ring = (string) ob_get_clean();
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '1')->update(['image_url' => 'https://sweep.test/ring.jpg']));
+        Http::fake(['sweep.test/*' => Http::response($ring, 200, ['Content-Type' => 'image/jpeg'])]);
+
+        app(BuildImageIndex::class)->handle($this->shop->id);
+        $this->assertSame(3, $this->pictures->images);
+
+        // as they were before the second trimming
+        $this->inShop(fn () => RetrievalImage::query()->update(['prep' => 1]));
+        $run = app(BuildImageIndex::class)->handle($this->shop->id);
+
+        $this->assertSame(4, $this->pictures->images, 'only the ring on the sweep is sent again');
+        $this->assertSame(1, $run->output['embedded']);
+        $this->assertSame([PictureTrim::VERSION], $this->inShop(fn () => RetrievalImage::query()->whereNotNull('embedding')->distinct()->pluck('prep')->map(fn ($p) => (int) $p)->all()), 'the others keep their vector under the new version');
+
+        app(BuildImageIndex::class)->handle($this->shop->id);
+        $this->assertSame(4, $this->pictures->images, 'and none is fetched for a model again');
     }
 
     public function test_a_picture_too_big_is_skipped(): void

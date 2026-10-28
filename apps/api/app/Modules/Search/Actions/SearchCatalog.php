@@ -89,6 +89,9 @@ final class SearchCatalog
     /** Words of a picture that say it is printed, not plain: a print, stripes, checks, flowers, an animal's coat. */
     private const PATTERNED = '/הדפס|מודפס|פסים|משבצ|פרחונ|פרחים|דוגמ|נמר|זברה|הסוואה|פייזלי|נקוד|print|stripe|check|plaid|tartan|floral|pattern|leopard|zebra|camo|paisley|polka|dots/iu';
 
+    /** What the picture's reader says of a piece with no print on it (caption v8, caption_pattern.covers). */
+    private const NO_PRINT = 'none';
+
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
 
@@ -737,19 +740,33 @@ final class SearchCatalog
      * is like the same ring with white ones, more than a green ring of another shape (Rocks, 26.10). Its picture read
      * with no words: all of them.
      *
+     * Printed is what its words say, unless the picture's reader saw no print on it at all (caption v8: covers "none"):
+     * a word says a shape as well as a print ("פרחוני" is a flower-shaped ring, "משבצת" a stone's setting), and a ring
+     * like it was left out for it (Rocks, 28.10). Checks on a logo only are still checks (Vans).
+     *
      * @param  list<string>  $externalIds
      * @return list<string>
      */
     private static function seenAlike(CatalogProduct $product, array $externalIds): array
     {
-        $own = array_values((array) (RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words'])?->caption_words ?? []));
-        if ($own === [] || $externalIds === []) {
+        $ownRow = RetrievalImage::query()->where('product_id', $product->id)->first(['caption_words', 'caption_pattern']);
+        if ($ownRow === null || (array) ($ownRow->caption_words ?? []) === [] || $externalIds === []) {
             return $externalIds;
         }
-        $printed = self::patterned($own);
-        $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy('external_id');
+        $printed = self::printed($ownRow);
+        $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words', 'caption_pattern'])->keyBy('external_id');
 
-        return array_values(array_filter($externalIds, fn (string $id): bool => self::patterned(array_values((array) ($theirs->get($id)?->caption_words ?? []))) === $printed));
+        return array_values(array_filter($externalIds, fn (string $id): bool => self::printed($theirs->get($id)) === $printed));
+    }
+
+    /** Whether a picture shows a print: by its words, unless its reader saw none (caption v8); no picture, none. */
+    private static function printed(?RetrievalImage $row): bool
+    {
+        if ($row === null || (is_array($row->caption_pattern) && ($row->caption_pattern['covers'] ?? null) === self::NO_PRINT)) {
+            return false;
+        }
+
+        return self::patterned(array_values((array) ($row->caption_words ?? [])));
     }
 
     /** @param  list<mixed>  $words */
@@ -1087,7 +1104,12 @@ final class SearchCatalog
             // Where looks lead, its colour as its title says it ("טבעת זהב צהוב"): its picture's words name every colour on
             // it, a thin black line and a white sole too, and its pictures already found what is coloured like it.
             $ownText = $looksLead ? (string) ($own['title'] ?? '') : trim((string) ($own['title'] ?? '').' '.(string) ($own['kw'] ?? ''));
-            $records = $own === null || ! $colours ? $records : self::byColour($records, Colours::parts([$ownText]));
+            $parts = Colours::parts([$ownText]);
+            // A title's colours are the whole piece's: its "part" is only its first word ("טבעת"), and a colour named
+            // further on ("טבעת וינטג' בריטית משובצת ספיר") is no less the ring's. Read as near that word, a blue ring
+            // whose picture's words open with its gold was "another colour" and went last (Rocks, 28.10).
+            $parts = $looksLead ? array_map(fn (array $p): array => ['part' => null] + $p, array_map(fn (array $p): array => array_diff_key($p, ['part' => true]), $parts)) : $parts;
+            $records = $own === null || ! $colours ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
 

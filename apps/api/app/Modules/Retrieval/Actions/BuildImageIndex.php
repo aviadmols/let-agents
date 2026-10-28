@@ -156,7 +156,13 @@ final class BuildImageIndex
                     continue;
                 }
 
-                $images[] = $image;
+                if (self::sameAsBefore($row, $image, $choice)) {
+                    $stats['kept']++;
+
+                    continue;
+                }
+
+                $images[] = ['mime' => $image['mime'], 'data' => $image['data']];
                 $rows[] = $row;
             }
 
@@ -316,8 +322,8 @@ final class BuildImageIndex
             $rows = [];
 
             foreach ($batch as $row) {
-                if (($image = $this->fetch($row)) !== null) {
-                    $images[] = $image;
+                if (($image = $this->fetch($row)) !== null && ! self::sameAsBefore($row, $image, $choice)) {
+                    $images[] = ['mime' => $image['mime'], 'data' => $image['data']];
                     $rows[] = $row;
                 }
             }
@@ -424,13 +430,32 @@ final class BuildImageIndex
      * The picture as it is compared: without the plain background around the product, when there is
      * one to trim; as it came otherwise.
      *
-     * @return array{mime: string, data: string}
+     * @return array{mime: string, data: string, background: string|null}
      */
     private static function prepared(string $mime, string $body): array
     {
-        $trimmed = PictureTrim::trim($body);
+        $cut = PictureTrim::cut($body);
 
-        return $trimmed === null ? ['mime' => $mime, 'data' => $body] : ['mime' => 'image/jpeg', 'data' => $trimmed];
+        return $cut === null ? ['mime' => $mime, 'data' => $body, 'background' => null] : ['mime' => 'image/jpeg', 'data' => $cut['data'], 'background' => $cut['background']];
+    }
+
+    /**
+     * A picture embedded under an older trimming that is prepared just the same now: its vector stands, only its version
+     * moves, and no model is asked (a new trimming re-embeds only the pictures it cuts differently).
+     *
+     * @param  array{mime: string, data: string, background: string|null}  $image
+     */
+    private static function sameAsBefore(RetrievalImage|RetrievalGalleryImage $row, array $image, ModelChoice $choice): bool
+    {
+        $prep = (int) $row->prep;
+
+        if ($row->embedding === null || $row->embedding_model !== $choice->model || $prep >= PictureTrim::VERSION || PictureTrim::changedSince($prep, $image['background'])) {
+            return false;
+        }
+
+        $row::query()->whereKey($row->id)->update(['prep' => PictureTrim::VERSION]);
+
+        return true;
     }
 
     private function failed(RetrievalImage|RetrievalGalleryImage $row, string $reason): null

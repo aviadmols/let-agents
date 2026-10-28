@@ -12,6 +12,7 @@ use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Contracts\RelatedByTags;
+use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -271,6 +272,65 @@ final class SimilarItemsTest extends TestCase
         LoadedIndex::forget();
 
         $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the wide ring first, though its picture came after');
+    }
+
+    public function test_a_ring_of_its_stone_colour_is_its_colour_wherever_its_title_names_the_stone(): void
+    {
+        // Rocks, 28.10: "טבעת וינטג' בריטית משובצת ספיר" names its sapphire four words after "טבעת", and the store's tag
+        // "ספיר, רובי, אמרלד" puts a ruby and an emerald beside "טבעות": read as a ring of another colour, it went after
+        // every ring whose title says "טבעת סוליטר משובצת ספיר"
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach ([
+                '301' => ["טבעת וינטג' משובצת אבן ספיר במרכז ויהלומים", ['טבעת', 'זהב לבן', 'אבן מרכזית אובלית', 'כחול כהה', 'הילה']],
+                '302' => ["טבעת וינטג' בריטית משובצת ספיר כהה ויהלומים", ['טבעת', 'זהב לבן', 'אבן מרכזית', 'אובלית', 'כחול כהה', 'הילה']],
+                '303' => ['טבעת סוליטר משובצת ספיר', ['טבעת', 'כחול כהה', 'סוליטר']],
+            ] as $id => [$title, $words]) {
+                CatalogProduct::query()->where('external_id', $id)->update(['title' => $title, 'in_stock' => true, 'payload' => ['tags' => ['טבעות ספיר', 'ספיר, רובי, אמרלד']]]);
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        // the shop filters by stone colour, as Rocks does: its colours order its alike; and the words Rocks' index holds
+        // for those two rings (its tags, its picture's words), as they were
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $index = SearchIndex::query()->sole();
+            $items = json_decode((string) $index->items, true);
+            $items['facets'][] = ['k' => 'stone_color', 'l' => 'צבע אבן', 'v' => [['k' => 'blue', 'l' => 'כחול']]];
+            $kw = [
+                'p:302' => "sivan 70729 טבעות טבעות ספיר ספיר, רובי, אמרלד Not Sale טבעת זהב שני צבעים ספיר זהב 18K כחול לבן שקוף וינטג' זהב צהוב זהוב אבן מרכזית כחול כהה אובלית הילה של אבנים קטנות שקופה נוצצת כסוף פס דק מבריק עדין",
+                'p:303' => 'פוזיילוב 61596 טבעות טבעות זהב לבן טבעות ספיר ספיר, רובי, אמרלד Not Sale טבעת זהב לבן ספיר 14K כחול לבן שקוף טבעת סוליטר כסוף אבן מרכזית אובלית כחול כהה שקופה נוצצת ארבע שיניים',
+            ];
+            $items['items'] = array_map(fn (array $item): array => isset($kw[$item['id']]) ? ['kw' => $kw[$item['id']]] + $item : $item, $items['items']);
+            $index->update(['items' => json_encode($items, JSON_UNESCAPED_UNICODE)]);
+        });
+        LoadedIndex::forget();
+
+        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'both blue: the pictures and its words order them');
+    }
+
+    public function test_a_word_of_shape_is_no_print_where_the_pictures_reader_saw_none(): void
+    {
+        // Rocks, 28.10: a Diana ring "פרחוני" (flower-shaped) was taken for a print and left out of a plain ring's alike
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach ([
+                '301' => [['טבעת', 'אבן כחולה', 'הילה'], ['covers' => 'none']],
+                '302' => [['טבעת', 'אבן כחולה', 'פרחוני'], ['covers' => 'none']],
+                '303' => [['טבעת', 'אבן כחולה', 'פרחוני'], null],
+            ] as $id => [$words, $pattern]) {
+                CatalogProduct::query()->where('external_id', $id)->update(['title' => 'טבעת '.$id, 'in_stock' => true]);
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => 'טבעת '.$id,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words, 'caption_pattern' => $pattern]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'its reader saw no print on 302; 303, read before it said, still goes by its words');
     }
 
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void
