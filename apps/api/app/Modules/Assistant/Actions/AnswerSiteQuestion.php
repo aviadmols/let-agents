@@ -101,11 +101,12 @@ final class AnswerSiteQuestion implements TriesQuestions
     /**
      * Prompt versions written but not released: never served, asked with the quality baseline (--scope-prompt,
      * --check-prompt) until the run with them is better, then taken off this list (docs/runbooks/answer-quality-eval.md).
-     * scope_site v9: a reply that narrows the request keeps the conditions it does not change (the budget, the one diamond).
+     * scope_site v9 (a reply that narrows the request keeps the conditions it does not change) was released after two runs
+     * on Rocks, 28.10: 7/7 and 6/7 of the conversation cases, supported 68→84, p90 12.7→9.8 s.
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['scope_site' => [9]];
+    public const CANDIDATES = [];
 
     private const THREAD_QUESTION_CHARS = 300;
 

@@ -530,15 +530,15 @@ final class SearchAsksTest extends TestCase
 
         $this->replies = $reply();
         $this->artisan('assistant:quality-baseline', ['action' => 'run', '--label' => 'as-is'])->assertSuccessful();
-        $this->assertNull($this->calls[1]['effort'], 'the checker thinks as its model does by default');
+        $this->assertSame('low', $this->calls[1]['effort'], 'the checker thinks little by default (Rocks, 28.10: as fast, as sound)');
 
         $this->calls = [];
         $this->replies = $reply();
-        $this->artisan('assistant:quality-baseline', ['action' => 'run', '--label' => 'low', '--set' => ['assistant.site_check_effort=low'], '--check-prompt' => '9'])
-            ->expectsOutputToContain('assistant.site_check_effort = low for this run')->assertSuccessful();
-        $this->assertSame('low', $this->calls[1]['effort'], 'the checker thinks less for this run');
+        $this->artisan('assistant:quality-baseline', ['action' => 'run', '--label' => 'low', '--set' => ['assistant.site_check_effort=medium'], '--check-prompt' => '9'])
+            ->expectsOutputToContain('assistant.site_check_effort = medium for this run')->assertSuccessful();
+        $this->assertSame('medium', $this->calls[1]['effort'], 'the checker thinks more for this run');
         $this->assertStringContainsString(file_get_contents(dirname(__DIR__).'/Prompts/verify_site.v9.md'), $this->calls[1]['system'] ?? '', 'and with the version chosen');
-        $this->assertSame('model_default', Settings::get('assistant.site_check_effort'), 'put back after the run');
+        $this->assertSame('low', Settings::get('assistant.site_check_effort'), 'put back after the run');
 
         $this->artisan('assistant:quality-baseline', ['action' => 'run', '--set' => ['nonsense']])->assertFailed();
         $this->artisan('assistant:quality-baseline', ['action' => 'compare', '--runs' => 'as-is,low'])->expectsOutputToContain('check_ms')->expectsOutputToContain('cases changed.')->assertSuccessful();

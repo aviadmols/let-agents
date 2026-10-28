@@ -335,7 +335,7 @@
                 "medium",
                 "high"
             ],
-            "default": "model_default",
+            "default": "low",
             "scope": "global"
         },
         {
