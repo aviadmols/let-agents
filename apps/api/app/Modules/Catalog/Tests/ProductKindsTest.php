@@ -95,6 +95,7 @@ final class ProductKindsTest extends TestCase
                 $make('6', 'נעלי סניקרס לילדים Old Skool V'),
                 $make('7', 'נעלי סניקרס Authentic', ['Women']),
                 $make('8', 'Mens Classic Tee'),
+                'tagged' => $make('9', 'אול סיינטס טישירט AYEDEE לגברים SS CREW', ['נשים']),
             ];
         });
 
@@ -104,6 +105,10 @@ final class ProductKindsTest extends TestCase
             $this->assertSame(['6'], $kinds->sameKind($products['baby'], ['6', '7']), 'a baby\'s sneaker is like a child\'s, never a woman\'s');
             $this->assertSame('men', CatalogProductKinds::audience($products[5]), 'in English too ("Mens Classic Tee")');
             $this->assertNull(CatalogProductKinds::audience($products[1]), 'unisex is for anyone');
+            // Chozen, 28.10: a man's tee the store also tagged נשים came up for "חולצה אפורה לנשים"
+            $this->assertSame('men', CatalogProductKinds::audience($products['tagged']), 'its title says whom, whatever its tags');
+            $this->assertSame(['men'], $kinds->audiences($products['tagged']));
+            $this->assertSame(['men'], $kinds->audiences($products[2]), 'a title that says none: its tags do');
         });
     }
 }

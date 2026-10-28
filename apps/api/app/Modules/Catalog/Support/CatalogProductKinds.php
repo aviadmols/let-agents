@@ -99,7 +99,7 @@ final class CatalogProductKinds implements ProductKinds
     ];
 
     /**
-     * Whom a product is for, as the store says it in its title, product type, categories and tags ("לנשים",
+     * Whom a product is for, as the store says it in its title, else its product type, categories and tags ("לנשים",
      * "ביגוד_גברים", "_תינוקות", "kids"): women, men, kids, babies, or null when it says none or both men and women
      * (unisex). Never its description, which may say "מתאים לגברים ולנשים" of anything.
      */
@@ -142,11 +142,24 @@ final class CatalogProductKinds implements ProductKinds
         return $words !== [] && array_filter($words, fn (string $word): bool => array_filter(self::AUDIENCE, fn (string $p): bool => preg_match($p, $word) === 1) === [] && ! in_array($word, ['ו', 'and', 'for'], true)) === [];
     }
 
-    /** @return array<string, true> every audience word its title, type, tags and categories say */
+    /**
+     * Every audience word its title says; when its title says none, every one its type, tags and categories say. The
+     * title is the product's own word: "טישירט לגברים" tagged נשים is a man's (Chozen, 28.10: shown for "חולצה לנשים").
+     *
+     * @return array<string, true>
+     */
     private static function saidAudiences(CatalogProduct $product): array
     {
-        $text = mb_strtolower(implode(' ', [(string) $product->title, (string) ($product->payload['product_type'] ?? ''),
+        $own = self::saidIn((string) $product->title);
+
+        return $own !== [] ? $own : self::saidIn(implode(' ', [(string) $product->title, (string) ($product->payload['product_type'] ?? ''),
             ...array_map('strval', (array) ($product->payload['tags'] ?? [])), ...array_map(fn (array $path): string => implode(' ', $path), $product->categoryPaths())]));
+    }
+
+    /** @return array<string, true> */
+    private static function saidIn(string $text): array
+    {
+        $text = mb_strtolower($text);
         $said = [];
         foreach (preg_split('/[^\p{L}]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
             foreach (self::AUDIENCE as $audience => $pattern) {
