@@ -234,9 +234,50 @@
       // the picture opens the product, as its name does
       '<div class="ls-card__media"><a class="ls-card__link" href="' + esc(r.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || '') + '" alt="">' + pic2(r) + '</a>' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
       '<span class="ls-card__heart">' + heartBtn(id, saved, true) + '</span></div>' +
-      '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' +
+      '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' + colourDots(r) +
       '<div class="ls-card__row">' + priceHtml(r) + (r.ns === 1 ? '' : '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button>') + '</div>' +
       buyBtn(r, 'ls-btn--sm ls-btn--block') + '<div data-after="' + esc(id) + '"></div></article>';
+  }
+  // The colours a product comes in, as dots under its name: one model the store sells as a product a colour (the index's
+  // cf: "פלדיום מגפיים PAMPA HI" in beige and in brown), a dot each that turns the card to it; or one product's variants'
+  // colours, a dot each. Only where there are two or more.
+  var MC_HEX = { 'שחור': '#161616', 'לבנ': '#ffffff', 'אדומ': '#cf3a2e', 'כחול': '#2563c9', 'ירוק': '#2f8f4e', 'צהוב': '#f1c21b', 'אפור': '#8e8e94',
+    'כתומ': '#ee7a1f', 'סגול': '#7b4bb7', 'ורוד': '#ec8fb3', 'כסופ': 'linear-gradient(135deg,#f4f4f5,#a6a6ac)', 'זהוב': 'linear-gradient(135deg,#f3d27a,#b4842a)',
+    'שקופ': 'clear', 'חומ': '#7a4a28', 'בז': '#d9c4a0' };
+  var DOTS_SHOWN = 6, families = null, familiesOf = null;
+  function familyOf(r) {
+    if (!r || !r.cf) { return null; }
+    if (familiesOf !== S.records) {
+      families = {}; familiesOf = S.records;
+      Object.keys(S.records || {}).forEach(function (k) { var x = S.records[k]; if (x && x.cf) { (families[x.cf] = families[x.cf] || []).push(x); } });
+    }
+    return families[r.cf] || null;
+  }
+  function dot(sw, label, attrs) {
+    return '<' + (attrs ? 'button' : 'span') + ' class="ls-dot' + (sw === 'clear' ? ' ls-dot--clear' : '') + '"' + (sw === 'clear' ? '' : ' style="--sw:' + esc(sw) + '"') +
+      ' title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></' + (attrs ? 'button' : 'span') + '>';
+  }
+  function colourDots(r) {
+    var out = [], seen = {}, fam = familyOf(r);
+    if (fam && fam.length > 1) {
+      // its own colour first, then the others in stock, then those sold out
+      [r].concat(fam.filter(function (x) { return x !== r && x.s !== 0; }), fam.filter(function (x) { return x !== r && x.s === 0; })).forEach(function (x) {
+        var c = x.mc && x.mc[0];
+        if (c && MC_HEX[c] && !seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], withFinals(c), ' data-sib="' + esc(pid(x.id)) + '" aria-pressed="' + (x === r) + '"')); }
+      });
+    } else if (r && r.v) {
+      var at = S.facets.map(function (f) { return f.k; }).indexOf('variant_color');
+      if (at < 0) { return ''; }
+      r.v.forEach(function (x) {
+        (x[0] || []).forEach(function (code) {
+          var v = Math.floor(code / 1000) === at ? S.facets[at].v[code % 1000] : null, sw = v && (v.h || SWATCH[v.l] || SWATCH[v.k]);
+          if (sw && !seen[code]) { seen[code] = 1; out.push(dot(sw, v.l)); }
+        });
+      });
+    }
+    if (out.length < 2) { return ''; }
+    return '<div class="ls-dots" role="group" aria-label="' + esc(t('colours')) + '">' + out.slice(0, DOTS_SHOWN).join('') +
+      (out.length > DOTS_SHOWN ? '<span class="ls-dots__more ls-num">+' + (out.length - DOTS_SHOWN) + '</span>' : '') + '</div>';
   }
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
   function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" decoding="async" draggable="false">' : ''; }

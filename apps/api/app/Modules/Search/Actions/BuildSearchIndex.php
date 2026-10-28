@@ -273,6 +273,7 @@ final class BuildSearchIndex
         // The shop's own, then its own word families (WriteWordFamilies), then those every shop shares; only its own are counted.
         $synonyms = [...$own, ...$this->storeFamilies(), ...self::families()];
         $items = [];
+        $families = [];
         $counts = ['product' => 0, 'content' => 0, 'category' => 0, 'synonyms' => count($own)];
 
         // What each product's picture shows, in words, joins its words: found by what it looks like.
@@ -365,7 +366,7 @@ final class BuildSearchIndex
                 'dw' => self::drawn($pictures->get($product->id)),
                 // its own colours, as a colour typed asks of it: the colour it is sold in (the store's colour filter) and
                 // the one its picture shows most, never a part's ("כפתורים שחורים" on an olive overshirt is no black shirt)
-                'mc' => self::mainColours((array) ($seen[$product->id] ?? []), $read['f'] ?? [], $facets['facets']) ?: null,
+                'mc' => self::mainColours((array) ($seen[$product->id] ?? []), $read['f'] ?? [], $facets['facets'], $product) ?: null,
                 // The code as the store writes it: a search for it shows this product alone.
                 'sku' => $product->sku === null ? null : mb_substr(trim((string) $product->sku), 0, 64),
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
@@ -382,8 +383,20 @@ final class BuildSearchIndex
                 // offer filed or called "Israel", not one whose text says it flies from Israel
                 'fn' => $lengths['days'] === [] ? null : (self::filedStems($product) ?: null),
             ]);
+            $families[self::familyKey($product)][] = count($items) - 1;
             $counts['product']++;
             $sized = $sized || $z !== null;
+        }
+
+        // One model in several colours, each a product of its own (Chozen: "פלדיום מגפיים PAMPA HI לגברים" in beige, in brown):
+        // a family, so its card shows the others' colours to switch to
+        foreach ($families ?? [] as $key => $members) {
+            $colours = array_unique(array_filter(array_map(fn (int $i): ?string => $items[$i]['mc'][0] ?? null, $members)));
+            if (count($members) >= 2 && count($members) <= self::FAMILY_MAX && count($colours) >= 2) {
+                foreach ($members as $i) {
+                    $items[$i]['cf'] = substr(md5((string) $key), 0, 8);
+                }
+            }
         }
 
         // What the store says about itself is for the assistant, never a result of its own; nor is a page the
@@ -452,22 +465,53 @@ final class BuildSearchIndex
             ]);
     }
 
+    /** The most products one model's colours are: more under one name are many products, not one in colours. */
+    private const FAMILY_MAX = 12;
+
+    /** One model of one brand, whatever colour it is: its title without colour words, its brand. */
+    private static function familyKey(CatalogProduct $product): string
+    {
+        $words = array_filter(explode(' ', HebrewSearch::normalize($product->title)), fn (string $w): bool => HebrewSearch::colorOf($w) === null && ! in_array($w, ['בצבע', 'בגוונ'], true));
+
+        return mb_strtolower(trim((string) $product->brand)).'|'.implode(' ', $words);
+    }
+
     /** A product's colours as its picture shows them: the first phrases of its picture's words that open with a colour. */
     private const PICTURE_COLOURS = 2;
 
     /**
      * A product's own colours, each as the base word HebrewSearch reads colours by ("שחור", "ירוק"): those of the store's
-     * colour filter it carries, and those its picture's words open a phrase with, most shown first ("ירוק זית"), never one
-     * a part has ("כפתורים שחורים", "סוליה לבנה").
+     * colour filter it carries, those its title names, the first its description says it comes in ("בצבע כחול כהה עם פסים
+     * בצבע שמנת" is blue), and those its picture's words open a phrase with, most shown first ("ירוק זית"), never one a part
+     * has ("כפתורים שחורים", "סוליה לבנה"). Where the store's words say it, the picture adds only its first: a beige boot
+     * whose picture names its blue label is no blue boot (Chozen, 28.10).
      *
      * @param  list<mixed>  $pictureWords
      * @param  list<int>  $codes
      * @param  list<array<string, mixed>>  $facets
      * @return list<string>
      */
-    private static function mainColours(array $pictureWords, array $codes, array $facets): array
+    private static function mainColours(array $pictureWords, array $codes, array $facets, ?CatalogProduct $product = null): array
     {
         $out = [];
+        if ($product !== null) {
+            foreach (explode(' ', HebrewSearch::normalize($product->title)) as $word) {
+                if (($base = HebrewSearch::colorOf($word)) !== null) {
+                    $out[$base] = true;
+                }
+            }
+            $text = HebrewSearch::normalize(strip_tags($product->shortDescription().' '.$product->description()));
+            if (preg_match('/(?:^| )(?:בצבע|בגוונ|בצבעי)((?: \S+){1,3})/u', $text, $said) === 1) {
+                foreach (explode(' ', trim($said[1])) as $word) {
+                    if ($word === 'עמ') {
+                        break;
+                    }
+                    if (($base = HebrewSearch::colorOf($word)) !== null) {
+                        $out[$base] = true;
+                    }
+                }
+            }
+        }
         foreach ($codes as $code) {
             $facet = $facets[intdiv((int) $code, 1000)] ?? null;
             if ($facet === null || preg_match('/colou?r|צבע/iu', (string) ($facet['k'] ?? '').' '.(string) ($facet['l'] ?? '')) !== 1) {
@@ -480,11 +524,12 @@ final class BuildSearchIndex
             }
         }
         $seen = 0;
+        $most = $out === [] ? self::PICTURE_COLOURS : 1;
         foreach ($pictureWords as $phrase) {
             $first = explode(' ', HebrewSearch::normalize(is_string($phrase) ? $phrase : ''))[0] ?? '';
             if ($first !== '' && ($base = HebrewSearch::colorOf($first)) !== null) {
                 $out[$base] = true;
-                if (++$seen >= self::PICTURE_COLOURS) {
+                if (++$seen >= $most) {
                     break;
                 }
             }

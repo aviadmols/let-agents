@@ -163,6 +163,7 @@
     // the press that ends a drag of a row of chips is not a press on a chip
     if (el.closest('.ls-chips--drag') && dragged) { e.preventDefault(); dragged = false; return; }
     if (d.popAll !== undefined) { S.popAll = !S.popAll; render(); return; }
+    if (d.sib) { var sibCard = el.closest('.ls-card'), sib = rec(d.sib); if (sibCard && sib) { sibCard.outerHTML = card(sib); } return; }
     if (d.close !== undefined) { e.preventDefault(); close(); return; }
     if (d.layerClose !== undefined) { hideLayer(); return; }
     if (d.tab) { S.tab = d.tab; S.wide = null; if (S.tab !== 'chat') { hideLive(); } render(); if (S.tab === 'chat') { INPUT.focus({ preventScroll: true }); } return; }
