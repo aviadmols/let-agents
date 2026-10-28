@@ -333,6 +333,28 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'its reader saw no print on 302; 303, read before it said, still goes by its words');
     }
 
+    public function test_tag_sharers_of_another_kind_never_stand_alone_and_leave_nothing(): void
+    {
+        // Sela Meir, 28.10: a bundle's tag-sharers were sets and series of other kinds; enough of them to stand alone,
+        // none of its kind: "0 similar items".
+        Settings::set('search.similar_by', 'meaning', $this->shop->id);
+        $this->travel(2)->seconds();
+        $type = fn (string $id, string $kind) => app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', $id)->update(['payload' => ['product_type' => $kind]]));
+        $type('301', 'Sneakers');
+        $type('302', 'Socks');
+        $type('303', 'Sneakers');
+        LoadedIndex::forget();
+        $this->app->instance(RelatedByTags::class, new class implements RelatedByTags
+        {
+            public function to(string $shopId, string $externalId, int $limit): array
+            {
+                return [['external_id' => '302', 'score' => 0.9]];
+            }
+        });
+
+        $this->assertSame(['303'], array_column($this->similar('301', 1)->json('products'), 'external_id'), 'the socks share its tags, and are no sneaker: the sneaker by meaning stands');
+    }
+
     public function test_a_book_or_a_bundle_of_books_has_its_alike_by_content_unless_the_shop_chose_its_pictures(): void
     {
         // Sela Meir, 28.10: "ספרי השבעה באוקטובר" had "ספרי דאגלס מאריי" for its alike: two collages of three covers look

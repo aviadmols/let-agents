@@ -1147,14 +1147,16 @@ final class SearchCatalog
             if ($looksLead) {
                 $ids = array_values(array_unique([...$looks, ...$ids]));
             }
+            // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
+            $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
+            // Those of its kind that share its tags first, and alone when they are enough: counted after the kind, so
+            // sharers of another kind never stand alone and leave nothing (Sela Meir, 28.10: a bundle's tag-sharers were
+            // sets and series of other kinds, and "0 similar items" stood where the books on its subject should).
             if ($tagged !== [] && ! $looksLead) {
                 $sharing = array_flip(array_map('strval', $tagged));
                 $first = array_values(array_filter($ids, fn (string $id): bool => isset($sharing[$id])));
                 $ids = count($first) >= $limit ? $first : [...$first, ...array_values(array_filter($ids, fn (string $id): bool => ! isset($sharing[$id])))];
             }
-
-            // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
-            $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
             // Where looks matter, what its picture is described with shows most (its colour, its print, its material): a
             // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
             // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
