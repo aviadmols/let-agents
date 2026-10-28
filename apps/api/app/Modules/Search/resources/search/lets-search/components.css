@@ -334,6 +334,8 @@ button.ls-dot { cursor: pointer; }
 .ls-answer { font-size: var(--lsp-text-base); line-height: 1.65; text-wrap: pretty; }
 .ls-answer p { margin: 0 0 10px; }
 .ls-answer__list { margin: 0 0 10px; padding-inline-start: 20px; }
+/* a phone, an hour range or an email, whole on one line */
+.ls-nb { white-space: nowrap; }
 .ls-answer__list li { margin: 0 0 4px; }
 .ls-answer__page { margin: 2px 0 12px; }
 .ls-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }

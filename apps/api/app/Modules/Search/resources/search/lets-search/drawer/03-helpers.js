@@ -66,16 +66,26 @@
   function post(url, body) { return json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), wait: 90000 }); }
   var API = String(CFG.api).replace(/\/$/, '');
   var SITE = encodeURIComponent(CFG.site);
-  function words(text, from) { var i = from || 0; return esc(text).split(' ').map(function (w) { return '<span class="ls-w" style="--i:' + (i++) + '">' + w + ' </span>'; }).join(''); }
+  function words(text, from) { var i = from || 0; return String(text).split(' ').map(function (w) { return '<span class="ls-w" style="--i:' + (i++) + '">' + ltrWord(w) + ' </span>'; }).join(''); }
+  // A word of numbers, an email or a link keeps its own order inside a Hebrew line: "10:00–15:00" is not read
+  // backwards, and the full stop after "info@store.co.il." still ends the Hebrew sentence (Rocks, 28.10). A short
+  // one is never broken across two lines.
+  var LTR_WORD = /^([("'״]*)([^\s֐-׿؀-ۿ]*?)([.,;:!?)"'״]*)$/;
+  function ltrWord(w) {
+    var m = LTR_WORD.exec(w);
+    return m && m[2] && /[0-9@]|:\/\//.test(m[2]) ? esc(m[1]) + '<bdi dir="ltr"' + (m[2].length <= 24 ? ' class="ls-nb"' : '') + '>' + esc(m[2]) + '</bdi>' + esc(m[3]) : esc(w);
+  }
+  function ltrWords(text) { return String(text).split(' ').map(ltrWord).join(' '); }
   // An answer as it reads best: its own lines kept (a line that starts with "-", "•" or "1." is a list item);
-  // a long answer in one block, a sentence a line, and a sentence of parts joined by ";" a list of them
+  // an answer of two sentences or more in one block, a sentence a line (but a short one, read at a glance), and a
+  // sentence of parts joined by ";" a list of them
   function answerBlocks(text) {
     var item = /^(?:[-•*]|\d{1,2}[.)])\s+/;
     // a writer's markdown is no markup here: "**חיזוק הגוף**" reads as its words (answers kept from before the server
     // took it off too)
     text = String(text || '').replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2').replace(/\*\*/g, '');
     var lines = String(text || '').split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
-    if (lines.length === 1 && lines[0].length > 200) {
+    if (lines.length === 1 && lines[0].length > 110) {
       lines = lines[0].replace(/([.!?])\s+(?=\S)/g, '$1\n').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
     }
     var blocks = [];
@@ -99,7 +109,7 @@
     return last >= t.length * 0.5 ? t.slice(0, last) : s;
   }
   function answerText(text, anim, pages) {
-    var n = 0, said = '', plain = function (s) { var h = anim ? words(s, n) : esc(s); n += String(s).split(' ').length; return h; };
+    var n = 0, said = '', plain = function (s) { var h = anim ? words(s, n) : ltrWords(s); n += String(s).split(' ').length; return h; };
     var out = function (s) {
       var m = pages && pages.length ? PAGE_SAID.exec(s) : null, before = m ? s.slice(0, m.index) : s;
       if (!m) { said += s + ' '; return plain(s); }
