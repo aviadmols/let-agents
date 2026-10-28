@@ -90,6 +90,14 @@
   // "לפי העמוד שלה", "according to its page": the words lead to that page (as Aviad asked, 2026-10-25). The page is
   // the one the answer names just before them, else the first it rests on.
   var PAGE_SAID = /(?:לפי|על[ -]פי|כפי שכתוב ב|כמו שכתוב ב)\s?(?:ה)?(?:עמודים|עמוד|דף)(?:\s(?:המוצר|שלה|שלו|שלנו|שלהם|באתר))*|according to (?:its|the|our) (?:product )?pages?/i;
+  // an answer that stops in the middle of a sentence ("…local travel professio", kept in this browser from before) ends at its
+  // last whole sentence, where that keeps half of it or more: as the server ends it (AnswerSiteQuestion::endsWhole)
+  function endsWhole(s) {
+    var t = String(s || '').replace(/\s+$/, ''), re = /[.!?…](?=\s|$)/g, m, last = -1;
+    if (t.length < 300 || /[.!?…:)"״'׳”»\]]$/.test(t)) { return s; }
+    while ((m = re.exec(t))) { last = m.index + 1; }
+    return last >= t.length * 0.5 ? t.slice(0, last) : s;
+  }
   function answerText(text, anim, pages) {
     var n = 0, said = '', plain = function (s) { var h = anim ? words(s, n) : esc(s); n += String(s).split(' ').length; return h; };
     var out = function (s) {
@@ -99,6 +107,6 @@
       said += before + m[0];
       return plain(before) + '<a class="ls-answer__page-link" href="' + esc(page.url) + '">' + plain(m[0]) + '</a>' + out(s.slice(m.index + m[0].length));
     };
-    return answerBlocks(text).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + out(s) + '</li>'; }).join('') + '</ul>' : '<p>' + out(b.text) + '</p>'; }).join('');
+    return answerBlocks(endsWhole(text)).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + out(s) + '</li>'; }).join('') + '</ul>' : '<p>' + out(b.text) + '</p>'; }).join('');
   }
 

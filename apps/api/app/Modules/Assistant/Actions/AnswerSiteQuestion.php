@@ -445,14 +445,15 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $picks = array_map(fn (string $id): array => ['external_id' => $id, 'title' => (string) ($titles[$id] ?? ''), 'why' => ''], array_slice($linked, 0, self::MAX_PICKS));
 
                 return [
-                    'outcome' => AssistantAnswer::ANSWERED, 'answer' => (string) $saved->answer, 'from' => 'bank', 'sources' => (array) $saved->sources,
+                    'outcome' => AssistantAnswer::ANSWERED, 'answer' => self::endsWhole((string) $saved->answer), 'from' => 'bank', 'sources' => (array) $saved->sources,
                     'picks' => $this->present($picks), 'answer_id' => $saved->id,
                 ] + (count($linked) > self::MAX_PICKS ? ['named' => ['names' => [], 'ids' => array_slice($linked, self::MAX_PICKS, self::NAMED_SHOWN)]] : []);
             }
 
             return [
                 'outcome' => AssistantAnswer::ANSWERED,
-                'answer' => (string) $saved->answer,
+                // kept from before answers were ended whole
+                'answer' => self::endsWhole((string) $saved->answer),
                 'from' => 'bank',
                 'sources' => (array) $saved->sources,
                 'picks' => $this->present((array) $saved->picks),
