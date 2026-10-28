@@ -14,12 +14,18 @@ final class QualityExpect
      * by address), and whether the checker of the other family found it supported by the store's own
      * data (its verdict "kept"): words can all be there and the answer still be wrong.
      *
-     * @param  array{outcome?: string, contains?: list<string>, absent?: list<string>, picks?: list<string>, sources?: list<string>, supported?: bool}  $expect
+     * Beyond its words, the picks against the catalogue: picks_max_price and picks_min_price (every pick's price within;
+     * a reply that keeps the conversation's budget), picks_title_any (every pick's title says one of the words),
+     * picks_say_any (its title or description does: "זהב צהוב" is in a ring's description, not its title), picks_max
+     * (no more than this many).
+     *
+     * @param  array{outcome?: string, contains?: list<string>, absent?: list<string>, picks?: list<string>, sources?: list<string>, supported?: bool, picks_max_price?: float, picks_min_price?: float, picks_title_any?: list<string>, picks_say_any?: list<string>, picks_max?: int}  $expect
      * @param  array<string, mixed>  $result  what AnswerSiteQuestion answered (outcome, answer, picks, sources)
      * @param  string|null  $verdict  the checker's verdict on it
+     * @param  array<string, array{title?: string, price?: float|null, text?: string}>  $catalog  the picked products, by external id
      * @return list<string> what failed, empty when it passed
      */
-    public static function problems(array $expect, array $result, ?string $verdict = null): array
+    public static function problems(array $expect, array $result, ?string $verdict = null, array $catalog = []): array
     {
         $answer = self::norm((string) ($result['answer'] ?? ''));
         $picks = array_map(fn ($p): string => (string) (is_array($p) ? ($p['external_id'] ?? '') : $p), (array) ($result['picks'] ?? []));
@@ -53,6 +59,30 @@ final class QualityExpect
 
         if (($expect['supported'] ?? false) === true && $verdict !== 'kept') {
             $problems[] = 'unsupported:'.($verdict ?? 'unchecked');
+        }
+
+        if (isset($expect['picks_max']) && count($picks) > (int) $expect['picks_max']) {
+            $problems[] = 'picks_over:'.count($picks);
+        }
+
+        foreach ($picks as $id) {
+            $product = $catalog[$id] ?? [];
+            $price = isset($product['price']) ? (float) $product['price'] : null;
+            $title = self::norm((string) ($product['title'] ?? ''));
+            $says = $title.' '.self::norm((string) ($product['text'] ?? ''));
+
+            if (isset($expect['picks_max_price']) && ($price === null || $price > (float) $expect['picks_max_price'])) {
+                $problems[] = 'price_over:'.$id.($price === null ? '' : ':'.$price);
+            }
+            if (isset($expect['picks_min_price']) && ($price === null || $price < (float) $expect['picks_min_price'])) {
+                $problems[] = 'price_under:'.$id.($price === null ? '' : ':'.$price);
+            }
+            if (($words = self::words($expect['picks_title_any'] ?? [])) !== [] && array_filter($words, fn (string $w): bool => str_contains($title, $w)) === []) {
+                $problems[] = 'pick_title:'.$id;
+            }
+            if (($words = self::words($expect['picks_say_any'] ?? [])) !== [] && array_filter($words, fn (string $w): bool => str_contains($says, $w)) === []) {
+                $problems[] = 'pick_says:'.$id;
+            }
         }
 
         return $problems;

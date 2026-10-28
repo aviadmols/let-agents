@@ -73,7 +73,7 @@ final class SearchAsksTest extends TestCase
 
             public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                $this->test->calls[] = ['provider' => $provider, 'user' => $user];
+                $this->test->calls[] = ['provider' => $provider, 'user' => $user, 'effort' => $reasoningEffort, 'system' => $system];
 
                 return new ModelReply(array_shift($this->test->replies) ?? [], 600, 150);
             }
@@ -481,6 +481,70 @@ final class SearchAsksTest extends TestCase
         $this->assertSame(100.0, (float) $runs[0]['before']['answered'], 'each run beside the one before it');
     }
 
+    public function test_a_reply_is_logged_with_its_conversation_and_the_baseline_asks_it_again_as_it_was_asked(): void
+    {
+        // Rocks, 28.10: "יש משהו עם זהב צהב?" after "טבעות עם יהלום אחד עד 3000 ש"ח" showed a ring at ₪3,300; asked again
+        // on its own, the words mean nothing. A case keeps the conversation, and is judged by the budget it set.
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '701')->update(['price' => 1200, 'in_stock' => true, 'purchasable' => true]));
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '702')->update(['price' => 3300, 'in_stock' => true, 'purchasable' => true]));
+        $answer = fn (): array => [['found' => true, 'answer' => 'יש יריעה בתקציב.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'בתקציב.']]], ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true]];
+        $thread = [['q' => 'מה יש לאיטום גג עד 2000 ש"ח?', 'a' => 'יריעה ביטומנית.']];
+
+        $this->replies = $answer();
+        $data = $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: ['HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain'],
+            content: json_encode(['question' => 'יש משהו עם יסוד?', 'vid' => self::VID, 'locale' => 'he', 'products' => ['701', '702'], 'previous' => [], 'thread' => $thread], JSON_UNESCAPED_UNICODE))->json('data');
+
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertSame(['יריעה ביטומנית לאיטום גגות 4 מ"מ'], array_column(json_decode($this->calls[0]['user'], true)['products'], 'title'), 'the conversation\'s budget holds: not the one at 3,300');
+        $this->assertSame($thread, $this->inShop(fn () => AssistantSearchAsk::query()->sole())->thread, 'logged with its conversation');
+
+        $this->assertSame([$this->shop->id => 1], app(BuildQualityBaseline::class)->handle(10));
+        $case = $this->inShop(fn () => AssistantQualityCase::query()->sole());
+        $this->assertSame($thread, $case->thread);
+        $this->assertNull($case->snapshot_at, 'a reply is asked on today\'s pages: what it stands for is written each time');
+        $this->inShop(fn () => $case->forceFill(['expect' => ['picks_max_price' => 2000, 'picks_say_any' => ['יריעה']]])->save());
+
+        $this->calls = [];
+        $this->replies = $answer();
+        $run = app(RunQualityCases::class)->handle($this->shop->id, null, null, AssistantQualityRun::FROZEN, AssistantQualityCase::BASELINE, 'replies');
+        $this->assertSame([['question' => 'מה יש לאיטום גג עד 2000 ש"ח?', 'answer' => 'יריעה ביטומנית.']], json_decode($this->calls[0]['user'], true)['conversation'], 'asked again with its conversation');
+        $result = AssistantQualityResult::query()->where('run_id', $run->id)->sole();
+        $this->assertTrue($result->passed, implode(' ', (array) $result->problems));
+        $this->assertSame([600, 150], $result->trace['writer_tokens'], 'each step kept on the result');
+        $this->assertNotNull($result->trace['check_ms']);
+        $this->assertArrayHasKey('p50_ms', (array) $run->totals);
+
+        // A pick over the budget fails the case in code, whatever the checker said of it.
+        $this->inShop(fn () => $case->forceFill(['expect' => ['picks_max_price' => 1000]])->save());
+        $this->calls = [];
+        $this->replies = $answer();
+        $run = app(RunQualityCases::class)->handle($this->shop->id, null, null, AssistantQualityRun::FROZEN, AssistantQualityCase::BASELINE, 'tighter');
+        $this->assertSame(['price_over:701:1200'], AssistantQualityResult::query()->where('run_id', $run->id)->sole()->problems);
+    }
+
+    public function test_a_run_tries_a_setting_and_a_prompt_version_without_touching_the_stores_and_two_runs_are_compared(): void
+    {
+        $this->inShop(fn () => AssistantSearchAsk::query()->create(['shop_id' => $this->shop->id, 'day' => now()->toDateString(), 'question' => 'במה אוטמים גג?', 'products' => ['701'], 'outcome' => 'answered', 'from' => 'model']));
+        app(BuildQualityBaseline::class)->handle(10);
+        $reply = fn (): array => [['found' => true, 'answer' => 'יריעה ביטומנית.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'לגג.']]], ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true]];
+
+        $this->replies = $reply();
+        $this->artisan('assistant:quality-baseline', ['action' => 'run', '--label' => 'as-is'])->assertSuccessful();
+        $this->assertNull($this->calls[1]['effort'], 'the checker thinks as its model does by default');
+
+        $this->calls = [];
+        $this->replies = $reply();
+        $this->artisan('assistant:quality-baseline', ['action' => 'run', '--label' => 'low', '--set' => ['assistant.site_check_effort=low'], '--check-prompt' => '9'])
+            ->expectsOutputToContain('assistant.site_check_effort = low for this run')->assertSuccessful();
+        $this->assertSame('low', $this->calls[1]['effort'], 'the checker thinks less for this run');
+        $this->assertStringContainsString(file_get_contents(dirname(__DIR__).'/Prompts/verify_site.v9.md'), $this->calls[1]['system'] ?? '', 'and with the version chosen');
+        $this->assertSame('model_default', Settings::get('assistant.site_check_effort'), 'put back after the run');
+
+        $this->artisan('assistant:quality-baseline', ['action' => 'run', '--set' => ['nonsense']])->assertFailed();
+        $this->artisan('assistant:quality-baseline', ['action' => 'compare', '--runs' => 'as-is,low'])->expectsOutputToContain('check_ms')->expectsOutputToContain('cases changed.')->assertSuccessful();
+        $this->artisan('assistant:quality-baseline', ['action' => 'compare', '--runs' => 'as-is,nowhere'])->assertFailed();
+    }
+
     public function test_cases_are_imported_from_a_file_with_their_data_and_no_model_call(): void
     {
         $this->artisan('assistant:quality-cases', ['shop' => $this->shop->slug, '--import' => base_path('app/Modules/Assistant/resources/evals/gueta-hedge-trimmer-620w.json')])
@@ -491,6 +555,13 @@ final class SearchAsksTest extends TestCase
         $this->assertTrue($cases->every(fn (AssistantQualityCase $c): bool => $c->kind === AssistantQualityCase::REGRESSION && $c->snapshot_at !== null));
         $this->assertSame(['outcome' => 'answered', 'contains' => ['620'], 'supported' => true], $cases->firstWhere('question', 'מה ההספק של גוזם גדר חי חשמלי 620W?')->expect);
         $this->assertSame([], $this->calls, 'importing asks no model');
+
+        $this->artisan('assistant:quality-cases', ['shop' => $this->shop->slug, '--import' => base_path('app/Modules/Assistant/resources/evals/rocks-conversations.json')])
+            ->expectsOutputToContain('8 cases imported')->assertSuccessful();
+        $reply = $this->inShop(fn () => AssistantQualityCase::query()->where('question', 'ומה עם עד 5000?')->sole());
+        $this->assertCount(1, $reply->thread, 'a reply with the conversation it was asked in');
+        $this->assertNull($reply->snapshot_at, 'nothing of a reply is frozen');
+        $this->assertSame(5000, $reply->expect['picks_max_price']);
     }
 
     public function test_a_reviewer_never_checks_its_own_family(): void

@@ -47,7 +47,7 @@ final class BuildQualityBaseline
     {
         $have = AssistantQualityCase::query()->pluck('question')->map(fn ($q): string => Question::key((string) $q))->flip();
         $asks = AssistantSearchAsk::query()->where('created_at', '>=', now()->subDays($days))->where('question', '!=', '[support]')
-            ->latest('created_at')->limit(3000)->get(['id', 'question', 'products', 'outcome']);
+            ->latest('created_at')->limit(3000)->get(['id', 'question', 'products', 'thread', 'outcome']);
         $groups = [];
 
         foreach ($asks->groupBy(fn (AssistantSearchAsk $a): string => Question::key((string) $a->question)) as $key => $same) {
@@ -76,8 +76,12 @@ final class BuildQualityBaseline
             /** @var AssistantSearchAsk $ask */
             $ask = $pick['ask'];
 
+            // A reply ("יש משהו עם זהב צהוב?") is kept with its conversation and asked again on today's pages: what it
+            // stands for is written by the topic check each time, so there is nothing of it to freeze.
+            $thread = array_values(array_filter((array) $ask->thread, fn ($t): bool => is_array($t) && isset($t['q'], $t['a'])));
+
             try {
-                $snapshot = $this->answers->snapshot($shopId, (string) $ask->question, (array) $ask->products);
+                $snapshot = $thread === [] ? $this->answers->snapshot($shopId, (string) $ask->question, (array) $ask->products) : null;
             } catch (Throwable $e) {
                 report($e);
                 $snapshot = null;
@@ -85,8 +89,8 @@ final class BuildQualityBaseline
 
             AssistantQualityCase::query()->create([
                 'shop_id' => $shopId, 'ask_id' => $ask->id, 'kind' => AssistantQualityCase::BASELINE, 'question' => mb_substr((string) $ask->question, 0, 500),
-                'products' => (array) $ask->products, 'expect' => [], 'snapshot' => $snapshot, 'snapshot_at' => $snapshot === null ? null : now(),
-                'note' => 'asked '.$pick['asked'].'×, '.$ask->outcome,
+                'products' => (array) $ask->products, 'thread' => $thread ?: null, 'expect' => [], 'snapshot' => $snapshot, 'snapshot_at' => $snapshot === null ? null : now(),
+                'note' => 'asked '.$pick['asked'].'×, '.$ask->outcome.($thread === [] ? '' : ', a reply'),
             ]);
             $added++;
         }

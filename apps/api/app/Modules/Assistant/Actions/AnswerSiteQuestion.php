@@ -98,9 +98,21 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** A reply carries this many of the conversation's questions and answers before it, at most, each cut to these lengths. */
     public const MAX_THREAD = 3;
 
+    /**
+     * Prompt versions written but not released: never served, asked with the quality baseline (--scope-prompt,
+     * --check-prompt) until the run with them is better, then taken off this list (docs/runbooks/answer-quality-eval.md).
+     * scope_site v9: a reply that narrows the request keeps the conditions it does not change (the budget, the one diamond).
+     *
+     * @var array<string, list<int>>
+     */
+    public const CANDIDATES = ['scope_site' => [9]];
+
     private const THREAD_QUESTION_CHARS = 300;
 
     private const THREAD_ANSWER_CHARS = 700;
+
+    /** A reply that says any of these speaks of price itself, and keeps no price from the conversation before it. */
+    private const PRICE_WORDS = '/מחיר|יקר|זול|תקציב|שקל|ש["״]?ח|₪|\d|price|cheap|expensive|budget|cost/iu';
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
@@ -216,6 +228,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** @var list<array{question: string, answer: string}> a reply's conversation before it, oldest first (handle()) */
     private array $conversation = [];
 
+    /** The words the shopper typed, a reply's own (handle()): whether it says anything of price. */
+    private string $asked = '';
+
     /**
      * Whether the question is about the products already shown ("מה הכי זול?" after a search, "מה ההבדל ביניהם?"): then
      * no product found by its page joins them (prepare()). A reply in the conversation is not: "לבעיות שינה" is answered
@@ -255,6 +270,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // sees the conversation too, and answers the reply only (answer_site v14). Never saved, never read from the
         // saved ones: its words alone mean nothing. A reply may be a word ("כן").
         $this->conversation = self::thread($thread);
+        $this->asked = $question;
 
         if (! Features::enabled('assistant.on_search', $shopId) || mb_strlen(Question::normalize($question)) < ($this->conversation === [] ? self::MIN_CHARS : 1)) {
             return $this->fixed('invalid', $locale);
@@ -289,7 +305,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             $page = $result['outcome'] === AssistantAnswer::ANSWERED ? self::namedPage($question, (array) ($result['sources'] ?? [])) : null;
             $result += $page === null ? [] : ['page' => $page];
             // The price the question names, as code read it: what the storefront suggests beside "not found" keeps to it.
-            $range = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+            $range = $this->priceRange($question);
             $result += $range['min'] === null && $range['max'] === null ? [] : ['range' => $range];
             // The store's categories and tags the question is about, as chips under the answer to search by.
             $related = $result['outcome'] === AssistantAnswer::ANSWERED && ! $bound && ! isset($result['set']) ? $this->relatedChips($shopId, $question) : [];
@@ -673,7 +689,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($missing === []) {
             return $productsByRef;
         }
-        ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        ['min' => $min, 'max' => $max] = $this->priceRange($question);
         $n = count($productsByRef);
         foreach ($this->candidates($missing) as $product) {
             if (($min !== null || $max !== null) && ! ($product['price'] !== null && $product['price'] > 0 && ($min === null || $product['price'] >= $min) && ($max === null || $product['price'] <= $max))) {
@@ -878,10 +894,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<string>  $products  external ids shown, best first
      * @return array{result: array<string, mixed>, trace: array<string, mixed>}
      */
-    public function evaluate(string $shopId, string $question, array $products, string $mode, string $locale = 'he'): array
+    public function evaluate(string $shopId, string $question, array $products, string $mode, string $locale = 'he', array $thread = []): array
     {
         $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
         $products = array_slice(array_values(array_unique(array_map('strval', $products))), 0, self::MAX_PRODUCTS);
+        // a reply, with the conversation it was asked in (handle())
+        $this->conversation = self::thread($thread);
+        $this->asked = $question;
 
         return $this->tenant->run($shopId, function () use ($shopId, $question, $products, $mode, $locale): array {
             // The same barrier as a shopper meets, without counting anyone or blocking anyone.
@@ -963,6 +982,13 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $this->passages->near($shopId, $wording, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
                 fn (array $p): bool => $p['similarity'] >= $floor,
             )), (int) Settings::get('assistant.site_passages', $shopId) + 4);
+        }
+        // Only pieces near the nearest: a guide on bracelets beside one on engagement rings adds words, not an answer.
+        // Off at 0; measured on the quality baseline before any store gets it.
+        $drop = (float) Settings::get('assistant.site_similarity_drop', $shopId);
+        if ($drop > 0 && $found !== []) {
+            $top = max(array_column($found, 'similarity'));
+            $found = array_values(array_filter($found, fn (array $p): bool => $p['similarity'] >= $top - $drop));
         }
         // Code before model: the pages whose title holds the question's words ("ביטול עסקה" for
         // "מה מדיניות הביטולים") are read first, whatever the meaning search found.
@@ -1243,6 +1269,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                 $effort = (string) Settings::get('assistant.reasoning_effort');
                 $effort = $effort === 'model_default' ? null : $effort;
+                // how much the checker thinks: a setting of its own, so its time is tuned apart from the writer's
+                $checkEffort = (string) Settings::get('assistant.site_check_effort');
+                $checkEffort = $checkEffort === 'model_default' ? null : $checkEffort;
                 $replies = [];
                 $flags = ['safe' => null, 'injection' => false, 'harmful' => false, 'personal' => false];
 
@@ -1302,7 +1331,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                     // ("איזזה ספרי חטופים" asks for one) and searched with. The words the shopper typed
                     // stay theirs: the answer is saved and logged under them.
                     $corrected = self::corrected($question, $scope->data['corrected'] ?? null);
-                    // a reply, as it stands alone (scope_site v8): "כמה פעמים כדאי לקחת את הקורדיספס?", what is searched and answered
+                    // a reply, as it stands alone (scope_site v8; v9 keeps what a narrowing reply does not change): "כמה פעמים כדאי לקחת את הקורדיספס?", what is searched and answered
                     $corrected = $this->conversation === [] ? $corrected : (self::standalone($scope->data['standalone'] ?? null) ?? $corrected);
                     if ($corrected !== null && $remember && $keep && $viewing === null && $visitorHash !== null
                         && ($set = $this->set($shopId, $corrected, $visitorHash, $locale)) !== null) {
@@ -1335,7 +1364,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing, $this->onShown);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
-                    'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input)];
+                    'passages_found' => $prepared['found'], 'passages_sent' => count($byRef), 'chars' => mb_strlen($input),
+                    // how near by meaning each piece the search found was (the store's own lines carry no nearness)
+                    'scores' => array_values(array_filter(array_map(fn (array $p): ?float => isset($p['similarity']) ? round((float) $p['similarity'], 3) : null, array_values($byRef)), fn (?float $x): bool => $x !== null))];
                 $trace = ['context' => $context, 'debug' => $prepared['debug']];
                 $noAnswer = $shown === [] ? AssistantAnswer::NO_INFO : 'no_match';
                 // what the writer is given, for the check screen: the pages by name and kind, the products by name
@@ -1414,7 +1445,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $started = hrtime(true);
 
                         try {
-                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared), $checkOutput, null, 'site_check');
+                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared), $checkOutput, $checkEffort, 'site_check');
                         } catch (ModelCallFailed $e) {
                             // The check could not be made (its provider refused, a key, an outage): the writer's
                             // words are never shown unchecked. What the store's own pages say, quoted as they
@@ -1509,12 +1540,14 @@ final class AnswerSiteQuestion implements TriesQuestions
             'checker_model' => isset($trace['check']['model']) ? mb_substr((string) $trace['check']['model'], 0, 80) : null,
             'verdict' => isset($trace['check']['verdict']) ? (string) $trace['check']['verdict'] : (isset($trace['check']['skipped']) ? 'skipped:'.mb_substr((string) $trace['check']['skipped'], 0, 30) : null),
             'trace' => array_filter([
-                'context' => isset($trace['context']) ? array_intersect_key((array) $trace['context'], array_flip(['mode', 'type', 'products_shown', 'products_sent', 'passages_found', 'passages_sent', 'chars'])) : null,
+                'context' => isset($trace['context']) ? array_intersect_key((array) $trace['context'], array_flip(['mode', 'type', 'products_shown', 'products_sent', 'passages_found', 'passages_sent', 'chars', 'scores'])) : null,
                 'refused' => $trace['refused'] ?? null,
                 'failed' => $trace['failed'] ?? null,
                 'scope' => $trace['scope'] ?? null,
                 'writer_ms' => $trace['writer']['ms'] ?? null,
                 'check_ms' => $trace['check']['ms'] ?? null,
+                'writer_tokens' => isset($trace['writer']['in']) ? [(int) $trace['writer']['in'], (int) ($trace['writer']['out'] ?? 0)] : null,
+                'check_tokens' => isset($trace['check']['in']) ? [(int) $trace['check']['in'], (int) ($trace['check']['out'] ?? 0)] : null,
                 'picks' => $trace['picks'] ?? null,
                 'corrected' => $corrected,
             ], fn ($v): bool => $v !== null && $v !== []),
@@ -1557,24 +1590,31 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<string>  $products  external ids shown, best first
      * @return array{result: array<string, mixed>, trace: array<string, mixed>, answered: array<string, mixed>|null}
      */
-    public function replay(string $shopId, string $question, array $products, ?int $answerVersion = null, string $locale = 'he', ?array $frozen = null): array
+    public function replay(string $shopId, string $question, array $products, ?int $answerVersion = null, string $locale = 'he', ?array $frozen = null, array $thread = [], array $versions = []): array
     {
-        if ($answerVersion !== null && ! in_array($answerVersion, self::promptVersions('answer_site'), true)) {
-            throw new \InvalidArgumentException("answer_site v{$answerVersion} does not exist.");
+        // the writer's version, and any other prompt's (scope_site, verify_site): each must exist
+        $versions = array_filter(['answer_site' => $answerVersion] + $versions, fn ($v): bool => $v !== null);
+        foreach ($versions as $prompt => $version) {
+            if (! in_array((int) $version, self::promptVersions((string) $prompt), true)) {
+                throw new \InvalidArgumentException("{$prompt} v{$version} does not exist.");
+            }
         }
 
-        $this->promptVersions = $answerVersion === null ? [] : ['answer_site' => $answerVersion];
+        $this->promptVersions = array_map('intval', $versions);
         $this->answered = null;
-        $this->frozen = $frozen === null ? null : array_diff_key($frozen, array_flip(['mode', 'question']));
+        // a reply is asked on today's pages: what it stands for is written by the topic check, never frozen
+        $this->frozen = $frozen === null || $thread !== [] ? null : array_diff_key($frozen, array_flip(['mode', 'question']));
 
         try {
-            $out = $this->evaluate($shopId, $question, $products, (string) ($frozen['mode'] ?? Settings::get('assistant.context_mode', $shopId)), $locale);
+            $out = $this->evaluate($shopId, $question, $products, (string) ($frozen['mode'] ?? Settings::get('assistant.context_mode', $shopId)), $locale, $thread);
 
             return $out + ['answered' => $this->answered];
         } finally {
             $this->promptVersions = [];
             $this->answered = null;
             $this->frozen = null;
+            $this->conversation = [];
+            $this->asked = '';
         }
     }
 
@@ -1592,6 +1632,33 @@ final class AnswerSiteQuestion implements TriesQuestions
         rsort($versions);
 
         return $versions;
+    }
+
+    /**
+     * The price a question keeps to, as code reads it: its own words', or, for a reply that says nothing of price ("יש
+     * משהו עם זהב צהוב?" after "טבעות נישואים עם יהלום אחד עד 3000 ש"ח"), the one the conversation asked for last, however
+     * the topic check wrote the reply again (Rocks, 28.10: a ring of ₪3,300 shown for it).
+     *
+     * @return array{min: float|null, max: float|null}
+     */
+    private function priceRange(string $question): array
+    {
+        $read = fn (string $q): array => app()->bound(PriceRange::class) ? app(PriceRange::class)->read($q) : ['min' => null, 'max' => null];
+        $range = $read($question);
+
+        if ($range['min'] !== null || $range['max'] !== null || $this->conversation === [] || preg_match(self::PRICE_WORDS, $this->asked) === 1) {
+            return $range;
+        }
+
+        foreach (array_reverse($this->conversation) as $turn) {
+            $earlier = $read($turn['question']);
+
+            if ($earlier['min'] !== null || $earlier['max'] !== null) {
+                return $earlier;
+            }
+        }
+
+        return $range;
     }
 
     /** The version of a prompt prompt() reads: the newest file there is, the bench's v5 aside. */
@@ -2151,7 +2218,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($asks === 'popular') {
             return null;
         }
-        ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        ['min' => $min, 'max' => $max] = $this->priceRange($question);
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
         // A range with another wish ("the biggest diamond", "the best for a gift") is not answered by price alone:
         // the writer chooses among the products inside it (withinPrice()).
@@ -2366,7 +2433,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     private function withinPrice(string $shopId, string $question, array $candidates): array
     {
-        ['min' => $min, 'max' => $max] = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        ['min' => $min, 'max' => $max] = $this->priceRange($question);
 
         if ($min === null && $max === null) {
             return $candidates;
@@ -2711,6 +2778,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             // read by the team and sent to the nightly review.
             'question' => ($result['reason'] ?? null) === 'support' ? '[support]' : mb_substr(Privacy::redact($question)['text'], 0, 500),
             'products' => $products,
+            // the conversation a reply answered in, as the storefront sent it, so the baseline asks it again as it was asked
+            'thread' => $this->conversation === [] ? null : array_map(fn (array $t): array => ['q' => Privacy::redact($t['question'])['text'], 'a' => Privacy::redact($t['answer'])['text']], $this->conversation),
             'outcome' => $result['outcome'],
             'from' => $result['from'],
             // Why it got no answer, for the operator: what refused it.
@@ -3120,12 +3189,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $file === null ? '' : (string) file_get_contents($file);
     }
 
-    /** The newest released version of a prompt, as its file. */
+    /** The newest released version of a prompt, as its file: never a candidate (CANDIDATES). */
     public static function promptFile(string $name): ?string
     {
         for ($version = self::PROMPT_VERSION; $version > 0; $version--) {
             // 5 is the bench's facts-only writer, never this answerer's.
-            if ($version !== 5 && is_file($file = __DIR__.'/../Prompts/'.$name.'.v'.$version.'.md')) {
+            if ($version !== 5 && ! in_array($version, self::CANDIDATES[$name] ?? [], true) && is_file($file = __DIR__.'/../Prompts/'.$name.'.v'.$version.'.md')) {
                 return $file;
             }
         }

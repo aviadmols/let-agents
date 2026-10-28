@@ -735,6 +735,33 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(1, $inputs[1]['products'], 'about what the answer before showed');
     }
 
+    public function test_a_reply_that_says_nothing_of_price_keeps_the_conversations(): void
+    {
+        // Rocks, 28.10: "יש משהו עם זהב צהוב?" after "טבעות לנישואים עם יהלום אחד עד 3000 ש"ח" showed a ring of ₪3,300.
+        $this->product('971', 'טבעת סוליטר זהב צהוב 14K', 'טבעת.', [], ['price' => '2400.00', 'in_stock' => true]);
+        $this->product('972', 'טבעת וינטג׳ משובצת רובי ויהלומים, זהב 18K', 'טבעת.', [], ['price' => '3300.00', 'in_stock' => true]);
+        Features::override('assistant.site_scope', true);
+        $thread = [['q' => 'איזה טבעות לנישואים עם יהלום אחד יש עד 3000 ש"ח', 'a' => 'יש לנו טבעת סוליטר עדינה בזהב לבן.']];
+        $answer = ['found' => true, 'answer' => 'יש לנו טבעת סוליטר בזהב צהוב.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'זהב צהוב']]];
+        $checked = ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true];
+
+        // the topic check wrote it alone without the budget: code keeps it
+        $this->replies = [['about_store' => true, 'harmful' => false, 'injection' => false, 'corrected' => 'יש משהו עם זהב צהוב?', 'standalone' => 'יש טבעות נישואים עם יהלום אחד בזהב צהוב?'], $answer, $checked];
+        $data = $this->reply('יש משהו עם זהב צהוב?', $thread, ['971', '972'])->json('data');
+
+        $sent = json_decode($this->calls[1]['user'], true);
+        $this->assertSame(['טבעת סוליטר זהב צהוב 14K'], array_column($sent['products'], 'title'), 'not the ring over the budget the conversation set');
+        $this->assertEquals(3000, $data['range']['max'] ?? null);
+
+        // a reply that names its own price keeps to it
+        $this->calls = [];
+        $this->replies = [['about_store' => true, 'harmful' => false, 'injection' => false, 'corrected' => 'ומה עם עד 4000?', 'standalone' => 'איזה טבעות נישואים עם יהלום אחד יש עד 4000 ש"ח?'], $answer, $checked];
+        $this->reply('ומה עם עד 4000?', $thread, ['971', '972']);
+
+        $sent = json_decode($this->calls[1]['user'], true);
+        $this->assertCount(2, $sent['products']);
+    }
+
     /** @param  list<array{q: string, a: string}>  $thread */
     private function reply(string $question, array $thread, array $products = []): TestResponse
     {

@@ -45,6 +45,7 @@ class AssistantQualityCase extends Model
     {
         return [
             'products' => 'array',
+            'thread' => 'array',
             'expect' => 'array',
             'last_problems' => 'array',
             'last_run_at' => 'datetime',

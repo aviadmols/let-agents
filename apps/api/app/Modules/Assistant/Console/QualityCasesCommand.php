@@ -20,7 +20,7 @@ final class QualityCasesCommand extends Command
 {
     protected $signature = 'assistant:quality-cases
         {shop : the shop, by slug or ID}
-        {--import= : a JSON file of [{question, products?, expect, note?}] to add as cases}
+        {--import= : a JSON file of [{question, products?, thread?, expect, note?}] to add as cases; thread: the conversation a reply was asked in, as q and a pairs}
         {--prompt= : the answer_site prompt version, the current one when left out}
         {--live : on today\'s catalogue and pages instead of each case\'s frozen data}';
 
@@ -53,11 +53,13 @@ final class QualityCasesCommand extends Command
                 }
 
                 $products = array_values(array_map('strval', (array) ($row['products'] ?? [])));
-                $snapshot = $answers->snapshot((string) $shop->id, (string) $row['question'], $products);
+                $thread = array_values(array_filter((array) ($row['thread'] ?? []), fn ($t): bool => is_array($t) && isset($t['q'], $t['a'])));
+                // a reply is asked again on today's pages, with its conversation: nothing of it to freeze
+                $snapshot = $thread === [] ? $answers->snapshot((string) $shop->id, (string) $row['question'], $products) : null;
                 $tenant->run((string) $shop->id, fn () => AssistantQualityCase::query()->updateOrCreate(
                     ['shop_id' => $shop->id, 'question' => mb_substr((string) $row['question'], 0, 500)],
-                    ['kind' => AssistantQualityCase::REGRESSION, 'products' => $products, 'expect' => (array) ($row['expect'] ?? []),
-                        'note' => isset($row['note']) ? mb_substr((string) $row['note'], 0, 300) : null, 'snapshot' => $snapshot, 'snapshot_at' => now()],
+                    ['kind' => AssistantQualityCase::REGRESSION, 'products' => $products, 'thread' => $thread ?: null, 'expect' => (array) ($row['expect'] ?? []),
+                        'note' => isset($row['note']) ? mb_substr((string) $row['note'], 0, 300) : null, 'snapshot' => $snapshot, 'snapshot_at' => $snapshot === null ? null : now()],
                 ));
                 $added++;
             }

@@ -135,6 +135,20 @@ return [
         'label' => 'Minimum nearness of a piece to the question',
         'description' => 'Below this a piece is not sent, and with no piece no writing model is asked.',
     ],
+    'site_similarity_drop' => [
+        'label' => 'How far below the nearest piece a piece is still sent',
+        'description' => 'A piece further below the nearest than this is not sent. 0 turns it off. Measured on the quality baseline before it is turned on.',
+    ],
+    'site_check_effort' => [
+        'label' => 'How much the checker thinks before deciding',
+        'description' => 'The model\'s default is medium. Less thinking: a faster, cheaper check. Measured on the quality baseline before it is changed.',
+        'options' => [
+            'model_default' => 'The model\'s default',
+            'low' => 'Low',
+            'medium' => 'Medium',
+            'high' => 'High',
+        ],
+    ],
     'site_retry_days' => [
         'label' => '"Not found" is asked again after',
         'description' => 'Days. So a page the store added since makes it into the answer.',

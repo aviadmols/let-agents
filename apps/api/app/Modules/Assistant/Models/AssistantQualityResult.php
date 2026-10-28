@@ -36,6 +36,7 @@ class AssistantQualityResult extends Model
             'passed' => 'boolean',
             'problems' => 'array',
             'picks' => 'array',
+            'trace' => 'array',
             'cost_usd' => 'float',
             'duration_ms' => 'integer',
         ];

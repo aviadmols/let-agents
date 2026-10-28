@@ -10,6 +10,7 @@ use App\Modules\Assistant\Models\AssistantQualityResult;
 use App\Modules\Assistant\Models\AssistantQualityRun;
 use App\Modules\Assistant\Support\AnswerFailure;
 use App\Modules\Assistant\Support\QualityExpect;
+use App\Modules\Catalog\Models\CatalogProduct;
 use Throwable;
 
 /**
@@ -32,8 +33,9 @@ final class RunQualityCases
      * @param  list<string>|null  $ids  some cases only
      * @param  string  $mode  AssistantQualityRun::FROZEN or LIVE
      * @param  string|null  $kind  regression, baseline, or null for both
+     * @param  array<string, int>  $versions  other prompts' versions to ask with (scope_site, verify_site); the current ones when left out
      */
-    public function handle(?string $shopId, ?array $ids = null, ?int $answerVersion = null, string $mode = AssistantQualityRun::FROZEN, ?string $kind = null, ?string $label = null, ?int $by = null): AssistantQualityRun
+    public function handle(?string $shopId, ?array $ids = null, ?int $answerVersion = null, string $mode = AssistantQualityRun::FROZEN, ?string $kind = null, ?string $label = null, ?int $by = null, array $versions = []): AssistantQualityRun
     {
         $mode = $mode === AssistantQualityRun::LIVE ? AssistantQualityRun::LIVE : AssistantQualityRun::FROZEN;
         $cases = $this->tenant->runUnscoped(fn () => AssistantQualityCase::query()
@@ -52,7 +54,7 @@ final class RunQualityCases
             /** @var AssistantQualityCase $case */
             try {
                 $out = $this->answers->replay((string) $case->shop_id, $case->question, (array) $case->products, $answerVersion, 'he',
-                    $mode === AssistantQualityRun::FROZEN && is_array($case->snapshot) ? $case->snapshot : null);
+                    $mode === AssistantQualityRun::FROZEN && is_array($case->snapshot) ? $case->snapshot : null, (array) $case->thread, $versions);
             } catch (SpendCapReached) {
                 $stopped = 'spend_cap';
                 break;
@@ -64,7 +66,7 @@ final class RunQualityCases
 
             $verdict = $out['answered']['verdict'] ?? null;
             $expected = array_filter((array) $case->expect, fn ($v): bool => $v !== null && $v !== [] && $v !== '' && $v !== false);
-            $problems = $expected === [] ? null : QualityExpect::problems($expected, $out['result'], $verdict);
+            $problems = $expected === [] ? null : QualityExpect::problems($expected, $out['result'], $verdict, $this->catalog((string) $case->shop_id, (array) ($out['result']['picks'] ?? [])));
             $result = [
                 'outcome' => mb_substr((string) ($out['result']['outcome'] ?? ''), 0, 40),
                 'verdict' => $verdict === null ? null : mb_substr((string) $verdict, 0, 40),
@@ -75,6 +77,8 @@ final class RunQualityCases
                 'picks' => array_values(array_map(fn ($p): string => (string) (is_array($p) ? ($p['external_id'] ?? '') : $p), (array) ($out['result']['picks'] ?? []))),
                 'cost_usd' => (float) ($out['answered']['cost_usd'] ?? 0),
                 'duration_ms' => $out['answered']['duration_ms'] ?? null,
+                // each step's time and tokens, what was sent and how near it was: a change is measured on these too
+                'trace' => $out['answered']['trace'] ?? null,
             ];
 
             AssistantQualityResult::query()->create(['run_id' => $run->id, 'case_id' => $case->id, 'shop_id' => $case->shop_id] + $result);
@@ -90,8 +94,29 @@ final class RunQualityCases
     }
 
     /**
+     * The picked products as the expectations read them: title, price and description, by external id.
+     *
+     * @param  list<array<string, mixed>|string>  $picks
+     * @return array<string, array{title: string, price: float|null, text: string}>
+     */
+    private function catalog(string $shopId, array $picks): array
+    {
+        $ids = array_values(array_filter(array_map(fn ($p): string => (string) (is_array($p) ? ($p['external_id'] ?? '') : $p), $picks)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return $this->tenant->run($shopId, fn (): array => CatalogProduct::query()->whereIn('external_id', $ids)->get()
+            ->mapWithKeys(fn (CatalogProduct $p): array => [(string) $p->external_id => [
+                'title' => (string) $p->title, 'price' => $p->price === null ? null : (float) $p->price, 'text' => mb_substr(strip_tags($p->shortDescription().' '.$p->description()), 0, 4000),
+            ]])->all());
+    }
+
+    /**
      * A run's numbers: how many ran, answered, were supported by the store's data (the checker kept them),
-     * failed and why, passed what was expected, and what they cost and took.
+     * failed and why, passed what was expected, what they cost and took, and, step by step, where the time went
+     * (the writer's and the checker's, as a mean), how much was sent (pieces, characters) and how near it was.
      *
      * @return array<string, mixed>
      */
@@ -101,8 +126,25 @@ final class RunQualityCases
         $ran = $results->count();
         $answered = $results->where('outcome', AssistantAnswer::ANSWERED)->count();
         $checked = $results->whereNotNull('passed');
+        $traces = $results->map(fn (AssistantQualityResult $r): array => (array) $r->trace)->filter();
+        $mean = fn (string $key): ?int => ($v = $traces->pluck($key)->filter(fn ($x): bool => is_numeric($x)))->isEmpty() ? null : (int) round((float) $v->avg());
+        $meanOf = fn (callable $pick): ?float => ($v = $traces->map($pick)->filter(fn ($x): bool => is_numeric($x)))->isEmpty() ? null : round((float) $v->avg(), 3);
+        $durations = $results->pluck('duration_ms')->filter(fn ($x): bool => is_numeric($x))->sort()->values();
+        $at = fn (float $share): ?int => $durations->isEmpty() ? null : (int) $durations[(int) min($durations->count() - 1, floor($share * $durations->count()))];
 
         return [
+            'p50_ms' => $at(0.5),
+            'p90_ms' => $at(0.9),
+            'writer_ms' => $mean('writer_ms'),
+            'check_ms' => $mean('check_ms'),
+            'writer_in' => $meanOf(fn (array $t): ?int => isset($t['writer_tokens'][0]) ? (int) $t['writer_tokens'][0] : null),
+            'check_out' => $meanOf(fn (array $t): ?int => isset($t['check_tokens'][1]) ? (int) $t['check_tokens'][1] : null),
+            'passages' => $meanOf(fn (array $t): ?int => isset($t['context']['passages_sent']) ? (int) $t['context']['passages_sent'] : null),
+            'chars' => $meanOf(fn (array $t): ?int => isset($t['context']['chars']) ? (int) $t['context']['chars'] : null),
+            // the nearest and the least near piece sent, as a mean over the cases that sent any
+            'score_top' => $meanOf(fn (array $t): ?float => ($t['context']['scores'] ?? []) === [] ? null : max($t['context']['scores'])),
+            'score_low' => $meanOf(fn (array $t): ?float => ($t['context']['scores'] ?? []) === [] ? null : min($t['context']['scores'])),
+        ] + [
             'ran' => $ran,
             'answered' => $ran > 0 ? round(100 * $answered / $ran, 1) : null,
             'supported' => $answered > 0 ? round(100 * $results->where('outcome', AssistantAnswer::ANSWERED)->where('verdict', 'kept')->count() / $answered, 1) : null,

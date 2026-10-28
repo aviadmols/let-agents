@@ -48,6 +48,7 @@ class AssistantSearchAsk extends Model
         return [
             'day' => 'date',
             'products' => 'array',
+            'thread' => 'array',
             'shown' => 'array',
             'picks' => 'array',
             'picked' => 'array',

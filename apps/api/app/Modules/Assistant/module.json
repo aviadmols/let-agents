@@ -13,7 +13,10 @@
     ],
     "provider": "AssistantServiceProvider",
     "features": [
-        { "name": "visitor_limit", "default": true },
+        {
+            "name": "visitor_limit",
+            "default": true
+        },
         {
             "name": "prepare_answers",
             "default": true
@@ -324,6 +327,18 @@
             "unit": "tokens"
         },
         {
+            "name": "site_check_effort",
+            "type": "enum",
+            "options": [
+                "model_default",
+                "low",
+                "medium",
+                "high"
+            ],
+            "default": "model_default",
+            "scope": "global"
+        },
+        {
             "name": "site_check_output_usd_per_million",
             "type": "float",
             "default": 0.5,
@@ -345,6 +360,14 @@
             "name": "site_min_similarity",
             "type": "float",
             "default": 0.35,
+            "min": 0,
+            "max": 1,
+            "scope": "shop"
+        },
+        {
+            "name": "site_similarity_drop",
+            "type": "float",
+            "default": 0,
             "min": 0,
             "max": 1,
             "scope": "shop"

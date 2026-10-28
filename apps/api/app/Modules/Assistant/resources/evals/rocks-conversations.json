@@ -1,0 +1,60 @@
+[
+    {
+        "question": "איזו טבעת עד 3000 ש\" מתאימה לנשיואים?",
+        "note": "Rocks, 28.10: the first turn of a conversation that lost its budget. Typed with its slips, as the shopper did.",
+        "expect": {"outcome": "answered", "picks_max_price": 3000, "picks_title_any": ["טבעת"]}
+    },
+    {
+        "question": "איזה עד טבעות לנישואים עם יהלום אחד יש עד 3000 ש\"ח",
+        "note": "Rocks, 28.10: the second turn, asked as a question of its own.",
+        "expect": {"outcome": "answered", "picks_max_price": 3000, "picks_say_any": ["יהלום"]}
+    },
+    {
+        "question": "יש משהו עם זהב צהב?",
+        "thread": [
+            {"q": "איזו טבעת עד 3000 ש\" מתאימה לנשיואים?", "a": "במחיר שביקשת, הזול ביותר שבמלאי מבין מה שמצאנו: טבעת וינטג' בצורת מרקיזה משובצת קמאו - מק\"ט 35235, זהב 10K."},
+            {"q": "איזה עד טבעות לנישואים עם יהלום אחד יש עד 3000 ש\"ח", "a": "במחיר שביקשת, יש לנו טבעת סוליטר עדינה משובצת יהלום בחיתוך עגול - מק\"ט 51436, זהב 14K, ב-₪1,250. זו טבעת עם יהלום אחד, במראה מינימליסטי וזהב לבן 14 קארט."}
+        ],
+        "note": "Rocks, 28.10: a reply that narrows the request to yellow gold. The budget and the one diamond hold; a ring at ₪3,300 was shown.",
+        "expect": {"picks_max_price": 3000, "picks_say_any": ["זהב צהוב", "צהוב"]}
+    },
+    {
+        "question": "אני צריך מאותו סוג זהב אבל טבעת שמתאימה להצעת נישואים",
+        "thread": [
+            {"q": "איזו טבעת עד 3000 ש\" מתאימה לנשיואים?", "a": "במחיר שביקשת, הזול ביותר שבמלאי מבין מה שמצאנו: טבעת וינטג' בצורת מרקיזה משובצת קמאו - מק\"ט 35235, זהב 10K."},
+            {"q": "איזה עד טבעות לנישואים עם יהלום אחד יש עד 3000 ש\"ח", "a": "במחיר שביקשת, יש לנו טבעת סוליטר עדינה משובצת יהלום בחיתוך עגול - מק\"ט 51436, זהב 14K, ב-₪1,250. זו טבעת עם יהלום אחד, במראה מינימליסטי וזהב לבן 14 קארט."},
+            {"q": "יש משהו עם זהב צהב?", "a": "כן, יש לנו טבעות בזהב צהוב. אם אתם מחפשים טבעת בזהב צהוב, טבעת הוינטג' משובצת אבני אמטיסט, טבעת הוינטג' משובצת אבני אופל, וטבעת הוינטג' המשובצת רובי ויהלומים הן כולן בזהב צהוב."}
+        ],
+        "note": "Rocks, 28.10: the fourth turn. Rings at ₪12,000 and ₪14,500 were shown for a budget of ₪3,000, and the checker, given the reply alone, let them through. Took 16 s.",
+        "expect": {"picks_max_price": 3000, "picks_say_any": ["זהב צהוב", "צהוב"]}
+    },
+    {
+        "question": "ומה עם עד 5000?",
+        "thread": [
+            {"q": "איזה עד טבעות לנישואים עם יהלום אחד יש עד 3000 ש\"ח", "a": "במחיר שביקשת, יש לנו טבעת סוליטר עדינה משובצת יהלום בחיתוך עגול - מק\"ט 51436, זהב 14K, ב-₪1,250. זו טבעת עם יהלום אחד, במראה מינימליסטי וזהב לבן 14 קארט."}
+        ],
+        "note": "A reply that moves the budget: its own price holds, not the conversation's.",
+        "expect": {"outcome": "answered", "picks_max_price": 5000, "picks_say_any": ["יהלום"]}
+    },
+    {
+        "question": "ומה לגבי משלוחים?",
+        "thread": [
+            {"q": "איזה עד טבעות לנישואים עם יהלום אחד יש עד 3000 ש\"ח", "a": "במחיר שביקשת, יש לנו טבעת סוליטר עדינה משובצת יהלום בחיתוך עגול - מק\"ט 51436, זהב 14K, ב-₪1,250."}
+        ],
+        "note": "A reply that asks something new: answered from the store's pages, no ring picked for it.",
+        "expect": {"outcome": "answered", "picks_max": 0, "contains": ["משלוח"]}
+    },
+    {
+        "question": "איך אפשר ליצור קשר עם השירות לקוחות?",
+        "note": "Rocks, 28.10: answered from the contact page; the hours and the phone as the page gives them.",
+        "expect": {"outcome": "answered", "picks_max": 0}
+    },
+    {
+        "question": "יש משהו עם זהב צהב?",
+        "thread": [
+            {"q": "יש לכם טבעות סוליטר?", "a": "כן, יש לנו טבעות סוליטר משובצות יהלום בזהב לבן ובזהב צהוב."}
+        ],
+        "note": "The same reply after a question without a budget: no price holds, only the kind and the colour.",
+        "expect": {"outcome": "answered", "picks_say_any": ["זהב צהוב", "צהוב"], "picks_title_any": ["טבעת"]}
+    }
+]
