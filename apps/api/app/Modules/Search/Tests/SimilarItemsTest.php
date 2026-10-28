@@ -333,6 +333,27 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'its reader saw no print on 302; 303, read before it said, still goes by its words');
     }
 
+    public function test_a_book_or_a_bundle_of_books_has_its_alike_by_content_unless_the_shop_chose_its_pictures(): void
+    {
+        // Sela Meir, 28.10: "ספרי השבעה באוקטובר" had "ספרי דאגלס מאריי" for its alike: two collages of three covers look
+        // alike, and say nothing of what the books are about.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        $this->travel(2)->seconds();
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', '301')->update(['title' => 'ספרי השבעה באוקטובר']));
+        LoadedIndex::forget();
+
+        $this->similar('301')->assertOk();
+        $this->assertSame(['picture' => 0, 'text' => 1], $this->asked, 'a bundle of books: by content alone, its covers never asked');
+
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', '302')->update(['payload' => ['product_type' => 'Books']]));
+        LoadedIndex::forget();
+        $this->similar('302')->assertOk();
+        $this->assertSame(['picture' => 0, 'text' => 2], $this->asked, 'filed as a book: the same');
+
+        $this->similar('303')->assertOk();
+        $this->assertSame(['picture' => 1, 'text' => 3], $this->asked, 'a sneaker: its picture asked, as the shop chose');
+    }
+
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void
     {
         // A bookshop whose bundles look alike: by content alone, the pictures never asked.

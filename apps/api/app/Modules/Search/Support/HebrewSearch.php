@@ -684,9 +684,47 @@ final class HebrewSearch
         $text = mb_strtolower((string) $text, 'UTF-8');
         $text = (string) preg_replace('/[\x{0591}-\x{05C7}]/u', '', $text);
         $text = (string) preg_replace('/[\x{05F3}\x{05F4}\'"`]/u', '', $text);
-        $text = strtr($text, self::FINALS);
+        $text = self::dates(strtr($text, self::FINALS));
 
         return trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text));
+    }
+
+    /** The months, as the day before them is written in digits. */
+    private const MONTHS = ['ינואר' => 1, 'פברואר' => 2, 'מרצ' => 3, 'מרס' => 3, 'אפריל' => 4, 'מאי' => 5, 'יוני' => 6, 'יולי' => 7, 'אוגוסט' => 8, 'ספטמבר' => 9, 'אוקטובר' => 10, 'נובמבר' => 11, 'דצמבר' => 12];
+
+    /** A day said in words before a month: its ordinal and its number, as normalized (no final letters). */
+    private const DAY_WORDS = ['ראשונ' => 1, 'אחד' => 1, 'שני' => 2, 'שניימ' => 2, 'שנימ' => 2, 'שלישי' => 3, 'שלושה' => 3, 'רביעי' => 4, 'ארבעה' => 4, 'חמישי' => 5, 'חמישה' => 5,
+        'שישי' => 6, 'שישה' => 6, 'שביעי' => 7, 'שבעה' => 7, 'שמיני' => 8, 'שמונה' => 8, 'תשיעי' => 9, 'תשעה' => 9, 'עשירי' => 10, 'עשרה' => 10];
+
+    /** What a number before a point is not a date in front of: a measure ("4.5 ממ"), a size, a product of sizes. */
+    private const NOT_A_DATE = '(?!\s*(?:ממ|סמ|מטר|מל|ליטר|קג|גרמ|גר|אינצ|מ|mm|cm|m|kg|g|ml|l|in|x|×|\*)(?:\s|$))';
+
+    /**
+     * A date is one thing however it is written: "7.10", "7/10", "ה-7 באוקטובר", "7 באוקטובר", "השביעי באוקטובר" and
+     * "שבעה באוקטובר" are all "7 אוקטובר", so a bookshop's "גבורה ותקומה אחרי 7.10" is found by "השביעי לאוקטובר"
+     * (Sela Meir, 28.10: only the product whose picture read "שביעי באוקטובר" held both words, and it stood alone). A
+     * number before a point followed by a measure ("4.5 ממ", "10.5 cm") is a size, not a date. Same in the browser
+     * (hebrew-search-engine.js dates()); change both.
+     */
+    public static function dates(string $text): string
+    {
+        $months = implode('|', array_keys(self::MONTHS));
+        $byNumber = array_flip(self::MONTHS);
+        $days = implode('|', array_keys(self::DAY_WORDS));
+        // "7.10", "7/10", "7.10.23", "7.10.2023": day 1–31, month 1–12, not a measure, not part of a longer number
+        $text = (string) preg_replace_callback('~(^|[^\p{L}\p{N}.])(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?(?![\d.])'.self::NOT_A_DATE.'~u', function (array $m) use ($byNumber): string {
+            $day = (int) $m[2];
+            $month = (int) $m[3];
+
+            return $day >= 1 && $day <= 31 && isset($byNumber[$month]) ? $m[1].$day.' '.$byNumber[$month].(isset($m[4]) && $m[4] !== '' ? ' '.$m[4] : '') : $m[0];
+        }, $text);
+
+        // "ה-7 באוקטובר", "7 באוקטובר", "השביעי באוקטובר", "שבעה לאוקטובר": the day in digits, the month bare
+        return (string) preg_replace_callback('~(^|[^\p{L}\p{N}])ה?-?(?:(\d{1,2})|('.$days.'))\s+[בל]?('.$months.')(?![\p{L}\p{N}])~u', function (array $m): string {
+            $day = $m[2] !== '' ? (int) $m[2] : self::DAY_WORDS[$m[3]];
+
+            return $day >= 1 && $day <= 31 ? $m[1].$day.' '.$m[4] : $m[0];
+        }, $text);
     }
 
     /**

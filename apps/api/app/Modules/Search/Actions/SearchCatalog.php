@@ -839,6 +839,17 @@ final class SearchCatalog
         return array_values(array_filter($externalIds, fn (string $id): bool => self::printed($theirs->get($id)) === $printed));
     }
 
+    /** What a product is read as being, when it is a thing that is read: by its title's first word, its type or its categories. */
+    private const READ = '/(^|[^\p{L}])(ספר|ספרי|ספרימ|ספרונ|ספרוני|ספרונימ|רומנ|רומנימ|מגזינ|מגזינימ|חוברת|חוברות|books?|novels?|e-?books?|audiobooks?|magazines?)([^\p{L}]|$)/iu';
+
+    /** A book, a bundle of books, a magazine: a thing that is read, whose cover says nothing of what it is about. */
+    private static function isRead(CatalogProduct $product): bool
+    {
+        $said = [HebrewSearch::normalize($product->title), HebrewSearch::normalize((string) ($product->payload['product_type'] ?? '')), ...array_map(fn ($c): string => HebrewSearch::normalize((string) $c->name), $product->categories->all())];
+
+        return preg_match(self::READ, (string) explode(' ', $said[0])[0]) === 1 || preg_match(self::READ, implode(' ', array_slice($said, 1))) === 1;
+    }
+
     /** Whether a picture shows a print: by its words, unless its reader saw none (caption v8); no picture, none. */
     private static function printed(?RetrievalImage $row): bool
     {
@@ -1098,7 +1109,7 @@ final class SearchCatalog
 
         return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour, $wants, &$others): array {
             $index = LoadedIndex::for($shopId);
-            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'external_id', 'title', 'payload']);
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->with('categories:id,name')->first(['id', 'shop_id', 'external_id', 'title', 'payload']);
 
             if ($index === null || $product === null || $limit < 1) {
                 return [];
@@ -1107,8 +1118,11 @@ final class SearchCatalog
             // Read now, from what the store sells now: the pictures that look alike and the products that
             // mean the same, ranked together. More than shown are read: those of another kind are left out.
             // As the shop chose (search.similar_by): by content, by picture, or both. A store whose covers look
-            // alike (a bundle of books beside another bundle) asks by content alone.
+            // alike (a bundle of books beside another bundle) asks by content alone; a book, a bundle of books or
+            // another thing that is read is by content unless the shop chose its pictures itself: its cover says nothing of
+            // what it is about (Sela Meir, 28.10: a bundle on 7.10 had another bundle, on Douglas Murray, for its alike).
             $by = (string) Settings::get('search.similar_by', $shopId);
+            $by = $by === 'both' && self::isRead($product) ? 'meaning' : $by;
             // in another colour, a wider pool: most of the nearest are of its own colour, and they go
             $pool = $limit * ($otherColour || $wants !== null ? 12 : 4);
             $pool = $by === 'meaning' ? $pool : max($pool, self::LOOKS_POOL);

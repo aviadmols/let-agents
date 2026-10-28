@@ -68,6 +68,36 @@ final class HebrewSearchTest extends TestCase
         $this->assertSame(HebrewSearch::stem('קופסה'), HebrewSearch::stem('קופסא'), 'and an ending written with א');
     }
 
+    public function test_a_date_is_one_thing_however_it_is_written_on_the_server_and_in_the_browser(): void
+    {
+        // Sela Meir, 28.10: "השביעי לאוקטובר" found only the bundle whose picture read "שביעי באוקטובר", and it stood
+        // alone; the books filed under "גבורה ותקומה אחרי 7.10" and "להבין את ה-7 באוקטובר" held "7", not "שביעי".
+        $cases = [
+            'השביעי לאוקטובר' => '7 אוקטובר', '7.10' => '7 אוקטובר', '7/10' => '7 אוקטובר', 'ה-7 באוקטובר' => '7 אוקטובר', 'שבעה באוקטובר' => '7 אוקטובר',
+            'גבורה ותקומה אחרי 7.10' => 'גבורה ותקומה אחרי 7 אוקטובר', 'להבין את ה-7 באוקטובר' => 'להבינ את 7 אוקטובר', '7.10.23' => '7 אוקטובר 23', '1/5/2024' => '1 מאי 2024',
+            'ספרי השבעה באוקטובר' => 'ספרי 7 אוקטובר', 'הראשון בינואר' => '1 ינואר',
+            // a measure, a product of sizes, a version: no date
+            '4.5 מ"מ' => '4 5 ממ', '10.5 cm' => '10 5 cm', '19x120 מ"מ' => '19x120 ממ', '3.14.1' => '3 14 1', '32.10' => '32 10',
+        ];
+
+        foreach ($cases as $text => $expected) {
+            $this->assertSame($expected, HebrewSearch::normalize($text), $text);
+        }
+
+        $node = (new ExecutableFinder)->find('node');
+
+        if ($node === null) {
+            $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
+        }
+
+        $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const c='.json_encode(array_keys($cases), JSON_UNESCAPED_UNICODE).';'
+            .'process.stdout.write(JSON.stringify(c.map(t=>e.normalize(t))));';
+        $process = new Process([$node, '-e', $harness]);
+        $process->mustRun();
+
+        $this->assertSame(array_values($cases), json_decode($process->getOutput(), true), 'the browser reads dates as the server does');
+    }
+
     public function test_the_query_as_a_whole_word_comes_before_it_inside_a_longer_word(): void
     {
         // A book store's "הרבי": the book about the Rebbe, not "הרביעייה" that only starts with the letters.
