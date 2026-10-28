@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\ReadSitePages;
 use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,5 +69,31 @@ final class SitePagesTest extends TestCase
         $again = app(ReadSitePages::class)->handle($shop->id);
 
         $this->assertSame([0, 2, 1], [$again->output['new'], $again->output['same'], $again->output['removed']], 'the sizes guide left the site');
+    }
+
+    public function test_a_products_own_page_is_no_site_page_and_a_page_keeps_its_picture(): void
+    {
+        // Gil Travel, 28.10: its tours came twice in the search, as offers and again as pages with no picture
+        $shop = Shop::factory()->create(['domain' => 'tours.test']);
+        $routes = [
+            'https://tours.test/sitemap.xml' => Http::response('<?xml version="1.0"?><urlset><url><loc>https://tours.test/tours/israel-10/</loc></url><url><loc>https://tours.test/israel-map/</loc></url></urlset>'),
+            'https://tours.test/tours/israel-10/' => Http::response('<html><body><main><h1>Israel 10 days</h1><p>'.str_repeat('Ten days from Jerusalem to the Red Sea. ', 8).'</p></main></body></html>'),
+            'https://tours.test/israel-map/' => Http::response('<html><head><meta property="og:image" content="https://tours.test/map.jpg"></head><body><main><h1>Israel Map</h1><p>'.str_repeat('Where each tour goes, on one map. ', 8).'</p></main></body></html>'),
+        ];
+        Http::fake(fn ($request) => $routes[(string) $request->url()] ?? Http::response('', 404));
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => '10', 'type' => 'simple', 'status' => 'publish', 'title' => 'Israel 10 days',
+                'url' => 'https://tours.test/tours/israel-10/', 'price' => null, 'in_stock' => true, 'purchasable' => false, 'hash' => 'h10', 'payload' => []]);
+            // read as a page before products were told apart
+            CatalogContent::query()->create(['shop_id' => $shop->id, 'type' => CatalogContent::PAGE, 'external_id' => ReadSitePages::PREFIX.substr(hash('sha256', 'tours.test/tours/israel-10'), 0, 24),
+                'title' => 'Israel 10 days', 'url' => 'https://tours.test/tours/israel-10/', 'body' => 'x', 'hash' => 'old']);
+        });
+
+        $run = app(ReadSitePages::class)->handle($shop->id);
+
+        $pages = app(TenantContext::class)->run($shop->id, fn () => CatalogContent::query()->whereNull('removed_at')->get()->keyBy('title'));
+        $this->assertSame(['Israel Map'], $pages->keys()->all(), 'the tour is its offer, not a page too');
+        $this->assertSame('https://tours.test/map.jpg', $pages['Israel Map']->image_url, 'its picture as it is shared');
+        $this->assertSame(1, $run->output['skipped']);
     }
 }

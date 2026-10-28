@@ -1428,6 +1428,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                     return;
                 }
 
+                // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
+                $answer = self::endsWhole($answer);
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
                 // what it recommends by name that is none of its products ("שיטאקה"): only names the answer, as checked, still says
                 $names = $refusal === null ? self::names($reply->data['names'] ?? null, $answer) : [];
@@ -2565,6 +2567,48 @@ final class AnswerSiteQuestion implements TriesQuestions
         return null;
     }
 
+    /**
+     * An answer that stops in the middle of a sentence ("…and bring in local travel professio") ends at its last whole
+     * sentence instead, where that keeps half of it or more; else it is as it was (a short answer may end with no full
+     * stop). One that ends as a sentence does (a full stop, a question or exclamation mark, a colon before a list, a
+     * closing quote) is as it was.
+     */
+    public static function endsWhole(string $answer): string
+    {
+        $text = rtrim($answer);
+        // a cut comes in a long answer: a short one with no full stop is as it was ("Try the classic band")
+        if (mb_strlen($text) < 300 || preg_match('/[.!?…:)"״\'׳”»\]]$/u', $text) === 1) {
+            return $answer;
+        }
+        if (preg_match_all('/[.!?…](?=\s|$)/u', $text, $ends, PREG_OFFSET_CAPTURE) > 0) {
+            $last = end($ends[0]);
+            $cut = substr($text, 0, $last[1] + strlen($last[0]));
+            if (mb_strlen($cut) >= mb_strlen($text) * 0.5) {
+                return $cut;
+            }
+        }
+
+        return $answer;
+    }
+
+    /** The most products of an answer's set kept with its ask: what the team reads, not the whole list. */
+    private const SHOWN_KEPT = 24;
+
+    /**
+     * The products an answer showed besides its picks, as external ids: those its words named, then a set it listed.
+     *
+     * @param  array<string, mixed>  $result
+     * @return list<string>
+     */
+    private static function shownBy(array $result): array
+    {
+        $picked = array_flip(array_map(fn (array $p): string => (string) $p['external_id'], (array) ($result['picks'] ?? [])));
+        $ids = [...(array) ($result['named']['ids'] ?? []), ...(array) ($result['set']['ids'] ?? [])];
+        $ids = array_map(fn ($id): string => str_starts_with((string) $id, 'p:') ? substr((string) $id, 2) : (string) $id, $ids);
+
+        return array_slice(array_values(array_unique(array_filter($ids, fn (string $id): bool => $id !== '' && ! isset($picked[$id])))), 0, self::SHOWN_KEPT);
+    }
+
     private function logged(string $shopId, string $question, array $products, array $result): array
     {
         $whatsapp = $result['outcome'] !== AssistantAnswer::ANSWERED && $result['outcome'] !== 'invalid'
@@ -2606,6 +2650,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             'answer' => ($result['answer_id'] ?? null) === null && $result['outcome'] === AssistantAnswer::ANSWERED
                 ? mb_substr(Privacy::redact((string) ($result['answer'] ?? ''))['text'], 0, 2000) : null,
             'picks' => array_map(fn (array $p): array => ['external_id' => $p['external_id'], 'title' => $p['title'], 'why' => $p['why']], (array) ($result['picks'] ?? [])),
+            // every other product the answer showed: those its words named, and a set it listed (the team reads them)
+            'shown' => self::shownBy($result) ?: null,
             'whatsapp_shown' => $whatsapp,
             // How it was answered (ask()), and why it failed as code reads it; the nightly review may add its own.
             ...($this->answered ?? []),

@@ -253,28 +253,47 @@ final class ShopQuestions extends OperatorShopQuestions
     }
 
     /**
-     * The products a shopper was shown with an answer, by their names: those the answer picked (with why), else those
-     * listed with it; each marked when the shopper opened or added it.
+     * The products the answer showed the shopper, as the store has them now: its picks first (with why), then the others
+     * it showed (named in its words, or a set it listed); each marked when the shopper opened or added it. Never the
+     * results that were on screen before the question: those were not the answer's.
      *
-     * @return list<array{title: string, url: string|null, opened: bool}>
+     * @return list<array{title: string, url: string|null, image: string|null, price: string|null, why: string|null, opened: bool}>
      */
     private static function shownWith(AssistantSearchAsk $ask): array
     {
         $opened = array_flip(array_map('strval', (array) $ask->picked));
         $picks = array_values(array_filter((array) $ask->picks, 'is_array'));
-        $ids = $picks !== [] ? array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $picks) : array_map('strval', (array) $ask->products);
-        $ids = array_values(array_filter($ids, fn (string $id): bool => $id !== ''));
+        $why = array_column($picks, 'why', 'external_id');
+        $ids = [...array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $picks), ...array_map('strval', (array) ($ask->shown ?? []))];
+        $ids = array_slice(array_values(array_unique(array_filter($ids, fn (string $id): bool => $id !== ''))), 0, self::SHOWN_MAX);
         if ($ids === []) {
             return [];
         }
-        $products = CatalogProduct::query()->whereIn('external_id', $ids)->get(['external_id', 'title', 'url'])->keyBy('external_id');
+        $products = CatalogProduct::query()->whereIn('external_id', $ids)->get(['external_id', 'title', 'url', 'image_url', 'price', 'currency'])->keyBy('external_id');
         $titles = array_column($picks, 'title', 'external_id');
 
-        return array_values(array_filter(array_map(fn (string $id): array => [
-            'title' => trim((string) ($products[$id]->title ?? $titles[$id] ?? '')),
-            'url' => $products[$id]->url ?? null,
-            'opened' => isset($opened[$id]),
-        ], array_slice($ids, 0, 12)), fn (array $p): bool => $p['title'] !== ''));
+        return array_values(array_filter(array_map(function (string $id) use ($products, $titles, $why, $opened): array {
+            $product = $products[$id] ?? null;
+
+            return [
+                'title' => trim((string) ($product->title ?? $titles[$id] ?? '')),
+                'url' => $product?->url,
+                'image' => $product?->image_url,
+                'price' => $product?->price === null ? null : self::money((float) $product->price, (string) ($product->currency ?? '')),
+                'why' => isset($why[$id]) && trim((string) $why[$id]) !== '' ? trim((string) $why[$id]) : null,
+                'opened' => isset($opened[$id]),
+            ];
+        }, $ids), fn (array $p): bool => $p['title'] !== ''));
+    }
+
+    /** The most products shown with one question in the list. */
+    private const SHOWN_MAX = 12;
+
+    private static function money(float $amount, string $currency): string
+    {
+        $symbol = ['ILS' => '₪', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'][strtoupper($currency)] ?? '';
+
+        return $symbol.number_format($amount, $amount >= 100 || floor($amount) === $amount ? 0 : 2);
     }
 
     /**

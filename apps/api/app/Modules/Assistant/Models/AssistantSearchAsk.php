@@ -15,7 +15,8 @@ use Illuminate\Support\Carbon;
  * @property string $shop_id
  * @property Carbon $day
  * @property string $question
- * @property list<string> $products external ids of the products shown with the question
+ * @property list<string> $products external ids of the products on screen when it was asked (the results before it)
+ * @property list<string>|null $shown external ids of the other products its answer showed: named in its words, or a set it listed
  * @property string $outcome answered, no_match, no_info, out_of_scope, limit or unavailable
  * @property string $from bank, model or none
  * @property string|null $answer_id
@@ -47,6 +48,7 @@ class AssistantSearchAsk extends Model
         return [
             'day' => 'date',
             'products' => 'array',
+            'shown' => 'array',
             'picks' => 'array',
             'picked' => 'array',
             'whatsapp_shown' => 'boolean',

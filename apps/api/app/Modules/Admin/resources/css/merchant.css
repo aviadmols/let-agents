@@ -663,7 +663,7 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-ftag button { width: 18px; height: 18px; border: 0; border-radius: 50%; background: none; color: inherit; opacity: .75; display: grid; place-items: center; cursor: pointer; }
 .fi-panel-merchant .lp-ftag svg { width: 10px; height: 10px; }
 .fi-panel-merchant .lp-chip-quiet { min-height: 24px; padding: 0 8px; font-size: 12px; margin: 2px 0; margin-inline-start: 4px; cursor: default; }
-.fi-panel-merchant .lp-sess { display: flex; gap: 16px; align-items: center; padding: 14px 12px; border-block-end: 1px solid var(--la-line); cursor: pointer; border-radius: 12px; min-width: 0; }
+.fi-panel-merchant .lp-sess { display: flex; gap: 16px; align-items: center; padding: 14px 12px; border-block-end: 1px solid var(--la-line); cursor: pointer; border-radius: 0; min-width: 0; }
 .fi-panel-merchant .lp-sess.is-on { background: var(--la-sunk); }
 .fi-panel-merchant .lp-sess-when { flex: none; width: 64px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; font-size: 13px; }
 .fi-panel-merchant .lp-sess-when b { font-weight: 500; color: var(--la-ink); }

@@ -59,13 +59,18 @@
                     @if (($row['products'] ?? []) !== [])
                         <div style="display: grid; gap: 6px; margin-top: 10px" data-answer-products>
                             <span class="lp-note">{{ $t('products_shown') }}</span>
-                            <div class="lp-chips">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px">
                                 @foreach ($row['products'] as $product)
-                                    @if ($product['url'])
-                                        <a class="lp-chip" href="{{ $product['url'] }}" target="_blank" rel="noopener" dir="auto" style="min-height: 30px; font-size: 13px; text-decoration: none; {{ $product['opened'] ? 'box-shadow: inset 0 0 0 1.5px var(--la-ink);' : '' }}">{{ $product['title'] }}@if ($product['opened'])<b style="font-weight: 600">· {{ $t('opened') }}</b>@endif</a>
-                                    @else
-                                        <span class="lp-chip" dir="auto" style="cursor: default; min-height: 30px; font-size: 13px">{{ $product['title'] }}</span>
-                                    @endif
+                                    <a href="{{ $product['url'] ?: '#' }}" target="_blank" rel="noopener" style="display: grid; gap: 6px; color: inherit; text-decoration: none" data-answer-product>
+                                        <span style="display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--la-sunk); {{ $product['opened'] ? 'box-shadow: 0 0 0 2px var(--la-ink);' : '' }}">
+                                            @if ($product['image'])<img src="{{ $product['image'] }}" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover">@endif
+                                        </span>
+                                        <span dir="auto" style="font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{ $product['title'] }}</span>
+                                        @if ($product['price'] || $product['opened'])
+                                            <span style="font-size: 12.5px; color: var(--la-muted)">{{ $product['price'] }}@if ($product['price'] && $product['opened']) · @endif @if ($product['opened'])<b style="color: var(--la-ink); font-weight: 600">{{ $t('opened') }}</b>@endif</span>
+                                        @endif
+                                        @if ($product['why'])<span dir="auto" style="font-size: 12px; color: var(--la-muted); line-height: 1.4">{{ $product['why'] }}</span>@endif
+                                    </a>
                                 @endforeach
                             </div>
                         </div>

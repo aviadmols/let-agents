@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Core\Text\HtmlText;
 use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Support\StoreRest;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -103,6 +104,11 @@ final class ReadSitePages
         // The feed's own pages and posts by address: not read twice.
         $fed = CatalogContent::query()->whereNull('removed_at')->where('external_id', 'not like', CatalogContent::OWN_PREFIX.'%')
             ->whereNotNull('url')->pluck('url')->map(fn ($u): string => self::norm((string) $u))->flip();
+        // nor a product's own page: a tour read as an offer is no page of the site too (Gil Travel, 28.10: every tour
+        // came twice in the search, once as a page with no picture)
+        $fed = $fed->union(CatalogProduct::query()->whereNull('removed_at')->whereNotNull('url')->pluck('url')->map(fn ($u): string => self::norm((string) $u))->flip());
+        // a page read before that the feed now brings as its own: its copy here goes
+        $theirs = [];
         $mine = CatalogContent::query()->where('external_id', 'like', self::PREFIX.'%')->get()->keyBy('external_id');
         $limit = (int) Settings::get('catalog.site_pages_per_run', $shopId);
         $seen = [];
@@ -115,6 +121,7 @@ final class ReadSitePages
 
             if (isset($fed[self::norm($url)])) {
                 $counts['skipped']++;
+                $theirs[$id] = true;
 
                 continue;
             }
@@ -154,13 +161,17 @@ final class ReadSitePages
 
             if ($had !== null && $had->hash === $hash && $had->removed_at === null) {
                 $counts['same']++;
+                // the same words: still the page's picture where it had none (read before pictures were kept); no change
+                if (($page['image'] ?? null) !== null && $had->image_url !== $page['image']) {
+                    $had->forceFill(['image_url' => $page['image']])->saveQuietly();
+                }
 
                 continue;
             }
 
             CatalogContent::query()->updateOrCreate(['external_id' => $id], [
                 'shop_id' => $shopId, 'type' => CatalogContent::PAGE, 'title' => mb_substr($page['title'], 0, 250), 'url' => mb_substr($url, 0, 1000),
-                'excerpt' => mb_substr($page['text'], 0, 300), 'body' => $page['text'], 'terms' => [], 'product_external_ids' => [],
+                'excerpt' => mb_substr($page['text'], 0, 300), 'body' => $page['text'], 'image_url' => $page['image'] ?? null, 'terms' => [], 'product_external_ids' => [],
                 'hash' => $hash, 'synced_at' => now(), 'removed_at' => null,
             ]);
             $counts[$had === null ? 'new' : 'changed']++;
@@ -172,7 +183,7 @@ final class ReadSitePages
             }
 
             // Kept before locks were told apart: a lock page's words are no page of the store.
-            if (StorefrontLock::text($page->title."\n".$page->body)) {
+            if (StorefrontLock::text($page->title."\n".$page->body) || isset($theirs[$id])) {
                 $page->forceFill(['removed_at' => now()])->save();
                 $counts['cleared']++;
             } elseif (! isset($seen[$id]) && $this->locked === null) {
@@ -260,7 +271,7 @@ final class ReadSitePages
     /**
      * A page's heading and its main text, structure kept; null when it cannot be read or says too little.
      *
-     * @return array{title: string, text: string}|null
+     * @return array{title: string, text: string, image: string|null}|null
      */
     private function page(string $url, string $host): ?array
     {
@@ -270,6 +281,11 @@ final class ReadSitePages
             return null;
         }
 
+        // the picture the page gives when it is shared (og:image): its picture in the search, never a blank square
+        $image = preg_match('~<meta[^>]+property=["\']og:image(?::url)?["\'][^>]+content=["\']([^"\']+)["\']~iu', $html, $og) === 1
+            || preg_match('~<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image(?::url)?["\']~iu', $html, $og) === 1
+            ? html_entity_decode(trim($og[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8') : null;
+        $image = $image !== null && preg_match('~^https?://~i', $image) === 1 ? mb_substr($image, 0, 1000) : null;
         $html = (string) preg_replace('~<(script|style|noscript|svg|form|iframe)\b.*?</\1>~siu', ' ', $html);
         $main = preg_match('~<main\b[^>]*>(.*?)</main>~siu', $html, $m) === 1 ? $m[1]
             : (preg_match('~<article\b[^>]*>(.*?)</article>~siu', $html, $a) === 1 ? $a[1] : $html);
@@ -278,7 +294,7 @@ final class ReadSitePages
         $title = trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($title), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $text = HtmlText::from($main);
 
-        return mb_strlen($text) < self::MIN_CHARS || $title === '' ? null : ['title' => $title, 'text' => mb_substr($text, 0, 60_000)];
+        return mb_strlen($text) < self::MIN_CHARS || $title === '' ? null : ['title' => $title, 'text' => mb_substr($text, 0, 60_000), 'image' => $image];
     }
 
     /** The last fetch found the site struggling (StoreRest): no answer, a server error, or "too many requests". */
