@@ -137,8 +137,15 @@ final class CatalogProductKinds implements ProductKinds
             return $externalIds;
         }
 
-        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $externalIds)->get(['id', 'external_id', 'title', 'brand', 'payload'])
+        $others = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $externalIds)->with('categories:id,name')->get(['id', 'external_id', 'title', 'brand', 'payload'])
             ->keyBy(fn (CatalogProduct $p): string => (string) $p->external_id);
+
+        // A thing that is read is of one kind with every other: a bookshop's categories (an imprint, a publisher, the
+        // bestsellers, the newest) file its books, they do not say what each is; what a book is about is for the ranking
+        // by tags and by meaning to tell (Sela Meir, 28.10: a bundle filed under its imprint had no alike at all).
+        if ($this->isRead($product)) {
+            return array_values(array_filter($externalIds, fn (string $id): bool => ($other = $others->get($id)) !== null && $this->isRead($other)));
+        }
         $audience = self::audience($product);
         $prefixes = $counts['prefix'];
 

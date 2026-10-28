@@ -201,6 +201,9 @@ final class ProductKindsTest extends TestCase
             $same = app(ProductKinds::class)->sameKind($p[0], ['2', '3', '4', '6'], $near);
             $this->assertSame(['2', '3', '4', '6'], $same, 'all biographies, whatever word each title opens with');
             $this->assertSame([], $near);
+            // a bundle filed under its imprint, not under the biographies: a book is of one kind with every book
+            $this->assertSame(['1', '2', '6'], app(ProductKinds::class)->sameKind($p[4], ['1', '2', '6'], $near));
+            $this->assertSame([], $near);
         });
     }
 
