@@ -5,6 +5,7 @@ namespace App\Modules\Retrieval;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\ScanProgress;
 use App\Modules\Admin\Contracts\ShopFacts;
+use App\Modules\Catalog\Events\CatalogLinksMoved;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Retrieval\Actions\CaptionImages;
@@ -23,6 +24,7 @@ use App\Modules\Retrieval\Contracts\RefreshesVectors;
 use App\Modules\Retrieval\Contracts\RunsRetrieval;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Contracts\TopicQuestions;
+use App\Modules\Retrieval\Listeners\MovePictureLinks;
 use App\Modules\Retrieval\Listeners\RefreshVectors;
 use App\Modules\Retrieval\Sources\ContentDocuments;
 use App\Modules\Retrieval\Sources\ProductDocuments;
@@ -74,6 +76,8 @@ final class RetrievalServiceProvider extends ModuleServiceProvider
     {
         // What changed today is searchable by meaning today: a sync queues one refresh of the vectors.
         Event::listen([CatalogUpdated::class, CatalogProductsChanged::class], RefreshVectors::class);
+        // The store moved: its pictures' vectors and captions are kept under their new links, never read again.
+        Event::listen(CatalogLinksMoved::class, MovePictureLinks::class);
 
         // After the catalogue sync (02:30) and before Enrichment's nightly reading (03:10), which
         // turns accepted matches into relations: the index first, then the matching that uses it.

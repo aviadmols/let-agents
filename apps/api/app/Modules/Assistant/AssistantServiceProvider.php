@@ -31,6 +31,7 @@ use App\Modules\Assistant\Console\ReviewAsksCommand;
 use App\Modules\Assistant\Console\WriterBenchCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
 use App\Modules\Assistant\Contracts\TriesQuestions;
+use App\Modules\Assistant\Listeners\MoveAnswerLinks;
 use App\Modules\Assistant\Listeners\ReadShopKnowledge;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\AssistantDailySummaries;
@@ -39,6 +40,7 @@ use App\Modules\Assistant\Support\AssistantReport;
 use App\Modules\Assistant\Support\AssistantShopFacts;
 use App\Modules\Assistant\Support\AssistantTimeline;
 use App\Modules\Assistant\Support\ContentReadAgain;
+use App\Modules\Catalog\Events\CatalogLinksMoved;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -73,6 +75,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
 
         // Every sync, the first included: what the store's pages repeat is read again.
         Event::listen(CatalogUpdated::class, ReadShopKnowledge::class);
+        // The store moved: kept answers send shoppers to its new address.
+        Event::listen(CatalogLinksMoved::class, MoveAnswerLinks::class);
 
         // A team answer to a store question, written, changed, hidden or removed: what the assistant
         // knows about the store follows at once.

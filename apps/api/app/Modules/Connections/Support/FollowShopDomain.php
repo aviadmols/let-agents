@@ -33,7 +33,8 @@ final class FollowShopDomain
                 $parts = parse_url((string) $connection->site_url);
                 $host = strtolower((string) ($parts['host'] ?? ''));
 
-                if ($host !== $old) {
+                // A shop's domain is kept without "www." (CreateShop), its connection as the store is read at.
+                if ((string) preg_replace('/^www\./', '', $host) !== (string) preg_replace('/^www\./', '', $old)) {
                     continue;
                 }
 
