@@ -9,6 +9,14 @@ return [
         'label' => 'How long a lead is kept',
         'description' => 'After this a lead is deleted. A single lead can be deleted at any time too.',
     ],
+    'email_team' => [
+        'label' => 'Email the team about every lead',
+        'description' => 'When somebody leaves their details, the store\'s owners and members get an email with them, what they asked and where.',
+    ],
+    'notify_email' => [
+        'label' => 'Also send leads to',
+        'description' => 'One more email address that gets every lead (a sales inbox). Empty: the team only.',
+    ],
     'form_title' => [
         'label' => 'The heading of leaving details',
         'description' => 'What the shopper reads above the fields when leaving details. Empty for the usual heading.',

@@ -59,6 +59,9 @@ class LeaveDetails extends Page
         return [
             'on' => 'feature:shoppers.callbacks',
             'recent' => 'feature:shoppers.recent_products',
+            // every lead mailed to the team, and to one more address if the shop gives one
+            'email_team' => 'setting:leads.email_team',
+            'notify_email' => 'setting:leads.notify_email',
         ];
     }
 
@@ -93,6 +96,12 @@ class LeaveDetails extends Page
         }
 
         $this->data['fields'] = is_array($this->data['fields'] ?? null) ? $this->data['fields'] : [];
+
+        // the extra address leads go to: an email, or none
+        $this->data['notify_email'] = trim((string) ($this->data['notify_email'] ?? ''));
+        if ($this->data['notify_email'] !== '' && filter_var($this->data['notify_email'], FILTER_VALIDATE_EMAIL) === false) {
+            $this->problems['notify_email'] = __('leads::shop_settings.bad_email');
+        }
     }
 
     protected function saveMore(): void

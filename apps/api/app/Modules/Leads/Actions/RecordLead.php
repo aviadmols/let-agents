@@ -3,6 +3,7 @@
 namespace App\Modules\Leads\Actions;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Leads\Jobs\SendLeadToTeam;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadFlow;
 use App\Modules\Leads\Support\FlowMachine;
@@ -81,6 +82,11 @@ final class RecordLead
                 'visitor_hash' => $visitorHash,
             ],
         ));
+
+        // the store's team is told by mail: a new lead, or the same person's with new details (SendLeadToTeam)
+        if ($lead->wasRecentlyCreated || $lead->wasChanged(['contact', 'answers'])) {
+            SendLeadToTeam::dispatch($shopId, (string) $lead->id);
+        }
 
         return ['lead' => $lead, 'error' => null];
     }

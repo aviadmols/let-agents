@@ -18,6 +18,11 @@ return [
     'promise_tip' => 'The sentence the shopper sees after leaving details. Keep it.',
     'recent' => '"Products you viewed recently"',
     'recent_tip' => 'A row of products the shopper already saw in this visit, at the bottom of the block.',
+    'email_team' => 'Email me every lead',
+    'email_team_tip' => 'The store\x27s owners and members get an email with the details, what was asked and where.',
+    'notify_email' => 'Also send leads to',
+    'notify_email_tip' => 'One more email address, such as a sales inbox. Empty: the team only.',
+    'bad_email' => 'That is not an email address.',
     'too_long' => 'Too long: up to :n characters.',
     'bank' => [
         'phone' => 'Phone',

@@ -60,6 +60,8 @@
             <x-lp::kv-row :label="$t('form_title')" :error="$this->problem('title')"><x-lp::field model="data.title" maxlength="120" /></x-lp::kv-row>
             <x-lp::kv-row :label="$t('promise')" :tip="$t('promise_tip')" :error="$this->problem('promise')"><x-lp::field model="data.promise" maxlength="120" /></x-lp::kv-row>
             <x-lp::kv-row :label="$t('recent')" :tip="$t('recent_tip')"><x-lp::toggle model="data.recent" :label="$t('recent')" /></x-lp::kv-row>
+            <x-lp::kv-row :label="$t('email_team')" :tip="$t('email_team_tip')"><x-lp::toggle model="data.email_team" :label="$t('email_team')" /></x-lp::kv-row>
+            <x-lp::kv-row :label="$t('notify_email')" :tip="$t('notify_email_tip')" :error="$this->problem('notify_email')"><x-lp::field model="data.notify_email" maxlength="190" dir="ltr" /></x-lp::kv-row>
         </x-lp::kv>
     </x-lp::card>
 

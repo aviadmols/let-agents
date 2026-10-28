@@ -47,6 +47,20 @@
             "scope": "shop"
         },
         {
+            "name": "email_team",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "notify_email",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 190,
+            "scope": "shop"
+        },
+        {
             "name": "writer_model",
             "type": "string",
             "default": "gpt-5.4-mini",

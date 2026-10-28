@@ -3,15 +3,20 @@
 namespace App\Modules\Leads\Tests;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Enums\ShopRole;
+use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Leads\Enums\LeadGoal;
+use App\Modules\Leads\Mail\LeadReceivedMail;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadFlow;
 use App\Modules\Leads\Support\FlowMachine;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -156,6 +161,31 @@ final class LeadFlowTest extends TestCase
         $this->postJson("/api/v1/widget/{$this->site}/lead", ['id' => '10', 'type' => 'product'], [
             'Origin' => 'https://somewhere.else',
         ])->assertStatus(403);
+    }
+
+    public function test_the_stores_team_gets_every_lead_by_mail(): void
+    {
+        Mail::fake();
+        $team = [];
+        foreach (['owner@store.test' => ShopRole::Owner, 'member@store.test' => ShopRole::Member, 'viewer@store.test' => ShopRole::Viewer] as $email => $role) {
+            $user = User::factory()->create(['email' => $email]);
+            $user->attachShop($this->shop, $role);
+            $team[] = $user;
+        }
+        Settings::set('leads.notify_email', 'sales@store.test', $this->shop->id);
+
+        $this->step(['phone' => '050-123-4567', 'name' => 'אביעד'], consent: true, asked: 2)->assertOk();
+
+        $sent = Mail::sent(LeadReceivedMail::class)->flatMap(fn (LeadReceivedMail $m) => array_column($m->to, 'address'))->sort()->values()->all();
+        $this->assertSame(['member@store.test', 'owner@store.test', 'sales@store.test'], $sent, 'its owners and members and the address it adds; a viewer only looks');
+        Mail::assertSent(LeadReceivedMail::class, fn (LeadReceivedMail $m): bool => $m->contact === '972501234567' && $m->answers === [['label' => 'שם', 'value' => 'אביעד']] && $m->panelUrl !== null);
+
+        // the same again sends nothing new; turned off, nothing at all
+        $this->step(['phone' => '050-123-4567', 'name' => 'אביעד'], consent: true, asked: 2);
+        Mail::assertSentCount(3);
+        Settings::set('leads.email_team', false, $this->shop->id);
+        $this->step(['phone' => '052-765-4321', 'name' => 'דנה'], consent: true, asked: 2);
+        Mail::assertSentCount(3);
     }
 
     /**
