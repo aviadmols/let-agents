@@ -48,7 +48,10 @@ final class AnswerQuestion
 
     public const ACTION = 'assistant.answer';
 
-    public const PROMPT_VERSION = 4;
+    public const PROMPT_VERSION = 5;
+
+    /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
+    private const STORE_CHARS = 2500;
 
     private const MIN_CHARS = 3;
 
@@ -117,7 +120,8 @@ final class AnswerQuestion
 
             // An answer from an older prompt is asked again: the rules for what shoppers see changed.
             // The team's own answers stay.
-            if ($saved !== null && $saved->prompt_version < self::PROMPT_VERSION && $saved->source !== 'team') {
+            // And one written before the team last changed its own lines: they may answer it now ("all our diamonds are natural").
+            if ($saved !== null && $saved->source !== 'team' && ($saved->prompt_version < self::PROMPT_VERSION || $this->storeLinesChangedSince($saved))) {
                 $saved->delete();
                 $saved = null;
             }
@@ -184,7 +188,10 @@ final class AnswerQuestion
                 $effort = (string) Settings::get('assistant.reasoning_effort');
                 $effort = $effort === 'model_default' ? null : $effort;
 
-                $contextJson = (string) json_encode($subject->context, JSON_UNESCAPED_UNICODE);
+                // what the store's team wrote about the store and all its products holds for this one too
+                $store = $subject->kind === Subject::PRODUCT ? $this->storeLines($shopId) : '';
+                $withStore = $store === '' ? [] : ['store' => $store];
+                $contextJson = (string) json_encode($subject->context, JSON_UNESCAPED_UNICODE).' '.$store;
                 $estimatedInput = (int) ceil(mb_strlen($contextJson) / 2) + 800;
                 /** @var list<array{0: ModelReply, 1: string}> $replies */
                 $replies = [];
@@ -206,7 +213,7 @@ final class AnswerQuestion
                         return;
                     }
 
-                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, 'question' => $question], $maxOutput, $effort, 'answer');
+                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, 'question' => $question], $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
 
                     $answer = mb_substr(trim((string) ($reply->data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
@@ -220,7 +227,7 @@ final class AnswerQuestion
                     };
 
                     if ($refusal === null) {
-                        $check = $this->call($run, $checkModel, $subject->prompt('verify'), [$subject->kind => $subject->context, 'question' => $question, 'answer' => $answer], self::CHECK_OUTPUT_TOKENS, $effort);
+                        $check = $this->call($run, $checkModel, $subject->prompt('verify'), [$subject->kind => $subject->context, ...$withStore, 'question' => $question, 'answer' => $answer], self::CHECK_OUTPUT_TOKENS, $effort);
                         $replies[] = [$check, 'scope'];
 
                         $refusal = match (false) {
@@ -350,6 +357,29 @@ final class AnswerQuestion
         }
 
         return false;
+    }
+
+    /** The lines the store's team wrote in the knowledge centre, as the assistant reads them; empty when none or not read. */
+    private function storeLines(string $shopId): string
+    {
+        if (! Features::enabled('assistant.knowledge', $shopId)) {
+            return '';
+        }
+
+        return mb_substr(trim((string) $this->ownEntry()?->body), 0, self::STORE_CHARS);
+    }
+
+    /** Whether the team changed its own lines after the answer was written. */
+    private function storeLinesChangedSince(AssistantAnswer $saved): bool
+    {
+        $changed = $this->ownEntry()?->updated_at;
+
+        return $changed !== null && $saved->updated_at !== null && $saved->updated_at->lt($changed);
+    }
+
+    private function ownEntry(): ?CatalogContent
+    {
+        return CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', BuildShopKnowledge::OWN)->first(['id', 'body', 'updated_at']);
     }
 
     private static function prompt(string $name): string

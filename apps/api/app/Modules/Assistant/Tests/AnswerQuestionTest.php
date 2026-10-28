@@ -8,6 +8,7 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerQuestion;
+use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -115,6 +116,26 @@ final class AnswerQuestionTest extends TestCase
         $this->assertSame('האם זה מתאים לחוץ?', $box['suggested'][0], 'what shoppers asked first, then common questions');
         $this->assertCount(4, $box['suggested']);
         $this->assertSame([['question' => 'האם זה מתאים לחוץ?', 'answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'source' => 'store']], $box['recent']);
+    }
+
+    public function test_what_the_team_wrote_about_the_store_answers_on_a_products_page_too(): void
+    {
+        // Rocks, 28.10: "all our diamonds are natural" was in the knowledge centre, and "is this a lab diamond?" asked on
+        // a ring's page was answered from general knowledge, as if the store had not said.
+        $this->model->replies = [['about_product' => true], ['answer' => 'לא מצוין אם הוא טבעי.', 'source' => 'general'], self::VERIFIED];
+        $this->ask('האם זה יהלום מעבדה?');
+        $this->assertStringNotContainsString('"store"', $this->model->calls[1]['user']);
+
+        $this->travel(1)->minutes();
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->addOwn('כל היהלומים באתר שלנו טבעיים לחלוטין.'));
+        $this->model->replies = [['about_product' => true], ['answer' => 'כל היהלומים שלנו טבעיים.', 'source' => 'store'], self::VERIFIED];
+
+        $data = $this->ask('האם זה יהלום מעבדה?')->json('data');
+        $this->assertSame(['model', 'store', 'כל היהלומים שלנו טבעיים.'], [$data['from'], $data['source'], $data['answer']], 'written again: the team changed its lines since');
+        $writer = (array) json_decode($this->model->calls[4]['user'], true);
+        $checker = (array) json_decode($this->model->calls[5]['user'], true);
+        $this->assertStringContainsString('טבעיים לחלוטין', (string) ($writer['store'] ?? ''), "the writer reads the team's lines");
+        $this->assertStringContainsString('טבעיים לחלוטין', (string) ($checker['store'] ?? ''), "and the checker, so the store's word is no unsupported claim");
     }
 
     public function test_the_writer_reads_the_products_card_without_its_prices_or_stock(): void
