@@ -14,7 +14,13 @@
                         @elseif ($isNew)
                             <span class="la-badge" data-tone="warn"><i></i>{{ __('runs::first_scan.badge_new') }}</span>
                         @endif
-                        <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{ __($running ? 'runs::first_scan.title_running' : ($first ? 'runs::first_scan.title_new' : 'runs::first_scan.title')) }}</h2>
+                        <h2 style="margin: 0; font-size: 18px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px">
+                            {{-- the Lets mark, turning over like an hourglass while the store is read --}}
+                            @if ($running)
+                                <span class="lp-onb-mark is-think" aria-hidden="true" style="--s: 20px; color: var(--la-ink)" data-scan-thinking><i></i><i></i></span>
+                            @endif
+                            {{ __($running ? 'runs::first_scan.title_running' : ($first ? 'runs::first_scan.title_new' : 'runs::first_scan.title')) }}
+                        </h2>
                         <p style="margin: 0; color: var(--la-muted); font-size: 14px">
                             @if ($running)
                                 {{ __('runs::first_scan.body_running', ['time' => $state['started']->timezone(config('app.display_timezone', 'Asia/Jerusalem'))->format('H:i')]) }}
@@ -53,8 +59,13 @@
                             <li style="{{ $loop->first ? '' : 'border-block-start: 1px solid var(--la-line-2);' }}" data-step="{{ $step }}" data-state="{{ $at ?? 'idle' }}">
                                 <button type="button" wire:click="toggle('{{ $step }}')" aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
                                     style="all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto 14px; gap: 4px 10px; align-items: center; padding: 10px 14px; font-size: 14px; {{ $isOpen ? 'background: var(--la-sunk);' : '' }}">
-                                    <span class="la-dot" data-tone="{{ ['done' => 'good', 'running' => 'info', 'failed' => 'bad'][$at] ?? '' }}" style="justify-self: center"></span>
-                                    <span style="font-weight: 600">{{ __("runs::first_scan.steps.{$step}") }}</span>
+                                    @if ($at === 'running')
+                                        <span class="lp-onb-mark is-think" aria-hidden="true" style="--s: 14px; color: var(--la-ink); justify-self: center"><i></i><i></i></span>
+                                        <span class="lp-onb-think-t" style="font-weight: 600">{{ __("runs::first_scan.steps.{$step}") }}</span>
+                                    @else
+                                        <span class="la-dot" data-tone="{{ ['done' => 'good', 'failed' => 'bad'][$at] ?? '' }}" style="justify-self: center"></span>
+                                        <span style="font-weight: 600">{{ __("runs::first_scan.steps.{$step}") }}</span>
+                                    @endif
                                     <small style="color: var(--la-muted)">{{ $at && $at !== 'waiting' ? __("runs::first_scan.states.{$at}") : '' }}</small>
                                     <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; fill: none; stroke: var(--la-muted); stroke-width: 2.2; stroke-linecap: round; {{ $isOpen ? 'transform: rotate(180deg)' : '' }}"><path d="M6 9l6 6 6-6"></path></svg>
                                     {{-- the step at work, as it goes: so many of so many, and for how long --}}
