@@ -18,6 +18,11 @@
   // the store's own currency, as the index says it (a site with no Store API: a content site, a demo), its symbol
   // where the language puts it; null for shekels or none, so ₪ stays as it was
   var CUR_AFFIX = {};
+  // "13 products", or on a site that tells about what it offers ("Read more": tours, courses) "13 items"
+  function countText(n) {
+    var items = S.config && S.config.cardAction === 'read_more';
+    return n === 1 ? t(items ? 'oneItem' : 'oneProduct') : t(items ? 'itemsCount' : 'productsCount', { n: n });
+  }
   function storeCurrency() {
     var code = S && S.config && S.config.currency;
     if (!code || code === 'ILS') { return null; }

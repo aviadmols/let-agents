@@ -333,6 +333,18 @@ return [
         'label' => 'Guides and articles after this many products',
         'description' => 'Where the guides and articles a search found are shown among the products. 0: after all of them. On a site with many articles, 4 shows them after the second row.',
     ],
+    'category_filter_max' => [
+        'label' => 'Categories in the filter',
+        'description' => 'How many of the store\'s categories the category filter offers, the most used first. A content site with many destinations or subjects shows more.',
+    ],
+    'store_tag_filter' => [
+        'label' => 'The store\'s tags as a filter',
+        'description' => 'The tags the store gives its products, a filter of their own: those not already a category, each on two products or more.',
+    ],
+    'length_filter' => [
+        'label' => 'Length as a filter',
+        'description' => 'For tours, courses and trips: how many days each lasts, as its title or opening words say it, a filter (1 day, 2 to 5 days…), and "4 days" in a search reads it.',
+    ],
     'image_fit' => [
         'label' => 'Product pictures',
         'description' => 'Fill the square and crop the edges, or show whole inside a light frame (suits pictures on a white ground).',

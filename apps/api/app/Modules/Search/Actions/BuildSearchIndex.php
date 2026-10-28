@@ -137,6 +137,28 @@ final class BuildSearchIndex
      *
      * @return list<string>
      */
+    /**
+     * What the store files a product as (its type, tags and categories), as word stems in any language ("Israel Tours":
+     * "israel", "tour"). Unlike kindStems, Latin words too: an offer's destination is often an English name.
+     *
+     * @return list<string>
+     */
+    private static function filedStems(CatalogProduct $product): array
+    {
+        $names = [(string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
+            ...$product->categories->pluck('name')->map(fn ($n): string => (string) $n)->all()];
+        $stems = [];
+        foreach ($names as $name) {
+            foreach (explode(' ', HebrewSearch::normalize(str_replace('_', ' ', $name))) as $word) {
+                if (preg_match('/^\p{L}{2,}$/u', $word) === 1) {
+                    $stems[HebrewSearch::stem($word)] = true;
+                }
+            }
+        }
+
+        return array_slice(array_keys($stems), 0, self::KIND_STEMS * 2);
+    }
+
     private static function kindStems(CatalogProduct $product): array
     {
         $names = [(string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
@@ -284,6 +306,9 @@ final class BuildSearchIndex
         $audiences = $whom === null ? [] : $this->audienceFacet($facets['facets'], $this->locale($shopId), $whom);
         // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
         $tagFilters = $this->tagFacets($facets['facets'], $shopId, $this->locale($shopId));
+        // The store's own tags, and how many days each offer lasts, where the shop asks for them (a content site).
+        $storeTags = $this->storeTagFacet($facets['facets'], $this->locale($shopId));
+        $lengths = $this->lengthFacet($facets['facets'], $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
         // Their values are words of the products either way: "הספר של עומר שם טוב" finds his book, whose title does not say him.
         $apart = $facets['facets'];
@@ -304,7 +329,7 @@ final class BuildSearchIndex
             // The names of what the store's approved facts say it is ("אמרלד קאט", "קרנליאן", "ספר מודפס") are words it
             // is found by, whatever its own text calls them ("קרנליון"): a filter's name finds what the filter holds.
             $named = array_map(fn (int $code): string => (string) ($facets['facets'][intdiv($code, 1000)]['v'][$code % 1000]['l'] ?? ''), $read['f'] ?? []);
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($fields[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($storeTags[$product->id] ?? []), ...($lengths['codes'][$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -348,6 +373,11 @@ final class BuildSearchIndex
                 'v' => $read['v'] ?? null,
                 'z' => $z = $read['z'] ?? $pageSizes[$product->id] ?? self::metaSize($product),
                 'd' => self::added($product),
+                // how many days it lasts, where the shop filters by length: "4 days" in a search asks it
+                'dy' => $lengths['days'][(string) $product->id] ?? null,
+                // what the store files it as, in any language, where the shop filters by length: "israel 10 days" is an
+                // offer filed or called "Israel", not one whose text says it flies from Israel
+                'fn' => $lengths['days'] === [] ? null : (self::filedStems($product) ?: null),
             ]);
             $counts['product']++;
             $sized = $sized || $z !== null;
@@ -994,7 +1024,8 @@ final class BuildSearchIndex
                 continue;
             }
 
-            if (count($values) >= self::MAX_CATEGORIES) {
+            // as many as the shop wants (search.category_filter_max): a content site's destinations and subjects run longer
+            if (count($values) >= max(2, (int) Settings::get('search.category_filter_max', $this->tenant->id()) ?: self::MAX_CATEGORIES)) {
                 break;
             }
 
@@ -1014,6 +1045,134 @@ final class BuildSearchIndex
         }
 
         return $products;
+    }
+
+    /** The lengths a tour (a course, a trip) is filtered by, in days: [first day, last day] of each. */
+    private const LENGTHS = ['1' => [1, 1], '2-5' => [2, 5], '6-9' => [6, 9], '10-14' => [10, 14], '15+' => [15, PHP_INT_MAX]];
+
+    /** A length is a filter where at least this share of the offers say theirs. */
+    private const LENGTH_MIN_SHARE = 0.25;
+
+    /**
+     * How long each offer lasts, as its title, its excerpt or its opening words say it in days ("A 10-Day Jewish
+     * Odyssey", "6 nights"), a filter of its own in spans of days, in the order of the days; and each offer's days, for
+     * "4 days" in a search (record "dy"). Only where the shop asks for it (search.length_filter: a content site), and
+     * where enough of its offers say their length in two spans or more.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     * @return array{codes: array<string, list<int>>, days: array<string, int>}
+     */
+    private function lengthFacet(array &$facets, string $locale): array
+    {
+        $none = ['codes' => [], 'days' => []];
+        if (! Settings::get('search.length_filter', $this->tenant->id())) {
+            return $none;
+        }
+
+        $days = [];
+        $total = 0;
+        foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
+            $total++;
+            $said = HebrewSearch::daysIn((string) $product->title)
+                ?? HebrewSearch::daysIn((string) ($product->payload['short_description'] ?? ''))
+                ?? HebrewSearch::daysIn(mb_substr((string) ($product->payload['description'] ?? ''), 0, 300));
+            if ($said !== null) {
+                $days[(string) $product->id] = $said;
+            }
+        }
+
+        $spans = [];
+        foreach ($days as $id => $n) {
+            foreach (self::LENGTHS as $key => [$from, $to]) {
+                if ($n >= $from && $n <= $to) {
+                    $spans[$key][] = $id;
+                    break;
+                }
+            }
+        }
+        if ($total === 0 || count($days) / $total < self::LENGTH_MIN_SHARE || count($spans) < 2) {
+            return $none;
+        }
+
+        $at = count($facets);
+        $values = [];
+        $codes = [];
+        foreach (array_keys(self::LENGTHS) as $key) {
+            if (! isset($spans[$key])) {
+                continue;
+            }
+            foreach ($spans[$key] as $id) {
+                $codes[$id][] = $at * 1000 + count($values);
+            }
+            $values[] = ['k' => $key, 'l' => (string) __('search::storefront.length.'.$key, [], $locale)];
+        }
+        $facets[] = ['k' => 'length', 'l' => (string) __('search::storefront.facet_length', [], $locale), 'v' => $values];
+
+        return ['codes' => $codes, 'days' => $days];
+    }
+
+    /** A store's tags that file a page, not describe what it offers: never a filter value (Gil Travel's "blog"). */
+    private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
+
+    /** A tag of the store's is a filter value where it is on at least this many products. */
+    private const STORE_TAG_MIN_PRODUCTS = 2;
+
+    /**
+     * The tags the store gives its products (WooCommerce's, WordPress's, Shopify's), a filter of their own: each on two
+     * products or more, never one already offered under the same name (its category "Spain" and its tag "Spain"), nor
+     * one on nearly every product. The most used first, as many as the categories. Only where the shop asks for it
+     * (search.store_tag_filter: a content site).
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  appended to
+     * @return array<string, list<int>> the codes of each product's tags, by product id
+     */
+    private function storeTagFacet(array &$facets, string $locale): array
+    {
+        if (! Settings::get('search.store_tag_filter', $this->tenant->id())) {
+            return [];
+        }
+
+        $offered = [];
+        foreach ($facets as $facet) {
+            foreach ($facet['v'] ?? [] as $value) {
+                $offered[mb_strtolower(trim((string) $value['l']))] = true;
+            }
+        }
+
+        $byTag = [];
+        $names = [];
+        $total = 0;
+        foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
+            $total++;
+            foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
+                $key = mb_strtolower($tag);
+                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true)) {
+                    continue;
+                }
+                $names[$key] ??= $tag;
+                $byTag[$key][] = (string) $product->id;
+            }
+        }
+
+        $byTag = array_filter($byTag, fn (array $ids): bool => count($ids) >= self::STORE_TAG_MIN_PRODUCTS && ($total === 0 || count($ids) / $total < self::CATEGORY_MAX_SHARE));
+        uksort($byTag, fn (string $a, string $b): int => [count($byTag[$b]), $a] <=> [count($byTag[$a]), $b]);
+        $byTag = array_slice($byTag, 0, max(2, (int) Settings::get('search.category_filter_max', $this->tenant->id()) ?: self::MAX_CATEGORIES), true);
+        if (count($byTag) < 2) {
+            return [];
+        }
+
+        $at = count($facets);
+        $values = [];
+        $codes = [];
+        foreach ($byTag as $key => $ids) {
+            foreach ($ids as $id) {
+                $codes[$id][] = $at * 1000 + count($values);
+            }
+            $values[] = ['k' => 'tag:'.$key, 'l' => $names[$key]];
+        }
+        $facets[] = ['k' => 'store_tags', 'l' => (string) __('search::storefront.facet_tags', [], $locale), 'v' => $values];
+
+        return $codes;
     }
 
     /**

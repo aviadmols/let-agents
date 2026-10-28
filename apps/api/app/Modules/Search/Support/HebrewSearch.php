@@ -239,10 +239,63 @@ final class HebrewSearch
     /** Words that turn the next word into what the shopper does not want. */
     public const WITHOUT = ['בלי', 'ללא', 'without', 'no'];
 
-    /** A number as a shopper writes it ("2500", "2,500", "2.5 אלף"), and the currency after it. */
-    private const PRICE_NUMBER = '(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(אלף|k)?';
+    /** A number as a shopper writes it ("2500", "2,500", "2.5 אלף", "$1000"), and the currency after it. */
+    private const PRICE_NUMBER = '(?:[$€£₪]\s*)?(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(אלף|k)?';
 
-    private const PRICE_CURRENCY = '(?:\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils))?';
+    /** Shekels, and dollars, euros and pounds (Gil Travel, 28.10: "max price 1000$" was searched for "1000"). */
+    private const CURRENCY = 'ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils|\$|usd|dollars?|דולר(?:ים)?|€|eur|euros?|יורו|£|gbp|ליש"ט';
+
+    private const PRICE_CURRENCY = '(?:\s*(?:'.self::CURRENCY.'))?';
+
+    /** A top: "עד", "under", "max price", "price up to" (the word "price" between the top and the amount, or before both). */
+    private const PRICE_TOP = 'עד|מתחת\s*ל-?|מתחת|פחות\s*מ-?|לא\s+יותר\s+מ-?|under|below|up\s+to|less\s+than|no\s+more\s+than|cheaper\s+than|max(?:imum)?(?:\s+(?:price|budget))?(?:\s+of)?|(?:price|budget)\s+(?:up\s+to|under|below|max(?:imum)?|of\s+up\s+to)';
+
+    /** A bottom: "מעל", "over", "more than", "min price". */
+    private const PRICE_BOTTOM = 'מעל|יותר\s*מ-?|לפחות|over|above|more\s+than|at\s+least|min(?:imum)?(?:\s+price)?(?:\s+of)?|(?:price|budget)\s+(?:over|above|from)';
+
+    /** "4 days" in a search, "A 10-Day Odyssey" in a title: a tour's length in days ("6 nights" is a day more). */
+    private const DAYS = '(\d{1,2})\s*[-–]?\s*(?:[\p{L}\']+\s+)?(?:days?|ימים)';
+
+    private const NIGHTS = '(\d{1,2})\s*[-–]?\s*(?:nights?|לילות)';
+
+    /** The longest a length in days is taken to be: past it, a number is something else ("30 days return"). */
+    public const MAX_DAYS = 45;
+
+    /**
+     * How many days a tour, a course or a trip lasts, as its own words say it ("A 10-Day Jewish Odyssey", "7 Day – Israel",
+     * "4 Magical Days", "6 nights", "5 ימים"); null when they say none. A day's number in an itinerary ("Day 3") is not
+     * a length.
+     */
+    public static function daysIn(string $text): ?int
+    {
+        foreach ([[self::DAYS, 0], [self::NIGHTS, 1]] as [$pattern, $more]) {
+            if (preg_match('/(?<![\d.,:])'.$pattern.'\b/iu', $text, $m) === 1) {
+                $days = (int) $m[1] + $more;
+
+                return $days >= 1 && $days <= self::MAX_DAYS ? $days : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * "4 days israel": the words to search, and the length asked for in days (a tour of about that many). Only where
+     * the shop's offers say their length (the length filter): elsewhere "3 days" is words like any.
+     *
+     * @return array{0: string, 1: int|null}
+     */
+    public static function days(string $query): array
+    {
+        $text = ' '.$query.' ';
+        foreach ([[self::DAYS, 0], [self::NIGHTS, 1]] as [$pattern, $more]) {
+            if (preg_match('/\s(?:(?:of|for|ל-?|של)\s+)?'.$pattern.'(?=\s)/iu', $text, $m) === 1 && (int) $m[1] >= 1 && (int) $m[1] + $more <= self::MAX_DAYS) {
+                return [trim((string) preg_replace('/\s+/u', ' ', str_replace($m[0], ' ', $text))), (int) $m[1] + $more];
+            }
+        }
+
+        return [trim($query), null];
+    }
 
     /**
      * "טבעת יהלום בזהב עד 2500 ש״ח": the words to search, and the price range the shopper asked for.
@@ -273,9 +326,9 @@ final class HebrewSearch
             '/\s(?:מ-?|מ־|from)\s*'.$num.$cur.'\s*(?:עד|to|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
             '/\s'.$num.$cur.'\s*(?:-|–|עד|to)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
             // a top
-            '/\s(?:עד|מתחת\s*ל-?|מתחת|פחות\s*מ-?|לא\s+יותר\s+מ-?|under|below|up\s+to|max)\s*'.$num.$cur.'(?=\s)/iu' => 'max',
+            '/\s(?:'.self::PRICE_TOP.')\s*'.$num.$cur.'(?=\s)/iu' => 'max',
             // a bottom
-            '/\s(?:מעל|יותר\s*מ-?|לפחות|over|above|min)\s*'.$num.$cur.'(?=\s)/iu' => 'min',
+            '/\s(?:'.self::PRICE_BOTTOM.')\s*'.$num.$cur.'(?=\s)/iu' => 'min',
         ];
 
         foreach ($patterns as $pattern => $kind) {
@@ -284,7 +337,7 @@ final class HebrewSearch
             }
 
             // A bare "14-18" with no currency is a size or a karat, not a price.
-            if ($kind === 'both' && ! preg_match('/ש|₪|nis|ils|בין|between|מ|from/iu', $m[0]) && min($amount($m, 1), $amount($m, 3)) < 100) {
+            if ($kind === 'both' && ! preg_match('/ש|₪|nis|ils|\$|usd|dollar|€|eur|£|בין|between|מ|from/iu', $m[0]) && min($amount($m, 1), $amount($m, 3)) < 100) {
                 continue;
             }
 
@@ -300,7 +353,7 @@ final class HebrewSearch
         }
 
         // A bare amount with its currency ("טבעת 2500 ש״ח"): a budget, so a top.
-        if ($min === null && $max === null && preg_match('/\s'.$num.'\s*(?:ש["״׳\'`]?ח|שקלים|שקל|₪|nis|ils)(?=\s)/iu', $text, $m) === 1) {
+        if ($min === null && $max === null && (preg_match('/\s'.$num.'\s*(?:'.self::CURRENCY.')(?=\s)/iu', $text, $m) === 1 || preg_match('/\s[$€£₪]\s*(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)()(?=\s)/iu', $text, $m) === 1)) {
             $max = $amount($m, 1);
             $text = str_replace($m[0], ' ', $text);
         }

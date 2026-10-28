@@ -63,7 +63,7 @@ final class ContentSiteTest extends TestCase
         ContentSite::settle($shop->id);
         Cache::flush();
         $content = $config();
-        $this->assertSame([false, 'read_more', 4, 'USD'], [$content['cart'], $content['cardAction'], $content['guidesAfter'], $content['currency']]);
+        $this->assertSame([false, 'read_more', 0, 'USD'], [$content['cart'], $content['cardAction'], $content['guidesAfter'], $content['currency']]);
         $this->assertTrue(Features::enabled('search.content_by_meaning', $shop->id), 'its articles found by what they say');
     }
 
@@ -75,7 +75,7 @@ final class ContentSiteTest extends TestCase
         app(TestStoreConnection::class)->handle($connection);
         $connection->refresh();
         $this->assertFalse($connection->info('woocommerce.active'));
-        $this->assertSame(['read_more', 4, 'USD'], [Settings::get('search.card_action', $shop->id), Settings::get('search.guides_after', $shop->id), $shop->fresh()->currency], 'set as a content site when first seen');
+        $this->assertSame(['read_more', 0, true, 'USD'], [Settings::get('search.card_action', $shop->id), Settings::get('search.guides_after', $shop->id), Settings::get('search.length_filter', $shop->id), $shop->fresh()->currency], 'set as a content site when first seen');
 
         $feed = app(PluginStoreFeed::class);
         $products = array_merge(...iterator_to_array($feed->products($connection), false));
@@ -86,9 +86,9 @@ final class ContentSiteTest extends TestCase
         Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/let-agents/v1/feed/'));
 
         // what the team changes after stays theirs: a second check sets nothing again
-        Settings::set('search.guides_after', 0, $shop->id);
+        Settings::set('search.card_action', 'product_page', $shop->id);
         app(TestStoreConnection::class)->handle($connection);
-        $this->assertSame(0, Settings::get('search.guides_after', $shop->id));
+        $this->assertSame('product_page', Settings::get('search.card_action', $shop->id));
     }
 
     public function test_connect_answers_at_once_and_the_currency_is_read_in_the_background(): void

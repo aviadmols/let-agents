@@ -185,7 +185,9 @@
   }
   // the live view is the results turn itself, as Enter will keep it, with the words still being typed
   function liveHtml(lv) {
-    var html = isQuestion(lv.q) ? askRow(lv.q, true) : '';
+    // a question gets its "ask" row here, above the results: the results then say what they say without a second one
+    lv.askShown = isQuestion(lv.q);
+    var html = lv.askShown ? askRow(lv.q, true) : '';
     lv.loading = (!lv.server || !!lv.pending) && !(lv.ids || []).length;
     // no bubble repeating what is being typed: the search line above already says it
     return html + '<section class="ls-turn ls-turn--live">' + resultsHtml(lv) + '</section>';

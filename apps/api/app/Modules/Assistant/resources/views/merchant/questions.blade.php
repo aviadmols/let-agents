@@ -29,6 +29,11 @@
                 @endforeach
             </div>
             <span class="lp-field"><svg aria-hidden="true"><use href="#lp-i-search"/></svg><input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="find" placeholder="{{ $t('find') }}" aria-label="{{ $t('find') }}"></span>
+            {{-- the order: what needs an answer first, or the latest asked first --}}
+            <div class="lp-tabs lp-tabs-sm" role="group" aria-label="{{ $t('order') }}" data-order>
+                <button type="button" wire:click="orderBy('need')" @class(['is-on' => $this->order !== 'date'])>{{ $t('order_need') }}</button>
+                <button type="button" wire:click="orderBy('date')" @class(['is-on' => $this->order === 'date'])>{{ $t('order_date') }}</button>
+            </div>
         </div>
 
         @forelse (array_slice($rows, 0, $this->shown) as $row)
@@ -39,7 +44,7 @@
                     <div class="lp-ask-meta">
                         <span class="lp-pill" data-tone="{{ ['open' => 'bad', 'answered' => 'good', 'off' => ''][$row['state']] }}"><i></i>{{ $t('states.'.$row['state']) }}</span>
                         <span>{{ trans_choice('assistant::ui.inbox.asked', $row['asked'], ['n' => number_format($row['asked'])]) }}</span>
-                        @if ($row['last'])<span>· {{ $t('last', ['when' => $page::ago($row['last'])]) }}</span>@endif
+                        @if ($row['last'])<span>· {{ $t('last_at', ['at' => $page::at($row['last']), 'when' => $page::ago($row['last'])]) }}</span>@endif
                         <span>· {{ $row['where'] }}</span>
                         @if ($row['score'] !== null)<span class="lp-pill" data-tone="{{ $row['score'] >= 80 ? 'good' : ($row['score'] >= 50 ? 'warn' : 'bad') }}">{{ $t('score', ['n' => $row['score']]) }}</span>@endif
                     </div>
@@ -48,6 +53,22 @@
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('answer_given') }}</span><p>{{ $row['answer'] }}</p></div>
                     @elseif ($row['answer'] !== '')
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('shown_instead') }}</span><p>{{ $row['answer'] }}</p></div>
+                    @endif
+
+                    {{-- the products shown with the answer, those the shopper opened or added marked --}}
+                    @if (($row['products'] ?? []) !== [])
+                        <div style="display: grid; gap: 6px; margin-top: 10px" data-answer-products>
+                            <span class="lp-note">{{ $t('products_shown') }}</span>
+                            <div class="lp-chips">
+                                @foreach ($row['products'] as $product)
+                                    @if ($product['url'])
+                                        <a class="lp-chip" href="{{ $product['url'] }}" target="_blank" rel="noopener" dir="auto" style="min-height: 30px; font-size: 13px; text-decoration: none; {{ $product['opened'] ? 'box-shadow: inset 0 0 0 1.5px var(--la-ink);' : '' }}">{{ $product['title'] }}@if ($product['opened'])<b style="font-weight: 600">· {{ $t('opened') }}</b>@endif</a>
+                                    @else
+                                        <span class="lp-chip" dir="auto" style="cursor: default; min-height: 30px; font-size: 13px">{{ $product['title'] }}</span>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
                     @endif
 
                     @if ($this->writing === $row['id'])

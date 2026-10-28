@@ -201,7 +201,7 @@
     var named = {};
     codes = codes.filter(function (code) { var l = String(S.facets[Math.floor(code / 1000)].v[code % 1000].l).toLowerCase(); if (named[l] && !onCode(c, code)) { return false; } named[l] = true; return true; });
     return { codes: max ? codes.slice(0, max) : codes, counts: counts, n: n,
-      stock: all.some(function (r) { return r.s === 0; }) && all.some(function (r) { return r.s === 1; }),
+      stock: stockMeans() && all.some(function (r) { return r.s === 0; }) && all.some(function (r) { return r.s === 1; }),
       sale: all.some(function (r) { return r.sl === 1; }) && all.some(function (r) { return r.sl !== 1; }) };
   }
   // the chips of typed words a store's word chosen in their place stands for
@@ -312,7 +312,7 @@
       : held === 0 && total ? t('meaningOnly', { q: turn.q })
       : held !== null && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
     if (!text) { return ''; }
-    return '<div data-unknown>' + askCardHtml(turn.q, text) + '</div>';
+    return '<div data-unknown>' + askCardHtml(turn.q, text, turn.askShown) + '</div>';
   }
   // The words of a search, as typed, that no product shown says in its title or words (its tags, its picture's words),
   // a word in any of its forms: "לבנה" is "לבן", "בצד" is "צד", "pocket" is "pockets". Only for a search of two words or more.
@@ -349,7 +349,9 @@
   }
   // Nothing found, or found only in part: the store's AI one press away, in the box the search box offers a question in
   // ("שאלו את … / the words"). It reads the whole catalogue for them ("תראה לי …": the set finder).
-  function askCardHtml(q, text) {
+  // shown: the "ask" row is already above (a question being typed): the words only, never the same button twice
+  function askCardHtml(q, text, shown) {
+    if (shown) { return text ? '<p class="ls-note__text">' + esc(text) + '</p>' : ''; }
     return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') +
       '<div class="ls-note"><button class="ls-ask" data-askcard data-from="' + esc(q) + '" data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"><span class="ls-ask__mark">' + mark() + '</span>' +
       '<span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(q) + '</span></span>' +
@@ -371,7 +373,7 @@
       } else {
         html += '<p class="ls-noanswer__text"><b>' + esc(t('noResults', { q: turn.q })) + '</b><br><span style="color:var(--ls-fg-muted)">' + esc(t('noResultsSub', { name: CFG.assistant })) + '</span></p>';
       }
-      html += askCardHtml(turn.q);
+      html += askCardHtml(turn.q, '', turn.askShown);
       return html;
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
@@ -380,7 +382,7 @@
     var guideFirst = gm >= GUIDE_FIRST && (!list.length || gm > matchOf(turn.q, decode(list[0].title), list[0].kw, 0));
     if (guideFirst) { html += guidesHtml(turn.content, turn.q); }
     html += noteHtml(turn);
-    html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(list.length === 1 ? t('oneProduct') : t('productsCount', { n: list.length })) + '</div>' +
+    html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>';
     html += chipRow(turn);
     // a size asked for that no product here says: told, with the team one press away, never silently ignored
@@ -411,7 +413,7 @@
     if (turn.loading) { return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' : '') + '</div><div style="padding:12px 0">' + thinking() + '</div>'; }
     if (turn.error) { return '<div class="ls-wide-head">' + back + '</div>' + errorHtml(turn); }
     var list = filtered(turn), shown = list.slice(0, fill(turn.limit || 24));
-    var title = similar ? esc(t('productsCount', { n: list.length })) + ' <span>' + esc(t('similar')) + '</span>' : esc(t('productsCount', { n: list.length })) + ' <span>"' + esc(turn.q) + '"</span>';
+    var title = similar ? esc(countText(list.length)) + ' <span>' + esc(t('similar')) + '</span>' : esc(countText(list.length)) + ' <span>"' + esc(turn.q) + '"</span>';
     return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' + oosNote(turn) : '') +
       '<div class="ls-summary" style="margin-top:' + (similar ? 18 : 8) + 'px"><div class="ls-summary__count ls-num" style="font-size:20px;font-weight:500">' + title + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn) + '</div>' +

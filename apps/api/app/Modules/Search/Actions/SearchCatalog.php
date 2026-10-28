@@ -92,6 +92,9 @@ final class SearchCatalog
     /** What the picture's reader says of a piece with no print on it (caption v8, caption_pattern.covers). */
     private const NO_PRINT = 'none';
 
+    /** "4 days" finds a tour of 3 to 5: a day either way. */
+    private const DAYS_EITHER_WAY = 1;
+
     /** Pictures compared with a tagged photo: every scanned picture of a shop this size. */
     private const PHOTO_ALL = 5000;
 
@@ -338,6 +341,54 @@ final class SearchCatalog
         return $result;
     }
 
+    /**
+     * A search of a length alone ("4 days", "a 10 day tour under $3000" once its words are read): every offer of about
+     * that many days (a day either way) within the price, in stock first, then as the index holds them, the actions
+     * asked ("cheapest") applied. In the shape of any search.
+     *
+     * @param  array<string, mixed>  $index
+     * @param  array<string, mixed>  $actions
+     * @param  list<string>|null  $only
+     * @return array<string, mixed>
+     */
+    private function ofLength(string $shopId, array $index, int $days, ?float $minPrice, ?float $maxPrice, array $actions, ?array $only, bool $count, ?int $perGroup, array $visit): array
+    {
+        $products = array_values(array_filter((array) $index['records'], fn (array $r): bool => ($r['t'] ?? null) === 'product'
+            && isset($r['dy']) && abs((int) $r['dy'] - $days) <= self::DAYS_EITHER_WAY && HebrewSearch::inRange($r['pr'] ?? null, $minPrice, $maxPrice)));
+        $products = [...array_values(array_filter($products, fn (array $r): bool => ($r['s'] ?? 0) === 1)), ...array_values(array_filter($products, fn (array $r): bool => ($r['s'] ?? 0) !== 1))];
+        $products = HebrewSearch::applyActions($products, $actions);
+        $total = count($products);
+        if ($count) {
+            $this->counter->search($shopId, '', $total, $visit);
+        }
+        $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
+        $groups = array_fill_keys(self::GROUPS, []);
+        $groups['product'] = $only === null || in_array('product', $only, true) ? array_map(fn (array $r): array => $this->present($r), array_slice($products, 0, $perGroup)) : [];
+
+        return ['query' => '', 'unknown' => [], 'held' => $total, 'total' => $total, 'semantic' => false, 'resolved' => false, 'subject' => false, 'actions' => $actions['ids'],
+            'ids' => array_slice(array_column($products, 'id'), 0, (int) Settings::get('search.all_ids')), 'single' => null, 'focus' => null, 'groups' => $groups,
+            'counts' => array_map('count', $groups) + ['product' => $total]];
+    }
+
+    /**
+     * Whether a product is called or filed as every word searched: in its title, or in what the store files it as (its
+     * type, categories and tags, the record's "kd"), each word as a stem.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function namedBy(array $record, string $query): bool
+    {
+        $words = array_values(array_filter(explode(' ', HebrewSearch::normalize($query)), fn (string $w): bool => mb_strlen($w) >= 2));
+        if ($words === [] || $record === []) {
+            return false;
+        }
+        $title = array_map(fn (string $w): string => HebrewSearch::stem($w), explode(' ', HebrewSearch::normalize((string) ($record['title'] ?? ''))));
+        $filed = array_map('strval', [...(array) ($record['kd'] ?? []), ...(array) ($record['fn'] ?? [])]);
+        $has = array_flip([...$title, ...$filed]);
+
+        return array_filter($words, fn (string $w): bool => ! isset($has[HebrewSearch::stem($w)])) === [];
+    }
+
     /** "בצבע" and "in colour" left alone once the colour is taken out: no word of what is searched. */
     private static function withoutLooseWords(string $query): string
     {
@@ -362,6 +413,16 @@ final class SearchCatalog
             // "הכי זול", "במבצע", "גדול מ-2": actions, not words. The same phrases in every shop, less
             // those its index leaves out (no size: "גדול" stays a word).
             [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);
+            // "4 days israel": where the shop's offers say how long they last (its length filter), the length asked, not
+            // words; a tour of about that many days (a day either way). Elsewhere "3 days" stays words.
+            $days = null;
+            if ($index !== null && in_array('length', array_column((array) ($index['facets'] ?? []), 'k'), true)) {
+                [$query, $days] = HebrewSearch::days($query);
+                // "4 days under $1000": nothing but the length (and a price) asked, every offer of about that length
+                if ($days !== null && trim($query) === '') {
+                    return $this->ofLength($shopId, $index, $days, $minPrice, $maxPrice, $actions, $only, $count, $perGroup, $visit);
+                }
+            }
             // "אני רוצה לקנות מתנה לאשתי טבעת יהלום": a sentence no product holds is searched by what it asks for ("טבעת
             // יהלומ"), then read for filters like any search. Words a product holds together are searched as typed. The
             // meaning reads the whole sentence: "משהו לחבר קרשים" is about joining boards.
@@ -386,7 +447,7 @@ final class SearchCatalog
             }
             $empty = ['query' => $query, 'total' => 0, 'semantic' => false, 'groups' => array_fill_keys(self::GROUPS, []), 'counts' => array_fill_keys(self::GROUPS, 0)];
             $this->trace?->step('read', array_filter([
-                'short' => $index === null, 'min_price' => $minPrice, 'max_price' => $maxPrice, 'without' => $without,
+                'short' => $index === null, 'min_price' => $minPrice, 'max_price' => $maxPrice, 'days' => $days, 'without' => $without,
                 'actions' => $actions['ids'], 'sentence' => $sentence === null ? null : $query, 'facets' => array_values(array_merge(...array_values($read ?: [[]]))),
             ], fn ($v): bool => $v !== null && $v !== [] && $v !== false));
 
@@ -398,7 +459,7 @@ final class SearchCatalog
             $spelling = self::either($index['engine'], $query);
             // A product code, or the only product that holds every word: shown alone, the rest on request.
             $asks = str_contains($raw, '?') || HebrewSearch::asks($query);
-            $single = $minPrice === null && $maxPrice === null && $without === [] && $actions['ids'] === [] && ! $asks
+            $single = $minPrice === null && $maxPrice === null && $days === null && $without === [] && $actions['ids'] === [] && ! $asks
                 ? HebrewSearch::single($index['codes'] ?? [], $query, $spelling)
                 : null;
             $single = $single !== null && isset($index['records'][$single['id']]) ? $single : null;
@@ -411,7 +472,7 @@ final class SearchCatalog
                     || (mb_strlen($w) > 3 && preg_match('/^[והבלמשכ]/u', $w) === 1 && HebrewSearch::says($text, mb_substr($w, 1)))) ? $single : null;
             }
             // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, to choose from.
-            $focus = $minPrice === null && $maxPrice === null && $without === [] && $actions['ids'] === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
+            $focus = $minPrice === null && $maxPrice === null && $days === null && $without === [] && $actions['ids'] === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
 
             // A sentence ("מה הכי טוב למברגה ביתית וזולה") holds words no product has: search
             // what it is about instead, so a question finds the products it asks about.
@@ -561,14 +622,27 @@ final class SearchCatalog
             // a synonym), only those: "צמיד" is close to "צמודים" by spelling, and when no bracelet
             // is that cheap the stud earrings would be all that is left.
             $products = array_values(array_filter($spelling, fn (array $hit): bool => str_starts_with($hit['id'], 'p:')));
-            if (($minPrice !== null || $maxPrice !== null) && $products !== []) {
+            // a length asked ("israel 10 days") decides the same way: tours of ten days to Morocco are no Israel tour
+            if (($minPrice !== null || $maxPrice !== null || $days !== null) && $products !== []) {
                 $before = $ids();
                 $exact = array_values(array_filter($products, fn (array $hit): bool => $hit['exact']));
+                // with a length, what it is filed as or called decides: a Morocco tour whose text says "a flight from
+                // Israel" is no Israel tour (Gil Travel, 28.10). Where some have the words in their title or what the
+                // store files them as (categories, tags, type), only those.
+                if ($days !== null) {
+                    $named = array_values(array_filter($exact !== [] ? $exact : $products, fn (array $hit): bool => self::namedBy($index['records'][$hit['id']] ?? [], $query)));
+                    $exact = $named !== [] ? $named : $exact;
+                }
                 $held = array_flip(array_column($exact !== [] ? $exact : $products, 'id'));
                 $keep = fn (string $id): bool => isset($held[$id]) || ! str_starts_with($id, 'p:');
                 $spelling = array_values(array_filter($spelling, fn (array $hit): bool => $keep($hit['id'])));
                 $meaning = array_values(array_filter($meaning, $keep));
                 $pictures = array_values(array_filter($pictures, $keep));
+                // and with a length, nothing only its description says ("a flight from Israel" in a Morocco tour)
+                if ($days !== null) {
+                    $described = array_values(array_filter($described, $keep));
+                    $termHits = array_values(array_filter($termHits, $keep));
+                }
                 $this->trace?->dropped($before, $ids(), 'price_words');
             }
             $pinned = $this->resolved($query, $index['records']);
@@ -609,6 +683,12 @@ final class SearchCatalog
 
                 if ($record !== null && $type === 'product' && ! HebrewSearch::inRange($record['pr'] ?? null, $minPrice, $maxPrice)) {
                     $this->trace?->left($id, 'price');
+
+                    continue;
+                }
+
+                if ($record !== null && $type === 'product' && $days !== null && (! isset($record['dy']) || abs((int) $record['dy'] - $days) > self::DAYS_EITHER_WAY)) {
+                    $this->trace?->left($id, 'days');
 
                     continue;
                 }

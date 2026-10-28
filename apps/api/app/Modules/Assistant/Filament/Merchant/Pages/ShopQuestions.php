@@ -10,6 +10,7 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\Question;
+use App\Modules\Catalog\Models\CatalogProduct;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Url;
@@ -47,6 +48,16 @@ final class ShopQuestions extends OperatorShopQuestions
 
     #[Url(as: 'find')]
     public string $find = '';
+
+    /** need: what has no answer first, then the most asked; date: the latest asked first, by its date and hour */
+    #[Url(as: 'order')]
+    public string $order = 'need';
+
+    public function orderBy(string $order): void
+    {
+        $this->order = $order === 'date' ? 'date' : 'need';
+        $this->shown = self::PAGE;
+    }
 
     /** The row being answered by hand. */
     public ?string $writing = null;
@@ -112,6 +123,8 @@ final class ShopQuestions extends OperatorShopQuestions
                     'answer' => trim((string) ($latest->getRelation('answer')?->getAttribute('answer') ?? $latest->getAttributes()['answer'] ?? '')),
                     'score' => $score === null ? null : (int) $score['score'],
                     'note' => $score['note'] ?? null,
+                    // the products shown with the answer that time, those the shopper opened or added marked
+                    'products' => self::shownWith($latest),
                 ];
             }
 
@@ -131,10 +144,13 @@ final class ShopQuestions extends OperatorShopQuestions
                     'answer' => trim((string) $answer->answer),
                     'score' => null,
                     'note' => null,
+                    'products' => [],
                 ];
             }
 
-            usort($rows, fn (array $a, array $b): int => [$b['state'] === 'open', $b['asked'], $b['last']?->getTimestamp() ?? 0] <=> [$a['state'] === 'open', $a['asked'], $a['last']?->getTimestamp() ?? 0]);
+            usort($rows, $this->order === 'date'
+                ? fn (array $a, array $b): int => ($b['last']?->getTimestamp() ?? 0) <=> ($a['last']?->getTimestamp() ?? 0)
+                : fn (array $a, array $b): int => [$b['state'] === 'open', $b['asked'], $b['last']?->getTimestamp() ?? 0] <=> [$a['state'] === 'open', $a['asked'], $a['last']?->getTimestamp() ?? 0]);
 
             return $rows;
         });
@@ -228,6 +244,37 @@ final class ShopQuestions extends OperatorShopQuestions
     public static function ago(?Carbon $at): string
     {
         return $at === null ? '' : $at->locale(app()->getLocale())->diffForHumans();
+    }
+
+    /** When it was asked, to the minute, as the shop reads the time: "28.10.2026 11:39". */
+    public static function at(?Carbon $at): string
+    {
+        return $at === null ? '' : $at->copy()->timezone((string) config('app.display_timezone', 'Asia/Jerusalem'))->format('d.m.Y H:i');
+    }
+
+    /**
+     * The products a shopper was shown with an answer, by their names: those the answer picked (with why), else those
+     * listed with it; each marked when the shopper opened or added it.
+     *
+     * @return list<array{title: string, url: string|null, opened: bool}>
+     */
+    private static function shownWith(AssistantSearchAsk $ask): array
+    {
+        $opened = array_flip(array_map('strval', (array) $ask->picked));
+        $picks = array_values(array_filter((array) $ask->picks, 'is_array'));
+        $ids = $picks !== [] ? array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $picks) : array_map('strval', (array) $ask->products);
+        $ids = array_values(array_filter($ids, fn (string $id): bool => $id !== ''));
+        if ($ids === []) {
+            return [];
+        }
+        $products = CatalogProduct::query()->whereIn('external_id', $ids)->get(['external_id', 'title', 'url'])->keyBy('external_id');
+        $titles = array_column($picks, 'title', 'external_id');
+
+        return array_values(array_filter(array_map(fn (string $id): array => [
+            'title' => trim((string) ($products[$id]->title ?? $titles[$id] ?? '')),
+            'url' => $products[$id]->url ?? null,
+            'opened' => isset($opened[$id]),
+        ], array_slice($ids, 0, 12)), fn (array $p): bool => $p['title'] !== ''));
     }
 
     /**

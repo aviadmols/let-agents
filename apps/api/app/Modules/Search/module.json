@@ -826,6 +826,26 @@
             "scope": "shop"
         },
         {
+            "name": "category_filter_max",
+            "type": "int",
+            "default": 12,
+            "min": 2,
+            "max": 60,
+            "scope": "shop"
+        },
+        {
+            "name": "store_tag_filter",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
+            "name": "length_filter",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "similar_by",
             "type": "enum",
             "options": [

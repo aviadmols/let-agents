@@ -162,7 +162,8 @@
     // in stock by default in every search (a pill the shopper can take off, and it stays off), unless nothing found is;
     // marked as read from the words only when the words said it
     c.saidStock = /(^|\s)(במלאי|in stock)(\s|$)/i.test(q) || acts.indexOf('in_stock') >= 0;
-    c.autoStock = !c.no.stock && (c.saidStock || all.some(function (r) { return r.s === 1; }));
+    // a site that tells about what it offers ("Read more": tours, courses) has no stock: nothing to narrow by
+    c.autoStock = stockMeans() && !c.no.stock && (c.saidStock || all.some(function (r) { return r.s === 1; }));
     c.autoSale = !c.no.sale && (/(^|\s)(ב?מבצע|on sale)(\s|$)/i.test(q) || acts.indexOf('on_sale') >= 0);
     c.autoSort = c.no.sort ? '' : acts.indexOf('cheapest') >= 0 ? 'asc' : acts.indexOf('dearest') >= 0 ? 'desc' : acts.indexOf('newest') >= 0 ? 'new' : '';
     // "טבעת רובי במידה גדולה": the largest third of the sizes these results come in. A size on the product itself
@@ -359,6 +360,8 @@
   var SIZE_BAND = { top: /(^|\s)(ב?מיד(ה|ות)\s+(גדול|רחב)|large\s+sizes?|big\s+sizes?|plus\s+sizes?)/i, bottom: /(^|\s)(ב?מיד(ה|ות)\s+(קטנ|צר)|small\s+sizes?|petite)/i };
   function onCode(c, code) { return !!(c.f[code] || (c.auto && c.auto[code])); }
   function onStock(c) { return !!(c.stock || c.autoStock); }
+  // whether "in stock" means anything here: a content site's cards say "Read more", and what it offers is never sold out
+  function stockMeans() { return !(S.config && S.config.cardAction === 'read_more'); }
   function onSale(c) { return !!(c.sale || c.autoSale); }
   function sortOf(c) { return c.sort || c.autoSort || ''; }
   function codesOn(c) { var o = {}; Object.keys(c.f).concat(Object.keys(c.auto || {})).forEach(function (k) { o[k] = 1; }); return Object.keys(o).map(Number); }

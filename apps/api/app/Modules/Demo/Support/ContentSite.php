@@ -21,8 +21,13 @@ final class ContentSite
     private const SETTINGS = [
         'search.show_cart' => false,
         'search.card_action' => 'read_more',
-        'search.guides_after' => 4,
+        // its articles after all of its offers: in the middle they broke the grid, a tour left alone after them (Gil Travel, 28.10)
+        'search.guides_after' => 0,
         'search.store_currency' => true,
+        // its filters: its many destinations and subjects, its own tags, and how many days each lasts
+        'search.category_filter_max' => 40,
+        'search.store_tag_filter' => true,
+        'search.length_filter' => true,
     ];
 
     public static function settle(string $shopId): void
