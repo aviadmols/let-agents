@@ -57,6 +57,7 @@ return [
     'sort' => 'מיון',
     'by_count' => 'לפי כמות',
     'by_name' => 'לפי שם',
+    'by_date' => 'לפי תאריך',
     'shown' => ':shown מתוך :all',
     'more' => 'לטעון עוד',
     'synonym' => 'מילה נרדפת',

@@ -57,6 +57,7 @@ return [
     'sort' => 'Sort',
     'by_count' => 'By count',
     'by_name' => 'By name',
+    'by_date' => 'By date',
     'shown' => ':shown of :all',
     'more' => 'Load more',
     'synonym' => 'Synonym',

@@ -158,6 +158,9 @@
                     <div class="lp-tabs lp-tabs-sm" role="group" aria-label="{{ $t('sort') }}">
                         <button type="button" wire:click="sortBy('value')" @class(['is-on' => $this->sort === 'value'])>{{ $t('by_count') }}</button>
                         <button type="button" wire:click="sortBy('name')" @class(['is-on' => $this->sort === 'name'])>{{ $t('by_name') }}</button>
+                        @if (in_array($this->list, \App\Modules\Analytics\Filament\Merchant\Pages\ShopAnalytics::BY_DATE, true))
+                            <button type="button" wire:click="sortBy('date')" @class(['is-on' => $this->sort === 'date']) data-sort-date>{{ $t('by_date') }}</button>
+                        @endif
                     </div>
                     <span class="lp-note">{{ $t('shown', ['shown' => number_format(count($found['rows'])), 'all' => number_format($found['total'])]) }}</span>
                 </div>

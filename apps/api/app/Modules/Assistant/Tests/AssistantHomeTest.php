@@ -83,6 +83,11 @@ final class AssistantHomeTest extends TestCase
         $this->assertSame(['all' => 5, 'answered' => 3, 'unanswered' => 1, 'off' => 1, 'search' => 4], $figures['questions']);
         $this->assertSame(5, array_sum($figures['series']['questions']), 'the chart counts what the figure counts');
         $this->assertSame(3, app(AssistantReport::class)->rows($shop, 'questions', $since, now(), 10)['total'], 'three different questions in the search window');
+        // by count, or by when each was last asked, the latest first (Rocks: questions from before its fixes led the list)
+        $rows = fn (string $sort): array => array_map(fn ($r): string => $r->title, app(AssistantReport::class)->rows($shop, 'questions', $since, now(), 10, '', $sort)['rows']);
+        $this->assertSame('משלוח לאילת?', $rows('value')[0], 'asked twice');
+        $this->assertSame(['משלוח לאילת?', 'יש עגילים מזהב לבן?', 'מה מזג האוויר?'], $rows('date'));
+        $this->assertSame('Last asked 18.10.2026 15:00', app(AssistantReport::class)->rows($shop, 'questions', $since, now(), 10, '', 'date')['rows'][0]->sub);
 
         // the analytics screen, by its address (the Analytics module is not this one's to import)
         $this->withHeader('Accept-Language', 'en')->get("/merchant/{$shop->slug}/analytics")

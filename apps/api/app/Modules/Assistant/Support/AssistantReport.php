@@ -10,6 +10,7 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -58,13 +59,18 @@ final class AssistantReport implements ShopReport
     {
         // the same period, by the same clock, as the count above (QuestionCounts)
         $asks = AssistantSearchAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)
-            ->select('question')->selectRaw('count(*) as n')->groupBy('question');
+            ->select('question')->selectRaw('count(*) as n, max(created_at) as last_at')->groupBy('question');
 
         if (($words = trim($search)) !== '') {
             $asks->where('question', 'like', '%'.$words.'%');
         }
 
-        $sort === 'name' ? $asks->orderBy('question') : $asks->orderByDesc(DB::raw('count(*)'))->orderBy('question');
+        // by count, by name, or by when it was last asked, the latest first
+        match ($sort) {
+            'name' => $asks->orderBy('question'),
+            'date' => $asks->orderByDesc(DB::raw('max(created_at)'))->orderBy('question'),
+            default => $asks->orderByDesc(DB::raw('count(*)'))->orderBy('question'),
+        };
 
         // What the team already answered or set aside leaves the list.
         $handled = app(TeamAnswers::class)->handledKeys();
@@ -86,8 +92,12 @@ final class AssistantReport implements ShopReport
             };
             $answer = trim((string) ($last?->getRelation('answer')?->getAttribute('answer') ?? $last?->getAttributes()['answer'] ?? ''));
 
+            $at = $q->last_at === null ? null : Carbon::parse((string) $q->last_at)->timezone(config('app.display_timezone', 'Asia/Jerusalem'));
+
             return new ReportRow(
                 key: (string) $q->question, title: (string) $q->question, value: (int) $q->n, pill: $pill, tone: $tone,
+                // when it was last asked: what the list is ordered by, when ordered by date
+                sub: $at === null ? '' : __('assistant::report.last_asked', ['date' => $at->format('d.m.Y H:i')]),
                 actions: in_array($outcome, self::OFF, true) ? ['answer'] : ['answer', 'aside'],
                 detail: $answer,
                 detailLabel: $answer === '' ? '' : __(in_array($outcome, self::ANSWERED, true) ? 'assistant::report.answer_given' : 'assistant::report.shown_instead'),

@@ -127,9 +127,16 @@ final class ShopAnalytics extends Page
         $this->failed = $which === 'noclick' ? 'noclick' : 'empty';
     }
 
+    /** The lists that can be ordered by when they happened, the latest first. */
+    public const BY_DATE = ['questions'];
+
     public function sortBy(string $sort): void
     {
-        $this->sort = $sort === 'name' ? 'name' : 'value';
+        $this->sort = match (true) {
+            $sort === 'name' => 'name',
+            $sort === 'date' && in_array($this->list, self::BY_DATE, true) => 'date',
+            default => 'value',
+        };
     }
 
     public function more(): void
