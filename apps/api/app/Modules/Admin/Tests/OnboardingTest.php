@@ -139,7 +139,10 @@ final class OnboardingTest extends TestCase
         $shop = $shop->fresh();
         $this->assertSame('ספרים ובגדים', $shop?->name);
         $this->assertSame('en', $shop?->content_locale, 'the first language is the main one');
-        $this->assertSame(['kind' => 'content', 'languages' => ['he'], 'sells' => ['ספרים', 'בגדים']], $shop?->profile);
+        // Postgres keeps a jsonb object's keys in its own order (SQLite as written): the keys in any order, each list in its own
+        $profile = (array) $shop?->profile;
+        ksort($profile);
+        $this->assertSame(['kind' => 'content', 'languages' => ['he'], 'sells' => ['ספרים', 'בגדים']], $profile);
         $this->assertSame(1, $scan->started);
     }
 
