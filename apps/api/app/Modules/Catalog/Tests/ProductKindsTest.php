@@ -168,16 +168,45 @@ final class ProductKindsTest extends TestCase
         $p = app(TenantContext::class)->run($shop->id, fn (): array => array_map(fn (array $x): CatalogProduct => CatalogProduct::query()->create([
             'shop_id' => $shop->id, 'external_id' => $x[0], 'type' => 'simple', 'status' => 'publish', 'title' => $x[1], 'brand' => $x[2],
             'url' => 'https://www.store.test/p/'.$x[0], 'in_stock' => true, 'purchasable' => true, 'hash' => 'h'.$x[0], 'price' => 100,
-            'payload' => ['tags' => ['אופנה', 'מכנסיים', 'גברים']],
+            'payload' => ['tags' => $x[3] ?? ['אופנה', 'מכנסיים', 'גברים']],
         ]), [
-            ['1', "דזיגואל ג'ינס לגברים", 'DESIGUAL'], ['2', 'דזיגואל מכנסיים ארוכים לגברים', 'DESIGUAL'], ['3', 'דזיגואל חולצה לגברים', 'DESIGUAL'],
-            ['4', 'אדידס מכנסיים ארוכים Germany לגברים', 'ADIDAS'], ['5', 'אדידס מכנסיים קצרים לגברים', 'ADIDAS'], ['6', 'אדידס סניקרס לגברים', 'ADIDAS'],
+            ['1', "דזיגואל ג'ינס לגברים", 'DESIGUAL'], ['2', 'דזיגואל מכנסיים ארוכים לגברים', 'DESIGUAL'], ['3', 'דזיגואל חולצה לגברים', 'DESIGUAL', ['אופנה', 'חולצות', 'גברים']],
+            ['4', 'אדידס מכנסיים ארוכים Germany לגברים', 'ADIDAS'], ['5', 'אדידס מכנסיים קצרים לגברים', 'ADIDAS'], ['6', 'אדידס סניקרס לגברים', 'ADIDAS', ['נעליים', 'גברים']], ['7', 'אדידס סניקרס SAMBA לגברים', 'ADIDAS', ['נעליים', 'גברים']],
+            ['8', 'דזיגואל חולצה מכופתרת לגברים', 'DESIGUAL', ['אופנה', 'חולצות', 'גברים']], ['9', 'אדידס טישירט לגברים', 'ADIDAS', ['חולצות', 'גברים']],
         ]));
 
         app(TenantContext::class)->run($shop->id, function () use ($p): void {
-            $same = app(ProductKinds::class)->sameKind($p[0], ['2', '4', '5'], $near);
+            $same = app(ProductKinds::class)->sameKind($p[0], ['2', '4', '3', '5', '6'], $near);
             $this->assertSame([], $same, 'nothing is like the jeans');
             $this->assertSame(['2', '4', '5'], $near, 'the trousers may interest');
+        });
+    }
+
+    public function test_a_shirt_is_never_a_sneakers_alike_by_whom_they_are_for(): void
+    {
+        // Chozen's demo, 28.10: where only Veja's titles said "סניקרס", "וג'ה סניקרס" was read as its name, and its
+        // sneakers had no kind but their tags: "גברים/יוניסקס" made a shirt one's alike.
+        $shop = Shop::factory()->create();
+        $p = app(TenantContext::class)->run($shop->id, fn (): array => array_map(fn (array $x): CatalogProduct => CatalogProduct::query()->create([
+            'shop_id' => $shop->id, 'external_id' => $x[0], 'type' => 'simple', 'status' => 'publish', 'title' => $x[1], 'brand' => $x[2],
+            'url' => 'https://www.store.test/p/'.$x[0], 'in_stock' => true, 'purchasable' => true, 'hash' => 'h'.$x[0], 'price' => 100,
+            'payload' => ['product_type' => 'חורף 26', 'tags' => $x[3]],
+        ]), [
+            ['1', "וג'ה סניקרס V-90 לגברים", 'VEJA', ['גברים/יוניסקס', 'החדשים', 'נעליים']],
+            ['2', "וג'ה סניקרס CAMPO לגברים", 'VEJA', ['גברים/יוניסקס', 'נעליים']],
+            ['3', "וג'ה סניקרס RIO BRANCO לגברים", 'VEJA', ['גברים/יוניסקס', 'נעליים']],
+            ['4', "סקוץ' אנד סודה חולצה מכופתרת לגברים", 'SCOTCH & SODA', ['גברים/יוניסקס', 'חולצות']],
+            ['5', "סקוץ' אנד סודה סווטשירט לגברים", 'SCOTCH & SODA', ['גברים/יוניסקס', 'סווטשירטים']],
+            ['6', "סקוץ' אנד סודה מכנסיים לגברים", 'SCOTCH & SODA', ['גברים/יוניסקס', 'מכנסיים']],
+            ['7', 'פלדיום מגפיים PAMPA HI לגברים', 'PALLADIUM', ['גברים/יוניסקס', 'נעליים']],
+        ]));
+
+        app(TenantContext::class)->run($shop->id, function () use ($p): void {
+            $kinds = app(ProductKinds::class);
+            $this->assertSame(['head:סניקרס'], $kinds->marks($p[0]), "its name is וג'ה; what its titles say after it is the kind");
+            $same = $kinds->sameKind($p[0], ['2', '4', '5', '3', '6', '7'], $near);
+            $this->assertSame(['2', '3'], $same);
+            $this->assertNotContains('4', [...$same, ...$near], 'never a shirt, not even as maybe');
         });
     }
 }
