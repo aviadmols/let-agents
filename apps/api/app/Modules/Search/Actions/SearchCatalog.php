@@ -1140,7 +1140,7 @@ final class SearchCatalog
             }
 
             // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
-            $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids));
+            $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
             // Where looks matter, what its picture is described with shows most (its colour, its print, its material): a
             // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
             // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
@@ -1148,7 +1148,8 @@ final class SearchCatalog
             $ofKind = $ids;
             $ids = $looksLead && ! $otherColour && ($wants['words'] ?? []) === [] ? self::seenAlike($product, $ids) : $ids;
             // what its look left out, as the store sells them now: never the product itself, and still all the question asked
-            $left = array_filter(array_map(fn (string $id): ?array => $id === $externalId ? null : ($index['records']['p:'.$id] ?? null), array_values(array_diff($ofKind, $ids))));
+            // and after them what is near its kind, not of it: "nothing quite like it, but maybe these" (jeans: trousers)
+            $left = array_filter(array_map(fn (string $id): ?array => $id === $externalId ? null : ($index['records']['p:'.$id] ?? null), array_values(array_unique([...array_diff($ofKind, $ids), ...$near]))));
             $left = $wants === null ? array_values($left) : SimilarWants::apply(array_values($left), $wants, $index['records']['p:'.$externalId] ?? null);
             usort($left, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
             $others = array_map(fn (array $r): array => $this->present($r), array_slice($left, 0, $limit));

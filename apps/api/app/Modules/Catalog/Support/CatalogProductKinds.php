@@ -72,8 +72,9 @@ final class CatalogProductKinds implements ProductKinds
         )));
     }
 
-    public function sameKind(CatalogProduct $product, array $externalIds): array
+    public function sameKind(CatalogProduct $product, array $externalIds, ?array &$near = null): array
     {
+        $near = [];
         $marks = $this->marks($product);
 
         // a product of no known kind keeps them all, of its own people still (a man's, never a woman's)
@@ -86,11 +87,23 @@ final class CatalogProductKinds implements ProductKinds
         $audience = self::audience($product);
         $prefixes = $this->counts((string) $product->shop_id)['prefix'];
 
-        $kept = array_values(array_filter($externalIds, function (string $id) use ($others, $marks, $audience, $prefixes): bool {
+        // Two titles that name two kinds ("ג'ינס", "מכנסיים קצרים") are two, whatever tag the store gives both ("מכנסיים"):
+        // near it, never like it (Chozen, 28.10: a pair of jeans' alike were trousers and shorts)
+        $head = self::own($product, $prefixes)['head'];
+        $kept = [];
+        foreach ($externalIds as $id) {
             $other = $others->get($id);
+            if ($other === null || ($marks !== [] && array_intersect($marks, self::allMarks($other, $prefixes)) === []) || ! self::sameAudience($audience, self::audience($other))) {
+                continue;
+            }
+            $theirs = self::own($other, $prefixes)['head'];
+            if ($head !== '' && $theirs !== '' && $theirs !== $head && (string) $id !== (string) $product->external_id) {
+                $near[] = $id;
 
-            return $other !== null && ($marks === [] || array_intersect($marks, self::allMarks($other, $prefixes)) !== []) && self::sameAudience($audience, self::audience($other));
-        }));
+                continue;
+            }
+            $kept[] = $id;
+        }
 
         // Of shoes, home slippers ("נעלי בית"), never running shoes ("נעלי ריצה") or flats ("נעלי בובה") (Chozen, 28.10):
         // where its title names it by two words and enough of the rest are named by them too, only those.
@@ -98,6 +111,7 @@ final class CatalogProductKinds implements ProductKinds
         if ($sub !== '') {
             $named = array_values(array_filter($kept, fn (string $id): bool => $id !== (string) $product->external_id && self::own($others->get($id), $prefixes)['sub'] === $sub));
             if (count($named) >= self::SUB_KIND_MIN) {
+                $near = [...array_values(array_filter($kept, fn (string $id): bool => $id !== (string) $product->external_id && ! in_array($id, $named, true))), ...$near];
                 $kept = array_values(array_filter($kept, fn (string $id): bool => $id === (string) $product->external_id || in_array($id, $named, true)));
             }
         }

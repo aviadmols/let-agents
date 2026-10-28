@@ -19,9 +19,11 @@ interface ProductKinds
      * keeps them all.
      *
      * @param  list<string>  $externalIds
+     * @param  list<string>|null  $near  filled with those near its kind and not of it (jeans beside trousers): what
+     *                                   may interest a shopper when nothing is like it
      * @return list<string>
      */
-    public function sameKind(CatalogProduct $product, array $externalIds): array;
+    public function sameKind(CatalogProduct $product, array $externalIds, ?array &$near = null): array;
 
     /**
      * Whether a category or tag names a campaign, a season or a collection rather than a kind ("חדש באתר", "NIGHT SALE",

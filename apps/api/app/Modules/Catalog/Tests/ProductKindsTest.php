@@ -153,6 +153,31 @@ final class ProductKindsTest extends TestCase
         app(TenantContext::class)->run($shop->id, function () use ($kinds, $products, $more): void {
             $this->assertSame(['12', '13', '14'], $kinds->sameKind($more[0], ['1', '3', '5', '12', '13', '14']), 'running shoes, of running shoes');
             $this->assertSame(['3', '5', '11'], $kinds->sameKind($products['mules'], ['3', '5', '11']), 'too few home slippers: any shoe');
+            // two kinds by their titles, though the store tags both alike: near, not like (Chozen: jeans beside trousers)
+            $this->assertSame([], $kinds->sameKind($products['jacket'], ['10'], $near));
+            $this->assertSame([], $near, 'a tee is no kind of jacket, nor near it: no mark in common');
+            $this->assertSame(['12', '13', '14'], $kinds->sameKind($more[0], ['12', '13', '14', '1', '5'], $near));
+            $this->assertSame(['1', '5'], $near, 'shoes that are not running shoes: maybe these');
+        });
+    }
+
+    public function test_jeans_are_not_like_trousers_the_store_tags_alike_but_may_interest(): void
+    {
+        // Chozen, 28.10: "דזיגואל ג'ינס לגברים" had trousers and shorts for its alike, all tagged מכנסיים
+        $shop = Shop::factory()->create();
+        $p = app(TenantContext::class)->run($shop->id, fn (): array => array_map(fn (array $x): CatalogProduct => CatalogProduct::query()->create([
+            'shop_id' => $shop->id, 'external_id' => $x[0], 'type' => 'simple', 'status' => 'publish', 'title' => $x[1], 'brand' => $x[2],
+            'url' => 'https://www.store.test/p/'.$x[0], 'in_stock' => true, 'purchasable' => true, 'hash' => 'h'.$x[0], 'price' => 100,
+            'payload' => ['tags' => ['אופנה', 'מכנסיים', 'גברים']],
+        ]), [
+            ['1', "דזיגואל ג'ינס לגברים", 'DESIGUAL'], ['2', 'דזיגואל מכנסיים ארוכים לגברים', 'DESIGUAL'], ['3', 'דזיגואל חולצה לגברים', 'DESIGUAL'],
+            ['4', 'אדידס מכנסיים ארוכים Germany לגברים', 'ADIDAS'], ['5', 'אדידס מכנסיים קצרים לגברים', 'ADIDAS'], ['6', 'אדידס סניקרס לגברים', 'ADIDAS'],
+        ]));
+
+        app(TenantContext::class)->run($shop->id, function () use ($p): void {
+            $same = app(ProductKinds::class)->sameKind($p[0], ['2', '4', '5'], $near);
+            $this->assertSame([], $same, 'nothing is like the jeans');
+            $this->assertSame(['2', '4', '5'], $near, 'the trousers may interest');
         });
     }
 }
