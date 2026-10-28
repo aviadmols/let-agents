@@ -802,6 +802,30 @@
             "scope": "shop"
         },
         {
+            "name": "card_action",
+            "type": "enum",
+            "options": [
+                "product_page",
+                "read_more"
+            ],
+            "default": "product_page",
+            "scope": "shop"
+        },
+        {
+            "name": "store_currency",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
+            "name": "guides_after",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 12,
+            "scope": "shop"
+        },
+        {
             "name": "similar_by",
             "type": "enum",
             "options": [

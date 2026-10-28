@@ -6,6 +6,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\ShopScan;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Demo\Models\DemoSite;
+use App\Modules\Demo\Support\ContentSite;
 use App\Modules\Demo\Support\PublicSite;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use Illuminate\Bus\Queueable;
@@ -72,6 +73,9 @@ final class PrepareDemoJob implements ShouldQueue
                 'content_locale' => $language ?? (in_array($read['locale'], ['he', 'en'], true) ? $read['locale'] : null),
             ]))->save();
             $site->forceFill(['platform' => $read['platform'], 'title' => $read['title'], 'store_products' => $read['products'], 'read_at' => now()])->save();
+            if ($read['platform'] === PublicSite::WORDPRESS) {
+                ContentSite::settle($shop->id);
+            }
         }
 
         if ($site->scan_at === null) {

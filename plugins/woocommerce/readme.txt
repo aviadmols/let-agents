@@ -4,7 +4,7 @@ Tags: woocommerce, shopping assistant, product recommendations
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.14.0
+Stable tag: 0.14.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -54,6 +54,9 @@ WooCommerce > Let Agents reports shows page views, visitors, hot pages, hot disp
 Or the other way round: in Lets, Settings > Connection and plan > Create a connection token, and paste it in WooCommerce > Let Agents > Have a token from Lets?
 
 == Changelog ==
+
+= 0.14.1 =
+* Works on a WordPress site with no WooCommerce: a content site. Let Agents reads what it offers (tours, courses, events) and its articles from what the site publishes, and Lets Search finds them. The settings are under Settings > Let Agents; nothing changes on a store with WooCommerce.
 
 = 0.14.0 =
 * Each product says how many were sold, as WooCommerce counts it: the assistant recommends what the shop's customers buy most.

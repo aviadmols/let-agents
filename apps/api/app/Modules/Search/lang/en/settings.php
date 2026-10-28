@@ -320,6 +320,19 @@ return [
         'description' => 'In the chat: the store\'s AI recommends from the products in the results, by the search, with ChatGPT, Claude or Perplexity to go on with below it. Outside: straight to choosing an outside AI, with the search and the products.',
         'options' => ['inside' => 'In the chat', 'outside' => 'Out to an outside AI'],
     ],
+    'card_action' => [
+        'label' => 'The button on every product, where there is no cart',
+        'description' => 'When the add to cart button is off: "Product page" for a store, "Read more" for a site that tells about what it offers (tours, courses, events).',
+        'options' => ['product_page' => 'Product page', 'read_more' => 'Read more'],
+    ],
+    'store_currency' => [
+        'label' => 'Prices in the store\'s currency',
+        'description' => 'For a site whose prices come with no currency of their own (a content site): the store\'s currency beside every price. Off, a store\'s own (its Store API, Shopify\'s format) as it always was.',
+    ],
+    'guides_after' => [
+        'label' => 'Guides and articles after this many products',
+        'description' => 'Where the guides and articles a search found are shown among the products. 0: after all of them. On a site with many articles, 4 shows them after the second row.',
+    ],
     'image_fit' => [
         'label' => 'Product pictures',
         'description' => 'Fill the square and crop the edges, or show whole inside a light frame (suits pictures on a white ground).',

@@ -21,6 +21,9 @@ final class PublicSite
 
     public const WOOCOMMERCE = 'woocommerce';
 
+    /** WordPress with no store: a content site, read by its content types (WordPressSite). */
+    public const WORDPRESS = 'wordpress';
+
     public const OTHER = 'other';
 
     /** "https://www.Store.co.il/shop?x=1" → "store.co.il"; null when it is no address. */
@@ -116,9 +119,14 @@ final class PublicSite
         $platform = match (true) {
             $shopify => self::SHOPIFY,
             is_array($woo?->json()) => self::WOOCOMMERCE,
+            in_array('wp/v2', (array) (self::json($host, '/wp-json/')['namespaces'] ?? []), true) => self::WORDPRESS,
             default => self::OTHER,
         };
         $total = $platform === self::WOOCOMMERCE ? (int) $woo?->header('X-WP-Total') : 0;
+        $storeCurrency = match ($platform) {
+            self::WORDPRESS => WordPressSite::read($host)['currency'],
+            default => null,
+        };
 
         preg_match('~<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)~i', $html, $site);
         preg_match('~<title[^>]*>(.*?)</title>~is', $html, $title);
@@ -130,7 +138,7 @@ final class PublicSite
             'platform' => $platform,
             'title' => $name !== '' ? mb_substr($name, 0, 120) : null,
             'locale' => isset($lang[1]) ? strtolower($lang[1]) : null,
-            'currency' => $currency[1] ?? null,
+            'currency' => $currency[1] ?? (is_string($storeCurrency) && preg_match('/^[A-Z]{3}$/', $storeCurrency) === 1 ? $storeCurrency : null),
             'products' => $total > 0 ? $total : null,
         ];
     }

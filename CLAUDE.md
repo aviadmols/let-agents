@@ -92,6 +92,21 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
 - `php` CLI defaults to 128 MB here and `composer check` runs out of memory in the full suite; run
   `php -d memory_limit=2G vendor/bin/phpunit` when it does.
 
+## A content site: WordPress with no WooCommerce (apps/api, Demo + Connections)
+
+- One reader, `Connections\Contracts\ContentSiteFeed`, implemented by `Demo\Support\WordPressContentFeed` (over
+  `WordPressSite`), for a demo (platform `wordpress` from `PublicSite::read`) and for a plugin-connected site whose
+  status says `woocommerce.active` false (`PluginStoreFeed` hands it over; a store with WooCommerce never reaches it).
+- `WordPressSite`: content types from the REST API, only those its sitemap lists, never `page` (internal pages) or a
+  builder's own. Three pages of each are read with `HtmlText`; the lines most pages repeat are the template and go; a
+  type whose pages state a price, a way to ask or book, or a length (or Product/Event/TouristTrip/Course data) is offered
+  and becomes products (`purchasable` false, its page's words when the API body is empty, the price only from its
+  first lines, one item once by address); one with article data becomes posts. Code only.
+- Its search (`Demo\Support\ContentSite::settle`, once: the demo's preparation, or the first plugin status with no
+  WooCommerce): `search.show_cart` off, `search.card_action` read_more, `search.guides_after` 4 (the guides after the
+  second row), `search.store_currency` on (the shop's currency, read from its prices), `search.content_by_meaning` on.
+  Every one defaults to what stores always had; the drawer reads them from the index config.
+
 ## Index and matching (apps/api, ADR 0007)
 
 - `Retrieval` builds a per-shop index by meaning (`retrieval_chunks`, pgvector on Postgres, JSON

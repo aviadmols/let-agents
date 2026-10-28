@@ -3,8 +3,10 @@
 namespace App\Modules\Demo;
 
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Connections\Contracts\ContentSiteFeed;
 use App\Modules\Demo\Console\SweepDemosCommand;
 use App\Modules\Demo\Support\PublicStoreFeed;
+use App\Modules\Demo\Support\WordPressContentFeed;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -19,6 +21,8 @@ final class DemoServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->tag([PublicStoreFeed::class], 'connections.store_feeds');
+        // the one reader of a content site (WordPress with no WooCommerce): a demo's and a plugin-connected site's alike
+        $this->app->bind(ContentSiteFeed::class, WordPressContentFeed::class);
     }
 
     protected function bootModule(): void

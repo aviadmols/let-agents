@@ -12,8 +12,23 @@
       var foreign = CFG.currency && CFG.shopCurrency && CFG.currency !== CFG.shopCurrency;
       try { return e.formatMoney(Math.round(Number(n) * 100), foreign ? '' : CFG.moneyFormat, CFG.currency || 'ILS', LANG); } catch (x) { /* plain */ }
     }
-    var text = Number(n).toLocaleString(LANG === 'he' ? 'he-IL' : 'en-US', { maximumFractionDigits: 2 }), cur = S && S.cur;
+    var text = Number(n).toLocaleString(LANG === 'he' ? 'he-IL' : 'en-US', { maximumFractionDigits: 2 }), cur = S && (S.cur || storeCurrency());
     return cur ? (cur.prefix || '') + text + (cur.suffix || '') : '₪' + text;
+  }
+  // the store's own currency, as the index says it (a site with no Store API: a content site, a demo), its symbol
+  // where the language puts it; null for shekels or none, so ₪ stays as it was
+  var CUR_AFFIX = {};
+  function storeCurrency() {
+    var code = S && S.config && S.config.currency;
+    if (!code || code === 'ILS') { return null; }
+    if (CUR_AFFIX[code] !== undefined) { return CUR_AFFIX[code]; }
+    try {
+      var parts = new Intl.NumberFormat(LANG === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' }).formatToParts(1);
+      var at = parts.findIndex(function (p) { return p.type === 'currency'; }), num = parts.findIndex(function (p) { return p.type === 'integer'; });
+      var sym = at >= 0 ? parts[at].value : code;
+      CUR_AFFIX[code] = at >= 0 && at > num ? { prefix: '', suffix: ' ' + sym } : { prefix: sym, suffix: '' };
+    } catch (x) { CUR_AFFIX[code] = { prefix: code + ' ', suffix: '' }; }
+    return CUR_AFFIX[code];
   }
   function store(kind, key, val) {
     try {

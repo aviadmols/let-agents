@@ -3,6 +3,7 @@
 namespace App\Modules\Connections\Actions;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Connections\Contracts\ContentSiteFeed;
 use App\Modules\Connections\Enums\ConnectionStatus;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\PluginHttp;
@@ -63,12 +64,20 @@ final class TestStoreConnection
         }
 
         $info = (array) $response->json('data');
+        $wasContentSite = $connection->info('woocommerce.active') === false;
 
         $this->save($connection, [
             'status' => ConnectionStatus::Connected,
             'last_error_code' => null,
             'site_info' => $info,
         ]);
+
+        // A site with no WooCommerce, seen for the first time: a content site, its search set as one (no cart, "Read more",
+        // its articles after the second row, its currency), once, so whatever the team changes after stays theirs.
+        // A store with WooCommerce is never touched.
+        if (! $wasContentSite && data_get($info, 'woocommerce.active') === false && app()->bound(ContentSiteFeed::class)) {
+            app(ContentSiteFeed::class)->settle((string) $connection->shop_id, (string) $connection->site_url);
+        }
 
         $products = (int) data_get($info, 'counts.products.publish', 0);
 

@@ -91,6 +91,12 @@ final class SearchIndexController
             // What each product carries, as the shop set it on its search display screen.
             'price' => (bool) Settings::get('search.show_price', $shopId),
             'cart' => (bool) Settings::get('search.show_cart', $shopId),
+            // where there is no cart: "Product page" or "Read more" (a site that tells about what it offers)
+            'cardAction' => (string) Settings::get('search.card_action', $shopId),
+            // how many cards come before the guides and articles a search found (0: after all of them)
+            'guidesAfter' => (int) Settings::get('search.guides_after', $shopId),
+            // the store's own currency, for a site whose prices come with none (no Store API, no Shopify format)
+            'currency' => Settings::get('search.store_currency', $shopId) ? (string) (Shop::query()->whereKey($shopId)->value('currency') ?? '') : null,
             // Product pictures fill their square ("cover"), or show whole in a light frame ("frame").
             'images' => (string) Settings::get('search.image_fit', $shopId),
             // "Not sure what fits?" under the results: the store's AI recommends among them (inside), or an outside AI (outside).

@@ -64,7 +64,7 @@ return array(
 		'Let Agents' => 'Let Agents',
 		'Let Agents answered with status %d.' => 'Let Agents החזירה סטטוס %d.',
 		'Let Agents does not know this store yet. Connect it in Let Agents with the current token.' => 'Let Agents עדיין לא מכירה את החנות. יש לחבר אותה ב־Let Agents עם הטוקן הנוכחי.',
-		'Let Agents needs WooCommerce. Activate WooCommerce so Let Agents can read the catalog.' => 'Let Agents צריכה את WooCommerce. יש להפעיל את WooCommerce כדי ש־Let Agents תוכל לקרוא את הקטלוג.',
+		'WooCommerce is not active, so Let Agents reads this site as a content site: what it offers (tours, courses, events) and its articles. Connect it with the token below.' => 'WooCommerce לא פעיל, ולכן Let Agents קוראת את האתר כאתר תוכן: מה שהוא מציע (סיורים, קורסים, אירועים) ואת המאמרים שלו. יש לחבר אותו עם הטוקן שלמטה.',
 		'Let Agents reads this store\'s products, categories and content to build the shopping assistant. Access is read-only and needs the token below. Customer details are never shared: for reports, Let Agents gets only order totals and product IDs.' => 'Let Agents קוראת את המוצרים, הקטגוריות והתוכן של החנות כדי לבנות את עוזר הקנייה. הגישה לקריאה בלבד ודורשת את הטוקן שלמטה. פרטי לקוחות לעולם לא משותפים: לדוחות Let Agents מקבלת רק סכומי הזמנות ומזהי מוצרים.',
 		'Let Agents refused the request. Check that the token connected in Let Agents is the current one and that the site clock is correct.' => 'Let Agents דחתה את הבקשה. יש לבדוק שהטוקן שמחובר ב־Let Agents הוא הנוכחי ושהשעון של האתר נכון.',
 		'Let Agents reports' => 'דוחות Let Agents',

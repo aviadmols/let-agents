@@ -9,8 +9,9 @@ use Generator;
 
 /**
  * A demo store's catalogue, from what the store publishes for anyone (platform "demo"): Shopify's public product
- * feed, WooCommerce's public store API and WordPress's pages and posts, or, on any other site, the products its
- * sitemap lists, read from the product data each page carries (JSON-LD). In the feed shape every other reader
+ * feed, WooCommerce's public store API and WordPress's pages and posts, a WordPress site with no store by what it
+ * offers and what it writes (WordPressSite), or, on any other site, the products its sitemap lists, read from the
+ * product data each page carries (JSON-LD). In the feed shape every other reader
  * gives (FeedRecord), so the catalogue's sync, the search and the assistant take it as they take a real store.
  * How many is the shop's own limit (catalog.max_products, catalog.max_content_items): the sync stops reading there.
  * A Shopify store's pages and policies come from its site's pages (ReadSitePages), as for a real Shopify store.
@@ -37,6 +38,7 @@ final class PublicStoreFeed implements PlatformStoreFeed
                 'external_id' => (string) $c['id'], 'name' => (string) $c['title'], 'parent_id' => null, 'path' => [(string) $c['title']],
                 'product_count' => (int) ($c['products_count'] ?? 0), 'url' => 'https://'.$host.'/collections/'.$c['handle'], 'image' => $c['image']['src'] ?? null,
             ], array_filter((array) (PublicSite::json($host, '/collections.json', ['limit' => 250])['collections'] ?? []), 'is_array'))),
+            PublicSite::WORDPRESS => app(WordPressContentFeed::class)->categories('https://'.$host),
             PublicSite::WOOCOMMERCE => array_values(array_map(fn (array $c): array => [
                 'external_id' => (string) $c['id'], 'name' => html_entity_decode((string) $c['name'], ENT_QUOTES), 'parent_id' => ($c['parent'] ?? 0) ? (string) $c['parent'] : null,
                 'path' => [html_entity_decode((string) $c['name'], ENT_QUOTES)], 'product_count' => (int) ($c['count'] ?? 0), 'url' => $c['permalink'] ?? null, 'image' => $c['image']['src'] ?? null,
@@ -79,6 +81,12 @@ final class PublicStoreFeed implements PlatformStoreFeed
             return;
         }
 
+        if ($kind === PublicSite::WORDPRESS) {
+            yield from app(WordPressContentFeed::class)->products('https://'.$host);
+
+            return;
+        }
+
         $batch = [];
         foreach (array_slice(Sitemap::urls($host, 'product'), 0, self::SITEMAP_PRODUCTS) as $url) {
             $record = self::fromPage($host, $url, $connection);
@@ -98,6 +106,13 @@ final class PublicStoreFeed implements PlatformStoreFeed
 
     public function content(StoreConnection $connection, string $type): Generator
     {
+        // a content site's articles, of every type it writes; never its internal pages
+        if (self::kind($connection) === PublicSite::WORDPRESS) {
+            yield from app(WordPressContentFeed::class)->content('https://'.self::hostOf($connection), $type);
+
+            return;
+        }
+
         // WordPress shares its pages and posts publicly; a Shopify or other site's come from its sitemap (ReadSitePages)
         if (self::kind($connection) !== PublicSite::WOOCOMMERCE) {
             return;
@@ -121,7 +136,11 @@ final class PublicStoreFeed implements PlatformStoreFeed
 
     public function contentTypes(StoreConnection $connection): array
     {
-        return self::kind($connection) === PublicSite::WOOCOMMERCE ? ['page', 'post'] : [];
+        return match (self::kind($connection)) {
+            PublicSite::WOOCOMMERCE => ['page', 'post'],
+            PublicSite::WORDPRESS => app(WordPressContentFeed::class)->contentTypes('https://'.self::hostOf($connection)),
+            default => [],
+        };
     }
 
     private static function hostOf(StoreConnection $connection): string

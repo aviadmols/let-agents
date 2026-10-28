@@ -57,9 +57,16 @@ final class SettingsPage {
 			return;
 		}
 
+		// No WooCommerce: a content site. Let Agents reads what it offers (tours, courses, events) and its articles from what
+		// the site publishes, and Lets Search finds them; nothing here needs WooCommerce. Shown on this plugin's pages only.
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( null === $screen || false === strpos( (string) $screen->id, self::SLUG ) ) {
+			return;
+		}
+
 		printf(
-			'<div class="notice notice-warning"><p>%s</p></div>',
-			esc_html__( 'Let Agents needs WooCommerce. Activate WooCommerce so Let Agents can read the catalog.', 'let-agents' )
+			'<div class="notice notice-info"><p>%s</p></div>',
+			esc_html__( 'WooCommerce is not active, so Let Agents reads this site as a content site: what it offers (tours, courses, events) and its articles. Connect it with the token below.', 'let-agents' )
 		);
 	}
 

@@ -244,7 +244,8 @@
   function buyBtn(r, cls) {
     var id = pid(r.id);
     // no cart: the product's page is the card's one action, as strong as "add to cart" where there is one
-    if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--primary ' + cls + '" href="' + esc(r.url) + '">' + esc(t('orderPage')) + '</a>' : ''; }
+    // on a site that tells rather than sells (a tour, an experience): "Read more", as the store chose (search.card_action)
+    if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--primary ' + cls + '" href="' + esc(r.url) + '">' + esc(t(S.config && S.config.cardAction === 'read_more' ? 'readMore' : 'orderPage')) + '</a>' : ''; }
     // sold out: its like in stock, or (none of its kind here) only that it is sold out
     if (r.s === 0) { return r.ns === 1 ? '<button class="ls-btn ls-btn--secondary ' + cls + '" disabled>' + esc(t('outStock')) + '</button>' : '<button class="ls-btn ls-btn--secondary ' + cls + '" data-similar="' + esc(id) + '">' + esc(t('similarInStock')) + '</button>'; }
     if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + esc(t('options')) + '</button>'; }
@@ -388,9 +389,13 @@
     }
     if (!list.length) { return html + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
     var n = gridN(turn);
-    html += '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>';
+    // the guides' place among the cards, as the store chose (search.guides_after): after so many cards, so a site's articles
+    // are seen without scrolling past every product; 0 keeps them after all the cards
+    var ga = !guideFirst && turn.content && turn.content.length && S.config && S.config.guidesAfter > 0 && Math.min(n, list.length) > S.config.guidesAfter ? S.config.guidesAfter : 0;
+    html += '<div class="ls-grid">' + list.slice(0, ga || n).map(card).join('') + '</div>';
+    if (ga) { html += guidesHtml(turn.content, turn.q) + '<div class="ls-grid">' + list.slice(ga, n).map(card).join('') + '</div>'; }
     if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
-    if (!guideFirst) { html += guidesHtml(turn.content, turn.q); }
+    if (!guideFirst && !ga) { html += guidesHtml(turn.content, turn.q); }
     // asked of the store's AI only over a few results (search.not_sure_max): a long list is narrowed by its filters first
     if (!off('ask') && list.length <= notSureMax()) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-not-sure="' + esc(turn.id) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>' + (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;

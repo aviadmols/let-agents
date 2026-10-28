@@ -2,6 +2,7 @@
 
 namespace App\Modules\Connections\Support;
 
+use App\Modules\Connections\Contracts\ContentSiteFeed;
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
 use App\Modules\Connections\Contracts\ReadsChangedProducts;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
@@ -51,18 +52,43 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
         ($this->sleeper)(self::BACKOFF_SECONDS[$attempt - 1] ?? self::BACKOFF_SECONDS[array_key_last(self::BACKOFF_SECONDS)]);
     }
 
+    /**
+     * A site whose plugin says WooCommerce is not active is a content site: its catalogue is read by the one content
+     * site reader (ContentSiteFeed), as a demo of it is. A store with WooCommerce never reaches it; nor does one whose
+     * plugin has not said (an older plugin, a status not read yet).
+     */
+    private function contentSite(StoreConnection $connection): ?ContentSiteFeed
+    {
+        return $connection->info('woocommerce.active') === false && app()->bound(ContentSiteFeed::class) ? app(ContentSiteFeed::class) : null;
+    }
+
     public function categories(StoreConnection $connection): array
     {
+        if ($site = $this->contentSite($connection)) {
+            return $site->categories((string) $connection->site_url);
+        }
+
         return array_values((array) $this->get($connection, '/feed/categories')['data']);
     }
 
     public function products(StoreConnection $connection): Generator
     {
+        if ($site = $this->contentSite($connection)) {
+            yield from $site->products((string) $connection->site_url);
+
+            return;
+        }
+
         yield from $this->pages($connection, '/feed/products');
     }
 
     public function changedProducts(StoreConnection $connection, CarbonInterface $since): ?Generator
     {
+        // a content site has no quick read of what changed: its nightly read sees it
+        if ($this->contentSite($connection)) {
+            return null;
+        }
+
         return $this->changed($connection, $since);
     }
 
@@ -87,11 +113,21 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 
     public function content(StoreConnection $connection, string $type): Generator
     {
+        if ($site = $this->contentSite($connection)) {
+            yield from $site->content((string) $connection->site_url, $type);
+
+            return;
+        }
+
         yield from $this->pages($connection, '/feed/content', ['type' => $type]);
     }
 
     public function contentTypes(StoreConnection $connection): array
     {
+        if ($site = $this->contentSite($connection)) {
+            return $site->contentTypes((string) $connection->site_url);
+        }
+
         $types = $connection->info('plugin.content_post_types');
 
         if (! is_array($types)) {
