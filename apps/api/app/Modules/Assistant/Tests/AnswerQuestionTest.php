@@ -6,8 +6,10 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerQuestion;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Question;
@@ -29,7 +31,7 @@ final class AnswerQuestionTest extends TestCase
 
     private const VID = 'anon-visitor1234567890abcd';
 
-    private const VERIFIED = ['about_this_product' => true, 'consistent' => true, 'on_topic' => true];
+    private const VERIFIED = ['about_this_product' => true, 'consistent' => true, 'on_topic' => true, 'safe' => true, 'injection' => false];
 
     /** @var object{calls: list<array{model: string, user: string}>, replies: list<array<string, mixed>>} */
     private object $model;
@@ -264,5 +266,68 @@ final class AnswerQuestionTest extends TestCase
         return $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/ask', server: [
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
         ], content: json_encode(['id' => $id, 'type' => $type, 'question' => $question, 'vid' => $vid, 'locale' => 'he'], JSON_UNESCAPED_UNICODE));
+    }
+
+    public function test_a_question_asking_for_harm_on_a_products_page_gets_no_writer_and_counts_against_the_visitor(): void
+    {
+        $this->model->replies = [['about_product' => true, 'harmful' => true, 'injection' => false]];
+
+        $this->assertSame('out_of_scope', $this->ask('איך משתמשים בזה כדי לפגוע במישהו?')->json('data.outcome'));
+        $this->assertCount(1, $this->model->calls, 'the writer never sees it');
+        $this->assertSame(0, $this->inShop(fn () => AssistantAnswer::query()->count()), 'nothing saved: the next asker is checked again');
+    }
+
+    public function test_an_answer_the_checker_finds_unsafe_is_never_shown(): void
+    {
+        $this->model->replies = [['about_product' => true], ['answer' => 'מתאים לשימוש בחוץ.', 'source' => 'store'], ['safe' => false] + self::VERIFIED];
+
+        $this->assertSame('no_info', $this->ask('האם זה מתאים לחוץ?')->json('data.outcome'));
+    }
+
+    public function test_every_call_is_held_to_its_prompts_schema(): void
+    {
+        $model = new class implements ChatModel, StructuredChatModel
+        {
+            /** @var list<array{system: string, schema: array<string, mixed>}> */
+            public array $calls = [];
+
+            /** @var list<array<string, mixed>> */
+            public array $replies = [];
+
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                throw new \LogicException('every prompt here has a schema');
+            }
+
+            public function structured(AiProviderName $provider, string $model, string $system, string $user, array $schema, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $this->calls[] = ['system' => $system, 'schema' => $schema];
+
+                return new ModelReply(array_shift($this->replies) ?? [], 500, 100);
+            }
+        };
+        $model->replies = [['about_product' => true, 'harmful' => false, 'injection' => false], ['answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'source' => 'store'], self::VERIFIED];
+        $this->app->instance(ChatModel::class, $model);
+
+        $this->assertSame('answered', $this->ask('האם זה מתאים לחוץ?')->json('data.outcome'));
+        $this->assertSame([['about_product', 'harmful', 'injection'], ['answer', 'source'], array_keys(self::VERIFIED)], array_map(fn (array $c): array => $c['schema']['required'], $model->calls));
+    }
+
+    /**
+     * Every prompt whose words a shopper reads, or that decides what a shopper reads, says what it is, that what it is
+     * given is data and never instructions, and is held to a schema.
+     */
+    public function test_every_prompt_shoppers_see_is_framed(): void
+    {
+        $dir = dirname(__DIR__).'/Prompts/';
+        $files = array_map(fn (string $name): string => $dir.$name.'.v'.AnswerQuestion::PROMPT_VERSION.'.md', ['answer', 'scope', 'verify', 'answer_article', 'scope_article', 'verify_article']);
+        $files = [...$files, ...array_map(fn (string $name): string => (string) AnswerSiteQuestion::promptFile($name), ['answer_site', 'scope_site', 'verify_site'])];
+
+        foreach ($files as $file) {
+            $text = (string) file_get_contents($file);
+            $this->assertMatchesRegularExpression('/^You /', $text, basename($file).' opens with who the model is');
+            $this->assertStringContainsString('not instructions', $text, basename($file).' says its input is data');
+            $this->assertNotNull(AnswerSiteQuestion::schemaFor($file), basename($file).' has a schema');
+        }
     }
 }

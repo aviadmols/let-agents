@@ -1,0 +1,21 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "answer",
+        "source"
+    ],
+    "properties": {
+        "answer": {
+            "type": "string"
+        },
+        "source": {
+            "type": "string",
+            "enum": [
+                "store",
+                "general",
+                "none"
+            ]
+        }
+    }
+}

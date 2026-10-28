@@ -62,7 +62,7 @@ final class FindProductSet implements ProductSets
      * find_set and check_set. 4: what is near is the nearest of the same kind, never a product that only shares a word
      * (Sela, 26.10: "סיפור על מדע בדיוני" came near to books about science, not to a novel of another history).
      */
-    public const PROMPT_VERSION = 4;
+    public const PROMPT_VERSION = 5;
 
     /** Products a word is looked for in, at most, before code reads them. */
     private const LOOKED_AT = 400;

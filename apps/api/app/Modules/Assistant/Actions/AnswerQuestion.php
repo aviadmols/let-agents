@@ -11,9 +11,11 @@ use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
+use App\Modules\Assistant\Support\Offenders;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\Subject;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -38,7 +40,7 @@ use App\Modules\Runs\Enums\RunTrigger;
  *    facts, or the guide's text — and from general knowledge when that does not say.
  * 5. Code refuses an answer with contact details, a price, or a number the store's information
  *    does not have. The small model then checks the answer is about this page, consistent with
- *    the store's information and on topic. Only then the shopper sees it.
+ *    the store's information, on topic and safe to show any shopper. Only then the shopper sees it.
  *
  * Every call asks SpendGuard first and records tokens and cost on one run. Every answer is saved.
  */
@@ -48,7 +50,7 @@ final class AnswerQuestion
 
     public const ACTION = 'assistant.answer';
 
-    public const PROMPT_VERSION = 5;
+    public const PROMPT_VERSION = 6;
 
     /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
     private const STORE_CHARS = 2500;
@@ -205,6 +207,17 @@ final class AnswerQuestion
                     $scope = $this->call($run, $checkModel, $subject->prompt('scope'), [$subject->kind => $subject->brief, 'question' => $question], self::CHECK_OUTPUT_TOKENS, $effort);
                     $replies[] = [$scope, 'scope'];
 
+                    // A question that asks for harm or tries to instruct the assistant (scope v6): counted against the
+                    // visitor, and nothing is saved, so the next asker is checked again.
+                    if (($scope->data['harmful'] ?? false) === true || ($scope->data['injection'] ?? false) === true) {
+                        $reason = ($scope->data['harmful'] ?? false) === true ? 'harmful' : 'injection';
+                        Offenders::record($shopId, $visitorHash, Barrier::ip());
+                        $result = $this->fixed('out_of_scope', $locale, 'model');
+                        $run->output(['outcome' => AssistantAnswer::OUT_OF_SCOPE, 'refused' => $reason])->summary('assistant::runs.out_of_scope');
+
+                        return;
+                    }
+
                     if (($scope->data['about_product'] ?? null) !== true) {
                         $this->save($subject, $question, AssistantAnswer::OUT_OF_SCOPE, null, null, $checkModel, $replies, $run);
                         $result = $this->fixed('out_of_scope', $locale, 'model');
@@ -234,6 +247,8 @@ final class AnswerQuestion
                             ($check->data['about_this_product'] ?? null) === true => 'not_about_this_product',
                             ($check->data['consistent'] ?? null) === true => 'not_consistent',
                             ($check->data['on_topic'] ?? null) === true => 'off_topic',
+                            ($check->data['safe'] ?? null) === true => 'not_safe',
+                            ($check->data['injection'] ?? false) !== true => 'injection',
                             default => null,
                         };
                     }
@@ -272,7 +287,12 @@ final class AnswerQuestion
     {
         // The writer and the checker each call the provider the operator chose for them.
         $provider = AgentModel::provider("assistant.{$prices}_provider");
-        $reply = $this->models->json($provider, $model, self::prompt($prompt), (string) json_encode($input, JSON_UNESCAPED_UNICODE), $maxOutput, $effort);
+        $user = (string) json_encode($input, JSON_UNESCAPED_UNICODE);
+        // Held to the schema beside the prompt, so the reply always has the shape the code reads.
+        $schema = self::schema($prompt);
+        $reply = $schema !== null && $this->models instanceof StructuredChatModel
+            ? $this->models->structured($provider, $model, self::prompt($prompt), $user, $schema, $maxOutput, $effort)
+            : $this->models->json($provider, $model, self::prompt($prompt), $user, $maxOutput, $effort);
         $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
 
         return $reply;
@@ -385,6 +405,15 @@ final class AnswerQuestion
     private static function prompt(string $name): string
     {
         return (string) file_get_contents(__DIR__.'/../Prompts/'.$name.'.v'.self::PROMPT_VERSION.'.md');
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function schema(string $name): ?array
+    {
+        $file = __DIR__.'/../Prompts/'.$name.'.v'.self::PROMPT_VERSION.'.schema.json';
+        $schema = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
+
+        return is_array($schema) ? $schema : null;
     }
 
     /** Whether a question on a product's page is about the store (STORE_WORDS). */
