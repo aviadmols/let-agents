@@ -23,15 +23,18 @@ final class RelatedByPackagingTest extends TestCase
 
     public function test_a_bundle_on_a_subject_is_like_the_books_on_it_not_like_every_other_bundle(): void
     {
-        $shop = Shop::factory()->create();
+        $shop = Shop::factory()->create(['name' => 'סלע מאיר']);
         $tenant = app(TenantContext::class);
 
         $found = $tenant->run($shop->id, function () use ($shop): array {
             $ids = [];
-            foreach (['757' => ['ספרי השבעה באוקטובר', ['באנדל']], '755' => ['ספרי דאגלס מאריי במבצע', ['באנדל']], '655' => ['להבין את ה-7 באוקטובר', []], '600' => ['מרד הגנרלים', []]] as $id => [$title, $tags]) {
+            // the shop's own name and its imprint, as store tags on the two bundles and the series book
+            foreach (['757' => ['ספרי השבעה באוקטובר', ['באנדל', 'סלע מאיר', 'ספריית שיבולת']], '755' => ['ספרי דאגלס מאריי במבצע', ['באנדל', 'סלע מאיר', 'ספריית שיבולת']], '655' => ['להבין את ה-7 באוקטובר', []], '600' => ['מרד הגנרלים', []], '9' => ['ספר שנמחק', []]] as $id => [$title, $tags]) {
                 $ids[$id] = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
-                    'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => ['tags' => $tags]])->id;
+                    'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => ['tags' => $tags],
+                    'removed_at' => $id === '9' ? now() : null])->id;
             }
+            CatalogProduct::query()->whereKey($ids['9'])->update(['removed_at' => now()]);
             $group = fn (string $key, string $kind, bool $recommend): TaxonomyGroup => TaxonomyGroup::query()->create(['shop_id' => $shop->id, 'key' => $key, 'label_he' => $key, 'label_en' => $key, 'kind' => $kind, 'recommend' => $recommend, 'version' => 1]);
             $tag = fn (TaxonomyGroup $g, string $key, string $he): TaxonomyTag => TaxonomyTag::query()->create(['shop_id' => $shop->id, 'group_id' => $g->id, 'key' => $key, 'label_he' => $he, 'label_en' => $key, 'version' => 1]);
             [$topic, $genre, $format] = [$group('topic', 'inferred', true), $group('genre', 'inferred', true), $group('format', 'factual', false)];
@@ -54,6 +57,8 @@ final class RelatedByPackagingTest extends TestCase
             $give($print, '655');
             $give($politics, '600');
             $give($print, '600');
+            // a product the store no longer sells: its tags count for no one, and make no tag rarer or commoner
+            $give($oct, '9');
 
             $titles = CatalogProduct::query()->pluck('title', 'id');
 
@@ -62,6 +67,7 @@ final class RelatedByPackagingTest extends TestCase
 
         $this->assertSame('להבין את ה-7 באוקטובר', $found[0]['title'], 'the book on its subject first, not the other bundle');
         $this->assertContains('7 באוקטובר ומלחמת חרבות ברזל', $found[0]['shared']);
+        $this->assertNotContains('ספר שנמחק', array_column($found, 'title'));
         $this->assertTrue(Related::packaging('באנדל ומארז'));
         $this->assertTrue(Related::packaging('Box set'));
         $this->assertFalse(Related::packaging('7 באוקטובר ומלחמת חרבות ברזל'));

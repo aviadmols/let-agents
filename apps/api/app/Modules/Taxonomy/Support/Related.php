@@ -3,9 +3,11 @@
 namespace App\Modules\Taxonomy\Support;
 
 use App\Core\Facades\Settings;
+use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
+use App\Modules\Tenancy\Models\Shop;
 
 /**
  * Products like one product by the tags they share, weighed: each kept tag by how central it is to
@@ -20,7 +22,10 @@ use App\Modules\Taxonomy\Models\TaxonomyTag;
  * next: a group the bank marked as not for recommendations (format, series) counts little, and a tag that
  * names a bundle, a set, an edition or a binding counts little wherever it was filed (Sela Meir, 28.10: a
  * bundle on 7.10 had every other bundle for its alike, by "באנדל ומארז" read from its picture into the genre
- * group, and the store's own "באנדל"; the books on 7.10 came after them).
+ * group, and the store's own "באנדל"; the books on 7.10 came after them). A store category or tag named as
+ * the shop itself (a publisher's imprint, "סלע מאיר"), a series or a library counts little too; and only the
+ * products the store sells now are counted, so a tag's rarity is its rarity in the store, not among every
+ * product that ever was (Sela Meir: 720 counted in a store of 203, and the shop's name came out rare).
  */
 final class Related
 {
@@ -31,7 +36,7 @@ final class Related
     private const ASIDE_SHARE = 0.15;
 
     /** Words of packaging and form, in a tag's name: what a product comes as, never what it is about. */
-    private const PACKAGING = '/(^|[^\p{L}])(באנדל|באנדלים|bundles?|מארז|מארזים|מארזי|סט|סטים|ערכה|ערכות|ערכת|חבילה|חבילות|חבילת|box ?sets?|kits?|packs?|מהדורה|מהדורות|editions?|כריכה|כריכת|paperback|hardcover|softcover|מודפס|מודפסת|printed|print|digital|דיגיטלי|דיגיטלית|format|פורמט|סדרה|סדרת|series|collection|אוסף)([^\p{L}]|$)/iu';
+    private const PACKAGING = '/(^|[^\p{L}])(באנדל|באנדלים|bundles?|מארז|מארזים|מארזי|סט|סטים|ערכה|ערכות|ערכת|חבילה|חבילות|חבילת|box ?sets?|kits?|packs?|מהדורה|מהדורות|editions?|כריכה|כריכת|paperback|hardcover|softcover|מודפס|מודפסת|printed|print|digital|דיגיטלי|דיגיטלית|format|פורמט|סדרה|סדרת|series|collection|אוסף|ספריה|ספרייה|ספריית|library|imprint|הוצאה|הוצאת|publisher)([^\p{L}]|$)/iu';
 
     /** @var array<string, array<string, float>>|null product id => tag id => weight */
     private ?array $vectors = null;
@@ -99,7 +104,12 @@ final class Related
         // how far a tag is trusted by where it was read from: the store's words saying it outright most
         $trust = ['explicit' => 1.0, 'catalog' => $percent('trust_inferred_percent'), 'picture' => $percent('trust_picture_percent'), 'knowledge' => $percent('trust_knowledge_percent')];
 
+        // the shop's own name on a category or a tag (a publisher's imprint) says nothing of what a product is about
+        $shopName = mb_strtolower(trim((string) Shop::query()->whereKey(app(TenantContext::class)->require())->value('name')));
+        $active = CatalogProduct::query()->whereNull('removed_at')->select('id');
+
         foreach (TaxonomyAssignment::query()->where('subject_type', TaxonomyAssignment::PRODUCT)->where('status', TaxonomyAssignment::KEPT)
+            ->whereIn('subject_id', $active)
             ->orderBy('id')->get(['subject_id', 'tag_id', 'weight', 'source', 'explicit']) as $a) {
             $weight = $a->weight * ($a->explicit ? $trust['explicit'] : ($trust[$a->source] ?? $trust['knowledge']));
             $weight *= isset($aside[$a->tag_id]) ? self::ASIDE_SHARE : 1.0;
@@ -116,13 +126,15 @@ final class Related
         $storeTags = $percent('store_tags_percent');
         foreach (CatalogProduct::query()->whereNull('removed_at')->whereIn('id', array_keys($vectors))->with('categories:id,name')->get(['id', 'payload']) as $product) {
             foreach ($product->categories as $category) {
-                $vectors[$product->id]['category:'.$category->id] = $categories * (self::packaging((string) $category->name) ? self::ASIDE_SHARE : 1.0);
+                $aside = self::packaging((string) $category->name) || mb_strtolower(trim((string) $category->name)) === $shopName;
+                $vectors[$product->id]['category:'.$category->id] = $categories * ($aside ? self::ASIDE_SHARE : 1.0);
                 $this->names['category:'.$category->id] = $category->name;
             }
             foreach ((array) ($product->payload['tags'] ?? []) as $tag) {
                 $name = trim(is_array($tag) ? (string) ($tag['name'] ?? '') : (string) $tag);
                 if ($name !== '') {
-                    $vectors[$product->id]['store_tag:'.mb_strtolower($name)] = $storeTags * (self::packaging($name) ? self::ASIDE_SHARE : 1.0);
+                    $aside = self::packaging($name) || mb_strtolower($name) === $shopName;
+                    $vectors[$product->id]['store_tag:'.mb_strtolower($name)] = $storeTags * ($aside ? self::ASIDE_SHARE : 1.0);
                     $this->names['store_tag:'.mb_strtolower($name)] = $name;
                 }
             }
