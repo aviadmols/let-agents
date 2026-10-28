@@ -32,6 +32,7 @@ final class QualityBaselineCommand extends Command
         {--set=* : run: a setting for this run only, as key=value (assistant.site_check_effort=low); put back after}
         {--live : run: on today\'s catalogue and pages instead of each case\'s frozen data}
         {--label= : run: a name for the run, to find it again}
+        {--kind=all : run: baseline (real questions), regression (cases with expectations), or all}
         {--runs= : compare: two runs, by ID or label, as a,b}';
 
     protected $description = 'Build the quality baseline from real questions, run it and print its numbers against the run before, or compare two runs case by case.';
@@ -62,13 +63,17 @@ final class QualityBaselineCommand extends Command
             return self::FAILURE;
         }
 
+        // the real questions, the cases with expectations (the conversations), or both: one run, one number
+        $kind = match ((string) $this->option('kind')) {
+            'baseline' => AssistantQualityCase::BASELINE, 'regression' => AssistantQualityCase::REGRESSION, default => null
+        };
         $runs = [];
         $restore = $this->apply($overrides, $shops);
 
         try {
             foreach ($shops ?? [null] as $shopId) {
                 $runs[] = $cases->handle($shopId, null, $this->option('prompt') === null ? null : (int) $this->option('prompt'),
-                    $this->option('live') ? AssistantQualityRun::LIVE : AssistantQualityRun::FROZEN, AssistantQualityCase::BASELINE, $this->option('label'), null, $versions);
+                    $this->option('live') ? AssistantQualityRun::LIVE : AssistantQualityRun::FROZEN, $kind, $this->option('label'), null, $versions);
             }
         } finally {
             $restore();
