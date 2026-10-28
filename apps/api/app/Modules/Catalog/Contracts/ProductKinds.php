@@ -26,6 +26,12 @@ interface ProductKinds
     public function sameKind(CatalogProduct $product, array $externalIds, ?array &$near = null): array;
 
     /**
+     * A book, a bundle of books, a magazine: a thing that is read, by its title's first word, its type or its categories.
+     * Its cover says nothing of what it is about, and its title opens with its own words, not with its kind.
+     */
+    public function isRead(CatalogProduct $product): bool;
+
+    /**
      * Whether a category or tag names a campaign, a season or a collection rather than a kind ("חדש באתר", "NIGHT SALE",
      * "CLUB 20%", "כל מה שחם", "BACK TO SCHOOL", "FW25"): never what a product is.
      */

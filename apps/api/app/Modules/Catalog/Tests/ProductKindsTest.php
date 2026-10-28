@@ -182,6 +182,28 @@ final class ProductKindsTest extends TestCase
         });
     }
 
+    public function test_a_books_title_opens_with_its_own_words_which_name_no_kind(): void
+    {
+        // Sela Meir, 28.10: "מפגש עם עצמי בגיהינום" had three alike ("ח"כ במשמרת לילה", "12 כללים לחיים") and the other
+        // hostages' books as "maybe": "מפגש" and "חטוף" were read as two kinds, as "ג'ינס" and "מכנסיים" are.
+        $shop = Shop::factory()->create();
+        $p = app(TenantContext::class)->run($shop->id, fn (): array => array_map(fn (array $x): CatalogProduct => CatalogProduct::query()->create([
+            'shop_id' => $shop->id, 'external_id' => $x[0], 'type' => 'simple', 'status' => 'publish', 'title' => $x[1], 'brand' => 'סלע מאיר',
+            'url' => 'https://www.store.test/p/'.$x[0], 'in_stock' => true, 'purchasable' => true, 'hash' => 'h'.$x[0], 'price' => 100,
+            'payload' => ['product_type' => 'ספר', 'tags' => $x[2]],
+        ]), [
+            ['1', 'מפגש עם עצמי בגיהינום', ['ביוגרפיות', 'רבי מכר']], ['2', 'חטוף - אלי שרעבי', ['ביוגרפיות', 'רבי מכר']], ['3', 'ח"כ במשמרת לילה', ['ביוגרפיות']],
+            ['4', 'מי שיש לו למה', ['ביוגרפיות']], ['5', 'ספרי השבעה באוקטובר', ['באנדל']], ['6', 'אבא בא', ['ביוגרפיות']],
+        ]));
+
+        app(TenantContext::class)->run($shop->id, function () use ($p): void {
+            $this->assertTrue(app(ProductKinds::class)->isRead($p[0]));
+            $same = app(ProductKinds::class)->sameKind($p[0], ['2', '3', '4', '6'], $near);
+            $this->assertSame(['2', '3', '4', '6'], $same, 'all biographies, whatever word each title opens with');
+            $this->assertSame([], $near);
+        });
+    }
+
     public function test_a_shirt_is_never_a_sneakers_alike_by_whom_they_are_for(): void
     {
         // Chozen's demo, 28.10: where only Veja's titles said "סניקרס", "וג'ה סניקרס" was read as its name, and its

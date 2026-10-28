@@ -143,8 +143,14 @@ final class CatalogProductKinds implements ProductKinds
         $prefixes = $counts['prefix'];
 
         // Two titles that name two kinds ("ג'ינס", "מכנסיים קצרים") are two, whatever tag the store gives both ("מכנסיים"):
-        // near it, never like it (Chozen, 28.10: a pair of jeans' alike were trousers and shorts)
+        // near it, never like it (Chozen, 28.10: a pair of jeans' alike were trousers and shorts). A word is a kind only
+        // where the store opens enough titles with it: a book's title opens with its own words ("מפגש", "חטוף"), which
+        // name no kind (Sela Meir, 28.10: a hostage's memoir had three alike and the other hostages' books "maybe").
         $head = self::own($product, $prefixes)['head'];
+        // two openings are two kinds where neither product is a thing that is read, and the store opens enough titles
+        // with one of them ("מכנסיים"): a lone "ג'ינס" beside them is still another kind
+        $named = fn (string $h): bool => $h !== '' && ($counts['head'][$h] ?? 0) >= self::SUB_KIND_MIN;
+        $read = $this->isRead($product);
         $kept = [];
         foreach ($externalIds as $id) {
             $other = $others->get($id);
@@ -159,7 +165,7 @@ final class CatalogProductKinds implements ProductKinds
                 continue;
             }
             $theirs = self::own($other, $prefixes)['head'];
-            if ($head !== '' && $theirs !== '' && $theirs !== $head && (string) $id !== (string) $product->external_id) {
+            if ($head !== '' && $theirs !== '' && $theirs !== $head && ! $read && ! $this->isRead($other) && ($named($head) || $named($theirs)) && (string) $id !== (string) $product->external_id) {
                 $near[] = $id;
 
                 continue;
@@ -179,6 +185,17 @@ final class CatalogProductKinds implements ProductKinds
         }
 
         return $kept;
+    }
+
+    /** What a thing that is read is called: by a title's first word, a type or a category. */
+    private const READ = '/(^|[^\p{L}])(ספר|ספרי|ספרים|ספרימ|ספרון|ספרוני|ספרונים|רומן|רומנים|מגזין|מגזינים|חוברת|חוברות|books?|novels?|e-?books?|audiobooks?|magazines?)([^\p{L}]|$)/iu';
+
+    public function isRead(CatalogProduct $product): bool
+    {
+        $first = (string) (preg_split('/\s+/u', trim((string) $product->title))[0] ?? '');
+        $filed = implode(' ', [(string) ($product->payload['product_type'] ?? ''), ...array_map(fn ($c): string => (string) $c->name, $product->relationLoaded('categories') ? $product->categories->all() : $product->categories()->get(['id', 'name'])->all())]);
+
+        return preg_match(self::READ, $first) === 1 || preg_match(self::READ, $filed) === 1;
     }
 
     /** A kind named by two words ("נעלי בית") is the alike's only where this many others are named by them. */
