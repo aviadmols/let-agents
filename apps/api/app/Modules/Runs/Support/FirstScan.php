@@ -4,6 +4,7 @@ namespace App\Modules\Runs\Support;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Admin\Contracts\ScanProgress;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Jobs\FirstScanStep;
@@ -203,6 +204,17 @@ final class FirstScan
 
     public static function mark(string $shopId, string $step, string $state): void
     {
+        // a step that ended teaches how long it takes (ScanTimes), every shop's estimate after it
+        if ($state === self::DONE && ($began = Cache::get(self::key($shopId, 'began:'.$step))) !== null) {
+            try {
+                $shop = Shop::query()->find($shopId);
+                $count = $shop === null ? null : (self::progress($shop)[$step] ?? null);
+                ScanTimes::learn($step, (int) Carbon::parse($began)->diffInSeconds(now()), (int) ($count['total'] ?? $count['done'] ?? 0));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
         Cache::put(self::key($shopId, 'step:'.$step), $state, now()->addDays(self::KEEP_DAYS));
 
         // When the step began and ended, to find what its runs reported.
@@ -312,6 +324,86 @@ final class FirstScan
         }
 
         return $details;
+    }
+
+    /**
+     * How far each step has got, from every module that answers for it (Admin\Contracts\ScanProgress), inside the shop:
+     * so many of so many, counted in code. A module that fails is left out.
+     *
+     * @return array<string, array{done: int, total: int|null}>
+     */
+    public static function progress(Shop $shop): array
+    {
+        $progress = [];
+        $began = [];
+        foreach (self::steps($shop) as $step) {
+            if (($at = self::began($shop, $step)) !== null) {
+                $began[$step] = $at;
+            }
+        }
+
+        foreach (app()->tagged(ScanProgress::TAG) as $source) {
+            try {
+                $progress += app(TenantContext::class)->run((string) $shop->id, fn (): array => $source->scanProgress($shop, $began));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $progress;
+    }
+
+    /**
+     * When the scan should end, once the site has been read (the catalog step done, so the products, pages and
+     * pictures to go through are counted): the step at work by how fast it goes, the steps after it by how long they
+     * took in the scans that ended (ScanTimes). Null before that, or when it has ended.
+     *
+     * @param  array{started: Carbon, steps: array<string, string>, finished: bool}|null  $state
+     * @param  array<string, array{done: int, total: int|null}>  $progress
+     * @return array{at: Carbon, minutes: int}|null
+     */
+    public static function estimate(Shop $shop, ?array $state, array $progress): ?array
+    {
+        if ($state === null || $state['finished'] || in_array($state['steps']['catalog'] ?? self::DONE, [self::WAITING, self::RUNNING], true)) {
+            return null;
+        }
+
+        $seconds = 0;
+        foreach ($state['steps'] as $step => $is) {
+            $count = $progress[$step] ?? ['done' => 0, 'total' => null];
+            if ($is === self::RUNNING) {
+                $began = Cache::get(self::key($shop->id, 'began:'.$step));
+                $seconds += ScanTimes::left($step, $began !== null ? Carbon::parse($began) : now(), $count['done'], $count['total']);
+            } elseif ($is === self::WAITING) {
+                $seconds += ScanTimes::whole($step, $count['total'] === null ? null : max(0, $count['total'] - $count['done']));
+            }
+        }
+
+        return ['at' => now()->addSeconds($seconds), 'minutes' => max(1, (int) ceil($seconds / 60))];
+    }
+
+    /** A while in the viewer's words: "5 minutes", "an hour and 20 minutes". */
+    public static function duration(int $minutes): string
+    {
+        $minutes = max(1, $minutes);
+        $hours = intdiv($minutes, 60);
+        $rest = $minutes % 60;
+        $m = fn (int $n): string => trans_choice('runs::first_scan.minutes', $n, ['count' => $n]);
+        $h = fn (int $n): string => trans_choice('runs::first_scan.hours', $n, ['count' => $n]);
+
+        return match (true) {
+            $hours === 0 => $m($rest),
+            $rest === 0 => $h($hours),
+            default => __('runs::first_scan.hours_minutes', ['hours' => $h($hours), 'minutes' => $m($rest)]),
+        };
+    }
+
+    /** When the step at work began, for "at work for 4 minutes". */
+    public static function began(Shop $shop, string $step): ?Carbon
+    {
+        $began = Cache::get(self::key($shop->id, 'began:'.$step));
+
+        return $began === null ? null : Carbon::parse($began);
     }
 
     /** A shop the night has not scanned yet: the overview offers the scan as its first thing to do. */

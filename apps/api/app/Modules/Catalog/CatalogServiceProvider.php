@@ -6,6 +6,7 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ScanDetails;
+use App\Modules\Admin\Contracts\ScanProgress;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Catalog\Console\BuildVariantsCommand;
@@ -24,6 +25,7 @@ use App\Modules\Catalog\Listeners\RebuildNamedVariants;
 use App\Modules\Catalog\Support\CatalogHome;
 use App\Modules\Catalog\Support\CatalogProductKinds;
 use App\Modules\Catalog\Support\CatalogScanDetails;
+use App\Modules\Catalog\Support\CatalogScanProgress;
 use App\Modules\Catalog\Support\CatalogShopFacts;
 use App\Modules\Catalog\Support\CatalogTimeline;
 use App\Modules\Catalog\Support\StorefrontHome;
@@ -42,6 +44,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
         $this->app->tag([StorefrontHome::class], HomeSource::TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([CatalogScanDetails::class], ScanDetails::TAG);
+        $this->app->tag([CatalogScanProgress::class], ScanProgress::TAG);
         // What this module counted, for the first-run screens.
         $this->app->tag([CatalogShopFacts::class], ShopFacts::TAG);
         $this->app->singleton(ProductKinds::class, CatalogProductKinds::class);

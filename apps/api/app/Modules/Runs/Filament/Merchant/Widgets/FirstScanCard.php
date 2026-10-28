@@ -77,8 +77,15 @@ final class FirstScanCard extends Widget implements OverviewBlock
 
         $state = FirstScan::state($shop);
         $isNew = FirstScan::isNew($shop);
+        $running = $state !== null && ! $state['finished'];
+        // while it runs: how far each step is, and when it should end (once the site has been read)
+        $progress = $running ? FirstScan::progress($shop) : [];
+        $now = $running ? array_search(FirstScan::RUNNING, $state['steps'], true) : false;
 
         return [
+            'progress' => $progress,
+            'estimate' => $running ? FirstScan::estimate($shop, $state, $progress) : null,
+            'began' => $now === false ? null : FirstScan::began($shop, (string) $now),
             'shop' => $shop,
             'state' => $state,
             'isNew' => $isNew,

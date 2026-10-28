@@ -2,7 +2,7 @@
     @if ($shop)
         @php($running = $state !== null && ! $state['finished'])
         @php($first = $isNew && $state === null)
-        <section class="la-card" data-first-scan @if ($running) wire:poll.10s @endif
+        <section class="la-card" data-first-scan @if ($running) wire:poll.5s @endif
             @if ($first) style="box-shadow: 0 0 0 2px var(--la-accent), var(--la-shadow)" @endif>
             <div class="la-card-body" style="display: grid; gap: 14px">
                 <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px">
@@ -18,6 +18,12 @@
                         <p style="margin: 0; color: var(--la-muted); font-size: 14px">
                             @if ($running)
                                 {{ __('runs::first_scan.body_running', ['time' => $state['started']->timezone(config('app.display_timezone', 'Asia/Jerusalem'))->format('H:i')]) }}
+                                <br>
+                                @if ($estimate)
+                                    <b style="color: var(--la-ink)" data-scan-eta>{{ __('runs::first_scan.eta', ['time' => $estimate['at']->timezone(config('app.display_timezone', 'Asia/Jerusalem'))->format('H:i'), 'duration' => \App\Modules\Runs\Support\FirstScan::duration($estimate['minutes'])]) }}</b>
+                                @else
+                                    <span data-scan-eta-later>{{ __('runs::first_scan.eta_later') }}</span>
+                                @endif
                             @elseif ($state && $state['finished'])
                                 {{ __('runs::first_scan.body_done', ['time' => $state['started']->timezone(config('app.display_timezone', 'Asia/Jerusalem'))->format('d.m H:i')]) }}
                             @else
@@ -51,6 +57,30 @@
                                     <span style="font-weight: 600">{{ __("runs::first_scan.steps.{$step}") }}</span>
                                     <small style="color: var(--la-muted)">{{ $at && $at !== 'waiting' ? __("runs::first_scan.states.{$at}") : '' }}</small>
                                     <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; fill: none; stroke: var(--la-muted); stroke-width: 2.2; stroke-linecap: round; {{ $isOpen ? 'transform: rotate(180deg)' : '' }}"><path d="M6 9l6 6 6-6"></path></svg>
+                                    {{-- the step at work, as it goes: so many of so many, and for how long --}}
+                                    @if ($at === 'running')
+                                        @php($count = $progress[$step] ?? null)
+                                        @php($unit = __("runs::first_scan.units.{$step}"))
+                                        @php($share = $count && $count['total'] ? min(100, (int) round(100 * $count['done'] / max(1, $count['total']))) : null)
+                                        <span></span>
+                                        <span style="grid-column: 2 / -1; display: grid; gap: 6px; padding-block: 2px 4px" data-step-progress>
+                                            @if ($share !== null)
+                                                <span style="display: block; height: 6px; border-radius: 99px; background: var(--la-line); overflow: hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $share }}">
+                                                    <span style="display: block; height: 100%; width: {{ max(2, $share) }}%; background: var(--la-accent); border-radius: 99px; transition: width 600ms ease"></span>
+                                                </span>
+                                            @endif
+                                            <span style="font-size: 13px; color: var(--la-ink-2)">
+                                                @if ($count && $count['total'])
+                                                    {{ __('runs::first_scan.of', ['done' => number_format(min($count['done'], $count['total'])), 'total' => number_format($count['total']), 'unit' => $unit]) }}
+                                                @elseif ($count && $count['done'] > 0)
+                                                    {{ __('runs::first_scan.so_far', ['done' => number_format($count['done']), 'unit' => $unit]) }}
+                                                @endif
+                                                @if ($began)
+                                                    <span style="color: var(--la-muted)">{{ $count && ($count['total'] || $count['done'] > 0) ? ' · ' : '' }}{{ __('runs::first_scan.at_work', ['duration' => \App\Modules\Runs\Support\FirstScan::duration((int) ceil($began->diffInSeconds(now()) / 60))]) }}</span>
+                                                @endif
+                                            </span>
+                                        </span>
+                                    @endif
                                     @foreach ($notes[$step] ?? [] as $note)
                                         <span></span>
                                         <span style="grid-column: 2 / -1; font-size: 13px; color: var(--la-ink-2)" data-step-note>{{ $note }}</span>
