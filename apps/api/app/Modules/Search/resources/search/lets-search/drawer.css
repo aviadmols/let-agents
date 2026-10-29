@@ -115,9 +115,6 @@
    moved above the products narrowed every result by its width, and the whole list jumped sideways. On a touch
    screen there is no bar at all: a finger scrolls it. */
 .ls-dbody { scrollbar-gutter: stable; }
-/* the body ends before the grip's strip at the edge, its content where it was (20px from the edge) */
-.ls-drawer .ls-dbody { margin-inline-end: 14px; padding-inline-end: 6px; }
-.ls-drawer .ls-cmp-wrap { margin-inline-end: -6px; padding-inline-end: 6px; }
 @media (hover: none) and (pointer: coarse) {
   .ls-dbody { scrollbar-width: none; scrollbar-gutter: auto; }
   .ls-dbody::-webkit-scrollbar { display: none; }
@@ -396,10 +393,10 @@
 .ls-logo--gemini { color: #4285f4; }
 
 /* ---------------------------------------------------------------- large view: the side of the drawer makes it wide */
-/* the resize grip has a strip of its own at the drawer's edge, past the body and its scrollbar (the body ends 14px
-   before the edge, below): a grip over the scrollbar took the pointer wherever the scrollbar was grabbed (29.10:
-   "expand" instead of scrolling) */
-.ls-edge { position: absolute; z-index: 11; inset-block: 64px 64px; inset-inline-end: 0; width: 14px; padding: 0; display: grid; place-items: center; cursor: ew-resize; background: transparent; }
+/* the resize grip stands inward of the scrollbar, in the body's gutter: a grip over the scrollbar took the pointer
+   wherever the scrollbar was grabbed (29.10: "expand" instead of scrolling), and the scrollbar stays at the edge, where
+   a scrollbar is */
+.ls-edge { position: absolute; z-index: 11; inset-block: 64px 64px; inset-inline-end: 14px; width: 14px; padding: 0; display: grid; place-items: center; cursor: ew-resize; background: transparent; }
 .ls-edge__grip { width: 4px; height: 44px; border-radius: 999px; background: var(--ls-line-strong); opacity: 0; transition: opacity 200ms ease, height 260ms var(--lsp-ease-out), background-color 200ms ease; }
 .ls-edge__tip { position: absolute; inset-inline-end: 18px; top: 50%; transform: translateY(-50%) scale(.96); white-space: nowrap; padding: 6px 10px; border-radius: 9px; background: var(--ls-fg); color: var(--ls-bg); font-size: var(--lsp-text-xs); font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 160ms ease, transform 200ms var(--lsp-ease-out); }
 .ls-drawer:hover .ls-edge__grip { opacity: 1; }
@@ -408,8 +405,8 @@
 .ls-edge:focus-visible { outline: none; }
 .ls-drawer.is-expanded { width: min(1040px, calc(100% - 24px)); }
 .ls-drawer.is-expanded .ls-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 28px 18px; }
-.ls-drawer.is-expanded .ls-dbody, .ls-drawer.is-wide .ls-dbody { padding-inline: 28px 14px; }
-.ls-drawer.is-expanded .ls-cmp-wrap, .ls-drawer.is-wide .ls-cmp-wrap { margin-inline: -28px -14px; padding-inline: 28px 14px; }
+.ls-drawer.is-expanded .ls-dbody, .ls-drawer.is-wide .ls-dbody { padding-inline: 28px; }
+.ls-drawer.is-expanded .ls-cmp-wrap, .ls-drawer.is-wide .ls-cmp-wrap { margin-inline: -28px; padding-inline: 28px; }
 /* ---------------------------------------------------------------- on the product page: the search row under "add to cart" */
 .ls-inline__field { --h: 54px; cursor: text; padding-inline: 7px 6px; }
 .ls-inline__mark { width: 38px; height: 38px; margin-inline-end: 6px; transition: transform 500ms var(--lsp-ease-in-out); }
@@ -478,7 +475,7 @@
   .ls-root .ls-drawer.is-wide { width: 100%; }
   .ls-drawer .ls-sheet__handle { display: block; touch-action: none; }
   .ls-drawer .ls-dhead { padding-block: 2px 6px; touch-action: none; }
-  .ls-drawer .ls-dbody { padding-inline: 16px; margin-inline-end: 0; }
+  .ls-drawer .ls-dbody { padding-inline: 16px; }
   .ls-drawer .ls-cmp-wrap { margin-inline: -16px; padding-inline: 16px; }
   .ls-drawer .ls-grid { gap: 18px 12px; }
   .ls-drawer.is-wide .ls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
