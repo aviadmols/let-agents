@@ -75,8 +75,9 @@ final class RecordOrder
                     ->whereIn('type', ['open', 'click', 'add_to_cart'])
                     ->get(['type', 'source', 'result', 'item_external_id']);
 
-                // The widget's: what the search did is counted on its own, below.
-                $assisted = $events->where('source', '!==', AnalyticsEvent::SOURCE_SEARCH)->isNotEmpty();
+                // The widget's: what the search did is counted on its own, below, and an add from the store's own
+                // page and button is the store's (Sela Meir, 29.10: seven orders "with Lets" that Lets never touched).
+                $assisted = $events->whereNotIn('source', [AnalyticsEvent::SOURCE_SEARCH, AnalyticsEvent::SOURCE_PAGE])->isNotEmpty();
                 $added = fn (string $source): array => $events
                     ->where('type', 'add_to_cart')->where('source', $source)->where('result', 'added')
                     ->pluck('item_external_id')->filter()->map(fn ($id): string => (string) $id)->unique()->all();

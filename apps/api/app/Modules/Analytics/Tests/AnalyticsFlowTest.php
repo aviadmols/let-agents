@@ -131,6 +131,21 @@ final class AnalyticsFlowTest extends TestCase
         $this->signed('POST', "/api/v1/plugin/{$this->site}/orders", json_encode(['order_ref' => 'Robert Smith'] + $order))->assertStatus(422);
     }
 
+    public function test_an_add_from_the_stores_own_page_makes_no_order_assisted(): void
+    {
+        // Sela Meir, 29.10: seven orders counted "with Lets", each after an add from the product page's own button,
+        // with the drawer never opened.
+        $this->sendBeacon($this->beacon([
+            $this->event('page_view'),
+            $this->event('add_to_cart', ['data' => ['source' => 'page', 'product_id' => '55', 'quantity' => 1, 'result' => 'added']]),
+        ]))->assertStatus(202);
+
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders", json_encode([
+            'order_ref' => hash('sha256', 'order-1002'), 'total' => 150, 'currency' => 'ils', 'ordered_at' => time(), 'vid' => self::VID,
+            'items' => [['product_id' => '55', 'quantity' => 1, 'total' => 150]],
+        ]))->assertStatus(202)->assertJson(['stored' => true, 'assisted' => false]);
+    }
+
     public function test_past_orders_arrive_in_pages_without_a_visitor_and_stay_out_of_the_report(): void
     {
         $order = fn (int $n, int $at, array $extra = []): array => $extra + [

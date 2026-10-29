@@ -41,6 +41,9 @@ class AnalyticsEvent extends Model
     /** An add to the cart from the store's search (its results or the assistant's picks), written by the Search module. */
     public const SOURCE_SEARCH = 'search';
 
+    /** An add to the cart from the store's own page and button, which the plugin reports too: not Lets' doing. */
+    public const SOURCE_PAGE = 'page';
+
     /** Visitors are stored only as a hash salted per shop: the same visitor in two shops cannot be joined. */
     public static function visitorHash(string $shopId, string $visitorId): string
     {
