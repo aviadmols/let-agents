@@ -4,7 +4,9 @@ namespace App\Modules\Taxonomy\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Taxonomy\Actions\FixRanges;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
 use App\Modules\Taxonomy\Models\TaxonomyGroup;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
@@ -13,6 +15,7 @@ use App\Modules\Taxonomy\Support\Meaning;
 use App\Modules\Taxonomy\Support\TagWords;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 /**
@@ -102,6 +105,63 @@ final class ExactValuesTest extends TestCase
         $html = view('enrichment::merchant.scan-meaning', ['meaning' => $tagged])->render();
         $this->assertStringContainsString('data-meaning-exact', $html);
         $this->assertStringContainsString('10 ימים', $html);
+    }
+
+    public function test_a_range_its_own_number_is_outside_of_moves_to_the_range_that_holds_it(): void
+    {
+        Event::fake([CatalogProductsChanged::class]);
+
+        [$moved, $after] = $this->tenant(function (): array {
+            $days = $this->group('trip_length', 'Trip length', 'אורך הטיול');
+            $carats = $this->group('diamond_weight', 'Total diamond weight', 'משקל היהלומים');
+            $tag = fn (TaxonomyGroup $g, string $key, string $en, string $he): TaxonomyTag => TaxonomyTag::query()->create(['shop_id' => $this->shop->id, 'group_id' => $g->id, 'key' => $key, 'label_en' => $en, 'label_he' => $he, 'version' => 1]);
+            $four = $tag($days, 'd4', '4–5 days', '4–5 ימים');
+            $six = $tag($days, 'd6', '6–8 days', '6–8 ימים');
+            $nine = $tag($days, 'd9', '9–11 days', '9–11 ימים');
+            $twelve = $tag($days, 'd12', '12+ days', '12 ימים ומעלה');
+            $upTo = $tag($carats, 'c0', 'Up to 0.25 ct', 'עד 0.25 קארט');
+            $quarter = $tag($carats, 'c1', '0.25 to 0.5 ct', '0.25 עד 0.5 קארט');
+            $half = $tag($carats, 'c2', '0.5 to 1 ct', '0.5 עד 1 קארט');
+            $one = $tag($carats, 'c3', '1 to 2 ct', '1 עד 2 קארט');
+            $over = $tag($carats, 'c4', 'Over 2 ct', 'מעל 2 קארט');
+            $dayTags = [$four, $six, $nine, $twelve];
+            $caratTags = [$upTo, $quarter, $half, $one, $over];
+
+            // the stores' own slips
+            $this->assertSame($six, Exact::fitting($four, '6-Day', $dayTags));
+            $this->assertSame($nine, Exact::fitting($six, '9 Days', $dayTags));
+            $this->assertSame($half, Exact::fitting($quarter, 'diamonds_total_carat: 0.75 ct', $caratTags));
+            $this->assertSame($one, Exact::fitting($half, '1.15 קארט', $caratTags));
+            $this->assertSame($upTo, Exact::fitting($quarter, '0.2 קארט', $caratTags));
+            $this->assertSame($one, Exact::fitting($over, '2 ct', $caratTags));
+            // what stays: a number in its range, nights, two numbers, a number two ranges hold
+            $this->assertSame($twelve, Exact::fitting($twelve, 'takes around 45 to 60 days to finish', $dayTags));
+            $this->assertSame($nine, Exact::fitting($nine, 'ten-night trip', $dayTags));
+            $this->assertSame($four, Exact::fitting($four, 'In eight to eleven unforgettable days', $dayTags));
+            $this->assertSame($upTo, Exact::fitting($upTo, '0.5 קארט', $caratTags));
+
+            $product = fn (string $id): string => CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "Tour {$id}",
+                'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []])->id;
+            $give = fn (string $subject, TaxonomyTag $t, string $evidence, ?string $checked = 'held') => TaxonomyAssignment::query()->create(['shop_id' => $this->shop->id, 'subject_type' => 'product',
+                'subject_id' => $subject, 'tag_id' => $t->id, 'source' => 'catalog', 'evidence' => $evidence, 'confidence' => 0.9, 'weight' => 1.0, 'status' => 'kept', 'checked' => $checked, 'input_hash' => 'h', 'bank_version' => 1]);
+            [$a, $b, $c] = [$product('1'), $product('2'), $product('3')];
+            $give($a, $four, '6-Day South Africa Itinerary');
+            $give($b, $four, '6-Day');
+            $give($b, $six, '6 days in the Cape'); // it has the right one already: the wrong one goes
+            $give($c, $four, '6-Day', TaxonomyAssignment::TEAM_KEPT); // the team kept it so: it stays
+
+            return [app(FixRanges::class)->handle($this->shop->id), TaxonomyAssignment::query()->orderBy('subject_id')->get(['subject_id', 'tag_id'])->map(fn ($x): array => [$x->subject_id, $x->tag_id])->all()];
+        });
+
+        $this->assertCount(2, $moved);
+        $this->assertSame(['4–5 days', '6–8 days'], [$moved[0]['from'], $moved[0]['to']]);
+        $tags = $this->tenant(fn (): array => TaxonomyTag::query()->pluck('id', 'key')->all());
+        $products = $this->tenant(fn (): array => CatalogProduct::query()->pluck('id', 'external_id')->all());
+        $this->assertEqualsCanonicalizing([[$products['1'], $tags['d6']], [$products['2'], $tags['d6']], [$products['3'], $tags['d4']]], $after);
+        Event::assertDispatched(CatalogProductsChanged::class, fn (CatalogProductsChanged $e): bool => $e->shopId === $this->shop->id);
+
+        // once is enough: nothing left to move
+        $this->assertSame([], app(FixRanges::class)->handle($this->shop->id));
     }
 
     private function group(string $key, string $en, string $he, string $kind = TaxonomyGroup::FACTUAL): TaxonomyGroup

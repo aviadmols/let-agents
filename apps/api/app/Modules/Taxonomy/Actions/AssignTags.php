@@ -16,6 +16,7 @@ use App\Modules\Taxonomy\Models\TaxonomyProposal;
 use App\Modules\Taxonomy\Models\TaxonomySubject;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
 use App\Modules\Taxonomy\Support\Bank;
+use App\Modules\Taxonomy\Support\Exact;
 use App\Modules\Taxonomy\Support\Models;
 use App\Modules\Taxonomy\Support\Norm;
 use App\Modules\Taxonomy\Support\Subjects;
@@ -80,7 +81,7 @@ final class AssignTags
 
     private function assign(RunContext $run, string $shopId, ?int $limit, bool $all, bool $posts, ?array $productIds): void
     {
-        $this->count = array_fill_keys(['subjects', 'calls', 'kept', 'review', 'rejected', 'dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'dropped_picture', 'unquoted', 'catalog', 'picture', 'knowledge', 'proposed', 'proposals_known', 'audited'], 0);
+        $this->count = array_fill_keys(['subjects', 'calls', 'kept', 'review', 'rejected', 'dropped_unknown', 'dropped_scope', 'dropped_unsupported', 'dropped_picture', 'unquoted', 'catalog', 'picture', 'knowledge', 'proposed', 'proposals_known', 'audited', 'range_moved'], 0);
         $groups = Bank::groups();
 
         if ($groups->isEmpty()) {
@@ -95,7 +96,8 @@ final class AssignTags
         }
 
         $this->groups = $groups->keyBy('key')->all();
-        $this->tags = $groups->mapWithKeys(fn (TaxonomyGroup $g): array => [$g->key => $g->tags->keyBy('key')->all()])->all();
+        // each tag knows its group: a range is read from its name and its group (Exact)
+        $this->tags = $groups->mapWithKeys(fn (TaxonomyGroup $g): array => [$g->key => $g->tags->each(fn (TaxonomyTag $t) => $t->setRelation('group', $g))->keyBy('key')->all()])->all();
         $prefix = Bank::prefix($groups);
         $version = Bank::version();
         $todo = $this->todo($limit, $all, $posts, $productIds);
@@ -236,6 +238,12 @@ final class AssignTags
             $source = (string) ($t['source'] ?? '');
             $evidence = mb_substr(trim((string) ($t['evidence'] ?? '')), 0, 400);
             $confidence = max(0.0, min(1.0, (float) ($t['confidence'] ?? 0)));
+
+            // a range its own passage's number is outside of ("6-Day" given "4–5 days"): the range that holds it
+            if ($tag !== null && ($fits = Exact::fitting($tag, $evidence, $this->tags[$groupKey])) !== $tag) {
+                $tag = $fits;
+                $this->count['range_moved']++;
+            }
 
             if ($tag === null || $group === null || ! in_array($source, TaxonomyAssignment::SOURCES, true) || isset($kept[$tag->id])) {
                 $this->count['dropped_unknown']++;

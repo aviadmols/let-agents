@@ -9,6 +9,7 @@ use App\Modules\Enrichment\Contracts\ProductMeaning;
 use App\Modules\Enrichment\Contracts\ShopRules;
 use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Contracts\RelatedByTags;
+use App\Modules\Taxonomy\Console\FixRangesCommand;
 use App\Modules\Taxonomy\Console\TagChangesCommand;
 use App\Modules\Taxonomy\Console\TaxonomyCommand;
 use App\Modules\Taxonomy\Listeners\TagWhatChanged;
@@ -57,6 +58,7 @@ final class TaxonomyServiceProvider extends ModuleServiceProvider
         return [
             TaxonomyCommand::class,
             TagChangesCommand::class,
+            FixRangesCommand::class,
         ];
     }
 }

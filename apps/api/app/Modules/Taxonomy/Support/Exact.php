@@ -80,6 +80,49 @@ final class Exact
             return null;
         }
 
+        $sure = array_filter(self::said($range, $text), fn (float $v): bool => self::holds($range, $v));
+
+        return count($sure) === 1 ? array_values($sure)[0] : null;
+    }
+
+    /**
+     * The tag of the same group whose range holds the number the passage gives, when the tag given does not hold it
+     * ("6-Day" given "4–5 days" is "6–8 days"); the tag given otherwise, and when no other one, or more than one, holds
+     * it. The passage is the store's own words: a model that put it in the next range misread it.
+     *
+     * @param  iterable<TaxonomyTag>  $siblings  the group's tags
+     */
+    public static function fitting(TaxonomyTag $tag, ?string $evidence, iterable $siblings): TaxonomyTag
+    {
+        $range = self::range($tag);
+        $said = $range === null ? [] : self::said($range, mb_strtolower(trim((string) $evidence)));
+        if (count($said) !== 1 || self::holds($range, $value = array_values($said)[0])) {
+            return $tag;
+        }
+
+        $holding = [];
+        foreach ($siblings as $other) {
+            $theirs = $other->id === $tag->id || $other->group_id !== $tag->group_id || ($other->status ?? TaxonomyTag::ACTIVE) !== TaxonomyTag::ACTIVE ? null : self::range($other);
+            if ($theirs !== null && mb_strtolower($theirs['unit_en']) === mb_strtolower($range['unit_en']) && self::holds($theirs, $value)) {
+                $holding[] = $other;
+            }
+        }
+
+        return count($holding) === 1 ? $holding[0] : $tag;
+    }
+
+    /**
+     * The numbers a passage gives in a range's unit, in or out of the range: by the unit when it says it; else its one
+     * number standing alone (never "ten-night").
+     *
+     * @param  array{unit_en: string, unit_he: string}  $range
+     * @return array<string, float>
+     */
+    private static function said(array $range, string $text): array
+    {
+        if ($text === '') {
+            return [];
+        }
         $units = self::units($range);
         $words = implode('|', array_map(fn (string $w): string => preg_quote($w, '/'), array_keys(self::WORDS)));
         preg_match_all('/(?<![\p{L}\d.,])('.self::NUM.'|'.$words.')(?![\p{L}\d])\s*-?\s*([\p{L}"\']*)/u', $text, $found, PREG_SET_ORDER);
@@ -88,9 +131,6 @@ final class Exact
         $unitBeside = [];
         foreach ($found as [, $number, $after]) {
             $value = is_numeric(str_replace(',', '.', $number)) ? self::num($number) : (float) self::WORDS[$number];
-            if (($range['min'] !== null && $value < $range['min']) || ($range['max'] !== null && $value > $range['max'])) {
-                continue;
-            }
             if (in_array($after, $units, true)) {
                 $unitBeside[(string) $value] = $value;
             } elseif ($after === '') {
@@ -98,10 +138,13 @@ final class Exact
             }
         }
 
-        // by the unit when the passage says it; else the passage's one number standing alone (never "ten-night")
-        $sure = $unitBeside !== [] ? $unitBeside : (count($found) === 1 ? $bare : []);
+        return $unitBeside !== [] ? $unitBeside : (count($found) === 1 ? $bare : []);
+    }
 
-        return count($sure) === 1 ? array_values($sure)[0] : null;
+    /** @param array{min: float|null, max: float|null} $range */
+    private static function holds(array $range, float $value): bool
+    {
+        return ($range['min'] === null || $value >= $range['min']) && ($range['max'] === null || $value <= $range['max']);
     }
 
     /** The exact value as a tag's name reads: "10 days", "10 ימים", "0.7 קארט". */
