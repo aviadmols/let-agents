@@ -64,7 +64,9 @@ final class SearchPurchasesTest extends TestCase
         $term = $this->inShop(fn () => SearchTerm::query()->sole());
         $this->assertSame([1, 1], [$term->clicks, $term->added]);
         $this->assertSame(1, $this->inShop(fn () => SearchClick::query()->sole())->added);
-        $event = $this->inShop(fn () => AnalyticsEvent::query()->sole());
+        // the click is kept too, so an add from the product's own page afterwards is the search's (RecordOrder)
+        $this->assertSame('7915917377601', $this->inShop(fn () => AnalyticsEvent::query()->where('type', 'click')->sole())->item_external_id);
+        $event = $this->inShop(fn () => AnalyticsEvent::query()->where('type', 'add_to_cart')->sole());
         $this->assertSame(['add_to_cart', 'search', 'added', '7915917377601', 'search'], [$event->type, $event->source, $event->result, $event->item_external_id, $event->page_type]);
         $this->assertSame(AnalyticsEvent::visitorHash($this->shop->id, self::VID), $event->visitor_hash, 'the visitor, only as a hash');
 
