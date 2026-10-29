@@ -42,7 +42,10 @@ class TaxonomyAssignment extends Model
 
     public const REJECTED = 'rejected';
 
-    public const SOURCES = ['catalog', 'picture', 'knowledge'];
+    /** source: the team itself, by a rule it wrote and approved (ApplyRule) */
+    public const TEAM_SOURCE = 'team';
+
+    public const SOURCES = ['catalog', 'picture', 'knowledge', self::TEAM_SOURCE];
 
     /** checked: what the team said of a tag (kept or taken out), which tagging again and the rules never undo */
     public const TEAM_KEPT = 'team';

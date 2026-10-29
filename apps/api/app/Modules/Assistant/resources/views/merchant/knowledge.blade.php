@@ -18,7 +18,7 @@
         </section>
 
         <nav class="lp-tabs" role="tablist" aria-label="{{ __('assistant::ui.knowledge.title') }}">
-            @foreach (['general' => $t('tabs.general_count', ['n' => $counts['general']]), 'posts' => (string) $counts['posts'], 'found' => (string) $counts['found']] as $key => $count)
+            @foreach (['general' => $t('tabs.general_count', ['n' => $counts['general']]), 'posts' => (string) $counts['posts'], 'found' => (string) $counts['found'], 'rules' => (string) $counts['rules']] as $key => $count)
                 <button type="button" role="tab" wire:click="show('{{ $key }}')" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
             @endforeach
         </nav>
@@ -146,6 +146,62 @@
                 @endforelse
                 @if (count($found) > $limit)
                     <button type="button" class="lp-link" wire:click="more('found')">{{ $t('more', ['n' => count($found) - $limit]) }}</button>
+                @endif
+            </section>
+        @endif
+
+        @if ($this->tab === 'rules')
+            {{-- the team's rules of its products: written in its words, read into a plan, approved before anything changes --}}
+            @php($rules = $this->rules())
+            @php($reading = collect($rules)->contains(fn (array $r): bool => $r['status'] === 'reading'))
+            <section class="lp-card" data-pane="rules" @if ($reading) wire:poll.5s @endif>
+                <div class="lp-card-t"><h2>{{ $t('rules.title') }}</h2><span class="lp-note">{{ $t('rules.note') }}</span></div>
+                <form wire:submit="addRule" class="lp-stack">
+                    <textarea class="lp-textarea" wire:model="newRule" rows="3" maxlength="600" placeholder="{{ $t('rules.placeholder') }}" aria-label="{{ $t('rules.title') }}"></textarea>
+                    <div class="lp-actions">
+                        <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary" wire:loading.attr="disabled" wire:target="addRule">{{ $t('rules.button') }}</button>
+                        <span class="lp-note">{{ $t('rules.checked') }}</span>
+                    </div>
+                </form>
+                @forelse (array_slice($rules, 0, $this->limits['rules']) as $rule)
+                    <div class="lp-row" data-rule="{{ $rule['id'] }}" data-status="{{ $rule['status'] }}">
+                        <span class="lp-pill" data-tone="{{ ['proposed' => 'warn', 'applied' => 'good', 'unclear' => 'bad', 'failed' => 'bad'][$rule['status']] ?? '' }}"><i></i>{{ $t('rules.status.'.$rule['status']) }}</span>
+                        <div class="lp-grow">
+                            <span class="lp-row-t" dir="auto">{{ $rule['text'] }}</span>
+                            <span class="lp-row-s">{{ $t('rules.written', ['date' => \Illuminate\Support\Carbon::parse($rule['at'])->timezone($tz)->format('j.n')]) }}</span>
+                            @if ($rule['note'])<p class="lp-row-s" dir="auto" style="margin: 6px 0 0"><b>{{ $t('rules.understood') }}</b> {{ $rule['note'] }}</p>@endif
+                            @if ($rule['changes'] !== [])
+                                <ul class="lp-notes" data-changes>
+                                    @foreach ($rule['changes'] as $change)
+                                        <li dir="auto" style="display: flex; gap: 10px; align-items: flex-start">
+                                            @if ($change['image'])<img src="{{ $change['image'] }}" alt="" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; flex: none">@endif
+                                            <span>
+                                                <b>{{ $change['title'] }}</b>
+                                                @if ($change['add'] !== [])<br>{{ $t('rules.add') }} {{ implode(', ', $change['add']) }}@endif
+                                                @if ($change['remove'] !== [])<br>{{ $t('rules.remove') }} {{ implode(', ', $change['remove']) }}@endif
+                                                @if ($change['apart'] !== [])<br>{{ $t('rules.apart') }} {{ implode(', ', $change['apart']) }}@endif
+                                                @if ($change['alike'] !== [])<br>{{ $t('rules.alike') }} {{ implode(', ', $change['alike']) }}@endif
+                                            </span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                            @if ($rule['status'] === 'proposed')
+                                <div class="lp-actions" style="margin-top: 10px">
+                                    <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="decideRule('{{ $rule['id'] }}', true)" wire:loading.attr="disabled" wire:target="decideRule">{{ $t('rules.approve') }}</button>
+                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="decideRule('{{ $rule['id'] }}', false)">{{ $t('rules.reject') }}</button>
+                                </div>
+                            @endif
+                        </div>
+                        @if ($rule['status'] !== 'reading')
+                            <button type="button" class="lp-link" wire:click="removeRule('{{ $rule['id'] }}')" wire:confirm="{{ $t('rules.remove_confirm') }}">{{ $t('rules.remove_rule') }}</button>
+                        @endif
+                    </div>
+                @empty
+                    <p class="lp-note">{{ $t('rules.none') }}</p>
+                @endforelse
+                @if (count($rules) > $this->limits['rules'])
+                    <button type="button" class="lp-link" wire:click="more('rules')">{{ $t('more', ['n' => count($rules) - $this->limits['rules']]) }}</button>
                 @endif
             </section>
         @endif

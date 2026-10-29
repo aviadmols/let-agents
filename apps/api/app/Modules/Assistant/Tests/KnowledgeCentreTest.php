@@ -16,6 +16,7 @@ use App\Modules\Assistant\Jobs\ReadPostKnowledgeJob;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Enrichment\Contracts\ShopRules;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -75,6 +76,61 @@ final class KnowledgeCentreTest extends TestCase
         app()->setLocale('he');
         Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
         Filament::setTenant($this->shop);
+    }
+
+    public function test_a_rule_the_team_writes_shows_its_plan_and_is_applied_on_approval(): void
+    {
+        // the rules live in another module (Taxonomy, through Enrichment\Contracts\ShopRules): here, what the screen does with them
+        $rules = new class implements ShopRules
+        {
+            /** @var list<array<string, mixed>> */
+            public array $rules = [];
+
+            /** @var list<array{0: string, 1: bool}> */
+            public array $decided = [];
+
+            public function list(): array
+            {
+                return $this->rules;
+            }
+
+            public function add(string $text, ?int $userId): ?string
+            {
+                $this->rules[] = ['id' => 'r1', 'text' => $text, 'status' => 'proposed', 'note' => 'הספר הוא ביוגרפיה.', 'at' => now()->toIso8601String(), 'changes' => [
+                    ['external_id' => '1', 'title' => 'מפגש עם עצמי בגיהינום', 'image' => null, 'url' => null, 'add' => ['ביוגרפיה'], 'remove' => ['אימה'], 'apart' => ['דרקולה'], 'alike' => []],
+                ]];
+
+                return 'r1';
+            }
+
+            public function decide(string $id, bool $approve, ?int $userId): void
+            {
+                $this->decided[] = [$id, $approve];
+                $this->rules[0]['status'] = $approve ? 'applied' : 'rejected';
+            }
+
+            public function remove(string $id): void
+            {
+                $this->rules = [];
+            }
+        };
+        $this->app->instance(ShopRules::class, $rules);
+
+        $page = Livewire::test(AboutStore::class)
+            ->call('show', 'rules')
+            ->assertSee(__('assistant::ui.centre.rules.none'))
+            ->set('newRule', 'הספר "מפגש עם עצמי בגיהינום" לא מתאים לספרים כמו "דרקולה"')
+            ->call('addRule')
+            ->assertSee(__('assistant::ui.centre.rules.status.proposed'))
+            ->assertSee('הספר הוא ביוגרפיה.')
+            ->assertSee('מפגש עם עצמי בגיהינום')->assertSee(__('assistant::ui.centre.rules.add').' ביוגרפיה')->assertSee(__('assistant::ui.centre.rules.remove').' אימה')->assertSee(__('assistant::ui.centre.rules.apart').' דרקולה')
+            ->assertSee(__('assistant::ui.centre.rules.approve'));
+        $this->assertSame('', $page->get('newRule'));
+
+        $page->call('decideRule', 'r1', true)->assertSee(__('assistant::ui.centre.rules.status.applied'))->assertDontSee(__('assistant::ui.centre.rules.approve'));
+        $this->assertSame([['r1', true]], $rules->decided);
+
+        $page->call('removeRule', 'r1')->assertSee(__('assistant::ui.centre.rules.none'));
     }
 
     public function test_a_line_the_team_adds_joins_general_information_and_can_be_edited_and_removed(): void

@@ -1122,6 +1122,10 @@ final class SearchCatalog
             // description reads. Those that share them first, the meaning (and the picture) ordering them among themselves;
             // when they are enough, only they. "חטוף" is like "מפגש עם עצמי בגיהינום", not like "דרקולה".
             $tagged = app()->bound(RelatedByTags::class) ? array_column(app(RelatedByTags::class)->to($shopId, $externalId, $pool), 'external_id') : [];
+            // the team's own word (a rule it wrote and approved): kept apart is never among them, put together is first
+            $pairs = app()->bound(RelatedByTags::class) ? app(RelatedByTags::class)->pairs($shopId, $externalId) : ['apart' => [], 'alike' => []];
+            $apart = array_flip(array_map('strval', $pairs['apart']));
+            $alike = array_values(array_filter(array_map('strval', $pairs['alike']), fn (string $id): bool => isset($index['records']['p:'.$id])));
             $rank = [];
             foreach ([[$tagged, self::TAG_SHARE], [$looks, 1.0], [$means, 1.0]] as [$list, $share]) {
                 foreach ($list as $at => $id) {
@@ -1139,6 +1143,8 @@ final class SearchCatalog
             }
             // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
+            $ids = array_values(array_unique([...$alike, ...array_filter($ids, fn (string $id): bool => ! isset($apart[$id]))]));
+            $near = array_values(array_filter((array) $near, fn ($id): bool => ! isset($apart[(string) $id])));
             // Those of its kind that share its tags first, and alone when they are enough: counted after the kind, so
             // sharers of another kind never stand alone and leave nothing (Sela Meir, 28.10: a bundle's tag-sharers were
             // sets and series of other kinds, and "0 similar items" stood where the books on its subject should).
@@ -1208,6 +1214,11 @@ final class SearchCatalog
             if ($looksLead && ! $otherColour && $wants === null && count($products) >= 2 && Features::enabled('search.photo_rank', $shopId) && RankPhotoResults::available()
                 && ($photo = RankSheet::photo((string) ($own['img'] ?? ''))) !== null) {
                 $products = $this->ranker->handle($shopId, $photo, null, $products);
+            }
+            // what the team put together with it stays first, whatever the pictures or the colours said
+            if ($alike !== []) {
+                $first = array_flip($alike);
+                $products = [...array_values(array_filter($products, fn (array $p): bool => isset($first[(string) ($p['external_id'] ?? '')]))), ...array_values(array_filter($products, fn (array $p): bool => ! isset($first[(string) ($p['external_id'] ?? '')])))];
             }
 
             return $products;

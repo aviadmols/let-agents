@@ -12,4 +12,12 @@ interface RelatedByTags
 {
     /** @return list<array{external_id: string, score: float}> the likest first */
     public function to(string $shopId, string $externalId, int $limit): array;
+
+    /**
+     * The team's own word on one product, by a rule it wrote and approved: the products it is kept apart from (never
+     * shown as alike) and put together with (always alike, first). Empty where the team said nothing.
+     *
+     * @return array{apart: list<string>, alike: list<string>} external ids
+     */
+    public function pairs(string $shopId, string $externalId): array;
 }

@@ -14,7 +14,8 @@
     "features": [
         { "name": "tagging", "default": false },
         { "name": "in_search", "default": false },
-        { "name": "in_filters", "default": false }
+        { "name": "in_filters", "default": false },
+        { "name": "rules", "default": true }
     ],
     "settings": [
         { "name": "bank_writer_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
@@ -37,6 +38,17 @@
         { "name": "tag_checker_input_usd_per_million", "type": "float", "default": 3, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
         { "name": "tag_checker_output_usd_per_million", "type": "float", "default": 15, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
         { "name": "tag_checker_max_output_tokens", "type": "int", "default": 3000, "min": 500, "max": 16000, "scope": "global", "unit": "tokens" },
+        { "name": "rule_writer_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "openai", "scope": "global" },
+        { "name": "rule_writer_model", "type": "string", "default": "gpt-5.4-mini", "min": 1, "max": 120, "scope": "global" },
+        { "name": "rule_writer_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "rule_writer_output_usd_per_million", "type": "float", "default": 8, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "rule_writer_max_output_tokens", "type": "int", "default": 6000, "min": 500, "max": 32000, "scope": "global", "unit": "tokens" },
+        { "name": "rule_checker_provider", "type": "enum", "options": ["openai", "anthropic", "gemini"], "default": "anthropic", "scope": "global" },
+        { "name": "rule_checker_model", "type": "string", "default": "claude-haiku-4-5", "min": 1, "max": 120, "scope": "global" },
+        { "name": "rule_checker_input_usd_per_million", "type": "float", "default": 1, "min": 0, "max": 100, "scope": "global", "unit": "usd" },
+        { "name": "rule_checker_output_usd_per_million", "type": "float", "default": 5, "min": 0, "max": 400, "scope": "global", "unit": "usd" },
+        { "name": "rule_checker_max_output_tokens", "type": "int", "default": 3000, "min": 500, "max": 16000, "scope": "global", "unit": "tokens" },
+        { "name": "rule_candidates_max", "type": "int", "default": 80, "min": 5, "max": 400, "scope": "shop", "unit": "products" },
         { "name": "sample_products", "type": "int", "default": 80, "min": 10, "max": 300, "scope": "shop", "unit": "products" },
         { "name": "sample_per_group", "type": "int", "default": 3, "min": 1, "max": 20, "scope": "shop", "unit": "products" },
         { "name": "sample_posts", "type": "int", "default": 20, "min": 0, "max": 100, "scope": "shop", "unit": "items" },
@@ -104,6 +116,16 @@
                     "prices": ["tag_checker_input_usd_per_million", "tag_checker_output_usd_per_million"],
                     "prompts": ["check_tags"]
                 }
+            ]
+        },
+        {
+            "name": "rule_reader",
+            "action": "read_rule",
+            "when": "on_request",
+            "features": ["rules"],
+            "roles": [
+                { "role": "writer", "provider": "rule_writer_provider", "model": "rule_writer_model", "prices": ["rule_writer_input_usd_per_million", "rule_writer_output_usd_per_million"], "prompts": ["read_rule"] },
+                { "role": "checker", "provider": "rule_checker_provider", "model": "rule_checker_model", "prices": ["rule_checker_input_usd_per_million", "rule_checker_output_usd_per_million"], "prompts": ["check_rule"] }
             ]
         }
     ]

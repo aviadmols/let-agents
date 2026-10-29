@@ -180,6 +180,11 @@ final class SimilarItemsTest extends TestCase
             {
                 return [['external_id' => '302', 'score' => 0.8]];
             }
+
+            public function pairs(string $shopId, string $externalId): array
+            {
+                return ['apart' => [], 'alike' => []];
+            }
         });
 
         $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the one sharing its tags first, the meaning after, to fill');
@@ -196,6 +201,11 @@ final class SimilarItemsTest extends TestCase
             public function to(string $shopId, string $externalId, int $limit): array
             {
                 return [['external_id' => '303', 'score' => 0.9]];
+            }
+
+            public function pairs(string $shopId, string $externalId): array
+            {
+                return ['apart' => [], 'alike' => []];
             }
         });
         app(TenantContext::class)->run($this->shop->id, function (): void {
@@ -340,6 +350,27 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'its reader saw no print on 302; 303, read before it said, still goes by its words');
     }
 
+    public function test_the_teams_word_keeps_two_products_apart_and_puts_two_together(): void
+    {
+        // a rule the team wrote and approved (Taxonomy): "301 is never like 302; 303 goes with it"
+        Settings::set('search.similar_by', 'meaning', $this->shop->id);
+        $this->travel(2)->seconds();
+        $this->app->instance(RelatedByTags::class, new class implements RelatedByTags
+        {
+            public function to(string $shopId, string $externalId, int $limit): array
+            {
+                return [['external_id' => '302', 'score' => 0.9]];
+            }
+
+            public function pairs(string $shopId, string $externalId): array
+            {
+                return $externalId === '301' ? ['apart' => ['302'], 'alike' => ['303']] : ['apart' => [], 'alike' => []];
+            }
+        });
+
+        $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'the one kept apart is never alike, however its tags read; the one put together is');
+    }
+
     public function test_tag_sharers_of_another_kind_never_stand_alone_and_leave_nothing(): void
     {
         // Sela Meir, 28.10: a bundle's tag-sharers were sets and series of other kinds; enough of them to stand alone,
@@ -356,6 +387,11 @@ final class SimilarItemsTest extends TestCase
             public function to(string $shopId, string $externalId, int $limit): array
             {
                 return [['external_id' => '302', 'score' => 0.9]];
+            }
+
+            public function pairs(string $shopId, string $externalId): array
+            {
+                return ['apart' => [], 'alike' => []];
             }
         });
 

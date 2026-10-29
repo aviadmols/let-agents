@@ -9,6 +9,7 @@ use App\Modules\Assistant\Jobs\ReadPostKnowledgeJob;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Enrichment\Contracts\ShopRules;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -52,6 +53,9 @@ class AboutStore extends Page
     /** A line the team is adding. */
     public string $newInfo = '';
 
+    /** A rule of the store's products, in the team's words (Enrichment\Contracts\ShopRules). */
+    public string $newRule = '';
+
     /** The line being edited, and its text. */
     public ?string $editing = null;
 
@@ -64,9 +68,9 @@ class AboutStore extends Page
     public ?string $openPost = null;
 
     /** How many rows each tab shows; "load more" adds. */
-    public array $limits = ['general' => 10, 'posts' => 10, 'found' => 10];
+    public array $limits = ['general' => 10, 'posts' => 10, 'found' => 10, 'rules' => 10];
 
-    private const TABS = ['general', 'posts', 'found'];
+    private const TABS = ['general', 'posts', 'found', 'rules'];
 
     private const MORE = 20;
 
@@ -457,7 +461,62 @@ class AboutStore extends Page
     /** @return array{general: int, posts: int, found: int} what each tab holds */
     public function counts(): array
     {
-        return ['general' => count($this->pages()), 'posts' => count($this->postRows()), 'found' => count($this->found())];
+        return ['general' => count($this->pages()), 'posts' => count($this->postRows()), 'found' => count($this->found()), 'rules' => count($this->rules())];
+    }
+
+    /**
+     * The rules the team wrote of the store's products, each with what was understood and the products it changes,
+     * where a module reads them (Enrichment\Contracts\ShopRules). Empty otherwise.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function rules(): array
+    {
+        if ($this->shop === null || ! app()->bound(ShopRules::class)) {
+            return [];
+        }
+
+        return $this->inShop(fn (): array => app(ShopRules::class)->list());
+    }
+
+    /** A rule written: kept, and read in the background into a plan for the team to approve. */
+    public function addRule(): void
+    {
+        $text = trim($this->newRule);
+
+        if ($this->shop === null || $text === '' || ! app()->bound(ShopRules::class)) {
+            return;
+        }
+
+        $id = $this->inShop(fn (): ?string => app(ShopRules::class)->add($text, auth()->id()));
+
+        if ($id === null) {
+            return;
+        }
+
+        $this->newRule = '';
+        $this->tab = 'rules';
+        Notification::make()->success()->title(__('assistant::ui.centre.rules.added'))->body(__('assistant::ui.centre.rules.added_body'))->send();
+    }
+
+    /** The team's word on a rule's plan: applied, or rejected. Nothing changes before it. */
+    public function decideRule(string $id, bool $approve): void
+    {
+        if ($this->shop === null || ! app()->bound(ShopRules::class)) {
+            return;
+        }
+
+        $this->inShop(fn () => app(ShopRules::class)->decide($id, $approve, auth()->id()));
+        Notification::make()->success()->title(__($approve ? 'assistant::ui.centre.rules.applied' : 'assistant::ui.centre.rules.rejected'))->send();
+    }
+
+    public function removeRule(string $id): void
+    {
+        if ($this->shop === null || ! app()->bound(ShopRules::class)) {
+            return;
+        }
+
+        $this->inShop(fn () => app(ShopRules::class)->remove($id));
     }
 
     /** @return list<array{id: string, question: string, answer: string, date: string}> */

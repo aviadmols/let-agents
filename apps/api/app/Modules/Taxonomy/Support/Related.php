@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
+use App\Modules\Taxonomy\Models\TaxonomyPair;
 use App\Modules\Taxonomy\Models\TaxonomyTag;
 use App\Modules\Tenancy\Models\Shop;
 
@@ -60,10 +61,13 @@ final class Related
         }
 
         $labels = TaxonomyTag::query()->whereIn('id', array_keys($mine))->pluck('label_he', 'id')->all() + $this->names;
+        // the team's word, by a rule it approved: kept apart is never alike, put together is alike first
+        $pairs = TaxonomyPair::of($productId);
+        $apart = array_flip($pairs['apart']);
         $scores = [];
 
         foreach ($vectors as $id => $theirs) {
-            if ($id === $productId) {
+            if ($id === $productId || isset($apart[(string) $id])) {
                 continue;
             }
             $shared = array_intersect_key($mine, $theirs);
@@ -82,6 +86,11 @@ final class Related
         }
 
         usort($scores, fn (array $a, array $b): int => [$b['score'], $a['id']] <=> [$a['score'], $b['id']]);
+        $alike = array_flip($pairs['alike']);
+        $scores = [
+            ...array_map(fn (string $id): array => ['id' => $id, 'score' => 1.0, 'shared' => [__('taxonomy::runs.team_alike')]], array_values(array_filter($pairs['alike'], fn (string $id): bool => isset($vectors[$id])))),
+            ...array_values(array_filter($scores, fn (array $s): bool => ! isset($alike[$s['id']]))),
+        ];
 
         return array_slice($scores, 0, $limit);
     }

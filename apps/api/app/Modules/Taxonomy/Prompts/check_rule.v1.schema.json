@@ -1,0 +1,21 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["ok", "wrong", "why"],
+    "properties": {
+        "ok": {"type": "boolean"},
+        "wrong": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "why"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "why": {"type": "string"}
+                }
+            }
+        },
+        "why": {"type": "string"}
+    }
+}

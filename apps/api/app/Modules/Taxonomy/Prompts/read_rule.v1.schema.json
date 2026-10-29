@@ -1,0 +1,24 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["understood", "changes", "question"],
+    "properties": {
+        "understood": {"type": "string"},
+        "changes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "add", "remove", "apart", "alike"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "add": {"type": "array", "items": {"type": "string"}},
+                    "remove": {"type": "array", "items": {"type": "string"}},
+                    "apart": {"type": "array", "items": {"type": "string"}},
+                    "alike": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        },
+        "question": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+    }
+}

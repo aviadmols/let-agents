@@ -4,11 +4,13 @@ namespace App\Modules\Taxonomy;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Enrichment\Contracts\ProductMeaning;
+use App\Modules\Enrichment\Contracts\ShopRules;
 use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Taxonomy\Console\TaxonomyCommand;
 use App\Modules\Taxonomy\Support\Meaning;
 use App\Modules\Taxonomy\Support\RelatedProducts;
+use App\Modules\Taxonomy\Support\Rules;
 use App\Modules\Taxonomy\Support\TagWords;
 
 /**
@@ -23,6 +25,7 @@ final class TaxonomyServiceProvider extends ModuleServiceProvider
         $this->app->bind(ProductTags::class, TagWords::class);
         $this->app->bind(ProductMeaning::class, Meaning::class);
         $this->app->bind(RelatedByTags::class, RelatedProducts::class);
+        $this->app->bind(ShopRules::class, Rules::class);
     }
 
     protected function bootModule(): void
