@@ -18,6 +18,36 @@ what you may change and what you must keep, so that every screen still works aft
 - Restyle against this first. Use the live panel below to check a state that only the live panel shows: something that
   updates while you watch, or what an action leaves behind.
 
+## Order and names: `layout/`
+
+The designer changes the panel's order and names in `layout/layout.js`, not in code. The local dashboard applies the
+file to every screen on refresh (`layout/apply.js`; do not edit it). `layout/default.js` is the panel as it is now; do
+not edit it either. The engineer at Lets compares the two files to port the changes.
+
+- `menu`: the sidebar, top to bottom. Each entry is `{ screen, label }`. Move an entry to move it; `hidden: true`
+  hides it.
+- `screens`: each screen's pages, in order.
+  - They show as tabs under the heading (`look: "tabs"`) or as a side menu like settings (`look: "side"`).
+  - The first page is the one the sidebar entry opens.
+  - `{ group: "…" }` is a heading in a side menu.
+  - Moving a page's line into another screen's list moves the page there.
+  - A new screen is a new key here plus an entry in `menu`.
+- `tabs`: the tabs inside a screen, keyed by page. Reorder, relabel or hide them; a tab keeps its place among its own
+  group.
+- `texts`: any other visible text, as `"exact text on screen": "new text"`. This covers headings, buttons, hints and
+  placeholders.
+
+Rules for editing it:
+
+1. Never change the values of `screen`, `page` or `tab`. They are identifiers the system knows.
+   - A `tab` value is the button's `data-tab` or `wire:click`.
+   - A tab without either is identified by its text, as `text:…`.
+2. Every new or changed label needs English as well. Add `en: "…"` beside it.
+3. Keep it valid JavaScript: commas after every entry, matching quotes and brackets. The dashboard's bottom bar reports
+   a file that fails to load.
+4. Order and names belong in this file, not in `views/`. Do not reorder tabs or menus by editing Blade.
+5. It shows in the local dashboard only. The live panel follows it once the engineer has ported it.
+
 ## Setting it up live (do this when asked to set up, run or "deploy" the kit against the live panel)
 
 Nothing is installed or deployed to a server. The panel runs on Lets' server. This kit's folder is served from the
@@ -123,6 +153,7 @@ or a setting's save changes the live shop. To see a state, open it; do not trigg
 ## What to hand back
 
 - `merchant.css`;
+- `layout/layout.js`, when order or names changed;
 - the changed files under `views/`, at the same paths;
 - any saved HTML screens with proposed structure;
 - `CHANGES.md`, listing per screen what changed, every new or renamed class, and every new text with its Hebrew and
