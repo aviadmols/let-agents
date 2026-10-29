@@ -34,14 +34,19 @@ final class PanelTheme
     /** The merchant panel's own layer, after the shared one: the Lets Search language (merchant.css). */
     public static function merchant(): HtmlString
     {
-        // a designer at work (DesignPass): the stylesheet from their own computer instead, so what they change shows at once
+        self::$merchant ??= (string) file_get_contents(dirname(__DIR__).'/resources/css/merchant.css');
+        $own = '<link rel="stylesheet" href="'.self::MERCHANT_FONT_URL.'"><style data-lets-merchant>'.self::$merchant.'</style>';
+        // A designer at work (DesignPass): the stylesheet from their own computer takes over once it has loaded, the
+        // panel's own set aside then. Never in the page's way: a stylesheet from localhost waits for the browser's leave
+        // to reach the local network, and one that blocked would leave the page blank until then (29.10).
         $local = request()->hasSession() && request()->session()->has(DesignPass::SESSION) ? request()->session()->get(DesignPass::SESSION_CSS) : null;
         if (is_string($local) && DesignPass::localCss($local) !== null) {
-            return new HtmlString('<link rel="stylesheet" href="'.self::MERCHANT_FONT_URL.'"><link rel="stylesheet" href="'.e($local).'" data-lets-merchant-local>');
+            $own .= '<link rel="stylesheet" href="'.e($local).'" media="print" data-lets-merchant-local'
+                .' onload="this.media=\'all\';var s=document.querySelector(\'style[data-lets-merchant]\');if(s){s.disabled=true;}document.documentElement.dataset.designCss=\'on\';var b=document.querySelector(\'[data-design-css-state]\');if(b){b.textContent=b.dataset.on;b.style.color=\'\';}"'
+                .' onerror="document.documentElement.dataset.designCss=\'failed\';">';
         }
-        self::$merchant ??= (string) file_get_contents(dirname(__DIR__).'/resources/css/merchant.css');
 
-        return new HtmlString('<link rel="stylesheet" href="'.self::MERCHANT_FONT_URL.'"><style data-lets-merchant>'.self::$merchant.'</style>');
+        return new HtmlString($own);
     }
 
     /** The design bar, while a designer's pass is open (DesignPass); nothing otherwise. */

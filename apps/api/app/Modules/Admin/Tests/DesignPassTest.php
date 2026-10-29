@@ -46,8 +46,8 @@ final class DesignPassTest extends TestCase
         // the stylesheet from the designer's computer, and nothing else
         $this->post('/design/css', ['url' => 'http://localhost:5500/merchant.css'])->assertRedirect();
         $this->get("/merchant/{$shop->slug}/overview")->assertOk()
-            ->assertSee('href="http://localhost:5500/merchant.css" data-lets-merchant-local', false)
-            ->assertDontSee('<style data-lets-merchant>', false);
+            ->assertSee('href="http://localhost:5500/merchant.css" media="print" data-lets-merchant-local', false)
+            ->assertSee('<style data-lets-merchant>', false);
         $this->post('/design/css', ['url' => 'https://evil.test/x.css']);
         $this->get("/merchant/{$shop->slug}/overview")->assertSee('<style data-lets-merchant>', false);
 

@@ -15,7 +15,16 @@
     </form>
     @if ($css)
         <form method="post" action="{{ route('admin.design.css') }}" style="margin:0">@csrf<input type="hidden" name="url" value=""><button style="height:30px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#fff;text-decoration:underline;font:inherit;cursor:pointer">{{ $t('css_clear') }}</button></form>
-        <span style="opacity:.7">{{ $t('css_on') }}</span>
+        {{-- whether it loaded: the browser may first ask leave to reach the local network --}}
+        <span data-design-css-state style="opacity:.8" data-on="{{ $t('css_on') }}" data-failed="{{ $t('css_failed') }}">{{ $t('css_wait') }}</span>
+        <script>
+            (function () {
+                const el = document.querySelector('[data-design-css-state]');
+                const show = () => { const s = document.documentElement.dataset.designCss; if (s === 'on') { el.textContent = el.dataset.on; return true; } if (s === 'failed') { el.textContent = el.dataset.failed; el.style.color = '#ff9b85'; return true; } return false; };
+                let tries = 0;
+                const timer = setInterval(() => { if (show() || ++tries > 40) { clearInterval(timer); if (! document.documentElement.dataset.designCss) { el.textContent = el.dataset.failed; el.style.color = '#ff9b85'; } } }, 250);
+            })();
+        </script>
     @endif
     <button type="button" onclick="lsDesignSnapshot()" style="margin-inline-start:auto;height:30px;padding:0 12px;border:0;border-radius:8px;background:#fff;color:#111;font:inherit;cursor:pointer">{{ $t('save') }}</button>
 </div>

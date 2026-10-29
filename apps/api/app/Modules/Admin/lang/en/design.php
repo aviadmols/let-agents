@@ -25,6 +25,8 @@ return [
         'css_reload' => 'Load again',
         'css_clear' => 'Back to the site\'s look',
         'css_on' => 'The look comes from your computer',
+        'css_wait' => 'Loading the file from your computer…',
+        'css_failed' => 'The file from your computer did not load: check the local server runs, and allow local network access if the browser asks.',
         'save' => 'Save this screen as HTML',
     ],
     'closed' => [
