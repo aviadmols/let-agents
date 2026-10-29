@@ -310,7 +310,8 @@ button.ls-dot { cursor: pointer; }
 .ls-tabs__pill { position: absolute; z-index: 0; inset-block: 3px; border-radius: 999px; background: var(--ls-bg); box-shadow: var(--lsp-shadow-sm); left: 3px; width: 0; transition: left 300ms var(--lsp-ease-out), width 300ms var(--lsp-ease-out); }
 .ls-tab__count.is-bump { animation: ls-pop 420ms var(--lsp-ease-out); }
 
-.ls-dbody { flex: 1; overflow: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
+/* up and down only: a row's hover ground that bleeds past the edge never widens the body (a chip once did, on a phone) */
+.ls-dbody { flex: 1; overflow: hidden auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
 .ls-dfoot { padding: 10px 12px 12px; }
 
 /* composer */
