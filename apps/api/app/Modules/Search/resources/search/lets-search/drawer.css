@@ -559,14 +559,19 @@
 .ls-kit { margin-bottom: 14px; padding: 6px 4px; border-radius: var(--lsp-r-md); box-shadow: inset 0 0 0 1px var(--ls-line-strong); }
 .ls-kit .ls-block__title { padding: 6px 8px 0; }
 
-/* search.image_fit = frame: product pictures shown whole on the light ground, the original look, for pictures on white */
-.is-frame .ls-card__media img, .is-frame .ls-pic2 { object-fit: contain; padding: 10%; mix-blend-mode: multiply; }
-.is-frame .ls-saved-item__media img, .is-frame .ls-of__media img { object-fit: contain; padding: 10%; mix-blend-mode: multiply; }
-.is-frame .ls-of__media { background: var(--ls-bg-sunken); }
-.is-frame .ls-pick__media img, .is-frame .ls-cmp .ls-cmp__img { object-fit: contain; padding: 8px; mix-blend-mode: multiply; }
-.is-frame .ls-mini__img { object-fit: contain; padding: 12px; mix-blend-mode: multiply; }
-.is-frame .ls-about__img, .is-frame .ls-order__img { object-fit: contain; padding: 6px; mix-blend-mode: multiply; }
-.is-frame .ls-prow__img { object-fit: contain; padding: 4px; mix-blend-mode: multiply; }
+/* search.image_fit = frame: product pictures shown whole, the original look, for pictures on white. The well is white
+   with a hairline round it, so the picture's own ground is the well's: no mix-blend-mode, which iOS Safari paints at
+   stale positions inside a scrolling drawer (Sela Meir, 29.10: cards drawn over one another and shifted sideways as
+   results loaded and scrolled). */
+.is-frame .ls-card__media, .is-frame .ls-saved-item__media, .is-frame .ls-of__media, .is-frame .ls-pick__media,
+.is-frame .ls-cmp .ls-cmp__img, .is-frame .ls-mini__img, .is-frame .ls-about__img, .is-frame .ls-order__img, .is-frame .ls-prow__img { background: var(--ls-bg); box-shadow: inset 0 0 0 1px var(--ls-line); }
+.is-frame .ls-pick:hover .ls-pick__media { background: var(--ls-bg); }
+.is-frame .ls-card__media img, .is-frame .ls-pic2 { object-fit: contain; padding: 10%; }
+.is-frame .ls-saved-item__media img, .is-frame .ls-of__media img { object-fit: contain; padding: 10%; }
+.is-frame .ls-pick__media img, .is-frame .ls-cmp .ls-cmp__img { object-fit: contain; padding: 8px; }
+.is-frame .ls-mini__img { object-fit: contain; padding: 12px; }
+.is-frame .ls-about__img, .is-frame .ls-order__img { object-fit: contain; padding: 6px; }
+.is-frame .ls-prow__img { object-fit: contain; padding: 4px; }
 
 /* "a question about these results?": what to ask, by the results, and the shopper's own question */
 .ls-askabout { margin: 4px 0 6px; padding: 12px; border-radius: var(--lsp-r-md); background: var(--ls-bg-sunken); }
