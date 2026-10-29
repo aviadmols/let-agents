@@ -27,12 +27,13 @@ final class ChooseWordFamily
     /**
      * @param  list<string>  $words
      * @param  string|null  $id  the team's family this replaces, when it is one
+     * @param  bool  $auto  decided by the judge (SettleWordFamilies), not by the team
      * @return SearchFamilyChoice|null null when too few words are left for a family (a family of the team's emptied goes)
      */
-    public function handle(string $shopId, string $status, array $words, ?string $id = null): ?SearchFamilyChoice
+    public function handle(string $shopId, string $status, array $words, ?string $id = null, bool $auto = false): ?SearchFamilyChoice
     {
         $words = $this->clean($shopId, $words);
-        $saved = $this->tenant->run($shopId, function () use ($shopId, $status, $words, $id): ?SearchFamilyChoice {
+        $saved = $this->tenant->run($shopId, function () use ($shopId, $status, $words, $id, $auto): ?SearchFamilyChoice {
             $choice = $id === null ? null : SearchFamilyChoice::query()->find($id);
             if ($status !== SearchFamilyChoice::HIDDEN && count($words) < 2) {
                 $choice?->delete();
@@ -43,7 +44,7 @@ final class ChooseWordFamily
                 $this->takeFromOthers($words, $choice?->id);
             }
             $choice ??= new SearchFamilyChoice(['shop_id' => $shopId]);
-            $choice->fill(['status' => $status, 'words' => $words, 'decided_by' => auth()->id()])->save();
+            $choice->fill(['status' => $status, 'words' => $words, 'auto' => $auto, 'decided_by' => $auto ? null : auth()->id()])->save();
 
             return $choice;
         });

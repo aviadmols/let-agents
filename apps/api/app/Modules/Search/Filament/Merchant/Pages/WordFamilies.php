@@ -4,6 +4,7 @@ namespace App\Modules\Search\Filament\Merchant\Pages;
 
 use App\Core\Facades\Settings;
 use App\Modules\Search\Actions\ChooseWordFamily;
+use App\Modules\Search\Jobs\SettleWordFamiliesJob;
 use App\Modules\Search\Models\SearchFamilyChoice;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
@@ -89,7 +90,7 @@ final class WordFamilies extends Page
     /** @return list<array{ref: string, words: list<string>}> */
     public function approvedRows(): array
     {
-        return array_map(fn (array $f): array => ['ref' => 'a-'.$f['id'], 'words' => $f['words']], StoreFamilies::approved());
+        return array_map(fn (array $f): array => ['ref' => 'a-'.$f['id'], 'words' => $f['words'], 'auto' => $f['auto']], StoreFamilies::approved());
     }
 
     /** @return list<array{word: string, searches: int, empty: int, near: list<string>}> */
@@ -119,6 +120,13 @@ final class WordFamilies extends Page
         }
 
         return $out;
+    }
+
+    /** The judge settles what waits now, in the background (SettleWordFamilies), rather than at night. */
+    public function checkNow(): void
+    {
+        SettleWordFamiliesJob::dispatch($this->shopId());
+        Notification::make()->success()->title(__('search::families.checking'))->send();
     }
 
     public function approve(string $ref): void

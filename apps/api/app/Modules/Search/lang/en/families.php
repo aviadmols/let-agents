@@ -16,11 +16,11 @@ return [
         'button' => 'Create',
     ],
     'waiting' => [
-        'help' => 'Families we found in the store\'s words. They already work in search. Approve them, fix them, or mark them as wrong.',
+        'help' => 'Families we found in the store\'s words. They already work in search, and each night a model checks and approves them, so there is no need to approve. You may fix them or mark them as wrong.',
         'none' => 'No families are waiting for you.',
     ],
     'approved' => [
-        'help' => 'Families you approved, fixed or created. They stay as they are, even when products change.',
+        'help' => 'Families you approved, fixed or created, and families the automatic check approved. They stay as they are, even when products change.',
         'none' => 'You have not approved any families yet.',
     ],
     'open' => [
@@ -38,6 +38,9 @@ return [
     'add_placeholder' => 'Word to add',
     'drop' => 'Take :word out of the family',
     'approve' => 'Approve',
+    'auto' => 'Approved automatically',
+    'check_now' => 'Check now',
+    'checking' => 'The check runs in the background. Refresh in a minute or two.',
     'reject' => 'Not right',
     'remove' => 'Delete family',
     'remove_confirm' => 'Delete this family? Its words will not be joined together again.',

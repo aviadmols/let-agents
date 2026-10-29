@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $shop_id
  * @property string $status approved, rejected or hidden
  * @property list<string> $words
+ * @property bool $auto decided by the judge (SettleWordFamilies), not by the team
  * @property int|null $decided_by
  */
 class SearchFamilyChoice extends Model
@@ -31,6 +32,6 @@ class SearchFamilyChoice extends Model
 
     protected function casts(): array
     {
-        return ['words' => 'array'];
+        return ['words' => 'array', 'auto' => 'boolean'];
     }
 }

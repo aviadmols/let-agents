@@ -5,8 +5,13 @@ namespace App\Modules\Search\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
+use App\Modules\Ai\Contracts\ChatModel;
+use App\Modules\Ai\Contracts\ModelReply;
+use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\SettleWordFamilies;
 use App\Modules\Search\Filament\Merchant\Pages\WordFamilies;
 use App\Modules\Search\Models\SearchFamilyChoice;
 use App\Modules\Search\Models\SearchIndex;
@@ -113,6 +118,59 @@ final class WordFamiliesScreenTest extends TestCase
         $this->assertEqualsCanonicalizing([['כפתורים', 'כפתור'], ['סווטשירט', 'סווטשירטים', 'רוכסן']], array_column(StoreFamilies::approved(), 'words'));
         $this->assertSame(1, SearchFamilyChoice::query()->where('status', SearchFamilyChoice::HIDDEN)->count());
         $this->assertSame([], array_column(Livewire::test(WordFamilies::class)->instance()->openRows(), 'word'), 'joined, paired or hidden: none left');
+    }
+
+    public function test_the_judge_settles_the_waiting_families_and_the_searched_words_without_the_team(): void
+    {
+        // Aviad, 29.10: 69 families waited for an approval, 40 searched words for a family
+        foreach (['כפתור' => 2, 'רוכסן' => 0, 'פנטזיה' => 0] as $query => $results) {
+            SearchLog::query()->create(['shop_id' => $this->shop->id, 'query' => $query, 'results' => $results, 'created_at' => now()->subDays(2)]);
+        }
+        $judge = new class implements ChatModel
+        {
+            /** @var list<array<string, mixed>> */
+            public array $asked = [];
+
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $in = json_decode($user, true);
+                $this->asked[] = ['provider' => $provider, 'model' => $model, 'in' => $in];
+                $id = fn (string $word): string => (string) collect($in['families'])->first(fn (array $f): bool => in_array($word, $f['words'], true))['id'];
+                $words = collect($in['words'])->keyBy('word');
+
+                return new ModelReply(['families' => [
+                    ['id' => $id('משבצות'), 'keep' => ['משובצת', 'משבצות']],
+                    ['id' => $id('שורט'), 'keep' => []],
+                    ['id' => $id('סווטשירט'), 'keep' => ['סווטשירט', 'סווטשירטים']],
+                ], 'words' => [
+                    ['id' => $words['כפתור']['id'], 'family' => null, 'with' => 'כפתורים'],
+                    ['id' => $words['רוכסן']['id'], 'family' => $id('סווטשירט'), 'with' => null],
+                    ['id' => $words['פנטזיה']['id'], 'family' => null, 'with' => null],
+                    // an id it was not given: nothing
+                    ['id' => 'w99', 'family' => null, 'with' => null],
+                ]], 3000, 400);
+            }
+        };
+        $this->app->instance(ChatModel::class, $judge);
+
+        $run = app(SettleWordFamilies::class)->handle($this->shop->id);
+
+        $this->assertSame('succeeded', $run->status->value);
+        $this->assertSame([AiProviderName::Anthropic, 'claude-opus-5-5'], [$judge->asked[0]['provider'], $judge->asked[0]['model']], 'a strong model of the other family than the writer');
+        $this->assertSame(['כפתורים'], collect($judge->asked[0]['in']['words'])->firstWhere('word', 'כפתור')['near'], 'with the store\'s words that look like it');
+        $this->assertEqualsCanonicalizing([['משובצת', 'משבצות'], ['סווטשירט', 'סווטשירטים', 'רוכסן'], ['כפתורים', 'כפתור']], array_column(StoreFamilies::approved(), 'words'));
+        $this->assertSame([true, true, true], array_column(StoreFamilies::approved(), 'auto'), 'the judge\'s, not the team\'s');
+        $this->assertSame(1, SearchFamilyChoice::query()->where('status', SearchFamilyChoice::REJECTED)->count(), '"שירט", "שורט": wrong');
+        $this->assertSame(['פנטזיה'], SearchFamilyChoice::query()->where('status', SearchFamilyChoice::HIDDEN)->sole()->words);
+        $this->assertSame([], StoreFamilies::waiting(), 'nothing waits for the team');
+        $this->assertSame(['approved' => 1, 'trimmed' => 1, 'wrong' => 1, 'joined' => 1, 'paired' => 1, 'hidden' => 1], array_intersect_key($run->output, array_flip(['approved', 'trimmed', 'wrong', 'joined', 'paired', 'hidden'])));
+
+        $screen = Livewire::test(WordFamilies::class);
+        $this->assertSame([], array_column($screen->instance()->openRows(), 'word'));
+        $screen->call('show', 'approved')->assertSee(__('search::families.auto'));
+        $this->assertNull(app(SettleWordFamilies::class)->handle($this->shop->id), 'nothing waits: no model is asked');
+        $this->assertCount(1, $judge->asked);
+        $this->assertSame(1, Run::query()->where('agent', SettleWordFamilies::AGENT)->count());
     }
 
     public function test_a_family_is_made_by_hand_and_a_word_is_in_one_of_the_teams_families(): void

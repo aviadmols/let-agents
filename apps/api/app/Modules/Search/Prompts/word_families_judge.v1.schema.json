@@ -1,0 +1,32 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["families", "words"],
+    "properties": {
+        "families": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "keep"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "keep": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        },
+        "words": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "family", "with"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "family": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                    "with": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+                }
+            }
+        }
+    }
+}

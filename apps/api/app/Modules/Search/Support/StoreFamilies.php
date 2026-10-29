@@ -19,11 +19,11 @@ final class StoreFamilies
         return [...array_column(self::approved(), 'words'), ...self::waiting()];
     }
 
-    /** @return list<array{id: string, words: list<string>}> the team's families, oldest first */
+    /** @return list<array{id: string, words: list<string>, auto: bool}> the team's families (and the judge's), oldest first */
     public static function approved(): array
     {
-        return SearchFamilyChoice::query()->where('status', SearchFamilyChoice::APPROVED)->orderBy('created_at')->orderBy('id')->get(['id', 'words'])
-            ->map(fn (SearchFamilyChoice $c): array => ['id' => (string) $c->id, 'words' => array_values(array_map('strval', (array) $c->words))])
+        return SearchFamilyChoice::query()->where('status', SearchFamilyChoice::APPROVED)->orderBy('created_at')->orderBy('id')->get(['id', 'words', 'auto'])
+            ->map(fn (SearchFamilyChoice $c): array => ['id' => (string) $c->id, 'words' => array_values(array_map('strval', (array) $c->words)), 'auto' => (bool) $c->auto])
             ->filter(fn (array $c): bool => count($c['words']) >= 2)->values()->all();
     }
 

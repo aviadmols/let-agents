@@ -11,6 +11,7 @@ use App\Modules\Search\Actions\CheckStoreSearch;
 use App\Modules\Search\Actions\LearnFromSearches;
 use App\Modules\Search\Actions\ResolveEmptySearches;
 use App\Modules\Search\Actions\SearchCatalog;
+use App\Modules\Search\Actions\SettleWordFamilies;
 use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Actions\WriteWordFamilies;
 use App\Modules\Search\Models\SearchClick;
@@ -83,6 +84,11 @@ final class SearchCommand extends Command
                     app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
                 }
             }
+            // what the families and the searched words wait for, settled by the judge (SettleWordFamilies): its choices build the index again
+            $settled = $run->status->value === 'succeeded' ? app(SettleWordFamilies::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual) : null;
+            if ($settled !== null) {
+                $this->line("{$shop->slug}: ".$settled->summary());
+            }
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
@@ -130,6 +136,11 @@ final class SearchCommand extends Command
                     app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
                 }
             }
+            // what the families and the searched words wait for, settled by the judge (SettleWordFamilies): its choices build the index again
+            $settled = $run->status->value === 'succeeded' ? app(SettleWordFamilies::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual) : null;
+            if ($settled !== null) {
+                $this->line("{$shop->slug}: ".$settled->summary());
+            }
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
@@ -158,6 +169,11 @@ final class SearchCommand extends Command
                 if ($families->status->value === 'succeeded') {
                     app(BuildSearchIndex::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual);
                 }
+            }
+            // what the families and the searched words wait for, settled by the judge (SettleWordFamilies): its choices build the index again
+            $settled = $run->status->value === 'succeeded' ? app(SettleWordFamilies::class)->handle($shop->id, $this->option('all') ? RunTrigger::Schedule : RunTrigger::Manual) : null;
+            if ($settled !== null) {
+                $this->line("{$shop->slug}: ".$settled->summary());
             }
         }
 

@@ -101,6 +101,10 @@ return [
         'label' => 'Search learns from shoppers',
         'description' => 'Every night, for each store alone: the products different shoppers opened and added to the cart for a search come first for it, and a word shoppers keep taking off as a filter is read as one no more. In code, no model.',
     ],
+    'word_families_auto' => [
+        'label' => 'Automatic word families',
+        'description' => 'Each night a strong model of the other family checks the written families and the words searched with no family: approves, fixes or takes out, and joins a word to a family only when it is the same thing. The team need not approve.',
+    ],
     'word_families' => [
         'label' => 'Word families',
         'description' => 'The store\'s words a shopper means as one ("checkered", "checks"; "captivity", "hostages") find each other. One model writes them, a model of the other family checks, only when the store\'s words change.',

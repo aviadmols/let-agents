@@ -58,6 +58,9 @@
             @php($rows = $this->tab === 'approved' ? $approved : $waiting)
             <section class="lp-card" data-pane="{{ $this->tab }}">
                 <p class="lp-set-help">{{ $t($this->tab.'.help') }}</p>
+                @if ($this->tab === 'waiting' && $rows !== [])
+                    <div class="lp-actions" style="margin-bottom: 8px"><button type="button" class="lp-btn lp-btn-sm" wire:click="checkNow" wire:loading.attr="disabled" wire:target="checkNow" data-check-now>{{ $t('check_now') }}</button></div>
+                @endif
                 @forelse ($rows as $row)
                     <div class="lp-row lp-row-wrap" data-family="{{ $row['ref'] }}" wire:key="{{ $row['ref'] }}">
                         <div class="lp-grow lp-chips">
@@ -74,6 +77,7 @@
                                 <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="approve('{{ $row['ref'] }}')">{{ $t('approve') }}</button>
                                 <button type="button" class="lp-btn lp-btn-sm" wire:click="reject('{{ $row['ref'] }}')">{{ $t('reject') }}</button>
                             @else
+                                @if ($row['auto'] ?? false)<span class="lp-note" data-auto>{{ $t('auto') }}</span>@endif
                                 <button type="button" class="lp-link" wire:click="reject('{{ $row['ref'] }}')" wire:confirm="{{ $t('remove_confirm') }}">{{ $t('remove') }}</button>
                             @endif
                         </div>

@@ -7,5 +7,6 @@ return [
     'photo_reader' => 'קורא תמונות של גולשים',
     'scan_checker' => 'בודק החיפוש אחרי סריקה',
     'family_writer' => 'כותב משפחות מילים',
+    'family_judge' => 'שופט משפחות מילים',
     'word_reader' => 'קורא מילים במשמעות',
 ];

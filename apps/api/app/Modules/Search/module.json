@@ -25,6 +25,10 @@
             "default": true
         },
         {
+            "name": "word_families_auto",
+            "default": true
+        },
+        {
             "name": "word_meanings",
             "default": true
         },
@@ -1062,6 +1066,66 @@
             "scope": "shop"
         },
         {
+            "name": "family_judge_provider",
+            "type": "enum",
+            "default": "anthropic",
+            "options": ["openai","anthropic","gemini"],
+            "scope": "global"
+        },
+        {
+            "name": "family_judge_model",
+            "type": "string",
+            "default": "claude-opus-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "family_judge_input_usd_per_million",
+            "type": "float",
+            "default": 4,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "family_judge_output_usd_per_million",
+            "type": "float",
+            "default": 20,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "family_judge_max_output_tokens",
+            "type": "int",
+            "default": 16000,
+            "min": 1000,
+            "max": 32000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "family_judge_families_max",
+            "type": "int",
+            "default": 150,
+            "min": 5,
+            "max": 400,
+            "scope": "global",
+            "unit": "items"
+        },
+        {
+            "name": "family_judge_words_max",
+            "type": "int",
+            "default": 60,
+            "min": 5,
+            "max": 200,
+            "scope": "global",
+            "unit": "items"
+        },
+        {
             "name": "families_max_output_tokens",
             "type": "int",
             "default": 6000,
@@ -1241,6 +1305,28 @@
                     ],
                     "prompts": [
                         "word_families_check"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "family_judge",
+            "action": "settle_families",
+            "when": "02:40",
+            "features": [
+                "word_families_auto"
+            ],
+            "roles": [
+                {
+                    "role": "checker",
+                    "provider": "family_judge_provider",
+                    "model": "family_judge_model",
+                    "prices": [
+                        "family_judge_input_usd_per_million",
+                        "family_judge_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "word_families_judge"
                     ]
                 }
             ]
