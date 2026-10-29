@@ -4,6 +4,7 @@ namespace App\Modules\Taxonomy\Actions;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
 use App\Modules\Taxonomy\Models\TaxonomyGroup;
@@ -43,29 +44,39 @@ final class ApplyRule
         $evidence = mb_substr(__('taxonomy::runs.rule_evidence', ['text' => $rule->text]), 0, 400);
         $touched = [];
 
+        // the posts and pages the rule names with "@" ("c:" and their id): they take tags only
+        $contents = CatalogContent::query()->whereNull('removed_at')
+            ->whereIn('external_id', array_values(array_map(fn (array $c): string => substr((string) $c['external_id'], 2), array_filter($changes, fn (array $c): bool => str_starts_with((string) ($c['external_id'] ?? ''), 'c:')))))
+            ->get(['id', 'external_id'])->keyBy('external_id');
+
         foreach ($changes as $change) {
-            $product = $products->get((string) ($change['external_id'] ?? ''));
+            $key = (string) ($change['external_id'] ?? '');
+            $content = str_starts_with($key, 'c:') ? $contents->get(substr($key, 2)) : null;
+            $product = $content ?? $products->get($key);
             if ($product === null) {
                 continue;
             }
-            $touched[(string) $product->external_id] = true;
+            $subject = $content !== null ? TaxonomyAssignment::CONTENT : TaxonomyAssignment::PRODUCT;
+            if ($content === null) {
+                $touched[(string) $product->external_id] = true;
+            }
 
-            foreach ((array) ($change['add_keys'] ?? []) as $key) {
-                if (! isset($tags[$key])) {
+            foreach ((array) ($change['add_keys'] ?? []) as $tagKey) {
+                if (! isset($tags[$tagKey])) {
                     continue;
                 }
                 TaxonomyAssignment::query()->updateOrCreate(
-                    ['subject_type' => TaxonomyAssignment::PRODUCT, 'subject_id' => (string) $product->id, 'tag_id' => $tags[$key]],
+                    ['subject_type' => $subject, 'subject_id' => (string) $product->id, 'tag_id' => $tags[$tagKey]],
                     ['shop_id' => $shopId, 'source' => TaxonomyAssignment::TEAM_SOURCE, 'evidence' => $evidence, 'confidence' => 1.0, 'weight' => 1.0, 'explicit' => true,
                         'status' => TaxonomyAssignment::KEPT, 'checked' => TaxonomyAssignment::TEAM_KEPT, 'check_note' => null, 'input_hash' => 'rule:'.$rule->id, 'bank_version' => $version, 'run_id' => $rule->run_id],
                 );
             }
 
-            foreach ((array) ($change['remove_keys'] ?? []) as $key) {
-                if (! isset($tags[$key])) {
+            foreach ((array) ($change['remove_keys'] ?? []) as $tagKey) {
+                if (! isset($tags[$tagKey])) {
                     continue;
                 }
-                TaxonomyAssignment::query()->where('subject_type', TaxonomyAssignment::PRODUCT)->where('subject_id', (string) $product->id)->where('tag_id', $tags[$key])
+                TaxonomyAssignment::query()->where('subject_type', $subject)->where('subject_id', (string) $product->id)->where('tag_id', $tags[$tagKey])
                     ->update(['status' => TaxonomyAssignment::REJECTED, 'checked' => TaxonomyAssignment::TEAM_OUT, 'check_note' => mb_substr(__('taxonomy::runs.team_out'), 0, 200), 'updated_at' => now()]);
             }
 

@@ -6,6 +6,8 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogCategory;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Contracts\ShopRules;
 use App\Modules\Runs\Models\Run;
@@ -167,6 +169,56 @@ final class ShopRulesTest extends TestCase
 
         $this->inShop(fn () => app(ShopRules::class)->decide((string) $first, false, 7));
         $this->assertSame([TaxonomyRule::REJECTED, 0], $this->inShop(fn (): array => [TaxonomyRule::query()->find($first)->status, TaxonomyPair::query()->count()]));
+    }
+
+    public function test_what_a_rule_names_with_at_is_read_exactly_and_a_post_takes_tags(): void
+    {
+        // Aviad, 29.10: "tree of life" was not found by its words; with "@" the team chooses from the store, and may
+        // name a category, a post or a page too
+        [$post, $category] = $this->inShop(function (): array {
+            $category = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'bio', 'name' => 'ביוגרפיות', 'path' => ['ביוגרפיות'], 'hash' => 'b', 'product_count' => 1]);
+            $this->products['3']->categories()->attach($category->id);
+            $post = CatalogContent::query()->create(['shop_id' => $this->shop->id, 'type' => 'post', 'external_id' => '90', 'title' => 'למה כתבנו את חטוף', 'url' => 'https://store.test/blog/90', 'excerpt' => 'x', 'body' => 'x', 'hash' => 'p90']);
+
+            return [$post, $category];
+        });
+
+        $found = $this->inShop(fn (): array => [app(ShopRules::class)->mentionables('מרד'), app(ShopRules::class)->mentionables('ביוג'), app(ShopRules::class)->mentionables('למה כתב')]);
+        $this->assertSame(['product', '4', 'מרד הגנרלים'], [$found[0][0]['type'], $found[0][0]['id'], $found[0][0]['label']], 'the store\'s products as its search finds them');
+        $this->assertContains(['type' => 'category', 'id' => 'bio', 'label' => 'ביוגרפיות', 'sub' => '1', 'image' => null], $found[1]);
+        $this->assertSame(['post', '90'], [$found[2][0]['type'], $found[2][0]['id']]);
+
+        $this->replies = [
+            'openai' => ['understood' => 'להפריד ולתייג.', 'link' => '', 'question' => null, 'changes' => [
+                ['id' => '4', 'add' => [], 'remove' => [], 'apart' => ['2'], 'alike' => []],
+                // a post takes tags only: its pair is dropped
+                ['id' => 'c:90', 'add' => ['genre:biography'], 'remove' => [], 'apart' => ['4'], 'alike' => []],
+            ]],
+            'anthropic' => ['ok' => true, 'wrong' => [], 'why' => ''],
+        ];
+        $id = $this->inShop(fn (): ?string => app(ShopRules::class)->add('@מרד הגנרלים לא דומה ל"דרקולה". @למה כתבנו את חטוף שייך ל@ביוגרפיות', 7, [
+            ['type' => 'product', 'id' => '4', 'label' => 'מרד הגנרלים'],
+            ['type' => 'post', 'id' => '90', 'label' => 'למה כתבנו את חטוף'],
+            ['type' => 'category', 'id' => 'bio', 'label' => 'ביוגרפיות'],
+            // chosen, then deleted from the text: not kept
+            ['type' => 'product', 'id' => '1', 'label' => 'מפגש עם עצמי בגיהינום'],
+        ]));
+
+        $this->assertCount(3, $this->inShop(fn (): array => (array) TaxonomyRule::query()->find($id)->mentions));
+        $sent = collect($this->calls[0]['user']['products'])->keyBy('id');
+        $this->assertTrue($sent['4']['named'], 'named exactly by "@", whatever its words');
+        $this->assertTrue($sent->has('3'), 'the category named by "@" brings its products');
+        $this->assertSame('post', $sent['c:90']['kind']);
+
+        $rules = $this->inShop(fn (): array => app(ShopRules::class)->list());
+        $this->assertSame(['מרד הגנרלים', 'למה כתבנו את חטוף', 'ביוגרפיות'], $rules[0]['mentions']);
+        $this->assertSame([], collect($rules[0]['changes'])->firstWhere('external_id', 'c:90')['apart'], 'a post is kept apart from nothing');
+
+        $this->inShop(fn () => app(ShopRules::class)->decide((string) $id, true, 7));
+        $this->inShop(function () use ($post): void {
+            $this->assertSame(TaxonomyAssignment::TEAM_KEPT, TaxonomyAssignment::query()->where('subject_type', TaxonomyAssignment::CONTENT)->where('subject_id', $post->id)->where('tag_id', $this->biography->id)->sole()->checked);
+            $this->assertSame(['apart' => [(string) $this->products['2']->id], 'alike' => []], TaxonomyPair::of((string) $this->products['4']->id));
+        });
     }
 
     private function inShop(callable $callback): mixed

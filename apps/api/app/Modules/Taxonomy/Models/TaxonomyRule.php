@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $shop_id
  * @property string $text as written, up to 600 characters
+ * @property list<array{type: string, id: string, label: string}>|null $mentions what it names with "@": a product, category, post or page, by its id
  * @property string $status reading | proposed | unclear | applied | rejected | failed
  * @property string|null $note what was understood, or the question asked back when the rule was unclear
  * @property array<string, mixed>|null $plan the changes, a product each, as shown to the team (ReadRule)
@@ -45,10 +46,13 @@ class TaxonomyRule extends Model
 
     public const MAX_TEXT = 600;
 
+    /** What a rule may name with "@". */
+    public const MENTIONS = ['product', 'category', 'post', 'page'];
+
     protected $guarded = ['id'];
 
     protected function casts(): array
     {
-        return ['plan' => 'array', 'decided_at' => 'datetime'];
+        return ['plan' => 'array', 'mentions' => 'array', 'decided_at' => 'datetime'];
     }
 }

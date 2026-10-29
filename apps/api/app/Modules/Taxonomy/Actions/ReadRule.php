@@ -5,6 +5,7 @@ namespace App\Modules\Taxonomy\Actions;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ModelCallFailed;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -34,7 +35,7 @@ final class ReadRule
 
     public const ACTION = 'taxonomy.read_rule';
 
-    public const WRITE_VERSION = 2;
+    public const WRITE_VERSION = 3;
 
     /** Products the rule names by title, whose links are read two by two, at most. */
     private const NAMED_LINKED = 6;
@@ -106,9 +107,11 @@ final class ReadRule
 
         $groups = Bank::groups();
         $tags = self::tagsByKey($groups);
-        $candidates = $this->candidates($rule->text);
+        $candidates = $this->candidates($rule->text, (array) $rule->mentions);
+        // the posts and pages it names with "@": they take tags, never a place among the alike
+        $contents = self::contents((array) $rule->mentions);
 
-        if ($candidates === []) {
+        if ($candidates === [] && $contents === []) {
             $rule->forceFill(['status' => TaxonomyRule::UNCLEAR, 'note' => __('taxonomy::runs.rule_nothing_named')])->save();
             $run->output(['rule' => $ruleId, 'products' => 0])->summary('taxonomy::runs.rule_unclear');
 
@@ -117,7 +120,7 @@ final class ReadRule
 
         $byId = [];
         $forModel = [];
-        $current = self::currentTags(array_map(fn (CatalogProduct $p): string => (string) $p->id, $candidates), $tags);
+        $current = self::currentTags([...array_map(fn (CatalogProduct $p): string => (string) $p->id, $candidates), ...array_map(fn (CatalogContent $c): string => (string) $c->id, $contents)], $tags);
 
         foreach ($candidates as $product) {
             $byId[(string) $product->external_id] = $product;
@@ -130,9 +133,21 @@ final class ReadRule
                 'tags' => $current[(string) $product->id] ?? [],
             ];
         }
+        foreach ($contents as $content) {
+            $byId['c:'.$content->external_id] = $content;
+            $forModel[] = [
+                'id' => 'c:'.$content->external_id,
+                'title' => (string) $content->title,
+                'kind' => (string) $content->type,
+                'named' => true,
+                'categories' => [],
+                'store_tags' => [],
+                'tags' => $current[(string) $content->id] ?? [],
+            ];
+        }
         // what ties each two products the rule names now: the tags, categories and store tags they share (Aviad, 29.10:
         // find them, read what links them, and propose what keeps them apart)
-        $links = self::links(array_values(array_filter($forModel, fn (array $p): bool => $p['named'])), $tags);
+        $links = self::links(array_values(array_filter($forModel, fn (array $p): bool => $p['named'] && ! isset($p['kind']))), $tags);
 
         // the same rule against the same products, with the same tags, is read once
         $fingerprint = hash('sha256', json_encode([self::WRITE_VERSION, self::CHECK_VERSION, trim($rule->text), array_map(fn (array $p): array => [$p['id'], $p['tags']], $forModel)], JSON_UNESCAPED_UNICODE));
@@ -221,18 +236,51 @@ final class ReadRule
      *
      * @return list<CatalogProduct>
      */
-    private function candidates(string $text): array
+    /**
+     * The posts and pages a rule names with "@", as the store has them now.
+     *
+     * @param  list<array<string, mixed>>  $mentions
+     * @return list<CatalogContent>
+     */
+    private static function contents(array $mentions): array
+    {
+        $ids = array_values(array_map(fn (array $m): string => (string) $m['id'], array_filter($mentions, fn ($m): bool => is_array($m) && in_array($m['type'] ?? '', ['post', 'page'], true))));
+
+        return $ids === [] ? [] : CatalogContent::query()->whereNull('removed_at')->whereIn('external_id', $ids)->orderBy('id')->get(['id', 'type', 'external_id', 'title', 'url', 'image_url'])->all();
+    }
+
+    /** @param  list<array<string, mixed>>  $mentions  what the rule names with "@": named exactly, before any by its words */
+    private function candidates(string $text, array $mentions = []): array
     {
         $max = max(1, (int) Settings::get('taxonomy.rule_candidates_max'));
+        $of = fn (string $type): array => array_flip(array_map(fn (array $m): string => (string) $m['id'], array_filter($mentions, fn ($m): bool => is_array($m) && ($m['type'] ?? '') === $type)));
+        $atProducts = $of('product');
+        $atCategories = $of('category');
+        // the words the rule says, without the names it gave with "@": a category named so is not also read as words
+        foreach ($mentions as $m) {
+            $text = str_replace('@'.(string) ($m['label'] ?? ''), ' ', $text);
+        }
         $said = array_flip(Norm::words($text));
         $quoted = preg_match_all('/["“”„«»\'‘’]([^"“”„«»\'‘’]{2,120})["“”„«»\'‘’]/u', $text, $m) ? array_map(fn (string $q): array => Norm::words($q), $m[1]) : [];
         $quoted = array_values(array_filter($quoted, fn (array $q): bool => $q !== []));
-        $products = CatalogProduct::query()->whereNull('removed_at')->with('categories:id,name')->orderBy('id')->get(['id', 'shop_id', 'external_id', 'title', 'image_url', 'url', 'payload']);
+        $products = CatalogProduct::query()->whereNull('removed_at')->with('categories:id,name,external_id')->orderBy('id')->get(['id', 'shop_id', 'external_id', 'title', 'image_url', 'url', 'payload']);
+        $atNamed = [];
+        $atScoped = [];
         $named = [];
         $this->named = [];
         $scoped = [];
 
         foreach ($products as $product) {
+            if (isset($atProducts[(string) $product->external_id])) {
+                $atNamed[] = $product;
+
+                continue;
+            }
+            if ($atCategories !== [] && $product->categories->contains(fn ($c): bool => isset($atCategories[(string) $c->external_id]))) {
+                $atScoped[] = $product;
+
+                continue;
+            }
             $words = Norm::words((string) $product->title);
             if ($words === []) {
                 continue;
@@ -255,11 +303,12 @@ final class ReadRule
             }
         }
 
+        $named = [...$atNamed, ...$named];
         foreach ($named as $product) {
             $this->named[(string) $product->external_id] = true;
         }
 
-        return array_slice([...$named, ...$scoped], 0, $max);
+        return array_slice([...$named, ...$atScoped, ...$scoped], 0, $max);
     }
 
     /**
@@ -344,7 +393,7 @@ final class ReadRule
             $keyOfTag[(string) $t['tag']->id] = $key;
         }
         $current = [];
-        foreach (TaxonomyAssignment::query()->where('subject_type', TaxonomyAssignment::PRODUCT)->whereIn('subject_id', $productIds)->where('status', TaxonomyAssignment::KEPT)->orderBy('id')->get(['subject_id', 'tag_id']) as $a) {
+        foreach (TaxonomyAssignment::query()->whereIn('subject_type', [TaxonomyAssignment::PRODUCT, TaxonomyAssignment::CONTENT])->whereIn('subject_id', $productIds)->where('status', TaxonomyAssignment::KEPT)->orderBy('id')->get(['subject_id', 'tag_id']) as $a) {
             if (isset($keyOfTag[(string) $a->tag_id])) {
                 $current[(string) $a->subject_id][] = $keyOfTag[(string) $a->tag_id];
             }
@@ -376,8 +425,9 @@ final class ReadRule
             $keys = fn (mixed $list, callable $ok): array => array_values(array_unique(array_filter(array_map(fn ($k): string => trim((string) $k), (array) $list), fn (string $k): bool => $k !== '' && $ok($k))));
             $add = $keys($change['add'] ?? [], fn (string $k): bool => isset($tags[$k]) && ! isset($has[$k]));
             $remove = $keys($change['remove'] ?? [], fn (string $k): bool => isset($tags[$k]) && isset($has[$k]));
-            $apart = $keys($change['apart'] ?? [], fn (string $k): bool => $k !== $id && isset($byId[$k]));
-            $alike = $keys($change['alike'] ?? [], fn (string $k): bool => $k !== $id && isset($byId[$k]) && ! in_array($k, $apart, true));
+            $isProduct = fn (string $k): bool => ! str_starts_with($k, 'c:');
+            $apart = $isProduct($id) ? $keys($change['apart'] ?? [], fn (string $k): bool => $k !== $id && isset($byId[$k]) && $isProduct($k)) : [];
+            $alike = $isProduct($id) ? $keys($change['alike'] ?? [], fn (string $k): bool => $k !== $id && isset($byId[$k]) && $isProduct($k) && ! in_array($k, $apart, true)) : [];
 
             if ($add === [] && $remove === [] && $apart === [] && $alike === []) {
                 continue;

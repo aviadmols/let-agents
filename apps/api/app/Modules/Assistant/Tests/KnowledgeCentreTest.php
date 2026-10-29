@@ -94,9 +94,10 @@ final class KnowledgeCentreTest extends TestCase
                 return $this->rules;
             }
 
-            public function add(string $text, ?int $userId): ?string
+            public function add(string $text, ?int $userId, array $mentions = []): ?string
             {
-                $this->rules[] = ['id' => 'r1', 'text' => $text, 'status' => 'proposed', 'note' => 'הספר הוא ביוגרפיה.', 'link' => 'שניהם מתויגים "אימה".', 'at' => now()->toIso8601String(), 'changes' => [
+                $this->mentioned = $mentions;
+                $this->rules[] = ['id' => 'r1', 'text' => $text, 'mentions' => array_column($mentions, 'label'), 'status' => 'proposed', 'note' => 'הספר הוא ביוגרפיה.', 'link' => 'שניהם מתויגים "אימה".', 'at' => now()->toIso8601String(), 'changes' => [
                     ['external_id' => '1', 'title' => 'מפגש עם עצמי בגיהינום', 'image' => null, 'url' => null, 'add' => ['ביוגרפיה'], 'remove' => ['אימה'], 'apart' => ['דרקולה'], 'alike' => []],
                 ]];
 
@@ -111,6 +112,14 @@ final class KnowledgeCentreTest extends TestCase
 
             public function retry(string $id): void {}
 
+            /** @var list<array<string, mixed>> */
+            public array $mentioned = [];
+
+            public function mentionables(string $query, int $limit = 8): array
+            {
+                return $query === 'חרד' ? [['type' => 'product', 'id' => '7', 'label' => 'חרדי וטוב לו', 'sub' => null, 'image' => null]] : [];
+            }
+
             public function remove(string $id): void
             {
                 $this->rules = [];
@@ -121,7 +130,9 @@ final class KnowledgeCentreTest extends TestCase
         $page = Livewire::test(AboutStore::class)
             ->call('show', 'rules')
             ->assertSee(__('assistant::ui.centre.rules.none'))
-            ->set('newRule', 'הספר "מפגש עם עצמי בגיהינום" לא מתאים לספרים כמו "דרקולה"')
+            ->assertSet('ruleMentions', [])
+            ->set('newRule', 'הספר "מפגש עם עצמי בגיהינום" לא מתאים לספרים כמו "דרקולה" ולא כמו @חרדי וטוב לו')
+            ->call('addMention', 'product', '7', 'חרדי וטוב לו')
             ->call('addRule')
             ->assertSee(__('assistant::ui.centre.rules.status.proposed'))
             ->assertSee('הספר הוא ביוגרפיה.')
@@ -129,6 +140,10 @@ final class KnowledgeCentreTest extends TestCase
             ->assertSee('מפגש עם עצמי בגיהינום')->assertSee(__('assistant::ui.centre.rules.add').' ביוגרפיה')->assertSee(__('assistant::ui.centre.rules.remove').' אימה')->assertSee(__('assistant::ui.centre.rules.apart').' דרקולה')
             ->assertSee(__('assistant::ui.centre.rules.approve'));
         $this->assertSame('', $page->get('newRule'));
+        $this->assertSame([['type' => 'product', 'id' => '7', 'label' => 'חרדי וטוב לו']], $rules->mentioned, 'what was chosen after "@" goes with the rule');
+        $this->assertSame([], $page->get('ruleMentions'));
+        $this->assertSame('מוצר', $page->instance()->mentionSearch('חרד')[0]['kind']);
+        $page->assertSeeHtml('<b>@חרדי וטוב לו</b>');
 
         $page->call('decideRule', 'r1', true)->assertSee(__('assistant::ui.centre.rules.status.applied'))->assertDontSee(__('assistant::ui.centre.rules.approve'));
         $this->assertSame([['r1', true]], $rules->decided);

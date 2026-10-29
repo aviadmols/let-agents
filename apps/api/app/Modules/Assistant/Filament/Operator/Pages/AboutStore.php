@@ -56,6 +56,9 @@ class AboutStore extends Page
     /** A rule of the store's products, in the team's words (Enrichment\Contracts\ShopRules). */
     public string $newRule = '';
 
+    /** @var list<array{type: string, id: string, label: string}> what the rule being written names with "@" */
+    public array $ruleMentions = [];
+
     /** The line being edited, and its text. */
     public ?string $editing = null;
 
@@ -488,15 +491,39 @@ class AboutStore extends Page
             return;
         }
 
-        $id = $this->inShop(fn (): ?string => app(ShopRules::class)->add($text, auth()->id()));
+        $id = $this->inShop(fn (): ?string => app(ShopRules::class)->add($text, auth()->id(), $this->ruleMentions));
 
         if ($id === null) {
             return;
         }
 
         $this->newRule = '';
+        $this->ruleMentions = [];
         $this->tab = 'rules';
         Notification::make()->success()->title(__('assistant::ui.centre.rules.added'))->body(__('assistant::ui.centre.rules.added_body'))->send();
+    }
+
+    /**
+     * What "@" and the words after it may name in a rule: the store's products as its own search finds them, its
+     * categories, posts and pages, each with the word for its kind.
+     *
+     * @return list<array{type: string, id: string, label: string, sub: string|null, image: string|null, kind: string}>
+     */
+    public function mentionSearch(string $query): array
+    {
+        if ($this->shop === null || ! app()->bound(ShopRules::class)) {
+            return [];
+        }
+
+        return array_map(fn (array $m): array => $m + ['kind' => __('assistant::ui.centre.rules.kinds.'.$m['type'])],
+            $this->inShop(fn (): array => app(ShopRules::class)->mentionables($query)));
+    }
+
+    /** One chosen after "@": kept with the rule being written. */
+    public function addMention(string $type, string $id, string $label): void
+    {
+        $this->ruleMentions = array_values(array_filter($this->ruleMentions, fn (array $m): bool => ! ($m['type'] === $type && $m['id'] === $id)));
+        $this->ruleMentions[] = ['type' => mb_substr($type, 0, 20), 'id' => mb_substr($id, 0, 64), 'label' => mb_substr($label, 0, 200)];
     }
 
     /** The team's word on a rule's plan: applied, or rejected. Nothing changes before it. */
