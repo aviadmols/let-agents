@@ -4,7 +4,21 @@ You are helping a designer restyle the merchant panel of Lets, the panel a shop 
 live shop with real data. The designer returns files, and an engineer ports them into the system. This file states
 what you may change and what you must keep, so that every screen still works after the port.
 
-## Setting it up (do this first when asked to set up, run or "deploy" the kit)
+## The quickest way: the local dashboard (no server, no link)
+
+`examples/index.html` opens a local copy of Sela Meir's panel. Open it straight from the folder (file://).
+
+- It holds all 39 screens and every tab of each, captured from the live panel with their real content.
+- The sidebar, the screens' links and the tabs work.
+- Buttons that act (approve, save, delete) do nothing here, and nothing reaches the live shop.
+- Ticking "לעצב לפי merchant.css שבתיקייה" in the bottom bar styles every screen with this folder's `merchant.css`
+  instead of the captured one. Edit `merchant.css`, save, refresh.
+- `examples/sela/*.html` are the raw captures. `examples/sela/*.png` are their pictures. `examples/gallery.html` shows
+  them side by side.
+- Restyle against this first. Use the live panel below to check a state that only the live panel shows: something that
+  updates while you watch, or what an action leaves behind.
+
+## Setting it up live (do this when asked to set up, run or "deploy" the kit against the live panel)
 
 Nothing is installed or deployed to a server. The panel runs on Lets' server. This kit's folder is served from the
 designer's computer, and the panel loads `merchant.css` from there.
