@@ -33,9 +33,9 @@ final class DailyReportsTest extends TestCase
             ->assertDontSee(__('assistant::ui.daily.label'))
             ->assertDontSee(__('assistant::ui.daily.headline', ['score' => '64', 'asks' => '67']))
             ->assertDontSee('אמר שהספר לא נמצא.', false)
-            ->assertSee(__('improvement::ui.daily.label'))
-            ->assertSeeInOrder([__('improvement::ui.daily.waiting', ['count' => 1]), 'להוסיף מילה נרדפת: ספרי ילדים', __('improvement::ui.daily.done', ['count' => 1]), 'תשובה: מדיניות החזרות'])
-            ->assertSee('גולשים חיפשו ספרי ילדים ולא מצאו.')
+            // and the site's daily check too (Aviad, 29.10): the shop's home shows neither report
+            ->assertDontSee(__('improvement::ui.daily.label'))
+            ->assertDontSee('גולשים חיפשו ספרי ילדים ולא מצאו.')
             ->assertDontSee('$0.04', false);
 
         $this->actingAs($merchant)->get('/operator/daily-reports')->assertForbidden();

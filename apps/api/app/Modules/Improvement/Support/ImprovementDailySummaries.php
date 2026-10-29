@@ -38,6 +38,12 @@ final class ImprovementDailySummaries implements DailySummaries
 
     public function summaries(?string $shopId, CarbonInterface $since, bool $operator = false): array
     {
+        // The operator's alone for now (Aviad, 29.10): the day's counts of what was checked are the mechanics of the
+        // system. The shop reads what waits for it in its proposals.
+        if (! $operator) {
+            return [];
+        }
+
         $read = function () use ($shopId, $since, $operator): array {
             $reviews = ImprovementReview::query()->with('proposals:id,review_id,title,status')->where('status', ImprovementReview::REVIEWED)->where('day', '>=', $since->toDateString())
                 ->when($shopId !== null, fn ($q) => $q->where('shop_id', $shopId))->orderByDesc('day')->limit(self::MAX)->get();
