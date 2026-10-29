@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Events\SpendCapHit;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,8 @@ final class MonthlySpendGuard implements SpendGuard
         $cap = $this->cap();
 
         if ($spent + $estimate > $cap) {
+            event(new SpendCapHit($spent, $cap));
+
             throw new SpendCapReached($spent, $estimate, $cap);
         }
 
@@ -38,6 +41,8 @@ final class MonthlySpendGuard implements SpendGuard
         $shopCap = $this->capFor($shopId);
 
         if ($shopSpent + $estimate > $shopCap) {
+            event(new SpendCapHit($shopSpent, $shopCap, $shopId));
+
             throw new SpendCapReached($shopSpent, $estimate, $shopCap, $shopId);
         }
     }
