@@ -34,6 +34,7 @@ use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\QuestionGuard;
 use App\Modules\Assistant\Support\QuestionLinks;
 use App\Modules\Assistant\Support\RelatedGroups;
+use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -824,7 +825,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             // what every page repeats, without a banner's line whose day is gone ("המשלוח הבא יוצא ב־15.9"):
             // read since the pages were, it would be told as the store's word today
             if ($entry->external_id === BuildShopKnowledge::REPEATED) {
-                $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => ! Dated::past($line)));
+                // and only what tells of its service: a heading or a line of its screens, read before, is not its word
+                $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => ! Dated::past($line) && RepeatedText::fact($line)));
             }
 
             if ($text !== '') {

@@ -128,7 +128,7 @@
                     <button type="button" class="lp-link" wire:click="more('posts')">{{ $t('more', ['n' => count($posts) - $limit]) }}</button>
                 @endif
             </section>
-        @else
+        @elseif ($this->tab === 'found')
             @php($found = $this->found())
             @php($limit = $this->limits['found'])
             <section class="lp-card" data-pane="found">

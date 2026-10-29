@@ -141,10 +141,11 @@ class AboutStore extends Page
             $hidden = (array) ($posts?->terms['hidden'] ?? []);
 
             return [
+                // only what tells of the store's service (RepeatedText::fact), from a reading before this too
                 'repeated' => $repeated === null || $repeated->removed_at !== null ? [] : array_values(array_filter(array_map(
                     fn (string $line): string => trim((string) preg_replace('/^-\s*/u', '', $line)),
                     explode("\n", (string) $repeated->body),
-                ))),
+                ), fn (string $line): bool => $line !== '' && RepeatedText::fact($line))),
                 'read_at' => $repeated?->terms['read_at'] ?? null,
                 'pages' => (int) ($repeated?->terms['pages'] ?? 0),
                 'policies' => CatalogContent::query()->active()->where('type', CatalogContent::PAGE)->orderBy('title')->get(['title', 'url'])
@@ -153,7 +154,20 @@ class AboutStore extends Page
                     ->values()->all(),
                 'posts' => collect((array) ($posts?->terms['read'] ?? []))
                     ->flatMap(fn (array $post): array => array_map(fn (string $fact): array => ['fact' => $fact, 'title' => (string) $post['title']], (array) $post['facts']))
-                    ->reject(fn (array $line): bool => in_array(RepeatedText::key($line['fact']), $hidden, true))
+                    ->reject(fn (array $line): bool => in_array(RepeatedText::key($line['fact']), $hidden, true) || ! RepeatedText::useful($line['fact']))
+                    // each fact once, whichever posts or pages said it
+                    ->pipe(function ($lines) {
+                        $kept = array_flip(RepeatedText::distinct($lines->pluck('fact')->all()));
+
+                        return $lines->filter(function (array $line) use (&$kept): bool {
+                            if (! isset($kept[$line['fact']])) {
+                                return false;
+                            }
+                            unset($kept[$line['fact']]);
+
+                            return true;
+                        });
+                    })
                     ->values()->all(),
                 'team' => $team === null || $team->removed_at !== null ? [] : array_values(array_filter(array_map(
                     function (string $pair): ?array {

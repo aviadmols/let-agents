@@ -46,6 +46,34 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertSame([], array_filter($found, fn (string $s): bool => str_contains($s, 'תפריט')), 'menus are not read');
     }
 
+    public function test_of_what_every_page_repeats_only_the_stores_word_on_its_service_is_kept_and_each_fact_once(): void
+    {
+        // Sela Meir, 29.10: 21 repeated sentences, two of them the store's word; the rest headings, buttons, screens
+        foreach (['משלוחים חינם בקניה מעל 199₪', 'כתבו את המייל שלכם וקבלו 15% הנחה על ההזמנה הראשונה באתר!', 'החזר כספי מלא תוך 14 יום',
+            'אחריות 12 חודשים על כל תכשיט', 'אפשרות לשריין מוצר באמצעות פריסת תשלומים וללא תפיסת מסגרת אשראי.', 'Free shipping on orders over $50',
+            'We always aim to reply within 1 business day.'] as $fact) {
+            $this->assertTrue(RepeatedText::fact($fact), $fact);
+        }
+        foreach (['העגלה שלך ריקה', 'האם הספר מתאים לי?', 'לכל הספרים שלנו', 'הצטרפו לקהילת התוכן', 'רגע לפני התשלום', 'נסו את הקולקציות הבאות:',
+            'לאיזו כתובת מייל לשלוח את אישור ההזמנה והעדכונים עליה?', 'מדי פעם נעדכן גם על ספרים חדשים, המלצות קריאה והטבות מיוחדות, בלי ספאם.',
+            'הספרים החדשים של דאגלס מאריי ופגי נונאן כבר בדרך למכבש הדפוס.', 'לא נמצאו תוצאות', 'Add to cart',
+            // Gil Travel's: a skip link, a menu, a cookie banner, a heading
+            'Skip to content', 'Asia/ South Pacific/ Africa', 'We use cookies to optimize your experience, analyze traffic, and personalize ads.', 'Start your adventure here'] as $line) {
+            $this->assertFalse(RepeatedText::fact($line), $line);
+        }
+
+        $facts = [
+            'ניתן להחליף מוצר שנרכש באתר בתוך 30 ימים מיום הרכישה, אם הוא חדש, לא נעשה בו שימוש והוא באריזתו המקורית. (תקנון)',
+            'ניתן לשלם באתר באמצעות חשבון PayPal או בכרטיס אשראי רגיל בלבד. (תשלום)',
+            'ניתן להחליף כל מוצר שנרכש באתר בתוך 30 ימים מיום הרכישה, אם הוא חדש, לא נעשה בו שימוש והוא באריזתו המקורית. (תשלום)',
+            'ביצוע עסקה באתר אפשרי רק באמצעות PayPal או בכרטיס אשראי רגיל. (תקנון)',
+            'בהחזרת מוצרים הם צריכים להיות באריזתם המקורית וללא שימוש. (תקנון)',
+        ];
+        $this->assertSame([$facts[0], $facts[1], $facts[4]], RepeatedText::distinct($facts), 'the 30 days and the way to pay once each, from whichever page');
+        $this->assertFalse(RepeatedText::useful('Non-essential tracking, analytics, advertising pixels, and marketing tools are blocked until you give explicit consent. (Privacy Policy)'));
+        $this->assertTrue(RepeatedText::useful('Gil Travel is a Philadelphia-based travel company that has planned Jewish heritage trips to Israel for more than 50 years.'));
+    }
+
     public function test_the_shop_keeps_what_its_pages_repeat_its_own_words_and_its_answers(): void
     {
         $this->shop = Shop::factory()->create();

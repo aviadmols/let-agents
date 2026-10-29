@@ -130,6 +130,7 @@ final class KnowledgeCentreTest extends TestCase
         $page = Livewire::test(AboutStore::class)
             ->call('show', 'rules')
             ->assertSee(__('assistant::ui.centre.rules.none'))
+            ->assertDontSee('data-pane="found"', false)
             ->assertSet('ruleMentions', [])
             ->set('newRule', 'הספר "מפגש עם עצמי בגיהינום" לא מתאים לספרים כמו "דרקולה" ולא כמו @חרדי וטוב לו')
             ->call('addMention', 'product', '7', 'חרדי וטוב לו')

@@ -115,7 +115,8 @@ final class BuildShopKnowledge
         // no longer the store's word: left out, as the team would hide it
         $found = array_values(array_filter(
             RepeatedText::repeated($pages, (float) Settings::get('assistant.knowledge_share')),
-            fn (array $s): bool => ! in_array(RepeatedText::key($s['text']), $hidden, true) && ! Dated::past($s['text']) && ! StorefrontLock::text($s['text']),
+            // and only what tells of the store's service: never a heading, a button or a line of its screens
+            fn (array $s): bool => ! in_array(RepeatedText::key($s['text']), $hidden, true) && ! Dated::past($s['text']) && ! StorefrontLock::text($s['text']) && RepeatedText::fact($s['text']),
         ));
 
         $this->put(self::REPEATED, 'repeated', implode("\n", array_map(fn (array $s): string => '- '.$s['text'], $found)), [
@@ -302,7 +303,7 @@ final class BuildShopKnowledge
 
         foreach ($read as $post) {
             foreach ($post['facts'] as $fact) {
-                if (! in_array(RepeatedText::key($fact), $hidden, true)) {
+                if (! in_array(RepeatedText::key($fact), $hidden, true) && RepeatedText::useful($fact)) {
                     $lines[] = '- '.$fact.' ('.$post['title'].')';
                 }
             }
@@ -311,7 +312,8 @@ final class BuildShopKnowledge
         // Asked for by the team (a post's link on the knowledge screen): waits until it is read.
         $wanted = array_values(array_diff(array_map('strval', (array) ($this->row(self::POSTS)?->terms['wanted'] ?? [])), array_map('strval', array_keys($read))));
 
-        $this->put(self::POSTS, 'posts', implode("\n", array_values(array_unique($lines))), ['read' => $read, 'hidden' => $hidden, 'wanted' => $wanted, 'read_at' => now()->toIso8601String()]);
+        // each fact once, whichever pages said it (the terms and the payment page both tell the 30 days to exchange)
+        $this->put(self::POSTS, 'posts', implode("\n", RepeatedText::distinct(array_values(array_unique($lines)))), ['read' => $read, 'hidden' => $hidden, 'wanted' => $wanted, 'read_at' => now()->toIso8601String()]);
     }
 
     /** A page or post read again even though it did not change: what it taught stays until the new reading replaces it. */

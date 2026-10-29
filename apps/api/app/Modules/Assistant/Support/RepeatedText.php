@@ -78,6 +78,75 @@ final class RepeatedText
         return array_map(fn (string $key): array => ['text' => $text[$key], 'pages' => $count[$key]], array_slice($kept, 0, $limit));
     }
 
+    /** What a store's word about its service is about: delivery, returns, warranty, payment, a discount, its hours. */
+    private const SERVICE = '/משלוח|שליח|אספק|איסוף|החזר|החלפ|ביטול|אחריות|תשלומ|תשלום|אשראי|הנחה|קופון|מבצע|חינם|שעות|פתוח|סגור|טלפון|וואטסאפ|כתובת החנות|'
+        .'deliver|shipping|ship|pickup|return|refund|exchange|warrant|payment|instal|discount|coupon|free|hours|open|reply|respond/iu';
+
+    /** A number that says how much, how long or how many: 199₪, 14 יום, 12 חודשים, 15%. */
+    private const MEASURE = '/\d+\s*(?:₪|ש"ח|שח|%|\$|€|יום|ימים|ימי|שעות|שבוע|שבועות|חודש|חודשים|שנה|שנים|תשלומים|days?|hours?|weeks?|months?|years?)|\d+\s*(?:business|working)\s+days?|\d+\s*ימי\s+עסקים|(?:₪|\$|€)\s*\d/iu';
+
+    /**
+     * A sentence the store repeats that tells a shopper something about its service: delivery, returns, warranty,
+     * payment, a discount, its hours, said with a measure or in a full sentence of five words or more. Not a heading,
+     * a question, a button or a line of its screens ("העגלה שלך ריקה", "האם הספר מתאים לי?", "לכל הספרים שלנו",
+     * "הצטרפו לקהילת התוכן"), nor the store's slogan: those are on every page and answer nothing (Sela Meir, 29.10:
+     * 21 repeated sentences, two of them the store's word). Code only.
+     */
+    public static function fact(string $sentence): bool
+    {
+        $sentence = trim((string) preg_replace('/^-\s*/u', '', $sentence));
+        $words = count(preg_split('/\s+/u', $sentence) ?: []);
+
+        if ($sentence === '' || preg_match('/[?:？]\s*$/u', $sentence) === 1 || $words < 4) {
+            return false;
+        }
+
+        return (preg_match(self::SERVICE, $sentence) === 1 && ($words >= 5 || preg_match(self::MEASURE, $sentence) === 1))
+            || preg_match(self::MEASURE, $sentence) === 1;
+    }
+
+    /** The site's lines on cookies, tracking and personal data: its privacy page holds them. */
+    private const LEGAL = '/cookie|עוגי|קובצי|tracking|pixel|personal(?:ly)?\s+(?:identifiable\s+)?(?:information|data)|מידע\s+אישי|פרטים\s+אישיים|gdpr|consent|הסכמה\s+ל|privacy|פרטיות/iu';
+
+    /**
+     * A fact worth keeping as the store's knowledge: not the site's legal lines on cookies, tracking and personal data
+     * (Gil Travel, 29.10: most of what its posts and pages said was its privacy policy).
+     */
+    public static function useful(string $fact): bool
+    {
+        return preg_match(self::LEGAL, $fact) !== 1;
+    }
+
+    /**
+     * The facts, each once: one that says what another already said (most of its words) goes, the first kept (Sela
+     * Meir, 29.10: the 30 days to exchange, from the terms and again from the payment page).
+     *
+     * @param  list<string>  $facts
+     * @return list<string>
+     */
+    public static function distinct(array $facts, float $same = 0.6): array
+    {
+        $kept = [];
+        $words = [];
+        foreach ($facts as $fact) {
+            // the page it came from ("(תקנון)") is no part of what it says
+            $mine = array_values(array_unique(array_filter(explode(' ', self::key((string) preg_replace('/\s*\([^()]*\)\s*$/u', '', $fact))), fn (string $w): bool => mb_strlen($w) > 2)));
+            if ($mine === []) {
+                continue;
+            }
+            foreach ($words as $theirs) {
+                $shared = count(array_intersect($mine, $theirs));
+                if ($shared / min(count($mine), count($theirs)) >= $same && $shared / max(count($mine), count($theirs)) >= $same * 0.75) {
+                    continue 2;
+                }
+            }
+            $kept[] = $fact;
+            $words[] = $mine;
+        }
+
+        return $kept;
+    }
+
     public static function key(string $sentence): string
     {
         return mb_strtolower(trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $sentence)));
