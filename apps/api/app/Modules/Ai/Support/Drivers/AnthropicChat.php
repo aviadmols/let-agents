@@ -3,6 +3,7 @@
 namespace App\Modules\Ai\Support\Drivers;
 
 use Anthropic\Client;
+use Anthropic\Core\Exceptions\RateLimitException as AnthropicRateLimit;
 use Anthropic\Messages\WebSearchResultBlock;
 use Anthropic\Messages\WebSearchTool20250305;
 use Anthropic\RequestOptions;
@@ -93,7 +94,7 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
                     tools: [WebSearchTool20250305::with(maxUses: $maxSearches)],
                 );
         } catch (Throwable $e) {
-            throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, $e);
+            throw new ModelCallFailed($e instanceof AnthropicRateLimit ? ModelCallFailed::RATE_LIMITED : ModelCallFailed::PROVIDER_ERROR, $e);
         }
 
         $text = '';
@@ -149,7 +150,7 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
                     thinking: $tune['thinking'] ?? null,
                 );
         } catch (Throwable $e) {
-            throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, $e);
+            throw new ModelCallFailed($e instanceof AnthropicRateLimit ? ModelCallFailed::RATE_LIMITED : ModelCallFailed::PROVIDER_ERROR, $e);
         }
 
         $text = '';

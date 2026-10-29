@@ -9,6 +9,7 @@ use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Ai\Enums\ProviderStatus;
 use App\Modules\Ai\Models\AiProvider;
+use App\Modules\Ai\Support\Drivers\OpenAiChat;
 use App\Modules\Ai\Support\KeyFailure;
 use App\Modules\Ai\Support\ProviderChatModel;
 use App\Modules\Tenancy\Models\Shop;
@@ -34,6 +35,15 @@ final class KeyFailureTest extends TestCase
         $this->assertSame('no_credit', KeyFailure::of($failed('You exceeded your current quota, please check your plan and billing details.')));
         $this->assertNull(KeyFailure::of($failed('Overloaded')), 'an outage passes; the key is fine');
         $this->assertNull(KeyFailure::of(new ModelCallFailed(ModelCallFailed::NOT_JSON)));
+    }
+
+    public function test_openai_out_of_credit_is_told_from_a_rate_limit_though_both_are_a_429(): void
+    {
+        // 29.10: every OpenAI call failed for hours with "Request rate limit has been exceeded.", and no alert said why
+        $body = '{"error":{"message":"You have no credits remaining.","type":"insufficient_quota","code":"credit_balance_exhausted"}}';
+        $this->assertTrue(OpenAiChat::outOfCredit($body));
+        $this->assertFalse(OpenAiChat::outOfCredit('{"error":{"message":"Rate limit reached for gpt-5.4-mini on tokens per min.","type":"tokens","code":"rate_limit_exceeded"}}'));
+        $this->assertSame(KeyFailure::NO_CREDIT, KeyFailure::of(new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, new RuntimeException('OpenAI insufficient_quota: '.$body))), 'marked so, and the operator is told');
     }
 
     public function test_a_live_call_refused_for_its_key_marks_the_provider_and_the_operator_sees_it_on_every_screen(): void

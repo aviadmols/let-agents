@@ -12,6 +12,9 @@ final class ModelCallFailed extends RuntimeException
 
     public const PROVIDER_ERROR = 'provider_error';
 
+    /** The provider said too many requests (429), still after a wait: worth asking again later. */
+    public const RATE_LIMITED = 'rate_limited';
+
     public const NOT_JSON = 'not_json';
 
     public const UNSUPPORTED = 'unsupported';

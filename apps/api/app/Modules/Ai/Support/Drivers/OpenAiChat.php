@@ -9,6 +9,8 @@ use App\Modules\Ai\Contracts\VisionDriver;
 use App\Modules\Ai\Enums\AiProviderName;
 use GuzzleHttp\Client;
 use OpenAI;
+use OpenAI\Exceptions\RateLimitException;
+use RuntimeException;
 use Throwable;
 
 /** Chat completions through openai-php/client, asking for a JSON object. */
@@ -50,6 +52,52 @@ final class OpenAiChat implements StructuredChatDriver, VisionDriver
      */
     private function send(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens, ?string $reasoningEffort, ?array $format = null): ModelReply
     {
+        // A rate limit (429) is waited out and asked again, twice: as the provider says (Retry-After), a few seconds for a
+        // shopper's short answer, up to 20 for background work (29.10: a shop's rule failed on one 429 and never came back).
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return $this->once($apiKey, $model, $system, $content, $maxOutputTokens, $reasoningEffort, $format);
+            } catch (RateLimitException $e) {
+                // Out of credit is a 429 too, and no wait mends it: said in the provider's own words, so the key is marked
+                // failed and the operator's panel says so (KeyFailure). The client's message alone named only a rate
+                // limit (29.10: every OpenAI call failed for hours, and no alert said why).
+                $body = (string) $e->response->getBody();
+                if (self::outOfCredit($body)) {
+                    throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, new RuntimeException('OpenAI insufficient_quota: '.mb_substr($body, 0, 300), 429, $e));
+                }
+                if ($attempt >= self::RATE_RETRIES) {
+                    throw new ModelCallFailed(ModelCallFailed::RATE_LIMITED, $e);
+                }
+                $said = (float) ($e->response->getHeaderLine('retry-after') ?: 0);
+                $cap = $maxOutputTokens > self::SHORT_REPLY_TOKENS ? 20.0 : 3.0;
+                usleep((int) (min($cap, max($said, 2.0 * ($attempt + 1))) * 1_000_000));
+            }
+        }
+    }
+
+    /** Whether a 429's body says the account is out of credit, not that it asked too fast. */
+    public static function outOfCredit(string $body): bool
+    {
+        $error = (array) (json_decode($body, true)['error'] ?? []);
+
+        return in_array('insufficient_quota', [$error['type'] ?? null, $error['code'] ?? null], true)
+            || preg_match('/insufficient_quota|credit_balance|no credits remaining|exceeded your current quota/i', $body) === 1;
+    }
+
+    /** Asked again after a rate limit at most this many times. */
+    private const RATE_RETRIES = 2;
+
+    /** A shopper's answer: waited for briefly, a few seconds at most. */
+    private const SHORT_REPLY_TOKENS = 2000;
+
+    /**
+     * @param  string|list<array<string, mixed>>  $content
+     * @param  array<string, mixed>|null  $format
+     *
+     * @throws RateLimitException
+     */
+    private function once(string $apiKey, string $model, string $system, string|array $content, int $maxOutputTokens, ?string $reasoningEffort, ?array $format): ModelReply
+    {
         try {
             $response = OpenAI::factory()
                 ->withApiKey($apiKey)
@@ -67,6 +115,8 @@ final class OpenAiChat implements StructuredChatDriver, VisionDriver
                     'max_completion_tokens' => $maxOutputTokens,
                     'reasoning_effort' => $reasoningEffort,
                 ], fn ($value): bool => $value !== null && $value !== ''));
+        } catch (RateLimitException $e) {
+            throw $e;
         } catch (Throwable $e) {
             throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, $e);
         }
