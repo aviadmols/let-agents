@@ -11,7 +11,10 @@
     var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null, other: !!otherColour, asked: asked || null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
     BODY.scrollTop = 0;
-    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : '')).then(function (r) {
+    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : ''))
+      // the alike are kept by the index's records: an answer that came before the index (the drawer just opened on a
+      // new page) waits for it, or every one of them went and "0 similar items" stood (Gil Travel, 30.10)
+      .then(function (r) { return loadIndex().then(function () { return r; }, function () { return r; }); }).then(function (r) {
       var ids = ((r.body && r.body.products) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id); });
       // few or none look like it: those of its kind its look left out (another colour, a print), shown apart as "maybe these"
       var others = ((r.body && r.body.others) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id) && ids.indexOf(x) < 0; });

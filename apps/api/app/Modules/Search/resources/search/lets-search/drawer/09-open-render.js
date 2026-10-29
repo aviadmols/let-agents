@@ -81,6 +81,12 @@
     var left = INPUT.value.trim();
     // (the words of the search on screen are that search, already kept with it)
     if (left && !S.askMode && left !== S.keptQ) { keepBack(left, null); }
+    // the similar products on screen are come back to as they were, large or not, not the search before them
+    // (as Aviad asked, 2026-10-30); a question and its answer still are not
+    else if (!S.askMode) {
+      var onScreen = S.wide ? turnById(S.wide) : chatTurns().filter(function (x) { return !x.prev; }).pop();
+      if (onScreen && onScreen.kind === 'similar' && !onScreen.loading && !onScreen.error) { keepBackTo(onScreen); }
+    }
     hideLayer(); MENU.hidden = true;
     SCRIM.classList.remove('is-open'); D.classList.remove('is-open'); D.classList.remove('is-wide'); S.wide = null; S.menu = '';
     D.style.removeProperty('--ls-drag');
