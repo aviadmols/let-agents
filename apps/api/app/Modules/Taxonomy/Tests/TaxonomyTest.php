@@ -8,8 +8,11 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Models\CatalogCategory;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Taxonomy\Actions\AssignTags;
@@ -17,6 +20,8 @@ use App\Modules\Taxonomy\Actions\BuildTagBank;
 use App\Modules\Taxonomy\Actions\MergeTagProposals;
 use App\Modules\Taxonomy\Actions\ReviewPictureGroups;
 use App\Modules\Taxonomy\Actions\ScanBankGaps;
+use App\Modules\Taxonomy\Jobs\TagChangesJob;
+use App\Modules\Taxonomy\Listeners\TagWhatChanged;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
 use App\Modules\Taxonomy\Models\TaxonomyGroup;
 use App\Modules\Taxonomy\Models\TaxonomyProposal;
@@ -30,6 +35,9 @@ use App\Modules\Taxonomy\Support\Sample;
 use App\Modules\Tenancy\Models\Shop;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -135,6 +143,51 @@ final class TaxonomyTest extends TestCase
         $after = $book();
         $this->assertSame('kept/team', $after['מתח'], 'brought back by the team, and kept when tagged again');
         $this->assertSame('rejected/team_out', $after['חטופים'], 'taken out by the team, and not given again');
+    }
+
+    public function test_a_shop_that_tags_by_itself_tags_what_changed_within_minutes_and_nothing_twice(): void
+    {
+        $this->bank();
+        app(BuildTagBank::class)->handle($this->shop->id);
+        $this->tagging();
+        $runs = fn (): int => Run::query()->where('action', AssignTags::ACTION)->count();
+
+        // switch off: a change is not even queued
+        Queue::fake();
+        app(TagWhatChanged::class)->handle(new CatalogProductsChanged($this->shop->id, ['b1']));
+        Queue::assertNothingPushed();
+
+        Features::override('taxonomy.tagging', true, $this->shop->id);
+        app(TagWhatChanged::class)->handle(new CatalogProductsChanged($this->shop->id, ['b1']));
+        app(TagWhatChanged::class)->handle(new CatalogProductsChanged($this->shop->id, ['b2']));
+        Queue::assertPushed(TagChangesJob::class, fn (TagChangesJob $job): bool => ! $job->everything);
+        $this->assertSame(['b1', 'b2'], Cache::get(TagChangesJob::WAITING.$this->shop->id), 'changes in a row wait for one run');
+
+        // the job: the two changed books tagged, the shirt left, the search told
+        Event::fake([CatalogProductsChanged::class]);
+        app()->call([new TagChangesJob($this->shop->id), 'handle']);
+        $tagged = app(TenantContext::class)->run($this->shop->id, fn (): array => CatalogProduct::query()
+            ->whereIn('id', TaxonomySubject::query()->select('subject_id'))->orderBy('external_id')->pluck('external_id')->all());
+        $this->assertSame(['b1', 'b2'], $tagged);
+        Event::assertDispatched(CatalogProductsChanged::class, fn (CatalogProductsChanged $e): bool => $e->externalIds !== [] && array_diff($e->externalIds, ['b1', 'b2']) === []);
+        $this->assertSame(1, $runs());
+
+        // told again with nothing changed in their words (their stock, a rule's pairs, its own event): no call, no run
+        $asked = count($this->calls);
+        TagChangesJob::products($this->shop->id, ['b1']);
+        app()->call([new TagChangesJob($this->shop->id), 'handle']);
+        $this->assertCount($asked, $this->calls);
+        $this->assertSame(1, $runs());
+
+        // the night: the shirt and the store's post, not the platform's own rows of what it learned of the store
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogContent::query()->create(['type' => CatalogContent::POST, 'external_id' => 'post-1', 'title' => 'מדריך לספרי מתח', 'body' => 'ספרי מתח לחופשה.', 'hash' => 'p1']);
+            CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => CatalogContent::OWN_PREFIX.'knowledge-posts', 'title' => '', 'body' => '- משלוח חינם', 'hash' => 'k1']);
+        });
+        $this->assertSame(2, app(AssignTags::class)->waiting($this->shop->id));
+        $this->artisan('taxonomy:tag-changes', ['--now' => true])->assertSuccessful();
+        $this->assertSame(0, app(AssignTags::class)->waiting($this->shop->id));
+        $this->assertSame(2, $runs());
     }
 
     public function test_the_bank_is_designed_from_a_sample_and_reviewed_by_the_other_family(): void

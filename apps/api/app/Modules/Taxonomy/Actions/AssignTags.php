@@ -112,7 +112,19 @@ final class AssignTags
     }
 
     /**
-     * What needs tagging: what changed since it was tagged, products first.
+     * How many products and posts wait to be tagged, in code, no model and no run: TagChangesJob asks first, so a
+     * change that leaves a product's words as they were (its stock, a rule's pairs) opens no run.
+     *
+     * @param  list<string>|null  $productIds
+     */
+    public function waiting(string $shopId, bool $posts = true, ?array $productIds = null): int
+    {
+        return $this->tenant->run($shopId, fn (): int => Bank::groups()->isEmpty() ? 0 : count($this->todo(null, false, $posts, $productIds)));
+    }
+
+    /**
+     * What needs tagging: what changed since it was tagged, products first. Not the platform's own rows of what it
+     * learned of the store (CatalogContent::OWN_PREFIX): they are no post of the store.
      *
      * @param  list<string>|null  $productIds
      * @return array<string, array<string, mixed>> by subject id
@@ -122,33 +134,38 @@ final class AssignTags
         $done = TaxonomySubject::query()->get(['subject_type', 'subject_id', 'input_hash'])->mapWithKeys(fn (TaxonomySubject $s): array => [$s->subject_type.':'.$s->subject_id => $s->input_hash])->all();
         $todo = [];
         $wanted = fn (array $item): bool => $all || ($done[$item['type'].':'.$item['id']] ?? null) !== $item['hash'];
+        $full = fn (): bool => $limit !== null && count($todo) >= $limit;
 
-        $query = CatalogProduct::query()->whereNull('removed_at')->when($productIds !== null, fn ($q) => $q->whereIn('id', $productIds))->orderBy('id');
-        foreach ($query->lazyById(200) as $product) {
-            foreach (Subjects::products(collect([$product])) as $id => $item) {
+        // read 100 at a time: a store of thousands asks the database tens of times, not thousands
+        $query = CatalogProduct::query()->whereNull('removed_at')->when($productIds !== null, fn ($q) => $q->whereIn('id', $productIds));
+        $query->chunkById(100, function ($products) use ($wanted, $full, &$todo): bool {
+            foreach (Subjects::products($products) as $id => $item) {
                 if ($wanted($item)) {
                     $todo[$id] = $item;
                 }
             }
-            if ($limit !== null && count($todo) >= $limit) {
-                return $todo;
-            }
+
+            return ! $full();
+        });
+        if ($full()) {
+            return array_slice($todo, 0, $limit, true);
         }
 
         if ($posts && $productIds === null) {
-            foreach (CatalogContent::query()->whereNull('removed_at')->orderBy('id')->lazyById(200) as $post) {
-                foreach (Subjects::posts(collect([$post])) as $id => $item) {
-                    if ($wanted($item)) {
-                        $todo[$id] = $item;
+            CatalogContent::query()->whereNull('removed_at')->where('type', '!=', CatalogContent::KNOWLEDGE)
+                ->where('external_id', 'not like', CatalogContent::OWN_PREFIX.'%')
+                ->chunkById(100, function ($contents) use ($wanted, $full, &$todo): bool {
+                    foreach (Subjects::posts($contents) as $id => $item) {
+                        if ($wanted($item)) {
+                            $todo[$id] = $item;
+                        }
                     }
-                }
-                if ($limit !== null && count($todo) >= $limit) {
-                    break;
-                }
-            }
+
+                    return ! $full();
+                });
         }
 
-        return $todo;
+        return $limit === null ? $todo : array_slice($todo, 0, $limit, true);
     }
 
     /** @param  array<string, array<string, mixed>>  $batch  by subject id */
