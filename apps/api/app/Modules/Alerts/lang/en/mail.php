@@ -48,7 +48,7 @@ return [
     ],
 
     'runs' => [
-        'title' => ':action failed :count times',
+        'title' => 'Failing again and again: :action (:count times)',
         'what' => 'In the last :minutes minutes (:shops).',
         'next' => [
             'no_key' => 'The AI provider\'s key is missing or invalid, and every call through it will fail. Update it on the AI providers screen.',
@@ -78,7 +78,7 @@ return [
     ],
 
     'stuck' => [
-        'title' => ':action has not ended for :hours hours',
+        'title' => 'Stuck runs: :action (over :hours hours)',
         'what' => ':count runs started and did not end, the first at :at. The work was likely cut in the middle, for example by a server restart.',
         'next' => 'What did not end waits for the next run. If this happens every day, check this work.',
     ],
