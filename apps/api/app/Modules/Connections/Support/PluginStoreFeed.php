@@ -79,7 +79,21 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
             return;
         }
 
-        yield from $this->pages($connection, '/feed/products');
+        foreach ($this->pages($connection, '/feed/products') as $records) {
+            yield array_values(array_filter($records, fn ($r): bool => ! is_array($r) || ! self::hidden($r)));
+        }
+    }
+
+    /**
+     * A product the store hides from its catalogue (WooCommerce's catalog visibility "hidden": on no shop page and in
+     * no search) is not read, as a draft is not: it leaves the catalogue on the next read (Aviad, 29.10). One shown
+     * on shop pages only, or in the store's own search only, is still the store's to be found by.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function hidden(array $record): bool
+    {
+        return ($record['catalog_visibility'] ?? 'visible') === 'hidden';
     }
 
     public function changedProducts(StoreConnection $connection, CarbonInterface $since): ?Generator
@@ -94,7 +108,7 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
 
     /**
      * What the store changed since a moment, in every status: a published product is read again,
-     * one made a draft, pending or private has gone. A product deleted outright leaves no trace and
+     * one made a draft, pending or private, or hidden from the catalogue, has gone. A product deleted outright leaves no trace and
      * is the nightly read's. A stock change from an order saves the product, so it is seen too.
      *
      * @return Generator<int, array{records: list<array<string, mixed>>, gone: list<string>}>
@@ -105,8 +119,8 @@ final class PluginStoreFeed implements PlatformStoreFeed, ReadsChangedProducts
             $records = array_values(array_filter($records, fn ($r): bool => is_array($r) && isset($r['external_id'])));
 
             yield [
-                'records' => array_values(array_filter($records, fn (array $r): bool => ($r['status'] ?? 'publish') === 'publish')),
-                'gone' => array_values(array_map(fn (array $r): string => (string) $r['external_id'], array_filter($records, fn (array $r): bool => ($r['status'] ?? 'publish') !== 'publish'))),
+                'records' => array_values(array_filter($records, fn (array $r): bool => ($r['status'] ?? 'publish') === 'publish' && ! self::hidden($r))),
+                'gone' => array_values(array_map(fn (array $r): string => (string) $r['external_id'], array_filter($records, fn (array $r): bool => ($r['status'] ?? 'publish') !== 'publish' || self::hidden($r)))),
             ];
         }
     }

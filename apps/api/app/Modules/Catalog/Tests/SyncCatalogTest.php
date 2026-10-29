@@ -154,6 +154,23 @@ final class SyncCatalogTest extends TestCase
         $this->assertSame(2, $run->output['products']['unchanged']);
     }
 
+    public function test_a_product_the_store_hides_from_its_catalogue_is_never_read_and_leaves_when_hidden(): void
+    {
+        // Aviad, 29.10: a product set to "hidden" in WooCommerce (no shop page, no search) must not show in the search
+        $this->products['13']['catalog_visibility'] = 'hidden';
+        app(SyncCatalog::class)->handle($this->shop->id);
+        $this->assertNull($this->inShop(fn () => CatalogProduct::query()->where('external_id', '13')->first()), 'hidden from the first read: never in the catalogue');
+
+        $this->products['13']['catalog_visibility'] = 'visible';
+        app(SyncCatalog::class)->handle($this->shop->id);
+        $this->assertNull($this->inShop(fn () => CatalogProduct::query()->where('external_id', '13')->sole()->removed_at), 'shown again: read');
+
+        // hidden between nights: the quick read of what changed takes it off
+        $this->products['13']['catalog_visibility'] = 'hidden';
+        app(SyncChangedProducts::class)->handle($this->shop->id);
+        $this->assertNotNull($this->inShop(fn () => CatalogProduct::query()->where('external_id', '13')->sole()->removed_at), 'hidden: off the catalogue within minutes');
+    }
+
     public function test_a_product_the_store_stopped_publishing_is_marked_removed_not_deleted(): void
     {
         app(SyncCatalog::class)->handle($this->shop->id);
