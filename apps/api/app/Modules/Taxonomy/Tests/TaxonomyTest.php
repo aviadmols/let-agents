@@ -188,6 +188,7 @@ final class TaxonomyTest extends TestCase
         $this->artisan('taxonomy:tag-changes', ['--now' => true])->assertSuccessful();
         $this->assertSame(0, app(AssignTags::class)->waiting($this->shop->id));
         $this->assertSame(2, $runs());
+        Queue::assertNotPushed(TagChangesJob::class, fn (TagChangesJob $job): bool => $job->everything, 'all tagged: no next slice');
     }
 
     public function test_the_bank_is_designed_from_a_sample_and_reviewed_by_the_other_family(): void

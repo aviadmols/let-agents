@@ -38,6 +38,9 @@ final class TagChangesJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
     /** Minutes a change waits for the ones after it. */
     public const GATHER = 3;
 
+    /** Products and posts one run of the whole store tags at most (some 30 calls, well inside $timeout); the rest next. */
+    public const SLICE = 240;
+
     /** Under the queue's retry_after (1800), or a long night would be started twice; what is cut short waits for the next. */
     public int $timeout = 1500;
 
@@ -89,14 +92,23 @@ final class TagChangesJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
         }
 
         $started = now()->subSecond();
-        $assign->handle($this->shopId, posts: $this->everything, productIds: $productIds, trigger: $this->everything ? RunTrigger::Schedule : RunTrigger::System);
+        $assign->handle($this->shopId, limit: $this->everything ? self::SLICE : null, posts: $this->everything, productIds: $productIds,
+            trigger: $this->everything ? RunTrigger::Schedule : RunTrigger::System);
 
         // what was tagged now, for the search to read
-        $tagged = $tenant->run($this->shopId, fn (): array => CatalogProduct::query()->whereIn('id', TaxonomySubject::query()
-            ->where('subject_type', TaxonomyAssignment::PRODUCT)->where('updated_at', '>=', $started)->select('subject_id'))
-            ->pluck('external_id')->map(fn ($id): string => (string) $id)->all());
+        [$tagged, $done] = $tenant->run($this->shopId, fn (): array => [
+            CatalogProduct::query()->whereIn('id', TaxonomySubject::query()->where('subject_type', TaxonomyAssignment::PRODUCT)->where('updated_at', '>=', $started)->select('subject_id'))
+                ->pluck('external_id')->map(fn ($id): string => (string) $id)->all(),
+            TaxonomySubject::query()->where('updated_at', '>=', $started)->count(),
+        ]);
         if ($tagged !== []) {
             event(new CatalogProductsChanged($this->shopId, $tagged));
+        }
+
+        // a store's first tagging, thousands of products: the next slice, as long as this one got somewhere (a model
+        // that answers nothing, or the budget spent, stops it here; the night tries again)
+        if ($this->everything && $done > 0 && $assign->waiting($this->shopId) > 0) {
+            self::dispatch($this->shopId, true);
         }
     }
 }
