@@ -85,7 +85,7 @@ final class ShopRulesTest extends TestCase
     public function test_a_rule_is_read_into_a_plan_the_team_approves_and_the_alike_honour_it(): void
     {
         $this->replies = [
-            'openai' => ['understood' => 'הספר "מפגש עם עצמי בגיהינום" הוא ביוגרפיה, לא אימה, ולא יוצג כדומה ל"דרקולה".', 'question' => null, 'changes' => [
+            'openai' => ['understood' => 'הספר "מפגש עם עצמי בגיהינום" הוא ביוגרפיה, לא אימה, ולא יוצג כדומה ל"דרקולה".', 'link' => 'שניהם מתויגים "אימה" ו"רבי מכר".', 'question' => null, 'changes' => [
                 ['id' => '1', 'add' => ['genre:biography'], 'remove' => ['genre:horror'], 'apart' => ['2'], 'alike' => ['3']],
                 // not among the products the rule names: dropped by code
                 ['id' => '4', 'add' => ['genre:biography'], 'remove' => [], 'apart' => [], 'alike' => []],
@@ -102,9 +102,12 @@ final class ShopRulesTest extends TestCase
         $sent = $this->calls[0]['user'];
         $this->assertSame(['1', '2', '3'], array_column($sent['products'], 'id'), 'the products the rule names, by their titles in quotes; "מרד הגנרלים" is not among them');
         $this->assertSame(['genre:horror'], $sent['products'][0]['tags'], 'with the tags each has now');
+        $this->assertSame([true, true, true], array_column($sent['products'], 'named'));
+        $this->assertContains(['a' => '1', 'b' => '2', 'shared' => ['אימה', 'רבי מכר']], $sent['links'], 'what ties the two the rule keeps apart: the tag read by mistake, and the store\'s tag');
 
         $rules = $this->inShop(fn (): array => app(ShopRules::class)->list());
         $this->assertSame([TaxonomyRule::PROPOSED, 'מפגש עם עצמי בגיהינום'], [$rules[0]['status'], $rules[0]['changes'][0]['title']]);
+        $this->assertSame('שניהם מתויגים "אימה" ו"רבי מכר".', $rules[0]['link']);
         $this->assertSame(['add' => ['ביוגרפיה'], 'remove' => ['אימה'], 'apart' => ['דרקולה'], 'alike' => ['חטוף - אלי שרעבי']], array_intersect_key($rules[0]['changes'][0], array_flip(['add', 'remove', 'apart', 'alike'])));
         $this->assertCount(1, $rules[0]['changes'], 'only what code gave and the rule touches');
         $this->assertSame(0, $this->inShop(fn (): int => TaxonomyPair::query()->count()), 'nothing changes before the team approves');

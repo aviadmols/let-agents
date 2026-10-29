@@ -4,6 +4,7 @@ namespace App\Modules\Taxonomy\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\ModelCallFailed;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -33,12 +34,24 @@ final class ReadRule
 
     public const ACTION = 'taxonomy.read_rule';
 
-    public const WRITE_VERSION = 1;
+    public const WRITE_VERSION = 2;
+
+    /** Products the rule names by title, whose links are read two by two, at most. */
+    private const NAMED_LINKED = 6;
+
+    /** @var array<string, true> the external ids of the products the rule names by title, of the last read */
+    private array $named = [];
 
     public const CHECK_VERSION = 1;
 
     /** Changes a rule may make at most: a rule of a whole category stays readable on the screen. */
     private const MAX_CHANGES = 120;
+
+    /** Whether the last read should be tried again later: the model was busy or out of reach, not the rule unclear. */
+    public bool $later = false;
+
+    /** A call that failed so: worth reading the rule again later. */
+    private const LATER = [ModelCallFailed::RATE_LIMITED, ModelCallFailed::PROVIDER_ERROR];
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -46,8 +59,11 @@ final class ReadRule
         private readonly Models $models,
     ) {}
 
-    public function handle(string $shopId, string $ruleId): void
+    /** @param  bool  $last  the last try: a busy model fails the rule instead of leaving it to be read again */
+    public function handle(string $shopId, string $ruleId, bool $last = true): void
     {
+        $this->later = false;
+        $this->last = $last;
         $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
@@ -56,6 +72,19 @@ final class ReadRule
             input: ['rule' => $ruleId],
             work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->read($run, $ruleId)),
         );
+    }
+
+    private bool $last = true;
+
+    /** A model call failed: the rule waits to be read again, unless this was its last try or the failure is not passing. */
+    private function failed(TaxonomyRule $rule): void
+    {
+        if (! $this->last && in_array($this->models->failure, self::LATER, true)) {
+            $this->later = true;
+
+            return;
+        }
+        $rule->forceFill(['status' => TaxonomyRule::FAILED, 'note' => __('taxonomy::runs.rule_failed_note')])->save();
     }
 
     private function read(RunContext $run, string $ruleId): void
@@ -95,11 +124,15 @@ final class ReadRule
             $forModel[] = [
                 'id' => (string) $product->external_id,
                 'title' => (string) $product->title,
+                'named' => isset($this->named[(string) $product->external_id]),
                 'categories' => $product->categories->pluck('name')->map(fn ($n): string => (string) $n)->values()->all(),
                 'store_tags' => self::storeTags($product),
                 'tags' => $current[(string) $product->id] ?? [],
             ];
         }
+        // what ties each two products the rule names now: the tags, categories and store tags they share (Aviad, 29.10:
+        // find them, read what links them, and propose what keeps them apart)
+        $links = self::links(array_values(array_filter($forModel, fn (array $p): bool => $p['named'])), $tags);
 
         // the same rule against the same products, with the same tags, is read once
         $fingerprint = hash('sha256', json_encode([self::WRITE_VERSION, self::CHECK_VERSION, trim($rule->text), array_map(fn (array $p): array => [$p['id'], $p['tags']], $forModel)], JSON_UNESCAPED_UNICODE));
@@ -112,15 +145,16 @@ final class ReadRule
             return;
         }
 
-        $reply = $this->models->call($run, 'read_rule', self::WRITE_VERSION, 'rule_writer', ['rule' => $rule->text, 'products' => $forModel], Bank::prefix($groups));
+        $reply = $this->models->call($run, 'read_rule', self::WRITE_VERSION, 'rule_writer', ['rule' => $rule->text, 'products' => $forModel, 'links' => $links], Bank::prefix($groups));
 
         if ($reply === null) {
-            $rule->forceFill(['status' => TaxonomyRule::FAILED, 'note' => __('taxonomy::runs.rule_failed_note')])->save();
+            $this->failed($rule);
 
             return;
         }
 
         $understood = mb_substr(trim((string) ($reply->data['understood'] ?? '')), 0, TaxonomyRule::MAX_TEXT);
+        $link = mb_substr(trim((string) ($reply->data['link'] ?? '')), 0, TaxonomyRule::MAX_TEXT);
         $question = mb_substr(trim((string) ($reply->data['question'] ?? '')), 0, TaxonomyRule::MAX_TEXT);
         $changes = self::gate((array) ($reply->data['changes'] ?? []), $byId, $tags, $current);
 
@@ -138,7 +172,7 @@ final class ReadRule
         ]);
 
         if ($check === null) {
-            $rule->forceFill(['status' => TaxonomyRule::FAILED, 'note' => __('taxonomy::runs.rule_failed_note')])->save();
+            $this->failed($rule);
 
             return;
         }
@@ -162,7 +196,7 @@ final class ReadRule
         $rule->forceFill([
             'status' => TaxonomyRule::PROPOSED,
             'note' => $understood !== '' ? $understood : null,
-            'plan' => ['understood' => $understood, 'changes' => $kept, 'wrong' => $wrong],
+            'plan' => ['understood' => $understood, 'link' => $link, 'links' => $links, 'changes' => $kept, 'wrong' => $wrong],
             'fingerprint' => $fingerprint,
             'proposed_by' => self::who('rule_writer'),
             'audited_by' => self::who('rule_checker'),
@@ -195,6 +229,7 @@ final class ReadRule
         $quoted = array_values(array_filter($quoted, fn (array $q): bool => $q !== []));
         $products = CatalogProduct::query()->whereNull('removed_at')->with('categories:id,name')->orderBy('id')->get(['id', 'shop_id', 'external_id', 'title', 'image_url', 'url', 'payload']);
         $named = [];
+        $this->named = [];
         $scoped = [];
 
         foreach ($products as $product) {
@@ -220,7 +255,40 @@ final class ReadRule
             }
         }
 
+        foreach ($named as $product) {
+            $this->named[(string) $product->external_id] = true;
+        }
+
         return array_slice([...$named, ...$scoped], 0, $max);
+    }
+
+    /**
+     * What each two named products share now, by its name: the bank's tags (their labels), the store's categories and
+     * its own tags. Only pairs that share something.
+     *
+     * @param  list<array{id: string, title: string, categories: list<string>, store_tags: list<string>, tags: list<string>}>  $named
+     * @param  array<string, array{tag: TaxonomyTag, label: string}>  $tags
+     * @return list<array{a: string, b: string, shared: list<string>}>
+     */
+    private static function links(array $named, array $tags): array
+    {
+        $named = array_slice($named, 0, self::NAMED_LINKED);
+        $of = fn (array $p): array => array_values(array_unique([
+            ...array_map(fn (string $k): string => $tags[$k]['label'] ?? $k, $p['tags']),
+            ...$p['categories'],
+            ...$p['store_tags'],
+        ]));
+        $links = [];
+        foreach ($named as $i => $a) {
+            foreach (array_slice($named, $i + 1) as $b) {
+                $shared = array_values(array_intersect($of($a), $of($b)));
+                if ($shared !== []) {
+                    $links[] = ['a' => $a['id'], 'b' => $b['id'], 'shared' => $shared];
+                }
+            }
+        }
+
+        return $links;
     }
 
     /**

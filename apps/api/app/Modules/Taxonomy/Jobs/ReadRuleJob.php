@@ -18,7 +18,10 @@ final class ReadRuleJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 180;
 
-    public int $tries = 1;
+    public int $tries = 3;
+
+    /** Seconds before each try again, after a busy model. */
+    private const WAIT = [60, 300];
 
     public int $uniqueFor = 300;
 
@@ -31,6 +34,11 @@ final class ReadRuleJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ReadRule $read): void
     {
-        $read->handle($this->shopId, $this->ruleId);
+        $last = $this->attempts() >= $this->tries;
+        $read->handle($this->shopId, $this->ruleId, $last);
+        // the model was busy: the rule stays "being read" and is read again a while later
+        if ($read->later && ! $last) {
+            $this->release(self::WAIT[min($this->attempts() - 1, count(self::WAIT) - 1)]);
+        }
     }
 }

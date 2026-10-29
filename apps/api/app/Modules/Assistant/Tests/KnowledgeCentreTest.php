@@ -96,7 +96,7 @@ final class KnowledgeCentreTest extends TestCase
 
             public function add(string $text, ?int $userId): ?string
             {
-                $this->rules[] = ['id' => 'r1', 'text' => $text, 'status' => 'proposed', 'note' => 'הספר הוא ביוגרפיה.', 'at' => now()->toIso8601String(), 'changes' => [
+                $this->rules[] = ['id' => 'r1', 'text' => $text, 'status' => 'proposed', 'note' => 'הספר הוא ביוגרפיה.', 'link' => 'שניהם מתויגים "אימה".', 'at' => now()->toIso8601String(), 'changes' => [
                     ['external_id' => '1', 'title' => 'מפגש עם עצמי בגיהינום', 'image' => null, 'url' => null, 'add' => ['ביוגרפיה'], 'remove' => ['אימה'], 'apart' => ['דרקולה'], 'alike' => []],
                 ]];
 
@@ -108,6 +108,8 @@ final class KnowledgeCentreTest extends TestCase
                 $this->decided[] = [$id, $approve];
                 $this->rules[0]['status'] = $approve ? 'applied' : 'rejected';
             }
+
+            public function retry(string $id): void {}
 
             public function remove(string $id): void
             {
@@ -123,6 +125,7 @@ final class KnowledgeCentreTest extends TestCase
             ->call('addRule')
             ->assertSee(__('assistant::ui.centre.rules.status.proposed'))
             ->assertSee('הספר הוא ביוגרפיה.')
+            ->assertSee(__('assistant::ui.centre.rules.link'))
             ->assertSee('מפגש עם עצמי בגיהינום')->assertSee(__('assistant::ui.centre.rules.add').' ביוגרפיה')->assertSee(__('assistant::ui.centre.rules.remove').' אימה')->assertSee(__('assistant::ui.centre.rules.apart').' דרקולה')
             ->assertSee(__('assistant::ui.centre.rules.approve'));
         $this->assertSame('', $page->get('newRule'));

@@ -14,10 +14,10 @@ interface ShopRules
 {
     /**
      * The shop's rules, the latest first: each with its text, its status (reading | proposed | unclear | applied |
-     * rejected | failed), what was understood or asked back (note), when it was written, and the plan's changes, a
+     * rejected | failed), what was understood or asked back (note), what ties the products it names now (link), when it was written, and the plan's changes, a
      * product each: tags to add and to take off (labels), products it is kept apart from and put together with.
      *
-     * @return list<array{id: string, text: string, status: string, note: string|null, at: string, changes: list<array{external_id: string, title: string, image: string|null, url: string|null, add: list<string>, remove: list<string>, apart: list<string>, alike: list<string>}>}>
+     * @return list<array{id: string, text: string, status: string, note: string|null, link: string|null, at: string, changes: list<array{external_id: string, title: string, image: string|null, url: string|null, add: list<string>, remove: list<string>, apart: list<string>, alike: list<string>}>}>
      */
     public function list(): array;
 
@@ -26,6 +26,9 @@ interface ShopRules
 
     /** The team's word on a plan: applied, or rejected. Nothing changes until this. */
     public function decide(string $id, bool $approve, ?int $userId): void;
+
+    /** A rule that failed, or came back unclear, read again as it is written. */
+    public function retry(string $id): void;
 
     /** A rule taken off the list. What an applied rule changed stays as the team approved it. */
     public function remove(string $id): void;

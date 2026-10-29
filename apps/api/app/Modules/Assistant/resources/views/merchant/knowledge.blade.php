@@ -169,7 +169,8 @@
                         <div class="lp-grow">
                             <span class="lp-row-t" dir="auto">{{ $rule['text'] }}</span>
                             <span class="lp-row-s">{{ $t('rules.written', ['date' => \Illuminate\Support\Carbon::parse($rule['at'])->timezone($tz)->format('j.n')]) }}</span>
-                            @if ($rule['note'])<p class="lp-row-s" dir="auto" style="margin: 6px 0 0"><b>{{ $t('rules.understood') }}</b> {{ $rule['note'] }}</p>@endif
+                            @if ($rule['note'])<p class="lp-row-s" dir="auto" style="margin: 6px 0 0">@if (in_array($rule['status'], ['proposed', 'applied', 'rejected'], true))<b>{{ $t('rules.understood') }}</b> @endif{{ $rule['note'] }}</p>@endif
+                            @if ($rule['link'] ?? null)<p class="lp-row-s" dir="auto" style="margin: 4px 0 0"><b>{{ $t('rules.link') }}</b> {{ $rule['link'] }}</p>@endif
                             @if ($rule['changes'] !== [])
                                 <ul class="lp-notes" data-changes>
                                     @foreach ($rule['changes'] as $change)
@@ -185,6 +186,11 @@
                                         </li>
                                     @endforeach
                                 </ul>
+                            @endif
+                            @if (in_array($rule['status'], ['failed', 'unclear'], true))
+                                <div class="lp-actions" style="margin-top: 10px">
+                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="retryRule('{{ $rule['id'] }}')" wire:loading.attr="disabled" wire:target="retryRule">{{ $t('rules.retry') }}</button>
+                                </div>
                             @endif
                             @if ($rule['status'] === 'proposed')
                                 <div class="lp-actions" style="margin-top: 10px">

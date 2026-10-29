@@ -510,6 +510,17 @@ class AboutStore extends Page
         Notification::make()->success()->title(__($approve ? 'assistant::ui.centre.rules.applied' : 'assistant::ui.centre.rules.rejected'))->send();
     }
 
+    /** A rule that failed or came back unclear, read again. */
+    public function retryRule(string $id): void
+    {
+        if ($this->shop === null || ! app()->bound(ShopRules::class)) {
+            return;
+        }
+
+        $this->inShop(fn () => app(ShopRules::class)->retry($id));
+        Notification::make()->success()->title(__('assistant::ui.centre.rules.added'))->body(__('assistant::ui.centre.rules.added_body'))->send();
+    }
+
     public function removeRule(string $id): void
     {
         if ($this->shop === null || ! app()->bound(ShopRules::class)) {

@@ -20,6 +20,9 @@ use App\Modules\Runs\Contracts\RunContext;
  */
 final class Models
 {
+    /** Why the last call failed (ModelCallFailed's reason, or "spend_cap"); null when it answered. */
+    public ?string $failure = null;
+
     public function __construct(
         private readonly ChatModel $models,
         private readonly SpendGuard $spend,
@@ -45,6 +48,8 @@ final class Models
         $in = (float) Settings::get("taxonomy.{$role}_input_usd_per_million");
         $out = (float) Settings::get("taxonomy.{$role}_output_usd_per_million");
 
+        $this->failure = null;
+
         try {
             $this->spend->assertCanSpend(((mb_strlen($system) + mb_strlen($user)) / 2 * $in + $maxOutput * $out) / 1_000_000);
             $reply = is_array($schema) && $this->models instanceof StructuredChatModel
@@ -54,8 +59,10 @@ final class Models
 
             return $reply;
         } catch (SpendCapReached $e) {
+            $this->failure = 'spend_cap';
             $run->fail('taxonomy::runs.spend_cap', [], $e->getMessage());
         } catch (ModelCallFailed $e) {
+            $this->failure = $e->reason;
             $run->fail('taxonomy::runs.model_failed', ['reason' => $e->reason], $e->getMessage());
         }
 

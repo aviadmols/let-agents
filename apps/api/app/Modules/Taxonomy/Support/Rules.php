@@ -21,6 +21,7 @@ final class Rules implements ShopRules
             'text' => (string) $rule->text,
             'status' => (string) $rule->status,
             'note' => $rule->note,
+            'link' => ($rule->plan['link'] ?? '') !== '' ? (string) $rule->plan['link'] : null,
             'at' => $rule->created_at->toIso8601String(),
             'changes' => array_values(array_map(fn (array $c): array => [
                 'external_id' => (string) ($c['external_id'] ?? ''),
@@ -65,6 +66,18 @@ final class Rules implements ShopRules
         }
 
         $rule->forceFill(['status' => TaxonomyRule::REJECTED, 'decided_by' => $userId, 'decided_at' => now()])->save();
+    }
+
+    public function retry(string $id): void
+    {
+        $rule = TaxonomyRule::query()->find($id);
+
+        if ($rule === null || ! in_array($rule->status, [TaxonomyRule::FAILED, TaxonomyRule::UNCLEAR], true)) {
+            return;
+        }
+
+        $rule->forceFill(['status' => TaxonomyRule::READING, 'note' => null, 'plan' => null, 'fingerprint' => null])->save();
+        ReadRuleJob::dispatch((string) $rule->shop_id, (string) $rule->id);
     }
 
     public function remove(string $id): void

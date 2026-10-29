@@ -14,7 +14,7 @@ return [
     'rule_evidence' => 'The team\'s rule: :text',
     'rule_gone' => 'The rule no longer waits to be read.',
     'rule_same_family' => 'The rules\' reader and checker are of one family (:family): not read.',
-    'rule_failed_note' => 'The reading failed. Remove it and write it again.',
+    'rule_failed_note' => 'The reading failed (the model was busy). Press "Read again".',
     'rule_nothing_named' => 'No product, category or tag the rule names was found in the store. Write the product\'s full name, in quotes.',
     'rule_unclear_note' => 'What to change could not be made out. Say which product, and what to do with it.',
     'rule_unclear' => 'The rule is unclear: back to the team with a question.',
