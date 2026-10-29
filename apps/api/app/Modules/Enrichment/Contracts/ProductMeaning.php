@@ -14,10 +14,11 @@ namespace App\Modules\Enrichment\Contracts;
 interface ProductMeaning
 {
     /**
-     * The kept and waiting tags first, the most central first; then those the check took out.
+     * The kept and waiting tags first, the most central first; then those the check took out. A tag that is a
+     * range ("9–11 days") carries the exact value its passage gives ("10 days"), or null.
      *
      * @param  string  $type  product | content
-     * @return list<array{id: string, group: string, label: string, weight: float, source: string, evidence: string|null, explicit: bool, status: string, note: string|null, team: bool}>
+     * @return list<array{id: string, group: string, label: string, exact: string|null, weight: float, source: string, evidence: string|null, explicit: bool, status: string, note: string|null, team: bool}>
      */
     public function of(string $type, string $id, string $locale): array;
 

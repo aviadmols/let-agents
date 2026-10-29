@@ -111,6 +111,7 @@ return [
     'meaning_sources' => ['catalog' => 'From the store\'s text', 'picture' => 'From the picture', 'knowledge' => 'Known of the work'],
     'meaning_explicit' => 'Said outright',
     'meaning_based' => 'Based on',
+    'meaning_exact' => 'The exact value the text gives, within the range of the tag',
     'meaning_out' => 'One tag was taken out in the check|:n tags were taken out in the check',
     'meaning_why_out' => 'Why',
     'recent' => [

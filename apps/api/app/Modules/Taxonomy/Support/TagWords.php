@@ -44,6 +44,10 @@ final class TagWords implements ProductTags
                 // a union, not array_merge: a name that is a number ("2024") keeps its key
                 $names = array_fill_keys(array_filter([$a->tag->label_he, $a->tag->label_en, ...(array) $a->tag->words], 'is_string'), $weight)
                     + array_fill_keys(array_filter([$a->tag->parent?->label_he, $a->tag->parent?->label_en], 'is_string'), $weight * self::BROADER);
+                // a range's exact value at the range's weight: "10 ימים" finds the ten-day trip as surely as "9–11"
+                if (($value = Exact::value($a->tag, $a->evidence)) !== null) {
+                    $names += array_fill_keys(array_filter([Exact::label($a->tag, $value, 'he'), Exact::label($a->tag, $value, 'en')]), $weight);
+                }
                 foreach ($names as $word => $w) {
                     $word = trim((string) $word);
                     if ($word !== '' && ($words[$a->subject_id][$word] ?? 0) < $w) {

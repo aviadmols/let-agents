@@ -13,6 +13,7 @@
                 <span>{{ $m['group'] }}</span>
                 <span>
                     <strong>{{ $m['label'] }}</strong>
+                    @if ($m['exact'] ?? null)<strong class="lp-pill" data-meaning-exact title="{{ $t('meaning_exact') }}">{{ $m['exact'] }}</strong>@endif
                     <span class="lp-pill" data-tone="{{ $m['weight'] >= 0.7 ? 'good' : '' }}">{{ $t('meaning_weight.'.($m['weight'] >= 0.7 ? 'central' : ($m['weight'] >= 0.4 ? 'part' : 'background'))) }}</span>
                     @if ($m['status'] === 'review')<span class="lp-pill" data-tone="warn">{{ $t('meaning_review') }}</span>@endif
                     @if ($m['team'])<span class="lp-pill" data-tone="good">{{ $t('meaning_team') }}</span>@endif

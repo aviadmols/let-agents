@@ -19,6 +19,8 @@ final class Meaning implements ProductMeaning
                 'team' => in_array($a->checked, TaxonomyAssignment::TEAM, true),
                 'group' => $a->tag->group->label($locale),
                 'label' => $locale === 'he' ? $a->tag->label_he : $a->tag->label_en,
+                // a range's exact value, as its passage gives it ("9–11 days": "10 days")
+                'exact' => ($value = Exact::value($a->tag, $a->evidence)) === null ? null : Exact::label($a->tag, $value, $locale),
                 'weight' => (float) $a->weight,
                 'source' => (string) $a->source,
                 'evidence' => $a->evidence,

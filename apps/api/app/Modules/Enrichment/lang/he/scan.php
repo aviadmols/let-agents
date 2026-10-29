@@ -111,6 +111,7 @@ return [
     'meaning_sources' => ['catalog' => 'מטקסט החנות', 'picture' => 'מהתמונה', 'knowledge' => 'ידוע על היצירה'],
     'meaning_explicit' => 'כתוב במפורש',
     'meaning_based' => 'מבוסס על',
+    'meaning_exact' => 'הערך המדויק מהטקסט, בתוך הטווח של התגית',
     'meaning_out' => 'תגית אחת נפסלה בבדיקה|:n תגיות נפסלו בבדיקה',
     'meaning_why_out' => 'למה נפסלה',
     'recent' => [
