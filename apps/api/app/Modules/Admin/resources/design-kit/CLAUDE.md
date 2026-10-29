@@ -4,25 +4,17 @@ You are helping a designer restyle the merchant panel of Lets, the panel a shop 
 live shop with real data. The designer returns files, and an engineer ports them into the system. This file states
 what you may change and what you must keep, so that every screen still works after the port.
 
-## The quickest way: the local dashboard (no server, no link)
-
-`examples/index.html` opens a local copy of Sela Meir's panel. Open it straight from the folder (file://).
-
-- It holds all 39 screens and every tab of each, captured from the live panel with their real content.
-- The sidebar, the screens' links and the tabs work.
-- Buttons that act (approve, save, delete) do nothing here, and nothing reaches the live shop.
-- Ticking "לעצב לפי merchant.css שבתיקייה" in the bottom bar styles every screen with this folder's `merchant.css`
-  instead of the captured one. Edit `merchant.css`, save, refresh.
-- `examples/sela/*.html` are the raw captures. `examples/sela/*.png` are their pictures. `examples/gallery.html` shows
-  them side by side.
-- Restyle against this first. Use the live panel below to check a state that only the live panel shows: something that
-  updates while you watch, or what an action leaves behind.
+Work on the live panel through this computer, `http://localhost:5501` (see "Setting it up" below). Everything works
+there. The local dashboard in `examples/` is a snapshot for working offline.
 
 ## Order and names: `layout/`
 
-The designer changes the panel's order and names in `layout/layout.js`, not in code. The local dashboard applies the
-file to every screen on refresh (`layout/apply.js`; do not edit it). `layout/default.js` is the panel as it is now; do
-not edit it either. The engineer at Lets compares the two files to port the changes.
+The designer changes the panel's order and names in `layout/layout.js`, not in code.
+- The live panel at `localhost:5501` and the local dashboard both apply it to every screen on refresh.
+- The live panel applies it again after every click that redraws a screen.
+- `layout/apply.js` does the applying. Do not edit it.
+- `layout/default.js` is the panel as it is now. Do not edit it either.
+- The engineer at Lets compares the two files to port the changes.
 
 - `menu`: the sidebar, top to bottom. Each entry is `{ screen, label }`. Move an entry to move it; `hidden: true`
   hides it.
@@ -43,12 +35,42 @@ Rules for editing it:
    - A `tab` value is the button's `data-tab` or `wire:click`.
    - A tab without either is identified by its text, as `text:…`.
 2. Every new or changed label needs English as well. Add `en: "…"` beside it.
-3. Keep it valid JavaScript: commas after every entry, matching quotes and brackets. The dashboard's bottom bar reports
-   a file that fails to load.
+3. Keep it valid JavaScript: commas after every entry, matching quotes and brackets. The blue bar (live) or the bottom
+   bar (local dashboard) reports a file that fails to load.
 4. Order and names belong in this file, not in `views/`. Do not reorder tabs or menus by editing Blade.
-5. It shows in the local dashboard only. The live panel follows it once the engineer has ported it.
+5. It shows on this computer only. Shop owners see it once the engineer has ported it.
 
-## Setting it up live (do this when asked to set up, run or "deploy" the kit against the live panel)
+## Setting it up (do this when asked to set up, run or "deploy" the kit)
+
+1. From this folder, run `node serve.mjs` (Node 18+, no packages) and leave it running in the background.
+   - `http://localhost:5500` serves this folder: the local dashboard at `/examples/`, and `merchant.css`.
+   - `http://localhost:5501` is the shop's **live panel through this computer**. Every tab, filter, search and button
+     works there, with real data.
+   - Every screen there is drawn with this folder's `merchant.css` and `layout/layout.js`, injected by `serve.mjs`.
+   - A blue bar ("מהמחשב שלך") switches each of them off and on.
+2. Sign-in needs no password. `design-link.txt` holds the shop's design link (valid 24 hours).
+   - `serve.mjs` opens the link whenever the panel would ask to sign in.
+   - Without the file, `http://localhost:5501` asks for the link once and saves it.
+   - `node serve.mjs <link>` saves a new one.
+   - An expired link shows "the link ended": ask the designer for a new link from Lets. You cannot make one.
+3. Open `http://localhost:5501` for the designer. Edit, save, refresh (F5).
+4. Check: `curl -I http://localhost:5500/merchant.css` answers `200`, and `http://localhost:5501` lands on
+   `/merchant/...`, not on a sign-in page.
+5. Do not change `serve.mjs` or `layout/apply.js`. They are the kit's plumbing, not the design.
+
+## Offline: the local dashboard
+
+`examples/index.html` opens a snapshot of Sela Meir's panel, straight from the folder (file://).
+
+- It holds all 39 screens and the main tabs of each, captured from the live panel with their real content.
+- The sidebar, the screens' links and the main tabs work.
+- Filters, searches and buttons that act do nothing here: there is no server behind a snapshot. Use the live panel for
+  them.
+- The bottom bar switches this folder's `merchant.css` and `layout/layout.js` on and off.
+- `examples/sela/*.html` are the raw captures. `examples/sela/*.png` are their pictures. `examples/gallery.html` shows
+  them side by side.
+
+## The design bar's own stylesheet field (older way, still works)
 
 Nothing is installed or deployed to a server. The panel runs on Lets' server. This kit's folder is served from the
 designer's computer, and the panel loads `merchant.css` from there.
