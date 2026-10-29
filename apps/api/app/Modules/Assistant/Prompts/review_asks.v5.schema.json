@@ -1,0 +1,25 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["items", "summary", "improvements", "summary_en", "improvements_en"],
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "score", "note", "flag"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "score": {"type": "integer"},
+                    "note": {"type": "string"},
+                    "flag": {"anyOf": [{"type": "string", "enum": ["invented", "refused_answerable", "wrong_products"]}, {"type": "null"}]}
+                }
+            }
+        },
+        "summary": {"type": "string"},
+        "improvements": {"type": "array", "items": {"type": "string"}},
+        "summary_en": {"type": "string"},
+        "improvements_en": {"type": "array", "items": {"type": "string"}}
+    }
+}

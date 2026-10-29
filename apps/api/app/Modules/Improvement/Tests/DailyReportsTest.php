@@ -28,10 +28,10 @@ final class DailyReportsTest extends TestCase
         $merchant = User::factory()->create();
         $merchant->attachShop($shop);
 
+        // the questions' daily score and what left the bank are the operator's alone (29.10): the shop sees the site's check
         $this->actingAs($merchant)->get("/merchant/{$shop->slug}/overview")->assertOk()
-            ->assertSee(__('assistant::ui.daily.label'))
-            ->assertSee(__('assistant::ui.daily.headline', ['score' => '64', 'asks' => '67']))
-            ->assertSeeInOrder([__('assistant::ui.daily.in', ['count' => 1]), 'על מה הספר חטוף?', __('assistant::ui.daily.out_shop', ['count' => 1]), 'הספר של עומר שם טוב או החטוף?'])
+            ->assertDontSee(__('assistant::ui.daily.label'))
+            ->assertDontSee(__('assistant::ui.daily.headline', ['score' => '64', 'asks' => '67']))
             ->assertDontSee('אמר שהספר לא נמצא.', false)
             ->assertSee(__('improvement::ui.daily.label'))
             ->assertSeeInOrder([__('improvement::ui.daily.waiting', ['count' => 1]), 'להוסיף מילה נרדפת: ספרי ילדים', __('improvement::ui.daily.done', ['count' => 1]), 'תשובה: מדיניות החזרות'])

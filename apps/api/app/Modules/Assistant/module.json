@@ -422,6 +422,14 @@
             "scope": "shop"
         },
         {
+            "name": "questions_from",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 40,
+            "scope": "shop"
+        },
+        {
             "name": "review_provider",
             "type": "enum",
             "options": [

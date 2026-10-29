@@ -281,6 +281,28 @@ final class SearchAsksTest extends TestCase
             ->assertSee(__('assistant::ui.weak.flags.invented'));
     }
 
+    public function test_the_products_an_answer_listed_under_its_words_reach_the_reviewer_as_its_picks(): void
+    {
+        // Sela Meir, 29.10: "which funny books do you have?" was answered "funny books (6):" with six books under it,
+        // and the review saw the heading alone: score 1, "refused where the store sells them".
+        $this->travel(1)->days();
+        $yesterday = now()->subDay();
+        $this->inShop(fn () => AssistantSearchAsk::query()->create([
+            'shop_id' => $this->shop->id, 'day' => $yesterday->toDateString(), 'question' => 'איזה יריעות יש לכם?', 'products' => [],
+            'outcome' => 'answered', 'from' => 'model', 'answer' => 'יריעות (2):', 'shown' => ['701', '702'], 'whatsapp_shown' => false, 'whatsapp_clicked' => false,
+            'created_at' => $yesterday, 'updated_at' => $yesterday,
+        ]));
+        $this->replies = [['items' => [['id' => 'a1', 'score' => 4, 'note' => 'רשימה.', 'flag' => null]], 'summary' => 'יום.', 'improvements' => []]];
+
+        app(ReviewSearchAsks::class)->handle($this->shop->id);
+
+        $sent = json_decode($this->calls[0]['user'], true);
+        $this->assertSame('יריעות (2):', $sent['items'][0]['answer']);
+        $this->assertCount(2, $sent['items'][0]['listed'], 'the products under the heading reach the reviewer');
+        $this->assertStringContainsString('יריעה', $sent['items'][0]['listed'][0]);
+        $this->assertStringContainsString('`listed`', (string) file_get_contents(__DIR__.'/../Prompts/review_asks.v'.ReviewSearchAsks::PROMPT_VERSION.'.md'), 'and the prompt says what they are');
+    }
+
     public function test_an_answer_that_invents_or_scores_low_reaches_the_operators_list_of_every_shop(): void
     {
         $this->travel(1)->days();

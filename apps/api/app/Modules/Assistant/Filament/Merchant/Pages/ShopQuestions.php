@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Filament\Merchant\Pages;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\WritesPosts;
@@ -81,6 +82,34 @@ final class ShopQuestions extends OperatorShopQuestions
     }
 
     /**
+     * "Reset questions": from this moment the list shows only what is asked after it, so the team sees
+     * the answers after a round of changes alone. Nothing is deleted; the operator's screen keeps all.
+     */
+    public function resetQuestions(): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        Settings::set('assistant.questions_from', now()->toIso8601String(), $this->shop);
+        $this->shown = self::PAGE;
+        Notification::make()->title(__('assistant::ui.inbox.reset_done'))->success()->send();
+    }
+
+    /** The list starts at the last weeks, or at the reset when the team reset it since. */
+    private function since(): Carbon
+    {
+        $since = now()->subDays(self::DAYS);
+        $from = (string) Settings::get('assistant.questions_from', $this->shop);
+
+        try {
+            return $from !== '' && ($at = Carbon::parse($from))->gt($since) ? $at : $since;
+        } catch (\Throwable) {
+            return $since;
+        }
+    }
+
+    /**
      * Every question of the last weeks, the same one once: from the search window (grouped by its words)
      * and from product and article pages, with its answer, score and how many asked. What the team
      * already answered or set aside is not here.
@@ -94,7 +123,7 @@ final class ShopQuestions extends OperatorShopQuestions
         }
 
         return app(TenantContext::class)->run($this->shop, function (): array {
-            $since = now()->subDays(self::DAYS);
+            $since = $this->since();
             $handled = AssistantAnswer::query()->whereNull('product_id')->whereNull('content_id')
                 ->where(fn ($q) => $q->where('source', self::TEAM)->orWhere('status', AssistantAnswer::HIDDEN))
                 ->pluck('question_key')->flip();

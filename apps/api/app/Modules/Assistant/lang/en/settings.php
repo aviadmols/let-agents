@@ -174,6 +174,10 @@ return [
         'label' => 'The message WhatsApp opens with from the search',
         'description' => 'Empty for the usual message. :question becomes the shopper\'s question.',
     ],
+    'questions_from' => [
+        'label' => 'The questions screen shows from',
+        'description' => 'Set when the team presses "Reset questions" on the questions screen: from then only new questions show. Empty shows all. No question is deleted.',
+    ],
     'review_provider' => [
         'label' => 'Provider of the model that reviews search questions',
         'description' => 'Another family than the answering model.',

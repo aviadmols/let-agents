@@ -36,6 +36,12 @@ final class AssistantDailySummaries implements DailySummaries
 
     public function summaries(?string $shopId, CarbonInterface $since, bool $operator = false): array
     {
+        // The operator's alone (29.10): a score a day and what left the bank are the mechanics of the assistant, not
+        // what changed for the shop. The shop reads its questions and their answers on the questions screen.
+        if (! $operator) {
+            return [];
+        }
+
         $read = function () use ($shopId, $since, $operator): array {
             $reviews = AssistantAskReview::query()->where('status', AssistantAskReview::REVIEWED)->where('day', '>=', $since->toDateString())
                 ->when($shopId !== null, fn ($q) => $q->where('shop_id', $shopId))->orderByDesc('day')->limit(self::MAX)->get();

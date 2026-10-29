@@ -38,7 +38,7 @@ final class ReviewSearchAsks
 
     public const ACTION = 'assistant.review_asks';
 
-    public const PROMPT_VERSION = 4;
+    public const PROMPT_VERSION = 5;
 
     /** What the reviewer may mark an item for the operator: an answer that invents, a refusal with the answer at hand, picks off the question. */
     public const FLAGS = ['invented', 'refused_answerable', 'wrong_products'];
@@ -104,7 +104,7 @@ final class ReviewSearchAsks
         }
 
         $answers = AssistantAnswer::query()->whereIn('id', $asks->pluck('answer_id')->filter()->unique()->values())->get(['id', 'answer'])->keyBy('id');
-        $products = CatalogProduct::query()->whereIn('external_id', $asks->pluck('products')->flatten()->unique()->values())->get(['external_id', 'title', 'payload'])->keyBy('external_id');
+        $products = CatalogProduct::query()->whereIn('external_id', $asks->map(fn (AssistantSearchAsk $a): array => [...(array) $a->products, ...(array) $a->shown])->flatten()->unique()->values())->get(['external_id', 'title', 'payload'])->keyBy('external_id');
         $titles = $products->map(fn (CatalogProduct $p): string => (string) $p->title);
         $byRef = [];
         $items = [];
@@ -118,6 +118,9 @@ final class ReviewSearchAsks
                 'shown' => array_values(array_filter(array_map(fn ($id) => $titles[$id] ?? null, array_slice((array) $ask->products, 0, 8)))),
                 'answer' => (string) ($answers->get($ask->answer_id)?->answer ?? $ask->answer ?? ''),
                 'picks' => array_map(fn (array $p): string => $p['title'].' — '.$p['why'], (array) $ask->picks),
+                // the products the answer itself listed under its words (a set: "funny books (6):" and six books under
+                // it), the answer's picks in all but name (Sela Meir, 29.10: the review saw the heading alone, scored 1)
+                'listed' => array_values(array_filter(array_map(fn ($id) => $titles[$id] ?? null, array_slice((array) $ask->shown, 0, 8)))),
                 'outcome' => $ask->outcome,
                 'whatsapp_offered' => $ask->whatsapp_shown,
                 'whatsapp_clicked' => $ask->whatsapp_clicked,

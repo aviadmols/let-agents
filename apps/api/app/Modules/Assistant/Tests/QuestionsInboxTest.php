@@ -61,6 +61,20 @@ final class QuestionsInboxTest extends TestCase
             ->assertSee('מה מזג האוויר מחר?');
     }
 
+    public function test_reset_hides_what_was_asked_until_now_and_shows_only_what_comes_after(): void
+    {
+        // the shop manager, 29.10: after a round of changes, to see only the questions and answers from then on
+        $this->ask('אפשר להחזיר או להחליף?', 'answered', 'כן.');
+        $this->travel(1)->minutes();
+
+        Livewire::test(ShopQuestions::class)->assertSee('אפשר להחזיר או להחליף?')->call('resetQuestions')->assertDontSee('אפשר להחזיר או להחליף?');
+
+        $this->travel(1)->minutes();
+        $this->ask('משלוח לאילת?', 'no_info');
+        Livewire::test(ShopQuestions::class)->assertDontSee('אפשר להחזיר או להחליף?')->assertSee('משלוח לאילת?');
+        $this->assertSame(2, AssistantSearchAsk::query()->count(), 'nothing is deleted');
+    }
+
     public function test_a_team_answer_or_not_relevant_takes_the_question_off_the_list(): void
     {
         $this->ask('יש לכם עגילים מזהב לבן?', 'no_info');

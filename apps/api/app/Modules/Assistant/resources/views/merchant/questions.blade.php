@@ -34,6 +34,8 @@
                 <button type="button" wire:click="orderBy('need')" @class(['is-on' => $this->order !== 'date'])>{{ $t('order_need') }}</button>
                 <button type="button" wire:click="orderBy('date')" @class(['is-on' => $this->order === 'date'])>{{ $t('order_date') }}</button>
             </div>
+            {{-- "reset questions": from this moment the list shows only what is asked after it; nothing is deleted --}}
+            <button type="button" class="lp-link" wire:click="resetQuestions" wire:confirm="{{ $t('reset_confirm') }}" data-reset>{{ $t('reset') }}</button>
         </div>
 
         @forelse (array_slice($rows, 0, $this->shown) as $row)
