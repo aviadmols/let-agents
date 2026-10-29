@@ -59,6 +59,10 @@
 
                         <div class="lp-card-t lp-sub-t"><h2>{{ $t('tags') }}</h2><span class="lp-note">{{ $t('tags_help') }}</span></div>
                         <div class="lp-chips">
+                            {{-- the store's own categories and tags: from the platform, changed there, not here --}}
+                            @foreach ($p['store_tags'] as $name)
+                                <span class="lp-chip lp-tag" title="{{ $t('store_tag_note') }}" data-store-tag><span class="lp-tag-btn" dir="auto">{{ $name }} <span class="lp-src">{{ $t('sources.store') }}</span></span></span>
+                            @endforeach
                             @foreach ($p['tags'] as $tag)
                                 <span class="lp-chip lp-tag" x-data="{ menu: false }" @click.outside="menu = false">
                                     <button type="button" class="lp-tag-btn" @click="menu = ! menu">{{ $tag['label'] }} <span class="lp-src">{{ $tag['source'] }}</span></button>

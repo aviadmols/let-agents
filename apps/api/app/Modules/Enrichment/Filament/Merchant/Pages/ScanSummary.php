@@ -276,6 +276,7 @@ final class ScanSummary extends Page
                 'label' => trim($f->valueLabel()),
                 'source' => __('enrichment::scan.sources.'.self::source($f)),
             ])->filter(fn (array $t): bool => $t['label'] !== '')->unique('label')->values()->all(),
+            'store_tags' => self::storeTags($product, $facts->whereIn('kind', self::TAG_KINDS)->map(fn (EnrichmentFact $f): string => trim($f->valueLabel()))->all()),
             'spec' => array_values(array_map(fn (array $s): array => [...$s, 'values' => implode(', ', array_unique(array_filter($s['values'])))], $spec)),
             'image' => $image === null ? null : [
                 'url' => $image->image_url,
@@ -601,6 +602,38 @@ final class ScanSummary extends Page
         $row = CatalogContent::query()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', CatalogContent::OWN_PREFIX.'knowledge-posts')->first(['terms']);
 
         return (array) ($row?->terms['read'] ?? []);
+    }
+
+    /**
+     * The categories and tags the product has in the store itself, each once, and none a tag above already says. A shop
+     * whose scan has no vocabulary to read them by (Gil Travel, 29.10: the tour "10 Day Complete Japan" in Japan and
+     * Jewish Heritage Tours, and an empty box) still shows what its own store says.
+     *
+     * @param  list<string>  $shown  the tags shown already
+     * @return list<string>
+     */
+    public static function storeTags(CatalogProduct $product, array $shown): array
+    {
+        $names = $product->categories()->whereNull('catalog_categories.removed_at')->pluck('name')->all();
+        $tags = ((array) $product->payload)['tags'] ?? [];
+        // Shopify may send its tags as one line: "summer, linen"
+        foreach (is_string($tags) ? explode(',', $tags) : (array) $tags as $tag) {
+            $names[] = is_array($tag) ? ($tag['name'] ?? $tag['title'] ?? '') : $tag;
+        }
+
+        $seen = array_flip(array_map(fn (string $s): string => mb_strtolower($s), $shown));
+        $out = [];
+        foreach ($names as $name) {
+            $name = trim(html_entity_decode((string) $name, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $key = mb_strtolower($name);
+            if ($name === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $name;
+        }
+
+        return $out;
     }
 
     private static function source(EnrichmentFact $fact): string

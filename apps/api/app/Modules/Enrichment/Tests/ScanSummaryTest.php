@@ -5,6 +5,7 @@ namespace App\Modules\Enrichment\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Contracts\ProductMeaning;
@@ -83,6 +84,32 @@ final class ScanSummaryTest extends TestCase
             ->call('pick', 'image')
             ->assertSee('דיסק סקוץ׳ למכונת פוליש')
             ->assertSee('תמונה לא נקראה');
+    }
+
+    public function test_the_stores_own_categories_and_tags_show_among_the_tags_even_with_no_vocabulary(): void
+    {
+        // Gil Travel, 29.10: a tour in Japan and Jewish Heritage Tours, and nothing in its tags box
+        $tour = $this->product('901', '10 Day Complete Japan Experience With Jewish Heritage');
+        $tour->forceFill(['payload' => ['tags' => ['Japan', 'Kyoto']]])->save();
+        foreach (['Japan', 'Jewish Heritage Tours', 'Old tours'] as $i => $name) {
+            $category = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'c'.$i, 'name' => $name, 'path' => [$name], 'depth' => 0, 'product_count' => 1, 'hash' => 'h'.$i,
+                'removed_at' => $name === 'Old tours' ? now() : null]);
+            $tour->categories()->attach($category->id);
+        }
+        $this->fact($tour, FactKind::Type, 'jewish heritage tours', 'category');
+
+        $this->assertSame(['Japan', 'Kyoto'], ScanSummary::storeTags($tour->fresh(), ['jewish heritage tours']),
+            'each once, none a tag already says, none the store removed');
+
+        Livewire::test(ScanSummary::class)
+            ->call('select', $tour->id)
+            ->assertSee('Kyoto')
+            ->assertSee('מהחנות');
+
+        // Shopify's tags as one line
+        $shirt = $this->product('902', 'Linen shirt');
+        $shirt->forceFill(['payload' => ['tags' => 'summer, linen ,summer']])->save();
+        $this->assertSame(['summer', 'linen'], ScanSummary::storeTags($shirt->fresh(), []));
     }
 
     public function test_the_team_removes_a_tag_adds_one_and_scans_the_product_again(): void
