@@ -77,6 +77,21 @@ final class TestAiProviderTest extends TestCase
         $this->assertStringNotContainsString('SECRETVALUE', json_encode($run->fresh()->toArray()));
     }
 
+    public function test_a_provider_set_aside_for_credit_is_checked_again_each_hour_and_a_refused_key_waits(): void
+    {
+        // 29.10: OpenAI ran out of credit and stayed set aside after it was added
+        $credit = AiProvider::query()->create(['provider' => AiProviderName::OpenAi, 'api_key' => 'sk-credit']);
+        $credit->forceFill(['status' => ProviderStatus::Failed, 'last_error_code' => 'no_credit'])->saveQuietly();
+        $refused = AiProvider::query()->create(['provider' => AiProviderName::Anthropic, 'api_key' => 'sk-ant-refused']);
+        $refused->forceFill(['status' => ProviderStatus::Failed, 'last_error_code' => 'invalid_key'])->saveQuietly();
+
+        $this->artisan('ai:recheck-providers')->assertSuccessful();
+
+        $this->assertSame([ProviderStatus::Connected, null], [$credit->fresh()->status, $credit->fresh()->last_error_code]);
+        $this->assertSame(ProviderStatus::Failed, $refused->fresh()->status, 'a refused key waits for a new one');
+        $this->assertSame([AiProviderName::OpenAi], array_column($this->calls, 0));
+    }
+
     public function test_the_key_is_encrypted_at_rest(): void
     {
         $provider = AiProvider::query()->create(['provider' => 'openai', 'api_key' => 'sk-proj-SECRETVALUE1234']);

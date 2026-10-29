@@ -5,6 +5,7 @@ namespace App\Modules\Ai;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Ai\Console\RecheckProvidersCommand;
 use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\Embedder;
@@ -35,6 +36,7 @@ use App\Modules\Ai\Support\UsageStrip;
 use App\Modules\Runs\Contracts\CallJournal;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Console\Scheduling\Schedule;
 
 final class AiServiceProvider extends ModuleServiceProvider
 {
@@ -83,5 +85,17 @@ final class AiServiceProvider extends ModuleServiceProvider
         // The month's allowance above every admin screen: a share for a shop, dollars for the operator.
         // Above it, for the operator only: a provider whose key stopped working, until a new key passes its check.
         FilamentView::registerRenderHook(PanelsRenderHook::CONTENT_START, fn (): string => app(KeyAlert::class)->render()->toHtml().app(UsageStrip::class)->render()->toHtml());
+
+        // a provider set aside for credit or a rate limit is checked again every hour: credit added brings it back
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->command('ai:recheck-providers')->hourlyAt(20)->name('ai:recheck-providers')->withoutOverlapping();
+        });
+    }
+
+    protected function moduleCommands(): array
+    {
+        return [
+            RecheckProvidersCommand::class,
+        ];
     }
 }
