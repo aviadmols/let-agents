@@ -121,6 +121,10 @@
   var FLOATS = false, FLOAT = null;
   function hookLauncher() {
     if (CFG.launcher === 'none') { return; }
+    // a place the theme marked for our button (<span data-lets-button></span>, in its header or wherever it likes): the
+    // launcher goes there, as in a header, and no floating one is added (Aviad, 29.10: a Shopify theme asked where)
+    var slot = doc.querySelector('[data-lets-button]');
+    if (slot && CFG.launcher !== 'float') { slot.appendChild(makeLauncher(false)); return; }
     var into = CFG.launcher !== 'float' && (CFG.launcherInto ? doc.querySelector(CFG.launcherInto) : (doc.querySelector('[data-search-open]') || {}).parentNode);
     if (into && CFG.launcher !== 'float') {
       var mobileToggle = into.querySelector('[data-search-open]');
