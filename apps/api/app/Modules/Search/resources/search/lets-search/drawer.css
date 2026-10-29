@@ -155,12 +155,7 @@
 @media (hover: hover) and (pointer: fine) { .ls-pill:hover { background: var(--ls-accent-hover); } .ls-pill:hover .ls-icon { opacity: 1; } }
 .ls-pill .ls-swatch { width: 12px; height: 12px; box-shadow: 0 0 0 1.5px rgb(255 255 255 / .55); }
 @media (pointer: coarse) { .ls-pill { height: 30px; } }
-/* the filter chips over the results: smaller than the drawer's other chips */
-.ls-chips--bar { gap: 6px; }
-.ls-chips--bar .ls-chip { height: 30px; padding-inline: 11px; gap: 4px; font-size: var(--lsp-text-xs); }
-.ls-chips--bar .ls-chip .ls-icon { width: 14px; height: 14px; }
-.ls-chips--bar .ls-chip[aria-pressed="true"] .ls-chip__check { width: 14px; }
-@media (pointer: coarse) { .ls-chips--bar .ls-chip { height: 34px; } }
+/* the filter chips over the results are the drawer's chips, as the design has them (29.10: they had been made smaller here, and the sites no longer looked like the design) */
 .ls-active__clear { font-size: var(--lsp-text-sm); margin-inline-start: 4px; }
 .ls-chip.is-auto[aria-pressed="true"] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls-accent) 16%, transparent); }
 .ls-chip--quiet.is-on { background: var(--ls-bg-hover); }
