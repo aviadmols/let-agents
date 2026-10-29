@@ -59,8 +59,14 @@ final class CountSearch
         }
     }
 
-    /** @param  array<string, string|null>  $visit */
-    public function click(string $shopId, string $raw, string $item, string $title, array $visit = []): void
+    /**
+     * A product opened from the search. When the visitor is known, kept with the shop's events too, so an add
+     * to the cart from the product's own page afterwards, and an order, are the search's (Analytics\Actions\RecordOrder;
+     * Aviad, 29.10: a product opened from Lets and added on its page is Lets' product).
+     *
+     * @param  array<string, string|null>  $visit
+     */
+    public function click(string $shopId, string $raw, string $item, string $title, array $visit = [], ?string $visitorId = null): void
     {
         $query = $this->query($raw);
 
@@ -90,6 +96,24 @@ final class CountSearch
         ]);
 
         SearchClick::query()->whereDate('day', $day)->where('query', $query)->where('item', $item)->incrementEach(['clicks' => 1], ['updated_at' => now()]);
+
+        if ($visitorId === null || ! preg_match('/^anon-[A-Za-z0-9_-]{16,64}$/', $visitorId) || ! str_starts_with($item, 'p:')) {
+            return;
+        }
+
+        AnalyticsEvent::query()->insertOrIgnore([
+            'shop_id' => $shopId,
+            'event_id' => (string) Str::ulid(),
+            'type' => 'click',
+            'page_type' => 'search',
+            'page_path' => '/',
+            'item_external_id' => substr($item, 2),
+            'source' => AnalyticsEvent::SOURCE_SEARCH,
+            'visitor_hash' => AnalyticsEvent::visitorHash($shopId, $visitorId),
+            'session_id' => 'search',
+            'occurred_at' => now(),
+            'created_at' => now(),
+        ]);
     }
 
     /**

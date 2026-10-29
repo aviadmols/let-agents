@@ -58,7 +58,7 @@ final class SearchEventsController
 
                 match ($event['type'] ?? null) {
                     'search' => $count->search($connection->shop_id, $event['q'], (int) ($event['results'] ?? 0), $visit),
-                    'click' => [$count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visit),
+                    'click' => [$count->click($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visit, $visitor),
                         $count->signal($connection->shop_id, 'click', $event['q'], (string) ($event['id'] ?? ''), $visitor)],
                     'add_to_cart' => [$count->added($connection->shop_id, $event['q'], (string) ($event['id'] ?? ''), (string) ($event['title'] ?? ''), $visitor, (string) ($event['path'] ?? '/')),
                         $count->signal($connection->shop_id, 'add', $event['q'], (string) ($event['id'] ?? ''), $visitor)],

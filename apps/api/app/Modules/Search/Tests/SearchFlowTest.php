@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogCategory;
@@ -606,6 +607,15 @@ final class SearchFlowTest extends TestCase
         $this->assertSame(['מקיטא', 1, 1], [$term->query, $term->searches, $term->clicks]);
         $click = $this->inShop(fn () => SearchClick::query()->sole());
         $this->assertSame(['p:101', 1], [$click->item, $click->clicks]);
+        $this->assertSame(0, $this->inShop(fn () => AnalyticsEvent::query()->where('type', 'click')->count()), 'no shopper named, nothing kept of one');
+
+        // with the shopper's anonymous id, the click is kept with the shop's events: a product opened from the search
+        // and added to the cart from its own page is the search's (RecordOrder)
+        $this->call('POST', "/api/v1/search/{$this->site}/events", server: ['CONTENT_TYPE' => 'text/plain', 'HTTP_ORIGIN' => 'https://www.store.test'], content: json_encode(['vid' => 'anon-visitor1234567890abcd', 'events' => [
+            ['type' => 'click', 'q' => 'מקיטא', 'id' => 'p:101', 'title' => 'מברגה נטענת מקיטה 18V'],
+        ]]))->assertNoContent();
+        $kept = $this->inShop(fn () => AnalyticsEvent::query()->where('type', 'click')->sole());
+        $this->assertSame(['101', AnalyticsEvent::SOURCE_SEARCH], [$kept->item_external_id, $kept->source]);
 
         $this->call('POST', "/api/v1/search/{$this->site}/events", server: ['CONTENT_TYPE' => 'text/plain', 'HTTP_ORIGIN' => 'https://evil.test'], content: '{"events":[]}')->assertForbidden();
     }

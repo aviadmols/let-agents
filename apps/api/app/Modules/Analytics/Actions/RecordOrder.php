@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\Validator;
  *                (its results or the assistant's picks), kept apart from the widget's
  *   assisted     the visitor opened or used the widget before ordering
  *
+ * A product the visitor opened from the widget or the search and then added from its own page is added from
+ * the one it was opened from (Aviad, 29.10): the store's own button finished what Lets began.
+ *
  * All within the shop's attribution window. The order carries no customer data: a hashed
  * order number, totals, product IDs and quantities, and the anonymous visitor ID.
  *
@@ -83,6 +86,13 @@ final class RecordOrder
                     ->pluck('item_external_id')->filter()->map(fn ($id): string => (string) $id)->unique()->all();
                 $addedFromWidget = $added('widget');
                 $addedFromSearch = $added(AnalyticsEvent::SOURCE_SEARCH);
+                // opened from Lets, added from its own page: the search's, or the widget's, as it was opened
+                $opened = fn (bool $search): array => $events->where('type', 'click')
+                    ->filter(fn (AnalyticsEvent $e): bool => $e->item_external_id !== null && ($e->source === AnalyticsEvent::SOURCE_SEARCH) === $search && $e->source !== AnalyticsEvent::SOURCE_PAGE)
+                    ->pluck('item_external_id')->map(fn ($id): string => (string) $id)->unique()->all();
+                $addedFromPage = $added(AnalyticsEvent::SOURCE_PAGE);
+                $addedFromSearch = array_values(array_unique([...$addedFromSearch, ...array_intersect($addedFromPage, $opened(true))]));
+                $addedFromWidget = array_values(array_unique([...$addedFromWidget, ...array_intersect($addedFromPage, $opened(false))]));
 
                 foreach ($payload['items'] as $item) {
                     if (in_array((string) $item['product_id'], $addedFromWidget, true)) {

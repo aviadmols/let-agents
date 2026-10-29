@@ -146,6 +146,29 @@ final class AnalyticsFlowTest extends TestCase
         ]))->assertStatus(202)->assertJson(['stored' => true, 'assisted' => false]);
     }
 
+    public function test_a_product_opened_from_the_search_and_added_from_its_own_page_is_the_searchs(): void
+    {
+        // Aviad, 29.10: a product clicked in Lets' search, reached on its page from there, and added there is Lets' product.
+        app(TenantContext::class)->run($this->shop->id, fn () => AnalyticsEvent::query()->create([
+            'shop_id' => $this->shop->id, 'event_id' => 'click-1', 'type' => 'click', 'page_type' => 'search', 'page_path' => '/',
+            'item_external_id' => '55', 'source' => AnalyticsEvent::SOURCE_SEARCH, 'visitor_hash' => AnalyticsEvent::visitorHash($this->shop->id, self::VID),
+            'session_id' => 'search', 'occurred_at' => now()->subMinutes(5), 'created_at' => now(),
+        ]));
+        $this->sendBeacon($this->beacon([
+            $this->event('page_view'),
+            $this->event('add_to_cart', ['data' => ['source' => 'page', 'product_id' => '55', 'quantity' => 1, 'result' => 'added']]),
+            $this->event('add_to_cart', ['data' => ['source' => 'page', 'product_id' => '10', 'quantity' => 1, 'result' => 'added']]),
+        ]))->assertStatus(202);
+
+        $this->signed('POST', "/api/v1/plugin/{$this->site}/orders", json_encode([
+            'order_ref' => hash('sha256', 'order-1003'), 'total' => 649.9, 'currency' => 'ils', 'ordered_at' => time(), 'vid' => self::VID,
+            'items' => [['product_id' => '55', 'quantity' => 1, 'total' => 150], ['product_id' => '10', 'quantity' => 1, 'total' => 499.9]],
+        ]))->assertStatus(202)->assertJson(['stored' => true]);
+
+        $stored = app(TenantContext::class)->run($this->shop->id, fn () => AnalyticsOrder::query()->sole());
+        $this->assertSame(['150.00', ['55'], '0.00'], [$stored->search_total, $stored->search_items, $stored->attributed_total], 'the one opened from the search, not the one the shopper found alone');
+    }
+
     public function test_past_orders_arrive_in_pages_without_a_visitor_and_stay_out_of_the_report(): void
     {
         $order = fn (int $n, int $at, array $extra = []): array => $extra + [
