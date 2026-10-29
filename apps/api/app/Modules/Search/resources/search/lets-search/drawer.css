@@ -394,8 +394,9 @@
 
 /* ---------------------------------------------------------------- large view: the side of the drawer makes it wide */
 /* a short grip at the middle of the edge, not the whole edge: the body's scrollbar runs along it, and a handle the
-   full height took the pointer wherever the scrollbar was grabbed (29.10: "expand" instead of scrolling) */
-.ls-edge { position: absolute; z-index: 11; top: 50%; translate: 0 -50%; height: 96px; inset-inline-end: 0; width: 14px; padding: 0; display: grid; place-items: center; cursor: ew-resize; background: transparent; }
+   full height took the pointer wherever the scrollbar was grabbed (29.10: "expand" instead of scrolling); and it
+   stands inward of the scrollbar's own width, in the body's gutter, so the scrollbar's thumb is never under it */
+.ls-edge { position: absolute; z-index: 11; top: 50%; translate: 0 -50%; height: 96px; inset-inline-end: 10px; width: 14px; padding: 0; display: grid; place-items: center; cursor: ew-resize; background: transparent; }
 .ls-edge__grip { width: 4px; height: 44px; border-radius: 999px; background: var(--ls-line-strong); opacity: 0; transition: opacity 200ms ease, height 260ms var(--lsp-ease-out), background-color 200ms ease; }
 .ls-edge__tip { position: absolute; inset-inline-end: 18px; top: 50%; transform: translateY(-50%) scale(.96); white-space: nowrap; padding: 6px 10px; border-radius: 9px; background: var(--ls-fg); color: var(--ls-bg); font-size: var(--lsp-text-xs); font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 160ms ease, transform 200ms var(--lsp-ease-out); }
 .ls-drawer:hover .ls-edge__grip { opacity: 1; }
