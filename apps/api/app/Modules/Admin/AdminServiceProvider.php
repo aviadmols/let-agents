@@ -5,6 +5,7 @@ namespace App\Modules\Admin;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Console\CreateOperatorCommand;
 use App\Modules\Admin\Console\DeleteDueShopsCommand;
+use App\Modules\Admin\Console\DesignKitCommand;
 use App\Modules\Admin\Console\EndDuePlansCommand;
 use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
@@ -68,6 +69,7 @@ final class AdminServiceProvider extends ModuleServiceProvider
     {
         return [
             CreateOperatorCommand::class,
+            DesignKitCommand::class,
             DeleteDueShopsCommand::class,
             EndDuePlansCommand::class,
             SetPasswordCommand::class,

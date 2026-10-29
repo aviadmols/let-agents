@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Admin\Http\Controllers\DesignPassController;
 use App\Modules\Admin\Http\Controllers\ExportShopDataController;
 use App\Modules\Admin\Http\Controllers\HomeController;
 use App\Modules\Admin\Http\Controllers\InvitationController;
@@ -30,6 +31,13 @@ Route::get('admin/theme/{theme}', fn () => redirect()->to('/'))->middleware('web
 Route::middleware(['throttle:20,1'])->group(function (): void {
     Route::get('invitation/{invitation}/{token}', [InvitationController::class, 'show'])->name('admin.invitation');
     Route::post('invitation/{invitation}/{token}', [InvitationController::class, 'accept'])->name('admin.invitation.accept');
+});
+
+// a designer's day in one shop's panel (DesignPassController): the link, the stylesheet from their computer, the end
+Route::middleware(['web'])->group(function (): void {
+    Route::get('design/closed', [DesignPassController::class, 'closed'])->name('admin.design.closed');
+    Route::post('design/css', [DesignPassController::class, 'css'])->middleware('auth')->name('admin.design.css');
+    Route::get('design/{token}', [DesignPassController::class, 'enter'])->where('token', '[A-Za-z0-9]{48}')->middleware('throttle:20,1')->name('admin.design');
 });
 
 Route::get('/', HomeController::class)->name('home');

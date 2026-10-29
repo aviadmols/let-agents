@@ -8,6 +8,7 @@ use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
+use App\Modules\Admin\Http\Middleware\EndDesignPass;
 use App\Modules\Admin\Http\Middleware\SyncTenantFromPanel;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
@@ -58,11 +59,13 @@ final class MerchantPanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE, fn (array $scopes): HtmlString => MerchantNavigation::section($scopes));
 
         // The Lets Search look on top of the shared one: the drawer's tokens, the mark in ink (merchant.css).
-        PanelDefaults::apply($panel, 'Merchant');
+        // a designer's session ends with its pass (EndDesignPass)
+        PanelDefaults::apply($panel, 'Merchant', [EndDesignPass::class]);
 
         return $panel
             ->brandLogo(fn (): HtmlString => new HtmlString(view('admin::panel.merchant-brand')->render()))
-            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): HtmlString => PanelTheme::merchant());
+            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): HtmlString => PanelTheme::merchant())
+            ->renderHook(PanelsRenderHook::BODY_END, fn (): HtmlString => PanelTheme::designBar());
     }
 
     private static function shopName(): string
