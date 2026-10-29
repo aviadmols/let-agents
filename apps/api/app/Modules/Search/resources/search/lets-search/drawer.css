@@ -109,6 +109,9 @@
 .ls-dfield .ls-field { --h: 50px; }
 .ls-field__send { display: none; }
 .ls-field.has-text .ls-field__send { display: inline-grid; }
+/* while something is typed the field is for writing: the camera and its line make way for the send button and the x
+   (Aviad, 29.10: as in a store without search by photo) */
+.ls-dfield .ls-field.has-text [data-photo], .ls-dfield .ls-field.has-text .ls-field__sep { display: none; }
 .ls-dmain { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ls-dbody { flex: 1; min-height: 0; }
 /* The scrollbar's room is kept whether the results fill the drawer or not: a bar that came and went as an article
