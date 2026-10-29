@@ -4,6 +4,35 @@ You are helping a designer restyle the merchant panel of Lets, the panel a shop 
 live shop with real data. The designer returns files, and an engineer ports them into the system. This file states
 what you may change and what you must keep, so that every screen still works after the port.
 
+## Setting it up (do this first when asked to set up, run or "deploy" the kit)
+
+Nothing is installed or deployed to a server. The panel runs on Lets' server. This kit's folder is served from the
+designer's computer, and the panel loads `merchant.css` from there.
+
+1. **The link.** The designer received a design link from Lets: `https://agents.lets.co.il/design/<token>`.
+   - It works for 24 hours, for one shop.
+   - Opening it signs the browser into that shop's real panel. A black "מצב עיצוב" (design mode) bar shows at the
+     foot of every screen.
+   - Without a link, or with an expired one, ask the designer to get a new one from Lets. You cannot make one.
+2. **Serve this folder** on port 5500, from the folder this file is in:
+   - `node serve.mjs` (Node 18+, no packages; serves with no caching and the header Chrome needs for local network
+     access);
+   - otherwise `python -m http.server 5500`;
+   - check: `curl -I http://localhost:5500/merchant.css` answers `200`.
+   - Leave it running in the background while the designer works.
+3. **Load it in the panel.** In the design bar, paste `http://localhost:5500/merchant.css` and press "לטעון" (Load).
+   - Chrome may ask whether the site may access devices on the local network. The designer must allow it.
+   - The bar then shows the file loaded ("העיצוב נטען מהמחשב שלך"), or that it did not load.
+   - Only `http(s)://localhost` or `127.0.0.1` addresses ending in `.css` are accepted.
+4. **Work.** Edit `merchant.css`, save, and refresh the panel (F5): the change shows on the shop's real screens.
+   - "חזרה לעיצוב של האתר" (back to the site's look) switches back to the live stylesheet.
+   - "שמירת המסך כקובץ HTML" saves the open screen, with its real content, as a file to propose structure in.
+5. **If it does not load:**
+   - the server is not running, or the port differs from the address in the bar;
+   - local network access was refused: allow it in the site's settings in Chrome, by the address bar;
+   - the file path is not `merchant.css` at the folder's root.
+6. **Hand back** as described at the end of this file. No git, no deploy: the engineer at Lets ports and ships.
+
 ## How the panel is built
 
 - The panel is rendered on the server: Laravel + Filament 5 + Livewire 3 + Alpine.js. There is no SPA, no REST API
