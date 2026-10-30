@@ -477,9 +477,11 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['402', '403', '404', '405', '406', '407', '401', '412', '408', '409', '410', '411'], array_column($this->similar('301')->json('products'), 'external_id'),
             'six by picture, then the two its words and its picture agree on, then the rest by picture');
 
-        // one its words find first that its pictures do not find near at all stays where the meaning leaves it: after them
+        // one its words find first that its pictures do not find near at all is not alike: the look decides, not the name
+        // (Chozen, 30.10: a kid's sneaker beside a man's boot by "נעליים" in both titles)
         $this->app->instance(SemanticSearch::class, $this->nearness(array_map('strval', range(402, 412)), ['401']));
-        $this->assertSame('401', array_column($this->similar('301')->json('products'), 'external_id')[11] ?? null);
+        $this->assertNotContains('401', array_column($this->similar('301')->json('products'), 'external_id'));
+        $this->assertCount(11, $this->similar('301')->json('products'));
 
         // how many: the shop's own number, or a group of results where it chose none
         Settings::set('search.similar_count', 4, $this->shop->id);

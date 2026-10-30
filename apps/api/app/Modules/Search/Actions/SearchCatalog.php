@@ -1177,7 +1177,12 @@ final class SearchCatalog
             // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
             // what it wants ("עם יהלום"): only kind made a striped, a floral and a denim shirt a brown overshirt's alike (Story)
             $ofKind = $ids;
-            $ids = $looksLead && ! $otherColour && ($wants['words'] ?? []) === [] ? self::seenAlike($product, $ids) : $ids;
+            // and only what its pictures found near: one its words alone found is at most "maybe these". A kid's sneaker
+            // was a man's boot's alike by "נעליים" and "נעלי" in their titles, and no picture near it (Chozen, 30.10)
+            if ($looksLead && ! $otherColour && ($wants['words'] ?? []) === []) {
+                $seen = array_flip([...$looks, ...$alike]);
+                $ids = self::seenAlike($product, array_values(array_filter($ids, fn (string $id): bool => isset($seen[$id]))));
+            }
             // what its look left out, as the store sells them now: never the product itself, and still all the question asked
             // and after them what is near its kind, not of it: "nothing quite like it, but maybe these" (jeans: trousers)
             $left = array_filter(array_map(fn (string $id): ?array => $id === $externalId ? null : ($index['records']['p:'.$id] ?? null), array_values(array_unique([...array_diff($ofKind, $ids), ...$near]))));

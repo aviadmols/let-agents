@@ -257,12 +257,18 @@ final class CatalogProductKinds implements ProductKinds
     {
         $said = self::saidAudiences($product);
 
+        // the young first: "נעלי ספורט ילדים יוניסקס" is a child's, for boys and girls, and was a man's boot's alike (Chozen, 30.10)
+        foreach (['babies', 'kids'] as $audience) {
+            if (isset($said[$audience])) {
+                return $audience;
+            }
+        }
+
         if (isset($said['unisex']) || (isset($said['women']) && isset($said['men']))) {
             return null;
         }
 
-        // the young are kids or babies; a store that says both of one product sells it to both
-        foreach (['babies', 'kids', 'women', 'men'] as $audience) {
+        foreach (['women', 'men'] as $audience) {
             if (isset($said[$audience])) {
                 return $audience;
             }
