@@ -48,7 +48,9 @@ final class SimilarController
         }
 
         // A bigger pool when the page will keep only some (the ones in a size that is gone here).
-        $limit = $request->has('limit') ? max(1, min(self::MAX_LIMIT, (int) $request->query('limit'))) : (int) Settings::get('search.results_per_group', $shopId);
+        // Else as many as the shop chose for its similar items (search.similar_count), or, where it chose none, as a group of results.
+        $limit = $request->has('limit') ? max(1, min(self::MAX_LIMIT, (int) $request->query('limit')))
+            : ((int) Settings::get('search.similar_count', $shopId) ?: (int) Settings::get('search.results_per_group', $shopId));
         // "colour=other": its alike in another colour or stone (a question asked on its page, "יש דומות בצבע אחר?")
         // "q": the question asked on its page, for what else it wants of them ("עם יהלום והרבה יותר יקרה"), read in code
         $asked = mb_substr(trim((string) $request->query('q', '')), 0, self::MAX_ASKED);

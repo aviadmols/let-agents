@@ -158,26 +158,57 @@ final class CatalogProductKinds implements ProductKinds
         // with one of them ("מכנסיים"): a lone "ג'ינס" beside them is still another kind
         $named = fn (string $h): bool => $h !== '' && ($counts['head'][$h] ?? 0) >= self::SUB_KIND_MIN;
         $read = $this->isRead($product);
-        $kept = [];
-        foreach ($externalIds as $id) {
-            $other = $others->get($id);
-            if ($other === null || ! self::sameAudience($audience, self::audience($other))) {
-                continue;
-            }
-            if ($marks !== [] && array_intersect($marks, self::allMarks($other, $prefixes)) === []) {
-                if ($nearBy !== [] && array_intersect($nearBy, self::allMarks($other, $prefixes)) !== [] && (string) $id !== (string) $product->external_id) {
-                    $near[] = $id;
+        $keep = function (array $marks, array $heads, bool $nearToo) use ($externalIds, $others, $audience, $prefixes, $nearBy, $product, $named, $read, &$near): array {
+            $kept = [];
+            foreach ($externalIds as $id) {
+                $other = $others->get($id);
+                if ($other === null || ! self::sameAudience($audience, self::audience($other))) {
+                    continue;
                 }
+                if ($marks !== [] && array_intersect($marks, self::allMarks($other, $prefixes)) === []) {
+                    if ($nearToo && $nearBy !== [] && array_intersect($nearBy, self::allMarks($other, $prefixes)) !== [] && (string) $id !== (string) $product->external_id) {
+                        $near[] = $id;
+                    }
 
-                continue;
-            }
-            $theirs = self::own($other, $prefixes)['head'];
-            if ($head !== '' && $theirs !== '' && $theirs !== $head && ! $read && ! $this->isRead($other) && ($named($head) || $named($theirs)) && (string) $id !== (string) $product->external_id) {
-                $near[] = $id;
+                    continue;
+                }
+                $theirs = self::own($other, $prefixes)['head'];
+                if ($heads !== [] && $theirs !== '' && ! in_array($theirs, $heads, true) && ! $read && ! $this->isRead($other)
+                    && ($named($heads[0]) || $named($theirs)) && (string) $id !== (string) $product->external_id) {
+                    if ($nearToo) {
+                        $near[] = $id;
+                    }
 
-                continue;
+                    continue;
+                }
+                $kept[] = $id;
             }
-            $kept[] = $id;
+
+            return $kept;
+        };
+        $kept = $keep($marks, $head !== '' ? [$head] : [], true);
+
+        // Few of its own kind: a narrower kind its store's own tags name it by is its kind too: one whose products the store
+        // files under its own kind as well (Chozen, 30.10: "פלדיום נעליים BAGGY" is tagged "מגפיים", and the boots are tagged
+        // "נעליים": a shoe tagged a boot is a boot; read as "נעליים" alone, the boots its pictures found first were another
+        // kind, and one sandal stood as its alike). Never a broader one: jeans tagged "מכנסיים" are not trousers, which no one
+        // tags "ג'ינס" (28.10). A product with enough of its own kind keeps to it.
+        $bases = fn (CatalogProduct $p): array => array_map(fn (string $t): string => self::base($t), self::own($p, $prefixes)['tags']);
+        $tagHeads = array_values(array_filter(array_unique(array_map(
+            fn (string $t): string => preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})$/u", $t) === 1 ? self::base($t) : '',
+            self::own($product, $prefixes)['tags'],
+        )), function (string $h) use ($head, $named, $others, $prefixes, $bases): bool {
+            if ($h === '' || $head === '' || $h === $head || ! $named($h)) {
+                return false;
+            }
+            $theirs = $others->filter(fn (CatalogProduct $o): bool => self::own($o, $prefixes)['head'] === $h);
+
+            return $theirs->isNotEmpty() && $theirs->filter(fn (CatalogProduct $o): bool => in_array($head, $bases($o), true))->count() * 2 >= $theirs->count();
+        }));
+        if ($tagHeads !== [] && count(array_diff($kept, [(string) $product->external_id])) < self::SUB_KIND_MIN) {
+            $wider = $keep([...$marks, ...array_map(fn (string $h): string => 'head:'.$h, $tagHeads)], $head !== '' ? [$head, ...$tagHeads] : $tagHeads, false);
+            $near = array_values(array_diff($near, $wider));
+            $kept = array_values(array_filter($externalIds, fn (string $id): bool => in_array($id, $kept, true) || in_array($id, $wider, true)));
         }
 
         // Of shoes, home slippers ("נעלי בית"), never running shoes ("נעלי ריצה") or flats ("נעלי בובה") (Chozen, 28.10):

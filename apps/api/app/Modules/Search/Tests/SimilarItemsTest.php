@@ -419,10 +419,10 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['picture' => 1, 'text' => 3], $this->asked, 'a sneaker: its picture asked, as the shop chose');
     }
 
-    public function test_where_the_shop_orders_photo_results_by_a_model_that_sees_them_its_alike_are_ordered_so_too(): void
+    public function test_the_alike_are_ordered_by_code_alone_even_where_a_model_orders_the_photo_results(): void
     {
-        // Rocks, 28.10: the same ring's alike and its photo's results differed, and the photo's looked more alike: the
-        // photo's were ordered by a model that sees them, the alike by code alone.
+        // Rocks, 28.10: a model that sees them ordered the alike as it orders a photo's results; it kept the shopper
+        // waiting seconds on every first look (Aviad, 30.10). The code and their nearness order them; no model is asked.
         Settings::set('search.similar_by', 'both', $this->shop->id);
         Settings::set('search.photo_rank_provider', 'anthropic');
         Settings::set('search.photo_rank_model', 'claude-haiku-5-5');
@@ -444,13 +444,122 @@ final class SimilarItemsTest extends TestCase
         };
         $this->app->instance(VisionModel::class, $vision);
 
-        $this->assertSame(['303', '302'], array_column($this->similar('301')->json('products'), 'external_id'), 'by code, until the shop turns the ordering on');
+        $this->assertSame(['303', '302'], array_column($this->similar('301')->json('products'), 'external_id'), 'by code');
         $this->assertSame(0, $vision->sheets);
 
         Features::override('search.photo_rank', true, $this->shop->id);
-        $this->assertSame(['302', '303'], array_column($this->similar('301')->json('products'), 'external_id'), 'as the model that saw them put them');
-        $this->similar('301')->assertOk();
-        $this->assertSame(1, $vision->sheets, 'asked once for the same picture and candidates');
+        $this->assertSame(['303', '302'], array_column($this->similar('301')->json('products'), 'external_id'), 'by code still, the photo ordering on');
+        $this->assertSame(0, $vision->sheets, 'no model asked, no picture fetched');
+        Http::assertNothingSent();
+    }
+
+    public function test_where_looks_lead_the_nearest_by_meaning_the_pictures_also_find_near_come_in_after_six(): void
+    {
+        // Rocks, 30.10: ring 34447's four nearest by its words (its picture's words among them) were 37th to 57th by
+        // picture, shot at a slant, and 24 by picture filled the list before them.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach (range(401, 412) as $id) {
+                CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish',
+                    'title' => "Ring {$id}", 'url' => "https://www.store.test/p/{$id}", 'image_url' => null, 'price' => '100', 'currency' => 'ILS',
+                    'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+            }
+            CatalogProduct::query()->whereIn('external_id', ['301', '302', '303'])->update(['removed_at' => now()]);
+            CatalogProduct::query()->where('external_id', '301')->update(['removed_at' => null, 'title' => 'Ring 301', 'in_stock' => true]);
+        });
+        $this->travel(2)->seconds();
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        // by picture: 402…412, then 401 (12th of them); by meaning: 401 first, then 412 (never near by picture? it is: 11th)
+        $looks = [...range(402, 412), 401];
+        $this->app->instance(SemanticSearch::class, $this->nearness(array_map('strval', $looks), ['401', '412']));
+        $this->assertSame(['402', '403', '404', '405', '406', '407', '401', '412', '408', '409', '410', '411'], array_column($this->similar('301')->json('products'), 'external_id'),
+            'six by picture, then the two its words and its picture agree on, then the rest by picture');
+
+        // one its words find first that its pictures do not find near at all stays where the meaning leaves it: after them
+        $this->app->instance(SemanticSearch::class, $this->nearness(array_map('strval', range(402, 412)), ['401']));
+        $this->assertSame('401', array_column($this->similar('301')->json('products'), 'external_id')[11] ?? null);
+
+        // how many: the shop's own number, or a group of results where it chose none
+        Settings::set('search.similar_count', 4, $this->shop->id);
+        $this->assertCount(4, $this->similar('301')->json('products'));
+        Settings::set('search.similar_count', 0, $this->shop->id);
+        Settings::set('search.results_per_group', 6, $this->shop->id);
+        $this->assertCount(6, $this->similar('301')->json('products'));
+    }
+
+    public function test_where_titles_open_with_the_brand_a_products_alike_are_of_its_kind_across_brands(): void
+    {
+        // Chozen, 30.10: the product was read without its brand, so "וג'ה סניקרס GT" was of the kind "וג'ה": its alike were
+        // its brand's few, a bag among them, and most products had none.
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->whereIn('external_id', ['301', '302', '303'])->update(['removed_at' => now()]);
+            foreach ([
+                '501' => ["וג'ה סניקרס GT SUEDE לנשים", 'VEJA'], '502' => ["וג'ה סניקרס V-10 לנשים", 'VEJA'], '503' => ["וג'ה תיק צד לנשים", 'VEJA'],
+                '504' => ['אדידס סניקרס SAMBA לנשים', 'ADIDAS'], '505' => ['אדידס סניקרס GAZELLE לנשים', 'ADIDAS'], '506' => ['אדידס חולצה לנשים', 'ADIDAS'],
+                '507' => ['דזיגואל תיק גב לנשים', 'DESIGUAL'], '508' => ['דזיגואל חולצה לנשים', 'DESIGUAL'],
+            ] as $id => [$title, $brand]) {
+                CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'brand' => $brand,
+                    'url' => "https://www.store.test/p/{$id}", 'image_url' => null, 'price' => '100', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+            }
+        });
+        $this->travel(2)->seconds();
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->app->instance(SemanticSearch::class, $this->nearness(['502', '503', '504', '506', '505', '507', '508'], []));
+
+        $this->assertEqualsCanonicalizing(['502', '504', '505'], array_column($this->similar('501')->json('products'), 'external_id'), 'the sneakers of every brand, not its brand\'s bag');
+    }
+
+    /**
+     * Stored nearness as given: by picture in $looks' order, by meaning in $means'.
+     *
+     * @param  list<string>  $looks
+     * @param  list<string>  $means
+     */
+    private function nearness(array $looks, array $means): SemanticSearch
+    {
+        return new class($looks, $means) implements SemanticSearch
+        {
+            public function __construct(private readonly array $looks, private readonly array $means) {}
+
+            public function similarTo(string $source, string $sourceId, array $sources, int $limit): array
+            {
+                return array_map(fn (string $id): array => ['source' => 'product', 'source_id' => 'x'.$id, 'external_id' => $id, 'title' => 'Ring '.$id, 'similarity' => 0.8], $this->means);
+            }
+
+            public function nearText(string $shopId, string $text, array $sources, int $limit): array
+            {
+                return [];
+            }
+
+            public function lookAlike(string $productId, int $limit): array
+            {
+                return array_map(fn (string $id): array => ['product_id' => 'x'.$id, 'external_id' => $id, 'title' => 'Ring '.$id, 'similarity' => 0.9], $this->looks);
+            }
+
+            public function picturesNearText(string $shopId, string $text, int $limit): array
+            {
+                return [];
+            }
+
+            public function picturesNearPhoto(string $shopId, string $mime, string $bytes, int $limit): array
+            {
+                return [];
+            }
+
+            public function picturesReady(): bool
+            {
+                return true;
+            }
+
+            public function ready(): bool
+            {
+                return true;
+            }
+        };
     }
 
     public function test_the_shop_chooses_similar_items_by_content_or_by_picture(): void

@@ -182,6 +182,33 @@ final class ProductKindsTest extends TestCase
         });
     }
 
+    public function test_a_shoe_the_store_tags_a_boot_is_like_its_boots_where_the_boots_are_filed_as_shoes(): void
+    {
+        // Chozen, 30.10: "פלדיום נעליים BAGGY לגברים" is tagged "מגפיים"; read as "נעליים" alone its boots were another kind,
+        // and a sandal stood as its alike. The boots are tagged "נעליים" too: the store files boots under shoes.
+        $shop = Shop::factory()->create();
+        $p = app(TenantContext::class)->run($shop->id, fn (): array => array_map(fn (array $x): CatalogProduct => CatalogProduct::query()->create([
+            'shop_id' => $shop->id, 'external_id' => $x[0], 'type' => 'simple', 'status' => 'publish', 'title' => $x[1], 'brand' => $x[2],
+            'url' => 'https://www.store.test/p/'.$x[0], 'in_stock' => true, 'purchasable' => true, 'hash' => 'h'.$x[0], 'price' => 100,
+            'payload' => ['tags' => $x[3]],
+        ]), [
+            ['1', 'פלדיום נעליים BAGGY לגברים', 'PALLADIUM', ['גברים/יוניסקס', 'מגפיים', 'נעליים']],
+            ['2', 'פלדיום מגפיים PAMPA HI לגברים', 'PALLADIUM', ['גברים/יוניסקס', 'מגפיים', 'נעליים']],
+            ['3', 'פלדיום מגפיים PAMPA LITE לגברים', 'PALLADIUM', ['גברים/יוניסקס', 'מגפיים', 'נעליים']],
+            ['4', 'פלדיום מגפיים PAMPA ZIP לגברים', 'PALLADIUM', ['גברים/יוניסקס', 'מגפיים', 'נעליים']],
+            ['5', 'הוקה סנדלים Infini Hike לגברים', 'HOKA', ['גברים/יוניסקס', 'סנדלים', 'נעליים']],
+            ['6', 'הוקה סנדלים Hopara לגברים', 'HOKA', ['גברים/יוניסקס', 'סנדלים', 'נעליים']],
+            ['7', 'פלדיום נעליים PAMPA OX לגברים', 'PALLADIUM', ['גברים/יוניסקס', 'סניקרס', 'נעליים']],
+            ['8', 'פלדיום מגפיים BAGGY לנשים', 'PALLADIUM', ['נשים', 'מגפיים', 'נעליים']],
+        ]));
+
+        app(TenantContext::class)->run($shop->id, function (): void {
+            $kinds = app(ProductKinds::class);
+            $boot = CatalogProduct::query()->where('external_id', '1')->first();
+            $this->assertSame(['2', '3', '4', '7'], $kinds->sameKind($boot, ['2', '5', '3', '6', '4', '7', '8']), 'the boots, and the other shoe; never the sandals, nor a woman\'s');
+        });
+    }
+
     public function test_a_books_title_opens_with_its_own_words_which_name_no_kind(): void
     {
         // Sela Meir, 28.10: "מפגש עם עצמי בגיהינום" had three alike ("ח"כ במשמרת לילה", "12 כללים לחיים") and the other

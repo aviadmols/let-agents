@@ -27,7 +27,6 @@ use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\Patterns;
 use App\Modules\Search\Support\PhotoLook;
 use App\Modules\Search\Support\PhotoPlacer;
-use App\Modules\Search\Support\RankSheet;
 use App\Modules\Search\Support\SearchTrace;
 use App\Modules\Search\Support\SimilarWants;
 use App\Modules\Search\Support\WordMeanings;
@@ -153,6 +152,15 @@ final class SearchCatalog
 
     /** How much the tags a product shares count beside the meaning and the picture, in the similar products. */
     private const TAG_SHARE = 2.0;
+
+    /** Where looks lead the similar products: the nearest this many by meaning... */
+    private const AGREE_MEANS = 6;
+
+    /** ...that are among the nearest this many by picture... */
+    private const AGREE_LOOKS = 60;
+
+    /** ...come in after this many of the pictures' own. */
+    private const AGREE_AFTER = 6;
 
     /** The kinds of article that grow old (models, prices, what is new); a how-to guide does not. */
     private const AGEING_KINDS = ['news', 'product_review', 'buying_guide'];
@@ -1099,7 +1107,9 @@ final class SearchCatalog
 
         return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit, $otherColour, $wants, &$others): array {
             $index = LoadedIndex::for($shopId);
-            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->with('categories:id,name')->first(['id', 'shop_id', 'external_id', 'title', 'payload']);
+            // its brand too: a title that opens with it says what the product is after it (ProductKinds); read without it,
+            // "וג'ה סניקרס" was of the kind "וג'ה", and a sneaker's alike were its brand's few (Chozen, 30.10)
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->with('categories:id,name')->first(['id', 'shop_id', 'external_id', 'title', 'brand', 'payload']);
 
             if ($index === null || $product === null || $limit < 1) {
                 return [];
@@ -1140,6 +1150,15 @@ final class SearchCatalog
             $looksLead = $by !== 'meaning' && $looks !== [];
             if ($looksLead) {
                 $ids = array_values(array_unique([...$looks, ...$ids]));
+                // where its words and its picture agree: the nearest by meaning (which reads its picture's words too) that
+                // the pictures also find near come in after the first of the pictures', not after all of them (Rocks, 30.10:
+                // the four rings its words found first were 37th to 57th by picture, shot at a slant, and never shown)
+                $nearLook = array_flip(array_slice($looks, 0, self::AGREE_LOOKS));
+                $agreed = array_values(array_filter(array_slice($means, 0, self::AGREE_MEANS), fn (string $id): bool => isset($nearLook[$id]) && $id !== $externalId));
+                if ($agreed !== []) {
+                    $rest = array_values(array_diff($ids, $agreed));
+                    $ids = [...array_slice($rest, 0, self::AGREE_AFTER), ...$agreed, ...array_slice($rest, self::AGREE_AFTER)];
+                }
             }
             // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
@@ -1205,16 +1224,10 @@ final class SearchCatalog
             $records = $own === null || ! $colours ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
+            // In the order the code and their nearness gave, with no model: one that ordered them by their pictures (Rocks,
+            // 28.10) kept the shopper waiting seconds on every first look (Aviad, 30.10). A photo's own search still asks it.
             $products = array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
 
-            // Where the shop orders its photo results by a model that sees them (search.photo_rank), its alike are
-            // ordered so too, its own picture above them: what a shopper sees as alike is what the model sees, in the
-            // store's search by photo and beside a product the same (Rocks, 28.10: the same ring's alike and its photo's
-            // results differed, and the photo's looked more alike). Asked once per picture and candidates, kept 30 days.
-            if ($looksLead && ! $otherColour && $wants === null && count($products) >= 2 && Features::enabled('search.photo_rank', $shopId) && RankPhotoResults::available()
-                && ($photo = RankSheet::photo((string) ($own['img'] ?? ''))) !== null) {
-                $products = $this->ranker->handle($shopId, $photo, null, $products);
-            }
             // what the team put together with it stays first, whatever the pictures or the colours said
             if ($alike !== []) {
                 $first = array_flip($alike);

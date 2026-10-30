@@ -861,6 +861,15 @@
             "scope": "shop"
         },
         {
+            "name": "similar_count",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 24,
+            "scope": "shop",
+            "unit": "results"
+        },
+        {
             "name": "not_sure_max",
             "type": "int",
             "default": 6,

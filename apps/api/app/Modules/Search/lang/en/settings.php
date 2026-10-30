@@ -311,6 +311,10 @@ return [
         'description' => 'By content (name, description and specs), by picture, or both together. Where different products look alike (books, bundles), by content is better.',
         'options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
     ],
+    'similar_count' => [
+        'label' => 'How many "similar items"',
+        'description' => 'How many similar products show beside a product, up to 24. 0: as many as each group of results.',
+    ],
     'not_sure_max' => [
         'label' => '"Not sure what fits?" up to this many results',
         'description' => 'The button shows only when the search found a few results (or the shopper narrowed them with the filters), and the AI gets only those: a long list is too much to recommend from well.',

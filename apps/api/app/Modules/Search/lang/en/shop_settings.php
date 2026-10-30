@@ -43,6 +43,8 @@ return [
         'similar_by' => 'Similar items by',
         'similar_by_sub' => 'Where different covers look alike (books, bundles), by content is better',
         'similar_by_options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
+        'similar_count' => 'How many similar items',
+        'similar_count_tip' => 'Up to 24. 0: as many as each group of results.',
         'price' => 'Price on every product',
         'cart' => '"Add to cart" button',
         'cart_sub' => 'Opens the theme\'s cart, with a variant choice when needed',
