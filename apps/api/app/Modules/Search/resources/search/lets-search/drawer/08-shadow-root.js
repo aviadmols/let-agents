@@ -88,13 +88,19 @@
   // On a phone the whole layer covers exactly what can be seen: with the keyboard up that is the visual
   // viewport, from its own top. innerHeight is never mixed in: on iOS it disagrees with the fixed layer
   // once the keyboard is up, and the sheet was pushed up and cut.
+  // The search field is at the sheet's top, above any keyboard: typed in, the sheet keeps its height and the keyboard
+  // covers its foot, only following where the phone scrolled what is seen. Fitted to the keyboard, the whole sheet
+  // shrank under the shopper's first letter (Aviad, 30.10). A field lower down (a reply) still has it fit above.
+  // Both as they were before the keyboard: a site that has its page resized by the keyboard shrinks "100svh" too.
+  var fullH = 0, sheetH = 0;
   function fitViewport() {
     var a = root.activeElement, typing = !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName);
-    var vv = win.visualViewport, phone = isPhone() && vv && typing;
+    var vv = win.visualViewport, phone = isPhone() && vv && typing, keep = phone && a === INPUT && fullH > 0 && sheetH > 0;
     R.style.top = phone ? vv.offsetTop + 'px' : '';
-    R.style.height = phone ? vv.height + 'px' : '';
+    R.style.height = keep ? fullH + 'px' : phone ? vv.height + 'px' : '';
     R.style.bottom = phone ? 'auto' : '';
+    if (!phone) { fullH = R.offsetHeight || fullH; sheetH = D.offsetHeight || sheetH; }
     // otherwise the sheet keeps the small viewport's height (CSS): the same whether the toolbar is in or out
-    if (phone) { D.style.setProperty('--ls-vh', vv.height + 'px'); } else { D.style.removeProperty('--ls-vh'); }
+    if (phone) { D.style.setProperty('--ls-vh', (keep ? sheetH + 8 : vv.height) + 'px'); } else { D.style.removeProperty('--ls-vh'); }
   }
 
