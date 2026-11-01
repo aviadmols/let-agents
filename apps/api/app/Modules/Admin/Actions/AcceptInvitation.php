@@ -26,7 +26,10 @@ final class AcceptInvitation
                     'password' => (string) $password,
                     'locale' => $invitation->locale,
                 ]);
-                $user->forceFill(['email_verified_at' => now()])->save();
+                // proven only by a link that reached that inbox; one handed over by the inviter proves nothing of it
+                if ($invitation->mailed_at !== null) {
+                    $user->forceFill(['email_verified_at' => now()])->save();
+                }
             }
 
             /** @var Shop $shop */

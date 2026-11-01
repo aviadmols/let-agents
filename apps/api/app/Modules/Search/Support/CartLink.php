@@ -2,11 +2,11 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Core\Http\OutboundUrl;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -206,8 +206,11 @@ final class CartLink
 
         return (array) Cache::remember('cart:checkout-link:v2:'.hash('sha256', $base), self::PROBE_SECONDS, function () use ($base): array {
             try {
-                $response = Http::withoutRedirecting()->timeout(6)->connectTimeout(3)->get($base.'/checkout-link/');
+                $response = OutboundUrl::request($base.'/checkout-link/')?->withoutRedirecting()->timeout(6)->connectTimeout(3)->get($base.'/checkout-link/');
             } catch (Throwable) {
+                return ['takes' => false, 'cart' => null];
+            }
+            if ($response === null) {
                 return ['takes' => false, 'cart' => null];
             }
 
@@ -227,7 +230,7 @@ final class CartLink
         }
 
         try {
-            $json = Http::timeout(8)->acceptJson()->get(rtrim($product->url, '/').'.js')->json();
+            $json = OutboundUrl::request(rtrim($product->url, '/').'.js')?->timeout(8)->acceptJson()->get(rtrim($product->url, '/').'.js')->json();
         } catch (Throwable) {
             return null;
         }

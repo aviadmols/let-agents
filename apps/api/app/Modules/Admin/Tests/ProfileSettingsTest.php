@@ -5,12 +5,15 @@ namespace App\Modules\Admin\Tests;
 use App\Modules\Admin\Contracts\PanelHost;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
+use App\Modules\Admin\Mail\EmailChangeMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -41,6 +44,8 @@ final class ProfileSettingsTest extends TestCase
 
     public function test_the_profile_saves_name_email_language_and_display_mode(): void
     {
+        Mail::fake();
+        config(['mail.default' => 'smtp']);
         // Even a viewer changes their own profile.
         Livewire::test(ProfileSettings::class)
             ->assertSee('הפרופיל שלי')
@@ -50,14 +55,26 @@ final class ProfileSettingsTest extends TestCase
             ->assertSet('data.name', 'אביעד')
             ->assertSet('data.theme', 'system')
             ->set('data.name', 'אביעד מולס')
-            ->set('data.email', 'Aviad@Lets.co.il')
+            ->set('data.email', 'Aviad@Moles.example')
             ->set('data.theme', 'dark')
             ->call('save')
             ->assertNotified('נשמר');
 
+        // A new email is the account's only once its inbox opens the link sent there.
         $me = $this->me->fresh();
         $this->assertSame('אביעד מולס', $me?->name);
-        $this->assertSame('aviad@lets.co.il', $me?->email);
+        $this->assertSame('aviad@example.com', $me?->email, 'not by typing it');
+        $sent = null;
+        Mail::assertSent(EmailChangeMail::class, function (EmailChangeMail $mail) use (&$sent): bool {
+            $sent = $mail->link;
+
+            return $mail->hasTo('aviad@moles.example');
+        });
+        auth()->logout();
+        $this->get((string) $sent)->assertRedirect('/merchant');
+        $me = $this->me->fresh();
+        $this->assertSame('aviad@moles.example', $me?->email);
+        $this->actingAs($this->me);
         $this->assertSame('dark', $me?->theme);
         $this->assertTrue(Hash::check('old-password', (string) $me?->password), 'no password typed, none changed');
 
@@ -112,9 +129,47 @@ final class ProfileSettingsTest extends TestCase
         $page->set('data.theme', 'dark')->call('save')->assertNotified('Saved');
         $this->assertSame(['lets-sell-book', 'owner@lets-sell-book.myshopify.com', 'dark'], [$own->fresh()?->name, $own->fresh()?->email, $own->fresh()?->theme]);
 
-        // Their own, once given, is theirs and shown.
+        // Their own, once given and confirmed from its inbox, is theirs and shown.
+        Mail::fake();
+        config(['mail.default' => 'smtp']);
         $page->set('data.name', 'Dana Gueta')->set('data.email', 'dana@example.com')->call('save');
+        $this->assertSame('owner@lets-sell-book.myshopify.com', $own->fresh()?->email);
+        $link = null;
+        Mail::assertSent(EmailChangeMail::class, function (EmailChangeMail $mail) use (&$link): bool {
+            $link = $mail->link;
+
+            return $mail->hasTo('dana@example.com');
+        });
+        $this->get((string) $link)->assertRedirect('/merchant');
+        $this->assertSame('dana@example.com', $own->fresh()?->email);
+        $this->actingAs($own->fresh());
         Livewire::test(ProfileSettings::class)->assertSet('data.name', 'Dana Gueta')->assertSet('data.email', 'dana@example.com')->assertDontSee('Add your name');
+    }
+
+    /**
+     * 1.11: a merchant who typed a store's future address into their own profile (store@{site key}.wordpress, the store's
+     * Shopify email, the team's domain) became that store's owner, or an operator, when it came. An address is never taken
+     * by typing it, the platform's own addresses never at all, and a link for another account's address changes nothing.
+     */
+    public function test_an_address_is_never_taken_by_typing_it(): void
+    {
+        Mail::fake();
+        config(['mail.default' => 'smtp']);
+        foreach (['store@0123456789abcdef01234567.wordpress', 'owner@victim.myshopify.com', 'design+x@design.lets.co.il', 'boss@lets.co.il'] as $reserved) {
+            Livewire::test(ProfileSettings::class)->set('data.email', $reserved)->call('save')->assertSee('הכתובת הזאת שייכת למערכת, ולא יכולה להיות של חשבון.');
+        }
+        Mail::assertNothingSent();
+        $this->assertSame('aviad@example.com', $this->me->fresh()?->email);
+
+        // No mail can be sent: no change at all
+        config(['mail.default' => 'log']);
+        Livewire::test(ProfileSettings::class)->set('data.email', 'aviad@other.example')->call('save')->assertSee('לא הצלחנו לשלוח קישור אישור לכתובת הזאת. נסו שוב מאוחר יותר.');
+        $this->assertSame('aviad@example.com', $this->me->fresh()?->email);
+
+        // A tampered link (another address, the same signature) is refused
+        $link = URL::temporarySignedRoute('admin.email.confirm', now()->addDay(), ['user' => $this->me->id, 'email' => 'aviad@other.example']);
+        $this->get(str_replace('aviad%40other.example', 'owner%40victim.myshopify.com', $link))->assertForbidden();
+        $this->assertSame('aviad@example.com', $this->me->fresh()?->email);
     }
 
     public function test_an_email_of_someone_else_is_refused(): void

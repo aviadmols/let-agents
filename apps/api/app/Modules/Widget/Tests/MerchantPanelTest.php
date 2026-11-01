@@ -15,6 +15,7 @@ use App\Modules\Shoppers\Filament\Merchant\Pages\ShopSignUps;
 use App\Modules\Shoppers\Models\ShopperIdentity;
 use App\Modules\Tenancy\Models\Shop;
 use App\Modules\Widget\Filament\Merchant\Pages\ProductPage;
+use App\Modules\Widget\Models\WidgetCuration;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -123,6 +124,12 @@ final class MerchantPanelTest extends TestCase
         // Even pointed at the other shop and its product, the screen stays on this shop.
         $page->set('shop', $this->theirs->id)->set('id', '10');
         $this->assertSame($this->mine->id, $page->instance()->shop);
+
+        // 1.11: a method that names another shop (pick, its id public in the page bank's JSON) never moves the screen
+        // there, and nothing written after it in the same request lands in that shop
+        $page->call('pick', $this->theirs->id, 'product', '10')->assertDontSee('מדף אורן שלהם')->assertSee('מדף אורן שלי')->call('pin', 'related');
+        $this->assertSame($this->mine->id, $page->instance()->shop);
+        $this->assertSame(0, app(TenantContext::class)->run($this->theirs->id, fn (): int => WidgetCuration::query()->count()), 'the other shop untouched');
     }
 
     public function test_the_panel_says_whose_shop_it_is_on_every_page(): void

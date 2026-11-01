@@ -118,7 +118,7 @@
             <div class="rec-tabs" role="tablist">
                 <button type="button" class="rec-tab" :class="kind === 'all' && 'is-on'" @click="kind = 'all'">{{ __('improvement::ui.list.all') }} (<span x-text="counts[state].all">{{ $counts['pending']['all'] }}</span>)</button>
                 @foreach ($kinds as $k)
-                    <button type="button" class="rec-tab" :class="kind === '{{ $k }}' && 'is-on'" @click="kind = '{{ $k }}'">{{ __("improvement::ui.list.tabs.{$k}") }} (<span x-text="counts[state]['{{ $k }}']">{{ $counts['pending'][$k] }}</span>)</button>
+                    <button type="button" class="rec-tab" :class="kind === '{{ $k }}' && 'is-on'" @click="kind = @js($k)">{{ __("improvement::ui.list.tabs.{$k}") }} (<span x-text="counts[state]['{{ $k }}']">{{ $counts['pending'][$k] }}</span>)</button>
                 @endforeach
             </div>
 
@@ -150,7 +150,7 @@
                     @php($p = $r['p'])
                     <div class="rec-row" data-row data-id="{{ $p->id }}" data-proposal="{{ $p->kind }}" data-kind="{{ $p->kind }}" data-state="{{ $r['open'] ? 'pending' : 'decided' }}" data-prio="{{ $r['priority'] }}"
                         data-text="{{ mb_strtolower($p->title.' '.$r['summary'].' '.implode(' ', array_column($r['evidence'], 'text'))) }}"
-                        x-show="shows($el)" @if (! $r['open']) style="display:none" @endif @click="show('{{ $p->id }}')" wire:key="row-{{ $p->id }}">
+                        x-show="shows($el)" @if (! $r['open']) style="display:none" @endif @click="show(@js($p->id))" wire:key="row-{{ $p->id }}">
                         <div style="min-width:0">
                             <div class="rec-title">{{ $p->title }}</div>
                             @if ($r['summary'] !== '' && $r['summary'] !== $p->title)<div class="rec-sub">{{ $r['summary'] }}</div>@endif
@@ -159,13 +159,13 @@
                             @if ($r['open'] && $this->drafting($p->id))
                                 <span style="{{ $small }}" wire:poll.5s>{{ __('improvement::ui.list.writing') }}</span>
                             @elseif ($r['open'] && $p->kind === 'content_gap' && $p->post === null && $quota['left'] > 0)
-                                <button type="button" class="rec-act is-ai" @click.stop wire:click="draftPost('{{ $p->id }}')">✦ {{ __('improvement::ui.post.write') }}</button>
+                                <button type="button" class="rec-act is-ai" @click.stop wire:click="draftPost(@js($p->id))">✦ {{ __('improvement::ui.post.write') }}</button>
                             @elseif ($r['open'] && $p->kind === 'faq' && ! isset($p->detail['ai']))
-                                <button type="button" class="rec-act is-ai" @click.stop wire:click="draftAnswer('{{ $p->id }}')">✦ {{ __('improvement::ui.answer.write') }}</button>
+                                <button type="button" class="rec-act is-ai" @click.stop wire:click="draftAnswer(@js($p->id))">✦ {{ __('improvement::ui.answer.write') }}</button>
                             @elseif ($r['open'])
-                                <button type="button" class="rec-act" @click.stop="show('{{ $p->id }}', 'content')">{{ __('improvement::ui.list.review') }}</button>
+                                <button type="button" class="rec-act" @click.stop="show(@js($p->id), 'content')">{{ __('improvement::ui.list.review') }}</button>
                             @elseif ($p->status === 'applied')
-                                <button type="button" class="rec-act" @click.stop="show('{{ $p->id }}', 'impact')">{{ __('improvement::ui.list.track') }}</button>
+                                <button type="button" class="rec-act" @click.stop="show(@js($p->id), 'impact')">{{ __('improvement::ui.list.track') }}</button>
                             @else
                                 <span style="{{ $small }}">{{ __("improvement::ui.statuses.{$p->status}") }}</span>
                             @endif
@@ -196,20 +196,20 @@
                     </div>
                     <div class="rec-panel__tabs">
                         @foreach (['rec', 'content', 'impact'] as $tab)
-                            <button type="button" class="rec-panel__tab" :class="tab === '{{ $tab }}' && 'is-on'" @click="tab = '{{ $tab }}'">{{ __("improvement::ui.list.panel_tabs.{$tab}") }}</button>
+                            <button type="button" class="rec-panel__tab" :class="tab === '{{ $tab }}' && 'is-on'" @click="tab = @js($tab)">{{ __("improvement::ui.list.panel_tabs.{$tab}") }}</button>
                         @endforeach
                         <div class="rec-status" data-s="{{ $p->status }}" @click.outside="menu = false">
                             <button type="button" @click="menu = ! menu"><i></i>{{ __("improvement::ui.statuses.{$p->status}") }} ▾</button>
                             <div class="rec-menu" x-show="menu" x-cloak>
                                 @if ($r['open'])
                                     @if (! ($p->kind === 'content_gap' && $p->post === null))
-                                        <button type="button" wire:click="approve('{{ $p->id }}')" @click="menu = false">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
+                                        <button type="button" wire:click="approve(@js($p->id))" @click="menu = false">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
                                     @else
                                         <button type="button" @click="tab = 'content'; menu = false">{{ __('improvement::ui.post.write') }}</button>
                                     @endif
-                                    <button type="button" wire:click="reject('{{ $p->id }}')" @click="menu = false">{{ __('improvement::ui.reject') }}</button>
+                                    <button type="button" wire:click="reject(@js($p->id))" @click="menu = false">{{ __('improvement::ui.reject') }}</button>
                                 @elseif ($p->status === 'applied' && $p->kind !== 'synonym')
-                                    <button type="button" wire:click="reject('{{ $p->id }}')" @click="menu = false">{{ __('improvement::ui.take_down') }}</button>
+                                    <button type="button" wire:click="reject(@js($p->id))" @click="menu = false">{{ __('improvement::ui.take_down') }}</button>
                                 @else
                                     <span style="{{ $small }};padding:8px 10px">{{ $p->decided_at?->format('d.m.Y') }}</span>
                                 @endif
@@ -360,10 +360,10 @@
                                                 <span style="{{ $chip }}" wire:poll.5s>{{ __('improvement::ui.post.sending') }}</span>
                                             @elseif (($remote['status'] ?? null) === 'draft')
                                                 <a href="{{ $remote['admin_url'] ?? $remote['url'] }}" target="_blank" rel="noopener" style="{{ $chip }}" data-remote>{{ __('improvement::ui.post.on_store') }} ↗</a>
-                                                <button type="button" wire:click="resendPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.resend') }}</button>
+                                                <button type="button" wire:click="resendPost(@js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.post.resend') }}</button>
                                             @elseif (($remote['status'] ?? null) === 'failed')
                                                 <span style="{{ $chip }};background:rgba(235,104,52,.15)" data-remote-failed>{{ __('connections::runs.failures.'.($remote['error'] ?? 'http_error'), ['status' => 0]) }}</span>
-                                                <button type="button" wire:click="resendPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.retry') }}</button>
+                                                <button type="button" wire:click="resendPost(@js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.post.retry') }}</button>
                                             @endif
                                         </div>
                                     @endif
@@ -375,27 +375,27 @@
                                     @if ($p->kind === 'content_gap' && $p->post === null)
                                         @unless ($this->drafting($p->id))
                                             @if ($quota['left'] > 0)
-                                                <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $dark }}">{{ __('improvement::ui.post.write') }}</button>
+                                                <button type="button" wire:click="draftPost(@js($p->id))" style="{{ $dark }}">{{ __('improvement::ui.post.write') }}</button>
                                             @else
                                                 <span style="{{ $small }}">{{ __('improvement::ui.post.cap_reached') }}</span>
                                             @endif
                                         @endunless
                                     @else
-                                        <button type="button" wire:click="approve('{{ $p->id }}')" style="{{ $dark }}">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
+                                        <button type="button" wire:click="approve(@js($p->id))" style="{{ $dark }}">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
                                         @if ($p->kind === 'faq' && ! $this->drafting($p->id))
-                                            <button type="button" wire:click="draftAnswer('{{ $p->id }}')" style="{{ $btn }}">{{ __(isset($p->detail['ai']) ? 'improvement::ui.answer.rewrite' : 'improvement::ui.answer.write') }}</button>
+                                            <button type="button" wire:click="draftAnswer(@js($p->id))" style="{{ $btn }}">{{ __(isset($p->detail['ai']) ? 'improvement::ui.answer.rewrite' : 'improvement::ui.answer.write') }}</button>
                                         @endif
                                         @if ($p->kind === 'faq' && ! isset($p->detail['post_proposal_id']) && $quota['left'] > 0)
-                                            <button type="button" wire:click="postFromQuestion('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.from_question') }}</button>
+                                            <button type="button" wire:click="postFromQuestion(@js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.post.from_question') }}</button>
                                         @endif
                                         @if ($p->kind === 'content_gap' && ! $this->drafting($p->id) && $quota['left'] > 0)
-                                            <button type="button" wire:click="draftPost('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.post.rewrite') }}</button>
+                                            <button type="button" wire:click="draftPost(@js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.post.rewrite') }}</button>
                                         @endif
                                     @endif
-                                    <button type="button" wire:click="reject('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.reject') }}</button>
+                                    <button type="button" wire:click="reject(@js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.reject') }}</button>
                                 </div>
                             @elseif ($p->status === 'applied' && $p->kind !== 'synonym')
-                                <div><button type="button" wire:click="reject('{{ $p->id }}')" style="{{ $btn }}">{{ __('improvement::ui.take_down') }}</button></div>
+                                <div><button type="button" wire:click="reject(@js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.take_down') }}</button></div>
                             @endif
                         </div></div>
 

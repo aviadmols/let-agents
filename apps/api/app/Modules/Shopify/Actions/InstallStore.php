@@ -171,12 +171,22 @@ final class InstallStore
             return;
         }
 
-        $user = User::query()->where('email', $install->owner_email)->first() ?? User::query()->create([
-            'email' => $install->owner_email,
-            'name' => $this->ownerName($install) ?? $shop->name,
-            'password' => Str::random(40),
-        ]);
-        $user->attachShop($shop, ShopRole::Owner);
+        // An account found by the store's email is its owner only when that address is proven the account's (its inbox
+        // confirmed it, an invitation reached it, or the team made it): one a merchant merely typed into their profile
+        // would have made them the owner of a store not yet theirs (1.11). Otherwise the store's own account stands in.
+        $user = User::query()->where('email', $install->owner_email)->first();
+        if ($user === null) {
+            $user = User::query()->create([
+                'email' => $install->owner_email,
+                'name' => $this->ownerName($install) ?? $shop->name,
+                'password' => Str::random(40),
+            ]);
+            // Shopify's own account email for the store: the platform's word for it
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
+        if (! $user->is_operator && $user->email_verified_at !== null) {
+            $user->attachShop($shop, ShopRole::Owner);
+        }
         $this->manager($install);
     }
 
@@ -218,7 +228,9 @@ final class InstallStore
 
         $owner = $this->ownerAccount($install);
 
-        if ($owner !== null || $install->owner_email === null || ! User::query()->where('email', $install->owner_email)->where('is_operator', true)->exists()) {
+        // the store's own account stands in where the account of its email is an operator's, or was never proven
+        if ($owner !== null || $install->owner_email === null || ! User::query()->where('email', $install->owner_email)
+            ->where(fn ($q) => $q->where('is_operator', true)->orWhereNull('email_verified_at'))->exists()) {
             return $owner;
         }
 

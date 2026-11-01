@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Admin\Http\Controllers\ConfirmEmailController;
 use App\Modules\Admin\Http\Controllers\DesignPassController;
 use App\Modules\Admin\Http\Controllers\ExportShopDataController;
 use App\Modules\Admin\Http\Controllers\HomeController;
@@ -18,6 +19,9 @@ Route::post('admin/shop', SwitchShopController::class)->middleware(['web', 'auth
 
 // The display mode chosen in the top bar, kept on the person.
 Route::post('admin/theme/{theme}', SwitchThemeController::class)->middleware(['web', 'auth'])->name('admin.theme');
+
+// A new email, confirmed from its inbox (a signed link, a day): only then the account's (ProfileSettings).
+Route::get('account/email/{user}', ConfirmEmailController::class)->middleware(['web', 'signed', 'throttle:20,1'])->name('admin.email.confirm');
 
 // Everything a shop holds, as one ZIP, for its owner (Settings · Privacy and account).
 Route::get('account/{shop}/export', ExportShopDataController::class)->middleware(['web', 'auth', 'throttle:6,10'])->name('admin.privacy.export');

@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Actions;
 
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\RepeatedText;
@@ -14,7 +15,6 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -426,8 +426,11 @@ final class BuildShopKnowledge
             usleep(app()->runningUnitTests() ? 0 : $wait * 1000);
 
             try {
-                $response = Http::timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
+                $response = OutboundUrl::request($url)?->timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
             } catch (Throwable) {
+                return null;
+            }
+            if ($response === null) {
                 return null;
             }
 

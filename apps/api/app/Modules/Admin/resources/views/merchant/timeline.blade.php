@@ -11,7 +11,7 @@
             <button type="button" wire:click="pick('')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->kind === ''])>{{ $t('all') }}</button>
             @foreach (\App\Modules\Admin\Filament\Merchant\Pages\ShopTimeline::KINDS as $k)
                 @if ($counts[$k] > 0)
-                    <button type="button" wire:click="pick('{{ $k }}')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->kind === $k]) data-kind="{{ $k }}">{{ $t('kinds.'.$k) }}</button>
+                    <button type="button" wire:click="pick(@js($k))" @class(['lp-chip lp-chip-sm', 'is-on' => $this->kind === $k]) data-kind="{{ $k }}">{{ $t('kinds.'.$k) }}</button>
                 @endif
             @endforeach
         </div>

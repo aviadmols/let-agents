@@ -40,7 +40,7 @@
                     <span class="lp-note">{{ $t('store.chart.'.$this->measure) }}</span>
                     <div class="lp-tabs lp-tabs-sm" role="tablist" aria-label="{{ $t('store.chart.choose') }}">
                         @foreach ($page::MEASURES as $measure)
-                            <button type="button" role="tab" wire:click="measure('{{ $measure }}')" aria-selected="{{ $this->measure === $measure ? 'true' : 'false' }}" @class(['is-on' => $this->measure === $measure])>{{ $t('store.chart.tabs.'.$measure) }}</button>
+                            <button type="button" role="tab" wire:click="measure(@js($measure))" aria-selected="{{ $this->measure === $measure ? 'true' : 'false' }}" @class(['is-on' => $this->measure === $measure])>{{ $t('store.chart.tabs.'.$measure) }}</button>
                         @endforeach
                     </div>
                 </div>
@@ -101,7 +101,7 @@
                     <section class="lp-card" data-card-list="{{ $key }}">
                         <div class="lp-card-t"><h2>{{ $t('lists.'.$key.'.title') }}</h2><span class="lp-note">{{ $t('lists.'.$key.'.note', ['n' => $count]) }}</span></div>
                         @forelse ($list['rows'] as $r){!! $row($key, $r) !!}@empty<p class="lp-empty">{{ $t('none') }}</p>@endforelse
-                        @if ($list['total'] > count($list['rows']))<button type="button" class="lp-link lp-all" wire:click="open('{{ $key }}')">{{ $t('all', ['n' => number_format($list['total'])]) }}</button>@endif
+                        @if ($list['total'] > count($list['rows']))<button type="button" class="lp-link lp-all" wire:click="open(@js($key))">{{ $t('all', ['n' => number_format($list['total'])]) }}</button>@endif
                         @if ($key === 'questions' && $list['total'] > 0)<button type="button" class="lp-link lp-all" wire:click="open('asked')" data-open-asked>{{ $t('asked_tabs.open') }}</button>@endif
                     </section>
                 @endif
@@ -122,7 +122,7 @@
                 </div>
                 <p class="lp-note" style="margin: 0 0 8px">{{ $t('failed.'.$this->failed.'_help') }}</p>
                 @forelse ($list['rows'] as $i => $r){!! $row($this->failed, $r, $i + 1) !!}@empty<p class="lp-empty">{{ $t('failed.none') }}</p>@endforelse
-                @if ($list['total'] > count($list['rows']))<button type="button" class="lp-link lp-all" wire:click="open('{{ $this->failed }}')">{{ $t('all', ['n' => number_format($list['total'])]) }}</button>@endif
+                @if ($list['total'] > count($list['rows']))<button type="button" class="lp-link lp-all" wire:click="open(@js($this->failed))">{{ $t('all', ['n' => number_format($list['total'])]) }}</button>@endif
             </section>
         @endif
 

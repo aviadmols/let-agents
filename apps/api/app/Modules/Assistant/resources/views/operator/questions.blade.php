@@ -138,9 +138,9 @@
                                         <div>{{ $row->question }} <span style="{{ $small }}">· {{ trans_choice('assistant::ui.questions.asked_times', $row->asked_count, ['count' => $row->asked_count]) }} · {{ $row->last_asked_at->diffForHumans() }}</span></div>
                                         <div style="display:flex;gap:8px;margin-top:8px;align-items:flex-start">
                                             <textarea wire:model="drafts.{{ $row->id }}" rows="2" placeholder="{{ __('assistant::ui.questions.write_answer') }}" style="flex:1;padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px;font:inherit"></textarea>
-                                            <button type="button" wire:click="answer('{{ $row->id }}')" style="{{ $btn }};background:#111827;color:#fff;border-color:#111827">{{ __('assistant::ui.questions.publish') }}</button>
-                                            @if ($this->teamDrafts())<button type="button" wire:click="draft('{{ $row->id }}')" wire:loading.attr="disabled" wire:target="draft('{{ $row->id }}')" data-draft="{{ $row->id }}" style="{{ $btn }};border-color:#8b5cf6;color:#7e22ce"><span wire:loading.remove wire:target="draft('{{ $row->id }}')">✨ {{ __('assistant::ui.questions.draft') }}</span><span wire:loading wire:target="draft('{{ $row->id }}')">{{ __('assistant::ui.questions.drafting') }}</span></button>@endif
-                                            <button type="button" wire:click="hide('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.hide') }}</button>
+                                            <button type="button" wire:click="answer(@js($row->id))" style="{{ $btn }};background:#111827;color:#fff;border-color:#111827">{{ __('assistant::ui.questions.publish') }}</button>
+                                            @if ($this->teamDrafts())<button type="button" wire:click="draft(@js($row->id))" wire:loading.attr="disabled" wire:target="draft('{{ $row->id }}')" data-draft="{{ $row->id }}" style="{{ $btn }};border-color:#8b5cf6;color:#7e22ce"><span wire:loading.remove wire:target="draft('{{ $row->id }}')">✨ {{ __('assistant::ui.questions.draft') }}</span><span wire:loading wire:target="draft('{{ $row->id }}')">{{ __('assistant::ui.questions.drafting') }}</span></button>@endif
+                                            <button type="button" wire:click="hide(@js($row->id))" style="{{ $btn }}">{{ __('assistant::ui.questions.hide') }}</button>
                                         </div>
                                         @include('assistant::operator.partials.draft-checks', ['checks' => $this->draftChecks[$row->id] ?? []])
                                     </div>
@@ -176,16 +176,16 @@
                                         @unless ($row->isShared())
                                             <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
                                                 <span style="{{ $small }}">{{ __('assistant::ui.questions.waiting', ['count' => $row->visitors, 'needed' => $q['share_after']]) }}</span>
-                                                <button type="button" wire:click="show('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.approve') }}</button>
+                                                <button type="button" wire:click="show(@js($row->id))" style="{{ $btn }}">{{ __('assistant::ui.questions.approve') }}</button>
                                             </div>
                                         @endunless
                                         <details style="margin-top:6px">
                                             <summary style="{{ $small }};cursor:pointer">{{ __('assistant::ui.questions.edit') }}</summary>
                                             <div style="display:flex;gap:8px;margin-top:6px;align-items:flex-start">
                                                 <textarea wire:model="drafts.{{ $row->id }}" rows="2" placeholder="{{ __('assistant::ui.questions.write_answer') }}" style="flex:1;padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px;font:inherit"></textarea>
-                                                <button type="button" wire:click="answer('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.publish') }}</button>
-                                                @if ($this->teamDrafts())<button type="button" wire:click="draft('{{ $row->id }}')" wire:loading.attr="disabled" wire:target="draft('{{ $row->id }}')" data-draft="{{ $row->id }}" style="{{ $btn }};border-color:#8b5cf6;color:#7e22ce"><span wire:loading.remove wire:target="draft('{{ $row->id }}')">✨ {{ __('assistant::ui.questions.draft') }}</span><span wire:loading wire:target="draft('{{ $row->id }}')">{{ __('assistant::ui.questions.drafting') }}</span></button>@endif
-                                                <button type="button" wire:click="hide('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.hide') }}</button>
+                                                <button type="button" wire:click="answer(@js($row->id))" style="{{ $btn }}">{{ __('assistant::ui.questions.publish') }}</button>
+                                                @if ($this->teamDrafts())<button type="button" wire:click="draft(@js($row->id))" wire:loading.attr="disabled" wire:target="draft('{{ $row->id }}')" data-draft="{{ $row->id }}" style="{{ $btn }};border-color:#8b5cf6;color:#7e22ce"><span wire:loading.remove wire:target="draft('{{ $row->id }}')">✨ {{ __('assistant::ui.questions.draft') }}</span><span wire:loading wire:target="draft('{{ $row->id }}')">{{ __('assistant::ui.questions.drafting') }}</span></button>@endif
+                                                <button type="button" wire:click="hide(@js($row->id))" style="{{ $btn }}">{{ __('assistant::ui.questions.hide') }}</button>
                                             </div>
                                             @include('assistant::operator.partials.draft-checks', ['checks' => $this->draftChecks[$row->id] ?? []])
                                         </details>
@@ -208,8 +208,8 @@
                             <details style="display:inline-block;margin-inline-start:6px"><summary style="{{ $small }};cursor:pointer;display:inline">{{ __('assistant::ui.questions.answer_anyway') }}</summary>
                                 <div style="display:flex;gap:8px;margin-top:6px">
                                     <textarea wire:model="drafts.{{ $row->id }}" rows="2" style="flex:1;padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px;font:inherit"></textarea>
-                                    <button type="button" wire:click="answer('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.publish') }}</button>
-                                    @if ($this->teamDrafts())<button type="button" wire:click="draft('{{ $row->id }}')" wire:loading.attr="disabled" wire:target="draft('{{ $row->id }}')" data-draft="{{ $row->id }}" style="{{ $btn }};border-color:#8b5cf6;color:#7e22ce"><span wire:loading.remove wire:target="draft('{{ $row->id }}')">✨ {{ __('assistant::ui.questions.draft') }}</span><span wire:loading wire:target="draft('{{ $row->id }}')">{{ __('assistant::ui.questions.drafting') }}</span></button>@endif
+                                    <button type="button" wire:click="answer(@js($row->id))" style="{{ $btn }}">{{ __('assistant::ui.questions.publish') }}</button>
+                                    @if ($this->teamDrafts())<button type="button" wire:click="draft(@js($row->id))" wire:loading.attr="disabled" wire:target="draft('{{ $row->id }}')" data-draft="{{ $row->id }}" style="{{ $btn }};border-color:#8b5cf6;color:#7e22ce"><span wire:loading.remove wire:target="draft('{{ $row->id }}')">✨ {{ __('assistant::ui.questions.draft') }}</span><span wire:loading wire:target="draft('{{ $row->id }}')">{{ __('assistant::ui.questions.drafting') }}</span></button>@endif
                                 </div>
                                 @include('assistant::operator.partials.draft-checks', ['checks' => $this->draftChecks[$row->id] ?? []])
                             </details>
@@ -224,7 +224,7 @@
                 <ul style="display:grid;gap:6px">
                     @foreach ($q['hidden'] as $row)
                         <li>{{ $row->question }} <span style="{{ $small }}">· {{ $row->page()?->title }}</span>
-                            <button type="button" wire:click="show('{{ $row->id }}')" style="{{ $btn }}">{{ __('assistant::ui.questions.show') }}</button>
+                            <button type="button" wire:click="show(@js($row->id))" style="{{ $btn }}">{{ __('assistant::ui.questions.show') }}</button>
                         </li>
                     @endforeach
                 </ul>

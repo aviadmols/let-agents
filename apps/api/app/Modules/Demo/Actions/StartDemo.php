@@ -9,6 +9,7 @@ use App\Modules\Demo\Models\DemoSite;
 use App\Modules\Demo\Support\PublicSite;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -95,9 +96,19 @@ final class StartDemo
         };
     }
 
-    /** A new code for the same demo: the old one stops working. */
+    /** A demo's email is sent this many codes a day at most, whoever asks and from wherever (1.11). */
+    public const CODES_PER_DAY = 5;
+
+    /** A new code for the same demo: the old one stops working. Past the day's codes nothing is sent. */
     public static function newCode(DemoSite $site): void
     {
+        $sent = 'demo:codes:'.$site->getKey();
+        Cache::add($sent, 1, now()->addDay());
+
+        if (Cache::increment($sent) > self::CODES_PER_DAY) {
+            return;
+        }
+
         $code = (string) random_int(100000, 999999);
         $site->forceFill(['code_hash' => Hash::make($code), 'code_expires_at' => now()->addMinutes(self::CODE_MINUTES), 'code_tries' => 0])->save();
         self::sendCode($site, $code);

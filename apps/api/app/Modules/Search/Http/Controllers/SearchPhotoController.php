@@ -5,6 +5,7 @@ namespace App\Modules\Search\Http\Controllers;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Http\Visit;
+use App\Core\Media\Picture;
 use App\Core\Usage\MonthlyUsage;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Http\StorefrontSite;
@@ -58,6 +59,11 @@ final class SearchPhotoController
 
         if (! in_array($mime, self::MIMES, true)) {
             return response()->json(['error' => 'not_image'], 415);
+        }
+
+        // a small file that says it is an enormous picture is refused before anything opens it (1.11)
+        if (! Picture::sane($bytes)) {
+            return response()->json(['error' => 'too_big'], 413);
         }
 
         $key = "search:photos:{$shopId}:".now()->toDateString();

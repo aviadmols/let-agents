@@ -19,12 +19,12 @@
                     <span class="lp-field lp-field-wide"><svg aria-hidden="true"><use href="#lp-i-search"/></svg><input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="search" placeholder="{{ $t('find_product') }}" aria-label="{{ $t('find_product') }}"></span>
                     <div class="lp-chips" style="margin: 10px 0">
                         @foreach (['all', 'missing', 'image', 'manual'] as $f)
-                            <button type="button" wire:click="pick('{{ $f }}')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->filter === $f])>{{ $t('filters.'.$f) }}</button>
+                            <button type="button" wire:click="pick(@js($f))" @class(['lp-chip lp-chip-sm', 'is-on' => $this->filter === $f])>{{ $t('filters.'.$f) }}</button>
                         @endforeach
                     </div>
                     <div class="lp-plist">
                         @forelse ($list['rows'] as $row)
-                            <button type="button" @class(['lp-prow', 'is-on' => $p !== null && $p['id'] === $row['id']]) wire:click="select('{{ $row['id'] }}')">
+                            <button type="button" @class(['lp-prow', 'is-on' => $p !== null && $p['id'] === $row['id']]) wire:click="select(@js($row['id']))">
                                 <span class="lp-flag" data-tone="{{ $row['flag'] }}"></span>
                                 <span class="lp-thumb">@if ($row['thumb'])<img src="{{ $row['thumb'] }}" alt="" loading="lazy">@else<svg><use href="#lp-i-doc"/></svg>@endif</span>
                                 <span class="lp-grow"><span class="lp-row-t lp-clip" dir="auto">{{ $row['title'] }}</span><span class="lp-row-s">{{ $row['line'] }}</span></span>
@@ -66,7 +66,7 @@
                             @foreach ($p['tags'] as $tag)
                                 <span class="lp-chip lp-tag" x-data="{ menu: false }" @click.outside="menu = false">
                                     <button type="button" class="lp-tag-btn" @click="menu = ! menu">{{ $tag['label'] }} <span class="lp-src">{{ $tag['source'] }}</span></button>
-                                    <span class="lp-tag-menu" x-show="menu" x-cloak><button type="button" class="lp-link" wire:click="removeTag('{{ $tag['id'] }}')">{{ $t('remove_tag') }}</button></span>
+                                    <span class="lp-tag-menu" x-show="menu" x-cloak><button type="button" class="lp-link" wire:click="removeTag(@js($tag['id']))">{{ $t('remove_tag') }}</button></span>
                                 </span>
                             @endforeach
                             <form class="lp-chip lp-chip-quiet lp-tag-add" x-data="{ adding: false }" wire:submit="addTag" @click.outside="adding = false">
@@ -86,9 +86,9 @@
                                             <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary">{{ $t('save') }}</button>
                                         </form>
                                     @elseif ($row['missing'])
-                                        <span><span class="lp-pill" data-tone="warn">{{ $t('missing') }}</span> · <button type="button" class="lp-link" wire:click="edit('{{ $row['key'] }}')">{{ $t('add') }}</button></span>
+                                        <span><span class="lp-pill" data-tone="warn">{{ $t('missing') }}</span> · <button type="button" class="lp-link" wire:click="edit(@js($row['key']))">{{ $t('add') }}</button></span>
                                     @else
-                                        <span><button type="button" class="lp-value" wire:click="edit('{{ $row['key'] }}')" title="{{ $t('edit') }}">{{ $row['values'] }}</button>@if ($row['manual']) <span class="lp-note">· {{ $t('manual') }}</span>@endif</span>
+                                        <span><button type="button" class="lp-value" wire:click="edit(@js($row['key']))" title="{{ $t('edit') }}">{{ $row['values'] }}</button>@if ($row['manual']) <span class="lp-note">· {{ $t('manual') }}</span>@endif</span>
                                     @endif
                                 </div>
                             @empty
@@ -161,12 +161,12 @@
                     <span class="lp-field lp-field-wide"><svg aria-hidden="true"><use href="#lp-i-search"/></svg><input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="search" placeholder="{{ $t('find_page') }}" aria-label="{{ $t('find_page') }}"></span>
                     <div class="lp-chips" style="margin: 10px 0">
                         @foreach (['all', 'pages', 'posts', 'unread'] as $f)
-                            <button type="button" wire:click="pick('{{ $f }}')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->filter === $f])>{{ $t('page_filters.'.$f) }}</button>
+                            <button type="button" wire:click="pick(@js($f))" @class(['lp-chip lp-chip-sm', 'is-on' => $this->filter === $f])>{{ $t('page_filters.'.$f) }}</button>
                         @endforeach
                     </div>
                     <div class="lp-plist">
                         @forelse ($list['rows'] as $row)
-                            <button type="button" @class(['lp-prow', 'is-on' => $c !== null && $c['id'] === $row['id']]) wire:click="select('{{ $row['id'] }}')">
+                            <button type="button" @class(['lp-prow', 'is-on' => $c !== null && $c['id'] === $row['id']]) wire:click="select(@js($row['id']))">
                                 <span class="lp-flag" data-tone="{{ $row['flag'] }}"></span>
                                 <span class="lp-thumb">@if ($row['thumb'])<img src="{{ $row['thumb'] }}" alt="" loading="lazy">@else<svg><use href="#lp-i-doc"/></svg>@endif</span>
                                 <span class="lp-grow"><span class="lp-row-t lp-clip" dir="auto">{{ $row['title'] }}</span><span class="lp-row-s">{{ $row['line'] }}</span></span>

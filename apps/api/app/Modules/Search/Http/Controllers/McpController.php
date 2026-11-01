@@ -27,6 +27,11 @@ use Illuminate\Http\Response;
  */
 final class McpController
 {
+    /** The largest message read, in bytes, and the most calls in one batch. */
+    private const MAX_BODY = 65536;
+
+    private const MAX_BATCH = 10;
+
     /** The protocol versions this server speaks, newest first. */
     public const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -47,6 +52,13 @@ final class McpController
             return response()->json(['error' => 'connector_off'], 404);
         }
 
+        // a message is small, and a batch is a few calls: a long one would run many searches past the rate limit (1.11)
+        if (strlen((string) $request->getContent()) > self::MAX_BODY) {
+            $why = 'Request too large';
+
+            return self::error(null, -32600, $why);
+        }
+
         $message = json_decode((string) $request->getContent(), true);
 
         if (! is_array($message)) {
@@ -54,6 +66,12 @@ final class McpController
         }
 
         // An older client may send a batch.
+        if (array_is_list($message) && count($message) > self::MAX_BATCH) {
+            $why = 'Batch too large';
+
+            return self::error(null, -32600, $why);
+        }
+
         if (array_is_list($message)) {
             $answers = array_values(array_filter(array_map(fn ($one) => is_array($one) ? $this->answer($one, $connection, $tenant, $search) : null, $message)));
 

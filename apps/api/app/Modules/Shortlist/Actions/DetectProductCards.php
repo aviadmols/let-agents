@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shortlist\Actions;
 
+use App\Core\Http\OutboundUrl;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -381,14 +382,7 @@ final class DetectProductCards
     /** An address that resolves inside a private or reserved network is never fetched. */
     private static function privateAddress(string $host): bool
     {
-        $addresses = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
-
-        foreach ($addresses as $ip) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                return true;
-            }
-        }
-
-        return false;
+        // every address it resolves to, IPv4 and IPv6, public (OutboundUrl); one that resolves to nothing is not fetched
+        return OutboundUrl::refusal('https://'.$host.'/') !== null;
     }
 }

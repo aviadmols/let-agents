@@ -30,6 +30,15 @@ final class ProductPage extends OperatorProductPage
     protected static bool $shouldRegisterNavigation = false;
 
     /**
+     * A page of this shop: the shop the call names is never taken, the panel's tenant is (1.11: a merchant's pick() with
+     * another shop's id read that shop's page bank and wrote its pins).
+     */
+    public function pick(string $shopId, string $type, string $externalId): void
+    {
+        parent::pick((string) (Filament::getTenant()?->getKey() ?? ''), $type, $externalId);
+    }
+
+    /**
      * The operator searches every shop at once; a merchant searches their own, through the tenant
      * scope, so nothing from another shop can come back.
      *

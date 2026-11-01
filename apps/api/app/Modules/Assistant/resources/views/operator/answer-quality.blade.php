@@ -10,7 +10,7 @@
 
     <div style="display:flex;gap:6px">
         @foreach (['asks', 'cases'] as $tab)
-            <button type="button" wire:click="$set('tab', '{{ $tab }}')" style="{{ $chip }};font-size:13px;{{ $this->tab === $tab ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('tabs.'.$tab) }}</button>
+            <button type="button" wire:click="$set('tab', @js($tab))" style="{{ $chip }};font-size:13px;{{ $this->tab === $tab ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('tabs.'.$tab) }}</button>
         @endforeach
     </div>
 
@@ -98,7 +98,7 @@
                         @else<span style="{{ $chip }};cursor:default">{{ $t('not_run') }}</span>@endif
                         @if ($case['at'])<span style="{{ $small }}" dir="ltr">{{ $case['at'] }} · v{{ $case['prompt'] }} · ${{ number_format((float) $case['cost'], 5) }}</span>@endif
                     </div>
-                    <button type="button" wire:click="deleteCase('{{ $case['id'] }}')" wire:confirm="{{ $t('delete_confirm') }}" style="font-size:12px;text-decoration:underline">{{ $t('delete') }}</button>
+                    <button type="button" wire:click="deleteCase(@js($case['id']))" wire:confirm="{{ $t('delete_confirm') }}" style="font-size:12px;text-decoration:underline">{{ $t('delete') }}</button>
                 </div>
                 <div style="margin-top:8px"><span style="{{ $small }}">{{ $t('question') }}</span> {{ $case['question'] }}</div>
                 <div style="margin-top:4px;{{ $small }}">{{ $t('expects') }}
@@ -150,7 +150,7 @@
         <button type="button" wire:click="pick('failed')" style="{{ $chip }};{{ $this->failure === 'failed' ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('filters.failed') }} <span dir="ltr">{{ $counts['failed'] }}</span></button>
         @foreach ($reasons as $reason)
             @if (($counts['by'][$reason] ?? 0) > 0 || $this->failure === $reason)
-                <button type="button" wire:click="pick('{{ $reason }}')" title="{{ $t('reasons_help.'.$reason) }}" style="{{ $chip }};{{ $this->failure === $reason ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('reasons.'.$reason) }} <span dir="ltr">{{ $counts['by'][$reason] ?? 0 }}</span></button>
+                <button type="button" wire:click="pick(@js($reason))" title="{{ $t('reasons_help.'.$reason) }}" style="{{ $chip }};{{ $this->failure === $reason ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('reasons.'.$reason) }} <span dir="ltr">{{ $counts['by'][$reason] ?? 0 }}</span></button>
             @endif
         @endforeach
         <button type="button" wire:click="pick('')" style="{{ $chip }};{{ $this->failure === '' ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('filters.all') }}</button>
@@ -175,7 +175,7 @@
                             @if ($row['prompt'])<span>answer_site v{{ $row['prompt'] }}</span>@endif
                             @if ($row['cost'] !== null)<span>${{ number_format((float) $row['cost'], 5) }}</span>@endif
                             @if ($row['ms'])<span>{{ number_format($row['ms']) }} ms</span>@endif
-                            <button type="button" wire:click="toggle('{{ $row['id'] }}')" style="text-decoration:underline">{{ $this->open === $row['id'] ? $t('less') : $t('more_details') }}</button>
+                            <button type="button" wire:click="toggle(@js($row['id']))" style="text-decoration:underline">{{ $this->open === $row['id'] ? $t('less') : $t('more_details') }}</button>
                         </div>
                     </div>
                     <div style="margin-top:8px"><span style="{{ $small }}">{{ $t('question') }}</span> {{ $row['question'] }}</div>
@@ -195,7 +195,7 @@
                         <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
                             <span style="{{ $small }}">{{ $t('team_reason') }}</span>
                             @foreach ([...$reasons, 'fine'] as $choice)
-                                <button type="button" wire:click="setFailure('{{ $row['id'] }}', '{{ $row['failure_team'] === $choice ? '' : $choice }}')" style="{{ $chip }};{{ $row['failure_team'] === $choice ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('reasons.'.$choice) }}</button>
+                                <button type="button" wire:click="setFailure(@js($row['id']), '{{ $row['failure_team'] === $choice ? '' : $choice }}')" style="{{ $chip }};{{ $row['failure_team'] === $choice ? 'font-weight:700;border-color:currentColor' : '' }}">{{ $t('reasons.'.$choice) }}</button>
                             @endforeach
                         </div>
 
@@ -206,7 +206,7 @@
                                 <option value="">{{ $t('current_prompt') }}</option>
                                 @foreach ($this->versions() as $v)<option value="{{ $v }}">answer_site v{{ $v }}</option>@endforeach
                             </select>
-                            <button type="button" wire:click="replay('{{ $row['id'] }}')" wire:loading.attr="disabled" wire:target="replay('{{ $row['id'] }}')" wire:confirm="{{ $t('replay_confirm') }}" style="{{ $chip }};font-weight:600">{{ $t('replay_run') }}</button>
+                            <button type="button" wire:click="replay(@js($row['id']))" wire:loading.attr="disabled" wire:target="replay('{{ $row['id'] }}')" wire:confirm="{{ $t('replay_confirm') }}" style="{{ $chip }};font-weight:600">{{ $t('replay_run') }}</button>
                         </div>
                         @if (isset($this->replays[$row['id']]))
                             @php($rp = $this->replays[$row['id']])
@@ -230,7 +230,7 @@
                                 <label style="font-size:13px"><input type="checkbox" wire:model="caseForm.{{ $row['id'] }}.sources_right"> {{ $t('sources_right') }}</label>
                                 <label style="font-size:13px"><input type="checkbox" wire:model="caseForm.{{ $row['id'] }}.supported"> {{ $t('supported') }}</label>
                                 <input wire:model="caseForm.{{ $row['id'] }}.note" placeholder="{{ $t('note_placeholder') }}" style="font-size:13px;border-radius:8px;padding:4px 8px">
-                                <button type="button" wire:click="makeCase('{{ $row['id'] }}')" style="{{ $chip }};font-weight:600;justify-self:start">{{ $t('save_case') }}</button>
+                                <button type="button" wire:click="makeCase(@js($row['id']))" style="{{ $chip }};font-weight:600;justify-self:start">{{ $t('save_case') }}</button>
                             </div>
                         </details>
                     @endif

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shopify\Feed;
 
+use App\Core\Http\OutboundUrl;
 use App\Core\Text\HtmlText;
 use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
@@ -13,7 +14,6 @@ use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
 use Carbon\CarbonInterface;
 use Generator;
-use Illuminate\Support\Facades\Http;
 
 /**
  * A Shopify store's catalog in the same feed shape the WooCommerce plugin serves, read from the
@@ -865,8 +865,11 @@ final class ShopifyStoreFeed implements PlatformStoreFeed, ReadsChangedProducts,
     private static function shown(string $url): string
     {
         try {
-            $response = Http::timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
+            $response = OutboundUrl::request($url)?->timeout(15)->connectTimeout(5)->withHeaders(['Accept' => 'text/html'])->get($url);
         } catch (\Throwable) {
+            return '';
+        }
+        if ($response === null) {
             return '';
         }
 

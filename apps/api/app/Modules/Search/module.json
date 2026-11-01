@@ -94,7 +94,7 @@
         },
         {
             "name": "photo_limits",
-            "default": false
+            "default": true
         },
         {
             "name": "photo_second_look",

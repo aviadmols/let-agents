@@ -24,7 +24,7 @@
             <x-filament::button size="xs" :color="$this->kind === '' ? 'primary' : 'gray'" wire:click="pick('')">{{ $t('all') }} ({{ count($all) }})</x-filament::button>
             @foreach (\App\Modules\Admin\Contracts\TimelineEntry::KINDS as $k)
                 @if ($counts[$k] > 0)
-                    <x-filament::button size="xs" :color="$this->kind === $k ? 'primary' : 'gray'" wire:click="pick('{{ $k }}')">{{ $t('kinds.'.$k) }} ({{ $counts[$k] }})</x-filament::button>
+                    <x-filament::button size="xs" :color="$this->kind === $k ? 'primary' : 'gray'" wire:click="pick(@js($k))">{{ $t('kinds.'.$k) }} ({{ $counts[$k] }})</x-filament::button>
                 @endif
             @endforeach
         </div>

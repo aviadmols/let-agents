@@ -14,7 +14,7 @@
 
     <x-filament::tabs>
         @foreach (\App\Modules\Knowledge\Filament\Operator\Pages\SystemMap::TABS as $key)
-            <x-filament::tabs.item :active="$tab === $key" wire:click="show('{{ $key }}')">
+            <x-filament::tabs.item :active="$tab === $key" wire:click="show(@js($key))">
                 {{ __('knowledge::map.tabs.'.$key) }}
             </x-filament::tabs.item>
         @endforeach

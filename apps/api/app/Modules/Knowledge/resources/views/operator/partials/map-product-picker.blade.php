@@ -10,7 +10,7 @@
             @if ($results !== [])
                 <div style="margin-top:6px;border:1px solid rgba(127,127,127,.25);border-radius:8px;overflow:hidden">
                     @foreach ($results as $result)
-                        <button type="button" wire:click="choose('{{ $result['id'] }}')" style="display:block;width:100%;text-align:start;padding:6px 10px;font-size:13px;border-bottom:1px solid rgba(127,127,127,.12)">
+                        <button type="button" wire:click="choose(@js($result['id']))" style="display:block;width:100%;text-align:start;padding:6px 10px;font-size:13px;border-bottom:1px solid rgba(127,127,127,.12)">
                             {{ $result['title'] }} <span style="opacity:.5" dir="ltr">#{{ $result['external_id'] }}</span>
                         </button>
                     @endforeach

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Support;
 
+use App\Core\Text\CsvCell;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\ApplyTeamValue;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -32,7 +33,8 @@ final class MissingInfoCsv
 
         foreach ($gaps as $gap) {
             foreach ($gap['missing'] as $product) {
-                fputcsv($out, [$product['external_id'], $product['title'], $gap['type_label'], $gap['attribute'], $gap['attribute_label'], $gap['importance'], '']);
+                // the names a person reads are kept as text; the ids read back on import stay as they are
+                fputcsv($out, [$product['external_id'], CsvCell::safe($product['title']), CsvCell::safe($gap['type_label']), $gap['attribute'], CsvCell::safe($gap['attribute_label']), $gap['importance'], '']);
             }
         }
 

@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Settings\InvalidSettingValue;
 use App\Core\Tenancy\TenantContext;
+use App\Core\Text\CsvCell;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Shortlist\Models\ShortlistCount;
 use App\Modules\Shortlist\Models\ShortlistWishlist;
@@ -214,7 +215,7 @@ class Shortlists extends Page
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, [__('shortlist::ui.col_updated'), __('shortlist::ui.col_who'), __('shortlist::ui.col_phone'), __('shortlist::ui.col_consent'), __('shortlist::ui.col_count'), __('shortlist::ui.col_products'), 'IP', __('shortlist::ui.col_device')]);
             foreach ($rows as $row) {
-                fputcsv($out, [$row['updated'], __('shortlist::ui.who_'.$row['who']), $row['consent'] ? $row['phone'] : '', $row['consent'] ? __('shortlist::ui.yes') : '', $row['count'], implode(' | ', $row['products']), (string) $row['ip'], trim($row['device'].' '.$row['browser'].' '.$row['os'])]);
+                fputcsv($out, CsvCell::row([$row['updated'], __('shortlist::ui.who_'.$row['who']), $row['consent'] ? $row['phone'] : '', $row['consent'] ? __('shortlist::ui.yes') : '', $row['count'], implode(' | ', $row['products']), (string) $row['ip'], trim($row['device'].' '.$row['browser'].' '.$row['os'])]));
             }
             fclose($out);
         }, 'wishlists-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

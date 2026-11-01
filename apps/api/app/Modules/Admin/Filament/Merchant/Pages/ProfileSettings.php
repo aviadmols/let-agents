@@ -3,7 +3,9 @@
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
 use App\Core\Localization\Locales;
+use App\Modules\Admin\Actions\InviteToShop;
 use App\Modules\Admin\Http\Middleware\ApplyAdminLocale;
+use App\Modules\Admin\Mail\EmailChangeMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\HostedPanel;
 use BackedEnum;
@@ -12,7 +14,10 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Livewire\Attributes\Locked;
+use Throwable;
 use UnitEnum;
 
 /**
@@ -128,6 +133,11 @@ class ProfileSettings extends Page
             $this->problems['email'] = $t('email_wrong');
         } elseif (User::query()->whereKeyNot($user->id)->whereRaw('lower(email) = ?', [$email])->exists()) {
             $this->problems['email'] = $t('email_taken');
+        } elseif ($email !== mb_strtolower((string) $user->email) && User::reservedEmail($email)) {
+            // the platform's own accounts' addresses: never a person's (User::reservedEmail)
+            $this->problems['email'] = $t('email_reserved');
+        } elseif ($email !== mb_strtolower((string) $user->email) && ! InviteToShop::canMail()) {
+            $this->problems['email'] = $t('email_unconfirmable');
         }
 
         // A new password only when one was typed (a browser may fill the current one by itself), and always with the current one.
@@ -147,7 +157,17 @@ class ProfileSettings extends Page
             return;
         }
 
-        $user->forceFill(['name' => mb_substr($name, 0, 120), 'email' => $email, 'locale' => $locale, 'theme' => $theme]);
+        // A new email is the account's only once its inbox opens the link sent there: an address is never taken by typing
+        // it (one a store, an install or a teammate was later found by would have been someone else's to claim).
+        $newEmail = $email !== mb_strtolower((string) $user->email) ? $email : null;
+        if ($newEmail !== null && ! $this->sendEmailLink($user, $newEmail, $locale)) {
+            $this->problems['email'] = $t('email_unconfirmable');
+            Notification::make()->warning()->title(__('admin::shop_settings.problems'))->send();
+
+            return;
+        }
+
+        $user->forceFill(['name' => mb_substr($name, 0, 120), 'locale' => $locale, 'theme' => $theme]);
         if ($password !== '') {
             $user->password = $password;
         }
@@ -163,11 +183,32 @@ class ProfileSettings extends Page
         $this->js('window.dispatchEvent(new CustomEvent("theme-changed", { detail: '.json_encode($theme).' }))');
 
         Notification::make()->success()->title(__('admin::shop_settings.saved_plain', [], $locale))->send();
+        if ($newEmail !== null) {
+            $this->data['email'] = self::stoodIn($user, 'email') ? '' : (string) $user->email;
+            Notification::make()->info()->title(__('admin::shop_settings.profile.email_sent', ['email' => $newEmail], $locale))->persistent()->send();
+        }
 
         // A new language redraws the whole panel in it.
         if ($languageChanged) {
             $this->redirect(static::getUrl(), navigate: false);
         }
+    }
+
+    /** The link that makes a new address the account's, mailed to it for a day; false when it could not be sent. */
+    private function sendEmailLink(User $user, string $email, string $locale): bool
+    {
+        $expires = now()->addDay();
+        $link = URL::temporarySignedRoute('admin.email.confirm', $expires, ['user' => $user->id, 'email' => $email]);
+
+        try {
+            Mail::to($email)->locale($locale)->send(new EmailChangeMail((string) $user->name, $link, $expires));
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
+
+        return true;
     }
 
     private function user(): User

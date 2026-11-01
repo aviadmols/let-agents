@@ -4,6 +4,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Core\Text\HtmlText;
 use App\Modules\Catalog\Contracts\StorefrontLock;
@@ -342,13 +343,8 @@ final class ReadSitePages
     /** A host that resolves only to public addresses: never the platform's own network. */
     private static function public(string $host): bool
     {
-        if (app()->runningUnitTests()) {
-            return true;
-        }
-
-        $ips = gethostbynamel($host) ?: [];
-
-        return $ips !== [] && array_filter($ips, fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) === [];
+        // every address it resolves to, IPv4 and IPv6, public (OutboundUrl)
+        return OutboundUrl::refusal('https://'.$host.'/') === null;
     }
 
     private static function norm(string $url): string

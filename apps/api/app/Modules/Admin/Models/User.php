@@ -48,6 +48,18 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /** One rule for every place a password is set: the admin form and the operator command. */
     public const MIN_PASSWORD_LENGTH = 8;
 
+    /**
+     * The addresses the platform gives its own accounts, which a person may never take as theirs: a WordPress store's
+     * account (store@{site key}.wordpress), a design pass (design+…@design.lets.co.il), a Shopify store's stand-in
+     * (owner@{store}.myshopify.com) and the team's own domain. Each is looked up by its address (StoreAccount,
+     * InstallStore, CreateDesignPass, admin:operator), so one a merchant set on their own account would have made them
+     * that store's owner, or an operator, when it came (1.11).
+     */
+    public static function reservedEmail(string $email): bool
+    {
+        return preg_match('/\.wordpress$|@design\.lets\.co\.il$|@([a-z0-9-]+\.)?myshopify\.com$|@([a-z0-9-]+\.)*lets\.co\.il$/i', trim($email)) === 1;
+    }
+
     /** How the panel is drawn: as the device is set, or always light or dark. */
     public const THEMES = ['system', 'light', 'dark'];
 

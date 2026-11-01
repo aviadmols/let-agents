@@ -2,6 +2,8 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Core\Http\OutboundUrl;
+use App\Core\Media\Picture;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -15,6 +17,9 @@ use Throwable;
 final class RankSheet
 {
     private const WIDTH = 800;
+
+    /** The most a store picture fetched for the sheet may be. */
+    private const MAX_BYTES = 8 * 1024 * 1024;
 
     private const COLUMNS = 4;
 
@@ -31,7 +36,7 @@ final class RankSheet
      */
     public static function build(string $photo, ?array $box, array $candidates): ?array
     {
-        $source = @imagecreatefromstring($photo);
+        $source = Picture::decode($photo);
 
         if ($source === false) {
             return null;
@@ -89,11 +94,12 @@ final class RankSheet
      */
     private static function pictures(array $candidates): array
     {
-        $wanted = array_values(array_filter($candidates, fn (array $c): bool => is_string($c['image'] ?? null) && preg_match('#^https?://#i', (string) $c['image']) === 1));
+        $wanted = array_values(array_filter($candidates, fn (array $c): bool => is_string($c['image'] ?? null) && preg_match('#^https?://#i', (string) $c['image']) === 1
+            && OutboundUrl::refusal(self::small((string) $c['image'])) === null));
 
         try {
             $responses = Http::pool(fn (Pool $pool) => array_map(
-                fn (array $c) => $pool->as((string) $c['external_id'])->timeout(6)->connectTimeout(3)->get(self::small((string) $c['image'])),
+                fn (array $c) => $pool->as((string) $c['external_id'])->withOptions(OutboundUrl::options(self::small((string) $c['image']), self::MAX_BYTES))->timeout(6)->connectTimeout(3)->get(self::small((string) $c['image'])),
                 $wanted,
             ));
         } catch (Throwable) {
@@ -105,7 +111,7 @@ final class RankSheet
         foreach ($wanted as $c) {
             $response = $responses[(string) $c['external_id']] ?? null;
 
-            if ($response instanceof Response && $response->successful() && ($image = @imagecreatefromstring($response->body())) !== false) {
+            if ($response instanceof Response && $response->successful() && ($image = Picture::decode($response->body())) !== false) {
                 $out[] = [(string) $c['external_id'], $image];
             }
         }
@@ -122,12 +128,15 @@ final class RankSheet
         }
 
         try {
-            $response = Http::timeout(6)->connectTimeout(3)->get(self::small($url));
+            $response = OutboundUrl::request(self::small($url), self::MAX_BYTES)?->timeout(6)->connectTimeout(3)->get(self::small($url));
         } catch (Throwable) {
             return null;
         }
+        if ($response === null) {
+            return null;
+        }
 
-        return $response->successful() && @imagecreatefromstring($response->body()) !== false ? $response->body() : null;
+        return $response->successful() && Picture::decode($response->body()) !== false ? $response->body() : null;
     }
 
     private static function small(string $url): string

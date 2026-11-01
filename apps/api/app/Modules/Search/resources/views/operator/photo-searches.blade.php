@@ -155,7 +155,7 @@
                                                 @if ($ask->expected_product === ($result['external_id'] ?? null))
                                                     <span style="color:#15803d;font-weight:600">✓ {{ __('search::ui.photo_log.the_product') }}</span>
                                                 @else
-                                                    <button type="button" wire:click="markProduct('{{ $ask->id }}', @js((string) ($result['external_id'] ?? '')))" style="{{ $btn }};font-size:11px;padding:1px 6px">{{ __('search::ui.photo_log.this_product') }}</button>
+                                                    <button type="button" wire:click="markProduct(@js($ask->id), @js((string) ($result['external_id'] ?? '')))" style="{{ $btn }};font-size:11px;padding:1px 6px">{{ __('search::ui.photo_log.this_product') }}</button>
                                                 @endif
                                             </div>
                                         @endforeach
@@ -172,7 +172,7 @@
                                         @endif
                                     @endif
                                     <input type="text" wire:model="product.{{ $ask->id }}" placeholder="{{ __('search::ui.photo_log.product_field') }}" style="{{ $input }};font-size:12px;min-width:220px">
-                                    <button type="button" wire:click="markProduct('{{ $ask->id }}')" style="{{ $btn }}">{{ __('search::ui.photo_log.product_mark') }}</button>
+                                    <button type="button" wire:click="markProduct(@js($ask->id))" style="{{ $btn }}">{{ __('search::ui.photo_log.product_mark') }}</button>
                                 </div>
                                 @if ($ask->checked_at !== null && $this->operatorView())
                                     <div style="{{ $small }}" data-check>
@@ -184,8 +184,8 @@
                             <div style="display:grid;gap:6px;align-content:start">
                                 @if ($ask->verdict === null)
                                     <div style="display:flex;gap:6px">
-                                        <button type="button" wire:click="markRight('{{ $ask->id }}')" style="{{ $btn }}">✓ {{ __('search::ui.photo_log.right') }}</button>
-                                        <button type="button" wire:click="markWrong('{{ $ask->id }}')" style="{{ $btn }}">✗ {{ __('search::ui.photo_log.wrong') }}</button>
+                                        <button type="button" wire:click="markRight(@js($ask->id))" style="{{ $btn }}">✓ {{ __('search::ui.photo_log.right') }}</button>
+                                        <button type="button" wire:click="markWrong(@js($ask->id))" style="{{ $btn }}">✗ {{ __('search::ui.photo_log.wrong') }}</button>
                                     </div>
                                     <input type="text" wire:model="expected.{{ $ask->id }}" placeholder="{{ __('search::ui.photo_log.expected') }}" style="{{ $input }};font-size:13px">
                                 @else
@@ -197,7 +197,7 @@
                                             <span>{{ __('search::ui.photo_log.was', ['what' => $ask->expected]) }}</span>
                                         @endif
                                     </div>
-                                    <button type="button" wire:click="unmark('{{ $ask->id }}')" style="{{ $btn }};justify-self:start">{{ __('search::ui.photo_log.unmark') }}</button>
+                                    <button type="button" wire:click="unmark(@js($ask->id))" style="{{ $btn }};justify-self:start">{{ __('search::ui.photo_log.unmark') }}</button>
                                 @endif
                             </div>
                         </div>

@@ -87,17 +87,22 @@ final class PhoneSignIn
         $row = DB::table('shortlist_phone_codes')->where('shop_id', $shopId)->where('phone_key', $key)
             ->whereNull('used_at')->where('expires_at', '>', now())->orderByDesc('id')->first();
 
-        if ($row === null || $row->attempts >= self::TRIES) {
+        // a try is taken before the code is compared, in one statement, and a code is used once: guesses or a right code
+        // sent at once never get past either (1.11)
+        $took = $row === null ? 0 : DB::table('shortlist_phone_codes')->where('id', $row->id)->whereNull('used_at')
+            ->where('attempts', '<', self::TRIES)->increment('attempts');
+
+        if ($took === 0) {
             return ['ok' => false, 'error' => 'expired'];
         }
-
-        DB::table('shortlist_phone_codes')->where('id', $row->id)->increment('attempts');
 
         if (! hash_equals((string) $row->code_hash, self::codeHash($key, trim($code)))) {
             return ['ok' => false, 'error' => 'bad_code'];
         }
 
-        DB::table('shortlist_phone_codes')->where('id', $row->id)->update(['used_at' => now()]);
+        if (DB::table('shortlist_phone_codes')->where('id', $row->id)->whereNull('used_at')->update(['used_at' => now()]) === 0) {
+            return ['ok' => false, 'error' => 'expired'];
+        }
 
         // The browser's list joins the number's (KeepWishlist merges a guest list into an account's).
         $this->keep->handle($shopId, $browserToken, self::ref($key));

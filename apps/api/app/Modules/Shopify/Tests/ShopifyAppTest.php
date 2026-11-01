@@ -369,6 +369,23 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame([$install->shop_id], $own->shops()->pluck('shops.id')->all(), 'this shop only');
     }
 
+    /**
+     * 1.11: a merchant of another store who had typed this store's email into their own profile became its owner when it
+     * installed. An account found by the store's email owns it only when the address was proven the account's.
+     */
+    public function test_an_account_that_never_proved_the_stores_email_is_not_made_its_owner(): void
+    {
+        $claimer = User::factory()->create(['email' => 'owner@gueta.test', 'email_verified_at' => null]);
+        $install = $this->installed();
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'status' => 'ACTIVE', 'trialDays' => 0, 'createdAt' => now()->toIso8601String()]];
+
+        $this->assertNull($claimer->fresh()?->roleIn($install->shop), 'not this store\'s owner, nor anything in it');
+        $this->get('/shopify/app?'.http_build_query(self::signed([])));
+        $own = User::query()->where('email', 'owner@'.self::SHOP)->sole();
+        $this->assertAuthenticatedAs($own);
+        $this->assertSame([$install->shop_id], $own->shops()->pluck('shops.id')->all(), 'the store\'s own account stands in');
+    }
+
     public function test_a_token_shopify_withdrew_is_renewed_when_the_app_opens_never_a_500(): void
     {
         $install = $this->installed();
@@ -410,6 +427,10 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame('failed', app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->sole()->status->value));
 
         Settings::set('search.results_per_group', 7, $install->shop_id);
+        // 1.11: a body signed for another store, sent naming this one, is refused and nothing is erased
+        $this->webhook('shop/redact', ['shop_domain' => 'another-store.myshopify.com'])->assertUnauthorized();
+        $this->assertSame(1, Shop::query()->count());
+
         $this->webhook('shop/redact', ['shop_domain' => self::SHOP])->assertOk();
         $this->assertSame(0, Shop::query()->count(), 'the shop and all it holds are erased');
         $this->assertSame(0, DB::table('setting_overrides')->where('scope', $install->shop_id)->count(), 'its own settings too, which have no foreign key');

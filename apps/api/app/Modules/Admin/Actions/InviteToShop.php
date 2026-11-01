@@ -104,6 +104,8 @@ final class InviteToShop
             Mail::to($invitation->email)
                 ->locale($invitation->locale)
                 ->send(new ShopInvitationMail($shop->name, $by?->name ?: null, $invitation->role, $link, $expires->copy()));
+            // it reached that inbox: accepting it proves the address (AcceptInvitation)
+            $this->tenant->run((string) $shop->id, fn () => $invitation->forceFill(['mailed_at' => now()])->save());
         } catch (Throwable $e) {
             // The invitation stands; its link is passed on by hand.
             report($e);

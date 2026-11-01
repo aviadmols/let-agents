@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Actions;
 use App\Core\Settings\OverrideScope;
 use App\Core\Tenancy\BelongsToTenant;
 use App\Core\Tenancy\TenantContext;
+use App\Core\Text\CsvCell;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -153,11 +154,11 @@ final class ExportShopData
                 $keys = array_keys($row);
                 // a table's rows come after a row of its columns; the fixed files name theirs from the first row
                 if (array_values($row) !== $keys) {
-                    fputcsv($out, $keys, escape: '');
+                    fputcsv($out, CsvCell::row($keys), escape: '');
                 }
                 $header = true;
             }
-            fputcsv($out, array_values($row), escape: '');
+            fputcsv($out, CsvCell::row(array_values($row)), escape: '');
         }
 
         fclose($out);

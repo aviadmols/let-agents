@@ -26,13 +26,16 @@ final class ConfirmSignUp
                 return ['status' => 'expired'];
             }
 
-            if ($pending->attempts >= (int) Settings::get('shoppers.code_attempts', $shopId)) {
+            // a try is taken before the code is compared, in one statement: guesses sent at once each take their own
+            // and none gets past the limit (1.11)
+            $took = ShopperVerification::query()->whereKey($pending->getKey())
+                ->where('attempts', '<', (int) Settings::get('shoppers.code_attempts', $shopId))->increment('attempts');
+
+            if ($took === 0) {
                 return ['status' => 'too_many'];
             }
 
             if (! hash_equals($pending->code_hash, SignUp::codeHash(trim($code)))) {
-                $pending->increment('attempts');
-
                 return ['status' => 'wrong_code'];
             }
 

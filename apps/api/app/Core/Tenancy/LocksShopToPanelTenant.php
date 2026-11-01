@@ -58,6 +58,21 @@ trait LocksShopToPanelTenant
         $this->lockShopToTenant();
     }
 
+    /**
+     * A method called in the request runs after booted, and a value it assigns never fires updatedShop: the shop is
+     * locked again before the screen is drawn and before its state is sent back, so nothing another shop holds is ever
+     * shown here or kept for the next request (1.11: "Page in the widget" took a shop id in pick()).
+     */
+    public function rendering(): void
+    {
+        $this->lockShopToTenant();
+    }
+
+    public function dehydrate(): void
+    {
+        $this->lockShopToTenant();
+    }
+
     public function updatedShop(): void
     {
         $this->lockShopToTenant();

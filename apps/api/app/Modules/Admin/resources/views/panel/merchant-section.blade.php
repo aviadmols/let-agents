@@ -4,7 +4,7 @@
     or as a side menu (settings, like Shopify's). The current page is marked.
 --}}
 @if ($hint !== null)
-<div class="lp-hint" role="note" data-hint="{{ $hintKey }}" x-data="{ shown: false, seen() { try { return JSON.parse(localStorage.getItem('lp-hints') || '{}') } catch (e) { return {} } }, close() { this.shown = false; try { const seen = this.seen(); seen['{{ $hintKey }}'] = 1; localStorage.setItem('lp-hints', JSON.stringify(seen)) } catch (e) {} } }" x-init="shown = ! seen()['{{ $hintKey }}']" x-show="shown" x-cloak x-transition.opacity>
+<div class="lp-hint" role="note" data-hint="{{ $hintKey }}" x-data="{ shown: false, seen() { try { return JSON.parse(localStorage.getItem('lp-hints') || '{}') } catch (e) { return {} } }, close() { this.shown = false; try { const seen = this.seen(); seen[@js($hintKey)] = 1; localStorage.setItem('lp-hints', JSON.stringify(seen)) } catch (e) {} } }" x-init="shown = ! seen()[@js($hintKey)]" x-show="shown" x-cloak x-transition.opacity>
     <span class="lp-mark lp-mark-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14a7 7 0 0 1-14 0zM5 21h14a7 7 0 0 0-14 0z" fill="currentColor"/></svg></span>
     <span>{{ $hint }}</span>
     <button type="button" aria-label="{{ __('admin::panels.close') }}" @click="close()">

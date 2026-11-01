@@ -198,9 +198,20 @@ final class CountSearch
             ->incrementEach(['count' => 1] + ($first ? ['visitors' => 1] : []), ['updated_at' => now()]);
     }
 
+    /**
+     * A shopper's email or mobile number typed into the box is no search term: kept as "[email]" or "[phone]", so the
+     * counts and the merchant's reports never hold a person's details (1.11). A product's code or barcode, digits too,
+     * stays as it was typed.
+     */
     private function query(string $raw): string
     {
-        return mb_substr(HebrewSearch::normalize(mb_substr($raw, 0, 300)), 0, self::MAX_QUERY);
+        $raw = (string) preg_replace(
+            ['/[^\s@]+@[^\s@]+\.[^\s@]+/u', '/(?<!\d)(?:\+?972[\s-]?|0)5\d(?:[\s-]?\d){7}(?!\d)/u'],
+            ['[email]', '[phone]'],
+            mb_substr($raw, 0, 300),
+        );
+
+        return mb_substr(HebrewSearch::normalize($raw), 0, self::MAX_QUERY);
     }
 
     private function ensure(string $shopId, string $query): void

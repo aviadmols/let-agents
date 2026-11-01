@@ -26,7 +26,7 @@
                 <strong style="flex:1">{{ $pass['shop'] }}</strong>
                 <span style="{{ $small }}">{{ $t('until', ['time' => $pass['expires']]) }}</span>
                 <span style="{{ $small }}">{{ $pass['used'] ? $t('used', ['time' => $pass['used']]) : $t('unused') }}</span>
-                <x-filament::button color="danger" size="sm" wire:click="revoke('{{ $pass['id'] }}')" wire:confirm="{{ $t('revoke_confirm') }}">{{ $t('revoke') }}</x-filament::button>
+                <x-filament::button color="danger" size="sm" wire:click="revoke(@js($pass['id']))" wire:confirm="{{ $t('revoke_confirm') }}">{{ $t('revoke') }}</x-filament::button>
             </div>
         @empty
             <p style="margin:0;opacity:.75">{{ $t('none') }}</p>

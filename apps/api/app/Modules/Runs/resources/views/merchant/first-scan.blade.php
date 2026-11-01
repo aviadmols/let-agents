@@ -57,7 +57,7 @@
                             @php($at = $state['steps'][$step] ?? null)
                             @php($isOpen = $open === $step)
                             <li style="{{ $loop->first ? '' : 'border-block-start: 1px solid var(--la-line-2);' }}" data-step="{{ $step }}" data-state="{{ $at ?? 'idle' }}">
-                                <button type="button" wire:click="toggle('{{ $step }}')" aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
+                                <button type="button" wire:click="toggle(@js($step))" aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
                                     style="all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto 14px; gap: 4px 10px; align-items: center; padding: 10px 14px; font-size: 14px; {{ $isOpen ? 'background: var(--la-sunk);' : '' }}">
                                     @if ($at === 'running')
                                         <span class="lp-onb-mark is-think" aria-hidden="true" style="--s: 14px; color: var(--la-ink); justify-self: center"><i></i><i></i></span>

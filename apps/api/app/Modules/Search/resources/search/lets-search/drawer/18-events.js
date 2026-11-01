@@ -141,6 +141,12 @@
   }
   // a picture that fails leaves its frame empty and clean, never the browser's broken-image mark
   root.addEventListener('error', function (e) { if (e.target && e.target.tagName === 'IMG') { e.target.classList.add('is-broken'); } }, true);
+  // No link in the drawer goes anywhere but a web address, whatever wrote it (the index, an answer, an order): checked at
+  // the click, before any other handler (1.11)
+  root.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (a && !/^https?:$/i.test(a.protocol || '')) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
   root.addEventListener('click', function (e) {
     var el = e.target.closest('button, a, [data-close]');
     if (el && !(el.closest('.ls-mini-row') && dragged)) {
@@ -193,7 +199,7 @@
       e.preventDefault();
       var a = S.records[d.savedAnswer];
       INPUT.value = ''; hideLive(); FIELD.classList.remove('has-text');
-      alsoFor(addTurn({ kind: 'answer', q: a.title, answer: a.ans, picks: [], sources: a.src || [], anim: 1 }));
+      alsoFor(addTurn({ kind: 'answer', q: a.title, answer: a.ans, picks: [], sources: a.src || [], anim: 1, oneProduct: a.ak === 'product' }));
       return;
     }
     if (d.unrecent) { e.preventDefault(); S.recent = S.recent.filter(function (x) { return x !== d.unrecent; }); store('local', 'ls_searches', S.recent); render(); return; }

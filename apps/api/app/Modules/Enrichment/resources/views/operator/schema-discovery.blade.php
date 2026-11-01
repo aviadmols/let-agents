@@ -25,7 +25,7 @@
         @if ($proposals->isNotEmpty())
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
                 @foreach ($proposals as $item)
-                    <x-filament::button size="sm" color="gray" wire:click="open('{{ $item->id }}')">
+                    <x-filament::button size="sm" color="gray" wire:click="open(@js($item->id))">
                         {{ $item->created_at?->format('d/m H:i') }}@if ($item->branch) · {{ $item->branch['name'] }}@endif · {{ $t('statuses.'.$item->status) }}@if ($item->score !== null) · {{ $item->score }}@endif · {{ $t('sampled', ['n' => $item->sampled]) }}
                     </x-filament::button>
                 @endforeach
@@ -73,8 +73,8 @@
             @endif
             @if ($p->status === 'proposed')
                 <div style="display:flex;gap:8px;margin-top:10px">
-                    <x-filament::button color="success" wire:click="decide('{{ $p->id }}', true)" wire:confirm="{{ $t('approve_confirm') }}">{{ $t('approve') }}</x-filament::button>
-                    <x-filament::button color="danger" wire:click="decide('{{ $p->id }}', false)">{{ $t('reject') }}</x-filament::button>
+                    <x-filament::button color="success" wire:click="decide(@js($p->id), true)" wire:confirm="{{ $t('approve_confirm') }}">{{ $t('approve') }}</x-filament::button>
+                    <x-filament::button color="danger" wire:click="decide(@js($p->id), false)">{{ $t('reject') }}</x-filament::button>
                 </div>
             @endif
             @if ($p->status === 'approved')<p style="{{ $muted }};margin-top:8px">{{ $t('approved_hint') }}</p>@endif

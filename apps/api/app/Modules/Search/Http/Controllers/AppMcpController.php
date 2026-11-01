@@ -31,6 +31,11 @@ use Illuminate\Support\Facades\Cache;
  */
 final class AppMcpController
 {
+    /** The largest message read, in bytes, and the most calls in one batch. */
+    private const MAX_BODY = 65536;
+
+    private const MAX_BATCH = 10;
+
     /** The cards a tool's answer is shown in, inside the AI. A new version is a new address. */
     public const WIDGET = 'ui://lets/products.v1.html';
 
@@ -43,10 +48,23 @@ final class AppMcpController
             return response('', 405, ['Allow' => 'POST']);
         }
 
+        // a message is small, and a batch is a few calls: a long one would run many searches past the rate limit (1.11)
+        if (strlen((string) $request->getContent()) > self::MAX_BODY) {
+            $why = 'Request too large';
+
+            return response()->json(self::failure(null, -32600, $why));
+        }
+
         $message = json_decode((string) $request->getContent(), true);
 
         if (! is_array($message)) {
             return response()->json(self::failure(null, -32700, 'Parse error'));
+        }
+
+        if (array_is_list($message) && count($message) > self::MAX_BATCH) {
+            $why = 'Batch too large';
+
+            return response()->json(self::failure(null, -32600, $why));
         }
 
         if (array_is_list($message)) {

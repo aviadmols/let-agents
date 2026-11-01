@@ -3,6 +3,8 @@
 namespace App\Modules\Enrichment\Actions;
 
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
+use App\Core\Media\Picture;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ModelCallFailed;
@@ -20,7 +22,6 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Models\Run;
 use GdImage;
-use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -178,12 +179,15 @@ final class SuggestFromPicture
     private static function picture(string $url): ?string
     {
         try {
-            $response = Http::timeout(20)->connectTimeout(5)->get($url);
+            $response = OutboundUrl::request($url)?->timeout(20)->connectTimeout(5)->get($url);
         } catch (Throwable) {
             return null;
         }
+        if ($response === null) {
+            return null;
+        }
 
-        $image = $response->successful() ? @imagecreatefromstring($response->body()) : false;
+        $image = $response->successful() ? Picture::decode($response->body()) : false;
 
         if (! $image instanceof GdImage) {
             return null;

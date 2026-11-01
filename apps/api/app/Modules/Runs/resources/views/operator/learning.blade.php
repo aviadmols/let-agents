@@ -27,7 +27,7 @@
                         <div style="{{ $muted }}">{{ $t('never') }}</div>
                     @endif
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        <x-filament::button size="xs" :color="$this->agent === $agent['key'] ? 'primary' : 'gray'" wire:click="focus('{{ $agent['key'] }}')">{{ $t('only') }}</x-filament::button>
+                        <x-filament::button size="xs" :color="$this->agent === $agent['key'] ? 'primary' : 'gray'" wire:click="focus(@js($agent['key']))">{{ $t('only') }}</x-filament::button>
                         <x-filament::button size="xs" color="gray" tag="a" :href="$process::getUrl(['step' => $agent['action']])">{{ $t('all_runs') }}</x-filament::button>
                     </div>
                 </div>

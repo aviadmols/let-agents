@@ -2,9 +2,9 @@
 
 namespace App\Modules\Demo\Support;
 
-use Illuminate\Http\Client\ConnectionException;
+use App\Core\Http\OutboundUrl;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
+use Throwable;
 
 /**
  * A store's public site, read the way a browser reads it, for a demo: only its own host, only when that host is a
@@ -42,13 +42,8 @@ final class PublicSite
     /** Whether the host is a public address on the internet: never ours to reach inside (a private or reserved range). */
     public static function public(string $host): bool
     {
-        if (app()->runningUnitTests()) {
-            return true;
-        }
-
-        $ips = gethostbynamel($host) ?: [];
-
-        return $ips !== [] && array_filter($ips, fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) === [];
+        // every address it resolves to, IPv4 and IPv6, on the public internet (OutboundUrl); each fetch checks again
+        return OutboundUrl::refusal('https://'.$host.'/') === null;
     }
 
     /** A page of the host (a path, or a whole address on it); null when it does not answer. */
@@ -62,8 +57,11 @@ final class PublicSite
         }
 
         try {
-            $response = Http::timeout(self::TIMEOUT)->connectTimeout(10)->withHeaders(['User-Agent' => self::AGENT, 'Accept-Language' => 'he,en;q=0.8'])->get($url, $query);
-        } catch (ConnectionException) {
+            $response = OutboundUrl::request($url)?->timeout(self::TIMEOUT)->connectTimeout(10)->withHeaders(['User-Agent' => self::AGENT, 'Accept-Language' => 'he,en;q=0.8'])->get($url, $query);
+        } catch (Throwable) {
+            return null;
+        }
+        if ($response === null) {
             return null;
         }
 

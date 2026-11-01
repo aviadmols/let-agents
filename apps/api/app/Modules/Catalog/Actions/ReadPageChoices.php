@@ -4,6 +4,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
@@ -18,7 +19,6 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Carbon\CarbonInterface;
 use Closure;
-use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -219,7 +219,7 @@ final class ReadPageChoices
         $row ??= new CatalogProductChoice(['product_id' => $product->id, 'fields' => []]);
 
         try {
-            $response = Http::withHeaders(['User-Agent' => 'LetsSearch/1.0 (+https://agents.lets.co.il)', 'Accept' => 'text/html'])
+            $response = OutboundUrl::request((string) $product->url)?->withHeaders(['User-Agent' => 'LetsSearch/1.0 (+https://agents.lets.co.il)', 'Accept' => 'text/html'])
                 ->timeout(self::TIMEOUT_SECONDS)->get((string) $product->url);
         } catch (Throwable) {
             $response = null;

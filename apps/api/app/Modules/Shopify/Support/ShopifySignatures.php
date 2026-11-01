@@ -45,8 +45,14 @@ final class ShopifySignatures
 
     public static function webhook(string $body, ?string $header): bool
     {
-        return $header !== null
-            && self::signer(fn (string $secret): bool => hash_equals(base64_encode(hash_hmac('sha256', $body, $secret, true)), $header)) !== null;
+        return self::webhookSigner($body, $header) !== null;
+    }
+
+    /** The app (its client id) whose secret signed this webhook, or null when none did. */
+    public static function webhookSigner(string $body, ?string $header): ?string
+    {
+        return $header === null ? null
+            : self::signer(fn (string $secret): bool => hash_equals(base64_encode(hash_hmac('sha256', $body, $secret, true)), $header));
     }
 
     /** @param array<string, mixed> $query */

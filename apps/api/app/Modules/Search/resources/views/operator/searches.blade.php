@@ -221,9 +221,9 @@
                                 <td style="{{ $cell }}"><span style="{{ $small }}">{{ __('search::ui.resolved.statuses.'.$row->status) }}</span></td>
                                 <td style="{{ $cell }}">
                                     @if ($row->status === 'resolved')
-                                        <button type="button" style="{{ $btn }}" wire:click="undoResolution('{{ $row->id }}')">{{ __('search::ui.resolved.undo') }}</button>
+                                        <button type="button" style="{{ $btn }}" wire:click="undoResolution(@js($row->id))">{{ __('search::ui.resolved.undo') }}</button>
                                     @elseif ($row->status === 'rejected' || $row->status === 'refused')
-                                        <button type="button" style="{{ $btn }}" wire:click="restoreResolution('{{ $row->id }}')">{{ __('search::ui.resolved.restore') }}</button>
+                                        <button type="button" style="{{ $btn }}" wire:click="restoreResolution(@js($row->id))">{{ __('search::ui.resolved.restore') }}</button>
                                     @endif
                                 </td>
                             </tr>
@@ -251,7 +251,7 @@
                                     @foreach ($row->shown() as $tag)
                                         <span style="display:inline-flex;align-items:center;gap:4px;margin:2px;padding:3px 10px;border-radius:999px;background:#f5f0fb;font-size:13px" title="{{ $tag['query'] }}">
                                             {{ $tag['label'] }}
-                                            <button type="button" style="border:0;background:none;cursor:pointer;opacity:.6" aria-label="{{ __('search::ui.tags.remove') }}" wire:click="hideTag('{{ $row->id }}', {{ \Illuminate\Support\Js::from($tag['label']) }})">×</button>
+                                            <button type="button" style="border:0;background:none;cursor:pointer;opacity:.6" aria-label="{{ __('search::ui.tags.remove') }}" wire:click="hideTag(@js($row->id), {{ \Illuminate\Support\Js::from($tag['label']) }})">×</button>
                                         </span>
                                     @endforeach
                                 </td>
@@ -276,7 +276,7 @@
                         <span style="display:inline-flex;gap:8px;align-items:center;padding:4px 10px;border:1px solid #e4e4e7;border-radius:999px;font-size:13px">
                             <strong>{{ $synonym->term }}</strong> = {{ $synonym->means }}
                             @if ($synonym->origin !== 'team')<span style="{{ $small }}">{{ __('search::ui.synonyms.from_review') }}</span>@endif
-                            <button type="button" wire:click="removeSynonym('{{ $synonym->id }}')" style="border:0;background:none;cursor:pointer;opacity:.6" aria-label="{{ __('search::ui.synonyms.remove') }}">×</button>
+                            <button type="button" wire:click="removeSynonym(@js($synonym->id))" style="border:0;background:none;cursor:pointer;opacity:.6" aria-label="{{ __('search::ui.synonyms.remove') }}">×</button>
                         </span>
                     @endforeach
                 </div>

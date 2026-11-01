@@ -1,5 +1,6 @@
 <?php
 
+use App\Core\Http\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Railway and Cloudflare terminate TLS in front of the app. Trusting their forwarded
         // headers gives correct https URLs and real client IPs for the anonymous rate limit.
         $middleware->trustProxies(at: '*');
+
+        // What every response says about itself: who may frame it, no guessed types, https kept (1.11).
+        $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

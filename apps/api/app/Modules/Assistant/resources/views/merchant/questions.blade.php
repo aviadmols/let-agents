@@ -25,7 +25,7 @@
         <div class="lp-list-tools">
             <div class="lp-tabs lp-tabs-sm" role="tablist">
                 @foreach (['all', 'open', 'answered', 'off'] as $key)
-                    <button type="button" role="tab" wire:click="filter('{{ $key }}')" @class(['is-on' => $this->show === $key])>{{ $t('filters.'.$key) }} <span class="lp-count">{{ number_format($counts[$key]) }}</span></button>
+                    <button type="button" role="tab" wire:click="filter(@js($key))" @class(['is-on' => $this->show === $key])>{{ $t('filters.'.$key) }} <span class="lp-count">{{ number_format($counts[$key]) }}</span></button>
                 @endforeach
             </div>
             <span class="lp-field"><svg aria-hidden="true"><use href="#lp-i-search"/></svg><input class="lp-input lp-input-sm" type="search" wire:model.live.debounce.400ms="find" placeholder="{{ $t('find') }}" aria-label="{{ $t('find') }}"></span>

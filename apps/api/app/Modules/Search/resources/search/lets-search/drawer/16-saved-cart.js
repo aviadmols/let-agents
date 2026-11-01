@@ -243,7 +243,7 @@
     }) : Promise.all([json(STORE + '/products/' + encodeURIComponent(id), { credentials: 'same-origin' }), wooPageFields(id)]).then(function (both) {
       var p = both[0].body || null, page = both[1];
       // a required field to type in can be filled only on the product's page
-      if (page && page.free) { var r0 = rec(id); if (r0 && r0.url) { win.location.href = r0.url; } return null; }
+      if (page && page.free) { var r0 = rec(id); if (r0 && safeUrl(r0.url)) { win.location.href = safeUrl(r0.url); } return null; }
       if (p && page && page.fields.length) {
         p.formUrl = page.url;
         // the page asks it, not the variations: a simple product has none, and an attribute the page asks by the

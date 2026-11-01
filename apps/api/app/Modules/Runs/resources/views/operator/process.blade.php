@@ -19,7 +19,7 @@
         <x-filament::section :heading="$t('runs')">
             <div style="display:flex;flex-direction:column;gap:6px">
                 @forelse ($runs as $run)
-                    <button type="button" wire:click="openRun('{{ $run->id }}')" data-process-run="{{ $run->id }}"
+                    <button type="button" wire:click="openRun(@js($run->id))" data-process-run="{{ $run->id }}"
                             @style([$row, 'width:100%;text-align:start;cursor:pointer;background:transparent;color:inherit', 'border-color:#8b5cf6' => $this->run === $run->id])>
                         <span style="{{ $dot($run->status->value !== 'failed') }}"></span>
                         <span style="flex-grow:1;min-width:0">

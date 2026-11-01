@@ -45,7 +45,7 @@
                                         <span class="la-badge" data-tone="{{ ['ok' => 'good', 'near' => 'warn', 'over' => 'bad', 'idle' => ''][$row['state']] }}">{{ __('ai::budget.screen.state.'.$row['state']) }}</span>
                                     </td>
                                     <td class="la-num">
-                                        <button type="button" class="la-link" style="background: none; border: 0; cursor: pointer" wire:click="edit('{{ $row['id'] }}')">{{ __('ai::budget.screen.edit') }}</button>
+                                        <button type="button" class="la-link" style="background: none; border: 0; cursor: pointer" wire:click="edit(@js($row['id']))">{{ __('ai::budget.screen.edit') }}</button>
                                     </td>
                                 </tr>
                                 @if ($editing === $row['id'])
@@ -58,7 +58,7 @@
                                                         $ <input type="number" min="0" max="10000" step="1" wire:model="cap" aria-label="{{ __('ai::budget.screen.form.cap') }}" style="width: 90px">
                                                     </label>
                                                     @foreach ([30, 45, 60, 100] as $preset)
-                                                        <button type="button" class="la-btn la-btn-sm" wire:click="$set('cap', '{{ $preset }}')">${{ $preset }}</button>
+                                                        <button type="button" class="la-btn la-btn-sm" wire:click="$set('cap', @js($preset))">${{ $preset }}</button>
                                                     @endforeach
                                                 </div>
                                                 @error('cap')

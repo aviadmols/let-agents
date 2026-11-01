@@ -47,7 +47,7 @@
                             @foreach ($agent['on'] as $feature => $on)
                                 <span style="display:inline-flex;gap:6px;align-items:center">
                                     <span>{{ __(\Illuminate\Support\Str::before($feature, '.').'::features.'.\Illuminate\Support\Str::after($feature, '.').'.label') }}</span>
-                                    <x-filament::button size="xs" :color="$on ? 'gray' : 'primary'" wire:click="toggle('{{ $feature }}', {{ $on ? 'false' : 'true' }})">
+                                    <x-filament::button size="xs" :color="$on ? 'gray' : 'primary'" wire:click="toggle(@js($feature), {{ $on ? 'false' : 'true' }})">
                                         {{ __('ai::agents_screen.'.($on ? 'turn_off' : 'turn_on')) }}
                                     </x-filament::button>
                                 </span>
@@ -112,10 +112,10 @@
                     @endforeach
 
                     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-                        <x-filament::button wire:click="save('{{ $agent['key'] }}')">{{ __('ai::agents_screen.save') }}</x-filament::button>
+                        <x-filament::button wire:click="save(@js($agent['key']))">{{ __('ai::agents_screen.save') }}</x-filament::button>
                         @if ($agent['run'])
                             @if ($chosen)
-                                <x-filament::button color="gray" icon="heroicon-o-play" wire:click="runNow('{{ $agent['key'] }}')" wire:loading.attr="disabled" data-run-now="{{ $agent['key'] }}">{{ __('ai::agents_screen.run_now', ['shop' => $chosen['name']]) }}</x-filament::button>
+                                <x-filament::button color="gray" icon="heroicon-o-play" wire:click="runNow(@js($agent['key']))" wire:loading.attr="disabled" data-run-now="{{ $agent['key'] }}">{{ __('ai::agents_screen.run_now', ['shop' => $chosen['name']]) }}</x-filament::button>
                             @else
                                 <span style="{{ $small }}">{{ __('ai::agents_screen.run_needs_shop') }}</span>
                             @endif

@@ -233,7 +233,7 @@
                     <span>{{ $t('preview.title') }}</span>
                     <div class="lad-seg" role="radiogroup" aria-label="{{ $t('preview.device') }}">
                         @foreach (['desktop', 'phone'] as $device)
-                            <button type="button" role="radio" aria-checked="{{ $this->device === $device ? 'true' : 'false' }}" wire:click="pickDevice('{{ $device }}')">{{ $t('preview.'.$device) }}</button>
+                            <button type="button" role="radio" aria-checked="{{ $this->device === $device ? 'true' : 'false' }}" wire:click="pickDevice(@js($device))">{{ $t('preview.'.$device) }}</button>
                         @endforeach
                     </div>
                 </div>

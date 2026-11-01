@@ -24,17 +24,33 @@ final class ShopifyWebhooksController
     {
         $body = (string) $request->getContent();
 
-        if (! ShopifySignatures::webhook($body, $request->header('X-Shopify-Hmac-Sha256'))) {
+        $signer = ShopifySignatures::webhookSigner($body, $request->header('X-Shopify-Hmac-Sha256'));
+
+        if ($signer === null) {
             return response()->json(['error' => 'bad_signature'], 401);
         }
 
         $topic = (string) $request->header('X-Shopify-Topic');
         $shop = ShopifySignatures::shopDomain($request->header('X-Shopify-Shop-Domain'));
         $payload = (array) json_decode($body, true);
+
+        // The store is named in a header the signature does not cover: a signed body is taken for its own store only
+        // (the store it names, when it names one), and only from the app that store installed (1.11: a body signed for
+        // one store, sent again naming another, could have removed that one).
+        $named = $payload['shop_domain'] ?? $payload['myshopify_domain'] ?? null;
+
+        if (is_string($named) && $named !== '' && ShopifySignatures::shopDomain($named) !== $shop) {
+            return response()->json(['error' => 'bad_signature'], 401);
+        }
+
         $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
 
         if ($install === null) {
             return response()->json(['ok' => true]); // nothing kept for this store
+        }
+
+        if (filled($install->client_id) && (string) $install->client_id !== $signer) {
+            return response()->json(['error' => 'bad_signature'], 401);
         }
 
         match ($topic) {

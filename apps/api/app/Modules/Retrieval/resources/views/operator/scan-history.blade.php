@@ -67,12 +67,12 @@
 
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
                 @foreach (\App\Modules\Retrieval\Filament\Operator\Pages\ScanHistory::STATES as $key)
-                    <x-filament::button size="sm" :color="$state === $key ? 'primary' : 'gray'" wire:click="$set('state', '{{ $key }}')">{{ __('retrieval::ui.scans.filter.'.$key) }}</x-filament::button>
+                    <x-filament::button size="sm" :color="$state === $key ? 'primary' : 'gray'" wire:click="$set('state', @js($key))">{{ __('retrieval::ui.scans.filter.'.$key) }}</x-filament::button>
                 @endforeach
                 @if ($this->operatorView())
                 <span style="display:inline-flex;gap:4px;margin-inline-start:8px">
                     @foreach (['table', 'gallery'] as $mode)
-                        <x-filament::button size="sm" :color="$display === $mode ? 'primary' : 'gray'" :icon="$mode === 'table' ? 'heroicon-o-list-bullet' : 'heroicon-o-squares-2x2'" wire:click="$set('display', '{{ $mode }}')" data-layout="{{ $mode }}">{{ __('retrieval::ui.scans.layout.'.$mode) }}</x-filament::button>
+                        <x-filament::button size="sm" :color="$display === $mode ? 'primary' : 'gray'" :icon="$mode === 'table' ? 'heroicon-o-list-bullet' : 'heroicon-o-squares-2x2'" wire:click="$set('display', @js($mode))" data-layout="{{ $mode }}">{{ __('retrieval::ui.scans.layout.'.$mode) }}</x-filament::button>
                     @endforeach
                 </span>
                 @endif
@@ -88,7 +88,7 @@
                         <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
                             <img src="{{ $look['image']->image_url }}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:10px">
                             <strong>{{ $look['image']->title }}</strong>
-                            <button type="button" wire:click="toggleInspect('{{ $look['image']->id }}')" style="all:unset;cursor:pointer;margin-inline-start:auto;font-size:12px;text-decoration:underline">{{ __('retrieval::ui.scans.inspect.close') }}</button>
+                            <button type="button" wire:click="toggleInspect(@js($look['image']->id))" style="all:unset;cursor:pointer;margin-inline-start:auto;font-size:12px;text-decoration:underline">{{ __('retrieval::ui.scans.inspect.close') }}</button>
                         </div>
                         @include('retrieval::operator.partials.inspection', ['look' => $look, 'operator' => $this->operatorView()])
                     </div>
@@ -97,7 +97,7 @@
                     @foreach ($images as $image)
                         @php($is = $this->stateOf($image))
                         @php($mini = $is === 'scanned' ? $this->miniStrip($image) : [])
-                        <button type="button" @if ($is === 'scanned') wire:click="toggleInspect('{{ $image->id }}')" @endif data-card="{{ $image->external_id }}"
+                        <button type="button" @if ($is === 'scanned') wire:click="toggleInspect(@js($image->id))" @endif data-card="{{ $image->external_id }}"
                             style="all:unset;cursor:{{ $is === 'scanned' ? 'pointer' : 'default' }};display:grid;gap:6px;padding:8px;border-radius:12px;border:1px solid {{ $inspect === $image->id ? 'rgb(80,140,255)' : 'rgba(127,127,127,.2)' }}">
                             <img src="{{ $image->image_url }}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:rgba(127,127,127,.12)">
                             <span style="font-size:12px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">{{ $image->title }}</span>
@@ -146,7 +146,7 @@
                                     <td style="{{ $cell }};white-space:nowrap">
                                         {{ $image->embedded_at?->timezone('Asia/Jerusalem')->format('d/m H:i') ?? '—' }}
                                         @if ($is === 'scanned')
-                                            <br><button type="button" wire:click="toggleInspect('{{ $image->id }}')" style="all:unset;cursor:pointer;font-size:12px;font-weight:600;text-decoration:underline" data-inspect="{{ $image->external_id }}">{{ __('retrieval::ui.scans.inspect.'.($inspect === $image->id ? 'close' : 'open')) }}</button>
+                                            <br><button type="button" wire:click="toggleInspect(@js($image->id))" style="all:unset;cursor:pointer;font-size:12px;font-weight:600;text-decoration:underline" data-inspect="{{ $image->external_id }}">{{ __('retrieval::ui.scans.inspect.'.($inspect === $image->id ? 'close' : 'open')) }}</button>
                                         @endif
                                     </td>
                                 </tr>

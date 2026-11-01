@@ -75,8 +75,8 @@
 
                 @if ($proposal->publishable())
                     <div style="margin-top:10px;display:flex;gap:7px">
-                        <x-filament::button size="xs" wire:click="publish('{{ $proposal->id }}')">{{ __('enrichment::scan.publish') }}</x-filament::button>
-                        <x-filament::button size="xs" color="gray" wire:click="discard('{{ $proposal->id }}')">{{ __('enrichment::scan.discard') }}</x-filament::button>
+                        <x-filament::button size="xs" wire:click="publish(@js($proposal->id))">{{ __('enrichment::scan.publish') }}</x-filament::button>
+                        <x-filament::button size="xs" color="gray" wire:click="discard(@js($proposal->id))">{{ __('enrichment::scan.discard') }}</x-filament::button>
                     </div>
                 @endif
             </div>

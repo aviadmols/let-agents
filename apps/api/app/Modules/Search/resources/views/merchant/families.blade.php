@@ -17,7 +17,7 @@
 
         <nav class="lp-tabs" role="tablist" aria-label="{{ $t('title') }}">
             @foreach (['waiting' => count($waiting), 'approved' => count($approved), 'open' => count($open)] as $key => $count)
-                <button type="button" role="tab" wire:click="show('{{ $key }}')" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
+                <button type="button" role="tab" wire:click="show(@js($key))" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
             @endforeach
         </nav>
 
@@ -65,7 +65,7 @@
                     <div class="lp-row lp-row-wrap" data-family="{{ $row['ref'] }}" wire:key="{{ $row['ref'] }}">
                         <div class="lp-grow lp-chips">
                             @foreach ($row['words'] as $w)
-                                <span class="lp-chip lp-chip-plus" data-word="{{ $w }}">{{ $word($w) }}<button type="button" class="lp-chip-x" wire:click="dropWord('{{ $row['ref'] }}', @js($w))" aria-label="{{ $t('drop', ['word' => $word($w)]) }}" title="{{ $t('drop', ['word' => $word($w)]) }}">✕</button></span>
+                                <span class="lp-chip lp-chip-plus" data-word="{{ $w }}">{{ $word($w) }}<button type="button" class="lp-chip-x" wire:click="dropWord(@js($row['ref']), @js($w))" aria-label="{{ $t('drop', ['word' => $word($w)]) }}" title="{{ $t('drop', ['word' => $word($w)]) }}">✕</button></span>
                             @endforeach
                             <form class="lp-chip lp-chip-quiet lp-tag-add" x-data="{ adding: false }" wire:submit="addWord('{{ $row['ref'] }}')" @click.outside="adding = false">
                                 <button type="button" x-show="! adding" @click="adding = true; $nextTick(() => $refs.word.focus())">+ {{ $t('add') }}</button>
@@ -74,11 +74,11 @@
                         </div>
                         <div class="lp-actions">
                             @if ($this->tab === 'waiting')
-                                <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="approve('{{ $row['ref'] }}')">{{ $t('approve') }}</button>
-                                <button type="button" class="lp-btn lp-btn-sm" wire:click="reject('{{ $row['ref'] }}')">{{ $t('reject') }}</button>
+                                <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="approve(@js($row['ref']))">{{ $t('approve') }}</button>
+                                <button type="button" class="lp-btn lp-btn-sm" wire:click="reject(@js($row['ref']))">{{ $t('reject') }}</button>
                             @else
                                 @if ($row['auto'] ?? false)<span class="lp-note" data-auto>{{ $t('auto') }}</span>@endif
-                                <button type="button" class="lp-link" wire:click="reject('{{ $row['ref'] }}')" wire:confirm="{{ $t('remove_confirm') }}">{{ $t('remove') }}</button>
+                                <button type="button" class="lp-link" wire:click="reject(@js($row['ref']))" wire:confirm="{{ $t('remove_confirm') }}">{{ $t('remove') }}</button>
                             @endif
                         </div>
                     </div>

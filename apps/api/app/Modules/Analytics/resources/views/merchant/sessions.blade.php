@@ -27,7 +27,7 @@
                     <span class="lp-lbl">{{ $t('filters.min') }}</span>
                     <div class="lp-chips">
                         @foreach ([0 => $t('filters.all'), 5 => '5+', 10 => '10+'] as $n => $label)
-                            <button type="button" wire:click="toggle('min', '{{ $n }}')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->min === $n])><bdi dir="ltr">{{ $label }}</bdi></button>
+                            <button type="button" wire:click="toggle('min', @js($n))" @class(['lp-chip lp-chip-sm', 'is-on' => $this->min === $n])><bdi dir="ltr">{{ $label }}</bdi></button>
                         @endforeach
                     </div>
                 </div>
@@ -35,7 +35,7 @@
                     <span class="lp-lbl">{{ $t('filters.src') }}</span>
                     <div class="lp-chips">
                         @foreach (['google', 'facebook', 'whatsapp', 'direct', 'email'] as $src)
-                            <button type="button" wire:click="toggle('src', '{{ $src }}')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->src === $src])>{{ $t('filters.sources.'.$src) }}</button>
+                            <button type="button" wire:click="toggle('src', @js($src))" @class(['lp-chip lp-chip-sm', 'is-on' => $this->src === $src])>{{ $t('filters.sources.'.$src) }}</button>
                         @endforeach
                     </div>
                     <span class="lp-lbl">{{ $t('filters.param') }}</span>
@@ -49,13 +49,13 @@
                     <span class="lp-lbl">{{ $t('filters.has') }}</span>
                     <div class="lp-chips">
                         @foreach (\App\Modules\Analytics\Models\AnalyticsVisit::DID as $did)
-                            <button type="button" wire:click="toggle('has', '{{ $did }}')" @class(['lp-chip lp-chip-sm', 'is-on' => in_array($did, $this->has, true)])>{{ $t('filters.did.'.$did) }}</button>
+                            <button type="button" wire:click="toggle('has', @js($did))" @class(['lp-chip lp-chip-sm', 'is-on' => in_array($did, $this->has, true)])>{{ $t('filters.did.'.$did) }}</button>
                         @endforeach
                     </div>
                     <span class="lp-lbl">{{ $t('filters.dev') }}</span>
                     <div class="lp-chips">
                         @foreach (['phone', 'computer'] as $dev)
-                            <button type="button" wire:click="toggle('dev', '{{ $dev }}')" @class(['lp-chip lp-chip-sm', 'is-on' => $this->dev === $dev])>{{ $t('devices.'.$dev) }}</button>
+                            <button type="button" wire:click="toggle('dev', @js($dev))" @class(['lp-chip lp-chip-sm', 'is-on' => $this->dev === $dev])>{{ $t('devices.'.$dev) }}</button>
                         @endforeach
                     </div>
                 </div>
@@ -71,7 +71,7 @@
                         ...collect($this->has)->mapWithKeys(fn (string $h): array => ['has:'.$h => $t('tags.has', ['what' => $t('filters.did.'.$h)])])->all(),
                     ]))
                     @forelse ($tags as $key => $label)
-                        <span class="lp-ftag">{{ $label }}<button type="button" wire:click="clear('{{ $key }}')" aria-label="{{ $t('tags.clear_one') }}"><svg><use href="#lp-i-x"/></svg></button></span>
+                        <span class="lp-ftag">{{ $label }}<button type="button" wire:click="clear(@js($key))" aria-label="{{ $t('tags.clear_one') }}"><svg><use href="#lp-i-x"/></svg></button></span>
                     @empty
                         <span class="lp-note">{{ $t('tags.none') }}</span>
                     @endforelse

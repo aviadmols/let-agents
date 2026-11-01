@@ -19,7 +19,7 @@
 
         <nav class="lp-tabs" role="tablist" aria-label="{{ __('assistant::ui.knowledge.title') }}">
             @foreach (['general' => $t('tabs.general_count', ['n' => $counts['general']]), 'posts' => (string) $counts['posts'], 'found' => (string) $counts['found'], 'rules' => (string) $counts['rules']] as $key => $count)
-                <button type="button" role="tab" wire:click="show('{{ $key }}')" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
+                <button type="button" role="tab" wire:click="show(@js($key))" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
             @endforeach
         </nav>
 
@@ -63,8 +63,8 @@
                             @endif
                         </div>
                         @if ($this->editing !== $row['id'])
-                            <button type="button" class="lp-link" wire:click="startEdit('{{ $row['id'] }}')">{{ $t('own.edit') }}</button>
-                            <button type="button" class="lp-link" wire:click="removeInfo('{{ $row['id'] }}')" wire:confirm="{{ $t('own.remove_confirm') }}">{{ $t('own.remove') }}</button>
+                            <button type="button" class="lp-link" wire:click="startEdit(@js($row['id']))">{{ $t('own.edit') }}</button>
+                            <button type="button" class="lp-link" wire:click="removeInfo(@js($row['id']))" wire:confirm="{{ $t('own.remove_confirm') }}">{{ $t('own.remove') }}</button>
                         @endif
                     </div>
                 @endforeach
@@ -111,7 +111,7 @@
                             </span>
                         </div>
                         @if ($post['facts'] !== [])
-                            <button type="button" class="lp-link" wire:click="togglePost('{{ $post['id'] }}')" aria-expanded="{{ $this->openPost === $post['id'] ? 'true' : 'false' }}">{{ $this->openPost === $post['id'] ? $t('posts.close') : $t('posts.to_facts') }}</button>
+                            <button type="button" class="lp-link" wire:click="togglePost(@js($post['id']))" aria-expanded="{{ $this->openPost === $post['id'] ? 'true' : 'false' }}">{{ $this->openPost === $post['id'] ? $t('posts.close') : $t('posts.to_facts') }}</button>
                         @endif
                         @if ($this->openPost === $post['id'])
                             <ul class="lp-facts">
@@ -139,7 +139,7 @@
                             <span class="lp-row-t">{{ $row['text'] }}</span>
                             <span class="lp-row-s">{{ $row['from'] }}</span>
                         </div>
-                        <button type="button" class="lp-link" wire:click="removeFound('{{ $row['kind'] }}', @js($row['key']))" wire:confirm="{{ $t('found.remove_confirm') }}">{{ $t('remove') }}</button>
+                        <button type="button" class="lp-link" wire:click="removeFound(@js($row['kind']), @js($row['key']))" wire:confirm="{{ $t('found.remove_confirm') }}">{{ $t('remove') }}</button>
                     </div>
                 @empty
                     <p class="lp-empty">{{ $t('found.none') }}</p>
@@ -240,18 +240,18 @@
                             @endif
                             @if (in_array($rule['status'], ['failed', 'unclear'], true))
                                 <div class="lp-actions" style="margin-top: 10px">
-                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="retryRule('{{ $rule['id'] }}')" wire:loading.attr="disabled" wire:target="retryRule">{{ $t('rules.retry') }}</button>
+                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="retryRule(@js($rule['id']))" wire:loading.attr="disabled" wire:target="retryRule">{{ $t('rules.retry') }}</button>
                                 </div>
                             @endif
                             @if ($rule['status'] === 'proposed')
                                 <div class="lp-actions" style="margin-top: 10px">
-                                    <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="decideRule('{{ $rule['id'] }}', true)" wire:loading.attr="disabled" wire:target="decideRule">{{ $t('rules.approve') }}</button>
-                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="decideRule('{{ $rule['id'] }}', false)">{{ $t('rules.reject') }}</button>
+                                    <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="decideRule(@js($rule['id']), true)" wire:loading.attr="disabled" wire:target="decideRule">{{ $t('rules.approve') }}</button>
+                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="decideRule(@js($rule['id']), false)">{{ $t('rules.reject') }}</button>
                                 </div>
                             @endif
                         </div>
                         @if ($rule['status'] !== 'reading')
-                            <button type="button" class="lp-link" wire:click="removeRule('{{ $rule['id'] }}')" wire:confirm="{{ $t('rules.remove_confirm') }}">{{ $t('rules.remove_rule') }}</button>
+                            <button type="button" class="lp-link" wire:click="removeRule(@js($rule['id']))" wire:confirm="{{ $t('rules.remove_confirm') }}">{{ $t('rules.remove_rule') }}</button>
                         @endif
                     </div>
                 @empty

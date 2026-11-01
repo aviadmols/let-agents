@@ -12,7 +12,7 @@
                     <div style="margin:0 0 4px;padding:0 10px;font-size:11px;font-weight:600;color:#9ca3af">{{ __('admin::configuration.tabs.shop') }}</div>
                 @endif
 
-                <button type="button" wire:click="openArea('{{ $key }}')"
+                <button type="button" wire:click="openArea(@js($key))"
                         @style([
                             'text-align:start;padding:7px 10px;border-radius:8px;font-size:13px;line-height:1.3;border:1px solid transparent',
                             'background:#f4f4f5;font-weight:600' => $this->area === $key,

@@ -74,7 +74,7 @@
                                 @if ($plan['url'] !== null)
                                     <a class="lp-btn lp-btn-sm {{ $plan['move'] === 'downgrade' ? '' : 'lp-btn-primary' }}" href="{{ $plan['url'] }}" target="_top" data-plan-move="{{ $plan['move'] }}">{{ $t($plan['move']) }}</a>
                                 @else
-                                    <button type="button" class="lp-btn lp-btn-sm {{ $plan['move'] === 'downgrade' ? '' : 'lp-btn-primary' }}" wire:click="askPlan('{{ $plan['code'] }}')" wire:loading.attr="disabled" data-plan-move="{{ $plan['move'] }}">{{ $t($plan['move']) }}</button>
+                                    <button type="button" class="lp-btn lp-btn-sm {{ $plan['move'] === 'downgrade' ? '' : 'lp-btn-primary' }}" wire:click="askPlan(@js($plan['code']))" wire:loading.attr="disabled" data-plan-move="{{ $plan['move'] }}">{{ $t($plan['move']) }}</button>
                                 @endif
                             </div>
                         @endif

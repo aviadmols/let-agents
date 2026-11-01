@@ -10,7 +10,7 @@
             <ul style="margin-top:8px;display:grid;gap:4px">
                 @foreach ($this->matches() as $match)
                     <li>
-                        <button type="button" wire:click="pick('{{ $match['shop_id'] }}', '{{ $match['type'] }}', '{{ $match['external_id'] }}')" style="text-decoration:underline;text-align:start">{{ $match['title'] }}</button>
+                        <button type="button" wire:click="pick(@js($match['shop_id']), @js($match['type']), @js($match['external_id']))" style="text-decoration:underline;text-align:start">{{ $match['title'] }}</button>
                         <span style="{{ $small }}">#{{ $match['external_id'] }} · {{ __('widget::ui.preview.page_types.'.$match['type']) }}@if ($this->picksShop()) · {{ $match['shop'] }}@endif</span>
                     </li>
                 @endforeach
@@ -21,7 +21,7 @@
             <ul style="margin-top:4px;display:grid;gap:4px">
                 @foreach ($this->recent() as $item)
                     <li>
-                        <button type="button" wire:click="pick('{{ $item['shop_id'] }}', '{{ $item['type'] }}', '{{ $item['external_id'] }}')" style="text-decoration:underline;text-align:start">{{ $item['title'] }}</button>
+                        <button type="button" wire:click="pick(@js($item['shop_id']), @js($item['type']), @js($item['external_id']))" style="text-decoration:underline;text-align:start">{{ $item['title'] }}</button>
                         <span style="{{ $small }}">{{ __('widget::ui.preview.page_types.'.$item['type']) }}</span>
                     </li>
                 @endforeach
@@ -75,7 +75,7 @@
                 <p style="margin-top:10px;{{ $small }}">{{ __('widget::ui.page.hidden_sections') }}:
                     @foreach ($page['hidden_sections'] as $candidate)
                         <span style="margin-inline-start:6px">{{ __('widget::bank.chips.'.$candidate) }}
-                            <button type="button" wire:click="clear('{{ $candidate }}')" style="{{ $btn }}">{{ __('widget::ui.page.show_again') }}</button>
+                            <button type="button" wire:click="clear(@js($candidate))" style="{{ $btn }}">{{ __('widget::ui.page.show_again') }}</button>
                         </span>
                     @endforeach
                 </p>
@@ -84,7 +84,7 @@
                 <p style="margin-top:6px;{{ $small }}">{{ __('widget::ui.page.hidden_in', ['section' => __('widget::bank.chips.'.$candidate)]) }}:
                     @foreach ($items as $item)
                         <span style="margin-inline-start:6px">{{ $page['titles'][$item] ?? $item }}
-                            <button type="button" wire:click="clear('{{ $candidate }}', '{{ $item }}')" style="{{ $btn }}">{{ __('widget::ui.page.show_again') }}</button>
+                            <button type="button" wire:click="clear(@js($candidate), @js($item))" style="{{ $btn }}">{{ __('widget::ui.page.show_again') }}</button>
                         </span>
                     @endforeach
                 </p>
@@ -169,11 +169,11 @@
                 <x-slot name="headerEnd">
                     <div style="display:flex;gap:6px">
                         @if ($pinnedSection)
-                            <button type="button" wire:click="clear('{{ $candidate }}')" style="{{ $btn }}">{{ __('widget::ui.page.unpin_section') }}</button>
+                            <button type="button" wire:click="clear(@js($candidate))" style="{{ $btn }}">{{ __('widget::ui.page.unpin_section') }}</button>
                         @else
-                            <button type="button" wire:click="pin('{{ $candidate }}')" style="{{ $btn }}">{{ __('widget::ui.page.pin_section') }}</button>
+                            <button type="button" wire:click="pin(@js($candidate))" style="{{ $btn }}">{{ __('widget::ui.page.pin_section') }}</button>
                         @endif
-                        <button type="button" wire:click="hide('{{ $candidate }}')" style="{{ $btn }}">{{ __('widget::ui.page.hide_section') }}</button>
+                        <button type="button" wire:click="hide(@js($candidate))" style="{{ $btn }}">{{ __('widget::ui.page.hide_section') }}</button>
                     </div>
                 </x-slot>
 
@@ -243,11 +243,11 @@
                                 </td>
                                 <td style="padding:6px 4px;white-space:nowrap;text-align:end">
                                     @if ($isPinned)
-                                        <button type="button" wire:click="clear('{{ $candidate }}', '{{ $product['id'] }}')" style="{{ $btn }}">{{ __('widget::ui.page.unpin') }}</button>
+                                        <button type="button" wire:click="clear(@js($candidate), @js($product['id']))" style="{{ $btn }}">{{ __('widget::ui.page.unpin') }}</button>
                                     @else
-                                        <button type="button" wire:click="pin('{{ $candidate }}', '{{ $product['id'] }}')" style="{{ $btn }}">{{ __('widget::ui.page.pin') }}</button>
+                                        <button type="button" wire:click="pin(@js($candidate), @js($product['id']))" style="{{ $btn }}">{{ __('widget::ui.page.pin') }}</button>
                                     @endif
-                                    <button type="button" wire:click="hide('{{ $candidate }}', '{{ $product['id'] }}')" style="{{ $btn }}">{{ __('widget::ui.page.hide') }}</button>
+                                    <button type="button" wire:click="hide(@js($candidate), @js($product['id']))" style="{{ $btn }}">{{ __('widget::ui.page.hide') }}</button>
                                 </td>
                             </tr>
                         @endforeach
@@ -257,11 +257,11 @@
                             <input type="search" wire:model.live.debounce.300ms="addSearch" placeholder="{{ __('widget::ui.page.add_search') }}" style="width:100%;padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px">
                             <ul style="margin-top:6px;display:grid;gap:4px">
                                 @foreach ($this->addMatches() as $match)
-                                    <li><button type="button" wire:click="add('{{ $match->external_id }}')" style="text-decoration:underline;text-align:start">{{ $match->title }}</button> <span style="{{ $small }}">#{{ $match->external_id }}</span></li>
+                                    <li><button type="button" wire:click="add(@js($match->external_id))" style="text-decoration:underline;text-align:start">{{ $match->title }}</button> <span style="{{ $small }}">#{{ $match->external_id }}</span></li>
                                 @endforeach
                             </ul>
                         @else
-                            <button type="button" wire:click="startAdding('{{ $candidate }}')" style="{{ $btn }}">{{ __('widget::ui.page.add_product') }}</button>
+                            <button type="button" wire:click="startAdding(@js($candidate))" style="{{ $btn }}">{{ __('widget::ui.page.add_product') }}</button>
                         @endif
                     </div>
                 @endif
@@ -273,7 +273,7 @@
                             <li>
                                 <a href="{{ $guide['url'] }}" target="_blank" rel="noopener" style="text-decoration:underline">{{ $guide['title'] }}</a>
                                 <span style="{{ $small }}">— {{ __('widget::ui.page.why_guide', ['score' => $g['score'] ?? '?', 'topic' => __('widget::ui.page.topics.'.($g['topic'] ?? 'unknown')), 'kind' => $g['kind'] ?? '?', 'uses' => implode(', ', $g['shared_uses'] ?? [])]) }}@if (! empty($g['matched'])) · {{ __('widget::ui.page.matched_article') }}@endif</span>
-                                <button type="button" wire:click="hide('{{ $candidate }}', '{{ $guide['id'] }}')" style="{{ $btn }}">{{ __('widget::ui.page.hide') }}</button>
+                                <button type="button" wire:click="hide(@js($candidate), @js($guide['id']))" style="{{ $btn }}">{{ __('widget::ui.page.hide') }}</button>
                             </li>
                         @endforeach
                     </ul>
@@ -327,12 +327,12 @@
                                 <input type="search" wire:model.live.debounce.300ms="addSearch" placeholder="{{ __('widget::ui.page.add_search') }}" style="width:100%;margin-top:4px;padding:6px 10px;border:1px solid #d4d4d8;border-radius:8px">
                                 <ul style="margin-top:6px;display:grid;gap:4px">
                                     @foreach ($this->addMatches() as $match)
-                                        <li><button type="button" wire:click="add('{{ $match->external_id }}')" style="text-decoration:underline;text-align:start">{{ $match->title }}</button> <span style="{{ $small }}">#{{ $match->external_id }}</span></li>
+                                        <li><button type="button" wire:click="add(@js($match->external_id))" style="text-decoration:underline;text-align:start">{{ $match->title }}</button> <span style="{{ $small }}">#{{ $match->external_id }}</span></li>
                                     @endforeach
                                 </ul>
                             </div>
                         @else
-                            <button type="button" wire:click="startAdding('{{ $candidate }}')" style="{{ $btn }}">{{ __('widget::ui.page.add_to', ['section' => __('widget::bank.chips.'.$candidate)]) }}</button>
+                            <button type="button" wire:click="startAdding(@js($candidate))" style="{{ $btn }}">{{ __('widget::ui.page.add_to', ['section' => __('widget::bank.chips.'.$candidate)]) }}</button>
                         @endif
                     @endforeach
                 </div>

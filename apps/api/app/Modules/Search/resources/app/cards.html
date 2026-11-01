@@ -50,7 +50,8 @@
 
   // The store's own address, opened by the AI's host (never inside the cards).
   function open(href) {
-    if (!href) {
+    // a web address only: "javascript:…" from a product row is no link (1.11)
+    if (!href || !/^https?:\/\//i.test(String(href))) {
       return;
     }
     if (window.openai && typeof window.openai.openExternal === 'function') {
@@ -198,8 +199,10 @@
   window.addEventListener('openai:set_globals', fromHost);
   fromHost();
 
-  // MCP Apps: the answer arrives as a message from the host.
+  // MCP Apps: the answer arrives as a message from the host, and only from it (1.11: another window that framed or
+  // opened this page could hand it products of its own).
   window.addEventListener('message', function (event) {
+    if (!window.parent || window.parent === window || event.source !== window.parent) { return; }
     var m = event.data;
     if (m && m.jsonrpc === '2.0' && m.method === 'ui/notifications/tool-result' && m.params) {
       take(m.params.structuredContent, m.params._meta);

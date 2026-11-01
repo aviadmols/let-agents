@@ -4,6 +4,7 @@ namespace App\Modules\Enrichment\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\AgentModel;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -23,7 +24,6 @@ use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Tenancy\Models\Shop;
-use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -414,8 +414,11 @@ final class LookUpOnTheWeb
     private function page(string $url): ?string
     {
         try {
-            $response = Http::timeout(12)->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; LetAgentsCheck/1.0)', 'Accept-Language' => 'he,en;q=0.8'])->get($url);
+            $response = OutboundUrl::request($url)?->timeout(12)->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; LetAgentsCheck/1.0)', 'Accept-Language' => 'he,en;q=0.8'])->get($url);
         } catch (Throwable) {
+            return null;
+        }
+        if ($response === null) {
             return null;
         }
 

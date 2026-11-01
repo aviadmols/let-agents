@@ -5,6 +5,7 @@ namespace App\Modules\Connections\Support;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\UriInterface;
 
 /**
  * One GET to the store's Let Agents plugin, with the saved token.
@@ -20,9 +21,27 @@ final class PluginHttp
      * @param  array<string, scalar>  $query
      * @return array{0: Response, 1: string} the response and the URL that produced it
      */
+    /**
+     * Redirects only within the store's own site (its host, with or without www, on https or http): the token and the
+     * signature never follow one to another host, which would then hold the key that signs this store's requests.
+     *
+     * @return array<string, mixed>
+     */
+    private static function sameSite(StoreConnection $connection): array
+    {
+        $home = preg_replace('/^www\./', '', strtolower((string) parse_url((string) $connection->site_url, PHP_URL_HOST)));
+
+        return ['allow_redirects' => ['max' => 3, 'protocols' => ['http', 'https'], 'on_redirect' => function ($request, $response, UriInterface $to) use ($home): void {
+            if (preg_replace('/^www\./', '', strtolower($to->getHost())) !== $home) {
+                throw new \RuntimeException('The store\'s site redirected to another host: the token is not sent there.');
+            }
+        }]];
+    }
+
     public static function get(StoreConnection $connection, string $route, array $query = [], int $timeoutSeconds = 30): array
     {
         $client = Http::acceptJson()
+            ->withOptions(self::sameSite($connection))
             ->withHeaders(['X-LetAgents-Token' => $connection->access_token, 'User-Agent' => 'Let Agents/'.config('app.name')])
             ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
             ->timeout($timeoutSeconds);
@@ -59,6 +78,7 @@ final class PluginHttp
                 'User-Agent' => 'Let Agents/'.config('app.name'),
             ])
             ->withBody($body, 'application/json')
+            ->withOptions(self::sameSite($connection))
             ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
             ->timeout($timeoutSeconds);
 

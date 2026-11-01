@@ -2,6 +2,8 @@
 
 namespace App\Modules\Retrieval\Support;
 
+use App\Core\Media\Picture;
+
 /**
  * A product picture without the plain background around the product: a small ring in the middle
  * of a large white frame is mostly white to a picture model, and a shopper's photo of a ring on a
@@ -65,7 +67,7 @@ final class PictureTrim
      */
     public static function cut(string $bytes): ?array
     {
-        $image = @imagecreatefromstring($bytes);
+        $image = Picture::decode($bytes);
 
         if ($image === false) {
             return null;

@@ -42,6 +42,7 @@ class ShopInvitation extends Model
         return [
             'role' => ShopRole::class,
             'sent_at' => 'datetime',
+            'mailed_at' => 'datetime',
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
         ];

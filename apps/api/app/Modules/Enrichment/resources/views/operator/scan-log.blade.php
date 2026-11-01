@@ -10,7 +10,7 @@
             <ul style="margin-top:8px;display:grid;gap:4px">
                 @foreach ($this->matches() as $match)
                     <li>
-                        <button type="button" wire:click="pick('{{ $match->id }}')" style="text-decoration:underline;text-align:start">
+                        <button type="button" wire:click="pick(@js($match->id))" style="text-decoration:underline;text-align:start">
                             {{ $match->title }}
                         </button>
                         <span style="opacity:.6;font-size:12px">#{{ $match->external_id }} · {{ $match->shop?->name }}</span>

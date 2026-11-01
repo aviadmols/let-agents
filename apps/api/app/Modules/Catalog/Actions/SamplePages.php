@@ -4,6 +4,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -16,7 +17,6 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Closure;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -163,7 +163,7 @@ final class SamplePages
     private function get(string $url, string $accept): ?Response
     {
         try {
-            return Http::withHeaders(['User-Agent' => 'LetsSearch/1.0 (+https://agents.lets.co.il)', 'Accept' => $accept])->timeout(self::TIMEOUT_SECONDS)->get($url);
+            return OutboundUrl::request($url)?->withHeaders(['User-Agent' => 'LetsSearch/1.0 (+https://agents.lets.co.il)', 'Accept' => $accept])->timeout(self::TIMEOUT_SECONDS)->get($url);
         } catch (Throwable) {
             return null;
         }

@@ -4,6 +4,7 @@ namespace App\Modules\Search\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Media\Picture;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogContent;
@@ -1526,7 +1527,7 @@ final class SearchCatalog
      */
     private static function cut(string $bytes, array $box): ?string
     {
-        $image = @imagecreatefromstring($bytes);
+        $image = Picture::decode($bytes);
 
         if ($image === false) {
             return null;
@@ -2034,8 +2035,9 @@ final class SearchCatalog
             return;
         }
 
+        // a shopper's "%" or "_" is a letter here, not a pattern that matches the whole catalogue (1.11)
         $known = CatalogProduct::query()->whereNull('removed_at')
-            ->where(fn ($q) => $q->where('sku', trim($query))->orWhere('title', 'like', '%'.trim($query).'%'))
+            ->where(fn ($q) => $q->where('sku', trim($query))->orWhere('title', 'like', '%'.addcslashes(trim($query), '%_\\').'%'))
             ->limit(20)->pluck('external_id')->map(fn ($id): string => 'p:'.$id);
 
         if ($known->contains(fn (string $id): bool => ! isset($index['records'][$id])) && Cache::add('search:missing-code:'.$shopId, true, now()->addMinutes(5))) {

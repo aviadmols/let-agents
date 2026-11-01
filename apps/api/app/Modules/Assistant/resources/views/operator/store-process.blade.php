@@ -103,7 +103,7 @@
         @else
             <div style="display:flex;flex-wrap:wrap;gap:8px">
                 @foreach ($reports as $item)
-                    <x-filament::button size="sm" :color="$this->report === $item->id ? 'primary' : 'gray'" wire:click="open('{{ $item->id }}')">
+                    <x-filament::button size="sm" :color="$this->report === $item->id ? 'primary' : 'gray'" wire:click="open(@js($item->id))">
                         {{ $label('kinds', $item->kind) }} · <span dir="ltr">{{ $item->label }}</span> · {{ $t('questions_n', ['n' => $item->questions]) }} · {{ $item->updated_at?->format('d/m H:i') }}
                     </x-filament::button>
                 @endforeach

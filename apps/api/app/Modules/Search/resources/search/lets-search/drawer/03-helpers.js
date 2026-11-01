@@ -13,6 +13,13 @@
       return (kept[k] = fn(k));
     };
   }
+  // A page's or a picture's address as the drawer uses it: a web address (http, https, protocol-relative) or a path on
+  // this site; anything else ("javascript:…", "data:…") is no address and becomes '' (1.11: a demo of any site could put
+  // a script behind a product's link).
+  function safeUrl(u) {
+    var s = String(u == null ? '' : u).trim();
+    return /^(https?:)?\/\/[^\s]/i.test(s) || /^\/(?!\/)/.test(s) ? s : '';
+  }
   var decode = memo(function (s) { var d = doc.createElement('textarea'); d.innerHTML = s; return d.value; });
   function icon(n, cls) { if (n === 'fwd' || n === 'back') { cls = (cls || '') + ' ls-icon--dir'; } return '<svg class="ls-icon ' + (cls || '') + '" aria-hidden="true"><use href="#ls-i-' + n + '"/></svg>'; }
   function mark(think) { return '<span class="ls-mark' + (think ? ' ls-mark--think' : '') + '" aria-hidden="true"><i></i><i></i></span>'; }

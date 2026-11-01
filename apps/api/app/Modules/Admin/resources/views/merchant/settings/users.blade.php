@@ -18,7 +18,7 @@
                         @if ($person['kind'] === 'invitation')
                             <span class="lp-pill" data-tone="warn">{{ $t($person['expired'] ? 'expired_pill' : 'waiting') }}</span>
                             @if ($manage)
-                                <button type="button" class="lp-link" wire:click="resend('{{ $person['id'] }}')" wire:loading.attr="disabled">{{ $t('resend') }}</button>
+                                <button type="button" class="lp-link" wire:click="resend(@js($person['id']))" wire:loading.attr="disabled">{{ $t('resend') }}</button>
                             @endif
                         @elseif (! $person['owner'])
                             <span class="lp-chip lp-chip-sm lp-chip-quiet">{{ $person['role']->label() }}</span>

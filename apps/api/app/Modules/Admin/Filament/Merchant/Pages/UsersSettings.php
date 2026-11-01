@@ -167,6 +167,9 @@ class UsersSettings extends Page
 
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             $this->problems['email'] = __('admin::shop_settings.users.email_wrong');
+        } elseif (User::reservedEmail($email)) {
+            // the platform's own accounts' addresses: never invited as a person (User::reservedEmail)
+            $this->problems['email'] = __('admin::shop_settings.profile.email_reserved');
         } elseif ($this->shop()->belongsToMany(User::class, 'shop_user')->whereRaw('lower(email) = ?', [$email])->exists()) {
             $this->problems['email'] = __('admin::shop_settings.users.already');
         } elseif (! app(InviteToShop::class)->hasRoom($this->shop(), $email)) {

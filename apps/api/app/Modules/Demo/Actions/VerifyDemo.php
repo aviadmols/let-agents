@@ -29,13 +29,24 @@ final class VerifyDemo
             return 'expired';
         }
 
-        if (! Hash::check(preg_replace('/\D/', '', $code), (string) $site->code_hash)) {
-            $site->increment('code_tries');
+        // a try is taken before the code is compared, in one statement: guesses sent at once each take their own and
+        // none gets past the limit (1.11)
+        if (DemoSite::query()->whereKey($site->getKey())->where('code_tries', '<', StartDemo::CODE_TRIES)->increment('code_tries') === 0) {
+            return 'locked';
+        }
 
+        $site->forceFill(['code_tries' => $site->code_tries + 1])->syncOriginalAttribute('code_tries');
+
+        if (! Hash::check(preg_replace('/\D/', '', $code), (string) $site->code_hash)) {
             return 'wrong';
         }
 
-        $site->forceFill(['verified_at' => now(), 'code_hash' => null])->save();
+        // the right code is taken once: a second request with it finds the demo already begun
+        if (DemoSite::query()->whereKey($site->getKey())->whereNotNull('code_hash')->update(['verified_at' => now(), 'code_hash' => null]) === 0) {
+            return 'done';
+        }
+
+        $site->forceFill(['verified_at' => now(), 'code_hash' => null])->syncOriginal();
         $this->begin($site);
 
         return 'ok';

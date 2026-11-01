@@ -3,6 +3,7 @@
 namespace App\Modules\Retrieval\Actions;
 
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\Embeddings;
 use App\Modules\Ai\Contracts\ImageEmbedder;
@@ -21,9 +22,8 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use Throwable;
 
 /**
  * Each product's main picture, given a vector in the same space as words.
@@ -409,8 +409,12 @@ final class BuildImageIndex
         $maxBytes = (int) Settings::get('retrieval.image_max_kb') * 1024;
 
         try {
-            $response = Http::timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get(PictureAddress::fetchable($row->image_url));
-        } catch (ConnectionException) {
+            $url = PictureAddress::fetchable($row->image_url);
+            $response = OutboundUrl::request($url, $maxBytes + 1)?->timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get($url);
+        } catch (Throwable) {
+            return $this->failed($row, 'unreachable');
+        }
+        if ($response === null) {
             return $this->failed($row, 'unreachable');
         }
 

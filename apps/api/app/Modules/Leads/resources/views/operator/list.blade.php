@@ -10,7 +10,7 @@
                 <x-filament::button
                     size="sm"
                     :color="$this->show === $which ? 'primary' : 'gray'"
-                    wire:click="setShow('{{ $which }}')">
+                    wire:click="setShow(@js($which))">
                     {{ __('leads::list.tabs.'.$which) }}
                     @if ($which !== 'all' && ($counts[$which] ?? 0) > 0)
                         ({{ $counts[$which] }})
@@ -40,7 +40,7 @@
                         <td style="{{ $cell }};font-variant-numeric:tabular-nums;direction:ltr;text-align:start">
                             {{ $this->contactOf($lead) }}
                             @unless (isset($this->revealed[$lead->id]))
-                                <button type="button" wire:click="reveal('{{ $lead->id }}')"
+                                <button type="button" wire:click="reveal(@js($lead->id))"
                                         style="margin-inline-start:6px;{{ $small }};text-decoration:underline">{{ __('leads::list.reveal') }}</button>
                             @endunless
                         </td>
@@ -58,10 +58,10 @@
                         <td style="{{ $cell }};{{ $small }}">{{ $lead->created_at->diffForHumans() }}</td>
                         <td style="{{ $cell }};white-space:nowrap">
                             @if ($lead->status !== 'handled')
-                                <x-filament::button size="xs" color="gray" wire:click="mark('{{ $lead->id }}', 'handled')">{{ __('leads::list.mark_handled') }}</x-filament::button>
+                                <x-filament::button size="xs" color="gray" wire:click="mark(@js($lead->id), 'handled')">{{ __('leads::list.mark_handled') }}</x-filament::button>
                             @endif
                             @if ($lead->status !== 'discarded')
-                                <x-filament::button size="xs" color="gray" wire:click="mark('{{ $lead->id }}', 'discarded')">{{ __('leads::list.mark_discarded') }}</x-filament::button>
+                                <x-filament::button size="xs" color="gray" wire:click="mark(@js($lead->id), 'discarded')">{{ __('leads::list.mark_discarded') }}</x-filament::button>
                             @endif
                         </td>
                     </tr>

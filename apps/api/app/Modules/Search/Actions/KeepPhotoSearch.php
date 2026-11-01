@@ -4,6 +4,7 @@ namespace App\Modules\Search\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Http\Visit;
+use App\Core\Media\Picture;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Support\PhotoLook;
 use Throwable;
@@ -82,7 +83,7 @@ final class KeepPhotoSearch
             return null;
         }
 
-        $image = @imagecreatefromstring($bytes);
+        $image = Picture::decode($bytes);
 
         if ($image === false) {
             return null;

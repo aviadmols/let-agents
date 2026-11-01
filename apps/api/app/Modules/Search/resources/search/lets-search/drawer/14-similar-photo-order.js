@@ -287,7 +287,7 @@
       var all = orderRows(turn);
       // everything in: straight to the cart; a choice left, the shopper chooses and adds again
       if (all.every(function (r) { return r.done || !r.add; }) && !all.some(function (r) { return !r.add && r.line.status === 'requires_manual_option_selection'; })) {
-        setTimeout(function () { win.location.href = turn.order.cart_url || CFG.cartUrl; }, 900);
+        setTimeout(function () { win.location.href = safeUrl(turn.order.cart_url) || CFG.cartUrl; }, 900);
       }
     });
   }

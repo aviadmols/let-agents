@@ -9,7 +9,7 @@
         <nav class="la-tabs" style="padding: 0" aria-label="{{ __('admin::home.notices.title') }}">
             @foreach (['all', ...\App\Modules\Admin\Contracts\ShopNotice::KINDS, 'done'] as $tab)
                 @php($count = match ($tab) { 'all' => count($all), 'done' => count($done), default => count(array_filter($all, fn ($n) => $n->kind === $tab)) })
-                <button type="button" wire:click="show('{{ $tab }}')" aria-selected="{{ $kind === $tab ? 'true' : 'false' }}">
+                <button type="button" wire:click="show(@js($tab))" aria-selected="{{ $kind === $tab ? 'true' : 'false' }}">
                     {{ __('admin::home.notices.tabs.'.$tab) }}
                     @if ($count > 0)<span class="la-badge" data-tone="{{ in_array($tab, ['todo', 'setup'], true) ? 'warn' : '' }}" style="margin-inline-start: 4px; padding: 0 8px">{{ $count }}</span>@endif
                 </button>

@@ -26,8 +26,8 @@ final class FeedRecord
             'path' => $path,
             'depth' => max(0, count($path) - 1),
             'product_count' => (int) ($record['product_count'] ?? 0),
-            'url' => self::nullableString($record['url'] ?? null),
-            'image_url' => self::nullableString($record['image'] ?? null),
+            'url' => self::webUrl($record['url'] ?? null),
+            'image_url' => self::webUrl($record['image'] ?? null),
             'hash' => (string) ($record['hash'] ?? hash('sha256', (string) json_encode($record))),
         ];
     }
@@ -49,7 +49,7 @@ final class FeedRecord
             'type' => self::limit((string) ($record['type'] ?? 'simple'), 20),
             'status' => self::limit((string) ($record['status'] ?? 'publish'), 20),
             'title' => self::limit((string) ($record['title'] ?? ''), 500),
-            'url' => self::nullableString($record['url'] ?? null),
+            'url' => self::webUrl($record['url'] ?? null),
             'sku' => self::nullableString($record['sku'] ?? null, 120),
             'brand' => self::brand($record),
             'price' => self::money($price['price'] ?? null) ?? self::money($price['min_price'] ?? null),
@@ -58,7 +58,7 @@ final class FeedRecord
             'on_sale' => (bool) ($price['on_sale'] ?? false),
             'in_stock' => (bool) ($stock['in_stock'] ?? false),
             'purchasable' => (bool) ($record['purchasable'] ?? false),
-            'image_url' => self::nullableString($images[0]['url'] ?? null),
+            'image_url' => self::webUrl($images[0]['url'] ?? null),
             'variations_count' => count((array) ($record['variations'] ?? [])),
             'source_updated_at' => self::date($record['updated_at'] ?? null),
             // how many it sold changes with every order and is no change to the product: never in its hash
@@ -138,8 +138,8 @@ final class FeedRecord
             'type' => self::limit((string) ($record['type'] ?? 'post'), 40),
             'external_id' => (string) $record['external_id'],
             'title' => self::limit((string) ($record['title'] ?? ''), 500),
-            'url' => self::nullableString($record['url'] ?? null),
-            'image_url' => self::nullableString($record['image'] ?? null),
+            'url' => self::webUrl($record['url'] ?? null),
+            'image_url' => self::webUrl($record['image'] ?? null),
             'excerpt' => self::nullableString($record['excerpt'] ?? null),
             'body' => self::nullableString($record['text'] ?? null),
             'terms' => $terms,
@@ -191,6 +191,24 @@ final class FeedRecord
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * An address a store's feed gives for a page or a picture, kept only when it is one: http or https, absolute (a
+     * protocol-relative "//cdn…" taken as https). Anything else ("javascript:…", "data:…", a path) is no address: a demo
+     * of any site could have put a script behind a product's link on the platform's own pages (1.11).
+     */
+    public static function webUrl(mixed $value): ?string
+    {
+        $url = self::nullableString($value);
+        if ($url === null) {
+            return null;
+        }
+        if (str_starts_with($url, '//')) {
+            $url = 'https:'.$url;
+        }
+
+        return preg_match('~^https?://[^\s/?#]+~i', $url) === 1 && preg_match('/[\x00-\x1F\x7F]/', $url) !== 1 ? $url : null;
     }
 
     private static function nullableString(mixed $value, int $max = 0): ?string

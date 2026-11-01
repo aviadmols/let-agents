@@ -150,5 +150,17 @@ return [
         'current_wrong' => 'The current password is not right.',
         'password_short' => 'At least :min characters.',
         'password_mismatch' => 'The passwords do not match.',
+        'email_reserved' => 'This address belongs to the system and cannot be an account\'s.',
+        'email_unconfirmable' => 'We could not send a confirmation link to this address. Try again later.',
+        'email_sent' => 'We sent a link to :email. The address is yours once you open it.',
+        'email_confirmed' => 'Your email is updated.',
+    ],
+    'email_mail' => [
+        'subject' => 'Confirm your new email for Lets',
+        'title' => 'Hi :name, is this your address?',
+        'body' => 'Someone asked to make this address the email of their Lets account. Open the link to confirm it is yours.',
+        'button' => 'Confirm my email',
+        'expires' => 'The link works until :date.',
+        'not_you' => 'If it was not you, ignore this message: nothing changes.',
     ],
 ];

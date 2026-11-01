@@ -147,7 +147,8 @@ final class SearchByPhotoTest extends TestCase
         $this->call('POST', "/api/v1/search/{$this->site}/photo", [], server: ['HTTP_ORIGIN' => 'https://www.store.test'])->assertStatus(422);
         $this->upload('https://evil.test')->assertForbidden();
 
-        // No limit while the switch is off (for now); with it on, the daily limit holds.
+        // No limit while the switch is off; with it on (as it is by default, 1.11), the daily limit holds.
+        Features::override('search.photo_limits', false, $this->shop->id);
         Settings::set('search.photos_per_day', 1, $this->shop->id);
         $this->upload()->assertOk();
         $this->upload()->assertOk();

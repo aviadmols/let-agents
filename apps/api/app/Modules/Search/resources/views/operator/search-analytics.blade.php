@@ -48,7 +48,7 @@
             <div style="display:flex;align-items:flex-end;gap:3px;height:160px;padding-top:8px;overflow-x:auto" role="img" aria-label="{{ __('search::ui.analytics.daily') }}">
                 @foreach ($r['daily'] as $d)
                     @php($h = (int) round(140 * ($d['searches'] + $d['photos']) / $r['max']))
-                    <button type="button" wire:click="pick('{{ $d['day'] }}')" title="{{ \Illuminate\Support\Carbon::parse($d['day'])->format('d/m') }}: {{ $d['searches'] }} · {{ __('search::ui.analytics.totals.photos') }} {{ $d['photos'] }}"
+                    <button type="button" wire:click="pick(@js($d['day']))" title="{{ \Illuminate\Support\Carbon::parse($d['day'])->format('d/m') }}: {{ $d['searches'] }} · {{ __('search::ui.analytics.totals.photos') }} {{ $d['photos'] }}"
                         style="flex:1 0 10px;min-width:10px;max-width:28px;height:{{ max(2, $h) }}px;border:0;padding:0;cursor:pointer;border-radius:4px 4px 0 0;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:transparent;outline:{{ $r['day'] === $d['day'] ? '2px solid #111' : 'none' }}">
                         @if ($d['photos'] > 0)
                             <span style="display:block;height:{{ (int) round(100 * $d['photos'] / max(1, $d['searches'] + $d['photos'])) }}%;background:#a5b4fc"></span>
@@ -74,7 +74,7 @@
                     <tbody>
                         @foreach (array_reverse($r['daily']) as $d)
                             @continue($d['searches'] + $d['photos'] + $d['questions'] + $d['added'] + $d['purchases'] === 0)
-                            <tr wire:click="pick('{{ $d['day'] }}')" style="cursor:pointer;{{ $r['day'] === $d['day'] ? 'background:rgba(79,70,229,.08)' : '' }}" data-day="{{ $d['day'] }}">
+                            <tr wire:click="pick(@js($d['day']))" style="cursor:pointer;{{ $r['day'] === $d['day'] ? 'background:rgba(79,70,229,.08)' : '' }}" data-day="{{ $d['day'] }}">
                                 <td style="{{ $cell }}">{{ \Illuminate\Support\Carbon::parse($d['day'])->translatedFormat('D d/m') }}</td>
                                 <td style="{{ $cell }}">{{ $d['searches'] }}</td>
                                 <td style="{{ $cell }}">{{ $d['queries'] }}</td>
@@ -93,7 +93,7 @@
 
         <x-filament::section :heading="$r['day'] ? __('search::ui.analytics.on_day', ['day' => \Illuminate\Support\Carbon::parse($r['day'])->translatedFormat('l d/m')]) : __('search::ui.analytics.in_period')">
             @if ($r['day'])
-                <button type="button" wire:click="pick('{{ $r['day'] }}')" style="{{ $small }};border:0;background:none;cursor:pointer;padding:0;margin-bottom:8px">← {{ __('search::ui.analytics.all_days') }}</button>
+                <button type="button" wire:click="pick(@js($r['day']))" style="{{ $small }};border:0;background:none;cursor:pointer;padding:0;margin-bottom:8px">← {{ __('search::ui.analytics.all_days') }}</button>
             @endif
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px">
                 <div>

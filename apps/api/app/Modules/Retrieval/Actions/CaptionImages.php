@@ -4,6 +4,7 @@ namespace App\Modules\Retrieval\Actions;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\ModelCallFailed;
@@ -21,11 +22,9 @@ use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Tenancy\Models\Shop;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Concurrency;
-use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -448,8 +447,12 @@ final class CaptionImages implements CaptionsPictures
     private function fetch(RetrievalImage $image): ?array
     {
         try {
-            $response = Http::timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get(PictureAddress::fetchable($image->image_url));
-        } catch (ConnectionException) {
+            $url = PictureAddress::fetchable($image->image_url);
+            $response = OutboundUrl::request($url, (int) Settings::get('retrieval.image_max_kb') * 1024 + 1)?->timeout(20)->connectTimeout(5)->withHeaders(['Accept' => 'image/*'])->get($url);
+        } catch (Throwable) {
+            return null;
+        }
+        if ($response === null) {
             return null;
         }
 
