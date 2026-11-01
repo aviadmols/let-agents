@@ -1,6 +1,19 @@
   // ---------------------------------------------------------------- tiny helpers
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]; }); }
-  function decode(s) { var d = doc.createElement('textarea'); d.innerHTML = String(s || ''); return d.value; }
+  // A title with its HTML entities read ("&amp;" is "&"), once per title: the cards, the filters and the reading of the
+  // words ask it of the same products on every key (Rocks, 1.11: a second of a phone's time over two searches).
+  // memo(): a value worked out once per input, forgotten all at once past MEMO_MAX inputs.
+  var MEMO_MAX = 5000;
+  function memo(fn) {
+    var kept = {}, n = 0;
+    return function (s) {
+      var k = String(s == null ? '' : s);
+      if (Object.prototype.hasOwnProperty.call(kept, k)) { return kept[k]; }
+      if (++n > MEMO_MAX) { kept = {}; n = 1; }
+      return (kept[k] = fn(k));
+    };
+  }
+  var decode = memo(function (s) { var d = doc.createElement('textarea'); d.innerHTML = s; return d.value; });
   function icon(n, cls) { if (n === 'fwd' || n === 'back') { cls = (cls || '') + ' ls-icon--dir'; } return '<svg class="ls-icon ' + (cls || '') + '" aria-hidden="true"><use href="#ls-i-' + n + '"/></svg>'; }
   function mark(think) { return '<span class="ls-mark' + (think ? ' ls-mark--think' : '') + '" aria-hidden="true"><i></i><i></i></span>'; }
   // a price as the store writes it: Shopify's money format (or, browsing in another currency, the browser's),

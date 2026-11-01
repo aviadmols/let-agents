@@ -3,15 +3,20 @@
   function C(turn) { if (!turn.c || !turn.c.no) { turn.c = Object.assign(blankC(), turn.c || {}); } return turn.c; }
   function stem(w) { return w.replace(/^[והבלמשכ](?=[א-ת]{2})/, ''); }
   // the marks inside a word ("ג'ינס", "וינטג׳") are part of it, as the engine reads it (normalize): one word, never two
-  function wordsOf(s) { return String(s || '').toLowerCase().replace(/[׳״'"`]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean); }
+  // read once per text (memo), and handed out as a copy of its own
+  var wordsRead = memo(function (s) { return s.toLowerCase().replace(/[׳״'"`]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean); });
+  function wordsOf(s) { return wordsRead(s || '').slice(); }
   function says(text, label) { return !!saidBy(text, label); }
   // Whether a product's own words say a value: each of its words as a word of them, maybe after a prefix letter or
   // with a plural or feminine ending; no sound-alikes, which are for what a shopper mistypes ("עגול" is not "עגילים").
   // As the server reads it (HebrewSearch::says).
+  // A product's words and a value's patterns, read once each (memo): the filters ask them of every product on every key.
+  function sayNorm(s) { var E = S.engine; try { return E && E.normalize ? E.normalize(String(s || '')) : String(s || ''); } catch (e) { return String(s || ''); } }
+  var sayHay = memo(function (text) { return ' ' + wordsOf(sayNorm(text)).join(' ') + ' '; });
+  var sayParts = memo(function (label) { return wordsOf(sayNorm(label)).map(function (w) { return new RegExp(' [והבלמשכ]?' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ים|ות|ה|י|ת)? '); }); });
   function plainlySays(text, label) {
-    var E = S.engine, norm = function (s) { try { return E && E.normalize ? E.normalize(String(s || '')) : String(s || ''); } catch (e) { return String(s || ''); } };
-    var hay = ' ' + wordsOf(norm(text)).join(' ') + ' ', parts = wordsOf(norm(label));
-    return parts.length > 0 && parts.every(function (w) { return new RegExp(' [והבלמשכ]?' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ים|ות|ה|י|ת)? ').test(hay); });
+    var hay = sayHay(text), parts = sayParts(label);
+    return parts.length > 0 && parts.every(function (re) { return re.test(hay); });
   }
   // which typed words name the label, one for each of its words; null when one of them is not said
   function saidBy(text, label) { var ws = wordsSaid(text, label); return ws.of > 0 && ws.n === ws.of ? ws.at : sizedBy(text, label); }

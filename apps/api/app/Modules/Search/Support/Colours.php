@@ -125,7 +125,50 @@ final class Colours
     ];
 
     /** The metal named by "זהב" with the word after it. */
-    private const GOLD = ['צהוב' => 'gold_yellow', 'לבן' => 'gold_white', 'אדום' => 'gold_rose', 'ורוד' => 'gold_rose', 'רוז' => 'gold_rose', 'yellow' => 'gold_yellow', 'white' => 'gold_white', 'rose' => 'gold_rose'];
+    // "זהב צהב" is yellow gold too, as the search reads the slip (readFacets: the store's family "צהוב", "צהב")
+    private const GOLD = ['צהוב' => 'gold_yellow', 'צהב' => 'gold_yellow', 'לבן' => 'gold_white', 'אדום' => 'gold_rose', 'ורוד' => 'gold_rose', 'רוז' => 'gold_rose', 'yellow' => 'gold_yellow', 'white' => 'gold_white', 'rose' => 'gold_rose'];
+
+    /** @var array<string, array{0: string, 1: string}|false> each word's colour family and group, once worked out */
+    private static array $wordFamilies = [];
+
+    /** @var array<string, array{0: list<string>, 1: list<array{family: string, group: string, at: int}>}> a text's words and colours */
+    private static array $texts = [];
+
+    /** @var list<array{0: string, 1: string, 2: string}>|null the colour names of two words or more: [stem, family, group] */
+    private static ?array $phrases = null;
+
+    /** @var array<string, bool> whether a word names a part, once worked out */
+    private static array $sameParts = [];
+
+    /** A memo grows to this many words, then starts again: a worker keeps it between searches. */
+    private const MEMO = 50000;
+
+    /**
+     * The colour family and group a word names on its own, the first in FAMILIES that one of its stems starts; null when
+     * none. The same word always names the same, so each is worked out once: a search orders a thousand products by
+     * the colours their words name (byColour), and the same words recur in all of them (Rocks, 1.11: seven seconds).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private static function familyOfWord(string $word): ?array
+    {
+        if (! isset(self::$wordFamilies[$word])) {
+            if (count(self::$wordFamilies) >= self::MEMO) {
+                self::$wordFamilies = [];
+            }
+            self::$wordFamilies[$word] = false;
+            foreach (self::FAMILIES as $family => [$group, $stems]) {
+                foreach ($stems as $stem) {
+                    if (! str_contains($stem, ' ') && self::starts($word, $stem)) {
+                        self::$wordFamilies[$word] = [(string) $family, (string) $group];
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        return self::$wordFamilies[$word] === false ? null : self::$wordFamilies[$word];
+    }
 
     /**
      * The colours in a text, each with the group it excludes within and where it is.
@@ -134,6 +177,26 @@ final class Colours
      */
     public static function mentions(string $text): array
     {
+        return self::read($text)[1];
+    }
+
+    /** The texts a worker keeps read: a store's products are ordered by their colours search after search. */
+    private const TEXTS = 3000;
+
+    /**
+     * A text's words and the colours they name, read once: the same product's words are read on every search that asks a
+     * colour (byColour), and a worker keeps them between searches.
+     *
+     * @return array{0: list<string>, 1: list<array{family: string, group: string, at: int}>}
+     */
+    private static function read(string $text): array
+    {
+        if (isset(self::$texts[$text])) {
+            return self::$texts[$text];
+        }
+        if (count(self::$texts) >= self::TEXTS) {
+            self::$texts = [];
+        }
         $words = self::tokens($text);
         $found = [];
 
@@ -154,28 +217,31 @@ final class Colours
                 }
             }
 
-            foreach (self::FAMILIES as $family => [$group, $stems]) {
-                foreach ($stems as $stem) {
-                    if (! str_contains($stem, ' ') && self::starts($word, $stem)) {
-                        $found[] = ['family' => $family, 'group' => $group, 'at' => $i];
-
-                        continue 3;
-                    }
-                }
+            $named = self::familyOfWord($word);
+            if ($named !== null) {
+                $found[] = ['family' => $named[0], 'group' => $named[1], 'at' => $i];
             }
         }
 
         // Two-word names ("white gold", "light blue") in English.
-        $joined = ' '.implode(' ', $words).' ';
-        foreach (self::FAMILIES as $family => [$group, $stems]) {
-            foreach ($stems as $stem) {
-                if (str_contains($stem, ' ') && str_contains($joined, ' '.$stem.' ')) {
-                    $found[] = ['family' => $family, 'group' => $group, 'at' => count(explode(' ', trim(strstr($joined, ' '.$stem.' ', true))))];
+        if (self::$phrases === null) {
+            self::$phrases = [];
+            foreach (self::FAMILIES as $family => [$group, $stems]) {
+                foreach ($stems as $stem) {
+                    if (str_contains($stem, ' ')) {
+                        self::$phrases[] = [$stem, (string) $family, (string) $group];
+                    }
                 }
             }
         }
+        $joined = ' '.implode(' ', $words).' ';
+        foreach (self::$phrases as [$stem, $family, $group]) {
+            if (str_contains($joined, ' '.$stem.' ')) {
+                $found[] = ['family' => $family, 'group' => $group, 'at' => count(explode(' ', trim(strstr($joined, ' '.$stem.' ', true))))];
+            }
+        }
 
-        return $found;
+        return self::$texts[$text] = [$words, $found];
     }
 
     /**
@@ -242,8 +308,7 @@ final class Colours
             return 0.0;
         }
 
-        $words = self::tokens($productText);
-        $mentions = self::mentions($productText);
+        [$words, $mentions] = self::read($productText);
 
         if ($mentions === []) {
             return 0.0;
@@ -317,6 +382,19 @@ final class Colours
     }
 
     private static function samePart(string $word, string $part): bool
+    {
+        $key = $word."\0".$part;
+        if (! isset(self::$sameParts[$key])) {
+            if (count(self::$sameParts) >= self::MEMO) {
+                self::$sameParts = [];
+            }
+            self::$sameParts[$key] = self::partsAlike($word, $part);
+        }
+
+        return self::$sameParts[$key];
+    }
+
+    private static function partsAlike(string $word, string $part): bool
     {
         if (self::starts($word, $part) || self::starts($part, $word)) {
             return true;
