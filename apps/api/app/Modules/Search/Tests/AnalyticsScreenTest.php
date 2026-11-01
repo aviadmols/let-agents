@@ -34,6 +34,8 @@ final class AnalyticsScreenTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // the middle of the day: the same date here and on the chart, which reads Jerusalem's (from 22:00 UTC it is tomorrow there)
+        $this->travelTo(now()->utc()->setTime(10, 0));
         $this->shop = Shop::factory()->create(['name' => 'גואטה אביגדור']);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $this->shop->id, 'site_url' => 'https://shop.test', 'access_token' => self::TOKEN]));
         $this->inShop(function (): void {
