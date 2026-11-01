@@ -91,6 +91,22 @@ final class ContentSiteTest extends TestCase
         $this->assertSame('product_page', Settings::get('search.card_action', $shop->id));
     }
 
+    public function test_a_content_site_settled_before_a_setting_was_added_gets_it_and_keeps_what_the_team_chose(): void
+    {
+        // Gil Travel, 1.11: settled on 27.10, before its length and tag filters were added, it read no length from "10 days"
+        $shop = Shop::factory()->create(['profile' => ['kind' => 'content']]);
+        Settings::set('search.card_action', 'read_more', $shop->id);
+        Settings::set('search.length_filter', false, $shop->id);
+
+        $this->assertTrue(ContentSite::is($shop));
+        $this->assertFalse(ContentSite::is(Shop::factory()->create()), 'a store is no content site');
+        $this->assertTrue(ContentSite::align($shop->id));
+        $this->assertTrue(Settings::get('search.store_tag_filter', $shop->id), 'what was added since, set');
+        $this->assertSame(40, Settings::get('search.category_filter_max', $shop->id));
+        $this->assertFalse(Settings::get('search.length_filter', $shop->id), 'what the team chose stays theirs');
+        $this->assertFalse(ContentSite::align($shop->id), 'aligned once, nothing more to set');
+    }
+
     public function test_connect_answers_at_once_and_the_currency_is_read_in_the_background(): void
     {
         // Gil Travel, 28.10: "Connect" read the whole site for its currency and looked like it did nothing

@@ -59,4 +59,30 @@ final class ContentSite
             SearchMatters::Content->apply($shop);
         }
     }
+
+    /**
+     * Every content site searches by the same settings, the latest of them: what was added here after a site was settled
+     * is set where the shop has no choice of its own for it, and what the team chose stays theirs. Gil Travel, 1.11: settled
+     * on 27.10, it never had the length and tag filters added on 28.10, and "tour 10 days israel" read no length.
+     *
+     * @return bool whether anything was set
+     */
+    public static function align(string $shopId): bool
+    {
+        $set = false;
+        foreach (self::SETTINGS as $key => $value) {
+            if (app(SettingRegistry::class)->has($key) && Settings::overrideFor($key, $shopId) === null) {
+                Settings::set($key, $value, $shopId);
+                $set = true;
+            }
+        }
+
+        return $set;
+    }
+
+    /** Whether a shop is a content site, as its profile says (settle). */
+    public static function is(Shop $shop): bool
+    {
+        return (((array) ($shop->profile ?? []))['kind'] ?? null) === 'content';
+    }
 }
