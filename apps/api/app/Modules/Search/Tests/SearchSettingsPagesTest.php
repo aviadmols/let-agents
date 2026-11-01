@@ -57,6 +57,25 @@ final class SearchSettingsPagesTest extends TestCase
         ]));
     }
 
+    public function test_the_outside_ai_is_closed_from_the_search_window(): void
+    {
+        $this->product('1', 'טבעת סוליטר');
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $page = Livewire::test(SearchWindowSettings::class)
+            ->assertOk()
+            ->assertSee('התייעצות עם AI חיצוני')
+            ->assertSet('data.ai_share', true);
+        $this->assertTrue($this->config()['aiShare']);
+
+        $page->set('data.ai_share', false)->call('save');
+
+        $this->assertFalse(Features::enabled('search.ai_share', $this->shop->id));
+        $config = $this->config();
+        $this->assertFalse($config['aiShare'], 'the drawer offers no outside AI, in its menu or under an answer');
+        $this->assertNull($config['aiAsk'], 'and has no address to send a shopper to');
+    }
+
     public function test_how_it_looks_saves_the_look_the_language_and_the_assistants_name(): void
     {
         $page = Livewire::test(LookSettings::class)

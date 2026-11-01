@@ -213,9 +213,9 @@ final class CatalogProductKinds implements ProductKinds
 
         // Of shoes, home slippers ("נעלי בית"), never running shoes ("נעלי ריצה") or flats ("נעלי בובה") (Chozen, 28.10):
         // where its title names it by two words and enough of the rest are named by them too, only those.
-        $sub = self::own($product, $prefixes)['sub'];
+        $sub = self::subKind(self::own($product, $prefixes), $counts);
         if ($sub !== '') {
-            $named = array_values(array_filter($kept, fn (string $id): bool => $id !== (string) $product->external_id && self::own($others->get($id), $prefixes)['sub'] === $sub));
+            $named = array_values(array_filter($kept, fn (string $id): bool => $id !== (string) $product->external_id && self::subKind(self::own($others->get($id), $prefixes), $counts) === $sub));
             if (count($named) >= self::SUB_KIND_MIN) {
                 $near = [...array_values(array_filter($kept, fn (string $id): bool => $id !== (string) $product->external_id && ! in_array($id, $named, true))), ...$near];
                 $kept = array_values(array_filter($kept, fn (string $id): bool => $id === (string) $product->external_id || in_array($id, $named, true)));
@@ -238,6 +238,12 @@ final class CatalogProductKinds implements ProductKinds
 
     /** A kind named by two words ("נעלי בית") is the alike's only where this many others are named by them. */
     private const SUB_KIND_MIN = 3;
+
+    /** A word after a singular kind ("תיק גב") names a kind of it where at least this share of the titles it comes second in open with that kind. */
+    private const SUB_WORD_SHARE = 0.8;
+
+    /** ...and that kind is at most this share of the store: where most is rings, what follows "טבעת" is a style ("וינטג'"), not a kind. */
+    private const SUB_HEAD_SHARE = 1 / 3;
 
     /** Words that say whom a product is for, as the store writes them in its titles, tags and categories. */
     private const AUDIENCE = [
@@ -403,7 +409,7 @@ final class CatalogProductKinds implements ProductKinds
 
     /**
      * @param  array<string, string>  $prefixes  the words each brand's titles open with (brandPrefixes)
-     * @return array{type: string, head: string, sub: string, categories: list<string>, tags: list<string>, title: string}
+     * @return array{type: string, head: string, sub: string, second: string, categories: list<string>, tags: list<string>, title: string}
      */
     private static function own(CatalogProduct $product, array $prefixes = []): array
     {
@@ -440,6 +446,9 @@ final class CatalogProductKinds implements ProductKinds
             // a plural's construct form opens a kind of two words ("נעלי בית", "כפכפי סליידס"), never by whom or what colour
             'sub' => $head !== '' && preg_match('/י$/u', $first) === 1 && preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})$/u", $second) === 1
                 && self::saidIn($second) === [] && ! ColorWords::knows($second) ? $head.' '.self::base($second) : '',
+            // the word after it, never by whom or what colour: whether it names a kind is for the store's titles to say (subKind)
+            'second' => $head !== '' && preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})$/u", $second) === 1
+                && self::saidIn($second) === [] && ! ColorWords::knows($second) ? self::base($second) : '',
             'categories' => array_values(array_unique(array_filter(array_map(fn (array $path): string => $clean(end($path) ?: ''), $product->categoryPaths())))),
             'tags' => array_values(array_unique(array_filter(array_map($clean, (array) ($product->payload['tags'] ?? []))))),
             'title' => $clean($product->title),
@@ -447,18 +456,38 @@ final class CatalogProductKinds implements ProductKinds
     }
 
     /**
+     * The kind of two words a title opens with: a plural's construct form says so itself ("נעלי בית"); after a singular
+     * ("תיק גב", "מברג אימפקט") the store's titles tell. A word that follows this kind alone names a kind of it; one that
+     * follows many says how a thing is ("זהב", "לב" after a ring, a pendant and earrings). Vans, 1.11: a backpack's alike
+     * were side bags and pouches, all of them "תיק".
+     *
+     * @param  array{head: string, sub: string, second: string}  $own
+     * @param  array{products: int, head: array<string, int>, after: array<string, array<string, int>>}  $counts
+     */
+    private static function subKind(array $own, array $counts): string
+    {
+        if ($own['sub'] !== '' || $own['second'] === '') {
+            return $own['sub'];
+        }
+        $after = $counts['after'][$own['second']] ?? [];
+
+        return ($counts['head'][$own['head']] ?? 0) <= self::SUB_HEAD_SHARE * $counts['products']
+            && ($after[$own['head']] ?? 0) >= self::SUB_WORD_SHARE * array_sum($after) ? $own['head'].' '.$own['second'] : '';
+    }
+
+    /**
      * How many active products carry each type, category and tag, kept until the catalog changes.
      *
-     * @return array{products: int, type: array<string, int>, head: array<string, int>, category: array<string, int>, tag: array<string, int>, prefix: array<string, string>}
+     * @return array{products: int, type: array<string, int>, head: array<string, int>, after: array<string, array<string, int>>, category: array<string, int>, tag: array<string, int>, prefix: array<string, string>}
      */
     private function counts(string $shopId): array
     {
         $active = CatalogProduct::query()->whereNull('removed_at');
-        $version = '4|'.$active->count().'|'.$active->max('updated_at');
+        $version = '5|'.$active->count().'|'.$active->max('updated_at');
 
         return Cache::remember('catalog:kinds:'.$shopId.':'.md5($version), now()->addHours(12), function (): array {
             $prefixes = self::brandPrefixes();
-            $counts = ['products' => 0, 'type' => [], 'head' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
+            $counts = ['products' => 0, 'type' => [], 'head' => [], 'after' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
 
             CatalogProduct::query()->whereNull('removed_at')->select(['id', 'title', 'brand', 'payload'])->orderBy('id')
                 ->chunk(500, function ($products) use (&$counts, $prefixes): void {
@@ -470,6 +499,9 @@ final class CatalogProductKinds implements ProductKinds
                         }
                         if ($own['head'] !== '') {
                             $counts['head'][$own['head']] = ($counts['head'][$own['head']] ?? 0) + 1;
+                        }
+                        if ($own['second'] !== '') {
+                            $counts['after'][$own['second']][$own['head']] = ($counts['after'][$own['second']][$own['head']] ?? 0) + 1;
                         }
                         foreach ($own['categories'] as $category) {
                             $counts['category'][$category] = ($counts['category'][$category] ?? 0) + 1;

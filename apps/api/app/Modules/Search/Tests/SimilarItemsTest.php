@@ -515,6 +515,62 @@ final class SimilarItemsTest extends TestCase
         $this->assertEqualsCanonicalizing(['502', '504', '505'], array_column($this->similar('501')->json('products'), 'external_id'), 'the sneakers of every brand, not its brand\'s bag');
     }
 
+    public function test_a_bag_is_like_its_own_kind_of_bag_and_a_word_of_style_names_no_kind(): void
+    {
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        $make = function (array $titles): void {
+            app(TenantContext::class)->run($this->shop->id, function () use ($titles): void {
+                CatalogProduct::query()->update(['removed_at' => now()]);
+                foreach ($titles as $id => $title) {
+                    CatalogProduct::query()->updateOrCreate(['shop_id' => $this->shop->id, 'external_id' => (string) $id], ['type' => 'simple', 'status' => 'publish', 'title' => $title, 'removed_at' => null,
+                        'url' => "https://www.store.test/p/{$id}", 'image_url' => null, 'price' => '100', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                }
+            });
+            $this->travel(2)->seconds();
+            LoadedIndex::forget();
+            app(BuildSearchIndex::class)->handle($this->shop->id);
+        };
+
+        // Vans: backpacks and side bags are all "תיק"; the pictures find them all near, and a backpack's alike are backpacks
+        $make([
+            '601' => 'תיק גב Old Skool', '602' => 'תיק גב Realm', '603' => 'תיק גב Ranger', '604' => 'תיק גב Classic',
+            '605' => 'תיק צד Ward', '606' => 'תיק צד Bum', '607' => 'תיק צד Mini', '608' => 'תיק צד Street',
+            '609' => 'חולצת טי Dirt', '610' => 'חולצת טי Trip', '611' => 'חולצת טי Off', '612' => 'כובע גרב Core',
+            '613' => 'נעל סקייט Era', '614' => 'נעל סקייט Half', '615' => 'נעל סקייט Knu', '616' => 'נעל סקייט Old',
+            '617' => 'נעל סקייט Rowan', '618' => 'נעל סקייט Zahba', '619' => 'חולצת טי Core', '620' => 'חולצת טי Logo',
+        ] + array_combine(range(691, 696), array_map(fn (int $i): string => "כובע גרב {$i}", range(691, 696))));
+        $this->app->instance(SemanticSearch::class, $this->nearness(['605', '602', '606', '603', '607', '604', '608'], []));
+        $this->assertSame(['602', '603', '604'], array_column($this->similar('601')->json('products'), 'external_id'));
+
+        // a tool store too: an impact driver's alike are impact drivers, not every driver
+        $make([
+            '621' => 'מברג אימפקט Makita', '622' => 'מברג אימפקט Bosch', '623' => 'מברג אימפקט Einhell', '624' => 'מברג אימפקט Total',
+            '625' => 'מברג שטוח Stanley', '626' => 'מסור שרשרת Stihl', '627' => 'מסור שרשרת Bosch', '628' => 'פלס לייזר Total',
+            '629' => 'פלס לייזר Bosch', '630' => 'ארגז כלים Keter', '631' => 'ארגז כלים Stanley', '632' => 'משחזת זווית Makita',
+            '633' => 'משחזת זווית Bosch', '634' => 'פטיש חציבה Makita', '635' => 'פטיש חציבה Bosch',
+        ]);
+        $this->app->instance(SemanticSearch::class, $this->nearness(['625', '622', '623', '624'], []));
+        $this->assertSame(['622', '623', '624'], array_column($this->similar('621')->json('products'), 'external_id'));
+
+        // a word that follows many kinds says how a thing is ("מעור" after a bag, a belt and a hat): no kind, the bags stay alike
+        $make([
+            '641' => 'תיק מעור שחור', '642' => 'תיק מעור חום', '643' => 'תיק מעור קטן', '644' => 'תיק מעור גדול', '645' => 'תיק בד Ward',
+            '646' => 'חגורה מעור Core', '647' => 'חגורה מעור Slim', '648' => 'ארנק מעור Zip', '649' => 'ארנק מעור Mini', '650' => 'כובע מעור Cap',
+            '651' => 'כובע מעור Flat', '652' => 'נעל מעור Era', '653' => 'נעל מעור Half', '654' => 'נעל מעור Knu', '655' => 'נעל מעור Old',
+        ]);
+        $this->app->instance(SemanticSearch::class, $this->nearness(['645', '642', '643', '644'], []));
+        $this->assertSame(['645', '642', '643', '644'], array_column($this->similar('641')->json('products'), 'external_id'));
+
+        // a store that is mostly rings: what follows "טבעת" is a style, however often only it follows
+        $rings = [];
+        foreach (range(661, 672) as $at => $id) {
+            $rings[$id] = ($at % 2 === 0 ? 'טבעת וינטג ' : 'טבעת סוליטר ').$id;
+        }
+        $make($rings + ['673' => 'עגיל תלוי 1', '674' => 'צמיד טניס 2', '675' => 'תליון לב 3']);
+        $this->app->instance(SemanticSearch::class, $this->nearness(['662', '663', '664', '665'], []));
+        $this->assertEqualsCanonicalizing(['662', '663', '664', '665'], array_column($this->similar('661')->json('products'), 'external_id'));
+    }
+
     /**
      * Stored nearness as given: by picture in $looks' order, by meaning in $means'.
      *

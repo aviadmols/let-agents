@@ -36,6 +36,7 @@
             <x-lp::toggle model="data.photos" :label="$t('photos')" />
         </x-lp::row>
         <x-lp::row :title="$t('ask')" :sub="$t('ask_sub')"><x-lp::toggle model="data.ask" :label="$t('ask')" /></x-lp::row>
+        <x-lp::row :title="$t('ai_share')" :sub="$t('ai_share_sub')" :tip="$t('ai_share_tip')"><x-lp::toggle model="data.ai_share" :label="$t('ai_share')" /></x-lp::row>
         <x-lp::row :title="$t('similar')" :tip="$t('similar_tip')"><x-lp::toggle model="data.similar" :label="$t('similar')" /></x-lp::row>
         <x-lp::row :title="$t('similar_by')" :sub="$t('similar_by_sub')"><x-lp::chips model="data.similar_by" :options="$t('similar_by_options')" :sm="true" :label="$t('similar_by')" /></x-lp::row>
         <x-lp::row :title="$t('similar_count')" :tip="$t('similar_count_tip')"><x-lp::num model="data.similar_count" :min="$similarCount['min']" :max="$similarCount['max']" :label="$t('similar_count')" /></x-lp::row>

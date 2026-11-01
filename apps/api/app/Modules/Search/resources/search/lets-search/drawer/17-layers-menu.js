@@ -167,7 +167,7 @@
         menuRow('data-share="link"', '<span class="ls-menu__logo">' + icon('link', 'ls-icon--sm') + '</span>', t('aiCopy')) +
         (typeof win.navigator.share === 'function' ? menuRow('data-share="more"', '<span class="ls-menu__logo">' + icon('share', 'ls-icon--sm') + '</span>', t('shareMore')) : '') + '<div class="ls-menu__note" role="status" data-menu-note></div>';
     }
-    var aiOn = !off(whole ? 'aiAsk' : 'aiShare'), shareOn = !off('shareResults');
+    var aiOn = !off('aiShare'), shareOn = !off('shareResults');
     return menuRow('data-new', icon('history'), t('newChat')) + (aiOn || shareOn ? '<div class="ls-menu__sep"></div>' : '') +
       (shareOn ? menuRow('data-menu-view="share"', icon('share'), t(whole ? 'shareStore' : 'shareSearch'), chev) : '') +
       (aiOn ? menuRow('data-menu-view="ai"', icon('spark'), t('aiAsk'), '<span class="ls-menu__logos">' + AIS.map(function (a) { return logo(a[0]); }).join('') + '</span>' + chev) : '') +

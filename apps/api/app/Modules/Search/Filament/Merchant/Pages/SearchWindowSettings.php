@@ -67,6 +67,7 @@ class SearchWindowSettings extends Page
             'float_bottom' => 'setting:search.float_bottom',
             'photos' => 'feature:search.photos',
             'ask' => 'feature:assistant.on_search',
+            'ai_share' => 'feature:search.ai_share',
             'similar' => 'feature:search.similar',
             'similar_by' => 'setting:search.similar_by',
             'similar_count' => 'setting:search.similar_count',
