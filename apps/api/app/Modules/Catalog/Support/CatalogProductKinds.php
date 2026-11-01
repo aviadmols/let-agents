@@ -437,8 +437,8 @@ final class CatalogProductKinds implements ProductKinds
         }
         $first = (string) ($words[0] ?? '');
         $second = (string) ($words[1] ?? '');
-        // a geresh is a letter of a Hebrew word ("ג'קט")
-        $head = preg_match("/^\p{Hebrew}(?:[\p{Hebrew}'׳]*\p{Hebrew})?$/u", $first) === 1 ? self::base($first) : '';
+        // a geresh is a letter of a Hebrew word ("ג'קט"), its last too ("פאוץ'": read as no kind, its alike were hats and socks)
+        $head = preg_match("/^\p{Hebrew}[\p{Hebrew}'׳]*$/u", $first) === 1 ? self::base($first) : '';
 
         return [
             'type' => $clean($product->payload['product_type'] ?? ''),

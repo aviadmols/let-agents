@@ -88,10 +88,10 @@ final class SearchCatalog
     private const LOOKS_POOL = 150;
 
     /** Words of a picture that say it is printed, not plain: a print, stripes, checks, flowers, an animal's coat. */
-    private const PATTERNED = '/הדפס|מודפס|פסים|משבצ|פרחונ|פרחים|דוגמ|נמר|זברה|הסוואה|פייזלי|נקוד|print|stripe|check|plaid|tartan|floral|pattern|leopard|zebra|camo|paisley|polka|dots/iu';
+    private const PATTERNED = '/הדפס|מודפס|פסים|משבצ|פרחונ|פרחים|דוגמ|נמר|מנומר|מפוספס|מנוקד|זברה|הסוואה|פייזלי|נקוד|print|stripe|check|plaid|tartan|floral|pattern|leopard|zebra|camo|paisley|polka|dots/iu';
 
-    /** What the picture's reader says of a piece with no print on it (caption v8, caption_pattern.covers). */
-    private const NO_PRINT = 'none';
+    /** What the picture's reader says of a piece with no print on it (caption v8, caption_pattern.covers): nothing, or a logo or a small mark on a plain piece. */
+    private const NO_PRINT = ['none', 'detail'];
 
     /** "4 days" finds a tour of 3 to 5: a day either way. */
     private const DAYS_EITHER_WAY = 1;
@@ -863,17 +863,25 @@ final class SearchCatalog
         $printed = self::printed($ownRow);
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words', 'caption_pattern'])->keyBy('external_id');
 
-        return array_values(array_filter($externalIds, fn (string $id): bool => self::printed($theirs->get($id)) === $printed));
+        // a logo in its own print is of its print still ("לוגו משבצות" beside checks: Patterns::tiered puts it last)
+        $family = $printed ? Patterns::family((string) ($ownRow->caption_pattern['name'] ?? '')) : null;
+        $logoOf = fn (?RetrievalImage $row): bool => $family !== null && ($row?->caption_pattern['covers'] ?? null) === 'detail' && Patterns::family((string) ($row->caption_pattern['name'] ?? '')) === $family;
+
+        return array_values(array_filter($externalIds, fn (string $id): bool => self::printed($theirs->get($id)) === $printed || $logoOf($theirs->get($id))));
     }
 
-    /** Whether a picture shows a print: by its words, unless its reader saw none (caption v8); no picture, none. */
+    /**
+     * Whether a picture shows a print: as its reader said (caption v8); before it said, by its words; no picture, none.
+     * Vans, 2.11: a leopard backpack's "מנומר" was no print to the words, and its alike were the plain bags.
+     */
     private static function printed(?RetrievalImage $row): bool
     {
-        if ($row === null || (is_array($row->caption_pattern) && ($row->caption_pattern['covers'] ?? null) === self::NO_PRINT)) {
+        if ($row === null) {
             return false;
         }
+        $covers = is_array($row->caption_pattern) ? ($row->caption_pattern['covers'] ?? null) : null;
 
-        return self::patterned(array_values((array) ($row->caption_words ?? [])));
+        return is_string($covers) ? ! in_array($covers, self::NO_PRINT, true) : self::patterned(array_values((array) ($row->caption_words ?? [])));
     }
 
     /** @param  list<mixed>  $words */
@@ -1182,6 +1190,19 @@ final class SearchCatalog
             $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
             $ids = array_values(array_unique([...$alike, ...array_filter($ids, fn (string $id): bool => ! isset($apart[$id]))]));
             $near = array_values(array_filter((array) $near, fn ($id): bool => ! isset($apart[(string) $id])));
+            // covered in a print, what opens its title as it does in that print is its alike, of another kind of it too: a
+            // leopard side bag is nearer a leopard backpack than a plain backpack is (Vans, 2.11)
+            $print = $looksLead && ! $otherColour ? Patterns::covered($index['records']['p:'.$externalId] ?? []) : null;
+            if ($print !== null) {
+                $opens = HebrewSearch::head((string) ($index['records']['p:'.$externalId]['title'] ?? ''));
+                $inPrint = array_values(array_filter($near, function ($id) use ($index, $print, $opens): bool {
+                    $record = $index['records']['p:'.$id] ?? [];
+
+                    return HebrewSearch::head((string) ($record['title'] ?? '')) === $opens && Patterns::covered($record) === $print;
+                }));
+                $ids = [...$ids, ...array_map('strval', $inPrint)];
+                $near = array_values(array_diff($near, $inPrint));
+            }
             // Those of its kind that share its tags first, and alone when they are enough: counted after the kind, so
             // sharers of another kind never stand alone and leave nothing (Sela Meir, 28.10: a bundle's tag-sharers were
             // sets and series of other kinds, and "0 similar items" stood where the books on its subject should).

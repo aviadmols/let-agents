@@ -515,6 +515,57 @@ final class SimilarItemsTest extends TestCase
         $this->assertEqualsCanonicalizing(['502', '504', '505'], array_column($this->similar('501')->json('products'), 'external_id'), 'the sneakers of every brand, not its brand\'s bag');
     }
 
+    public function test_a_leopard_backpack_is_like_what_is_printed_not_the_plain_bags_and_a_pouch_like_pouches(): void
+    {
+        // Vans, 2.11: "מנומר" was no print to the picture's words, so a leopard backpack's alike were plain backpacks and totes
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        $bags = [
+            '701' => ['תיק גב New Skool', ['תיק גב', 'מנומר'], ['name' => 'מנומר', 'covers' => 'most']],
+            '702' => ['תיק גב Classic', ['תיק גב', 'לוגו'], ['name' => 'לוגו', 'covers' => 'detail']],
+            '703' => ['תיק גב Realm', ['תיק גב', 'הדפס לוגו'], ['name' => 'הדפס לוגו', 'covers' => 'detail']],
+            '704' => ['תיק גב Check', ['תיק גב', 'משבצות'], ['name' => 'משבצות', 'covers' => 'all']],
+            '705' => ['תיק גב Flowers', ['תיק גב', 'פרחוני'], ['name' => 'פרחוני', 'covers' => 'all']],
+            '706' => ['תיק צד Katie', ['תיק צד', 'מנומר'], ['name' => 'מנומר', 'covers' => 'all']],
+            '707' => ['תיק צד Lawler', ['תיק צד', 'חלק'], ['covers' => 'none']],
+            '708' => ['תיק צד Pergs', ['תיק צד', 'חלק'], ['covers' => 'none']],
+            '709' => ['תיק צד Mini', ['תיק צד', 'חלק'], ['covers' => 'none']],
+        ];
+        $others = ['711' => "פאוץ' Ward", '712' => "פאוץ' Cross", '713' => 'כובע טמבל Dropped', '714' => 'כובע מצחיה Knu', '715' => 'כובע מצחיה Core', '716' => 'כובע גרב One'];
+        foreach (range(721, 738) as $id) {
+            $others[$id] = "חולצת טי {$id}";
+        }
+        app(TenantContext::class)->run($this->shop->id, function () use ($bags, $others): void {
+            CatalogProduct::query()->update(['removed_at' => now()]);
+            $make = fn (string $id, string $title): CatalogProduct => CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'url' => "https://www.store.test/p/{$id}", 'image_url' => null, 'price' => '100', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+            foreach ($bags as $id => [$title, $words, $pattern]) {
+                $product = $make((string) $id, $title);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => (string) $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', (string) $id), 'caption_words' => $words, 'caption_pattern' => $pattern]);
+            }
+            foreach ($others as $id => $title) {
+                $make((string) $id, $title);
+            }
+        });
+        $this->travel(2)->seconds();
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->app->instance(SemanticSearch::class, $this->nearness(['702', '703', '707', '708', '704', '706', '705', '709'], []));
+
+        $leopard = $this->similar('701')->json();
+        $this->assertSame('706', $leopard['products'][0]['external_id'], 'the leopard side bag first, the nearest in print');
+        $this->assertEqualsCanonicalizing(['704', '705', '706'], array_column($leopard['products'], 'external_id'), 'what is printed, never the plain backpacks and totes');
+        $this->assertEqualsCanonicalizing(['702', '703'], array_slice(array_column($leopard['others'], 'external_id'), 0, 2), 'the plain backpacks only "maybe", before the plain side bags');
+
+        // a logo on a plain backpack is a plain backpack, whatever its words: alike with the other plain ones
+        $this->app->instance(SemanticSearch::class, $this->nearness(['704', '703', '705', '701'], []));
+        $this->assertSame(['703'], array_column($this->similar('702')->json('products'), 'external_id'));
+
+        // a geresh at a word's end is of the word: a pouch's alike are pouches, not hats
+        $this->app->instance(SemanticSearch::class, $this->nearness(['713', '714', '712', '702'], []));
+        $this->assertSame(['712'], array_column($this->similar('711')->json('products'), 'external_id'));
+    }
+
     public function test_a_bag_is_like_its_own_kind_of_bag_and_a_word_of_style_names_no_kind(): void
     {
         Settings::set('search.similar_by', 'both', $this->shop->id);
