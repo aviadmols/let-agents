@@ -238,8 +238,13 @@ final class SearchCatalog
         $this->readWords = $readWords;
         try {
             $result = $this->searchOnce($shopId, $raw, $only, $count, $perGroup, $meaning, $visit);
+            // no product as asked, though articles may say the words: the nearest looser search, said so. Gil Travel, 1.11:
+            // "tour 10 days israel kosher" showed articles alone, and the ten-day Israel tour was a word away. A question
+            // may be answered by articles alone, and keeps them.
+            $products = $only === null || in_array('product', $only, true);
+            $none = ($result['total'] ?? 0) === 0 || ($products && ($result['counts']['product'] ?? 0) === 0 && ! HebrewSearch::asks($raw) && ! str_contains($raw, '?'));
 
-            return ($result['total'] ?? 0) === 0 ? $this->loosened($shopId, $raw, $only, $perGroup, $meaning, $result) : $result;
+            return $none ? $this->loosened($shopId, $raw, $only, $perGroup, $meaning, $result) : $result;
         } finally {
             $this->readWords = false;
         }
@@ -393,9 +398,21 @@ final class SearchCatalog
         }
         $title = array_map(fn (string $w): string => HebrewSearch::stem($w), explode(' ', HebrewSearch::normalize((string) ($record['title'] ?? ''))));
         $filed = array_map('strval', [...(array) ($record['kd'] ?? []), ...(array) ($record['fn'] ?? [])]);
-        $has = array_flip([...$title, ...$filed]);
+        // an English word and its plural are one word: "tour" is filed as "Israel Tours" (Gil Travel, 1.11: "tour 10 days
+        // israel" left out the one ten-day Israel tour, its title "A 10-Day Jewish Odyssey")
+        $has = array_flip(array_map(self::singular(...), [...$title, ...$filed]));
 
-        return array_filter($words, fn (string $w): bool => ! isset($has[HebrewSearch::stem($w)])) === [];
+        return array_filter($words, fn (string $w): bool => ! isset($has[self::singular(HebrewSearch::stem($w))])) === [];
+    }
+
+    /** An English word without its plural ending ("tours" "tour", "cities" "city", "classes" "class"); any other as it is. */
+    private static function singular(string $word): string
+    {
+        if (preg_match('/^[a-z]{4,}$/', $word) !== 1) {
+            return $word;
+        }
+
+        return (string) preg_replace(['/ies$/', '/(ss|x|z|ch|sh)es$/', '/(?<!s)s$/'], ['y', '$1', ''], $word, 1);
     }
 
     /** "בצבע" and "in colour" left alone once the colour is taken out: no word of what is searched. */

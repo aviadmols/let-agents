@@ -231,16 +231,16 @@
     return out;
   }
   function activeFilters(c) { return codesOn(c).length + Object.keys(c.words || {}).length + Object.keys(c.picked || {}).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
+  // The row over the results offers what more there is to choose; what is chosen, by the shopper or read from the words,
+  // is shown once, in the row under it with its × (activeRow), never a second time here with a ✓ (as Aviad asked, 1.11)
+  var OFFERED = 4;
   function chipRow(turn) {
-    var fc = facetChips(turn, 4), c = C(turn), act = activeFilters(c);
+    var fc = facetChips(turn, 99), c = C(turn), act = activeFilters(c);
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
-    if (fc.stock || onStock(c)) { chips += chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock && !!c.saidStock); }
-    if (fc.sale || onSale(c)) { chips += chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale); }
-    fc.codes.forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(f, v)); });
-    var gave = givenWay(c);
-    Object.keys(c.words || {}).forEach(function (k) { chips += chip(c.words[k].label, !gave[k], 'w:' + k, turn.id, true); });
-    // chosen from what was offered, then what is offered: the store's words close to what was typed
-    Object.keys(c.picked || {}).forEach(function (k) { chips += chip(c.picked[k].label, true, 'g:' + k, turn.id, false); });
+    if (fc.stock && !onStock(c)) { chips += chip(t('inStock'), false, 'stock', turn.id, false); }
+    if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
+    fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), false, 'f:' + code, turn.id, false, swatch(f, v)); });
+    // the store's words close to what was typed, offered to choose (a chosen one is in the row under it)
     Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(c.suggest[k].label, false, 'g:' + k, turn.id, false); } });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }

@@ -308,7 +308,8 @@
     return has(word) || ['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'].some(function (p) { return has(p + word); });
   }
   function holdsToken(hay, token, whole) {
-    if (whole) { return new RegExp('(?:^| )[והבלמשכ]{0,2}' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ות|ה|י|ת)?(?: |$)').test(hay); }
+    // an English word's plural is the word too ("tour" in "Israel Tours"), as a Hebrew word's endings are
+    if (whole) { return new RegExp('(?:^| )[והבלמשכ]{0,2}' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ות|ה|י|ת|s|es)?(?: |$)').test(hay); }
     if (token.length >= 3) { return hay.indexOf(token) !== -1; }
     return new RegExp('(?:^| )[והבלמשכ]?' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?: |$)').test(hay);
   }

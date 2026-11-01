@@ -76,6 +76,13 @@ final class ContentFiltersTest extends TestCase
         $this->assertSame(['p:6', 'p:7'], $this->found('4 days max price 1000$'));
         $this->assertSame(['p:2'], $this->found('israel under $1000'));
         $this->assertSame([], $this->found('4 days israel max price 1000$'), 'none is all of it: none, never another');
+        // Gil Travel, 1.11: "israel" is read as "Israel Tours" and "10 days" as the length, and what is left, "tour", is the
+        // store's word "Tours" too: the ten-day Israel tour, whose title says no "tour"
+        $this->assertSame(['p:1'], $this->found('tour 10 days israel'));
+        $this->assertSame(['p:1'], $this->found('tour 10 days israel family'), 'its own tag');
+        $kosher = app(SearchCatalog::class)->handle($this->shop->id, 'tour 10 days israel kosher', null, false, null, false);
+        $this->assertSame(['p:1'], array_column($kosher['groups']['product'], 'id'), 'no tour is kosher: the nearest, a word left out, never the articles alone');
+        $this->assertSame(['kosher'], $kosher['loosened']['left'] ?? null, 'and the shopper is told which');
     }
 
     public function test_a_store_without_them_filters_and_searches_as_it_did(): void

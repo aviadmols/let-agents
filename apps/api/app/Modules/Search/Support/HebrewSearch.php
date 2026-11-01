@@ -1502,8 +1502,9 @@ final class HebrewSearch
     {
         // a word the catalogue has whole is held as a word, a prefix letter or two before it and an ending after it, never
         // inside a longer one: "שבי" is not in "שביל" (Sela, 26.10); any other is held as the start of one, as it is typed
+        // an English word's plural is the word too ("tour" in "Israel Tours"), as a Hebrew word's endings are
         if ($whole) {
-            return preg_match('/(?:^| )[והבלמשכ]{0,2}'.preg_quote($token, '/').'(?:ימ|ות|ה|י|ת)?(?: |$)/u', $hay) === 1;
+            return preg_match('/(?:^| )[והבלמשכ]{0,2}'.preg_quote($token, '/').'(?:ימ|ות|ה|י|ת|s|es)?(?: |$)/u', $hay) === 1;
         }
 
         return mb_strlen($token) >= 3 ? str_contains($hay, $token) : preg_match('/(?:^| )[והבלמשכ]?'.preg_quote($token, '/').'(?: |$)/u', $hay) === 1;
