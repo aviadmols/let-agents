@@ -268,7 +268,7 @@ final class SearchCatalog
             return $result;
         }
         $facets = (array) ($index['facets'] ?? []);
-        $whomSaid = array_map(fn (array $n): string => HebrewSearch::normalize((string) $n['said']), array_filter(HebrewSearch::facets($raw, $facets),
+        $whomSaid = array_map(fn (array $n): string => HebrewSearch::normalize((string) $n['said']), array_filter(HebrewSearch::facets($raw, $facets, $index),
             fn (array $n): bool => in_array((string) ($facets[intdiv((int) $n['code'], 1000)]['k'] ?? ''), self::WHOM_FACETS, true)));
 
         // the words that say how it is: not the first (what it is), not whom it is for, not one that only joins
@@ -450,7 +450,7 @@ final class SearchCatalog
             // book, not every book with the author's name taken off. Within one filter any value; across filters all.
             $read = [];
             if ($index !== null && $query !== $worded) {
-                foreach (HebrewSearch::facets($worded, (array) ($index['facets'] ?? [])) as $named) {
+                foreach (HebrewSearch::facets($worded, (array) ($index['facets'] ?? []), $index) as $named) {
                     $read[intdiv((int) $named['code'], 1000)][(int) $named['code']] = (string) $named['label'];
                 }
             }

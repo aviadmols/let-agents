@@ -2,7 +2,8 @@
   // A value the shopper typed ("אלון", "שחור", "במבצע") is chosen for them and marked ✓. Taken off, it stays off.
   function C(turn) { if (!turn.c || !turn.c.no) { turn.c = Object.assign(blankC(), turn.c || {}); } return turn.c; }
   function stem(w) { return w.replace(/^[והבלמשכ](?=[א-ת]{2})/, ''); }
-  function wordsOf(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean); }
+  // the marks inside a word ("ג'ינס", "וינטג׳") are part of it, as the engine reads it (normalize): one word, never two
+  function wordsOf(s) { return String(s || '').toLowerCase().replace(/[׳״'"`]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean); }
   function says(text, label) { return !!saidBy(text, label); }
   // Whether a product's own words say a value: each of its words as a word of them, maybe after a prefix letter or
   // with a plural or feminine ending; no sound-alikes, which are for what a shopper mistypes ("עגול" is not "עגילים").
@@ -64,38 +65,6 @@
       });
     });
   }
-  // A category (or a tag shown as a filter) is read from the words when its whole name is typed, or, for a name of
-  // three words or more, all of it but one word and at least two: "ספרי מופת" is "ספרי מופת מתורגמים".
-  // Dates, as a day and a month: "7.10", "7/10", "שבעה באוקטובר", "ה-7 באוקטובר", "7 October". Each as "d.m", with
-  // where it was typed (the places of its words).
-  var MONTHS = { 'ינואר': 1, 'פברואר': 2, 'מרץ': 3, 'מרס': 3, 'אפריל': 4, 'מאי': 5, 'יוני': 6, 'יולי': 7, 'אוגוסט': 8, 'ספטמבר': 9, 'אוקטובר': 10, 'נובמבר': 11, 'דצמבר': 12,
-    january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
-  var DAY_WORDS = { 'אחד': 1, 'אחת': 1, 'שניים': 2, 'שתיים': 2, 'שני': 2, 'שתי': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4, 'חמש': 5, 'חמישה': 5,
-    'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9, 'עשר': 10, 'עשרה': 10 };
-  function datesIn(text) {
-    var out = [], raw = String(text || ''), tw = wordsOf(raw), m, re = /(\d{1,2})\s*[.\/]\s*(\d{1,2})(?!\d)/g;
-    while ((m = re.exec(raw))) { if (+m[2] >= 1 && +m[2] <= 12) { out.push({ d: (+m[1]) + '.' + (+m[2]), at: [] }); } }
-    var month = function (w) { return MONTHS[w] || (/^[בלה]/.test(w) ? MONTHS[w.slice(1)] : null) || null; };
-    var day = function (w) { var x = w.replace(/^ה/, ''); return /^\d{1,2}$/.test(x) ? +x : (DAY_WORDS[x] || DAY_WORDS[w] || null); };
-    tw.forEach(function (w, i) {
-      var mo = month(w);
-      if (!mo) { return; }
-      if (i > 0 && day(tw[i - 1])) { out.push({ d: day(tw[i - 1]) + '.' + mo, at: [i - 1, i] }); }
-      else if (tw[i + 1] && day(tw[i + 1])) { out.push({ d: day(tw[i + 1]) + '.' + mo, at: [i, i + 1] }); }
-    });
-    return out;
-  }
-  function datedBy(text, label) {
-    var named = datesIn(label).map(function (x) { return x.d; });
-    if (!named.length) { return null; }
-    var hit = datesIn(text).filter(function (x) { return x.at.length && named.indexOf(x.d) >= 0; })[0];
-    return hit ? hit.at : null;
-  }
-  function namesGroup(text, label) {
-    var ws = wordsSaid(text, label);
-    if (ws.of < 2) { return null; }
-    return ws.n === ws.of || (ws.of >= 3 && ws.n >= 2 && ws.n >= ws.of - 1) ? ws.at : null;
-  }
   // The same word as the search engine reads it, through a spelling slip: "לבין" is "לבן", "אדומה" is "אדום"
   // (its stem, or how it sounds once its look-alike letters are one). Short words must be exact. A word the store writes
   // as it is typed is that word, never another that sounds like it: "מרכזית" (its rings' "אבן מרכזית") is no "מרקיזה"
@@ -120,43 +89,57 @@
     var list = S.index && S.index.nochips, E = S.engine;
     return !!(list && list.length && E && E.normalize && list.indexOf(E.normalize(String(label))) >= 0);
   }
+  // How many products carry each filter value, over the whole index, as the server counts them (LoadedIndex): the reading
+  // prefers the value most carry.
+  var valueCount = null, valueCountOf = null;
+  function valueCounts() {
+    if (valueCountOf !== S.records) {
+      valueCount = {}; valueCountOf = S.records;
+      Object.keys(S.records || {}).forEach(function (id) { var r = S.records[id]; if (r && r.t === 'product') { (r.f || []).forEach(function (code) { valueCount[code] = (valueCount[code] || 0) + 1; }); } });
+    }
+    return valueCount;
+  }
+  // The filter values the words name, read as the server reads them: one reading for both (the engine's readFacets), with
+  // the store's words, its families and how many products carry each value, so what shows the moment the index answers is
+  // what shows when the server does ("זהב צהב" stays "זהב צהוב", never "זהב" and a yellow stone after a few seconds). Its
+  // places are turned into the words this drawer counts (wordsOf); where those differ in number ("80 על 150", one size),
+  // the words are read as this drawer counts them. A value the shopper took off, or one this store's shoppers keep taking
+  // off, is never read, and its words are free for another.
+  function readValues(c, q) {
+    var E = S.engine;
+    if (!E || !E.readFacets || !E.facetWords) { return []; }
+    var words = wordsOf(q), pieces = [];
+    words.forEach(function (w, j) { E.facetWords(w).forEach(function () { pieces.push(j); }); });
+    var aligned = pieces.length === E.facetWords(q).length;
+    var ctx = { holders: S.built ? S.built.holders : null, families: (S.index && S.index.families) || [], counts: valueCounts(), skip: function (code, label) { return !!c.no[code] || noChip(label); } };
+    var reads;
+    try { reads = E.readFacets(aligned ? q : words.join(' '), S.facets || [], ctx); } catch (e) { return []; }
+    if (aligned) {
+      reads.forEach(function (r) { r.at = r.at.map(function (i) { return pieces[i]; }).filter(function (j, k, all) { return all.indexOf(j) === k; }); });
+    }
+    return reads;
+  }
+  // whether a value read holds any of the results on its own: one no result carries is let go before anything else
+  function holdsAlone(turn, code) {
+    var c = C(turn), keep = { auto: c.auto, stock: c.autoStock, sale: c.autoSale, words: c.words, picked: c.picked };
+    c.auto = {}; c.auto[code] = true; c.autoStock = false; c.autoSale = false; c.words = {}; c.picked = {};
+    var n = filtered(turn).length;
+    c.auto = keep.auto; c.autoStock = keep.stock; c.autoSale = keep.sale; c.words = keep.words; c.picked = keep.picked;
+    return n > 0;
+  }
   function readTags(turn) {
-    var c = C(turn), q = turn.q || '', all = (turn.ids || []).map(rec).filter(Boolean), counts = {}, best = {}, said = {}, part = {};
+    var c = C(turn), q = turn.q || '', all = (turn.ids || []).map(rec).filter(Boolean), counts = {};
     all.forEach(function (r) { (r.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; }); });
-    Object.keys(counts).forEach(function (code) {
-      var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
-      // a category (or a tag shown as a filter) of one word is chosen by the shopper, never read from the words: "ברגים"
-      // finds screws outside the screws category too. One of several words, said enough (namesGroup), is it.
-      if (!value || c.no[code] || /^(אחר|other)$/i.test(value.l) || noChip(value.l)) { return; }
-      var grouped = facet.k === 'category' || /^tag:/.test(facet.k);
-      // a date said in words names the filter that writes it as a date: "שבעה באוקטובר" is "גבורה ותקומה אחרי 7.10" (Sela)
-      var by = (grouped ? namesGroup(q, value.l) : saidBy(q, value.l)) || datedBy(q, value.l);
-      if (!by) { return; }
-      // one value name in several attributes ("שחור" as a colour and as a coating): the one most results carry
-      var k = value.l.toLowerCase();
-      if (!best[k] || counts[code] > counts[best[k]]) { best[k] = code; said[k] = by; part[k] = grouped && !saidBy(q, value.l); }
-    });
-    // A name read from all its words but one is read only where it is the one: "זהב צהוב" is all of "טבעות זהב צהוב" and part
-    // of "תליונים זהב צהוב" and "עגילים זהב צהוב". A name said whole in its filter takes the place of the partial ones;
-    // several partial and none whole, none is read.
-    var byGroup = {};
-    Object.keys(best).forEach(function (k) { var g = Math.floor(best[k] / 1000); (byGroup[g] = byGroup[g] || []).push(k); });
-    Object.keys(byGroup).forEach(function (g) {
-      var ks = byGroup[g], whole = ks.filter(function (k) { return !part[k]; }), partial = ks.filter(function (k) { return part[k]; });
-      if (partial.length && (whole.length || partial.length > 1)) { partial.forEach(function (k) { delete best[k]; delete said[k]; }); }
-    });
     c.auto = {};
     c.at = {};
     // The most precise name first, and a typed word names one thing: "ספר" is said within "ספרי מופת מתורגמים", so only
     // the category is chosen; in "עגילים אדומים בזהב צהוב" the word "בזהב" belongs to "עגילים זהב צהוב", so "זהב אדום"
-    // is not read from "אדומים בזהב", and "אדומים" is left to the stone's colour.
-    var taken = [], precise = {};
-    Object.keys(best).sort(function (a, b) { return said[b].length - said[a].length || counts[best[b]] - counts[best[a]] || (a < b ? -1 : a > b ? 1 : 0); }).forEach(function (k) {
-      if (said[k].some(function (i) { return taken.indexOf(i) >= 0; })) { return; }
-      c.auto[best[k]] = true;
-      c.at[best[k]] = said[k].slice();
-      precise[best[k]] = said[k].length;
-      taken.push.apply(taken, said[k]);
+    // is not read from "אדומים בזהב", and "אדומים" is left to the stone's colour (readFacets).
+    var precise = {};
+    readValues(c, q).forEach(function (r) {
+      c.auto[r.code] = true;
+      c.at[r.code] = r.at.slice();
+      precise[r.code] = r.at.length;
     });
     var acts = (turn.actions || []).map(function (a) { return a.id || a; });
     // in stock by default in every search (a pill the shopper can take off, and it stays off), unless nothing found is;
@@ -183,6 +166,8 @@
     // all, the least precise of it is let go (its chip unmarked, the shopper can turn it back on).
     // "In stock" by default is weighed apart: what the shopper named, all sold out, is shown sold out, not swapped for
     // something else in stock.
+    // a value the words name that none of these results has is let go first: the others read stay as they are
+    if (all.length) { Object.keys(precise).map(Number).forEach(function (code) { if (c.auto[code] && !holdsAlone(turn, code)) { delete c.auto[code]; } }); }
     var loose = Object.keys(c.auto).map(Number).sort(function (a, b) { return (precise[a] || 0) - (precise[b] || 0) || a - b; });
     var stocked = c.autoStock;
     c.autoStock = false;

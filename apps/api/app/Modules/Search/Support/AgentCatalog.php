@@ -559,7 +559,7 @@ final class AgentCatalog
         return [
             'min_price' => $min,
             'max_price' => $max,
-            'filters' => $index === null ? [] : array_map(fn (array $n): array => ['name' => $n['title'], 'value' => $n['label']], HebrewSearch::facets($query, (array) ($index['facets'] ?? []))),
+            'filters' => $index === null ? [] : array_map(fn (array $n): array => ['name' => $n['title'], 'value' => $n['label']], HebrewSearch::facets($query, (array) ($index['facets'] ?? []), $index)),
         ];
     }
 }

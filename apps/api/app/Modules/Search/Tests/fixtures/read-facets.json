@@ -1,0 +1,79 @@
+{
+  "about": "Three stores in small: jewellery (Rocks), hardware (Gueta) and tours (Gil Travel). Their filters, their word families and a few products whose words are the catalogue's, as the live indexes had them on 1.11.2026.",
+  "stores": {
+    "jewellery": {
+      "facets": [
+        {"k": "type", "l": "סוג מוצר", "v": [{"k": "ring", "l": "טבעת"}, {"k": "earrings", "l": "עגילים"}, {"k": "pendant", "l": "תליון"}]},
+        {"k": "metal", "l": "מתכת", "v": [{"k": "yellow_gold", "l": "זהב צהוב"}, {"k": "white_gold", "l": "זהב לבן"}, {"k": "rose_gold", "l": "זהב אדום"}, {"k": "gold", "l": "זהב"}]},
+        {"k": "stone", "l": "אבן", "v": [{"k": "emerald", "l": "אמרלד"}, {"k": "ruby", "l": "רובי"}, {"k": "diamond", "l": "יהלום"}]},
+        {"k": "stone_color", "l": "צבע האבן", "v": [{"k": "blue", "l": "כחול"}, {"k": "yellow", "l": "צהוב"}, {"k": "clear", "l": "שקוף"}, {"k": "red", "l": "אדום"}]},
+        {"k": "stone_shape", "l": "צורה וחיתוך", "v": [{"k": "heart", "l": "לב"}, {"k": "oval", "l": "אובלי"}, {"k": "marquise", "l": "מרקיזה"}]},
+        {"k": "variant_size", "l": "מידה", "v": [{"k": "52", "l": "52"}, {"k": "54", "l": "54"}]},
+        {"k": "category", "l": "קטגוריה", "v": [{"k": "c1", "l": "טבעות"}, {"k": "c2", "l": "טבעות זהב צהוב"}, {"k": "c3", "l": "טבעות זהב לבן"}, {"k": "c4", "l": "עגילים זהב צהוב"}, {"k": "c5", "l": "תליונים זהב צהוב"}]}
+      ],
+      "families": [["צהוב", "צהב"], ["וינטג", "וינטאג"]],
+      "items": [
+        {"id": "p:1", "title": "טבעת וינטג' משובצת אבן מרכזית אובלית, זהב 14K", "keywords": "זהב צהוב זהוב אבן מרכזית"},
+        {"id": "p:2", "title": "עגילים משובצים אמרלד, זהב 18K", "keywords": "זהב לבן כסוף"},
+        {"id": "p:3", "title": "תליון לב משובץ רובי", "keywords": "זהב אדום ורדרד"}
+      ],
+      "counts": {"1000": 40, "1003": 12, "4000": 9, "4001": 5, "6000": 3}
+    },
+    "hardware": {
+      "facets": [
+        {"k": "type", "l": "סוג מוצר", "v": [{"k": "a", "l": "מברג"}, {"k": "b", "l": "מקדח"}, {"k": "c", "l": "ידית"}]},
+        {"k": "finish", "l": "גימור", "v": [{"k": "a", "l": "שחור"}, {"k": "b", "l": "מט"}]},
+        {"k": "coating", "l": "ציפוי", "v": [{"k": "a", "l": "שחור"}, {"k": "b", "l": "נירוסטה"}]},
+        {"k": "brand", "l": "מותג", "v": [{"k": "a", "l": "מקיטה"}]}
+      ],
+      "families": [["מקדח", "מקדחימ"], ["מברגה", "מברגת", "מברגות"], ["מברג", "מברגימ"]],
+      "items": [
+        {"id": "p:1", "title": "מברגה נטענת מקיטה", "keywords": "מברגה"},
+        {"id": "p:2", "title": "מקדח לעץ", "keywords": "מקדח"},
+        {"id": "p:3", "title": "ידית שחורה מט", "keywords": "ידית"}
+      ],
+      "counts": {"1000": 3, "2000": 20}
+    },
+    "tours": {
+      "facets": [
+        {"k": "category", "l": "Category", "v": [{"k": "a", "l": "Jewish Heritage Tours"}, {"k": "b", "l": "Israel Private Tours"}, {"k": "c", "l": "Israel Tours"}, {"k": "d", "l": "Kosher"}, {"k": "e", "l": "Spain"}]},
+        {"k": "length", "l": "Length", "v": [{"k": "2-5", "l": "2 to 5 days"}, {"k": "6-9", "l": "6 to 9 days"}, {"k": "10-14", "l": "10 to 14 days"}, {"k": "15+", "l": "15 days or more"}]}
+      ],
+      "families": [["israel", "israek"]],
+      "items": [
+        {"id": "p:1", "title": "Israel: Jewish Heritage Tour", "keywords": "kosher"},
+        {"id": "p:2", "title": "A 10-Day Jewish Odyssey", "keywords": "israel"}
+      ],
+      "counts": {}
+    }
+  },
+  "expected": {
+    "jewellery": {
+      "טבעת זהב צהב עם אבן כחול": [[6001, "family"], [3000, "exact"]],
+      "טבעת זהב צהוב עם אבן כחול": [[6001, "form"], [3000, "exact"]],
+      "עגילים אדומים בזהב צהוב": [[6003, "form"], [3003, "form"]],
+      "עגילי זהב": [[1, "form"], [1003, "exact"]],
+      "טבעת צהוב": [[0, "exact"], [3001, "exact"]],
+      "טבעת זהובה": [[0, "exact"]],
+      "טבעת אמרלך": [[0, "exact"], [2000, "slip"]],
+      "טבעת וינטאג": [[0, "exact"]],
+      "טבעת מרכזית אובלית": [[0, "exact"], [4001, "form"]],
+      "תליון לב": [[2, "exact"], [4000, "exact"]],
+      "טבעת רובי מידה 54": [[0, "exact"], [2001, "exact"], [5001, "exact"]]
+    },
+    "hardware": {
+      "מברגה נטענת": [],
+      "מקדחה מקיטה": [[3000, "exact"]],
+      "ידית שחורה מט": [[2, "exact"], [2000, "form"], [1001, "exact"]],
+      "בורג נרוסטה": [[2001, "vowels"]]
+    },
+    "tours": {
+      "tour 10 days israel kosher": [[1002, "exact"], [2, "exact"]],
+      "isreal tours": [[2, "slip"]],
+      "private israel tour": [[2, "form"]],
+      "jewish heritag tours": [[0, "exact"]],
+      "kosher cruise": [],
+      "6 nights spain": [[1001, "exact"]]
+    }
+  }
+}

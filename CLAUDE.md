@@ -136,7 +136,11 @@ Multi-tenant widget for stores (WooCommerce first, Shopify later). The plan, in 
   `npm run build:lets-search`; `LetsSearchBuildTest` fails when it is stale). Its code is one function
   split by subject into `lets-search/drawer/NN-*.js` (filters, search, cart…), joined in number order and
   sharing one scope; edit the part, never the built file. It is served at
-  `/api/v1/search/lets-search.js` and at the old `/search/let-agents-search.js` address. The index (`search_indexes`) is rebuilt at
+  `/api/v1/search/lets-search.js` and at the old `/search/let-agents-search.js` address. The filter values the words
+  name are read ONCE, by `readFacets` (engine and `HebrewSearch`, same reads, fixture `read-facets.json`): the server
+  applies them and the drawer shows the same, never a reading of its own from the results on screen. A word names a
+  value as itself, a form, the store's family, or (only a word the store does not write, no kind, no colour) its vowels,
+  sound or one slip; a category/tag only from a name of two words or more. The index (`search_indexes`) is rebuilt at
   02:40 and on demand; synonyms are applied at build time, never at query time.
 - A picture's words are the product's words in the search for words, less what is only drawn, printed or written on
   it (`BuildSearchIndex::shown`: the describer's `depicted` list since caption v8, and before it a phrase that opens

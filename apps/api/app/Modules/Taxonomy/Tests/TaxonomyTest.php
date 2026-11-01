@@ -4,6 +4,7 @@ namespace App\Modules\Taxonomy\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Features\FeatureRegistry;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
@@ -358,6 +359,9 @@ final class TaxonomyTest extends TestCase
             foreach (['f6', 'f7', 'f8'] as $p) {
                 $give($fantasy, $p, ['source' => 'knowledge']);
             }
+            // a post given the horror tag by the same rules: it narrows with the filter beside the products
+            $post = CatalogContent::query()->create(['type' => CatalogContent::POST, 'external_id' => 'post-horror', 'title' => 'ספרי אימה לחורף', 'url' => 'https://books.test/horror', 'body' => 'אימה', 'hash' => 'h']);
+            $give($horror, 'f1', ['subject_type' => 'content', 'subject_id' => $post->id]);
         });
         $facets = function (): array {
             app(BuildSearchIndex::class)->handle($this->shop->id);
@@ -365,7 +369,8 @@ final class TaxonomyTest extends TestCase
             return (array) json_decode((string) app(TenantContext::class)->run($this->shop->id, fn () => SearchIndex::query()->sole()->items), true);
         };
 
-        $this->assertNotContains('tag:genre', array_column($facets()['facets'], 'k'), 'off: the filters as they were');
+        Features::override('taxonomy.in_filters', false, $this->shop->id);
+        $this->assertNotContains('tag:genre', array_column($facets()['facets'], 'k'), 'turned off: the filters as they were');
 
         Features::override('taxonomy.in_filters', true, $this->shop->id);
         $index = $facets();
@@ -377,6 +382,8 @@ final class TaxonomyTest extends TestCase
         $f7 = collect($index['items'])->firstWhere('title', 'ספר 7')['f'] ?? [];
         $this->assertContains($at * 1000 + 1, $f1);
         $this->assertNotContains($at * 1000, $f7, 'a tag in its background narrows nothing');
+        $this->assertSame([$at * 1000], collect($index['items'])->firstWhere('id', 'c:post-horror')['f'] ?? null, 'the post given the tag carries its filter');
+        $this->assertTrue(app(FeatureRegistry::class)->get('taxonomy.in_filters')->default, 'on in every store that has tags');
     }
 
     public function test_the_gap_scan_reads_the_products_the_bank_does_not_describe_and_proposes_what_it_lacks(): void

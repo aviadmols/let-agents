@@ -88,6 +88,9 @@ final class BuildSearchIndex
     /** @var array<string, list<string>> the store-field values each product has (fieldFacets), words of it */
     private array $fieldValues = [];
 
+    /** @var array<string, list<int>> the tag filters each post or page holds (tagFacets), by catalog content id */
+    private array $contentTags = [];
+
     /** Words that say a collection is a campaign or a shelf of the moment, not a kind of product. */
     private const CAMPAIGN_WORDS = '~sale|friday|cyber|valentine|summer|winter|edit|black|gift ?guide|new ?arrivals?|best ?sellers?|trending|shop ?all|מבצע|סייל|סוף[- ]?שנה|חג|הגיעו לאחרונה|חדש(ים|ות)? באתר|המלצות|עולות|הכי נמכר|רבי מכר|קולקציית|מתנות ל~iu';
 
@@ -417,6 +420,8 @@ final class BuildSearchIndex
                 'url' => $content->url,
                 'img' => $content->image_url,
                 'kind' => $content->type,
+                // the tag filters its tags hold (tagFacets): a filter chosen narrows the articles beside the products
+                'f' => $this->contentTags[(string) $content->id] ?? null,
             ]);
             $counts['content']++;
         }
@@ -772,7 +777,7 @@ final class BuildSearchIndex
      */
     private static function actions(string $locale, bool $hasSize, bool $sizeFilter = false): array
     {
-        // "מידה 52" in a shop whose variants have sizes is its size filter (queryFacets), not a number near 52.
+        // "מידה 52" in a shop whose variants have sizes is its size filter (readFacets), not a number near 52.
         $registry = array_values(array_filter(self::registry(), fn (array $entry): bool => ($hasSize || ($entry['needs'] ?? null) !== 'size')
             && ! ($sizeFilter && ($entry['unless'] ?? null) === 'size_filter')));
 
@@ -962,6 +967,7 @@ final class BuildSearchIndex
      */
     private function tagFacets(array &$facets, string $shopId, string $locale): array
     {
+        $this->contentTags = [];
         if (! app()->bound(ProductTags::class)) {
             return [];
         }
@@ -987,6 +993,9 @@ final class BuildSearchIndex
             foreach ($values as $i => $value) {
                 foreach ($value['products'] as $id) {
                     $products[$id][] = $at * 1000 + $i;
+                }
+                foreach ((array) ($value['content'] ?? []) as $id) {
+                    $this->contentTags[(string) $id][] = $at * 1000 + $i;
                 }
             }
         }

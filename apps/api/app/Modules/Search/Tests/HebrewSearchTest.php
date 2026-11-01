@@ -18,6 +18,8 @@ final class HebrewSearchTest extends TestCase
 
     private const SCRIPT = __DIR__.'/../resources/search/hebrew-search-engine.js';
 
+    private const READ_FIXTURE = __DIR__.'/fixtures/read-facets.json';
+
     /** @return array<string, mixed> */
     private static function fixture(): array
     {
@@ -261,5 +263,43 @@ final class HebrewSearchTest extends TestCase
         $this->assertSame('פטריה שטובה ללישון', HebrewSearch::withFinals(HebrewSearch::normalize('פטריה שטובה ללישון')));
         $this->assertSame('כמון נענע קרשים חוף ארץ', HebrewSearch::withFinals('כמונ נענע קרשימ חופ ארצ'));
         $this->assertSame('sleep well 7', HebrewSearch::withFinals('sleep well 7'), 'English as it is');
+    }
+
+    /**
+     * The filter values the words name, read through a form, the store's family, the vowel letters, a sound or a slip,
+     * as a name of several words in its order, the same on the server and in the browser (readFacets). Rocks, 1.11:
+     * "טבעת זהב צהב" was "זהב צהוב" a moment in the drawer, then "זהב" and a yellow stone once the server answered.
+     */
+    public function test_filter_values_are_read_with_forms_families_and_slips_alike_on_the_server_and_in_the_browser(): void
+    {
+        $fixture = json_decode((string) file_get_contents(self::READ_FIXTURE), true);
+        $server = [];
+        foreach ($fixture['stores'] as $name => $store) {
+            $ctx = HebrewSearch::readContext(['engine' => HebrewSearch::build($store['items']), 'families' => $store['families'], 'counts' => $store['counts']]);
+            foreach ($fixture['expected'][$name] as $query => $reads) {
+                $server[$name][$query] = array_map(fn (array $r): array => [$r['code'], $r['how']], HebrewSearch::readFacets((string) $query, $store['facets'], $ctx));
+                $this->assertSame($reads, $server[$name][$query], "{$name}: \"{$query}\"");
+            }
+        }
+
+        // the words the values were read from leave the search, as they were typed
+        $jewellery = $fixture['stores']['jewellery'];
+        $ctx = HebrewSearch::readContext(['engine' => HebrewSearch::build($jewellery['items']), 'families' => $jewellery['families'], 'counts' => $jewellery['counts']]);
+        $read = HebrewSearch::readFacets('יהלום משובץ בזהב צהב', $jewellery['facets'], $ctx);
+        $this->assertSame([[2002, [0]], [1000, [2, 3]]], array_map(fn (array $r): array => [$r['code'], $r['at']], $read));
+        $this->assertSame('יהלום משובץ', HebrewSearch::withoutAt('יהלום משובץ בזהב צהב', $read[1]['at']));
+
+        $node = (new ExecutableFinder)->find('node');
+        if ($node === null) {
+            $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
+        }
+        $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const f=require('.json_encode(realpath(self::READ_FIXTURE)).');const out={};'
+            .'for(const [name,s] of Object.entries(f.stores)){const b=e.build(s.items);out[name]={};'
+            .'for(const q of Object.keys(f.expected[name])){out[name][q]=e.readFacets(q,s.facets,{holders:b.holders,families:s.families,counts:s.counts}).map(r=>[r.code,r.how]);}}'
+            .'process.stdout.write(JSON.stringify(out));';
+        $process = new Process([$node, '-e', $harness]);
+        $process->mustRun();
+
+        $this->assertSame($server, json_decode($process->getOutput(), true), 'the browser reads the words as the server does');
     }
 }

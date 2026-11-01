@@ -17,7 +17,9 @@
     module.exports = engine;
     return;
   }
-  if (root && !root.LA_ENGINE) {
+  // an older copy a page still holds (a cached script, a second address) has no readFacets: the drawer would read no filter
+  // from the words, so this one takes its place
+  if (root && (!root.LA_ENGINE || !root.LA_ENGINE.readFacets)) {
     root.LA_ENGINE = engine;
   }
 }(typeof window !== 'undefined' ? window : this, function () {
@@ -763,63 +765,429 @@
     return normalize(String(text).replace(/(\d)\s*(?:[x×X*✕]|על|on)\s*(\d)/g, '$1x$2'));
   }
 
-  /**
-   * The shop's filter values the words name ("כחול", "כחולה", "בכחול", "80x150", "זהב צהוב"):
-   * those filters are chosen for this query, as if pressed, and shown at the top with their ×.
-   * In code, from last night's index; the longest name wins ("זהב צהוב" before "זהב"). Not the
-   * product's type: "שטיח" is what the words search for, not a filter on it.
-   */
-  function queryFacets(raw, facets) {
-    var text = ' ' + facetText(raw) + ' ';
-    var found = [];
-    (facets || []).forEach(function (facet, at) {
-      if (facet.k === 'type') {
-        return;
+  // ---------------------------------------------------------------- the filter values the words name
+  // One reading for the server (HebrewSearch::readFacets) and the drawer: change both. HebrewSearchTest runs both on one
+  // fixture and requires the same reads.
+  var READ_HOW = ['exact', 'form', 'family', 'vowels', 'sound', 'slip'];
+  var READ_PREFIX = /^[ובהלמ]/;
+  var READ_LATIN = /^[a-z]+$/;
+  var READ_HEBREW = /^[א-ת]+$/;
+  var READ_SIZE_WORD = /^(?:[ובה]?מיד[הת]|size)$/;
+  var READ_DAYS = /^(?:day|days|ימימ|יומ)$/;
+  var READ_NIGHTS = /^(?:night|nights|לילות|לילה)$/;
+  var READ_OTHER = /^(?:אחר|other)$/;
+
+  /** A typed word without the one letter Hebrew puts before it ("בזהב": "זהב"), when two letters or more are left. */
+  function readBare(word) {
+    return word.length > 2 && READ_PREFIX.test(word) && READ_HEBREW.test(word) ? word.slice(1) : null;
+  }
+
+  /** How far two words are by one letter more, less, another or two side by side swapped; more than max as max + 1. */
+  function slips(a, b, max) {
+    if (Math.abs(a.length - b.length) > max) {
+      return max + 1;
+    }
+    var rows = [], i, j;
+    for (i = 0; i <= a.length; i++) {
+      rows.push([i]);
+    }
+    for (j = 1; j <= b.length; j++) {
+      rows[0][j] = j;
+    }
+    for (i = 1; i <= a.length; i++) {
+      var least = max + 1;
+      for (j = 1; j <= b.length; j++) {
+        var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+        var d = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a.charAt(i - 1) === b.charAt(j - 2) && a.charAt(i - 2) === b.charAt(j - 1)) {
+          d = Math.min(d, rows[i - 2][j - 2] + 1);
+        }
+        rows[i][j] = d;
+        least = Math.min(least, d);
       }
-      (facet.v || []).forEach(function (value, i) {
-        var name = facetText(value.l);
-        var quoted = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // "חולצה מידה M", "טבעת במידה 52": a value after the word for size is that size, however short
-        var sized = name !== '' ? text.match(new RegExp('\\s((?:[ובה]?מיד(?:ה|ת)|size)\\s?:?\\s?' + quoted + ')(?=\\s)')) : null;
-        if (sized) {
-          found.push({ code: at * 1000 + i, said: sized[1], label: value.l, title: facet.l });
+      if (least > max) {
+        return max + 1;
+      }
+    }
+    return rows[a.length][b.length];
+  }
+
+  /** Each single word of the store's families with the families it is in. A family lists its forms itself: never by their
+   * core, which would make one family of "מברגה" (a drill) and "מברג" (a screwdriver). */
+  var READ_FAMILIES = { of: null, map: null };
+  function familyMap(families) {
+    if (READ_FAMILIES.of === families && READ_FAMILIES.map) {
+      return READ_FAMILIES.map;
+    }
+    var map = {};
+    (families || []).forEach(function (family, at) {
+      (family || []).forEach(function (member) {
+        var m = normalize(member);
+        if (!m || m.indexOf(' ') !== -1) {
           return;
         }
-        // Too short to be meant ("S", "M"), unless it is a size with numbers.
-        if (name.length < 3 && !/\d/.test(name)) {
-          return;
+        if (!Object.prototype.hasOwnProperty.call(map, m)) {
+          map[m] = [];
         }
-        var hebrew = /[\u0590-\u05FF]$/.test(name);
-        var pattern = new RegExp('\\s[ובהלמ]?(' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + (hebrew ? '(?:ה|ימ|ות)?' : '') + ')(?=\\s)');
-        var m = text.match(pattern);
-        if (m) {
-          found.push({ code: at * 1000 + i, said: m[1], label: value.l, title: facet.l });
+        if (map[m].indexOf(at) === -1) {
+          map[m].push(at);
         }
       });
     });
-    found.sort(function (a, b) { return b.said.length - a.said.length || a.code - b.code; });
-    var taken = [];
-    return found.filter(function (named) {
-      if (taken.some(function (word) { return word.indexOf(named.said) !== -1; })) {
-        return false;
+    READ_FAMILIES.of = families;
+    READ_FAMILIES.map = map;
+    return map;
+  }
+
+  function familiesOf(map, words) {
+    var out = [];
+    words.forEach(function (w) {
+      if (w && Object.prototype.hasOwnProperty.call(map, w)) {
+        map[w].forEach(function (at) { if (out.indexOf(at) === -1) { out.push(at); } });
       }
-      taken.push(named.said);
-      return true;
+    });
+    return out;
+  }
+
+  /**
+   * What the reader needs of a store's filters, worked out once per index: each value's words; the words that name what
+   * products are (a category's or a kind's, three letters or more); the words of the values that say what a product has
+   * (its metal, its colour), never guessed; and how many values of each filter hold each word.
+   */
+  var READ_PREPARED = { of: null, prepared: null };
+  function prepareFacets(facets) {
+    if (READ_PREPARED.of === facets && READ_PREPARED.prepared) {
+      return READ_PREPARED.prepared;
+    }
+    var kinds = [], kindOf = {}, attributes = {}, many = [], values = [], vocabulary = {};
+    (facets || []).forEach(function (facet, g) {
+      var k = String(facet.k == null ? '' : facet.k);
+      var grouped = k === 'category' || /^tag:/.test(k);
+      var describes = !grouped && k !== 'type' && k !== 'length';
+      var counted = {};
+      (facet.v || []).forEach(function (value, i) {
+        var label = String(value.l == null ? '' : value.l);
+        var lw = facetText(label).split(' ').filter(Boolean);
+        var cores = {};
+        lw.forEach(function (w) {
+          vocabulary[w] = true;
+          cores[core(w)] = true;
+          if ((k === 'category' || k === 'type') && w.length >= 3 && !kindOf[w]) {
+            kindOf[w] = true;
+            kinds.push(w);
+          }
+          if (describes && w.length >= 2) {
+            attributes[core(w)] = true;
+          }
+        });
+        Object.keys(cores).forEach(function (c) { counted[c] = (counted[c] || 0) + 1; });
+        values.push({ code: g * 1000 + i, g: g, k: k, key: value.k, label: label, title: String(facet.l == null ? '' : facet.l), lw: lw, grouped: grouped });
+      });
+      many.push(counted);
+    });
+    // a word of a category's name that is a value of another filter ("זהב", "צהוב" in "טבעות זהב צהוב") says how a product
+    // is, not what it is: no kind
+    kinds = kinds.filter(function (w) { return !attributes[core(w)]; });
+    READ_PREPARED.of = facets;
+    READ_PREPARED.prepared = { kinds: kinds, kindOf: kindOf, attributes: attributes, many: many, values: values, vocabulary: Object.keys(vocabulary) };
+    return READ_PREPARED.prepared;
+  }
+
+  function namesKind(kinds, word) {
+    if (word.length < 3) {
+      return false;
+    }
+    var bare = readBare(word);
+    return kinds.some(function (w) {
+      return word === w || bare === w || ((w.indexOf(word) === 0 || word.indexOf(w) === 0) && Math.abs(w.length - word.length) <= 2);
     });
   }
 
-  /** The words as typed, less the ones that read as $said ("80 על 150" for "80x150"); null when not found. */
-  function withoutSaid(raw, said) {
-    var tokens = String(raw).split(/\s+/);
-    for (var size = 1; size <= 4; size++) {
-      for (var i = 0; i + size <= tokens.length; i++) {
-        var piece = facetText(tokens.slice(i, i + size).join(' '));
-        if (piece === said || piece.replace(/^[ובהלמ]/, '') === said) {
-          return tokens.slice(0, i).concat(tokens.slice(i + size)).join(' ').replace(/\s+/g, ' ').trim();
+  /** A noun's plurals: "טבעת" "טבעות", "ספר" "ספרימ", "שמלה" "שמלות". */
+  function pluralsOf(word) {
+    var out = [word + 'ימ', word + 'ות'];
+    if (/[הת]$/.test(word)) {
+      out.push(word.slice(0, -1) + 'ות');
+    }
+    return out;
+  }
+
+  /** Two forms of one noun: one the other's plural, or the plural's construct ("עגילי", "ספרי"). Never "מברגה" for "מברג". */
+  function nounForms(a, b) {
+    var construct = function (x, y) { return /י$/.test(x) && (x + 'מ' === y || pluralsOf(y).indexOf(x + 'מ') !== -1); };
+    return pluralsOf(a).indexOf(b) !== -1 || pluralsOf(b).indexOf(a) !== -1 || construct(a, b) || construct(b, a);
+  }
+
+  /**
+   * How a typed word names a word of a value: 0 the same, 1 a form of it, 2 the store's family, 3 its vowel letters
+   * typed otherwise, 4 a letter that sounds the same, 5 one slip of the keyboard; -1 none. A word that names what
+   * products are has a noun's forms only ("מקדחה", a drill, is no "מקדח", a bit); a word that says how one is
+   * ("כחולה", "אדומים") has every ending. The last three only for a word the store does not write as typed and that
+   * names no kind of product: "זהב" is never "זהוב", "מרכזית" never "מרקיזה".
+   */
+  function wordNames(typed, word, on) {
+    if (typed === word) {
+      return 0;
+    }
+    var bare = readBare(typed);
+    if (bare === word) {
+      return 1;
+    }
+    if (/\d/.test(typed) || /\d/.test(word) || typed.length < 3 || word.length < 3) {
+      return -1;
+    }
+    var noun = on.kindOf[word] === true && !on.attributes[core(word)];
+    if (noun ? (nounForms(typed, word) || (bare !== null && bare.length >= 3 && nounForms(bare, word)))
+      : (core(typed) === core(word) || (bare !== null && bare.length >= 3 && core(bare) === core(word))
+        || (word.length >= 4 && typed.indexOf(word) === 0 && typed.length - word.length <= 2))) {
+      return 1;
+    }
+    if (READ_LATIN.test(typed) && READ_LATIN.test(word) && (typed === word + 's' || word === typed + 's' || typed === word + 'es' || word === typed + 'es')) {
+      return 1;
+    }
+    if (on.families) {
+      var mine = familiesOf(on.families, [typed, bare]);
+      if (mine.length && familiesOf(on.families, [word]).some(function (at) { return mine.indexOf(at) !== -1; })) {
+        return 2;
+      }
+    }
+    if (on.guarded(typed)) {
+      return -1;
+    }
+    var hebrew = READ_HEBREW.test(typed) && READ_HEBREW.test(word);
+    if (hebrew && (stem(typed) === stem(word) || skeleton(typed) === skeleton(word) || (bare !== null && bare.length >= 3 && stem(bare) === stem(word)))) {
+      return 3;
+    }
+    if (hebrew && word.length >= 4 && sound(typed) === sound(word)) {
+      return 4;
+    }
+    if (typed.length >= 5 && word.length >= 5) {
+      var max = Math.min(typed.length, word.length) >= 8 ? 2 : 1;
+      if (slips(typed, word, max) <= max) {
+        return 5;
+      }
+    }
+    return -1;
+  }
+
+  /** The best places of a value's words among the typed ones: the most words, the closest together, the closest read. */
+  function placeWords(places, lw) {
+    var lists = lw.map(function (w) { return places[w] || []; });
+    var best = { at: [], tiers: [], ks: [] };
+    var spread = function (at) { return at.length ? at[at.length - 1] - at[0] : 0; };
+    var sum = function (tiers) { return tiers.reduce(function (s, t) { return s + t; }, 0); };
+    (function walk(k, at, tiers, ks) {
+      if (k === lw.length) {
+        if (at.length > best.at.length || (at.length === best.at.length && (spread(at) < spread(best.at) || (spread(at) === spread(best.at) && sum(tiers) < sum(best.tiers))))) {
+          best = { at: at.slice(), tiers: tiers.slice(), ks: ks.slice() };
+        }
+        return;
+      }
+      walk(k + 1, at, tiers, ks);
+      lists[k].forEach(function (place) {
+        var last = at.length ? at[at.length - 1] : -1;
+        if (place[0] <= last || (at.length && place[0] - last > 2)) {
+          return;
+        }
+        at.push(place[0]); tiers.push(place[1]); ks.push(k);
+        walk(k + 1, at, tiers, ks);
+        at.pop(); tiers.pop(); ks.pop();
+      });
+    })(0, [], [], []);
+    return best;
+  }
+
+  /** "מידה 52", "size M": a value right after the word for size, however short. */
+  function sizedAt(tw, lw) {
+    if (lw.length !== 1) {
+      return null;
+    }
+    for (var i = 1; i < tw.length; i++) {
+      if (tw[i] === lw[0] && READ_SIZE_WORD.test(tw[i - 1])) {
+        return [i - 1, i];
+      }
+    }
+    return null;
+  }
+
+  /** A date the value's name holds ("7 אוקטובר", as normalize writes every date), said in the words. */
+  function datedAt(tw, lw) {
+    for (var k = 0; k + 1 < lw.length; k++) {
+      if (/^\d{1,2}$/.test(lw[k]) && MONTH_NAMES.indexOf(lw[k + 1]) !== -1) {
+        for (var i = 0; i + 1 < tw.length; i++) {
+          if (tw[i] === lw[k] && tw[i + 1] === lw[k + 1]) {
+            return [i, i + 1];
+          }
         }
       }
     }
     return null;
+  }
+
+  /** "10 days", "a 10-day tour", "6 nights" (a day more): how many days, and where they were said. */
+  function daysAt(tw) {
+    for (var i = 0; i < tw.length; i++) {
+      if (!/^\d{1,2}$/.test(tw[i])) {
+        continue;
+      }
+      for (var j = i + 1; j <= i + 2 && j < tw.length; j++) {
+        if (READ_DAYS.test(tw[j])) {
+          return { days: Number(tw[i]), at: [i, j] };
+        }
+        if (READ_NIGHTS.test(tw[j])) {
+          return { days: Number(tw[i]) + 1, at: [i, j] };
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Whether a length value ("10-14", "15+", "1") holds a number of days. */
+  function lengthHolds(key, days) {
+    var m = /^(\d+)(?:-(\d+)|(\+))?$/.exec(String(key));
+    if (!m) {
+      return false;
+    }
+    var from = Number(m[1]), to = m[3] ? Infinity : (m[2] ? Number(m[2]) : from);
+    return days >= from && days <= to;
+  }
+
+  /**
+   * The store's filter values the words name. A typed word names a word of a value as itself, a form of it, the store's
+   * family of it, or (for a word the store does not write) its vowel letters, sound or one slip otherwise (wordNames).
+   * A name of several words is read where its words come in its order, at most one other word between two of them: "זהב
+   * צהב" is "זהב צהוב". A category or a tag is read only from a name of two words or more: whole, or part of it where each
+   * word left out says what the filter's values all are ("israel" is "Israel Tours") or is the one left of three or more,
+   * and is never a value of another filter ("עגילי זהב" is no "עגילים זהב צהוב"). A length is read from "10 days". Each
+   * typed word names one value: the one that covers the most words, then the closest reading, then the one most products
+   * carry. The same value name in several filters is the one most products carry. Within one filter a part gives way to a
+   * whole, and several parts to none.
+   *
+   * ctx: {holders, families, counts: {code: products}, skip: function (code, label)}; all may be left out.
+   * @return {Array<{code: number, at: number[], said: string, label: string, title: string, k: string, how: string, part: boolean}>}
+   */
+  function readFacets(raw, facets, ctx) {
+    ctx = ctx || {};
+    var tw = facetText(raw).split(' ').filter(Boolean);
+    if (!tw.length || !facets || !facets.length) {
+      return [];
+    }
+    var prepared = prepareFacets(facets);
+    var holders = ctx.holders || null;
+    var on = {
+      families: ctx.families && ctx.families.length ? familyMap(ctx.families) : null,
+      kindOf: prepared.kindOf,
+      attributes: prepared.attributes,
+      // a word the store writes, one that names a kind, or a colour in any of its forms ("זהובה" is golden, not gold) is
+      // that word: never read as another that looks like it
+      guarded: function (word) { return (!!holders && heldWhole(holders, word)) || namesKind(prepared.kinds, word) || colorOf(word) !== null || colorOf(readBare(word) || '') !== null; }
+    };
+    // where each word of the store's values is typed, and how closely: each pair weighed once
+    var places = {};
+    prepared.vocabulary.forEach(function (w) {
+      var out = [];
+      tw.forEach(function (x, i) {
+        var tier = wordNames(x, w, on);
+        if (tier >= 0) {
+          out.push([i, tier]);
+        }
+      });
+      if (out.length) {
+        places[w] = out;
+      }
+    });
+    var counts = ctx.counts || {};
+    var count = function (code) { return Number(counts[code] || 0); };
+    var days = daysAt(tw);
+    var other = tw.some(function (w) { return READ_SIZE_WORD.test(w) || MONTH_NAMES.indexOf(w) !== -1; });
+    var found = [];
+    prepared.values.forEach(function (value) {
+      if (READ_OTHER.test(value.label.toLowerCase().trim()) || !value.lw.length || (ctx.skip && ctx.skip(value.code, value.label))) {
+        return;
+      }
+      var read = null;
+      if (value.k === 'length') {
+        read = days && lengthHolds(value.key, days.days) ? { at: days.at, tiers: [0], part: false } : null;
+      } else if (value.lw.join('').length >= 2 && value.lw.some(function (w) { return places[w]; })) {
+        var placed = placeWords(places, value.lw);
+        var n = placed.at.length, of = value.lw.length;
+        // a word of the name not typed: one that says what the filter's values all are ("Tours"), or the one left of
+        // three or more; never one of another filter (a colour, a metal), which the shopper did not ask
+        var guessed = value.lw.every(function (w, k) {
+          return placed.ks.indexOf(k) !== -1 || (!prepared.attributes[core(w)] && ((prepared.many[value.g][core(w)] || 0) >= 3 || (of >= 3 && n >= 2 && n >= of - 1)));
+        });
+        if (!value.grouped && n === of) {
+          // "מידה 54": the word for size goes with the size it names
+          read = of === 1 && placed.at[0] > 0 && READ_SIZE_WORD.test(tw[placed.at[0] - 1])
+            ? { at: [placed.at[0] - 1, placed.at[0]], tiers: [0, placed.tiers[0]], part: false }
+            : { at: placed.at, tiers: placed.tiers, part: false };
+        } else if (value.grouped && of >= 2 && n >= 1 && (n === of || guessed)) {
+          read = { at: placed.at, tiers: placed.tiers, part: n < of };
+        }
+      }
+      if (!read && other) {
+        var at = sizedAt(tw, value.lw) || datedAt(tw, value.lw);
+        read = at ? { at: at, tiers: [0], part: false } : null;
+      }
+      if (read) {
+        found.push({ code: value.code, g: value.g, at: read.at, tiers: read.tiers, part: read.part, label: value.label, title: value.title, k: value.k });
+      }
+    });
+
+    // one value name in several filters ("שחור" a colour and a coating): the one most products carry
+    var byName = {};
+    found.forEach(function (r) {
+      var name = normalize(r.label);
+      var was = byName[name];
+      if (!was || count(r.code) > count(was.code) || (count(r.code) === count(was.code) && r.code < was.code)) {
+        byName[name] = r;
+      }
+    });
+    found = found.filter(function (r) { return byName[normalize(r.label)] === r; });
+
+    // within one filter a part gives way to a whole, and several parts to none
+    var parts = {}, wholes = {};
+    found.forEach(function (r) {
+      var into = r.part ? parts : wholes;
+      into[r.g] = (into[r.g] || 0) + 1;
+    });
+    found = found.filter(function (r) { return !r.part || (!wholes[r.g] && parts[r.g] === 1); });
+
+    var sum = function (r) { return r.tiers.reduce(function (s, t) { return s + t; }, 0); };
+    found.sort(function (a, b) {
+      return b.at.length - a.at.length || sum(a) - sum(b) || count(b.code) - count(a.code) || a.code - b.code;
+    });
+    var taken = [];
+    var out = [];
+    found.forEach(function (r) {
+      if (r.at.some(function (at) { return taken.indexOf(at) !== -1; })) {
+        return;
+      }
+      taken.push.apply(taken, r.at);
+      out.push({ code: r.code, at: r.at.slice(), said: r.at.map(function (at) { return tw[at]; }).join(' '), label: r.label, title: r.title, k: r.k,
+        how: READ_HOW[Math.max.apply(null, r.tiers)], part: r.part });
+    });
+    out.sort(function (a, b) { return a.at[0] - b.at[0] || a.code - b.code; });
+    return out;
+  }
+
+  /** The words facetText reads: the places readFacets gives are places in these. */
+  function facetWords(raw) {
+    return facetText(raw).split(' ').filter(Boolean);
+  }
+
+  /**
+   * The typed words less those at the places readFacets gave, as they were typed ("טבעת יהלום", not "טבעת יהלומ"); where
+   * the typed words and the words read differ in number ("80 על 150" is one size), in the words read.
+   */
+  function withoutAt(raw, at) {
+    var words = facetWords(raw), typed = String(raw == null ? '' : raw).trim().split(/\s+/).filter(Boolean), of = [];
+    typed.forEach(function (w, j) { facetWords(w).forEach(function () { of.push(j); }); });
+    if (of.length !== words.length) {
+      return words.filter(function (w, i) { return at.indexOf(i) === -1; }).join(' ');
+    }
+    var gone = at.map(function (i) { return of[i]; });
+    return typed.filter(function (w, j) { return gone.indexOf(j) === -1; }).join(' ');
   }
 
 
@@ -967,8 +1335,9 @@
     focus: focus,
     closeAnswer: closeAnswer,
     readActions: readActions,
-    queryFacets: queryFacets,
-    withoutSaid: withoutSaid,
+    readFacets: readFacets,
+    facetWords: facetWords,
+    withoutAt: withoutAt,
     either: either,
     applyActions: applyActions,
     band: band,

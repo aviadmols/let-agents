@@ -114,7 +114,7 @@ final class SearchForAgent
 
         // "שטיח כחול 80x150": only products with those values, when any of those found has them.
         $index = $ids === [] ? null : LoadedIndex::for($shopId);
-        $codes = $index === null ? [] : array_column(HebrewSearch::facets($query, (array) ($index['facets'] ?? [])), 'code');
+        $codes = $index === null ? [] : array_column(HebrewSearch::facets($query, (array) ($index['facets'] ?? []), $index), 'code');
         if ($codes !== []) {
             $held = array_values(array_filter($ids, fn (string $id): bool => array_diff($codes, (array) ($index['records'][$id]['f'] ?? [])) === []));
             $ids = $held !== [] ? $held : $ids;

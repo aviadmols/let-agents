@@ -172,12 +172,12 @@ final class QueryActionsTest extends TestCase
         $server = [];
         foreach ($queries as $query) {
             $named = HebrewSearch::facets($query, $facets);
-            $server[$query] = ['named' => array_map(fn (array $n): array => [$n['code'], $n['said']], $named), 'left' => $named === [] ? null : HebrewSearch::withoutSaid($query, $named[0]['said'])];
+            $server[$query] = ['named' => array_map(fn (array $n): array => [$n['code'], $n['said']], $named), 'left' => $named === [] ? null : HebrewSearch::withoutAt($query, $named[0]['at'])];
         }
 
         $this->assertSame([[1000, '80x150']], $server['שטיח עד 1000 שח 80 על 150']['named'], 'a size however it is written');
         $this->assertSame('שטיח עד 1000 שח', $server['שטיח עד 1000 שח 80 על 150']['left'], 'the × takes out exactly those words');
-        $this->assertSame([[1000, '80x150'], [2000, 'כחולה']], $server['שטיח כחולה 80X150']['named'], 'a colour in the feminine');
+        $this->assertSame([[2000, 'כחולה'], [1000, '80x150']], $server['שטיח כחולה 80X150']['named'], 'a colour in the feminine, in the order typed');
         $this->assertSame('שטיח', $server['שטיח בכחול']['left'], 'with a letter in front');
         $this->assertSame([[3001, 'זהב צהוב']], $server['טבעת זהב צהוב']['named'], 'the longest name, not also "זהב"');
         $this->assertSame([], $server['שטיח']['named'], 'never the type');
@@ -188,7 +188,7 @@ final class QueryActionsTest extends TestCase
             $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
         }
         $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const f='.json_encode($facets, JSON_UNESCAPED_UNICODE).';const out={};'
-            .'for(const q of '.json_encode($queries, JSON_UNESCAPED_UNICODE).'){const n=e.queryFacets(q,f);out[q]={named:n.map(x=>[x.code,x.said]),left:n.length?e.withoutSaid(q,n[0].said):null};}'
+            .'for(const q of '.json_encode($queries, JSON_UNESCAPED_UNICODE).'){const n=e.readFacets(q,f).filter(x=>x.k!=="type");out[q]={named:n.map(x=>[x.code,x.said]),left:n.length?e.withoutAt(q,n[0].at):null};}'
             .'process.stdout.write(JSON.stringify(out));';
         $process = new Process([$node, '-e', $harness]);
         $process->mustRun();

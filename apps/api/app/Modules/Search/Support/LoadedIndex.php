@@ -40,10 +40,17 @@ final class LoadedIndex
         $items = is_array($data['items'] ?? null) ? $data['items'] : [];
         $records = [];
         $source = [];
+        // how many products carry each filter value: the reading of the words prefers the value most carry, as the drawer does
+        $counts = [];
 
         foreach ($items as $item) {
             $records[(string) $item['id']] = $item;
             $source[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'keywords' => (string) ($item['kw'] ?? ''), 'tags' => is_array($item['tg'] ?? null) ? $item['tg'] : []];
+            if (($item['t'] ?? null) === 'product') {
+                foreach ((array) ($item['f'] ?? []) as $code) {
+                    $counts[(int) $code] = ($counts[(int) $code] ?? 0) + 1;
+                }
+            }
         }
 
         unset(self::$loaded[$shopId]);
@@ -63,6 +70,10 @@ final class LoadedIndex
             'facets' => is_array($data['facets'] ?? null) ? $data['facets'] : [],
             // words this store's shoppers take off as chips (LearnFromSearches)
             'nochips' => is_array($data['nochips'] ?? null) ? $data['nochips'] : [],
+            // the store's word families (WriteWordFamilies) and how many products carry each value: what the words are read
+            // with (HebrewSearch::readContext), as the drawer reads them
+            'families' => is_array($data['families'] ?? null) ? $data['families'] : [],
+            'counts' => $counts,
         ];
     }
 

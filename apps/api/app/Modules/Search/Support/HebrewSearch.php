@@ -492,74 +492,567 @@ final class HebrewSearch
     }
 
     /**
-     * The shop's filter values the words name ("כחול", "כחולה", "בכחול", "80x150", "זהב צהוב"),
-     * longest first, one value per phrase; never the product's type. The same in the browser
-     * (queryFacets).
+     * The shop's filter values the words name, never the product's type ("שטיח" is what the words search for, not a
+     * filter on it): readFacets, as the drawer reads them, with the index's words and families where it is given.
      *
      * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets  the index's
-     * @return list<array{code: int, said: string, label: string, title: string}>
+     * @param  array<string, mixed>|null  $index  as LoadedIndex keeps it
+     * @return list<array{code: int, said: string, label: string, title: string, at: list<int>, how: string, k: string, part: bool}>
      */
-    public static function facets(string $raw, array $facets): array
+    public static function facets(string $raw, array $facets, ?array $index = null): array
     {
-        $text = ' '.self::facetText($raw).' ';
-        $found = [];
+        return array_values(array_filter(self::readFacets($raw, $facets, self::readContext($index)), fn (array $read): bool => $read['k'] !== 'type'));
+    }
 
-        foreach ($facets as $at => $facet) {
-            if (($facet['k'] ?? '') === 'type') {
-                continue;
+    /**
+     * What readFacets is told of a shop: the words its catalogue writes, its word families, how many products carry each
+     * value, and the words its shoppers keep taking off as chips (LearnFromSearches), read as no value. The drawer the same.
+     *
+     * @param  array<string, mixed>|null  $index  as LoadedIndex keeps it
+     * @return array{holders?: array<string, mixed>, families?: list<list<string>>, counts?: array<int, int>, skip?: callable}
+     */
+    public static function readContext(?array $index): array
+    {
+        if ($index === null) {
+            return [];
+        }
+        $nochips = array_map(fn ($w): string => self::normalize((string) $w), (array) ($index['nochips'] ?? []));
+
+        return [
+            'holders' => (array) ($index['engine']['holders'] ?? []),
+            'families' => (array) ($index['families'] ?? []),
+            'counts' => (array) ($index['counts'] ?? []),
+            'skip' => $nochips === [] ? null : fn (int $code, string $label): bool => in_array(self::normalize($label), $nochips, true),
+        ];
+    }
+
+    private const READ_HOW = ['exact', 'form', 'family', 'vowels', 'sound', 'slip'];
+
+    private const READ_SIZE_WORD = '/^(?:[ובה]?מיד[הת]|size)$/u';
+
+    private const READ_DAYS = '/^(?:day|days|ימימ|יומ)$/u';
+
+    private const READ_NIGHTS = '/^(?:night|nights|לילות|לילה)$/u';
+
+    /** @var array<string, array<string, mixed>> */
+    private static array $prepared = [];
+
+    /** @var array<string, array<string, list<int>>> */
+    private static array $familyMaps = [];
+
+    /** A typed word without the one letter Hebrew puts before it ("בזהב": "זהב"), when two letters or more are left. */
+    private static function readBare(string $word): ?string
+    {
+        return mb_strlen($word) > 2 && preg_match('/^[ובהלמ]/u', $word) === 1 && preg_match('/^[א-ת]+$/u', $word) === 1 ? mb_substr($word, 1) : null;
+    }
+
+    /** How far two words are by one letter more, less, another or two side by side swapped; more than max as max + 1. */
+    private static function slips(string $a, string $b, int $max): int
+    {
+        $x = mb_str_split($a);
+        $y = mb_str_split($b);
+        if (abs(count($x) - count($y)) > $max) {
+            return $max + 1;
+        }
+        $rows = [];
+        for ($i = 0; $i <= count($x); $i++) {
+            $rows[$i] = [0 => $i];
+        }
+        for ($j = 1; $j <= count($y); $j++) {
+            $rows[0][$j] = $j;
+        }
+        for ($i = 1; $i <= count($x); $i++) {
+            $least = $max + 1;
+            for ($j = 1; $j <= count($y); $j++) {
+                $cost = $x[$i - 1] === $y[$j - 1] ? 0 : 1;
+                $d = min($rows[$i - 1][$j] + 1, $rows[$i][$j - 1] + 1, $rows[$i - 1][$j - 1] + $cost);
+                if ($i > 1 && $j > 1 && $x[$i - 1] === $y[$j - 2] && $x[$i - 2] === $y[$j - 1]) {
+                    $d = min($d, $rows[$i - 2][$j - 2] + 1);
+                }
+                $rows[$i][$j] = $d;
+                $least = min($least, $d);
             }
+            if ($least > $max) {
+                return $max + 1;
+            }
+        }
 
-            foreach ((array) ($facet['v'] ?? []) as $i => $value) {
-                $name = self::facetText((string) ($value['l'] ?? ''));
+        return $rows[count($x)][count($y)];
+    }
 
-                // "חולצה מידה M", "טבעת במידה 52": a value after the word for size is that size, however short.
-                if ($name !== '' && preg_match('/\s((?:[ובה]?מיד(?:ה|ת)|size)\s?:?\s?'.preg_quote($name, '/').')(?=\s)/u', $text, $m) === 1) {
-                    $found[] = ['code' => $at * 1000 + $i, 'said' => $m[1], 'label' => (string) $value['l'], 'title' => (string) ($facet['l'] ?? '')];
-
+    /**
+     * Each single word of the store's families with the families it is in. A family lists its forms itself: never by their
+     * core, which would make one family of "מברגה" (a drill) and "מברג" (a screwdriver).
+     *
+     * @param  list<list<string>>  $families
+     * @return array<string, list<int>>
+     */
+    private static function familyMap(array $families): array
+    {
+        $key = hash('xxh128', serialize($families));
+        if (isset(self::$familyMaps[$key])) {
+            return self::$familyMaps[$key];
+        }
+        $map = [];
+        foreach (array_values($families) as $at => $family) {
+            foreach ((array) $family as $member) {
+                $m = self::normalize((string) $member);
+                if ($m === '' || str_contains($m, ' ')) {
                     continue;
                 }
-
-                if (mb_strlen($name) < 3 && preg_match('/\d/', $name) !== 1) {
-                    continue;
+                if (! in_array($at, $map[$m] ?? [], true)) {
+                    $map[$m][] = $at;
                 }
+            }
+        }
+        if (count(self::$familyMaps) >= 8) {
+            array_shift(self::$familyMaps);
+        }
 
-                $hebrew = preg_match('/[\x{0590}-\x{05FF}]$/u', $name) === 1;
-                if (preg_match('/\s[ובהלמ]?('.preg_quote($name, '/').($hebrew ? '(?:ה|ימ|ות)?' : '').')(?=\s)/u', $text, $m) === 1) {
-                    $found[] = ['code' => $at * 1000 + $i, 'said' => $m[1], 'label' => (string) $value['l'], 'title' => (string) ($facet['l'] ?? '')];
+        return self::$familyMaps[$key] = $map;
+    }
+
+    /**
+     * @param  array<string, list<int>>  $map
+     * @param  list<string|null>  $words
+     * @return list<int>
+     */
+    private static function familiesOf(array $map, array $words): array
+    {
+        $out = [];
+        foreach ($words as $w) {
+            foreach ($w !== null && $w !== '' ? ($map[$w] ?? []) : [] as $at) {
+                if (! in_array($at, $out, true)) {
+                    $out[] = $at;
                 }
             }
         }
 
-        usort($found, fn (array $a, array $b): int => [mb_strlen($b['said']), $a['code']] <=> [mb_strlen($a['said']), $b['code']]);
-        $taken = [];
-
-        return array_values(array_filter($found, function (array $named) use (&$taken): bool {
-            foreach ($taken as $word) {
-                if (str_contains($word, $named['said'])) {
-                    return false;
-                }
-            }
-            $taken[] = $named['said'];
-
-            return true;
-        }));
+        return $out;
     }
 
-    /** The words as typed, less the ones that read as $said ("80 על 150" for "80x150"); null when not found. The same in the browser. */
-    public static function withoutSaid(string $raw, string $said): ?string
+    /**
+     * What the reader needs of a store's filters, worked out once per index: each value's words; the words that name what
+     * products are (a category's or a kind's, three letters or more); the words of the values that say what a product has
+     * (its metal, its colour), never guessed; and how many values of each filter hold each word.
+     *
+     * @return array{kinds: list<string>, kindOf: array<string, bool>, attributes: array<string, bool>, many: list<array<string, int>>, values: list<array<string, mixed>>, vocabulary: list<string>}
+     */
+    private static function prepareFacets(array $facets): array
     {
-        $tokens = preg_split('/\s+/u', $raw) ?: [];
+        $key = hash('xxh128', serialize($facets));
+        if (isset(self::$prepared[$key])) {
+            return self::$prepared[$key];
+        }
+        $kinds = [];
+        $kindOf = [];
+        $attributes = [];
+        $many = [];
+        $values = [];
+        $vocabulary = [];
+        foreach (array_values($facets) as $g => $facet) {
+            $k = (string) ($facet['k'] ?? '');
+            $grouped = $k === 'category' || str_starts_with($k, 'tag:');
+            $describes = ! $grouped && $k !== 'type' && $k !== 'length';
+            $counted = [];
+            foreach (array_values((array) ($facet['v'] ?? [])) as $i => $value) {
+                $label = (string) ($value['l'] ?? '');
+                $lw = array_values(array_filter(explode(' ', self::facetText($label)), fn (string $w): bool => $w !== ''));
+                $cores = [];
+                foreach ($lw as $w) {
+                    $vocabulary[$w] = true;
+                    $cores[self::core($w)] = true;
+                    if (($k === 'category' || $k === 'type') && mb_strlen($w) >= 3 && ! isset($kindOf[$w])) {
+                        $kindOf[$w] = true;
+                        $kinds[] = $w;
+                    }
+                    if ($describes && mb_strlen($w) >= 2) {
+                        $attributes[self::core($w)] = true;
+                    }
+                }
+                foreach (array_keys($cores) as $c) {
+                    $counted[(string) $c] = ($counted[(string) $c] ?? 0) + 1;
+                }
+                $values[] = ['code' => $g * 1000 + $i, 'g' => $g, 'k' => $k, 'key' => (string) ($value['k'] ?? ''), 'label' => $label, 'title' => (string) ($facet['l'] ?? ''), 'lw' => $lw, 'grouped' => $grouped];
+            }
+            $many[] = $counted;
+        }
+        // a word of a category's name that is a value of another filter ("זהב", "צהוב" in "טבעות זהב צהוב") says how a product
+        // is, not what it is: no kind
+        $kinds = array_values(array_filter($kinds, fn (string $w): bool => ! isset($attributes[self::core($w)])));
+        if (count(self::$prepared) >= 8) {
+            array_shift(self::$prepared);
+        }
 
-        for ($size = 1; $size <= 4; $size++) {
-            for ($i = 0; $i + $size <= count($tokens); $i++) {
-                $piece = self::facetText(implode(' ', array_slice($tokens, $i, $size)));
-                if ($piece === $said || (string) preg_replace('/^[ובהלמ]/u', '', $piece) === $said) {
-                    return trim((string) preg_replace('/\s+/u', ' ', implode(' ', [...array_slice($tokens, 0, $i), ...array_slice($tokens, $i + $size)])));
+        return self::$prepared[$key] = ['kinds' => $kinds, 'kindOf' => $kindOf, 'attributes' => $attributes, 'many' => $many, 'values' => $values, 'vocabulary' => array_map('strval', array_keys($vocabulary))];
+    }
+
+    /** @param  list<string>  $kinds */
+    private static function namesKind(array $kinds, string $word): bool
+    {
+        if (mb_strlen($word) < 3) {
+            return false;
+        }
+        $bare = self::readBare($word);
+
+        return array_any($kinds, fn (string $w): bool => $word === $w || $bare === $w
+            || ((str_starts_with($w, $word) || str_starts_with($word, $w)) && abs(mb_strlen($w) - mb_strlen($word)) <= 2));
+    }
+
+    /** @return list<string> a noun's plurals: "טבעת" "טבעות", "ספר" "ספרימ", "שמלה" "שמלות" */
+    private static function pluralsOf(string $word): array
+    {
+        $out = [$word.'ימ', $word.'ות'];
+        if (preg_match('/[הת]$/u', $word) === 1) {
+            $out[] = mb_substr($word, 0, -1).'ות';
+        }
+
+        return $out;
+    }
+
+    /** Two forms of one noun: one the other's plural, or the plural's construct ("עגילי", "ספרי"). Never "מברגה" for "מברג". */
+    private static function nounForms(string $a, string $b): bool
+    {
+        $construct = fn (string $x, string $y): bool => preg_match('/י$/u', $x) === 1 && ($x.'מ' === $y || in_array($x.'מ', self::pluralsOf($y), true));
+
+        return in_array($b, self::pluralsOf($a), true) || in_array($a, self::pluralsOf($b), true) || $construct($a, $b) || $construct($b, $a);
+    }
+
+    /**
+     * How a typed word names a word of a value: 0 the same, 1 a form of it, 2 the store's family, 3 its vowel letters
+     * typed otherwise, 4 a letter that sounds the same, 5 one slip of the keyboard; -1 none. A word that names what
+     * products are has a noun's forms only ("מקדחה", a drill, is no "מקדח", a bit); a word that says how one is
+     * ("כחולה", "אדומים") has every ending. The last three only for a word the store does not write as typed and that
+     * names no kind of product: "זהב" is never "זהוב", "מרכזית" never "מרקיזה". The same in the browser (wordNames).
+     *
+     * @param  array{families: array<string, list<int>>|null, kindOf: array<string, bool>, attributes: array<string, bool>, guarded: callable}  $on
+     */
+    private static function wordNames(string $typed, string $word, array $on): int
+    {
+        if ($typed === $word) {
+            return 0;
+        }
+        $bare = self::readBare($typed);
+        if ($bare === $word) {
+            return 1;
+        }
+        if (preg_match('/\d/u', $typed) === 1 || preg_match('/\d/u', $word) === 1 || mb_strlen($typed) < 3 || mb_strlen($word) < 3) {
+            return -1;
+        }
+        $noun = ($on['kindOf'][$word] ?? false) === true && ! isset($on['attributes'][self::core($word)]);
+        $form = $noun
+            ? (self::nounForms($typed, $word) || ($bare !== null && mb_strlen($bare) >= 3 && self::nounForms($bare, $word)))
+            : (self::core($typed) === self::core($word) || ($bare !== null && mb_strlen($bare) >= 3 && self::core($bare) === self::core($word))
+                || (mb_strlen($word) >= 4 && str_starts_with($typed, $word) && mb_strlen($typed) - mb_strlen($word) <= 2));
+        if ($form) {
+            return 1;
+        }
+        if (preg_match('/^[a-z]+$/', $typed) === 1 && preg_match('/^[a-z]+$/', $word) === 1
+            && ($typed === $word.'s' || $word === $typed.'s' || $typed === $word.'es' || $word === $typed.'es')) {
+            return 1;
+        }
+        if ($on['families'] !== null) {
+            $mine = self::familiesOf($on['families'], [$typed, $bare]);
+            if ($mine !== [] && array_intersect(self::familiesOf($on['families'], [$word]), $mine) !== []) {
+                return 2;
+            }
+        }
+        if (($on['guarded'])($typed)) {
+            return -1;
+        }
+        $hebrew = preg_match('/^[א-ת]+$/u', $typed) === 1 && preg_match('/^[א-ת]+$/u', $word) === 1;
+        if ($hebrew && (self::stem($typed) === self::stem($word) || self::skeleton($typed) === self::skeleton($word)
+            || ($bare !== null && mb_strlen($bare) >= 3 && self::stem($bare) === self::stem($word)))) {
+            return 3;
+        }
+        if ($hebrew && mb_strlen($word) >= 4 && self::sound($typed) === self::sound($word)) {
+            return 4;
+        }
+        if (mb_strlen($typed) >= 5 && mb_strlen($word) >= 5) {
+            $max = min(mb_strlen($typed), mb_strlen($word)) >= 8 ? 2 : 1;
+            if (self::slips($typed, $word, $max) <= $max) {
+                return 5;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * The best places of a value's words among the typed ones: the most words, the closest together, the closest read.
+     *
+     * @param  array<string, list<array{0: int, 1: int}>>  $places
+     * @param  list<string>  $lw
+     * @return array{at: list<int>, tiers: list<int>, ks: list<int>}
+     */
+    private static function placeWords(array $places, array $lw): array
+    {
+        $lists = array_map(fn (string $w): array => $places[$w] ?? [], $lw);
+        $best = ['at' => [], 'tiers' => [], 'ks' => []];
+        $spread = fn (array $at): int => $at === [] ? 0 : $at[count($at) - 1] - $at[0];
+        $walk = function (int $k, array $at, array $tiers, array $ks) use (&$walk, &$best, $lists, $lw, $spread): void {
+            if ($k === count($lw)) {
+                if (count($at) > count($best['at']) || (count($at) === count($best['at']) && ($spread($at) < $spread($best['at'])
+                    || ($spread($at) === $spread($best['at']) && array_sum($tiers) < array_sum($best['tiers']))))) {
+                    $best = ['at' => $at, 'tiers' => $tiers, 'ks' => $ks];
+                }
+
+                return;
+            }
+            $walk($k + 1, $at, $tiers, $ks);
+            foreach ($lists[$k] as [$i, $tier]) {
+                $last = $at === [] ? -1 : $at[count($at) - 1];
+                if ($i <= $last || ($at !== [] && $i - $last > 2)) {
+                    continue;
+                }
+                $walk($k + 1, [...$at, $i], [...$tiers, $tier], [...$ks, $k]);
+            }
+        };
+        $walk(0, [], [], []);
+
+        return $best;
+    }
+
+    /**
+     * "מידה 52", "size M": a value right after the word for size, however short.
+     *
+     * @param  list<string>  $tw
+     * @param  list<string>  $lw
+     * @return list<int>|null
+     */
+    private static function sizedAt(array $tw, array $lw): ?array
+    {
+        if (count($lw) !== 1) {
+            return null;
+        }
+        for ($i = 1; $i < count($tw); $i++) {
+            if ($tw[$i] === $lw[0] && preg_match(self::READ_SIZE_WORD, $tw[$i - 1]) === 1) {
+                return [$i - 1, $i];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A date the value's name holds ("7 אוקטובר", as normalize writes every date), said in the words.
+     *
+     * @param  list<string>  $tw
+     * @param  list<string>  $lw
+     * @return list<int>|null
+     */
+    private static function datedAt(array $tw, array $lw): ?array
+    {
+        for ($k = 0; $k + 1 < count($lw); $k++) {
+            if (preg_match('/^\d{1,2}$/', $lw[$k]) === 1 && isset(self::MONTHS[$lw[$k + 1]])) {
+                for ($i = 0; $i + 1 < count($tw); $i++) {
+                    if ($tw[$i] === $lw[$k] && $tw[$i + 1] === $lw[$k + 1]) {
+                        return [$i, $i + 1];
+                    }
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * "10 days", "a 10-day tour", "6 nights" (a day more): how many days, and where they were said.
+     *
+     * @param  list<string>  $tw
+     * @return array{days: int, at: list<int>}|null
+     */
+    private static function daysAt(array $tw): ?array
+    {
+        for ($i = 0; $i < count($tw); $i++) {
+            if (preg_match('/^\d{1,2}$/', $tw[$i]) !== 1) {
+                continue;
+            }
+            for ($j = $i + 1; $j <= $i + 2 && $j < count($tw); $j++) {
+                if (preg_match(self::READ_DAYS, $tw[$j]) === 1) {
+                    return ['days' => (int) $tw[$i], 'at' => [$i, $j]];
+                }
+                if (preg_match(self::READ_NIGHTS, $tw[$j]) === 1) {
+                    return ['days' => (int) $tw[$i] + 1, 'at' => [$i, $j]];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Whether a length value ("10-14", "15+", "1") holds a number of days. */
+    private static function lengthHolds(string $key, int $days): bool
+    {
+        if (preg_match('/^(\d+)(?:-(\d+)|(\+))?$/', $key, $m) !== 1) {
+            return false;
+        }
+        $from = (int) $m[1];
+        $to = ($m[3] ?? '') !== '' ? PHP_INT_MAX : (($m[2] ?? '') !== '' ? (int) $m[2] : $from);
+
+        return $days >= $from && $days <= $to;
+    }
+
+    /**
+     * The store's filter values the words name. A typed word names a word of a value as itself, a form of it, the store's
+     * family of it, or (for a word the store does not write) its vowel letters, sound or one slip otherwise (wordNames).
+     * A name of several words is read where its words come in its order, at most one other word between two of them: "זהב
+     * צהב" is "זהב צהוב". A category or a tag is read only from a name of two words or more: whole, or part of it where each
+     * word left out says what the filter's values all are ("israel" is "Israel Tours") or is the one left of three or more,
+     * and is never a value of another filter ("עגילי זהב" is no "עגילים זהב צהוב"). A length is read from "10 days". Each
+     * typed word names one value: the one that covers the most words, then the closest reading, then the one most products
+     * carry. The same value name in several filters is the one most products carry. Within one filter a part gives way to a
+     * whole, and several parts to none. The same in the browser (readFacets): change both.
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets
+     * @param  array{holders?: array<string, mixed>, families?: list<list<string>>, counts?: array<int, int>, skip?: callable|null}  $ctx
+     * @return list<array{code: int, at: list<int>, said: string, label: string, title: string, k: string, how: string, part: bool}>
+     */
+    public static function readFacets(string $raw, array $facets, array $ctx = []): array
+    {
+        $tw = array_values(array_filter(explode(' ', self::facetText($raw)), fn (string $w): bool => $w !== ''));
+        if ($tw === [] || $facets === []) {
+            return [];
+        }
+        $prepared = self::prepareFacets($facets);
+        $holders = isset($ctx['holders']) && $ctx['holders'] !== [] ? $ctx['holders'] : null;
+        $on = [
+            'families' => ($ctx['families'] ?? []) !== [] ? self::familyMap($ctx['families']) : null,
+            'kindOf' => $prepared['kindOf'],
+            'attributes' => $prepared['attributes'],
+            // a word the store writes, one that names a kind, or a colour in any of its forms ("זהובה" is golden, not gold) is
+            // that word: never read as another that looks like it
+            'guarded' => fn (string $word): bool => ($holders !== null && self::heldWhole($holders, $word)) || self::namesKind($prepared['kinds'], $word)
+                || self::colorOf($word) !== null || self::colorOf(self::readBare($word) ?? '') !== null,
+        ];
+        // where each word of the store's values is typed, and how closely: each pair weighed once
+        $places = [];
+        foreach ($prepared['vocabulary'] as $w) {
+            $out = [];
+            foreach ($tw as $i => $x) {
+                $tier = self::wordNames($x, $w, $on);
+                if ($tier >= 0) {
+                    $out[] = [$i, $tier];
+                }
+            }
+            if ($out !== []) {
+                $places[$w] = $out;
+            }
+        }
+        $counts = (array) ($ctx['counts'] ?? []);
+        $count = fn (int $code): int => (int) ($counts[$code] ?? 0);
+        $skip = $ctx['skip'] ?? null;
+        $days = self::daysAt($tw);
+        $other = array_any($tw, fn (string $w): bool => preg_match(self::READ_SIZE_WORD, $w) === 1 || isset(self::MONTHS[$w]));
+        $found = [];
+        foreach ($prepared['values'] as $value) {
+            $lw = $value['lw'];
+            if (preg_match('/^(?:אחר|other)$/u', mb_strtolower(trim($value['label']))) === 1 || $lw === [] || ($skip !== null && $skip($value['code'], $value['label']))) {
+                continue;
+            }
+            $read = null;
+            if ($value['k'] === 'length') {
+                $read = $days !== null && self::lengthHolds($value['key'], $days['days']) ? ['at' => $days['at'], 'tiers' => [0], 'part' => false] : null;
+            } elseif (mb_strlen(implode('', $lw)) >= 2 && array_any($lw, fn (string $w): bool => isset($places[$w]))) {
+                $placed = self::placeWords($places, $lw);
+                $n = count($placed['at']);
+                $of = count($lw);
+                // a word of the name not typed: one that says what the filter's values all are ("Tours"), or the one left of
+                // three or more; never one of another filter (a colour, a metal), which the shopper did not ask
+                $guessed = true;
+                foreach ($lw as $k => $w) {
+                    if (! in_array($k, $placed['ks'], true) && (isset($prepared['attributes'][self::core($w)])
+                        || ! (($prepared['many'][$value['g']][self::core($w)] ?? 0) >= 3 || ($of >= 3 && $n >= 2 && $n >= $of - 1)))) {
+                        $guessed = false;
+                    }
+                }
+                if (! $value['grouped'] && $n === $of) {
+                    // "מידה 54": the word for size goes with the size it names
+                    $read = $of === 1 && $placed['at'][0] > 0 && preg_match(self::READ_SIZE_WORD, $tw[$placed['at'][0] - 1]) === 1
+                        ? ['at' => [$placed['at'][0] - 1, $placed['at'][0]], 'tiers' => [0, $placed['tiers'][0]], 'part' => false]
+                        : ['at' => $placed['at'], 'tiers' => $placed['tiers'], 'part' => false];
+                } elseif ($value['grouped'] && $of >= 2 && $n >= 1 && ($n === $of || $guessed)) {
+                    $read = ['at' => $placed['at'], 'tiers' => $placed['tiers'], 'part' => $n < $of];
+                }
+            }
+            if ($read === null && $other) {
+                $at = self::sizedAt($tw, $lw) ?? self::datedAt($tw, $lw);
+                $read = $at === null ? null : ['at' => $at, 'tiers' => [0], 'part' => false];
+            }
+            if ($read !== null) {
+                $found[] = ['code' => $value['code'], 'g' => $value['g'], 'label' => $value['label'], 'title' => $value['title'], 'k' => $value['k']] + $read;
+            }
+        }
+
+        // one value name in several filters ("שחור" a colour and a coating): the one most products carry
+        $byName = [];
+        foreach ($found as $at => $r) {
+            $name = self::normalize($r['label']);
+            $was = $byName[$name] ?? null;
+            if ($was === null || $count($r['code']) > $count($found[$was]['code']) || ($count($r['code']) === $count($found[$was]['code']) && $r['code'] < $found[$was]['code'])) {
+                $byName[$name] = $at;
+            }
+        }
+        $found = array_values(array_filter($found, fn (array $r, int $at): bool => $byName[self::normalize($r['label'])] === $at, ARRAY_FILTER_USE_BOTH));
+
+        // within one filter a part gives way to a whole, and several parts to none
+        $parts = [];
+        $wholes = [];
+        foreach ($found as $r) {
+            if ($r['part']) {
+                $parts[$r['g']] = ($parts[$r['g']] ?? 0) + 1;
+            } else {
+                $wholes[$r['g']] = ($wholes[$r['g']] ?? 0) + 1;
+            }
+        }
+        $found = array_values(array_filter($found, fn (array $r): bool => ! $r['part'] || (! isset($wholes[$r['g']]) && ($parts[$r['g']] ?? 0) === 1)));
+
+        usort($found, fn (array $a, array $b): int => count($b['at']) <=> count($a['at']) ?: array_sum($a['tiers']) <=> array_sum($b['tiers'])
+            ?: $count($b['code']) <=> $count($a['code']) ?: $a['code'] <=> $b['code']);
+        $taken = [];
+        $out = [];
+        foreach ($found as $r) {
+            if (array_intersect($r['at'], $taken) !== []) {
+                continue;
+            }
+            array_push($taken, ...$r['at']);
+            $out[] = ['code' => $r['code'], 'at' => $r['at'], 'said' => implode(' ', array_map(fn (int $at): string => $tw[$at], $r['at'])), 'label' => $r['label'],
+                'title' => $r['title'], 'k' => $r['k'], 'how' => self::READ_HOW[max($r['tiers'])], 'part' => $r['part']];
+        }
+        usort($out, fn (array $a, array $b): int => $a['at'][0] <=> $b['at'][0] ?: $a['code'] <=> $b['code']);
+
+        return $out;
+    }
+
+    /** @return list<string> the words facetText reads: the places readFacets gives are places in these */
+    public static function facetWords(string $raw): array
+    {
+        return array_values(array_filter(explode(' ', self::facetText($raw)), fn (string $w): bool => $w !== ''));
+    }
+
+    /**
+     * The typed words less those at the places readFacets gave, as they were typed ("טבעת יהלום", not "טבעת יהלומ"); where
+     * the typed words and the words read differ in number ("80 על 150" is one size), in the words read. The same in the
+     * browser (withoutAt).
+     *
+     * @param  list<int>  $at
+     */
+    public static function withoutAt(string $raw, array $at): string
+    {
+        $words = self::facetWords($raw);
+        $typed = array_values(array_filter(preg_split('/\s+/u', trim($raw)) ?: [], fn (string $w): bool => $w !== ''));
+        $of = [];
+        foreach ($typed as $j => $w) {
+            foreach (self::facetWords($w) as $piece) {
+                $of[] = $j;
+            }
+        }
+        if (count($of) !== count($words)) {
+            return implode(' ', array_values(array_filter($words, fn (string $w, int $i): bool => ! in_array($i, $at, true), ARRAY_FILTER_USE_BOTH)));
+        }
+        $gone = array_map(fn (int $i): int => $of[$i], $at);
+
+        return implode(' ', array_values(array_filter($typed, fn (string $w, int $j): bool => ! in_array($j, $gone, true), ARRAY_FILTER_USE_BOTH)));
     }
 
     /**
@@ -572,21 +1065,19 @@ final class HebrewSearch
      */
     public static function withoutFacetWords(array $index, string $query): string
     {
-        $named = self::facets($query, (array) ($index['facets'] ?? []));
+        $named = self::facets($query, (array) ($index['facets'] ?? []), $index);
 
         if ($named === []) {
             return $query;
         }
 
-        $stripped = $query;
-        foreach ($named as $value) {
-            $stripped = self::withoutSaid($stripped, $value['said']) ?? $stripped;
-        }
+        // the words the values were read from, wherever they were typed ("זהב עם צהוב", "זהב צהב")
+        $stripped = self::withoutAt($query, array_merge(...array_column($named, 'at')));
 
         // nothing left but words that join the rest ("עם", "של"): as nothing left. "טבעות עם יהלום" with "טבעות" and
         // "יהלום" read as filters searched "עם" and found the 27 rings whose words say it, of 973 (Rocks, 26.10)
         $left = array_filter(explode(' ', self::normalize($stripped)), fn (string $w): bool => $w !== '' && ! self::isFiller($w));
-        if ($left === [] || $stripped === $query) {
+        if ($left === []) {
             return $query;
         }
 

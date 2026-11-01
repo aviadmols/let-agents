@@ -184,6 +184,26 @@
     else { out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1); }); }
     return out;
   }
+  // The articles beside the results, narrowed by the filters on that articles carry too (a tag a post was given, the
+  // index's f of a content record): "10 to 14 days" keeps the guides about such trips. A filter no article carries (a
+  // price, a colour) narrows the products only, and leaves the articles as they were.
+  var carriedOf = null, carried = null;
+  function guidesFor(turn) {
+    var list = turn.content || [], on = codesOn(C(turn));
+    if (!list.length || !on.length) { return list; }
+    if (carriedOf !== S.records) {
+      carried = {}; carriedOf = S.records;
+      Object.keys(S.records || {}).forEach(function (id) { var r = S.records[id]; if (r && r.t === 'content') { (r.f || []).forEach(function (code) { carried[Math.floor(code / 1000)] = true; }); } });
+    }
+    var groups = {};
+    on.forEach(function (code) { var g = Math.floor(code / 1000); if (carried[g]) { (groups[g] = groups[g] || []).push(code); } });
+    var gs = Object.keys(groups);
+    if (!gs.length) { return list; }
+    return list.filter(function (x) {
+      var f = (S.records[x.id] || {}).f || [];
+      return gs.every(function (g) { return groups[g].some(function (code) { return f.indexOf(code) >= 0; }); });
+    });
+  }
   function facetChips(turn, max) {
     var c = C(turn), all = (turn.ids || []).map(rec).filter(Boolean), n = all.length, counts = {};
     all.forEach(function (r) { (r.f || []).forEach(function (code) { counts[code] = (counts[code] || 0) + 1; }); });
@@ -419,9 +439,10 @@
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
     // names it almost word for word (90% or more) and better than any product does; "טבעת זהב" keeps the products first
-    var g0 = turn.content && turn.content[0], gm = g0 && meantWords(turn.q).length >= GUIDE_FIRST_WORDS ? matchOf(turn.q, g0.title, (S.records[g0.id] || {}).kw, 0) : 0;
+    var guides = guidesFor(turn);
+    var g0 = guides[0], gm = g0 && meantWords(turn.q).length >= GUIDE_FIRST_WORDS ? matchOf(turn.q, g0.title, (S.records[g0.id] || {}).kw, 0) : 0;
     var guideFirst = gm >= GUIDE_FIRST && (!list.length || gm > matchOf(turn.q, decode(list[0].title), list[0].kw, 0));
-    if (guideFirst) { html += guidesHtml(turn.content, turn.q); }
+    if (guideFirst) { html += guidesHtml(guides, turn.q); }
     html += noteHtml(turn);
     html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>';
@@ -434,11 +455,11 @@
     var n = gridN(turn);
     // the guides' place among the cards, as the store chose (search.guides_after): after so many cards, so a site's articles
     // are seen without scrolling past every product; 0 keeps them after all the cards
-    var ga = !guideFirst && turn.content && turn.content.length && S.config && S.config.guidesAfter > 0 && Math.min(n, list.length) > S.config.guidesAfter ? S.config.guidesAfter : 0;
+    var ga = !guideFirst && guides.length && S.config && S.config.guidesAfter > 0 && Math.min(n, list.length) > S.config.guidesAfter ? S.config.guidesAfter : 0;
     html += '<div class="ls-grid">' + list.slice(0, ga || n).map(card).join('') + '</div>';
-    if (ga) { html += guidesHtml(turn.content, turn.q) + '<div class="ls-grid">' + list.slice(ga, n).map(card).join('') + '</div>'; }
+    if (ga) { html += guidesHtml(guides, turn.q) + '<div class="ls-grid">' + list.slice(ga, n).map(card).join('') + '</div>'; }
     if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
-    if (!guideFirst && !ga) { html += guidesHtml(turn.content, turn.q); }
+    if (!guideFirst && !ga) { html += guidesHtml(guides, turn.q); }
     // asked of the store's AI only over a few results (search.not_sure_max): a long list is narrowed by its filters first
     if (!off('ask') && list.length <= notSureMax()) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-not-sure="' + esc(turn.id) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>' + (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;

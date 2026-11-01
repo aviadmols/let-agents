@@ -14,7 +14,7 @@
     "features": [
         { "name": "tagging", "default": false },
         { "name": "in_search", "default": false },
-        { "name": "in_filters", "default": false },
+        { "name": "in_filters", "default": true },
         { "name": "rules", "default": true }
     ],
     "settings": [

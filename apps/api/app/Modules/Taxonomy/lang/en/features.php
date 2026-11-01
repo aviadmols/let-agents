@@ -15,6 +15,6 @@ return [
     ],
     'in_filters' => [
         'label' => 'Tags as filters',
-        'description' => 'A group of tags marked as a filter is shown beside the results, as a category is. Only a tag the checker held, central to the product and read from the store\'s text or picture. Off until the pilot\'s results are checked.',
+        'description' => 'A group of tags marked as a filter is shown beside the results, as a category is. Only a tag the checker held, central to the product and read from the store\'s text or picture. Articles given the same tag narrow with it. On in every store that has tags.',
     ],
 ];

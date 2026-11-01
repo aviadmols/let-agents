@@ -4,6 +4,7 @@ namespace App\Modules\Taxonomy\Support;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Taxonomy\Models\TaxonomyAssignment;
@@ -94,6 +95,19 @@ final class TagWords implements ProductTags
                 $held[$a->tag_id][$a->subject_id] = true;
             });
 
+        // the posts and pages given the same tags, by the same rules: a filter chosen narrows the articles beside the products
+        // ("10 to 14 days" keeps the guides about such trips), never makes a value of its own
+        $articles = [];
+        TaxonomyAssignment::query()->where('subject_type', TaxonomyAssignment::CONTENT)->where('status', TaxonomyAssignment::KEPT)
+            ->where('checked', 'held')->where('source', '!=', 'knowledge')
+            ->where('weight', '>=', (int) Settings::get('taxonomy.filter_min_weight_percent', $shopId) / 100)
+            ->where('confidence', '>=', (int) Settings::get('taxonomy.filter_min_confidence_percent', $shopId) / 100)
+            ->whereIn('subject_id', CatalogContent::query()->active()->select('id'))
+            ->orderBy('id')->get(['tag_id', 'subject_id'])
+            ->each(function (TaxonomyAssignment $a) use (&$articles): void {
+                $articles[$a->tag_id][$a->subject_id] = true;
+            });
+
         $min = (int) Settings::get('taxonomy.filter_min_products', $shopId);
         $most = (int) Settings::get('taxonomy.filter_max_values', $shopId);
         $out = [];
@@ -101,7 +115,8 @@ final class TagWords implements ProductTags
 
         foreach ($groups as $group) {
             $values = $tags->get($group->id, collect())
-                ->map(fn (TaxonomyTag $tag): array => ['key' => $tag->key, 'label' => $locale === 'he' ? $tag->label_he : $tag->label_en, 'products' => array_map('strval', array_keys($held[$tag->id]))])
+                ->map(fn (TaxonomyTag $tag): array => ['key' => $tag->key, 'label' => $locale === 'he' ? $tag->label_he : $tag->label_en, 'products' => array_map('strval', array_keys($held[$tag->id])),
+                    'content' => array_map('strval', array_keys($articles[$tag->id] ?? []))])
                 ->filter(fn (array $v): bool => trim($v['label']) !== '' && count($v['products']) >= $min && ($total === 0 || count($v['products']) / $total < self::MAX_SHARE))
                 // the most held first, then by name: the same order every night
                 ->sort(fn (array $a, array $b): int => [count($b['products']), $a['label']] <=> [count($a['products']), $b['label']])

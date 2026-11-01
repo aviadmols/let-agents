@@ -21,10 +21,10 @@ interface ProductTags
     public function tagsByProduct(string $shopId): array;
 
     /**
-     * The groups of tags shown as filters, each value with the catalog product ids it holds. Empty where
-     * the shop has none.
+     * The groups of tags shown as filters, each value with the catalog product ids it holds and the catalog content ids
+     * (posts, pages) given the same tag. Empty where the shop has none.
      *
-     * @return list<array{key: string, label: string, values: list<array{key: string, label: string, products: list<string>}>}>
+     * @return list<array{key: string, label: string, values: list<array{key: string, label: string, products: list<string>, content?: list<string>}>}>
      */
     public function filters(string $shopId, string $locale): array;
 }
