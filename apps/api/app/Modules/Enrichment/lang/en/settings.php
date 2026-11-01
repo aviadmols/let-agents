@@ -168,7 +168,7 @@ return [
     ],
     'max_branches' => [
         'label' => 'Most branches in one scan',
-        'description' => 'The biggest branches first. The rest of the catalog is read with the closest branch, or not at all.',
+        'description' => '0 for no cap: every category big enough is a branch. With a number, the biggest first.',
     ],
     'schema_pass_score' => [
         'label' => 'Score a vocabulary needs to pass',

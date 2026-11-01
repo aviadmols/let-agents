@@ -570,8 +570,8 @@
         {
             "name": "branch_min_products",
             "type": "int",
-            "default": 15,
-            "min": 5,
+            "default": 6,
+            "min": 2,
             "max": 200,
             "scope": "shop",
             "unit": "products"
@@ -588,9 +588,9 @@
         {
             "name": "max_branches",
             "type": "int",
-            "default": 12,
-            "min": 1,
-            "max": 40,
+            "default": 0,
+            "min": 0,
+            "max": 200,
             "scope": "shop",
             "unit": "products"
         },

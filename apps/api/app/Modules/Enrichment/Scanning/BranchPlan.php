@@ -16,7 +16,8 @@ use App\Modules\Catalog\Models\CatalogProduct;
  * catalog and has at least two big subcategories is split into those subcategories, again and
  * again, so "jewelry" with 900 rings, 700 earrings and 300 other pieces becomes three branches, and
  * "diamonds" is not buried inside a general vocabulary. A category too small for a vocabulary of
- * its own is left to the rest. The store's own categories are never changed.
+ * its own (5 products or fewer by default) is left to the rest. There is no cap on how many branches
+ * a store has. The store's own categories are never changed.
  *
  * A campaign ("NIGHT SALE", "חדש באתר") or whom products are for ("גברים", "ילדים") is never a branch: it says
  * nothing of what its products are. When the branches cover less than WHOLE_BELOW of the catalog (a store of many
@@ -102,9 +103,12 @@ final class BranchPlan
             }
         }
 
-        // The biggest first; the same order for the same sizes.
+        // The biggest first; the same order for the same sizes. Every category big enough is a branch: no cap unless
+        // one is set (0 = none; a demo sets its own, for its budget; as Aviad asked, 1.11)
         uasort($chosen, fn (array $a, array $b): int => [$b['products'], $a['external_id']] <=> [$a['products'], $b['external_id']]);
-        $chosen = array_slice($chosen, 0, max(1, $max), true);
+        if ($max > 0) {
+            $chosen = array_slice($chosen, 0, $max, true);
+        }
 
         $covered = [];
         $branches = [];
