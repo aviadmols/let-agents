@@ -42,6 +42,8 @@ final class AssistantSettingsTest extends TestCase
 
     public function test_it_shows_what_the_assistant_did_and_last_months_busiest_day(): void
     {
+        // the middle of a month: on its first days, last month's 4th is still within the last 30 days (1.11 failed so)
+        $this->travelTo(now()->startOfMonth()->addDays(20));
         $this->ask('אפשר להחזיר?', 'answered');
         $this->ask('יש עגילי זהב לבן?', 'no_info');
         $this->ask('מה מזג האוויר?', 'out_of_scope');
