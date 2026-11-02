@@ -298,6 +298,14 @@ return [
         'label' => 'Likeness that counts as the same picture',
         'description' => 'An uploaded photo at least this alike (0 to 1) to a product picture is that product\'s own picture: it comes first, whatever was seen and whatever tags were chosen.',
     ],
+    'photo_apart_similarity' => [
+        'label' => 'Likeness of a product that stands apart',
+        'description' => 'A product picture at least this alike (0 to 1) to an uploaded photo, and farther than the set gap from the next picture, comes first.',
+    ],
+    'photo_apart_gap' => [
+        'label' => 'Gap from the next picture',
+        'description' => 'How much nearer (0 to 1) the nearest picture must be than the next one for its product to count as standing apart.',
+    ],
     'show_price' => [
         'label' => 'Price on every product',
         'description' => 'The live price from the store beside every product in the results.',

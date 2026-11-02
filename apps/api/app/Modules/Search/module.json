@@ -457,6 +457,22 @@
             "scope": "global"
         },
         {
+            "name": "photo_apart_similarity",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.8,
+            "max": 1,
+            "scope": "global"
+        },
+        {
+            "name": "photo_apart_gap",
+            "type": "float",
+            "default": 0.06,
+            "min": 0.01,
+            "max": 0.5,
+            "scope": "global"
+        },
+        {
             "name": "photo_relative_gap",
             "type": "float",
             "default": 0.06,

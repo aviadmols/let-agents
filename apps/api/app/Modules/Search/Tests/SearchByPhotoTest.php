@@ -21,6 +21,7 @@ use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\CheckPhotoSearches;
+use App\Modules\Search\Actions\RankPhotoResults;
 use App\Modules\Search\Actions\ReadPhotoTags;
 use App\Modules\Search\Filament\Operator\Pages\PhotoSearches;
 use App\Modules\Search\Models\SearchPhotoAsk;
@@ -532,6 +533,89 @@ final class SearchByPhotoTest extends TestCase
 
         $this->assertSame('96', $result['groups']['product'][0]['external_id'], 'the plain thin band, by its name; gold, which every ring is, decides nothing');
         $this->assertGreaterThan(0, $result['groups']['product'][0]['words']);
+    }
+
+    /** Rings of one category in the photo's search, the setup's shirts gone. @param array<string, array{0: string, 1: list<float>}> $rings */
+    private function rings(array $rings): void
+    {
+        $this->inShop(function () use ($rings): void {
+            RetrievalImage::query()->delete();
+            CatalogProduct::query()->delete();
+            $category = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k9', 'name' => 'טבעות', 'path' => ['טבעות'], 'depth' => 0, 'hash' => 'k9', 'product_count' => count($rings)]);
+            foreach ($rings as $id => [$title, $vector]) {
+                $this->shirt((string) $id, $title, $vector);
+            }
+            CatalogProduct::query()->get()->each(fn (CatalogProduct $p) => $p->categories()->attach($category->id));
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+    }
+
+    public function test_the_ring_photographed_comes_first_though_the_readers_words_name_others(): void
+    {
+        // Rocks, 2.11: "טבעת עם אבן מרכזית" names 492 rings, all before the very ring photographed: 95.5% alike, the next 84.3%.
+        $this->rings([
+            '10' => ['טבעת עם אבן מרכזית אחת', [1.0, 0.7, 0.1]],
+            '11' => ['טבעת עם אבן מרכזית שתיים', [1.0, 0.7, 0.1]],
+            '12' => ['טבעת עם אבן מרכזית שלוש', [1.0, 0.7, 0.1]],
+            '13' => ['טבעת עם אבן מרכזית ארבע', [1.0, 0.7, 0.1]],
+            '14' => ['טבעת אמרלד וספירלת יהלומים', [1.0, 0.3, 0.1]],
+        ]);
+        $this->reader(['object' => 'טבעת עם אבן מרכזית אובלית', 'also' => ['טבעת'], 'details' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+
+        $first = $this->upload()->assertOk()->json('groups.product.0');
+
+        $this->assertSame('14', $first['external_id']);
+        $this->assertTrue($first['apart']);
+        $this->assertArrayNotHasKey('same', $first, 'most likely it, never said to be the same picture');
+    }
+
+    public function test_a_ring_near_the_photo_stands_with_the_rings_the_words_name(): void
+    {
+        // Nothing stands apart here. The ring its picture says is nearest is ordered with those the words name, not after all of them.
+        $this->rings([
+            '20' => ['טבעת עם אבן מרכזית אחת', [1.0, 2.0, 0.1]],
+            '21' => ['טבעת עם אבן מרכזית שתיים', [1.0, 2.0, 0.1]],
+            '22' => ['טבעת עם אבן מרכזית שלוש', [1.0, 2.0, 0.1]],
+            '23' => ['טבעת עם אבן מרכזית ארבע', [1.0, 2.0, 0.1]],
+            '24' => ['טבעת אמרלד', [1.0, 0.7, 0.1]],
+            '25' => ['טבעת זהב', [1.0, 0.72, 0.1]],
+        ]);
+        $this->reader(['object' => 'טבעת עם אבן מרכזית אובלית', 'also' => ['טבעת'], 'details' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        $this->assertSame('24', $this->upload()->assertOk()->json('groups.product.0.external_id'));
+    }
+
+    public function test_words_that_name_a_product_or_two_name_the_thing_itself_and_stay_first(): void
+    {
+        $this->rings([
+            '30' => ['טבעת חותם', [1.0, 2.0, 0.1]],
+            '31' => ['טבעת אמרלד', [1.0, 0.7, 0.1]],
+            '32' => ['טבעת זהב', [1.0, 0.72, 0.1]],
+        ]);
+        $this->reader(['object' => 'טבעת חותם', 'also' => ['טבעת'], 'details' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        $this->assertSame('30', $this->upload()->assertOk()->json('groups.product.0.external_id'));
+    }
+
+    public function test_the_second_ordering_leaves_first_a_product_that_stands_apart(): void
+    {
+        $vision = new class implements VisionModel
+        {
+            public function jsonWithImage(AiProviderName $provider, string $model, string $system, string $user, string $mime, string $bytes, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                return new ModelReply(['order' => [2, 1], 'same' => null], 1700, 20);
+            }
+        };
+        $this->app->instance(VisionModel::class, $vision);
+        Http::fake(['*' => Http::response(base64_decode(self::JPEG), 200, ['Content-Type' => 'image/jpeg'])]);
+        $product = fn (string $id, array $more = []): array => ['external_id' => $id, 'title' => 'טבעת '.$id, 'image' => "https://www.store.test/i/{$id}.jpg"] + $more;
+        $image = imagecreatetruecolor(400, 400);
+        ob_start();
+        imagejpeg($image);
+        $photo = (string) ob_get_clean();
+
+        $ordered = $this->inShop(fn () => app(RankPhotoResults::class)->handle($this->shop->id, $photo, null, [$product('1', ['apart' => true]), $product('2'), $product('3')]));
+
+        $this->assertSame(['1', '3', '2'], array_column($ordered, 'external_id'), 'the first stays, the others are ordered');
     }
 
     public function test_what_is_drawn_on_a_product_is_what_a_photo_of_it_shows_though_no_word_of_it(): void

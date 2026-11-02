@@ -60,8 +60,8 @@ final class RankPhotoResults
     public function handle(string $shopId, string $bytes, ?array $box, array $products, string $described = ''): array
     {
         $count = (int) Settings::get('search.photo_rank_candidates', $shopId);
-        // The shop's own picture uploaded again is already known: it keeps its place, the rest are ordered.
-        $kept = isset($products[0]['same']) && $products[0]['same'] === true ? [array_shift($products)] : [];
+        // The shop's own picture uploaded again, or one far nearer than any other, is already known: it keeps its place, the rest are ordered.
+        $kept = isset($products[0]) && (($products[0]['same'] ?? false) === true || ($products[0]['apart'] ?? false) === true) ? [array_shift($products)] : [];
         $top = array_slice($products, 0, $count);
 
         if (! self::available() || count($top) < 2) {

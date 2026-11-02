@@ -6,6 +6,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchIndex;
+use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +20,17 @@ use Tests\TestCase;
 final class ColourFamiliesTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_a_word_that_only_starts_like_a_colour_is_no_colour(): void
+    {
+        // Rocks, 2.11: a spiral halo read as a sapphire's blue, a rectangular stone as white.
+        foreach (['מלבנית', 'מלבניות', 'ומלבני', 'מלבן', 'סגלגלה', 'ספירלה', 'וספירלת', 'ספירלי', 'מרובים', 'רוזטה', 'לבנדר', 'לבנייה', 'שלבניה', 'הלבנת', 'להלבנה'] as $word) {
+            $this->assertSame([], Colours::mentions($word), $word);
+        }
+        foreach (['לבן' => 'white', 'לבנה' => 'white', 'הלבנה' => 'white', 'ולבנים' => 'white', 'סגול' => 'purple', 'ספיר' => 'blue', 'וספיר' => 'blue', 'ספירים' => 'blue', 'רובי' => 'red', 'ורובי' => 'red', 'רוז' => 'gold_rose'] as $word => $family) {
+            $this->assertSame($family, Colours::mentions($word)[0]['family'] ?? null, $word);
+        }
+    }
 
     public function test_one_model_in_colours_is_a_family_and_its_colours_are_the_stores_words(): void
     {

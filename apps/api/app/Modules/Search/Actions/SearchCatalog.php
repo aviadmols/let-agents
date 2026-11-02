@@ -115,6 +115,16 @@ final class SearchCatalog
     /** At least this many products of the kind photographed, and a photo search shows only that kind. */
     private const PHOTO_KIND_MIN = 3;
 
+    /**
+     * The pictures nearest a photo come up with what the reader's words name. Alone, the words were a wall: "טבעת עם
+     * אבן מרכזית" names 492 of Rocks' rings, and all of them went before the very ring photographed, whose own words say
+     * "אבן ירוקה" (2.11).
+     */
+    private const PHOTO_NEAREST_WITH_NAMED = 10;
+
+    /** Words that name this few products name the thing itself: those stay before the nearest pictures. */
+    private const OBJECT_NAMED_FEW = 3;
+
     /** In a shop of tools (search.photo_match = function), what a picture shows weighs at least this against how it looks. */
     private const PHOTO_FUNCTION_WEIGHT = 0.75;
 
@@ -1807,11 +1817,16 @@ final class SearchCatalog
         // chosen by a shared word: "סטים" (power-tool kits) for "סט ביטים". Then the bit sets come
         // first. When it holds some ("טבעת" among the rings), the picture orders them as before.
         $missed = $objectNamed !== [] && array_filter(array_keys($objectNamed), fn ($id): bool => array_intersect($members[$id] ?? [], $main) !== []) === [];
+        // A category chosen by a shared word: what looks nearest in it is no nearer to what was photographed.
+        $nearest = $missed ? [] : array_flip(array_map('strval', array_column(array_slice($hits, 0, self::PHOTO_NEAREST_WITH_NAMED), 'external_id')));
         // "טבעת חותם": the words name a kind narrower than the category (rings), so the signet rings
         // come before the other rings, and their pictures order them.
         $missed = $missed || $specific;
-        $byObject = fn (array $c): int => $missed && isset($objectNamed[$c['external_id']]) ? 1 : 0;
-        usort($candidates, fn (array $a, array $b): int => $byObject($b) <=> $byObject($a) ?: $isMain($b) <=> $isMain($a) ?: $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
+        $few = count($objectNamed) <= self::OBJECT_NAMED_FEW;
+        $byObject = fn (array $c): int => ! $missed ? 0 : (isset($objectNamed[$c['external_id']]) ? ($few ? 2 : 1) : (isset($nearest[$c['external_id']]) ? 1 : 0));
+        $apart = self::standsApart($hits);
+        $first = fn (array $c): int => $c['external_id'] === $apart ? 1 : 0;
+        usort($candidates, fn (array $a, array $b): int => $first($b) <=> $first($a) ?: $byObject($b) <=> $byObject($a) ?: $isMain($b) <=> $isMain($a) ?: $b['similarity'] <=> $a['similarity'] ?: count($members[$b['external_id']]) <=> count($members[$a['external_id']]));
         $brandOf = fn (array $c): string => mb_strtolower(trim((string) $rows->get($c['external_id'])?->brand)) ?: 'id:'.$c['external_id'];
 
         $out = [];
@@ -1828,10 +1843,30 @@ final class SearchCatalog
                 'lacks' => isset($lacking[$id]) ? true : null,
                 'colour' => ($tint[$id] ?? 0.0) !== 0.0 ? (int) round($tint[$id] * 100) : null,
                 'kind' => $isMain($c) === 1,
+                'apart' => $id === $apart ? true : null,
             ], fn ($v): bool => $v !== null);
         }
 
         return $out;
+    }
+
+    /**
+     * The product whose picture stands far apart from all the others as the nearest to a photo: most likely what was
+     * photographed, though no other picture of it (a screenshot of Rocks' ring was 95.5% alike, the next ring 84.3%).
+     * Asks both, how alike and how far from the next, since many a photo is near several pictures at once.
+     *
+     * @param  list<array{external_id: string, similarity: float}>  $hits  nearest first
+     */
+    private static function standsApart(array $hits): ?string
+    {
+        if (count($hits) < 2) {
+            return null;
+        }
+
+        [$nearest, $next] = [(float) $hits[0]['similarity'], (float) $hits[1]['similarity']];
+
+        return $nearest >= (float) Settings::get('search.photo_apart_similarity') && $nearest - $next >= (float) Settings::get('search.photo_apart_gap')
+            ? (string) $hits[0]['external_id'] : null;
     }
 
     /**

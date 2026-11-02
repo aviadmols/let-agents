@@ -21,6 +21,13 @@ final class Colours
     private const NEAR = 3;
 
     /**
+     * Words that only start like a colour, each with the one letter Hebrew may put before it: "מלבנית" is rectangular,
+     * not "לבן"; "סגלגלה" oval, not "סגל"; "ספירלה" a spiral, not "ספיר"; "מרובים" many, not "רובי"; "רוזטה" a rosette,
+     * not "רוז"; "לבנדר" and "לבנייה" nothing of "לבן". "הלבנה" is white, "הלבנת" and "להלבנה" are not.
+     */
+    private const NOT_COLOURS = '/^[הובלמשכ]?(?:מלבן|מלבנ|סגלגל|ספירל|מרובי|רוזט|לבנד|לבניי|לבניה)|^(?:הלבנת|להלבנה)$/u';
+
+    /**
      * family => [group, stems]. A stem matches a word that starts with it ("שחור" holds "שחורה", "שחורים"). A gem is
      * its colour too ("אמרלד" is green, "רובי" red): a store names its stones, not their colours.
      *
@@ -157,7 +164,7 @@ final class Colours
                 self::$wordFamilies = [];
             }
             self::$wordFamilies[$word] = false;
-            foreach (self::FAMILIES as $family => [$group, $stems]) {
+            foreach (preg_match(self::NOT_COLOURS, $word) === 1 ? [] : self::FAMILIES as $family => [$group, $stems]) {
                 foreach ($stems as $stem) {
                     if (! str_contains($stem, ' ') && self::starts($word, $stem)) {
                         self::$wordFamilies[$word] = [(string) $family, (string) $group];
@@ -414,6 +421,10 @@ final class Colours
 
     private static function isColourWord(string $word): bool
     {
+        if (preg_match(self::NOT_COLOURS, $word) === 1) {
+            return false;
+        }
+
         if (self::goldOf($word) !== null) {
             return true;
         }
