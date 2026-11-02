@@ -149,15 +149,39 @@ final class ShopKnowledgeTest extends TestCase
             ->invoke(app(AnswerSiteQuestion::class), 'איפה החניון הקרוב?', $this->shop->id, []));
 
         $this->assertSame('store_team', $passages[0]['from']);
-        $this->assertStringStartsWith('- '.$parking, $passages[0]['text'], 'the row that speaks of it, first and whole');
-        $this->assertStringEndsWith('החזרות', trim($passages[0]['text']), 'and no row cut in its middle');
+        $this->assertSame('- '.$parking, $passages[0]['text'], 'the row that speaks of it, a passage of its own, first');
+        $this->assertSame('store_team', $passages[1]['from'], 'the others after it');
+        $this->assertStringEndsWith('החזרות', trim($passages[1]['text']), 'and no row cut in its middle');
+    }
+
+    public function test_what_the_team_wrote_writes_a_saved_answer_again(): void
+    {
+        // Rocks, 2.11: the team added where its parking is, and the answer kept from the accessibility page was shown
+        $this->shop = Shop::factory()->create();
+        $stale = fn (AssistantAnswer $answer): bool => (new ReflectionMethod(AnswerSiteQuestion::class, 'stale'))->invoke(app(AnswerSiteQuestion::class), $answer, $this->shop->id);
+        $saved = fn (array $flags): AssistantAnswer => AssistantAnswer::query()->create([
+            'question_key' => Question::key('איפה החניון?'), 'question' => 'איפה החניון?', 'answer' => 'בחניון התחנה.', 'outcome' => AssistantAnswer::ANSWERED,
+            'status' => AssistantAnswer::SHOWN, 'prompt_version' => AnswerSiteQuestion::PROMPT_VERSION, 'flags' => $flags, 'last_asked_at' => now(),
+        ]);
+
+        $this->inShop(function () use ($stale, $saved): void {
+            $answer = $saved([]);
+            $this->assertFalse($stale($answer), 'nothing written: it stands');
+
+            app(BuildShopKnowledge::class)->own('החניון הקרוב: חניון התחנה.');
+            $this->assertTrue($stale($answer), 'the team wrote since: written again when next asked');
+
+            $hash = CatalogContent::query()->where('external_id', BuildShopKnowledge::OWN)->value('hash');
+            $answer->forceFill(['flags' => ['own' => $hash]])->save();
+            $this->assertFalse($stale($answer), 'written from what it says now');
+        });
     }
 
     public function test_the_writer_is_told_the_team_word_comes_first_and_the_checker_reads_its_last_version(): void
     {
         $prompts = __DIR__.'/../Prompts/';
 
-        $this->assertSame(file_get_contents($prompts.'answer_site.v17.md'), AnswerSiteQuestion::prompt('answer_site'), 'v17: said directly, never "לפי הצוות"; v16: the store\'s own word gives its address and link, and stands over a page; v15: what is recommended most by what the store\'s customers choose; v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
+        $this->assertSame(file_get_contents($prompts.'answer_site.v18.md'), AnswerSiteQuestion::prompt('answer_site'), 'v18: clear everyday language, never a page\'s official wording; v17: said directly, never "לפי הצוות"; v16: the store\'s own word gives its address and link, and stands over a page; v15: what is recommended most by what the store\'s customers choose; v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
         $this->assertStringContainsString('יש לנו', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertSame(file_get_contents($prompts.'verify_site.v16.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version (v16: the store\'s own word stands; v15: "the most popular" only by popular_first): approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');

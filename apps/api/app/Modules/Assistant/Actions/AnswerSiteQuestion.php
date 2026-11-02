@@ -89,7 +89,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
      */
-    public const PROMPT_VERSION = 17;
+    public const PROMPT_VERSION = 18;
 
     /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
     private const MAX_NAMES = 3;
@@ -403,9 +403,20 @@ final class AnswerSiteQuestion implements TriesQuestions
         return 'answered';
     }
 
-    /** Whether a page an answer was written from changed after it was written. */
+    /** What the team wrote in the knowledge centre, as its hash; null when it wrote nothing. */
+    private static function ownWord(): ?string
+    {
+        return CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', BuildShopKnowledge::OWN)->value('hash');
+    }
+
+    /** Whether a page an answer was written from, or what the team wrote, changed after it was written. */
     private function pagesChangedSince(AssistantAnswer $saved): bool
     {
+        // what the team wrote changed: whatever the answer cited, it may now have the store's own word to say (Rocks, 2.11)
+        if ((((array) $saved->flags)['own'] ?? null) !== self::ownWord()) {
+            return true;
+        }
+
         $urls = array_values(array_filter(array_map(fn ($s): ?string => is_array($s) ? ($s['url'] ?? null) : null, (array) $saved->sources)));
         $changed = $urls === [] ? null : CatalogContent::query()->active()->whereIn('url', $urls)->max('updated_at');
 
@@ -822,14 +833,26 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
             }
 
-            // what the team wrote: its rows that speak of the question first, and whole, so the cut below never takes the one that answers
+            $passage = fn (string $text): array => ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => self::WRITTEN_BY[(string) $entry->external_id] ?? null];
+
+            // what the team wrote: its rows that speak of the question a passage of their own, first, so the writer reads
+            // them as the answer (Rocks, 2.11: its parking row among seven, and the accessibility page was what it told);
+            // whole rows, so the cut never takes one in its middle
             if ($entry->external_id === BuildShopKnowledge::OWN) {
+                $whole = function (array $rows): string {
+                    while (count($rows) > 1 && mb_strlen(implode("\n", $rows)) > self::KNOWLEDGE_CHARS) {
+                        array_pop($rows);
+                    }
+
+                    return implode("\n", $rows);
+                };
                 $rows = explode("\n", $text);
-                $rows = [...array_filter($rows, $speaks), ...array_filter($rows, fn (string $row): bool => ! $speaks($row))];
-                while (count($rows) > 1 && mb_strlen(implode("\n", $rows)) > self::KNOWLEDGE_CHARS) {
-                    array_pop($rows);
+                $said = array_values(array_filter($rows, $speaks));
+                if ($said !== [] && count($said) < count($rows)) {
+                    $first[] = $passage($whole($said));
+                    $rows = array_values(array_filter($rows, fn (string $row): bool => ! $speaks($row)));
                 }
-                $text = implode("\n", $rows);
+                $text = $whole($rows);
             }
 
             // what every page repeats, without a banner's line whose day is gone ("המשלוח הבא יוצא ב־15.9"):
@@ -840,7 +863,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             }
 
             if ($text !== '') {
-                $first[] = ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => self::WRITTEN_BY[(string) $entry->external_id] ?? null]
+                $first[] = $passage($text)
                     // Cut to what speaks of the question: kept for a question about a product too.
                     + ($entry->external_id === BuildShopKnowledge::POSTS ? ['speaks' => true] : []);
             }
@@ -1518,6 +1541,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 // what it recommends by name that is none of its products ("שיטאקה"): only names the answer, as checked, still says
                 $names = $refusal === null ? self::names($reply->data['names'] ?? null, $answer) : [];
                 $flags = $names === [] ? $flags : (array) $flags + ['names' => $names];
+                $flags = (array) $flags + ['own' => self::ownWord()];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $unfit ??= false;
                 $notFound ??= null;
