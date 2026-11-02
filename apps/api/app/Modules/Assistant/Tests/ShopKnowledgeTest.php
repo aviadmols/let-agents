@@ -137,14 +137,30 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertSame([], app(TenantContext::class)->run($other->id, fn (): array => app(BuildShopKnowledge::class)->entries()));
     }
 
+    public function test_the_teams_row_that_answers_is_read_however_much_it_wrote(): void
+    {
+        // what the team wrote is cut to what a passage holds: never the row the question is about
+        $this->shop = Shop::factory()->create();
+        $rows = array_map(fn (int $n): string => "שורה {$n} ".str_repeat('מידע על משלוחים והחזרות ', 24), range(1, 6));
+        $parking = 'מיקום החניון הקרוב ביותר: https://maps.app.goo.gl/yXaw11dYgA8gCFAi8 ויש גם חניה במתחם התחנה.';
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->own(implode("\n", [...$rows, $parking])));
+
+        $passages = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), 'איפה החניון הקרוב?', $this->shop->id, []));
+
+        $this->assertSame('store_team', $passages[0]['from']);
+        $this->assertStringStartsWith('- '.$parking, $passages[0]['text'], 'the row that speaks of it, first and whole');
+        $this->assertStringEndsWith('החזרות', trim($passages[0]['text']), 'and no row cut in its middle');
+    }
+
     public function test_the_writer_is_told_the_team_word_comes_first_and_the_checker_reads_its_last_version(): void
     {
         $prompts = __DIR__.'/../Prompts/';
 
-        $this->assertSame(file_get_contents($prompts.'answer_site.v15.md'), AnswerSiteQuestion::prompt('answer_site'), 'v15: what is recommended most by what the store\'s customers choose; v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
+        $this->assertSame(file_get_contents($prompts.'answer_site.v16.md'), AnswerSiteQuestion::prompt('answer_site'), 'v16: the store\'s own word gives its address and link, and stands over a page; v15: what is recommended most by what the store\'s customers choose; v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
         $this->assertStringContainsString('יש לנו', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
-        $this->assertSame(file_get_contents($prompts.'verify_site.v15.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version (v15: "the most popular" only by popular_first): approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');
+        $this->assertSame(file_get_contents($prompts.'verify_site.v16.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version (v16: the store\'s own word stands; v15: "the most popular" only by popular_first): approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');
         $this->assertSame(file_get_contents($prompts.'scope_site.v9.md'), AnswerSiteQuestion::prompt('scope_site'), 'v9: a reply that narrows the request keeps its conditions, released after the Rocks runs of 28.10; v8: a reply written to stand alone; v7: the scope check also reads what its own products and pages say nearest the question');
     }
 

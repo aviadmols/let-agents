@@ -89,7 +89,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
      */
-    public const PROMPT_VERSION = 15;
+    public const PROMPT_VERSION = 16;
 
     /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
     private const MAX_NAMES = 3;
@@ -820,6 +820,16 @@ final class AnswerSiteQuestion implements TriesQuestions
 
             if ($entry->external_id === BuildShopKnowledge::POSTS) {
                 $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
+            }
+
+            // what the team wrote: its rows that speak of the question first, and whole, so the cut below never takes the one that answers
+            if ($entry->external_id === BuildShopKnowledge::OWN) {
+                $rows = explode("\n", $text);
+                $rows = [...array_filter($rows, $speaks), ...array_filter($rows, fn (string $row): bool => ! $speaks($row))];
+                while (count($rows) > 1 && mb_strlen(implode("\n", $rows)) > self::KNOWLEDGE_CHARS) {
+                    array_pop($rows);
+                }
+                $text = implode("\n", $rows);
             }
 
             // what every page repeats, without a banner's line whose day is gone ("המשלוח הבא יוצא ב־15.9"):
@@ -1814,7 +1824,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         // What the cited pages themselves say: a store's policy may name its cancellation fee ("עד 5% או
         // 100 ₪") and how to reach it; quoted from there, that is the store's word, not one made up. And the prices above.
-        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], $cited))."\n".$prices;
+        // The team's own word too, cited or not: an address or a link it wrote is the store's.
+        $own = array_keys(array_filter($byRef, fn (array $passage): bool => in_array($passage['from'] ?? null, self::OWN_WORD, true)));
+        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], array_values(array_unique([...$cited, ...$own]))))."\n".$prices;
 
         // Code's checks on the answer, sentence by sentence (gate()); the picks stand or fall on their own.
         $trimmed = 0;
@@ -1829,6 +1841,12 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed];
     }
+
+    /** Who wrote a passage, when it is the store's own word (WRITTEN_BY): above any page. */
+    private const OWN_WORD = ['store_team', 'team_answers'];
+
+    /** A link in a text. */
+    private const LINK = '~https?://\S+|\bwww\.\S+~iu';
 
     /** The longest "not found" line shown: a sentence or two, never an answer. */
     private const NOT_FOUND_CHARS = 240;
@@ -1872,15 +1890,20 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     public static function gate(string $answer, string $known, string $pages): array
     {
-        $fault = fn (string $text): ?string => match (true) {
-            (Question::hasContactDetails($text) || array_diff(Privacy::redact($text)['found'], ['link']) !== []) && ! self::contactsFrom($text, $pages) => 'contact_details',
-            preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $text) === 1 && ! self::amountsFrom($text, $pages) => 'price',
-            self::hasRef($text) => 'internal_ref',
-            self::hasNumberNotIn($text, $known) => 'number_not_in_the_pages',
-            self::hasMeasureNotIn($text, $known) => 'measure_not_in_the_pages',
-            // something still to come on a day already gone: a stale banner told as news
-            Dated::past($text) => 'past_date',
-            default => null,
+        $fault = function (string $text) use ($known, $pages): ?string {
+            // what a link holds is no number or ref of the answer ("yXaw11dYgA8"); the link itself is checked as contact details are
+            $said = (string) preg_replace(self::LINK, ' ', $text);
+
+            return match (true) {
+                (Question::hasContactDetails($text) || array_diff(Privacy::redact($text)['found'], ['link']) !== []) && ! self::contactsFrom($text, $pages) => 'contact_details',
+                preg_match('~₪|ש"ח|ש״ח|\d+\s*שקל~u', $said) === 1 && ! self::amountsFrom($said, $pages) => 'price',
+                self::hasRef($said) => 'internal_ref',
+                self::hasNumberNotIn($said, $known) => 'number_not_in_the_pages',
+                self::hasMeasureNotIn($said, $known) => 'measure_not_in_the_pages',
+                // something still to come on a day already gone: a stale banner told as news
+                Dated::past($said) => 'past_date',
+                default => null,
+            };
         };
 
         $whole = $fault($answer);
@@ -2001,7 +2024,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         return (string) json_encode([
             'question' => $question,
             'answer' => $answer,
-            'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']], $cited),
+            'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']] + (in_array($byRef[$ref]['from'] ?? null, self::OWN_WORD, true) ? ['from' => $byRef[$ref]['from']] : []), $cited),
             'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank'])), $picks),
             'analysis' => $analysis,
         ], JSON_UNESCAPED_UNICODE);
@@ -2687,7 +2710,8 @@ final class AnswerSiteQuestion implements TriesQuestions
     {
         $text = rtrim($answer);
         // a cut comes in a long answer: a short one with no full stop is as it was ("Try the classic band")
-        if (mb_strlen($text) < 300 || preg_match('/[.!?…:)"״\'׳”»\]]$/u', $text) === 1) {
+        // a link at its end ends it too
+        if (mb_strlen($text) < 300 || preg_match('/[.!?…:)"״\'׳”»\]]$/u', $text) === 1 || preg_match('~(?:https?://|\bwww\.)\S+$~iu', $text) === 1) {
             return $answer;
         }
         if (preg_match_all('/[.!?…](?=\s|$)/u', $text, $ends, PREG_OFFSET_CAPTURE) > 0) {
@@ -3151,19 +3175,26 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /**
-     * Whether every phone number and email address the answer gives is written in the pages it cites:
-     * the store's own, as its policy publishes them for cancelling, never one a shopper or the model wrote.
+     * Whether every phone number, email address, link and street address the answer gives is written in the pages it
+     * rests on: the store's own, as its policy publishes them for cancelling or its team wrote them ("מיקום החניון: https://…"),
+     * never one a shopper or the model wrote.
      */
     public static function contactsFrom(string $answer, string $pages): bool
     {
-        preg_match_all('~[\w.+-]+@[\w-]+(?:\.[\w-]+)+~u', $answer, $emails);
-        preg_match_all('~\+?\d[\d\s-]{7,}\d~u', $answer, $phones);
+        preg_match_all(self::LINK, $answer, $links);
+        $links = array_map(fn (string $link): string => rtrim($link, '.,;:!?)"\'״'), $links[0]);
+        $said = (string) preg_replace(self::LINK, ' ', $answer);
+        preg_match_all('~[\w.+-]+@[\w-]+(?:\.[\w-]+)+~u', $said, $emails);
+        preg_match_all('~\+?\d[\d\s-]{7,}\d~u', $said, $phones);
+        // a street as the pages may write it: without its word or the letter before it ("ברחוב שבזי 31": "שבזי 31")
+        $streets = array_map(fn (string $a): string => (string) preg_replace('/^[ובלה]?(?:רחוב|רח[\'׳]|שד[\'׳]|שדרות|סמטת|כיכר|דרך)\s+/u', '', $a), Privacy::addresses($said));
         $digits = fn (string $s): string => (string) preg_replace('/\D+/', '', $s);
         $pagesDigits = (string) preg_replace('/[\s-]+/', '', $pages);
-        $found = [...$emails[0], ...$phones[0]];
+        $found = [...$emails[0], ...$phones[0], ...$links, ...$streets];
+        $written = fn (string $s): bool => mb_stripos($pages, $s) !== false;
 
         return $found !== []
-            && array_filter($emails[0], fn (string $e): bool => mb_stripos($pages, $e) === false) === []
+            && array_filter([...$emails[0], ...$links, ...$streets], fn (string $s): bool => ! $written($s)) === []
             && array_filter($phones[0], fn (string $p): bool => ! str_contains($pagesDigits, $digits($p))) === [];
     }
 

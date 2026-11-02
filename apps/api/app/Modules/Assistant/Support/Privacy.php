@@ -55,6 +55,14 @@ final class Privacy
         return ['text' => $text, 'found' => array_values(array_unique($found))];
     }
 
+    /** @return list<string> the street addresses a text gives, as it writes them */
+    public static function addresses(string $text): array
+    {
+        preg_match_all(self::ADDRESS, $text, $found);
+
+        return $found[0];
+    }
+
     public static function has(string $text): bool
     {
         return self::redact($text)['found'] !== [];

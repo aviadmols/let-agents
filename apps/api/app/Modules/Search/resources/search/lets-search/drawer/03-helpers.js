@@ -93,6 +93,8 @@
   var LTR_WORD = /^([("'״]*)([^\s֐-׿؀-ۿ]*?)([.,;:!?)"'״]*)$/;
   function ltrWord(w) {
     var m = LTR_WORD.exec(w);
+    // a link a store's own word gave ("https://maps.app.goo.gl/…"): to press, by the name of its site
+    if (m && /^https?:\/\/[^/]/i.test(m[2])) { return esc(m[1]) + '<bdi dir="ltr"><a class="ls-answer__page-link" href="' + esc(m[2]) + '" target="_blank" rel="noopener">' + esc(m[2].replace(/^https?:\/\/(?:www\.)?/i, '').split(/[/?#]/)[0]) + '</a></bdi>' + esc(m[3]); }
     return m && m[2] && /[0-9@]|:\/\//.test(m[2]) ? esc(m[1]) + '<bdi dir="ltr"' + (m[2].length <= 24 ? ' class="ls-nb"' : '') + '>' + esc(m[2]) + '</bdi>' + esc(m[3]) : esc(w);
   }
   function ltrWords(text) { return String(text).split(' ').map(ltrWord).join(' '); }
@@ -124,7 +126,7 @@
   // last whole sentence, where that keeps half of it or more: as the server ends it (AnswerSiteQuestion::endsWhole)
   function endsWhole(s) {
     var t = String(s || '').replace(/\s+$/, ''), re = /[.!?…](?=\s|$)/g, m, last = -1;
-    if (t.length < 300 || /[.!?…:)"״'׳”»\]]$/.test(t)) { return s; }
+    if (t.length < 300 || /[.!?…:)"״'׳”»\]]$/.test(t) || /https?:\/\/\S+$/i.test(t)) { return s; }
     while ((m = re.exec(t))) { last = m.index + 1; }
     return last >= t.length * 0.5 ? t.slice(0, last) : s;
   }

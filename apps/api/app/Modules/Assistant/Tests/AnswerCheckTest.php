@@ -189,6 +189,21 @@ final class AnswerCheckTest extends TestCase
         $this->assertSame(['', 'number_not_in_the_pages'], [$none, $why], 'nothing worth showing left: refused whole, as before');
     }
 
+    public function test_a_link_and_an_address_the_stores_own_word_gives_stay_in_the_answer(): void
+    {
+        // Rocks, 2.11: the team wrote where its parking is; "בנוסף יש חניה…" was left, the sentence before it taken out for its link
+        $own = 'מיקום החניון הקרוב ביותר: https://maps.app.goo.gl/yXaw11dYgA8gCFAi8?g_st=ac ויש גם חניה במתחם התחנה, 5 דקות הליכה לחנות. החנות ברחוב שבזי 31 תל אביב.';
+        $answer = 'החניון הקרוב ביותר כאן: https://maps.app.goo.gl/yXaw11dYgA8gCFAi8?g_st=ac. בנוסף יש חניה במתחם התחנה, 5 דקות הליכה מהחנות.';
+
+        $this->assertSame([$answer, null, 0], AnswerSiteQuestion::gate($answer, $own, $own), 'the store\'s own link, whole');
+        $this->assertSame(['בנוסף יש חניה במתחם התחנה, 5 דקות הליכה מהחנות.', null, 1], AnswerSiteQuestion::gate('החניון כאן: https://evil.test/parking. בנוסף יש חניה במתחם התחנה, 5 דקות הליכה מהחנות.', $own, $own), 'a link no page writes goes, with its sentence');
+        $this->assertSame(0, AnswerSiteQuestion::gate('אנחנו ברחוב שבזי 31, תל אביב, מוזמנים לבוא.', $own, $own)[2], 'an address the store wrote');
+        $this->assertSame(1, AnswerSiteQuestion::gate('אנחנו ברחוב הרצל 12, תל אביב. בנוסף יש חניה במתחם התחנה, 5 דקות הליכה מהחנות.', $own.' 12', $own)[2], 'an address it did not');
+
+        $long = str_repeat('יש גם חניה במתחם התחנה ליד החנות שלנו. ', 9).'החניון כאן: https://waze.com/ul/hsv8wrh2mm';
+        $this->assertSame($long, AnswerSiteQuestion::endsWhole($long), 'a link ends a sentence');
+    }
+
     public function test_contact_details_the_pages_do_not_write_are_taken_out_with_their_sentence(): void
     {
         [$left] = AnswerSiteQuestion::gate('המשלוח לוקח שלושה ימי עסקים לכל הארץ. לשאלות התקשרו ל-054-9998877.', 'משלוח תוך שלושה ימי עסקים.', '');
