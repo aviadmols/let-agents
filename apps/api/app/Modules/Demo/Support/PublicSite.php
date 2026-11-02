@@ -112,7 +112,9 @@ final class PublicSite
         }
 
         $html = (string) $home->body();
-        $shopify = is_array(self::json($host, '/products.json', ['limit' => 1])['products'] ?? null);
+        // a feed that did not answer (Shilav, 2.11: Cloudflare's 429) is no store without one: its home page still says Shopify
+        $feed = self::get($host, '/products.json', ['limit' => 1]);
+        $shopify = is_array($feed?->json()['products'] ?? null) || ($feed === null && preg_match('~cdn\.shopify\.com|Shopify\.theme~i', $html) === 1);
         $woo = $shopify ? null : self::get($host, '/wp-json/wc/store/v1/products', ['per_page' => 1]);
         $platform = match (true) {
             $shopify => self::SHOPIFY,

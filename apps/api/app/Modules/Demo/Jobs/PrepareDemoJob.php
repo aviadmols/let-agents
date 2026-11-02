@@ -28,9 +28,10 @@ final class PrepareDemoJob implements ShouldQueue
 
     public int $timeout = 180;
 
-    public int $tries = 3;
+    public int $tries = 6;
 
-    public int $backoff = 20;
+    /** Seconds before the next try, more each time: a store that throttles (Shilav, 2.11) lets go after minutes, not seconds. */
+    public int $backoff = 60;
 
     public function __construct(public readonly string $demoId) {}
 
@@ -50,7 +51,7 @@ final class PrepareDemoJob implements ShouldQueue
             $read = PublicSite::read($site->host);
 
             if ($read === null && $this->attempts() < $this->tries) {
-                $this->release($this->backoff);
+                $this->release($this->backoff * $this->attempts());
 
                 return;
             }

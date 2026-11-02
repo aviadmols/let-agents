@@ -27,6 +27,14 @@ final class PublicStoreFeed implements PlatformStoreFeed
     /** Of each category, at least this many products in a demo's sample. */
     private const SAMPLE_EACH = 3;
 
+    /** A page that did not answer is asked this many times, this long apart: a store throttles for a while, and "no answer" is no empty catalogue. */
+    private const ASKED = 3;
+
+    private const ASK_AGAIN_MS = 20000;
+
+    /** After this many categories in a row with no answer, the sample ends: the store is not answering now. */
+    private const SAMPLE_SILENT = 3;
+
     /** Product pages read for a site with no public feed, at most. */
     private const SITEMAP_PRODUCTS = 300;
 
@@ -60,15 +68,19 @@ final class PublicStoreFeed implements PlatformStoreFeed
 
         if ($kind === PublicSite::SHOPIFY) {
             $seen = [];
-            $collections = array_filter((array) (PublicSite::json($host, '/collections.json', ['limit' => 250])['collections'] ?? []), fn ($c): bool => is_array($c) && (int) ($c['products_count'] ?? 0) > 0 && isset($c['handle']));
+            $collections = array_filter((array) (self::patient($host, '/collections.json', ['limit' => 250])['collections'] ?? []), fn ($c): bool => is_array($c) && (int) ($c['products_count'] ?? 0) > 0 && isset($c['handle']));
             yield from self::sample(
                 array_map(fn (array $c): array => ['count' => (int) $c['products_count'], 'key' => (string) $c['handle']], $collections), $connection, $seen,
-                fn (string $handle, int $many): array => (array) (PublicSite::json($host, '/collections/'.rawurlencode($handle).'/products.json', ['limit' => $many])['products'] ?? []),
+                function (string $handle, int $many) use ($host): ?array {
+                    $read = self::patient($host, '/collections/'.rawurlencode($handle).'/products.json', ['limit' => $many]);
+
+                    return $read === null ? null : (array) ($read['products'] ?? []);
+                },
                 fn (array $p): bool => array_any((array) ($p['variants'] ?? []), fn ($v): bool => is_array($v) && (bool) ($v['available'] ?? false)),
                 fn (array $p): array => self::shopify($p, $host, $connection),
             );
             for ($page = 1; $page <= 40; $page++) {
-                $products = (array) (PublicSite::json($host, '/products.json', ['limit' => 250, 'page' => $page])['products'] ?? []);
+                $products = (array) (self::patient($host, '/products.json', ['limit' => 250, 'page' => $page])['products'] ?? []);
                 if ($products === []) {
                     return;
                 }
@@ -84,15 +96,15 @@ final class PublicStoreFeed implements PlatformStoreFeed
 
         if ($kind === PublicSite::WOOCOMMERCE) {
             $seen = [];
-            $categories = array_filter((array) PublicSite::json($host, '/wp-json/wc/store/v1/products/categories', ['per_page' => 100]), fn ($c): bool => is_array($c) && (int) ($c['count'] ?? 0) > 0 && isset($c['id']));
+            $categories = array_filter((array) self::patient($host, '/wp-json/wc/store/v1/products/categories', ['per_page' => 100]), fn ($c): bool => is_array($c) && (int) ($c['count'] ?? 0) > 0 && isset($c['id']));
             yield from self::sample(
                 array_map(fn (array $c): array => ['count' => (int) $c['count'], 'key' => (string) $c['id']], $categories), $connection, $seen,
-                fn (string $id, int $many): array => (array) PublicSite::json($host, '/wp-json/wc/store/v1/products', ['category' => $id, 'per_page' => $many]),
+                fn (string $id, int $many): ?array => self::patient($host, '/wp-json/wc/store/v1/products', ['category' => $id, 'per_page' => $many]),
                 fn (array $p): bool => (bool) ($p['is_in_stock'] ?? true),
                 fn (array $p): array => self::woocommerce($p),
             );
             for ($page = 1; $page <= 100; $page++) {
-                $products = PublicSite::json($host, '/wp-json/wc/store/v1/products', ['per_page' => 100, 'page' => $page]);
+                $products = self::patient($host, '/wp-json/wc/store/v1/products', ['per_page' => 100, 'page' => $page]);
                 if ($products === null && $page === 1) {
                     throw new StoreFeedUnavailable('unreachable', null, 'store api');
                 }
@@ -137,7 +149,7 @@ final class PublicStoreFeed implements PlatformStoreFeed
      *
      * @param  list<array{count: int, key: string}>|array<int, array{count: int, key: string}>  $categories
      * @param  array<string, true>  $seen  filled with the products read
-     * @param  callable(string, int): array<int, mixed>  $read  a category's products, at most this many
+     * @param  callable(string, int): (array<int, mixed>|null)  $read  a category's products, at most this many; null when it did not answer
      * @param  callable(array<string, mixed>): bool  $inStock
      * @param  callable(array<string, mixed>): array<string, mixed>  $record
      */
@@ -150,13 +162,16 @@ final class PublicStoreFeed implements PlatformStoreFeed
         $each = max(self::SAMPLE_EACH, (int) ceil($limit / count($categories)));
         usort($categories, fn (array $a, array $b): int => [$b['count'], $a['key']] <=> [$a['count'], $b['key']]);
 
+        $silent = 0;
         foreach ($categories as $category) {
-            if (count($seen) >= $limit) {
+            if (count($seen) >= $limit || $silent >= self::SAMPLE_SILENT) {
                 return;
             }
             $batch = [];
             // twice as many: some are sold out, or read already from another category
-            foreach ($read($category['key'], $each * 2) as $product) {
+            $products = $read($category['key'], $each * 2);
+            $silent = $products === null ? $silent + 1 : 0;
+            foreach ($products ?? [] as $product) {
                 $id = is_array($product) ? (string) ($product['id'] ?? '') : '';
                 if ($id !== '' && ! isset($seen[$id]) && count($batch) < $each && $inStock($product)) {
                     $seen[$id] = true;
@@ -168,6 +183,27 @@ final class PublicStoreFeed implements PlatformStoreFeed
             }
             usleep(app()->runningUnitTests() ? 0 : self::PAUSE_MS * 1000);
         }
+    }
+
+    /**
+     * JSON from the store, asked again a while later when it does not answer.
+     *
+     * @param  array<string, mixed>  $query
+     * @return array<mixed>|null
+     */
+    private static function patient(string $host, string $path, array $query): ?array
+    {
+        for ($asked = 1; $asked <= self::ASKED; $asked++) {
+            $read = PublicSite::json($host, $path, $query);
+            if ($read !== null) {
+                return $read;
+            }
+            if ($asked < self::ASKED) {
+                usleep(app()->runningUnitTests() ? 0 : self::ASK_AGAIN_MS * 1000);
+            }
+        }
+
+        return null;
     }
 
     public function content(StoreConnection $connection, string $type): Generator

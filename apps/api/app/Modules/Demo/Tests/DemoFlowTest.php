@@ -16,6 +16,7 @@ use App\Modules\Demo\Jobs\PrepareDemoJob;
 use App\Modules\Demo\Mail\DemoMail;
 use App\Modules\Demo\Models\DemoSite;
 use App\Modules\Demo\Support\DemoProgress;
+use App\Modules\Demo\Support\PublicSite;
 use App\Modules\Demo\Support\PublicStoreFeed;
 use App\Modules\Tenancy\Contracts\CreatesShops;
 use App\Modules\Tenancy\Enums\ShopStatus;
@@ -184,6 +185,23 @@ final class DemoFlowTest extends TestCase
         $this->assertSame(['7', 'טבעת זהב', 'https://store.test/products/ring', 'variable', 'טבעת זהב 14K'], [$record['external_id'], $record['title'], $record['url'], $record['type'], $record['description']]);
         $this->assertSame(['890', '990', true, true], [$record['price']['price'], $record['price']['regular_price'], $record['price']['on_sale'], $record['stock']['in_stock']]);
         $this->assertSame([['name' => 'מידה', 'value' => '52']], $record['variations'][0]['attributes']);
+    }
+
+    public function test_a_store_that_throttles_is_read_as_what_it_is_and_asked_again(): void
+    {
+        // Shilav, 2.11: Cloudflare's 429 on its feed read the store as no Shopify store, and its demo had no product
+        Http::fake(['https://throttled.test/products.json*' => Http::response('slow down', 429), 'https://throttled.test/' => Http::response('<html><script src="https://cdn.shopify.com/s/x.js"></script></html>')]);
+        $this->assertSame(PublicSite::SHOPIFY, PublicSite::read('throttled.test')['platform']);
+
+        Http::fake(['https://hidden.test/products.json*' => Http::response('<html>no feed</html>'), 'https://hidden.test/' => Http::response('<html><script src="https://cdn.shopify.com/s/x.js"></script></html>')]);
+        $this->assertSame(PublicSite::OTHER, PublicSite::read('hidden.test')['platform'], 'a feed it hides: read by its sitemap, as before');
+
+        Http::fake([
+            'https://back.test/collections.json*' => Http::response(['collections' => []]),
+            'https://back.test/products.json*' => Http::sequence()->push('slow down', 429)->push(['products' => [['id' => 7, 'title' => 'כובע', 'handle' => 'p7', 'body_html' => '', 'vendor' => 'S', 'product_type' => 'T', 'tags' => '', 'variants' => [['id' => 70, 'title' => 'x', 'price' => '10.00', 'available' => true]], 'options' => [], 'images' => []]]])->push(['products' => []]),
+        ]);
+        $connection = (new StoreConnection)->forceFill(['site_url' => 'https://back.test', 'site_info' => ['demo' => ['platform' => 'shopify', 'currency' => 'ILS']]]);
+        $this->assertSame('7', iterator_to_array(app(PublicStoreFeed::class)->products($connection), false)[0][0]['external_id'], 'no answer is no empty catalogue');
     }
 
     public function test_a_demo_reads_a_few_of_each_category_not_the_newest_of_one(): void
