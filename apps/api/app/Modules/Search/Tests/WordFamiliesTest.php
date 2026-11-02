@@ -102,6 +102,54 @@ final class WordFamiliesTest extends TestCase
         $this->assertNotContains(['מנומר', 'מנומרות'], $groups, 'a group another holds all of adds nothing');
     }
 
+    public function test_a_big_group_is_handed_and_many_groups_are_written_over_several_calls(): void
+    {
+        // Rocks, 2.11: ten words of one root never reached the writer, and "ריבוע" never met "מרובע"
+        $square = ['מרובעות', 'מרובעת', 'מרובע', 'מרובעים', 'מרבעת', 'רבע', 'ריבוע', 'ריבועי', 'ריבועית', 'ריבועים'];
+        $this->assertContains($square, WriteWordFamilies::alike($square));
+
+        $letters = ['א', 'ב', 'ג', 'ד', 'ז', 'ח', 'ט', 'כ', 'ל', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'];
+        $products = [];
+        foreach ($letters as $a) {
+            foreach ($letters as $b) {
+                $one = "{$a}{$b}גד";
+                $products["{$a}{$b}1"] = ["מוצר {$one}", "{$one} {$one}ים"];
+                $products["{$a}{$b}2"] = ["פריט {$one}ים", "{$one} {$one}ים"];
+            }
+        }
+        $this->catalog($products);
+        app(WriteWordFamilies::class)->handle($this->shop->id);
+
+        $written = array_values(array_filter($this->calls, fn (array $c): bool => $c['provider'] === 'openai'));
+        $this->assertGreaterThan(1, count($written), 'more groups than one call holds: several calls');
+        $this->assertLessThanOrEqual(120, max(array_map(fn (array $c): int => count($c['input']['alike']), $written)));
+        $this->assertGreaterThan(200, array_sum(array_map(fn (array $c): int => count($c['input']['alike']), $written)), 'past the old cut of 200');
+        $this->assertLessThan(count($written[0]['input']['store_words']), count(end($written)['input']['store_words']), 'the next calls read their groups alone');
+    }
+
+    public function test_the_same_words_said_by_more_products_write_nothing(): void
+    {
+        $this->catalog(['1' => ['חולצה משובצת', 'משובצת כותנה'], '2' => ['חולצה משובצת', 'משובצת כותנה'], '3' => ['מכנס במשבצות', 'משבצות כותנה'], '4' => ['מכנס במשבצות', 'משבצות צמר'],
+            '5' => ['כובע צמר', 'צמר שירה'], '6' => ['צעיף צמר', 'שירה זיכרון'], '7' => ['ספר שירה', 'זיכרון עדות'], '8' => ['ספר עדות', 'עדות זיכרון'], '9' => ['שמיכה נייר', 'נייר ספירלה'], '10' => ['מחברת נייר', 'נייר ספירלה']]);
+        $this->assertNotNull(app(WriteWordFamilies::class)->handle($this->shop->id));
+
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '11', 'type' => 'simple', 'status' => 'publish', 'title' => 'ספר שירה', 'url' => 'https://www.store.test/p/11',
+                'in_stock' => true, 'purchasable' => true, 'hash' => 'h11', 'payload' => ['tags' => ['צמר', 'נייר']], 'price' => 100]);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $this->assertNull(app(WriteWordFamilies::class)->handle($this->shop->id), 'another count, the same words');
+    }
+
+    public function test_a_form_past_the_lists_cap_is_read_the_most_said_first(): void
+    {
+        $record = fn (string $title): array => ['t' => 'product', 'title' => $title, 'kw' => ''];
+        $index = ['records' => [$record('מברגה'), $record('מברגות אחת'), $record('מברגות שתיים')]];
+
+        $this->assertSame(['מברגות', 'מברגה'], StoreWords::rareForms($index, ['מברג']), 'two products say it: past the cap, still a form of the store\'s word');
+    }
+
     public function test_a_form_one_product_alone_says_is_read_beside_the_stores_word_of_its_root(): void
     {
         // Vans, 26.10: "נמר" on one sneaker, "מנומר" on three: never a family, "נמר" found one, "מנומרות" four

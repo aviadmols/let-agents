@@ -35,17 +35,20 @@ final class WriteWordFamilies
 
     public const ACTION = 'search.write_families';
 
-    public const PROMPT_VERSION = 3;
+    public const PROMPT_VERSION = 4;
 
     private const PROMPTS = __DIR__.'/../Prompts/';
 
     /** What the checker may say holds a family together; anything else (its "wrong") and the family goes. */
     private const KINDS = ['forms', 'same_thing', 'genres'];
 
-    /** At most this many words a family, and this many families. */
-    private const FAMILY_MAX = 8;
+    /** At most this many families. */
+    private const FAMILIES_MAX = 800;
 
-    private const FAMILIES_MAX = 400;
+    /** The groups handed in one call and the families checked in one: what the tokens of one answer hold (families_max_output_tokens). */
+    private const ALIKE_PER_CALL = 120;
+
+    private const CHECKED_PER_CALL = 80;
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -65,11 +68,14 @@ final class WriteWordFamilies
         if ($index === null) {
             return null;
         }
-        [$words, $hash] = StoreWords::of($shopId, $index);
+        [$words] = StoreWords::of($shopId, $index);
         // with the forms one product alone says of the store's words ("נמר" beside "מנומר")
         $words = [...$words, ...StoreWords::rareForms($index, $words)];
-        // the words and the groups code hands with them: a better grouping writes every store's families again, once
-        $hash = substr(hash('sha256', $hash.'|'.json_encode(self::alike($words), JSON_UNESCAPED_UNICODE)), 0, 20);
+        // the words and the groups code hands with them: a better grouping writes every store's families again, once;
+        // sorted, so the same words said by more or fewer products write nothing
+        $sorted = $words;
+        sort($sorted, SORT_STRING);
+        $hash = substr(hash('sha256', implode('|', $sorted).'|'.json_encode(self::alike($sorted), JSON_UNESCAPED_UNICODE)), 0, 20);
         $saved = $this->tenant->run($shopId, fn (): ?SearchWordFamily => SearchWordFamily::query()->first());
         if (count($words) < 10 || ($saved !== null && $saved->words_hash === $hash && $saved->prompt_version === self::PROMPT_VERSION)) {
             return null;
@@ -103,22 +109,29 @@ final class WriteWordFamilies
         }
         $language = (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he');
 
+        // the first call reads the whole list, for what only means the same; the next ones their groups' forms
+        $written = [];
         try {
-            $written = $this->ask($run, $writer, 'word_families', ['language' => $language, 'store_words' => $words, 'alike' => self::alike($words)]);
+            foreach (array_chunk(self::alike($words), self::ALIKE_PER_CALL) ?: [[]] as $call => $groups) {
+                $said = $call === 0 ? $words : array_values(array_unique(array_merge(...$groups)));
+                $reply = $this->ask($run, $writer, 'word_families', ['language' => $language, 'store_words' => $said, 'alike' => $groups]);
+                $written = [...$written, ...(array) ($reply->data['families'] ?? [])];
+            }
         } catch (SpendCapReached|ModelCallFailed $e) {
             $run->fail('search::runs.families_failed', [], $e->getMessage());
 
             return;
         }
 
-        // code's gate: the store's own words, as it writes them, a word in one family at most, two to FAMILY_MAX a family
+        // code's gate: the store's own words, as it writes them, a word in one family at most, two to the store's cap a family
+        $wordsMax = max(2, (int) Settings::get('search.family_words_max', $shopId));
         $byKey = [];
         foreach ($words as $w) {
             $byKey[HebrewSearch::normalize($w)] ??= $w;
         }
         $families = [];
         $taken = [];
-        foreach (array_slice((array) ($written->data['families'] ?? []), 0, self::FAMILIES_MAX) as $family) {
+        foreach (array_slice($written, 0, self::FAMILIES_MAX) as $family) {
             $kept = [];
             foreach ((array) $family as $word) {
                 $key = HebrewSearch::normalize(is_string($word) ? $word : '');
@@ -127,7 +140,7 @@ final class WriteWordFamilies
                 }
             }
             if (count($kept) >= 2) {
-                $kept = array_slice($kept, 0, self::FAMILY_MAX, true);
+                $kept = array_slice($kept, 0, $wordsMax, true);
                 $taken += $kept;
                 $families['f'.(count($families) + 1)] = array_values($kept);
             }
@@ -137,24 +150,26 @@ final class WriteWordFamilies
         // wrong, or does not answer for, goes (a list of what to take out read as one of what to keep: v2 lost "משבצות")
         $kinds = [];
         if ($families !== []) {
-            try {
-                $checked = $this->ask($run, $checker, 'word_families_check', ['language' => $language,
-                    'families' => array_map(fn (string $id, array $f): array => ['id' => $id, 'words' => $f], array_keys($families), $families)]);
-            } catch (SpendCapReached|ModelCallFailed $e) {
-                $run->fail('search::runs.families_failed', [], $e->getMessage());
-
-                return;
-            }
             $kept = [];
-            foreach ((array) ($checked->data['families'] ?? []) as $answer) {
-                $id = (string) ($answer['id'] ?? '');
-                $kind = (string) ($answer['kind'] ?? 'wrong');
-                if (! isset($families[$id]) || isset($kept[$id]) || ! in_array($kind, self::KINDS, true)) {
-                    continue;
+            foreach (array_chunk($families, self::CHECKED_PER_CALL, true) as $batch) {
+                try {
+                    $checked = $this->ask($run, $checker, 'word_families_check', ['language' => $language,
+                        'families' => array_map(fn (string $id, array $f): array => ['id' => $id, 'words' => $f], array_keys($batch), $batch)]);
+                } catch (SpendCapReached|ModelCallFailed $e) {
+                    $run->fail('search::runs.families_failed', [], $e->getMessage());
+
+                    return;
                 }
-                $keep = array_map(fn ($w): string => HebrewSearch::normalize(is_string($w) ? $w : ''), (array) ($answer['keep'] ?? []));
-                $kept[$id] = array_values(array_filter($families[$id], fn (string $w): bool => in_array(HebrewSearch::normalize($w), $keep, true)));
-                $kinds[$kind] = ($kinds[$kind] ?? 0) + 1;
+                foreach ((array) ($checked->data['families'] ?? []) as $answer) {
+                    $id = (string) ($answer['id'] ?? '');
+                    $kind = (string) ($answer['kind'] ?? 'wrong');
+                    if (! isset($batch[$id]) || isset($kept[$id]) || ! in_array($kind, self::KINDS, true)) {
+                        continue;
+                    }
+                    $keep = array_map(fn ($w): string => HebrewSearch::normalize(is_string($w) ? $w : ''), (array) ($answer['keep'] ?? []));
+                    $kept[$id] = array_values(array_filter($batch[$id], fn (string $w): bool => in_array(HebrewSearch::normalize($w), $keep, true)));
+                    $kinds[$kind] = ($kinds[$kind] ?? 0) + 1;
+                }
             }
             $families = array_filter($kept, fn (array $f): bool => count($f) >= 2);
         }
@@ -194,13 +209,16 @@ final class WriteWordFamilies
         return $reply;
     }
 
-    /** At most this many groups of words that share a root are handed to the writer. */
-    private const ALIKE_MAX = 200;
+    /** At most this many groups of words that share a root are handed to the writer, of at most this many words. */
+    private const ALIKE_MAX = 600;
+
+    private const ALIKE_WORDS_MAX = 24;
 
     /**
      * The store's single words grouped by their letters' root (HebrewSearch::stem, then its consonants): most groups are
      * forms of one word ("משובץ", "משובצת", "משבצות"), some only look alike ("עגיל", "עגול"); the writer tells which, so a
-     * form is never missed among hundreds of words.
+     * form is never missed among hundreds of words. A big group is most often the forms of two words, and is handed all the
+     * same (Rocks: "ריבוע", "ריבועים", "מרובע", "מרובעת" in a group of ten never met).
      *
      * @param  list<string>  $words
      * @return list<list<string>>
@@ -216,7 +234,7 @@ final class WriteWordFamilies
             }
         }
         // a group only of words some other group holds as well adds nothing
-        $groups = array_values(array_filter($groups, fn (array $g): bool => count($g) >= 2 && count($g) <= self::FAMILY_MAX));
+        $groups = array_values(array_filter($groups, fn (array $g): bool => count($g) >= 2 && count($g) <= self::ALIKE_WORDS_MAX));
         $kept = [];
         foreach ($groups as $i => $group) {
             foreach ($groups as $j => $other) {

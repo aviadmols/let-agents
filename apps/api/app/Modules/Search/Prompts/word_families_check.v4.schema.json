@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["families"],
+    "properties": {
+        "families": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "kind", "keep"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["forms", "same_thing", "genres", "wrong"]},
+                    "keep": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        }
+    }
+}

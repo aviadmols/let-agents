@@ -11,6 +11,7 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Runs\Models\Run;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\ChooseWordFamily;
 use App\Modules\Search\Actions\SettleWordFamilies;
 use App\Modules\Search\Filament\Merchant\Pages\WordFamilies;
 use App\Modules\Search\Models\SearchFamilyChoice;
@@ -160,7 +161,7 @@ final class WordFamiliesScreenTest extends TestCase
         $this->assertSame(['כפתורים'], collect($judge->asked[0]['in']['words'])->firstWhere('word', 'כפתור')['near'], 'with the store\'s words that look like it');
         $this->assertEqualsCanonicalizing([['משובצת', 'משבצות'], ['סווטשירט', 'סווטשירטים', 'רוכסן'], ['כפתורים', 'כפתור']], array_column(StoreFamilies::approved(), 'words'));
         $this->assertSame([true, true, true], array_column(StoreFamilies::approved(), 'auto'), 'the judge\'s, not the team\'s');
-        $this->assertSame(1, SearchFamilyChoice::query()->where('status', SearchFamilyChoice::REJECTED)->count(), '"שירט", "שורט": wrong');
+        $this->assertEqualsCanonicalizing([['שירט', 'שורט'], ['משובצת', 'משובץ']], SearchFamilyChoice::query()->where('status', SearchFamilyChoice::REJECTED)->pluck('words')->all(), '"שירט", "שורט": wrong; "משובץ", left out of its family, stays out');
         $this->assertSame(['פנטזיה'], SearchFamilyChoice::query()->where('status', SearchFamilyChoice::HIDDEN)->sole()->words);
         $this->assertSame([], StoreFamilies::waiting(), 'nothing waits for the team');
         $this->assertSame(['approved' => 1, 'trimmed' => 1, 'wrong' => 1, 'joined' => 1, 'paired' => 1, 'hidden' => 1], array_intersect_key($run->output, array_flip(['approved', 'trimmed', 'wrong', 'joined', 'paired', 'hidden'])));
@@ -171,6 +172,36 @@ final class WordFamiliesScreenTest extends TestCase
         $this->assertNull(app(SettleWordFamilies::class)->handle($this->shop->id), 'nothing waits: no model is asked');
         $this->assertCount(1, $judge->asked);
         $this->assertSame(1, Run::query()->where('agent', SettleWordFamilies::AGENT)->count());
+    }
+
+    public function test_a_new_form_joins_the_judges_family_and_never_the_teams(): void
+    {
+        // Rocks, 2.11: "מרובע" approved, "ריבוע" a form of it that never met it
+        $judged = app(ChooseWordFamily::class)->handle($this->shop->id, SearchFamilyChoice::APPROVED, ['מרובע', 'מרובעת'], auto: true);
+        app(ChooseWordFamily::class)->handle($this->shop->id, SearchFamilyChoice::APPROVED, ['ריבועי', 'ריבועית'], auto: true);
+        app(ChooseWordFamily::class)->handle($this->shop->id, SearchFamilyChoice::APPROVED, ['כפתור', 'כפתורים']);
+        SearchWordFamily::query()->sole()->update(['families' => [['ריבוע', 'ריבועים', 'מרובע', 'ריבועי'], ['כפתור', 'כפתורון', 'כפתורונים']]]);
+
+        $this->assertSame([['מרובע', 'מרובעת', 'ריבועי', 'ריבועית', 'ריבוע', 'ריבועים'], ['כפתורון', 'כפתורונים']], StoreFamilies::waiting(), 'into the judge\'s, two of one word as one; beside the team\'s, as written');
+        $this->assertContains(['מרובע', 'מרובעת', 'ריבועי', 'ריבועית', 'ריבוע', 'ריבועים'], StoreFamilies::all(), 'it counts before anyone decides');
+
+        $judge = new class implements ChatModel
+        {
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                $in = json_decode($user, true);
+
+                return new ModelReply(['families' => array_map(fn (array $f): array => ['id' => $f['id'], 'keep' => array_values(array_diff($f['words'], ['ריבועים', 'כפתורון', 'כפתורונים']))], $in['families']), 'words' => []], 100, 10);
+            }
+        };
+        $this->app->instance(ChatModel::class, $judge);
+        app(SettleWordFamilies::class)->handle($this->shop->id);
+
+        $words = array_column(StoreFamilies::approved(), 'words');
+        $this->assertContains(['מרובע', 'מרובעת', 'ריבועי', 'ריבועית', 'ריבוע'], $words, 'one family, written over the two');
+        $this->assertContains(['כפתור', 'כפתורים'], $words, 'the team\'s as it was');
+        $this->assertNull(SearchFamilyChoice::query()->find($judged->id), 'the judge\'s old one replaced');
+        $this->assertSame([], StoreFamilies::waiting(), 'what it left out is not offered again; nothing waits');
     }
 
     public function test_a_family_is_made_by_hand_and_a_word_is_in_one_of_the_teams_families(): void

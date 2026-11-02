@@ -2,14 +2,18 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Core\Facades\Settings;
+use App\Core\Tenancy\TenantContext;
 use App\Modules\Search\Models\SearchFamilyChoice;
 use App\Modules\Search\Models\SearchWordFamily;
 
 /**
  * A store's word families as its search reads them: the ones its team approved, fixed or made, as they are; then the
  * written ones (WriteWordFamilies), with no word the team placed in a family of its own and never two words of a family
- * the team called wrong ("לא נכון"). Written families wait for the team's word but count from the start. Read inside
- * the store's tenant context. Code only.
+ * the team called wrong ("לא נכון"). Written families wait for the team's word but count from the start. A written family
+ * that says a word of a family the judge approved brings its new words there rather than beginning another: "ריבוע"
+ * joins the approved "מרובע", and two approved families of one word become one. A family of the team's stays as it is: a
+ * word it lacks may be one the team took out. Read inside the store's tenant context. Code only.
  */
 final class StoreFamilies
 {
@@ -30,10 +34,11 @@ final class StoreFamilies
     /** @return list<list<string>> the written families the team has not decided on, as the team's choices leave them */
     public static function waiting(): array
     {
+        $approved = self::approved();
         $placed = [];
-        foreach (self::approved() as $family) {
+        foreach ($approved as $i => $family) {
             foreach ($family['words'] as $word) {
-                $placed[HebrewSearch::normalize($word)] = true;
+                $placed[HebrewSearch::normalize($word)] = $i;
             }
         }
         // two words of one family the team called wrong stay apart
@@ -44,13 +49,37 @@ final class StoreFamilies
             }
         }
 
+        $atOdds = fn (string $w, string $o): bool => array_intersect_key($apart[HebrewSearch::normalize($w)] ?? [], $apart[HebrewSearch::normalize($o)] ?? []) !== [];
+        $hidden = self::hidden();
+        $wordsMax = max(2, (int) Settings::get('search.family_words_max', app(TenantContext::class)->id()));
+
         $out = [];
+        $grown = [];
         foreach ((array) (SearchWordFamily::query()->first(['families'])?->families ?? []) as $family) {
-            $words = array_values(array_filter(array_map('strval', (array) $family), fn (string $w): bool => ! isset($placed[HebrewSearch::normalize($w)])));
+            $family = array_map('strval', (array) $family);
+            $touched = array_values(array_unique(array_filter(array_map(fn (string $w): ?int => $placed[HebrewSearch::normalize($w)] ?? null, $family), 'is_int')));
+            if ($touched !== [] && array_filter($touched, fn (int $i): bool => ! $approved[$i]['auto']) === []) {
+                usort($touched, fn (int $a, int $b): int => [count($approved[$b]['words']), $a] <=> [count($approved[$a]['words']), $b]);
+                $into = $touched[0];
+                $joined = $grown[$into] ?? $approved[$into]['words'];
+                $before = count($joined);
+                foreach ([...array_merge(...array_map(fn (int $i): array => $approved[$i]['words'], array_slice($touched, 1))), ...$family] as $word) {
+                    $key = HebrewSearch::normalize($word);
+                    if (count($joined) < $wordsMax && ! isset($hidden[$key]) && ! in_array($key, array_map(fn (string $w): string => HebrewSearch::normalize($w), $joined), true)
+                        && array_filter($joined, fn (string $o): bool => $atOdds($word, $o)) === []) {
+                        $joined[] = $word;
+                    }
+                }
+                if (count($joined) > $before) {
+                    $grown[$into] = $joined;
+
+                    continue;
+                }
+            }
+            $words = array_values(array_filter($family, fn (string $w): bool => ! isset($placed[HebrewSearch::normalize($w)])));
             // the word most at odds with the others goes first, until none is ("משובץ" out, "משבצות", "משובצת" stay)
             while (count($words) >= 2) {
-                $odds = array_map(fn (string $w): int => count(array_filter($words, fn (string $o): bool => $o !== $w
-                    && array_intersect_key($apart[HebrewSearch::normalize($w)] ?? [], $apart[HebrewSearch::normalize($o)] ?? []) !== [])), $words);
+                $odds = array_map(fn (string $w): int => count(array_filter($words, fn (string $o): bool => $o !== $w && $atOdds($w, $o))), $words);
                 if (max($odds) === 0) {
                     break;
                 }
@@ -61,7 +90,7 @@ final class StoreFamilies
             }
         }
 
-        return $out;
+        return [...array_values($grown), ...$out];
     }
 
     /** @return array<string, true> the searched words the team set aside, normalized */

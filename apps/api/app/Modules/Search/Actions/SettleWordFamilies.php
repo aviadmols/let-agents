@@ -157,6 +157,10 @@ final class SettleWordFamilies
             if (count($keep) >= 2) {
                 $choices[$id] = $this->choose->handle($shopId, SearchFamilyChoice::APPROVED, $keep, auto: true);
                 $counts[count($keep) === count($families[$id]) ? 'approved' : 'trimmed']++;
+                // a word it left out is not offered to this family again (StoreFamilies::waiting)
+                foreach (array_diff($families[$id], $keep) as $out) {
+                    $this->choose->handle($shopId, SearchFamilyChoice::REJECTED, [$keep[0], $out], auto: true);
+                }
             } else {
                 $this->choose->handle($shopId, SearchFamilyChoice::REJECTED, $families[$id], auto: true);
                 $choices[$id] = null;

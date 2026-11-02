@@ -36,12 +36,12 @@ final class StoreWords
     }
 
     /** Rare forms read beside a store's words, at most. */
-    private const RARE_MAX = 200;
+    private const RARE_MAX = 800;
 
     /**
-     * The words one product alone says that share a root with the store's words (rootKeys): "נמר" on Vans' one leopard
-     * sneaker beside the "מנומר" of three. Too rare to be the store's words, a form of one all the same: its families
-     * read them (WriteWordFamilies), so a search for either finds both.
+     * The words the store's list left out that share a root with its words (rootKeys): "נמר" on Vans' one leopard sneaker
+     * beside the "מנומר" of three, or a form past the list's cap, the most said first. Not the store's words, a form of
+     * one all the same: its families read them (WriteWordFamilies), so a search for either finds both.
      *
      * @param  array<string, mixed>  $index  the loaded index
      * @param  list<string>  $words  the store's words (of)
@@ -68,14 +68,14 @@ final class StoreWords
         $out = [];
         foreach ($said as $word => $n) {
             $word = (string) $word;
-            if ($n === 1 && ! isset($known[$word]) && preg_match('/^[א-ת]{3,}$/u', $word) === 1 && ! HebrewSearch::isFiller($word)
+            if (! isset($known[$word]) && preg_match('/^[א-ת]{3,}$/u', $word) === 1 && ! HebrewSearch::isFiller($word)
                 && array_filter(self::rootKeys($word), fn (string $key): bool => isset($roots[$key])) !== []) {
-                $out[] = HebrewSearch::withFinals($word);
+                $out[$word] = $n;
             }
         }
-        sort($out, SORT_STRING);
+        uksort($out, fn (string|int $a, string|int $b): int => [$out[$b], (string) $a] <=> [$out[$a], (string) $b]);
 
-        return array_slice($out, 0, self::RARE_MAX);
+        return array_map(fn (string|int $word): string => HebrewSearch::withFinals((string) $word), array_slice(array_keys($out), 0, self::RARE_MAX));
     }
 
     /**
