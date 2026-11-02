@@ -2,6 +2,7 @@
 
 namespace App\Modules\Demo\Support;
 
+use App\Core\Facades\Settings;
 use App\Modules\Connections\Contracts\PlatformStoreFeed;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
@@ -14,12 +15,17 @@ use Generator;
  * product data each page carries (JSON-LD). In the feed shape every other reader
  * gives (FeedRecord), so the catalogue's sync, the search and the assistant take it as they take a real store.
  * How many is the shop's own limit (catalog.max_products, catalog.max_content_items): the sync stops reading there.
+ * Those a demo reads show the whole store: a few in stock of each of its categories first, then the rest as its feed
+ * lists them (Shilav, 2.11: the newest 300 of 20,000 were shoes and clothes, and no stroller or bottle to find).
  * A Shopify store's pages and policies come from its site's pages (ReadSitePages), as for a real Shopify store.
  */
 final class PublicStoreFeed implements PlatformStoreFeed
 {
     /** A pause between pages: a demo never weighs on the store's server. */
     private const PAUSE_MS = 400;
+
+    /** Of each category, at least this many products in a demo's sample. */
+    private const SAMPLE_EACH = 3;
 
     /** Product pages read for a site with no public feed, at most. */
     private const SITEMAP_PRODUCTS = 300;
@@ -53,12 +59,23 @@ final class PublicStoreFeed implements PlatformStoreFeed
         $kind = self::kind($connection);
 
         if ($kind === PublicSite::SHOPIFY) {
+            $seen = [];
+            $collections = array_filter((array) (PublicSite::json($host, '/collections.json', ['limit' => 250])['collections'] ?? []), fn ($c): bool => is_array($c) && (int) ($c['products_count'] ?? 0) > 0 && isset($c['handle']));
+            yield from self::sample(
+                array_map(fn (array $c): array => ['count' => (int) $c['products_count'], 'key' => (string) $c['handle']], $collections), $connection, $seen,
+                fn (string $handle, int $many): array => (array) (PublicSite::json($host, '/collections/'.rawurlencode($handle).'/products.json', ['limit' => $many])['products'] ?? []),
+                fn (array $p): bool => array_any((array) ($p['variants'] ?? []), fn ($v): bool => is_array($v) && (bool) ($v['available'] ?? false)),
+                fn (array $p): array => self::shopify($p, $host, $connection),
+            );
             for ($page = 1; $page <= 40; $page++) {
                 $products = (array) (PublicSite::json($host, '/products.json', ['limit' => 250, 'page' => $page])['products'] ?? []);
                 if ($products === []) {
                     return;
                 }
-                yield array_values(array_map(fn (array $p): array => self::shopify($p, $host, $connection), array_filter($products, 'is_array')));
+                $rest = array_filter($products, fn ($p): bool => is_array($p) && ! isset($seen[(string) ($p['id'] ?? '')]));
+                if ($rest !== []) {
+                    yield array_values(array_map(fn (array $p): array => self::shopify($p, $host, $connection), $rest));
+                }
                 usleep(self::PAUSE_MS * 1000);
             }
 
@@ -66,6 +83,14 @@ final class PublicStoreFeed implements PlatformStoreFeed
         }
 
         if ($kind === PublicSite::WOOCOMMERCE) {
+            $seen = [];
+            $categories = array_filter((array) PublicSite::json($host, '/wp-json/wc/store/v1/products/categories', ['per_page' => 100]), fn ($c): bool => is_array($c) && (int) ($c['count'] ?? 0) > 0 && isset($c['id']));
+            yield from self::sample(
+                array_map(fn (array $c): array => ['count' => (int) $c['count'], 'key' => (string) $c['id']], $categories), $connection, $seen,
+                fn (string $id, int $many): array => (array) PublicSite::json($host, '/wp-json/wc/store/v1/products', ['category' => $id, 'per_page' => $many]),
+                fn (array $p): bool => (bool) ($p['is_in_stock'] ?? true),
+                fn (array $p): array => self::woocommerce($p),
+            );
             for ($page = 1; $page <= 100; $page++) {
                 $products = PublicSite::json($host, '/wp-json/wc/store/v1/products', ['per_page' => 100, 'page' => $page]);
                 if ($products === null && $page === 1) {
@@ -74,7 +99,10 @@ final class PublicStoreFeed implements PlatformStoreFeed
                 if ($products === null || $products === []) {
                     return;
                 }
-                yield array_values(array_map(fn (array $p): array => self::woocommerce($p), array_filter($products, 'is_array')));
+                $rest = array_filter($products, fn ($p): bool => is_array($p) && ! isset($seen[(string) ($p['id'] ?? '')]));
+                if ($rest !== []) {
+                    yield array_values(array_map(fn (array $p): array => self::woocommerce($p), $rest));
+                }
                 usleep(self::PAUSE_MS * 1000);
             }
 
@@ -101,6 +129,44 @@ final class PublicStoreFeed implements PlatformStoreFeed
         }
         if ($batch !== []) {
             yield $batch;
+        }
+    }
+
+    /**
+     * A few in stock of each category, the largest first, each product once, up to the shop's limit.
+     *
+     * @param  list<array{count: int, key: string}>|array<int, array{count: int, key: string}>  $categories
+     * @param  array<string, true>  $seen  filled with the products read
+     * @param  callable(string, int): array<int, mixed>  $read  a category's products, at most this many
+     * @param  callable(array<string, mixed>): bool  $inStock
+     * @param  callable(array<string, mixed>): array<string, mixed>  $record
+     */
+    private static function sample(array $categories, StoreConnection $connection, array &$seen, callable $read, callable $inStock, callable $record): Generator
+    {
+        if ($categories === []) {
+            return;
+        }
+        $limit = (int) Settings::get('catalog.max_products', $connection->shop_id);
+        $each = max(self::SAMPLE_EACH, (int) ceil($limit / count($categories)));
+        usort($categories, fn (array $a, array $b): int => [$b['count'], $a['key']] <=> [$a['count'], $b['key']]);
+
+        foreach ($categories as $category) {
+            if (count($seen) >= $limit) {
+                return;
+            }
+            $batch = [];
+            // twice as many: some are sold out, or read already from another category
+            foreach ($read($category['key'], $each * 2) as $product) {
+                $id = is_array($product) ? (string) ($product['id'] ?? '') : '';
+                if ($id !== '' && ! isset($seen[$id]) && count($batch) < $each && $inStock($product)) {
+                    $seen[$id] = true;
+                    $batch[] = $record($product);
+                }
+            }
+            if ($batch !== []) {
+                yield $batch;
+            }
+            usleep(app()->runningUnitTests() ? 0 : self::PAUSE_MS * 1000);
         }
     }
 

@@ -186,6 +186,32 @@ final class DemoFlowTest extends TestCase
         $this->assertSame([['name' => 'מידה', 'value' => '52']], $record['variations'][0]['attributes']);
     }
 
+    public function test_a_demo_reads_a_few_of_each_category_not_the_newest_of_one(): void
+    {
+        // Shilav, 2.11: the newest 300 of 20,000 were shoes and clothes, and no stroller or bottle to find
+        Settings::set('catalog.max_products', 100);
+        $product = fn (int $id, string $title, bool $available = true): array => ['id' => $id, 'title' => $title, 'handle' => "p{$id}", 'body_html' => '', 'vendor' => 'S', 'product_type' => 'T', 'tags' => '',
+            'variants' => [['id' => $id * 10, 'title' => 'x', 'price' => '10.00', 'available' => $available]], 'options' => [], 'images' => []];
+        Http::fake([
+            'https://store.test/collections.json*' => Http::response(['collections' => [
+                ['id' => 1, 'title' => 'עגלות', 'handle' => 'עגלות', 'products_count' => 2],
+                ['id' => 2, 'title' => 'נעליים', 'handle' => 'shoes', 'products_count' => 900],
+                ['id' => 3, 'title' => 'ריקה', 'handle' => 'empty', 'products_count' => 0],
+                // many more, so each has its few of the hundred
+                ...array_map(fn (int $i): array => ['id' => 10 + $i, 'title' => "קטגוריה {$i}", 'handle' => "c{$i}", 'products_count' => 1], range(1, 40)),
+            ]]),
+            'https://store.test/collections/c*' => Http::response(['products' => []]),
+            'https://store.test/collections/shoes/products.json*' => Http::response(['products' => [$product(1, 'נעל 1'), $product(2, 'נעל 2', false), $product(3, 'נעל 3'), $product(4, 'נעל 4'), $product(5, 'נעל 5'), $product(8, 'נעל 8'), $product(9, 'נעל 9')]]),
+            'https://store.test/collections/'.rawurlencode('עגלות').'/products.json*' => Http::response(['products' => [$product(1, 'נעל 1'), $product(6, 'עגלה')]]),
+            'https://store.test/products.json*' => Http::sequence()->push(['products' => [$product(1, 'נעל 1'), $product(7, 'כובע')]])->push(['products' => []]),
+        ]);
+        $connection = (new StoreConnection)->forceFill(['site_url' => 'https://store.test', 'site_info' => ['demo' => ['platform' => 'shopify', 'currency' => 'ILS']]]);
+
+        $read = array_column(array_merge(...iterator_to_array(app(PublicStoreFeed::class)->products($connection), false)), 'external_id');
+
+        $this->assertSame(['1', '3', '4', '6', '7'], $read, 'the largest first, none sold out, its share and no more; the small one too; then the rest, each once');
+    }
+
     public function test_each_demo_shows_what_it_cost_building_it_and_its_visitors_apart_and_keeps_it_when_it_ends(): void
     {
         $site = $this->verified();
@@ -243,7 +269,9 @@ final class DemoFlowTest extends TestCase
 
     public function test_a_woocommerce_stores_variants_come_with_their_colours_and_sizes_by_name(): void
     {
+        // no categories first (its address begins the same), then the products
         Http::fake(['https://store.test/wp-json/wc/store/v1/products*' => Http::sequence()
+            ->push([])
             ->push([[
                 'id' => 5, 'name' => 'Old Skool', 'type' => 'variable', 'permalink' => 'https://store.test/p/old-skool', 'is_in_stock' => true,
                 'prices' => ['price' => '29990', 'regular_price' => '29990', 'currency_code' => 'ILS', 'currency_minor_unit' => 2],
