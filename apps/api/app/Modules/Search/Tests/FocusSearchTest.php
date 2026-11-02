@@ -65,15 +65,18 @@ final class FocusSearchTest extends TestCase
             '3' => ['עגלה גאזל 2 חום קומפלט תאומים', 'טיול'],
             '4' => ['כיסוי גשם עגלה', 'טיול'],
             '5' => ['עגלה Cybex לתאומים', 'טיול'],
+            '9' => ['עגלת תינוק מיוס', 'טיול'],
             '6' => ['כובע תינוק', 'בגד'],
             '7' => ['מיטת תינוק', 'חדר'],
             '8' => ['שמיכה לתינוק', 'חדר'],
         ]);
 
         $found = array_column($this->search('עגלה')['groups']['product'], 'external_id');
-        $this->assertEqualsCanonicalizing(['3', '5'], array_slice($found, 0, 2), 'the strollers');
-        $this->assertSame(['4', '1', '2'], array_slice($found, 2), 'what mentions one, then what is made for one');
-        $this->assertSame(['6', '7', '8'], array_column($this->search('תינוק')['groups']['product'], 'external_id'), 'a word that opens no title: as it was');
+        $this->assertEqualsCanonicalizing(['3', '5', '9'], array_slice($found, 0, 3), 'the strollers, its construct form too');
+        $this->assertSame(['4', '1', '2'], array_slice($found, 3), 'what mentions one, then what is made for one');
+        $plural = array_column($this->search('עגלות')['groups']['product'], 'external_id');
+        $this->assertEqualsCanonicalizing($found, $plural, 'the plural no product says: as its singular');
+        $this->assertSame(['4', '1', '2'], array_slice($plural, 3));
     }
 
     public function test_a_kind_named_with_a_colour_shows_that_kind_only_or_none(): void

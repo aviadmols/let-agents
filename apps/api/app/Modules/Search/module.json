@@ -275,7 +275,7 @@
         {
             "name": "word_enough",
             "type": "int",
-            "default": 12,
+            "default": 3,
             "min": 1,
             "max": 500,
             "scope": "shop",

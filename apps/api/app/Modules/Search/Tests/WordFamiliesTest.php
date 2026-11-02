@@ -127,6 +127,12 @@ final class WordFamiliesTest extends TestCase
         $this->assertLessThan(count($written[0]['input']['store_words']), count(end($written)['input']['store_words']), 'the next calls read their groups alone');
     }
 
+    public function test_a_short_words_construct_form_is_handed_beside_it(): void
+    {
+        // Shilav, 2.11: "עגלה" and "עגלת" never met
+        $this->assertContains(['עגלה', 'עגלת'], WriteWordFamilies::alike(['עגלה', 'עגלת', 'כובע']));
+    }
+
     public function test_the_same_words_said_by_more_products_write_nothing(): void
     {
         $this->catalog(['1' => ['חולצה משובצת', 'משובצת כותנה'], '2' => ['חולצה משובצת', 'משובצת כותנה'], '3' => ['מכנס במשבצות', 'משבצות כותנה'], '4' => ['מכנס במשבצות', 'משבצות צמר'],

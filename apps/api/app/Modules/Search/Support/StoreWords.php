@@ -91,7 +91,10 @@ final class StoreWords
         }
         $root = HebrewSearch::skeleton(HebrewSearch::stem($plain));
 
-        return preg_match('/^[מתה](.{3,})$/u', $root, $m) === 1 ? [$root, $m[1]] : [$root];
+        $keys = preg_match('/^[מתה](.{3,})$/u', $root, $m) === 1 ? [$root, $m[1]] : [$root];
+
+        // a short word's construct form: "עגלת" beside "עגלה", whose stems differ
+        return preg_match('/^[א-ת]{3}ת$/u', $plain) === 1 ? array_values(array_unique([...$keys, HebrewSearch::skeleton(mb_substr($plain, 0, -1))])) : $keys;
     }
 
     /**

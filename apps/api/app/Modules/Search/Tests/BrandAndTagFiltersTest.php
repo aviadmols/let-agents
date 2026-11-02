@@ -57,13 +57,13 @@ final class BrandAndTagFiltersTest extends TestCase
             foreach (['1', '2', '3', '4', '5'] as $id) {
                 CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "מוצר {$id}",
                     'url' => "https://store.test/p/{$id}", 'price' => 300, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}",
-                    'payload' => ['tags' => $id < '3' ? ['low-stock-flagged', 'shilav_p', 'NewIn', 'SHILAV_B', 'איסוף עצמי', 'T-Shirt', 'Cotton Blend'] : ['שאר המוצרים']]]);
+                    'payload' => ['tags' => $id < '3' ? ['low-stock-flagged', 'shilav_p', 'NewIn', 'SHILAV_B', 'first_step_shoes', 'bis-hidden', 'SETHIT', 'nov_ROOM', 'איסוף עצמי', 'T-Shirt', 'Cotton Blend'] : ['שאר המוצרים']]]);
             }
         });
 
         app(BuildSearchIndex::class)->handle($shop->id);
         $facets = array_column((array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['facets'], null, 'k');
 
-        $this->assertEqualsCanonicalizing(['איסוף עצמי', 'T-Shirt', 'Cotton Blend', 'שאר המוצרים'], array_column($facets['store_tags']['v'], 'l'));
+        $this->assertEqualsCanonicalizing(['איסוף עצמי', 'שאר המוצרים'], array_column($facets['store_tags']['v'], 'l'), 'a Hebrew store: its Hebrew tags');
     }
 }

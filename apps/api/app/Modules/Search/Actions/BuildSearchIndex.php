@@ -1213,6 +1213,8 @@ final class BuildSearchIndex
             foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
                 $key = mb_strtolower($tag);
                 if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true) || self::machineTag($tag)
+                    // a Hebrew store's shopper filters by Hebrew words: "SETHIT", "shilav_pc" are the store's own codes
+                    || ($locale === 'he' && preg_match('/\p{Hebrew}/u', $tag) !== 1)
                     || (! $asked && ($kinds->campaign($tag) || $kinds->onlyWhom(str_replace(['/', '_', '-'], ' ', $tag))))) {
                     continue;
                 }

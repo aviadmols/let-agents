@@ -510,6 +510,21 @@ final class SearchCatalog
             }
             // A guide or a page is a result only when it holds every word: one that shares a word of
             // "מברגה שחורה" is not about black screwdrivers. Products keep their wider net.
+            // "עגלה", "עגלת" and "עגלות" are one word, whose stems differ (Shilav, 2.11): what says any of them was asked for
+            if (! str_contains($query, ' ')) {
+                $at = array_flip(array_column($spelling, 'id'));
+                foreach (self::shortForms(HebrewSearch::normalize($query)) as $form) {
+                    foreach (HebrewSearch::search($index['engine'], $form) as $hit) {
+                        if (! isset($at[$hit['id']])) {
+                            $at[$hit['id']] = count($spelling);
+                            $spelling[] = $hit;
+                        } elseif ($hit['exact'] && ! $spelling[$at[$hit['id']]]['exact']) {
+                            // close to the word as typed, and this form of it says it
+                            $spelling[$at[$hit['id']]] = $hit;
+                        }
+                    }
+                }
+            }
             $spelling = array_values(array_filter($spelling, fn (array $hit): bool => ! str_starts_with($hit['id'], 'c:') || $hit['full']));
             // A code no product of the index has ("53077"): nothing is near it by meaning, so nothing is
             // shown by meaning. If the catalogue has it and the index not yet, the index is built again now.
@@ -759,7 +774,7 @@ final class SearchCatalog
             $kinds = $read === [] && ! str_contains(HebrewSearch::normalize($worded), ' ') ? [] : $named;
             // A kind alone keeps what is near it, after what is that kind: on Shilav "עגלה" opened with the strollers' pillows
             if ($kinds === [] && $named !== []) {
-                $groups['product'] = self::kindFirst($groups['product'], (string) array_key_first($named));
+                $groups['product'] = self::kindFirst($groups['product'], array_map('strval', array_keys($named)));
             }
             if ($kinds !== []) {
                 $before = array_column($groups['product'], 'id');
@@ -1027,19 +1042,45 @@ final class SearchCatalog
      * only mentions it, and last what is made for it, the kind after a "ל" ("נחשושון לעגלה" for "עגלה"; "צבע לעץ" for "עץ").
      *
      * @param  list<array<string, mixed>>  $records
+     * @param  list<string>  $stems  the kind, as title stems (askedKinds)
      * @return list<array<string, mixed>>
      */
-    private static function kindFirst(array $records, string $stem): array
+    private static function kindFirst(array $records, array $stems): array
     {
-        $rank = function (array $r) use ($stem): array {
+        $rank = function (array $r) use ($stems): array {
             $title = (string) ($r['title'] ?? '');
-            $forIt = array_filter(explode(' ', HebrewSearch::normalize($title)), fn (string $word): bool => preg_match('/^ל[א-ת]{2,}$/u', $word) === 1 && HebrewSearch::stem(mb_substr($word, 1)) === $stem);
+            $forIt = array_filter(explode(' ', HebrewSearch::normalize($title)), fn (string $word): bool => preg_match('/^ל[א-ת]{2,}$/u', $word) === 1 && in_array(HebrewSearch::stem(mb_substr($word, 1)), $stems, true));
 
-            return [($r['s'] ?? 0) === 1 ? 0 : 1, self::headOf($title) === $stem ? 0 : ($forIt === [] ? 1 : 2)];
+            return [($r['s'] ?? 0) === 1 ? 0 : 1, in_array(self::headOf($title), $stems, true) ? 0 : ($forIt === [] ? 1 : 2)];
         };
         usort($records, fn (array $a, array $b): int => $rank($a) <=> $rank($b));
 
         return $records;
+    }
+
+    /**
+     * A short word's other forms, whose stems differ from its own ("עגלות", "עגלה", "עגלת"), where a longer word's are one:
+     * its plural's singular and construct form, a singular's construct form.
+     *
+     * @return list<string>
+     */
+    private static function shortForms(string $word): array
+    {
+        return match (true) {
+            preg_match('/^[א-ת]{3}ות$/u', $word) === 1 => [mb_substr($word, 0, -2).'ה', mb_substr($word, 0, -2).'ת'],
+            preg_match('/^[א-ת]{3}ה$/u', $word) === 1 => [mb_substr($word, 0, -1).'ת'],
+            default => [],
+        };
+    }
+
+    /**
+     * A word's stem as a title may open with it: its own and its short forms' ("עגלות": a title's "עגלה" and "עגלת").
+     *
+     * @return list<string>
+     */
+    private static function headsOf(string $word): array
+    {
+        return array_values(array_unique(array_map(fn (string $form): string => HebrewSearch::stem($form), [$word, ...self::shortForms($word)])));
     }
 
     private static function headOf(string $title): string
@@ -1072,10 +1113,12 @@ final class SearchCatalog
 
         $asked = [];
         foreach (explode(' ', HebrewSearch::normalize($query)) as $word) {
-            $stem = preg_match('/^[א-ת]{2,}$/u', $word) === 1 ? HebrewSearch::stem($word) : '';
-            $n = $heads[$key]['heads'][$stem] ?? 0;
-            if ($stem !== '' && $n >= 2 && $n <= $heads[$key]['products'] * self::KIND_MAX_SHARE) {
-                $asked[$stem] = $n;
+            $stems = preg_match('/^[א-ת]{2,}$/u', $word) === 1 ? self::headsOf($word) : [];
+            $n = array_sum(array_map(fn (string $stem): int => $heads[$key]['heads'][$stem] ?? 0, $stems));
+            if ($n >= 2 && $n <= $heads[$key]['products'] * self::KIND_MAX_SHARE) {
+                foreach ($stems as $stem) {
+                    $asked[$stem] = $n;
+                }
             }
         }
 
