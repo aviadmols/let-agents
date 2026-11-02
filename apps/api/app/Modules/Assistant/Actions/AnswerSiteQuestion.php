@@ -89,7 +89,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
      */
-    public const PROMPT_VERSION = 16;
+    public const PROMPT_VERSION = 17;
 
     /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
     private const MAX_NAMES = 3;
