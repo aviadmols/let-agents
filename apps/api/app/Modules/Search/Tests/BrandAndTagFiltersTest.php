@@ -47,4 +47,23 @@ final class BrandAndTagFiltersTest extends TestCase
         $tags = array_column($facets['store_tags']['v'], 'l');
         $this->assertEqualsCanonicalizing(['נעליים', 'סניקרס', 'אופנה', "ג'קטים ומעילים", 'תיקים'], $tags);
     }
+
+    public function test_a_tag_written_for_the_stores_systems_is_no_filter(): void
+    {
+        // Shilav, 2.11: "low-stock-flagged", "shilav_p" and "NewIn" among the shopper's filters
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create();
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach (['1', '2', '3', '4', '5'] as $id) {
+                CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => "מוצר {$id}",
+                    'url' => "https://store.test/p/{$id}", 'price' => 300, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}",
+                    'payload' => ['tags' => $id < '3' ? ['low-stock-flagged', 'shilav_p', 'NewIn', 'SHILAV_B', 'איסוף עצמי', 'T-Shirt', 'Cotton Blend'] : ['שאר המוצרים']]]);
+            }
+        });
+
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $facets = array_column((array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['facets'], null, 'k');
+
+        $this->assertEqualsCanonicalizing(['איסוף עצמי', 'T-Shirt', 'Cotton Blend', 'שאר המוצרים'], array_column($facets['store_tags']['v'], 'l'));
+    }
 }

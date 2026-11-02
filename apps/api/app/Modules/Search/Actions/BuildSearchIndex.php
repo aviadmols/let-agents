@@ -1171,6 +1171,12 @@ final class BuildSearchIndex
     /** A store's tags that file a page, not describe what it offers: never a filter value (Gil Travel's "blog"). */
     private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
 
+    /** A tag written for the store's systems, not for a shopper: "low-stock-flagged", "shilav_p", "NewIn" (Shilav, 2.11). */
+    private static function machineTag(string $tag): bool
+    {
+        return preg_match('/^[a-z0-9]+(?:[_-][a-z0-9]+)+$|^[A-Za-z0-9]+_[A-Za-z0-9_]+$|^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/', $tag) === 1;
+    }
+
     /** A tag of the store's is a filter value where it is on at least this many products. */
     private const STORE_TAG_MIN_PRODUCTS = 2;
 
@@ -1206,7 +1212,7 @@ final class BuildSearchIndex
             $total++;
             foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
                 $key = mb_strtolower($tag);
-                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true)
+                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true) || self::machineTag($tag)
                     || (! $asked && ($kinds->campaign($tag) || $kinds->onlyWhom(str_replace(['/', '_', '-'], ' ', $tag))))) {
                     continue;
                 }

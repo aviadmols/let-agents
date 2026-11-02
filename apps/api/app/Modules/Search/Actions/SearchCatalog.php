@@ -753,10 +753,14 @@ final class SearchCatalog
             // kind asked for, and what is said with it ("לבן", "עם כיס") holds across every kind: only that kind is shown. A
             // white keychain is no white bag: none, and the drawer offers the AI. A kind alone ("מדף") keeps what is very
             // near it by meaning ("כוורת מדפים").
-            $kinds = $read === [] && ! str_contains(HebrewSearch::normalize($worded), ' ') ? [] : self::askedKinds($index, $worded);
             // ...unless most of the store says it: "פטריה" opens a few titles of a mushroom store ("פטריית ריישי") and is
             // what every one of its formulas is made of ("מיקו דרים"); the store's subject is no kind among its products
-            $kinds = array_filter($kinds, fn (int $opens, string $stem): bool => ! DescribedProducts::subject($shopId, (string) $index['hash'], $stem, $opens), ARRAY_FILTER_USE_BOTH);
+            $named = array_filter(self::askedKinds($index, $worded), fn (int $opens, string $stem): bool => ! DescribedProducts::subject($shopId, (string) $index['hash'], $stem, $opens), ARRAY_FILTER_USE_BOTH);
+            $kinds = $read === [] && ! str_contains(HebrewSearch::normalize($worded), ' ') ? [] : $named;
+            // A kind alone keeps what is near it, after what is that kind: on Shilav "עגלה" opened with the strollers' pillows
+            if ($kinds === [] && $named !== []) {
+                $groups['product'] = self::kindFirst($groups['product'], (string) array_key_first($named));
+            }
             if ($kinds !== []) {
                 $before = array_column($groups['product'], 'id');
                 $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => self::ofKinds($r, $kinds)));
@@ -1016,6 +1020,26 @@ final class SearchCatalog
         $mine = $colours($own);
 
         return $mine === [] ? $records : array_values(array_filter($records, fn (array $r): bool => array_intersect($mine, $colours($r)) === []));
+    }
+
+    /**
+     * The products found for a kind alone, in stock first as they were: what opens its title with the kind, then what
+     * only mentions it, and last what is made for it, the kind after a "ל" ("נחשושון לעגלה" for "עגלה"; "צבע לעץ" for "עץ").
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @return list<array<string, mixed>>
+     */
+    private static function kindFirst(array $records, string $stem): array
+    {
+        $rank = function (array $r) use ($stem): array {
+            $title = (string) ($r['title'] ?? '');
+            $forIt = array_filter(explode(' ', HebrewSearch::normalize($title)), fn (string $word): bool => preg_match('/^ל[א-ת]{2,}$/u', $word) === 1 && HebrewSearch::stem(mb_substr($word, 1)) === $stem);
+
+            return [($r['s'] ?? 0) === 1 ? 0 : 1, self::headOf($title) === $stem ? 0 : ($forIt === [] ? 1 : 2)];
+        };
+        usort($records, fn (array $a, array $b): int => $rank($a) <=> $rank($b));
+
+        return $records;
     }
 
     private static function headOf(string $title): string

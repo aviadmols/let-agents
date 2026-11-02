@@ -56,6 +56,26 @@ final class FocusSearchTest extends TestCase
         $this->assertNull($result['focus'], 'something holds every word: nothing to choose');
     }
 
+    public function test_a_kind_alone_shows_what_is_it_before_what_is_made_for_it(): void
+    {
+        // Shilav, 2.11: "עגלה" opened with pillows "לעגלה", the strollers among them
+        $this->catalog([
+            '1' => ['נחשושון לעגלה mix it פסים', 'כרית'],
+            '2' => ['נחשושון לעגלה mix it עלים', 'כרית'],
+            '3' => ['עגלה גאזל 2 חום קומפלט תאומים', 'טיול'],
+            '4' => ['כיסוי גשם עגלה', 'טיול'],
+            '5' => ['עגלה Cybex לתאומים', 'טיול'],
+            '6' => ['כובע תינוק', 'בגד'],
+            '7' => ['מיטת תינוק', 'חדר'],
+            '8' => ['שמיכה לתינוק', 'חדר'],
+        ]);
+
+        $found = array_column($this->search('עגלה')['groups']['product'], 'external_id');
+        $this->assertEqualsCanonicalizing(['3', '5'], array_slice($found, 0, 2), 'the strollers');
+        $this->assertSame(['4', '1', '2'], array_slice($found, 2), 'what mentions one, then what is made for one');
+        $this->assertSame(['6', '7', '8'], array_column($this->search('תינוק')['groups']['product'], 'external_id'), 'a word that opens no title: as it was');
+    }
+
     public function test_a_kind_named_with_a_colour_shows_that_kind_only_or_none(): void
     {
         // Vans: "תיק לבן" showed a white keychain, white sneakers and a white T-shirt: the colour holds across kinds,
