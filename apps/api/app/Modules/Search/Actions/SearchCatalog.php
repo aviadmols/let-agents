@@ -122,8 +122,11 @@ final class SearchCatalog
      */
     private const PHOTO_NEAREST_WITH_NAMED = 10;
 
-    /** Words that name this few products name the thing itself: those stay before the nearest pictures. */
-    private const OBJECT_NAMED_FEW = 3;
+    /**
+     * Words that name this few products name the thing itself: those stay before the nearest pictures. Replayed on
+     * every photo search kept (3.11), at 3 a silver pendant passed the 6 "מגן דוד" and a cable the 9 "שקע חשמלי".
+     */
+    private const OBJECT_NAMED_FEW = 10;
 
     /** In a shop of tools (search.photo_match = function), what a picture shows weighs at least this against how it looks. */
     private const PHOTO_FUNCTION_WEIGHT = 0.75;

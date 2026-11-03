@@ -573,11 +573,11 @@ final class SearchByPhotoTest extends TestCase
     public function test_a_ring_near_the_photo_stands_with_the_rings_the_words_name(): void
     {
         // Nothing stands apart here. The ring its picture says is nearest is ordered with those the words name, not after all of them.
-        $this->rings([
-            '20' => ['טבעת עם אבן מרכזית אחת', [1.0, 2.0, 0.1]],
-            '21' => ['טבעת עם אבן מרכזית שתיים', [1.0, 2.0, 0.1]],
-            '22' => ['טבעת עם אבן מרכזית שלוש', [1.0, 2.0, 0.1]],
-            '23' => ['טבעת עם אבן מרכזית ארבע', [1.0, 2.0, 0.1]],
+        $named = [];
+        foreach (range(40, 50) as $id) {
+            $named[(string) $id] = ['טבעת עם אבן מרכזית דגם '.$id, [1.0, 2.0, 0.1]];
+        }
+        $this->rings($named + [
             '24' => ['טבעת אמרלד', [1.0, 0.7, 0.1]],
             '25' => ['טבעת זהב', [1.0, 0.72, 0.1]],
         ]);
@@ -594,6 +594,26 @@ final class SearchByPhotoTest extends TestCase
         ]);
         $this->reader(['object' => 'טבעת חותם', 'also' => ['טבעת'], 'details' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
         $this->assertSame('30', $this->upload()->assertOk()->json('groups.product.0.external_id'));
+    }
+
+    public function test_words_that_name_a_handful_stay_before_what_only_looks_near(): void
+    {
+        // Rocks, 3.11: the 6 "מגן דוד" pendants, not the silver pendants that look near a silver one.
+        $this->rings([
+            '60' => ['טבעת מגן דוד אחת', [1.0, 2.0, 0.1]],
+            '61' => ['טבעת מגן דוד שתיים', [1.0, 2.0, 0.1]],
+            '62' => ['טבעת מגן דוד שלוש', [1.0, 2.0, 0.1]],
+            '63' => ['טבעת מגן דוד ארבע', [1.0, 2.0, 0.1]],
+            '64' => ['טבעת מגן דוד חמש', [1.0, 2.0, 0.1]],
+            '65' => ['טבעת מגן דוד שש', [1.0, 2.0, 0.1]],
+            '66' => ['טבעת אמרלד', [1.0, 0.7, 0.1]],
+            '67' => ['טבעת זהב', [1.0, 0.72, 0.1]],
+        ]);
+        $this->reader(['object' => 'טבעת מגן דוד', 'also' => ['טבעת'], 'details' => [], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        $ids = array_column($this->upload()->assertOk()->json('groups.product'), 'external_id');
+        $first = array_map('strval', array_slice($ids, 0, 6));
+        sort($first);
+        $this->assertSame(['60', '61', '62', '63', '64', '65'], $first);
     }
 
     public function test_the_second_ordering_leaves_first_a_product_that_stands_apart(): void
