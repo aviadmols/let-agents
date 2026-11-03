@@ -128,6 +128,9 @@
     // engine reads questions alike on the server; this is the drawer's own)
     if (buildAsk(q)) { return true; }
     if (S.engine && S.engine.isQuestion) { try { if (S.engine.isQuestion(q)) { return true; } } catch (e) { /* none */ } }
+    // "החנות פתוחה עכשיו" asks about the store, and searching it finds nothing; unless the store sells what it names
+    // ("החנות הקטנה של הזוועות" in a bookshop)
+    if (S.engine && S.engine.aboutStore) { try { if (S.engine.aboutStore(q) && !hits(q).some(function (r) { return r.t === 'product'; })) { return true; } } catch (e) { /* none */ } }
     // A long text is a question only when it asks for something ("תמליצו לי…", "מה ההבדל…"): a long
     // description of a product ("טבעת זהב צהוב עם שתי רצועות דקות…") is searched, by its words and its meaning.
     // "תן לי את כל ספרי החטופים", "תציג לי את ספריית שיבולת": a set asked to see, which the assistant shows whole

@@ -57,6 +57,12 @@ class AssistantAnswer extends Model
         return Question::key($question);
     }
 
+    /** Whether what answers a question depends on when it is asked: "החנות פתוחה עכשיו", "אתם פתוחים היום". */
+    public static function asksTheClock(string $question): bool
+    {
+        return preg_match('/(?<!\p{L})(?:עכשיו|כעת|כרגע|היום|מחר|הערב|הלילה|הבוקר|פתוח|פתוחה|פתוחים|פתוחות|סגור|סגורה|סגורים|סגורות|נפתח|נפתחת|נפתחים|נסגר|נסגרת|נסגרים|now|today|tomorrow|tonight|open|closed)(?!\p{L})/iu', $question) === 1;
+    }
+
     protected $guarded = ['id'];
 
     /**

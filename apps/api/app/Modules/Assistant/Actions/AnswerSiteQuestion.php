@@ -89,7 +89,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
      */
-    public const PROMPT_VERSION = 18;
+    public const PROMPT_VERSION = 19;
 
     /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
     private const MAX_NAMES = 3;
@@ -1095,17 +1095,37 @@ final class AnswerSiteQuestion implements TriesQuestions
         // The product whose page the question was asked from, by its ref.
         $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
 
+        // "החנות פתוחה עכשיו": the store's own day and hour, only for a question that depends on when it is asked
+        $now = AssistantAnswer::asksTheClock($question) ? self::clock($shopId) : null;
+
         $input = (string) json_encode([
             'question' => $question,
         ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation])
-            + (is_string($viewingRef) ? ['viewing' => $viewingRef] : []) + [
+            + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
+            + ($now === null ? [] : ['now' => $now]) + [
                 'products' => $forModel,
                 'analysis' => $analysis,
                 'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
             ], JSON_UNESCAPED_UNICODE);
 
         return ['type' => $type, 'empty' => $counts['found'] === 0 && $counts['shown'] === 0] + $counts
-            + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug');
+            + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug', 'now');
+    }
+
+    /**
+     * The day and hour where the store is, by the shop's own clock.
+     *
+     * @return array{day: string, date: string, time: string}
+     */
+    private static function clock(string $shopId): array
+    {
+        try {
+            $now = Carbon::now((string) Shop::query()->whereKey($shopId)->value('timezone') ?: null);
+        } catch (\Exception) {
+            $now = Carbon::now();
+        }
+
+        return ['day' => $now->format('l'), 'date' => $now->format('Y-m-d'), 'time' => $now->format('H:i')];
     }
 
     /**
@@ -2048,6 +2068,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         return (string) json_encode([
             'question' => $question,
             'answer' => $answer,
+        ] + (isset($prepared['now']) ? ['now' => $prepared['now']] : []) + [
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']] + (in_array($byRef[$ref]['from'] ?? null, self::OWN_WORD, true) ? ['from' => $byRef[$ref]['from']] : []), $cited),
             'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank'])), $picks),
             'analysis' => $analysis,
@@ -3057,6 +3078,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
         // An answer that quotes a price is today's: prices change, so it is this asker's only, never the next shopper's.
         if ($outcome === AssistantAnswer::ANSWERED && preg_match('~₪|ש"ח|ש״ח|\d\s*שקל|[$€£]\s?\d~u', (string) $answer) === 1) {
+            return null;
+        }
+        // An answer to "are you open now" is this moment's: kept, it told the next shopper the hour of the one before.
+        if ($outcome === AssistantAnswer::ANSWERED && AssistantAnswer::asksTheClock($question)) {
             return null;
         }
 

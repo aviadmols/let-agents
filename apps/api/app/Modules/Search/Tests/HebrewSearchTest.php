@@ -210,6 +210,41 @@ final class HebrewSearchTest extends TestCase
         $this->assertSame($cases, json_decode($process->getOutput(), true));
     }
 
+    public function test_words_about_the_store_are_told_from_words_about_a_product(): void
+    {
+        $node = (new ExecutableFinder)->find('node');
+
+        if ($node === null) {
+            $this->markTestSkipped('Node is not installed here; CI runs this with Node.');
+        }
+
+        // Rocks, 2.11: "החנות פתוחה עכשיו" was looked up as a product, and showed "לא מצאנו".
+        $cases = [
+            'החנות פתוחה עכשיו' => true,
+            'הסניף פתוח בשבת' => true,
+            'פתוח בשישי' => true,
+            'אתם פתוחים היום' => true,
+            'שעות פתיחה' => true,
+            'טלפון של החנות' => true,
+            'open now' => true,
+            'store hours' => true,
+            'החנות' => false,
+            'נעל פתוחה' => false,
+            'טבעת פתוחה זהב' => false,
+            'חולצה סגורה' => false,
+            'שעון זהב' => false,
+            'open toe shoes' => false,
+        ];
+        $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const out={};'
+            .'for(const q of '.json_encode(array_keys($cases), JSON_UNESCAPED_UNICODE).'){out[q]=e.aboutStore(q);}'
+            .'process.stdout.write(JSON.stringify(out));';
+
+        $process = new Process([$node, '-e', $harness]);
+        $process->mustRun();
+
+        $this->assertSame($cases, json_decode($process->getOutput(), true));
+    }
+
     public function test_a_saved_answer_shows_only_for_the_same_question(): void
     {
         $node = (new ExecutableFinder)->find('node');

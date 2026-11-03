@@ -28,6 +28,7 @@ use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -895,6 +896,38 @@ final class SiteQuestionTest extends TestCase
         $prepared = ['byRef' => [], 'productsByRef' => ['p1' => ['title' => 'פלטת לאמי אורן', 'about' => 'פלטה.', 'external_id' => '971']], 'forModel' => [['ref' => 'p1', 'price' => '₪350', 'option_prices' => ['18 מ"מ: ₪350']]]];
         $screened = app(AnswerSiteQuestion::class)->screen(['answer' => 'הפלטה עולה ₪350. היא פלטת לאמי מאורן. חיתוך לגודל אחר יעלה ₪210.', 'picks' => [['ref' => 'p1', 'why' => 'פלטה']]], $prepared, 'כמה עולה?', 'full');
         $this->assertSame('הפלטה עולה ₪350. היא פלטת לאמי מאורן.', $screened['answer'], 'the made-up sum goes, the store\'s price stays');
+    }
+
+    public function test_a_question_that_depends_on_the_hour_is_told_the_stores_clock_and_never_kept(): void
+    {
+        // Rocks, 2.11: "are you open now" was answered "write us what time it is", and that was saved for everyone.
+        $this->shop->forceFill(['timezone' => 'Asia/Jerusalem'])->save();
+        Carbon::setTestNow(Carbon::parse('2026-11-02 17:31:00', 'UTC'));
+        $answer = 'החנות סגורה עכשיו ונפתח שוב מחר בבוקר.';
+        $reply = ['found' => true, 'answer' => $answer, 'refs' => ['s1']];
+        $check = ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true];
+        $this->replies = [$reply, $check];
+
+        $data = $this->ask('החנות פתוחה עכשיו')->json('data');
+
+        $this->assertSame(['day' => 'Monday', 'date' => '2026-11-02', 'time' => '19:31'], json_decode($this->calls[0]['user'], true)['now'], 'the store\'s hour, not the server\'s');
+        $this->assertSame(json_decode($this->calls[0]['user'], true)['now'], json_decode($this->calls[1]['user'], true)['now'], 'the checker reads the same clock');
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertSame(0, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->count()), 'this moment\'s answer is this asker\'s only');
+
+        // Asked again later: a new answer, never the one before.
+        $this->replies = [$reply, $check];
+        Carbon::setTestNow(Carbon::parse('2026-11-03 08:00:00', 'UTC'));
+        $this->ask('החנות פתוחה עכשיו');
+        $this->assertSame('10:00', json_decode($this->calls[2]['user'], true)['now']['time']);
+
+        // A question that does not depend on the hour is told none, and is kept.
+        $this->replies = [['found' => true, 'answer' => 'צריך בערך שלושים ברגים למטר.', 'refs' => ['s1']], $check];
+        $this->ask('כמה ברגים צריך למטר דק?');
+        $this->assertArrayNotHasKey('now', json_decode($this->calls[4]['user'], true));
+        $this->assertSame(1, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->count()));
+
+        Carbon::setTestNow();
     }
 
     public function test_a_number_any_given_page_states_stays_and_a_bare_yes_never_outlives_what_it_answered(): void

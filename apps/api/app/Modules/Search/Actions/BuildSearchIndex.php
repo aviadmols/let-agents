@@ -837,7 +837,9 @@ final class BuildSearchIndex
             ->orderByDesc('asked_count')->orderBy('id')
             ->limit($limit)
             ->get()
-            ->filter(fn (AssistantAnswer $a): bool => ($a->product === null || $a->product->removed_at === null) && ShownQuestion::fit(ShownQuestion::text($a)))
+            ->filter(fn (AssistantAnswer $a): bool => ($a->product === null || $a->product->removed_at === null) && ShownQuestion::fit(ShownQuestion::text($a))
+                // "החנות פתוחה עכשיו" is answered by the hour it is asked, never from the night's index; the team's own words stand
+                && ($a->source === 'team' || ! AssistantAnswer::asksTheClock((string) $a->question)))
             ->map(fn (AssistantAnswer $a): array => [
                 'id' => $a->id,
                 'store' => $a->product_id === null && $a->content_id === null,

@@ -602,6 +602,23 @@
     return words.length >= 2 && QUESTION_WORDS.indexOf(words[0]) !== -1;
   }
 
+  /**
+   * Words about the store and not about a product, though they open like no question: "החנות פתוחה
+   * עכשיו", "הסניף פתוח בשבת", "אתם פתוחים היום", "שעות פתיחה". Two words or more.
+   */
+  var ABOUT_STORE = [
+    /(^|\s)(החנות|הסניף|הסניפים|אתם|אצלכם)(?=\s|$)/,
+    /(^|\s)(פתוח|פתוחה|פתוחים|סגור|סגורה|סגורים)\s+(עכשיו|כרגע|היום|מחר|הערב|בשבת|בשישי|בחמישי|ברביעי|בשלישי|בשני|בראשון|בחג|בחגים)(?=\s|$)/,
+    /(^|\s)שעות\s+(ה)?(פתיחה|פעילות)(?=\s|$)/,
+    /(^|\s)(open|closed)\s+(now|today|tomorrow|tonight)(?=\s|$)/,
+    /(^|\s)(opening|store|shop)\s+hours(?=\s|$)/,
+  ];
+
+  function aboutStore(raw) {
+    var text = String(raw || '').trim().toLowerCase();
+    return text.split(/\s+/).length >= 2 && ABOUT_STORE.some(function (words) { return words.test(text); });
+  }
+
   /** Words a question wraps around what it is about, for telling one saved question from another. */
   var ANSWER_FILLER = ['כדאי', 'צריך', 'מתאים', 'מתאימה', 'מתאימים', 'הכי', 'לי', 'לנו', 'עם', 'של', 'את', 'על', 'ליד', 'זה', 'זו', 'יש', 'אפשר',
     'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גם', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my'];
@@ -1331,6 +1348,7 @@
     colorOf: colorOf,
     search: search,
     isQuestion: isQuestion,
+    aboutStore: aboutStore,
     codes: codes,
     single: single,
     focus: focus,
