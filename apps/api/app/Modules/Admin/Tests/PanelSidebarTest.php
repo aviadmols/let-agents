@@ -50,12 +50,13 @@ final class PanelSidebarTest extends TestCase
                 ->assertOk()
                 ->getContent();
 
-            // No groups: the home, then each screen once; a screen's other pages are its tabs.
+            // No groups: Today and Searches, then each screen once; a screen's other pages are its tabs. Analytics (in
+            // Searches now) and the timeline (the operator's) are off the sidebar (the redesign, 11.2026).
             $this->assertSame([''], array_values(array_unique($this->groupLabels($html))));
             $this->assertSame(
-                [__('admin::home.nav', [], $locale), ...array_map(
+                [__('admin::home.nav', [], $locale), __('admin::searches.nav', [], $locale), ...array_map(
                     fn (string $key): string => __("admin::panels.screens.{$key}", [], $locale),
-                    ['analytics', 'sessions', 'timeline', 'inbox', 'knowledge', 'scan', 'settings'],
+                    ['sessions', 'inbox', 'knowledge', 'scan', 'settings'],
                 )],
                 $this->itemLabels($html),
             );

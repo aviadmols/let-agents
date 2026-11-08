@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Admin\Contracts\ScanProgress;
+use App\Modules\Admin\Contracts\SearchesScreen;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Admin\Contracts\TodayImprovements;
@@ -36,6 +37,7 @@ use App\Modules\Search\Support\SearchHome;
 use App\Modules\Search\Support\SearchReport;
 use App\Modules\Search\Support\SearchScanDetails;
 use App\Modules\Search\Support\SearchScanProgress;
+use App\Modules\Search\Support\SearchScreen;
 use App\Modules\Search\Support\SearchShopFacts;
 use App\Modules\Search\Support\SearchToday;
 use App\Modules\Search\Support\SpellingProductsForQuery;
@@ -63,6 +65,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
         // Today's searches: found, top words, what sold, the live feed.
         $this->app->tag([SearchToday::class], TodaySearches::TAG);
         $this->app->tag([SearchFixesToday::class], TodayImprovements::TAG);
+        // the Searches screen: what shoppers look for, in their own words, and what they find
+        $this->app->tag([SearchScreen::class], SearchesScreen::TAG);
     }
 
     protected function bootModule(): void

@@ -22,6 +22,12 @@ final class MerchantNavigation
     /** The screens, top to bottom, after the home. A screen with no page yet is left out. */
     public const SECTIONS = ['analytics', 'sessions', 'timeline', 'inbox', 'knowledge', 'scan', 'settings'];
 
+    /**
+     * Screens the redesign (11.2026) takes off the sidebar, their pages still open by their address and keep their tabs:
+     * analytics, which the Searches screen holds now, and the timeline, which is the operator's (the system's log).
+     */
+    public const OFF_SIDEBAR = ['analytics', 'timeline'];
+
     /** Shown as a side menu instead of tabs, like Shopify's settings. */
     public const SIDE = ['settings'];
 
@@ -45,7 +51,7 @@ final class MerchantNavigation
             $items[] = self::item($page, [$page], $page::getNavigationLabel(), ++$sort, $page::getNavigationIcon());
         }
 
-        foreach (self::SECTIONS as $key) {
+        foreach (array_diff(self::SECTIONS, self::OFF_SIDEBAR) as $key) {
             $pages = self::pages($key);
 
             if ($pages !== []) {
