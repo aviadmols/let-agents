@@ -8,6 +8,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Contracts\StoreBlog;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
@@ -16,6 +17,7 @@ use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Improvement\Actions\DecideProposal;
 use App\Modules\Improvement\Actions\DraftPost;
 use App\Modules\Improvement\Filament\Operator\Pages\SiteSuggestions;
 use App\Modules\Improvement\Models\ImprovementPost;
@@ -168,6 +170,76 @@ final class StoreBlogTest extends TestCase
         $this->refuse = null;
         Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])->call('resendPost', $proposal->id);
         $this->assertSame('gid://shopify/Article/77', $this->sent[1]['id'], 'the same draft, updated');
+    }
+
+    public function test_the_team_picks_the_products_previews_saves_and_puts_the_post_on_lets(): void
+    {
+        $post = $this->draftedPost();
+        $id = $post->proposal_id;
+
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        $page = Livewire::test(SiteSuggestions::class, ['shop' => $this->shop->id])
+            ->assertSet("destinations.{$id}", ImprovementPost::STORE)
+            ->assertSee('data-post-products', false)
+            ->assertSet("products.{$id}", ['1', '2'])
+            // out, found by a word of its title, back in, and first again
+            ->call('removeProduct', $id, '1')
+            ->assertSet("products.{$id}", ['2'])
+            ->set("productFind.{$id}", 'יהלום')
+            ->assertSee('טבעת יהלום עגול')
+            ->call('addProduct', $id, '1')
+            ->assertSet("products.{$id}", ['2', '1'])
+            ->assertSet("productFind.{$id}", '')
+            ->call('moveProduct', $id, '1', -1)
+            ->assertSet("products.{$id}", ['1', '2'])
+            // a product the store doesn't sell never gets in
+            ->call('addProduct', $id, 'nope')
+            ->assertSet("products.{$id}", ['1', '2'])
+            ->call('removeProduct', $id, '2')
+            ->set("titles.{$id}", 'כותרת חדשה לפוסט')
+            // the preview shows the fields as left, before they are saved
+            ->set('previewing', $id)
+            ->assertSee('data-preview', false)
+            ->assertSee('כותרת חדשה לפוסט')
+            ->assertSee('https://rocks.test/products/1', false)
+            ->call('saveDraft', $id);
+
+        $kept = $this->inShop(fn () => $post->fresh());
+        $this->assertSame(['כותרת חדשה לפוסט', ['1'], ImprovementPost::DRAFT, ImprovementPost::STORE], [$kept->title, $kept->products, $kept->status, $kept->destination]);
+
+        $page->set("destinations.{$id}", ImprovementPost::LETS)->call('approve', $id);
+
+        $this->assertSame([], $this->sent, 'a post on Lets is not sent to the store');
+        $published = $this->inShop(fn () => $post->fresh());
+        $this->assertSame([ImprovementPost::PUBLISHED, ImprovementPost::LETS, ['1']], [$published->status, $published->destination, $published->products]);
+        $this->assertTrue($this->inShop(fn () => CatalogContent::query()->where('external_id', $published->contentId())->whereNull('removed_at')->exists()), 'among the store\'s content');
+        $this->get(route('improvement.guide', ['shop' => 'rocks', 'post' => $published->id]))->assertOk()->assertSee('כותרת חדשה לפוסט')->assertSee('https://rocks.test/products/1', false);
+    }
+
+    public function test_a_post_on_the_store_has_no_page_on_lets_and_without_a_store_it_cannot_go_there(): void
+    {
+        $post = $this->draftedPost();
+        $proposal = $this->inShop(fn () => ImprovementProposal::query()->with('post')->findOrFail($post->proposal_id));
+
+        $this->assertNull($this->inShop(fn () => app(DecideProposal::class)->approve($proposal, null, destination: ImprovementPost::STORE)));
+
+        $this->assertCount(1, $this->sent);
+        $published = $this->inShop(fn () => $post->fresh());
+        $this->assertSame([ImprovementPost::PUBLISHED, ImprovementPost::STORE], [$published->status, $published->destination]);
+        $this->assertFalse($this->inShop(fn () => CatalogContent::query()->where('external_id', $published->contentId())->exists()), 'the store\'s content brings it in once it is published there');
+        $this->get(route('improvement.guide', ['shop' => 'rocks', 'post' => $published->id]))->assertNotFound();
+
+        // no store to send it to: it can't go there, and nothing is published
+        $this->inShop(fn () => StoreConnection::query()->delete());
+        $other = $this->inShop(fn (): ImprovementProposal => $this->proposal('טבעת אירוסין'));
+        $this->inShop(fn () => ImprovementPost::query()->create([
+            'shop_id' => $this->shop->id, 'proposal_id' => $other->id, 'title' => 'אירוסין', 'body' => 'גוף.', 'products' => [], 'status' => ImprovementPost::DRAFT,
+            'checked' => true, 'problems' => [], 'written_by' => 'x',
+        ]));
+        $other = $this->inShop(fn () => $other->fresh('post'));
+        $this->assertSame('improvement::ui.post.no_store', $this->inShop(fn () => app(DecideProposal::class)->approve($other, null, destination: ImprovementPost::STORE)));
+        $this->assertSame(ImprovementPost::DRAFT, $this->inShop(fn () => $other->post->fresh()->status));
     }
 
     private function draftedPost(): ImprovementPost

@@ -4,9 +4,11 @@ namespace App\Modules\Improvement\Actions;
 
 use App\Core\Facades\Features;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Improvement\Jobs\SendPostJob;
 use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementProposal;
+use App\Modules\Improvement\Support\PostProducts;
 use App\Modules\Search\Models\SearchSynonym;
 use Illuminate\Support\Facades\Cache;
 
@@ -14,8 +16,9 @@ use Illuminate\Support\Facades\Cache;
  * The team's decision on a proposal. Approving a synonym puts it into the search (from the next
  * update). Approving a question publishes its answer, as the team left it, as an answer of the
  * site's own: the search offers it and the assistant gives it, with no model in between.
- * Approving a missing topic publishes the post a model drafted and the team edited, as a guide
- * of the store's own, and sends it to the store's own blog as a draft (improvement.post_to_store).
+ * Approving a missing topic publishes the post a model drafted and the team edited, with the products
+ * they chose, where they chose: on the store's own site, sent to its blog as a draft
+ * (improvement.post_to_store, a connected store), or on Lets, as a guide of the store's own.
  * Rejecting keeps the proposal, so the review never proposes it again, and
  * takes back what an earlier approval put out. Callers are inside the shop's tenant.
  */
@@ -29,9 +32,11 @@ final class DecideProposal
      * @param  string|null  $text  the answer or the post body as the team left it; the draft when null
      * @param  string|null  $title  the post's title as the team left it; the draft's when null
      * @param  array<string, string>|null  $seo  the post's SEO title and description as the team left them
+     * @param  list<string>|null  $products  the post's products as the team left them (store ids); the draft's when null
+     * @param  string|null  $destination  store or lets; the post's, or the store's blog when it can take it, when null
      * @return string|null why it could not be approved (a text key), or null when it was
      */
-    public function approve(ImprovementProposal $proposal, ?int $userId, ?string $text = null, ?string $title = null, ?array $seo = null): ?string
+    public function approve(ImprovementProposal $proposal, ?int $userId, ?string $text = null, ?string $title = null, ?array $seo = null, ?array $products = null, ?string $destination = null): ?string
     {
         if (! in_array($proposal->status, [ImprovementProposal::PENDING, ImprovementProposal::REFUSED], true)) {
             return null;
@@ -69,14 +74,20 @@ final class DecideProposal
                 return 'improvement::ui.post_missing';
             }
 
-            if ($seo !== null) {
-                $post->seo = array_replace((array) $post->seo, array_map(fn ($v): string => mb_substr(trim((string) $v), 0, 170), array_intersect_key($seo, array_flip(['seo_title', 'meta_description']))));
+            $where = $destination ?? $post->destination ?? (self::storeTakesPosts($proposal->shop_id) ? ImprovementPost::STORE : ImprovementPost::LETS);
+            if (! in_array($where, [ImprovementPost::STORE, ImprovementPost::LETS], true)) {
+                $where = ImprovementPost::LETS;
+            }
+            if ($where === ImprovementPost::STORE && ! self::storeTakesPosts($proposal->shop_id)) {
+                return 'improvement::ui.post.no_store';
             }
 
+            $this->fill($post, $seo, $products);
+            $post->destination = $where;
             $this->posts->publish($post, $heading, $body);
             $status = ImprovementProposal::APPLIED;
 
-            if (Features::enabled('improvement.post_to_store', $proposal->shop_id)) {
+            if ($where === ImprovementPost::STORE) {
                 self::send($post->shop_id, $post->id);
             }
         }
@@ -84,6 +95,56 @@ final class DecideProposal
         $proposal->forceFill(['status' => $status, 'decided_by' => $userId, 'decided_at' => now()])->save();
 
         return null;
+    }
+
+    /**
+     * Keeps a post's draft as the team left it, without publishing: the title, the body, the search fields, the
+     * products and where it will live.
+     *
+     * @param  array<string, string>|null  $seo
+     * @param  list<string>|null  $products
+     * @return string|null why it could not be kept (a text key), or null when it was
+     */
+    public function keep(ImprovementProposal $proposal, ?string $text, ?string $title, ?array $seo, ?array $products, ?string $destination): ?string
+    {
+        $post = $proposal->post;
+        if ($proposal->kind !== ImprovementProposal::CONTENT_GAP || $post === null || $post->status === ImprovementPost::PUBLISHED) {
+            return 'improvement::ui.post_missing';
+        }
+        $body = trim((string) ($text ?? $post->body));
+        $heading = trim((string) ($title ?? $post->title));
+        if ($body === '' || $heading === '') {
+            return 'improvement::ui.post_missing';
+        }
+
+        $this->fill($post, $seo, $products);
+        $post->forceFill([
+            'title' => mb_substr($heading, 0, 200),
+            'body' => $body,
+            'destination' => in_array($destination, [ImprovementPost::STORE, ImprovementPost::LETS], true) ? $destination : $post->destination,
+        ])->save();
+
+        return null;
+    }
+
+    /** Whether the store's own site can take a post: the feature on and a store connected to send it to. */
+    public static function storeTakesPosts(string $shopId): bool
+    {
+        return Features::enabled('improvement.post_to_store', $shopId) && StoreConnection::query()->where('shop_id', $shopId)->exists();
+    }
+
+    /**
+     * @param  array<string, string>|null  $seo
+     * @param  list<string>|null  $products
+     */
+    private function fill(ImprovementPost $post, ?array $seo, ?array $products): void
+    {
+        if ($seo !== null) {
+            $post->seo = array_replace((array) $post->seo, array_map(fn ($v): string => mb_substr(trim((string) $v), 0, 170), array_intersect_key($seo, array_flip(['seo_title', 'meta_description']))));
+        }
+        if ($products !== null) {
+            $post->products = PostProducts::valid($products);
+        }
     }
 
     public function reject(ImprovementProposal $proposal, ?int $userId): void

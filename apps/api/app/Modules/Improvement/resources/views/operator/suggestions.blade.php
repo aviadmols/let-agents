@@ -78,6 +78,34 @@
             .rec-row > .rec-prio, .rec-row > .rec-num { display: none; }
             .rec-panel__top, .rec-panel__tabs, .rec-panel__body { padding-inline: 16px; }
         }
+        /* a post: where it lives, edit or preview, its products */
+        .rec-where { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .rec-where > div { grid-column: 1 / -1; }
+        .rec-where__opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--rec-line); border-radius: 10px; cursor: pointer; }
+        .rec-where__opt.is-on { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; }
+        .rec-where__opt.is-off { opacity: .55; cursor: not-allowed; }
+        .rec-where__opt input { margin-top: 4px; }
+        .rec-where__opt b { display: block; font-size: 14px; }
+        .rec-where__opt small { display: block; font-size: 12px; opacity: .7; line-height: 1.45; margin-top: 2px; }
+        .rec-seg { display: inline-flex; justify-self: start; padding: 3px; border-radius: 999px; background: var(--rec-soft); border: 1px solid var(--rec-line); }
+        .rec-seg button { padding: 5px 14px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .rec-seg button.is-on { background: var(--rec-card); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+        .rec-preview { display: block; width: 100%; height: 70vh; min-height: 420px; border: 1px solid var(--rec-line); border-radius: 10px; background: #fff; }
+        .rec-prods { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--rec-line); border-radius: 8px; }
+        .rec-prod { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px; border-radius: 8px; background: var(--rec-soft); }
+        .rec-prod img, .rec-prod__pic { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: rgba(127,127,127,.15); display: block; }
+        .rec-prod__title { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rec-prod__do { display: flex; gap: 4px; }
+        .rec-prod__do a, .rec-prod__do button { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--rec-line); border-radius: 999px; background: var(--rec-card); color: inherit; font-size: 13px; text-decoration: none; cursor: pointer; }
+        .rec-prod__do button:disabled { opacity: .35; cursor: default; }
+        .rec-matches { display: grid; gap: 4px; }
+        .rec-match { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 5px 8px; border: 1px dashed var(--rec-line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: start; cursor: pointer; }
+        .rec-match:hover { background: var(--rec-soft); }
+        .rec-match img, .rec-match .rec-prod__pic { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
+        .rec-match span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rec-match small { opacity: .6; }
+        .rec-match b { font-size: 12px; font-weight: 600; white-space: nowrap; }
+        @media (max-width: 640px) { .rec-where { grid-template-columns: 1fr; } }
     </style>
 
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
@@ -307,10 +335,80 @@
                                         <p style="{{ $small }}">{{ __('improvement::ui.list.no_post') }}</p>
                                     @endif
                                 @elseif ($r['open'])
+                                    @php($where = $this->destinations[$p->id] ?? 'lets')
+                                    @php($storeOk = $this->storeTakesPosts())
+                                    {{-- where the post will live: the store's own site, or a page on Lets --}}
+                                    <div class="rec-where" role="radiogroup" aria-label="{{ __('improvement::ui.post.where') }}" data-where>
+                                        <div style="{{ $small }}">{{ __('improvement::ui.post.where') }}</div>
+                                        <label @class(['rec-where__opt', 'is-on' => $where === 'store', 'is-off' => ! $storeOk])>
+                                            <input type="radio" value="store" wire:model.live="destinations.{{ $p->id }}" @disabled(! $storeOk)>
+                                            <span><b>{{ __('improvement::ui.post.where_store') }}</b><small>{{ $storeOk ? __('improvement::ui.post.where_store_about') : __('improvement::ui.post.no_store') }}</small></span>
+                                        </label>
+                                        <label @class(['rec-where__opt', 'is-on' => $where === 'lets'])>
+                                            <input type="radio" value="lets" wire:model.live="destinations.{{ $p->id }}">
+                                            <span><b>{{ __('improvement::ui.post.where_lets') }}</b><small>{{ __('improvement::ui.post.where_lets_about') }}</small></span>
+                                        </label>
+                                    </div>
+
+                                    {{-- write it, or see it as it will look --}}
+                                    <div class="rec-seg" role="tablist">
+                                        <button type="button" role="tab" @class(['is-on' => $previewing !== $p->id]) aria-selected="{{ $previewing !== $p->id ? 'true' : 'false' }}" wire:click="$set('previewing', null)">{{ __('improvement::ui.post.edit') }}</button>
+                                        <button type="button" role="tab" @class(['is-on' => $previewing === $p->id]) aria-selected="{{ $previewing === $p->id ? 'true' : 'false' }}" wire:click="$set('previewing', @js($p->id))" data-preview-tab>{{ __('improvement::ui.post.preview') }}</button>
+                                    </div>
+                                    @if ($previewing === $p->id)
+                                        <div data-preview>
+                                            <iframe class="rec-preview" title="{{ __('improvement::ui.post.preview') }}" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="{{ $this->previewHtml($p->id) }}"></iframe>
+                                            <div style="{{ $small }};margin-top:6px">{{ $where === 'store' ? __('improvement::ui.post.preview_store') : __('improvement::ui.post.preview_lets') }}</div>
+                                        </div>
+                                    @else
                                     <label style="{{ $small }}">{{ __('improvement::ui.post.title') }}</label>
                                     <input type="text" wire:model="titles.{{ $p->id }}" style="{{ $field }}">
                                     <label style="{{ $small }}">{{ __('improvement::ui.post.body') }}</label>
                                     <textarea wire:model="drafts.{{ $p->id }}" rows="16" style="{{ $field }};font-family:inherit"></textarea>
+                                    @endif
+
+                                    {{-- the products: linked where the post names them, and shown as a list at its end --}}
+                                    @php($chosen = $this->chosenProducts($p->id))
+                                    <section class="rec-prods" data-post-products>
+                                        <div style="font-weight:600;font-size:13px">{{ __('improvement::ui.post.products_title') }} <span style="{{ $small }}">({{ count($chosen) }}/{{ \App\Modules\Improvement\Models\ImprovementPost::MAX_PRODUCTS }})</span></div>
+                                        <div style="{{ $small }}">{{ __('improvement::ui.post.products_about') }}</div>
+                                        @forelse ($chosen as $i => $prod)
+                                            <div class="rec-prod" wire:key="prod-{{ $p->id }}-{{ $prod['id'] }}">
+                                                @if ($prod['picture'])<img src="{{ $prod['picture'] }}" alt="" loading="lazy">@else<span class="rec-prod__pic"></span>@endif
+                                                <div style="min-width:0">
+                                                    <div class="rec-prod__title" dir="auto">{{ $prod['title'] }}</div>
+                                                    <div style="{{ $small }}">@if ($prod['sku'])<span dir="ltr">{{ $prod['sku'] }}</span>@endif @if ($i === 0)@if ($prod['sku']) · @endif{{ __('improvement::ui.post.products_first') }}@endif</div>
+                                                </div>
+                                                <div class="rec-prod__do">
+                                                    @if ($prod['url'])<a href="{{ $prod['url'] }}" target="_blank" rel="noopener" title="{{ __('improvement::ui.post.products_open') }}" aria-label="{{ __('improvement::ui.post.products_open') }}">↗</a>@endif
+                                                    <button type="button" wire:click="moveProduct(@js($p->id), @js($prod['id']), -1)" @disabled($i === 0) title="{{ __('improvement::ui.post.products_up') }}" aria-label="{{ __('improvement::ui.post.products_up') }}">↑</button>
+                                                    <button type="button" wire:click="moveProduct(@js($p->id), @js($prod['id']), 1)" @disabled($i === count($chosen) - 1) title="{{ __('improvement::ui.post.products_down') }}" aria-label="{{ __('improvement::ui.post.products_down') }}">↓</button>
+                                                    <button type="button" wire:click="removeProduct(@js($p->id), @js($prod['id']))" title="{{ __('improvement::ui.post.products_remove') }}" aria-label="{{ __('improvement::ui.post.products_remove') }}">✕</button>
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div style="{{ $small }}">{{ __('improvement::ui.post.products_none') }}</div>
+                                        @endforelse
+                                        @if (count($chosen) < \App\Modules\Improvement\Models\ImprovementPost::MAX_PRODUCTS)
+                                            <input type="search" wire:model.live.debounce.350ms="productFind.{{ $p->id }}" placeholder="{{ __('improvement::ui.post.products_find') }}" style="{{ $field }}" autocomplete="off" dir="auto" data-product-find>
+                                            @php($matches = $this->productMatches($p->id))
+                                            @if ($matches !== [])
+                                                <div class="rec-matches">
+                                                    @foreach ($matches as $m)
+                                                        <button type="button" class="rec-match" wire:click="addProduct(@js($p->id), @js($m['id']))" wire:key="match-{{ $p->id }}-{{ $m['id'] }}">
+                                                            @if ($m['picture'])<img src="{{ $m['picture'] }}" alt="" loading="lazy">@else<span class="rec-prod__pic"></span>@endif
+                                                            <span dir="auto">{{ $m['title'] }}</span>
+                                                            @if ($m['sku'])<small dir="ltr">{{ $m['sku'] }}</small>@endif
+                                                            <b>+ {{ __('improvement::ui.post.products_add') }}</b>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @elseif (mb_strlen(trim($this->productFind[$p->id] ?? '')) >= 2)
+                                                <div style="{{ $small }}">{{ __('improvement::ui.post.products_no_match') }}</div>
+                                            @endif
+                                        @endif
+                                    </section>
+
                                     <details style="border:1px solid var(--rec-line);border-radius:8px;padding:8px 10px" open>
                                         <summary style="cursor:pointer;font-weight:600;font-size:13px">{{ __('improvement::ui.post.seo') }}</summary>
                                         <div style="display:grid;gap:6px;margin-top:8px">
@@ -332,12 +430,9 @@
                                                     @endforeach
                                                 </div>
                                             @endif
-                                            <div style="{{ $small }}">{{ __('improvement::ui.post.store_note') }}</div>
+                                            <div style="{{ $small }}">{{ $where === 'store' ? __('improvement::ui.post.store_note') : __('improvement::ui.post.lets_note') }}</div>
                                         </div>
                                     </details>
-                                    @if ($p->post->products !== [])
-                                        <div style="{{ $small }}">{{ __('improvement::ui.post.products', ['count' => count($p->post->products)]) }}</div>
-                                    @endif
                                     @if ($p->post->problems !== [])
                                         <div style="padding:8px 10px;border-radius:8px;background:rgba(235,104,52,.1);font-size:13px" data-problems>
                                             <div style="font-weight:600">{{ __('improvement::ui.post.problems') }}</div>
@@ -354,9 +449,10 @@
                                     <div style="font-weight:600">{{ $p->post->title }}</div>
                                     @if ($p->status === 'applied' && $p->post->status === 'published')
                                         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-                                            <a href="{{ $this->guideUrl($p->post) }}" target="_blank" rel="noopener" style="{{ $chip }}">{{ __('improvement::ui.post.open') }} ↗</a>
+                                            @if ($p->post->hosted())<a href="{{ $this->guideUrl($p->post) }}" target="_blank" rel="noopener" style="{{ $chip }}" data-guide>{{ __('improvement::ui.post.open') }} ↗</a>@endif
                                             @php($remote = $p->post->remote ?? [])
-                                            @if ($this->sending($p->post))
+                                            @if (! $p->post->sentToStore())
+                                            @elseif ($this->sending($p->post))
                                                 <span style="{{ $chip }}" wire:poll.5s>{{ __('improvement::ui.post.sending') }}</span>
                                             @elseif (($remote['status'] ?? null) === 'draft')
                                                 <a href="{{ $remote['admin_url'] ?? $remote['url'] }}" target="_blank" rel="noopener" style="{{ $chip }}" data-remote>{{ __('improvement::ui.post.on_store') }} ↗</a>
@@ -382,6 +478,10 @@
                                         @endunless
                                     @else
                                         <button type="button" wire:click="approve(@js($p->id))" style="{{ $dark }}">{{ __("improvement::ui.approve.{$p->kind}") }}</button>
+                                        @if ($p->kind === 'content_gap' && $p->post !== null)
+                                            <button type="button" wire:click="saveDraft(@js($p->id))" style="{{ $btn }}" data-save-draft>{{ __('improvement::ui.post.save_draft') }}</button>
+                                            @if ($previewing !== $p->id)<button type="button" wire:click="$set('previewing', @js($p->id))" style="{{ $btn }}">{{ __('improvement::ui.post.preview') }}</button>@endif
+                                        @endif
                                         @if ($p->kind === 'faq' && ! $this->drafting($p->id))
                                             <button type="button" wire:click="draftAnswer(@js($p->id))" style="{{ $btn }}">{{ __(isset($p->detail['ai']) ? 'improvement::ui.answer.rewrite' : 'improvement::ui.answer.write') }}</button>
                                         @endif

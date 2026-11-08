@@ -21,7 +21,8 @@ final class GuideController
         $store = Shop::query()->where('slug', $shop)->firstOrFail();
         $guide = $tenant->run($store->id, fn (): ?ImprovementPost => ImprovementPost::query()->whereKey($post)->where('status', ImprovementPost::PUBLISHED)->first());
 
-        abort_if($guide === null, 404);
+        // a post that lives on the store's own site is read there, not here
+        abort_if($guide === null || ! $guide->hosted(), 404);
 
         $products = $tenant->run($store->id, fn () => CatalogProduct::query()->active()
             ->whereIn('external_id', $guide->products)

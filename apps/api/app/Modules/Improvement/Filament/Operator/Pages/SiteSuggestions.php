@@ -13,6 +13,8 @@ use App\Modules\Improvement\Models\ImprovementPost;
 use App\Modules\Improvement\Models\ImprovementPostWrite;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Improvement\Models\ImprovementReview;
+use App\Modules\Improvement\Support\PostDocument;
+use App\Modules\Improvement\Support\PostProducts;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Tenancy\Models\Shop;
@@ -55,6 +57,18 @@ class SiteSuggestions extends Page
 
     /** @var array<string, array{seo_title: string, meta_description: string}> the post's search-result title and description as the team leaves them */
     public array $seo = [];
+
+    /** @var array<string, list<string>> the post's products as the team leaves them (store ids, in order), by proposal */
+    public array $products = [];
+
+    /** @var array<string, string> where the post will live: store (the store's blog) or lets (a page on Lets), by proposal */
+    public array $destinations = [];
+
+    /** @var array<string, string> the words typed to find a product to add, by proposal */
+    public array $productFind = [];
+
+    /** The proposal whose post is shown as it will look, instead of its fields. */
+    public ?string $previewing = null;
 
     public static function getNavigationLabel(): string
     {
@@ -112,6 +126,8 @@ class SiteSuggestions extends Page
                 $this->drafts[$p->id] ??= (string) $p->post->body;
                 $this->titles[$p->id] ??= (string) $p->post->title;
                 $this->seo[$p->id] ??= ['seo_title' => (string) ($p->post->seo['seo_title'] ?? ''), 'meta_description' => (string) ($p->post->seo['meta_description'] ?? '')];
+                $this->products[$p->id] ??= array_values(array_map('strval', (array) $p->post->products));
+                $this->destinations[$p->id] ??= $p->post->destination ?? ($this->storeTakesPosts() ? ImprovementPost::STORE : ImprovementPost::LETS);
             }
         }
 
@@ -346,7 +362,7 @@ class SiteSuggestions extends Page
                 return null;
             }
 
-            return app(DecideProposal::class)->approve($proposal, auth()->id(), $this->drafts[$id] ?? null, $this->titles[$id] ?? null, $this->seo[$id] ?? null);
+            return app(DecideProposal::class)->approve($proposal, auth()->id(), $this->drafts[$id] ?? null, $this->titles[$id] ?? null, $this->seo[$id] ?? null, $this->products[$id] ?? null, $this->destinations[$id] ?? null);
         });
 
         if ($problem !== null) {
@@ -355,7 +371,10 @@ class SiteSuggestions extends Page
             return;
         }
 
-        unset($this->drafts[$id], $this->titles[$id], $this->seo[$id]);
+        unset($this->drafts[$id], $this->titles[$id], $this->seo[$id], $this->products[$id], $this->destinations[$id], $this->productFind[$id]);
+        if ($this->previewing === $id) {
+            $this->previewing = null;
+        }
         Notification::make()->success()->title(__($approve ? 'improvement::ui.approved' : 'improvement::ui.rejected'))->send();
     }
 
@@ -395,6 +414,132 @@ class SiteSuggestions extends Page
             DecideProposal::send($post->shop_id, $post->id);
             Notification::make()->success()->title(__('improvement::ui.post.sending'))->send();
         }
+    }
+
+    /** Keeps the post as the team left it, without publishing it. */
+    public function saveDraft(string $id): void
+    {
+        if ($this->shop === null) {
+            return;
+        }
+
+        $problem = app(TenantContext::class)->run($this->shop, function () use ($id): ?string {
+            $proposal = ImprovementProposal::query()->with('post')->find($id);
+
+            return $proposal === null ? 'improvement::ui.post_missing' : app(DecideProposal::class)->keep(
+                $proposal, $this->drafts[$id] ?? null, $this->titles[$id] ?? null, $this->seo[$id] ?? null, $this->products[$id] ?? null, $this->destinations[$id] ?? null,
+            );
+        });
+
+        $problem === null
+            ? Notification::make()->success()->title(__('improvement::ui.post.saved'))->send()
+            : Notification::make()->warning()->title(__($problem))->send();
+    }
+
+    /** Adds a product to the post: linked where the post names it, and shown at its end. */
+    public function addProduct(string $id, string $product): void
+    {
+        $list = $this->products[$id] ?? [];
+        if (count($list) >= ImprovementPost::MAX_PRODUCTS) {
+            Notification::make()->warning()->title(__('improvement::ui.post.products_max', ['n' => ImprovementPost::MAX_PRODUCTS]))->send();
+
+            return;
+        }
+        $valid = $this->inShop(fn (): array => PostProducts::valid([...$list, $product])) ?? $list;
+        $this->products[$id] = $valid;
+        $this->productFind[$id] = '';
+    }
+
+    public function removeProduct(string $id, string $product): void
+    {
+        $this->products[$id] = array_values(array_filter($this->products[$id] ?? [], fn (string $p): bool => $p !== $product));
+    }
+
+    /** Moves a product one place up (-1) or down (1): the first gives the post its picture. */
+    public function moveProduct(string $id, string $product, int $by): void
+    {
+        $list = array_values($this->products[$id] ?? []);
+        $at = array_search($product, $list, true);
+        $to = is_int($at) ? $at + ($by < 0 ? -1 : 1) : -1;
+        if (! is_int($at) || $to < 0 || $to >= count($list)) {
+            return;
+        }
+        [$list[$at], $list[$to]] = [$list[$to], $list[$at]];
+        $this->products[$id] = $list;
+    }
+
+    /**
+     * The post's products as the team leaves them, with their picture and link.
+     *
+     * @return list<array{id: string, title: string, url: string|null, picture: string|null, sku: string|null}>
+     */
+    public function chosenProducts(string $id): array
+    {
+        $ids = $this->products[$id] ?? [];
+
+        return $this->inShop(fn (): array => PostProducts::models($ids)->map(fn ($p): array => [
+            'id' => (string) $p->external_id, 'title' => (string) $p->title, 'url' => $p->url ?: null, 'picture' => $p->image_url ?: null, 'sku' => $p->sku ?: null,
+        ])->all()) ?? [];
+    }
+
+    /** @return list<array{id: string, title: string, picture: string|null, sku: string|null}> products to add, by the words typed */
+    public function productMatches(string $id): array
+    {
+        $words = (string) ($this->productFind[$id] ?? '');
+
+        return $this->inShop(fn (): array => PostProducts::find($words, $this->products[$id] ?? [])) ?? [];
+    }
+
+    /** Whether the store's own site can take the post (a store connected, and the feature on). */
+    public function storeTakesPosts(): bool
+    {
+        return $this->shop !== null && (bool) $this->inShop(fn (): bool => DecideProposal::storeTakesPosts((string) $this->shop));
+    }
+
+    /**
+     * The post as it will look, from what the team left in the fields (saved or not): its title, body with the products
+     * linked where it names them, the products at its end and its questions. A whole page, for a sandboxed frame.
+     */
+    public function previewHtml(string $id): string
+    {
+        if ($this->shop === null) {
+            return '';
+        }
+
+        return (string) $this->inShop(function () use ($id): string {
+            $post = ImprovementPost::query()->where('proposal_id', $id)->first();
+            $shop = Shop::query()->find($this->shop);
+            if ($post === null || $shop === null) {
+                return '';
+            }
+            $draft = $post->replicate();
+            $draft->id = $post->id;
+            $draft->title = trim((string) ($this->titles[$id] ?? $post->title));
+            $draft->body = trim((string) ($this->drafts[$id] ?? $post->body));
+            $draft->seo = array_replace((array) $post->seo, array_map('strval', array_intersect_key($this->seo[$id] ?? [], array_flip(['seo_title', 'meta_description']))));
+            $draft->products = PostProducts::valid($this->products[$id] ?? $post->products);
+            $products = PostProducts::models($draft->products);
+            $document = new PostDocument($draft, $products, (string) $shop->name);
+
+            $html = view('improvement::guide', [
+                'shop' => $shop, 'post' => $draft, 'document' => $document, 'html' => $document->body(), 'products' => $products,
+                'rtl' => $document->rtl(), 'schemas' => [],
+            ])->render();
+
+            // links in the preview open beside the panel
+            return (string) preg_replace('/<head>/', '<head><base target="_blank">', $html, 1);
+        });
+    }
+
+    /**
+     * @template T
+     *
+     * @param  callable(): T  $do
+     * @return T|null
+     */
+    private function inShop(callable $do): mixed
+    {
+        return $this->shop === null ? null : app(TenantContext::class)->run($this->shop, $do);
     }
 
     /** Where a published post is read. */

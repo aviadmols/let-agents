@@ -26,6 +26,14 @@ final class PublishPost
             'published_at' => $post->published_at ?? now(),
         ])->save();
 
+        // A post that lives on the store's own site has no address here: the store's content brings it in once the
+        // store publishes it, so the search does not hold it twice.
+        if (! $post->hosted()) {
+            $this->leaveContent($post);
+
+            return;
+        }
+
         $shop = Shop::query()->findOrFail($post->shop_id);
         $image = $post->products === [] ? null : CatalogProduct::query()->active()->where('external_id', $post->products[0])->value('image_url');
         $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags(Str::markdown($post->body, ['html_input' => 'strip', 'allow_unsafe_links' => false]))));
@@ -56,8 +64,13 @@ final class PublishPost
         }
 
         $post->forceFill(['status' => ImprovementPost::UNPUBLISHED])->save();
-        CatalogContent::query()->where('external_id', $post->contentId())->whereNull('removed_at')->update(['removed_at' => now()]);
+        $this->leaveContent($post);
+    }
 
-        event(new CatalogUpdated($post->shop_id));
+    private function leaveContent(ImprovementPost $post): void
+    {
+        if (CatalogContent::query()->where('external_id', $post->contentId())->whereNull('removed_at')->update(['removed_at' => now()]) > 0) {
+            event(new CatalogUpdated($post->shop_id));
+        }
     }
 }
