@@ -206,7 +206,7 @@ final class ShopKnowledgeTest extends TestCase
             ->call('addInfo');
 
         $this->assertSame('- משלוח עד הבית תוך 3 ימי עסקים.', $this->inShop(fn () => app(BuildShopKnowledge::class)->entries())[BuildShopKnowledge::OWN]->body);
-        Livewire::test(AboutStore::class)->assertSet('own', 'משלוח עד הבית תוך 3 ימי עסקים.')->assertSee('משלוח עד הבית תוך 3 ימי עסקים.');
+        Livewire::test(AboutStore::class)->assertSet('own', 'משלוח עד הבית תוך 3 ימי עסקים.')->call('show', 'notes')->assertSee('משלוח עד הבית תוך 3 ימי עסקים.');
     }
 
     private function inShop(callable $callback): mixed

@@ -5,6 +5,8 @@ namespace App\Modules\Admin\Support;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\Searches;
+use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
 use Closure;
@@ -27,12 +29,19 @@ final class ViewerGuard
     /** Screens that are for reading (MerchantNavigation keys); the home has no key. */
     public const READING_SCREENS = ['analytics', 'sessions', 'timeline'];
 
+    /**
+     * Pages outside every screen that are for reading: Today and Searches. The redesign (11.2026) put screens that
+     * change things on the sidebar's top level too (Improvements, Shoppers, Store knowledge), so being outside a
+     * screen no longer makes a page a reading one; each is named.
+     */
+    public const READING_PAGES = [ShopOverview::class, Searches::class];
+
     /** Calls that only show something, anywhere in the panel. */
     public const READING_CALLS = [
         '$refresh', '$set', '$toggle', '__dispatch', '__lazyLoad',
         'open', 'close', 'show', 'hide', 'more', 'pick', 'select', 'filter', 'sortBy', 'setDays', 'narrowTo',
         'toggleGroup', 'toggleInspect', 'showFailed', 'setShow', 'reveal', 'downloadPlugin',
-        'mountAction', 'unmountAction', 'gotoPage', 'nextPage', 'previousPage', 'setPage', 'resetPage', 'toggle',
+        'mountAction', 'unmountAction', 'gotoPage', 'nextPage', 'previousPage', 'setPage', 'resetPage', 'toggle', 'togglePost',
     ];
 
     /**
@@ -94,8 +103,6 @@ final class ViewerGuard
     /** @param  class-string<Page>  $page */
     private static function reading(string $page): bool
     {
-        $group = $page::getNavigationGroup();
-
-        return $group === null || in_array($group, self::READING_SCREENS, true);
+        return in_array($page, self::READING_PAGES, true) || in_array($page::getNavigationGroup(), self::READING_SCREENS, true);
     }
 }

@@ -1736,3 +1736,101 @@ html.dark .fi-panel-merchant .lp-d-task:hover { background: var(--lp-d-card); }
     .fi-panel-merchant .lp-d-lead-do { grid-column: 2; justify-items: start; grid-auto-flow: column; }
     .fi-panel-merchant .lp-d-src { grid-template-columns: 90px minmax(0, 1fr) 40px; }
 }
+
+/* ================================================================ store knowledge (the redesign, 11.2026: prototype knowledge.html) */
+.fi-panel-merchant .lp-d-teach { grid-column: 1 / -1; background: var(--lp-d-night); color: #fff; border-radius: 28px; padding: 24px 28px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 28px; align-items: center; position: relative; overflow: hidden; }
+.fi-panel-merchant .lp-d-teach::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--lp-d-line-night) 1px, transparent 1px), linear-gradient(90deg, var(--lp-d-line-night) 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(80% 120% at 0% 0%, #000 10%, transparent 70%); pointer-events: none; }
+.fi-panel-merchant .lp-d-teach > * { position: relative; min-width: 0; }
+.fi-panel-merchant .lp-d-teach h2 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.02em; color: #fff; }
+.fi-panel-merchant .lp-d-teach p { margin: 6px 0 0; color: var(--lp-d-on-night); font-size: 14px; }
+.fi-panel-merchant .lp-d-teach-box { display: flex; gap: 8px; padding: 6px; padding-inline-start: 18px; border-radius: 20px; background: var(--lp-d-night-3); align-items: center; }
+.fi-panel-merchant .lp-d-teach-box:focus-within { box-shadow: inset 0 0 0 1.5px #fff; }
+.fi-panel-merchant .lp-d-teach-box input { flex: 1; min-width: 0; border: 0; background: transparent; color: #fff; font: inherit; font-size: 15px; outline: none; height: 44px; box-shadow: none; padding: 0; }
+.fi-panel-merchant .lp-d-teach-box input::placeholder { color: var(--lp-d-on-night); }
+.fi-panel-merchant .lp-d-teach-ex { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.fi-panel-merchant .lp-d-teach-ex button { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: rgb(255 255 255 / .08); color: #d9d9df; font: inherit; font-size: 12.5px; cursor: pointer; }
+.fi-panel-merchant .lp-d-teach-ex button:hover { background: rgb(255 255 255 / .14); }
+.fi-panel-merchant .lp-d-know { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.fi-panel-merchant .lp-d-know > div { min-width: 0; }
+.fi-panel-merchant .lp-d-ktabs { display: flex; gap: 4px; padding: 4px; background: var(--lp-d-card); border-radius: 999px; width: max-content; max-width: 100%; overflow-x: auto; scrollbar-width: none; margin-bottom: 14px; }
+.fi-panel-merchant .lp-d-ktabs button { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-size: 14px; color: var(--lp-d-ink-soft); cursor: pointer; white-space: nowrap; }
+.fi-panel-merchant .lp-d-ktabs button[aria-selected="true"] { background: var(--lp-d-paper); color: var(--lp-d-ink); font-weight: 500; box-shadow: 0 1px 2px rgb(11 11 12 / .08); }
+.fi-panel-merchant .lp-d-ktabs-n { min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px; background: rgb(11 11 12 / .07); font-size: 12px; display: grid; place-items: center; font-weight: 500; }
+.fi-panel-merchant .lp-d-ktabs button[aria-selected="true"] .lp-d-ktabs-n { background: var(--lp-lime); color: var(--lp-d-night); }
+.fi-panel-merchant .lp-d-srow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px; border-radius: 16px; }
+.fi-panel-merchant .lp-d-srow + .lp-d-srow { box-shadow: 0 -1px 0 var(--lp-d-line); }
+.fi-panel-merchant .lp-d-srow:hover { background: var(--lp-d-ground); }
+.fi-panel-merchant .lp-d-srow-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--lp-d-ground); display: grid; place-items: center; }
+.fi-panel-merchant .lp-d-srow-ic.is-new { background: var(--lp-lime); }
+.fi-panel-merchant .lp-d-srow-ic svg { width: 19px; height: 19px; stroke: var(--lp-d-ink); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fi-panel-merchant .lp-d-srow-main { min-width: 0; }
+.fi-panel-merchant .lp-d-srow-main > b { display: block; font-weight: 500; font-size: 14.5px; overflow-wrap: anywhere; }
+.fi-panel-merchant .lp-d-srow-main > b a { color: inherit; text-decoration: none; }
+.fi-panel-merchant .lp-d-srow-main > b a:hover { text-decoration: underline; }
+.fi-panel-merchant .lp-d-srow-l { display: block; font-size: 13px; color: var(--lp-d-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fi-panel-merchant .lp-d-srow-wrap { white-space: normal; }
+.fi-panel-merchant .lp-d-srow-used { text-align: end; font-size: 12.5px; color: var(--lp-d-muted); white-space: nowrap; }
+.fi-panel-merchant .lp-d-srow-used b { font-size: 15px; color: var(--lp-d-ink); font-weight: 500; margin-inline-end: 4px; }
+.fi-panel-merchant .lp-d-srow-more { margin: 8px 4px 0; }
+.fi-panel-merchant .lp-d-ksub { margin: 22px 12px 6px; font-size: 13px; font-weight: 500; color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-kfacts { grid-column: 2 / -1; margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.fi-panel-merchant .lp-d-kfacts li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--lp-d-ground); font-size: 13.5px; }
+.fi-panel-merchant .lp-d-kline { display: flex; gap: 8px; align-items: center; margin: 12px 12px 0; }
+.fi-panel-merchant .lp-d-kline-top { margin: 0 0 14px; }
+.fi-panel-merchant .lp-d-srow .lp-d-kline { margin: 0; }
+.fi-panel-merchant .lp-d-kline input { flex: 1; min-width: 0; height: 40px; border: 0; border-radius: 999px; background: var(--lp-d-ground); padding: 0 16px; font: inherit; font-size: 14px; color: var(--lp-d-ink); box-shadow: inset 0 0 0 1px var(--lp-d-line); outline: none; }
+.fi-panel-merchant .lp-d-kline input:focus { box-shadow: inset 0 0 0 1.5px var(--lp-d-ink); }
+.fi-panel-merchant .lp-d-plist { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin-bottom: 18px; padding: 2px; }
+.fi-panel-merchant .lp-d-plist button { flex: none; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 14px; overflow: hidden; cursor: pointer; box-shadow: 0 0 0 2px transparent; background: var(--lp-d-ground); position: relative; }
+.fi-panel-merchant .lp-d-plist button img, .fi-panel-merchant .lp-d-plist button .lp-d-tile { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fi-panel-merchant .lp-d-plist button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lp-d-ink); }
+.fi-panel-merchant .lp-d-plist-dot { position: absolute; inset-block-start: 5px; inset-inline-end: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--lp-sun); box-shadow: 0 0 0 2px #fff; }
+.fi-panel-merchant .lp-d-popen { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 22px; }
+.fi-panel-merchant .lp-d-popen > img, .fi-panel-merchant .lp-d-popen > .lp-d-tile { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 20px; }
+.fi-panel-merchant .lp-d-popen > div { min-width: 0; }
+.fi-panel-merchant .lp-d-popen h3 { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: -.015em; }
+.fi-panel-merchant .lp-d-popen-price { font-size: 14px; color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-kv { margin-top: 14px; display: grid; gap: 12px; }
+.fi-panel-merchant .lp-d-kv h4 { margin: 0 0 6px; font-size: 12.5px; font-weight: 500; color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.fi-panel-merchant .lp-d-tag { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 999px; background: var(--lp-d-ground); font-size: 13px; }
+.fi-panel-merchant .lp-d-tag i { font-style: normal; font-size: 11px; color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-tag-miss { background: var(--lp-sun); color: var(--lp-d-night); }
+.fi-panel-merchant .lp-d-tag-miss i { color: #3a3a40; }
+.fi-panel-merchant .lp-d-saw { margin: 0; font-size: 14px; color: var(--lp-d-ink-soft); background: var(--lp-d-ground); border-radius: 14px; padding: 12px 14px; line-height: 1.55; }
+.fi-panel-merchant .lp-d-popen-do { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fi-panel-merchant .lp-d-popen-do .lp-d-ghost { display: inline-flex; align-items: center; text-decoration: none; }
+.fi-panel-merchant .lp-d-rules-sub { margin: 0 0 14px; }
+.fi-panel-merchant [data-pane="rules"] form { margin-bottom: 16px; }
+.fi-panel-merchant .lp-d-rule { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px; border-radius: 16px; background: var(--lp-d-ground); }
+.fi-panel-merchant .lp-d-rule + .lp-d-rule { margin-top: 8px; }
+.fi-panel-merchant .lp-d-rule > div:first-child { min-width: 0; }
+.fi-panel-merchant .lp-d-rule p { margin: 0; font-size: 14.5px; overflow-wrap: anywhere; }
+.fi-panel-merchant .lp-d-rule p code { font-family: inherit; background: var(--lp-d-paper); padding: 2px 8px; border-radius: 8px; font-weight: 500; }
+.fi-panel-merchant .lp-d-rule span { font-size: 12.5px; color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-rule-l { display: block; margin-top: 4px; }
+.fi-panel-merchant .lp-d-rule-do { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.fi-panel-merchant .lp-d-rule-changes { margin-top: 8px; font-size: 13px; }
+.fi-panel-merchant .lp-d-rule-changes summary { cursor: pointer; color: var(--lp-d-ink-soft); }
+.fi-panel-merchant .lp-d-rule-changes ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.fi-panel-merchant .lp-d-rule-changes li { display: flex; gap: 10px; align-items: flex-start; }
+.fi-panel-merchant .lp-d-rule-changes img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; flex: none; }
+.fi-panel-merchant .lp-d-knows-grid { display: grid; gap: 10px; margin-top: 12px; }
+.fi-panel-merchant .lp-d-knows-grid div { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; padding: 10px 0; border-top: 1px solid var(--lp-d-line); }
+.fi-panel-merchant .lp-d-knows-grid div:first-child { border-top: 0; }
+.fi-panel-merchant .lp-d-knows-grid b { font-weight: 500; font-size: 18px; }
+.fi-panel-merchant .lp-d-knows p { margin-top: 14px; text-align: start; }
+@media (max-width: 1180px) {
+    .fi-panel-merchant .lp-d-know { grid-template-columns: minmax(0, 1fr); }
+    .fi-panel-merchant .lp-d-know .lp-d-imp-aside { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+    .fi-panel-merchant .lp-d-teach { grid-template-columns: minmax(0, 1fr); padding: 20px; border-radius: 24px; gap: 16px; }
+    .fi-panel-merchant .lp-d-popen { grid-template-columns: minmax(0, 1fr); }
+    .fi-panel-merchant .lp-d-popen > img, .fi-panel-merchant .lp-d-popen > .lp-d-tile { max-width: 220px; }
+    .fi-panel-merchant .lp-d-srow { grid-template-columns: 40px minmax(0, 1fr); }
+    .fi-panel-merchant .lp-d-srow > :nth-child(n+3) { grid-column: 2; justify-self: start; text-align: start; }
+    .fi-panel-merchant .lp-d-rule { grid-template-columns: minmax(0, 1fr); }
+    .fi-panel-merchant .lp-d-rule-do { justify-content: flex-start; }
+    .fi-panel-merchant .lp-d-know .lp-d-imp-aside { grid-template-columns: minmax(0, 1fr); }
+}

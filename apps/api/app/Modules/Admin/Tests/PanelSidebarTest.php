@@ -55,9 +55,9 @@ final class PanelSidebarTest extends TestCase
             // the sidebar (the redesign, 11.2026).
             $this->assertSame([''], array_values(array_unique($this->groupLabels($html))));
             $this->assertSame(
-                [__('admin::home.nav', [], $locale), __('admin::searches.nav', [], $locale), __('admin::improvements.nav', [], $locale), __('admin::shoppers.nav', [], $locale), ...array_map(
+                [__('admin::home.nav', [], $locale), __('admin::searches.nav', [], $locale), __('admin::improvements.nav', [], $locale), __('admin::shoppers.nav', [], $locale), __('assistant::store_knowledge.nav', [], $locale), ...array_map(
                     fn (string $key): string => __("admin::panels.screens.{$key}", [], $locale),
-                    ['inbox', 'knowledge', 'scan', 'settings'],
+                    ['inbox', 'scan', 'settings'],
                 )],
                 $this->itemLabels($html),
             );

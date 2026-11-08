@@ -1,266 +1,271 @@
 <x-filament-panels::page>
-    {{-- The knowledge centre, as the designer's panel draws it: add a line, then three tabs (general
-         information, posts, what was found on the site). Every row is a possible answer. --}}
-    @php($t = fn (string $key, array $params = []) => __('assistant::ui.centre.'.$key, $params))
-    @php($counts = $this->counts())
-    @php($tz = 'Asia/Jerusalem')
+    {{-- Store knowledge, as the designer's redesign draws it (AboutStore; prototype knowledge.html, 11.2026). --}}
+    @php($t = fn (string $key, array $params = []) => __('assistant::store_knowledge.'.$key, $params))
+    @php($n = fn (string $key, int $count, array $params = []) => trans_choice('assistant::store_knowledge.'.$key, $count, ['n' => number_format($count)] + $params))
+    @php($locale = app()->getLocale())
+    @php($ago = fn ($at) => $at === null ? '' : \Illuminate\Support\Carbon::parse($at)->locale($locale)->diffForHumans())
+    @php($mark = '<svg viewBox="0 0 225 225" fill="currentColor" aria-hidden="true"><path d="m0,225c0-62.13,50.37-112.5,112.5-112.5s112.5,50.37,112.5,112.5H0Z"/><path d="m225,0c0,62.13-50.37,112.5-112.5,112.5S0,62.13,0,0h225Z"/></svg>')
+    @php($pageIcon = '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6"/></svg>')
+    @php($penIcon = '<svg viewBox="0 0 24 24"><path d="M5 19.5h4l10-10-4-4-10 10z"/></svg>')
+    @php($own = $this->ownRows())
+    @php($pages = $this->pages())
+    @php($rules = $this->rules())
+    @php($knows = $this->knows())
 
-    <div class="lp-page" data-knowledge-centre>
-        <section class="lp-card" data-add-info>
-            <div class="lp-card-t"><h2>{{ $t('add.title') }}</h2><span class="lp-note">{{ $t('add.note') }}</span></div>
-            <form wire:submit="addInfo" class="lp-stack">
-                <textarea class="lp-textarea" wire:model="newInfo" rows="3" maxlength="600" placeholder="{{ $t('add.placeholder', ['price' => \App\Core\Localization\Money::price(8, (string) (\Filament\Facades\Filament::getTenant()?->currency ?: 'ILS'))]) }}" aria-label="{{ $t('add.title') }}"></textarea>
-                <div class="lp-actions">
-                    <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary" wire:loading.attr="disabled" wire:target="addInfo"><svg class="lp-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>{{ $t('add.button') }}</button>
-                    <span class="lp-note">{{ $t('add.checked') }}</span>
+    <div class="lp-page lp-d" data-store-knowledge>
+        <div class="lp-d-grid">
+            {{-- teach Lets something --}}
+            <section class="lp-d-teach" aria-labelledby="teach-title" x-data>
+                <div><h2 id="teach-title">{{ $t('teach.title') }}</h2><p>{{ $t('teach.text') }}</p></div>
+                <div>
+                    <form class="lp-d-teach-box" wire:submit="addInfo">
+                        <label class="sr-only" for="teach-in">{{ $t('teach.label') }}</label>
+                        <input id="teach-in" x-ref="teach" autocomplete="off" maxlength="600" wire:model="newInfo" placeholder="{{ $t('teach.placeholder') }}" dir="auto">
+                        <button class="lp-d-btn lp-d-btn-lime lp-d-btn-sm" type="submit" wire:loading.attr="disabled" wire:target="addInfo">{{ $t('teach.add') }}</button>
+                    </form>
+                    <div class="lp-d-teach-ex">
+                        @foreach (__('assistant::store_knowledge.teach.examples') as $example)
+                            <button type="button" @click="$refs.teach.value = @js($example); $refs.teach.dispatchEvent(new Event('input')); $refs.teach.focus()">{{ $example }}</button>
+                        @endforeach
+                    </div>
                 </div>
-            </form>
-        </section>
+            </section>
 
-        <nav class="lp-tabs" role="tablist" aria-label="{{ __('assistant::ui.knowledge.title') }}">
-            @foreach (['general' => $t('tabs.general_count', ['n' => $counts['general']]), 'posts' => (string) $counts['posts'], 'found' => (string) $counts['found'], 'rules' => (string) $counts['rules']] as $key => $count)
-                <button type="button" role="tab" wire:click="show(@js($key))" @class(['is-on' => $this->tab === $key]) aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}">{{ $t('tabs.'.$key) }} <span class="lp-count">{{ $count }}</span></button>
-            @endforeach
-        </nav>
+            <div class="lp-d-know">
+                <div>
+                    <div class="lp-d-ktabs" role="tablist" aria-label="{{ $t('tabs.label') }}">
+                        @foreach (['pages' => count($pages), 'products' => $knows['products'], 'notes' => count($own), 'rules' => count($rules)] as $key => $count)
+                            <button type="button" role="tab" wire:click="show(@js($key))" aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}"><span>{{ $t('tabs.'.$key) }}</span><span class="lp-d-ktabs-n lp-d-num">{{ number_format($count) }}</span></button>
+                        @endforeach
+                    </div>
 
-        @if ($this->tab === 'general')
-            @php($own = $this->ownRows())
-            @php($pages = $this->pages())
-            @php($limit = $this->limits['general'])
-            @php($checking = collect($own)->contains(fn (array $r): bool => $r["check"] === null && $r["at"] !== null && \Illuminate\Support\Carbon::parse($r["at"])->gt(now()->subMinutes(10))))
-            <section class="lp-card" data-pane="general" @if ($checking) wire:poll.5s @endif>
-                @foreach ($own as $row)
-                    <div class="lp-row" data-own="{{ $row['id'] }}">
-                        @php($check = $row['check'])
-                        <span class="lp-pill" data-tone="{{ ($check['status'] ?? null) === 'conflict' ? 'bad' : 'good' }}"><i></i>{{ $t('own.pill') }}</span>
-                        <div class="lp-grow">
-                            @if ($this->editing === $row['id'])
-                                <form wire:submit="saveEdit" class="lp-stack">
-                                    <textarea class="lp-textarea" wire:model="editText" rows="2" maxlength="600"></textarea>
-                                    <div class="lp-actions">
-                                        <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary">{{ $t('own.save') }}</button>
-                                        <button type="button" class="lp-link" wire:click="cancelEdit">{{ $t('own.cancel') }}</button>
+                    @if ($this->tab === 'pages')
+                        {{-- the pages and policies, then the posts, then what product pages repeat and the team answered --}}
+                        <section class="lp-d-card" data-pane="pages">
+                            @forelse (array_slice($pages, 0, $this->limits['pages']) as $page)
+                                <div class="lp-d-srow" data-page="{{ $page['id'] }}">
+                                    <span class="lp-d-srow-ic">{!! $pageIcon !!}</span>
+                                    <span class="lp-d-srow-main"><b dir="auto">@if ($page['url'])<a href="{{ $page['url'] }}" target="_blank" rel="noopener">{{ $page['title'] }}</a>@else{{ $page['title'] }}@endif</b><span class="lp-d-srow-l" dir="auto">{{ $page['summary'] }}</span></span>
+                                    <span class="lp-d-srow-used">{!! trans_choice('assistant::store_knowledge.pages.answers', $page['answered'], ['n' => number_format($page['answered'])]) !!}</span>
+                                    <span @class(['lp-d-chip', 'lp-d-chip-line' => $page['read'], 'lp-d-chip-quiet' => ! $page['read']])>{{ $page['read'] ? $t('pages.read') : $t('pages.not_read') }}</span>
+                                </div>
+                            @empty
+                                <p class="lp-d-note">{{ $t('pages.none') }}</p>
+                            @endforelse
+                            @if (count($pages) > $this->limits['pages'])
+                                <button type="button" class="lp-d-ghost lp-d-srow-more" wire:click="more('pages')">{{ $n('pages.more', count($pages) - $this->limits['pages']) }}</button>
+                            @endif
+
+                            @php($posts = $this->postRows())
+                            <h3 class="lp-d-ksub">{{ $t('pages.posts') }}</h3>
+                            @foreach (array_slice($posts, 0, $this->limits['posts']) as $post)
+                                <div class="lp-d-srow" data-post="{{ $post['id'] }}">
+                                    <span class="lp-d-srow-ic">{!! $pageIcon !!}</span>
+                                    <span class="lp-d-srow-main"><b dir="auto">@if ($post['url'])<a href="{{ $post['url'] }}" target="_blank" rel="noopener">{{ $post['title'] }}</a>@else{{ $post['title'] }}@endif</b>
+                                        <span class="lp-d-srow-l">{{ $post['read'] ? $n('pages.post_facts', count($post['facts'])) : '' }}</span></span>
+                                    @if ($post['facts'] !== [])
+                                        <button type="button" class="lp-d-ghost" wire:click="togglePost(@js($post['id']))" aria-expanded="{{ $this->openPost === $post['id'] ? 'true' : 'false' }}">{{ $this->openPost === $post['id'] ? $t('pages.facts_close') : $t('pages.facts_open') }}</button>
+                                    @else<span></span>@endif
+                                    <span @class(['lp-d-chip', 'lp-d-chip-line' => $post['read'], 'lp-d-chip-sun' => ! $post['read'] && $post['waiting'], 'lp-d-chip-quiet' => ! $post['read'] && ! $post['waiting']])>{{ $post['read'] ? $t('pages.read') : ($post['waiting'] ? $t('pages.waiting') : $t('pages.not_read')) }}</span>
+                                    @if ($this->openPost === $post['id'])
+                                        <ul class="lp-d-kfacts">
+                                            @foreach ($post['facts'] as $fact)
+                                                <li><span dir="auto">{{ $fact }}</span><button type="button" class="lp-d-ghost" wire:click="removePostFact(@js($fact))" wire:confirm="{{ __('assistant::ui.knowledge.posts.remove_confirm') }}">{{ $t('pages.remove') }}</button></li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                </div>
+                            @endforeach
+                            @if (count($posts) > $this->limits['posts'])
+                                <button type="button" class="lp-d-ghost lp-d-srow-more" wire:click="more('posts')">{{ $n('pages.more_posts', count($posts) - $this->limits['posts']) }}</button>
+                            @endif
+                            <form class="lp-d-kline" wire:submit="addPost">
+                                <input type="url" wire:model="postUrl" dir="ltr" placeholder="{{ $t('pages.post_link') }}" aria-label="{{ $t('pages.post_link') }}">
+                                <button type="submit" class="lp-d-btn lp-d-btn-line lp-d-btn-sm">{{ $t('pages.post_add') }}</button>
+                            </form>
+
+                            @php($found = $this->found())
+                            @if ($found !== [])
+                                <h3 class="lp-d-ksub">{{ $t('pages.found') }}</h3>
+                                @foreach (array_slice($found, 0, $this->limits['found']) as $row)
+                                    <div class="lp-d-srow" data-found="{{ $row['kind'] }}">
+                                        <span class="lp-d-srow-ic">{!! $penIcon !!}</span>
+                                        <span class="lp-d-srow-main"><b dir="auto">{{ $row['text'] }}</b><span class="lp-d-srow-l" dir="auto">{{ $row['from'] }}</span></span>
+                                        <span></span>
+                                        <button type="button" class="lp-d-ghost" wire:click="removeFound(@js($row['kind']), @js($row['key']))" wire:confirm="{{ __('assistant::ui.centre.found.remove_confirm') }}">{{ $t('pages.remove') }}</button>
                                     </div>
-                                </form>
-                            @else
-                                <span class="lp-row-t">{{ $row['text'] }}</span>
-                                <span class="lp-row-s">
-                                    @if ($row['at']){{ $t('own.added', ['date' => \Illuminate\Support\Carbon::parse($row['at'])->timezone($tz)->format('j.n')]) }} · @endif
-                                    @switch($check['status'] ?? null)
-                                        @case('ok') {{ $t('own.check_ok') }} @break
-                                        @case('nothing') {{ $t('own.check_nothing') }} @break
-                                        @case('conflict') <b>{{ $t('own.check_conflict') }}</b> @break
-                                        @case('later') {{ $t('own.check_later') }} @break
-                                        @case('failed') {{ $t('own.check_failed') }} @break
-                                        @default {{ $t('own.checking') }}
-                                    @endswitch
-                                </span>
-                                @if (($check['status'] ?? null) === 'conflict')
-                                    <ul class="lp-notes">
-                                        @foreach ($check['notes'] as $note)<li><b>{{ $note['title'] }}:</b> {{ $note['why'] }}</li>@endforeach
-                                    </ul>
-                                @endif
-                            @endif
-                        </div>
-                        @if ($this->editing !== $row['id'])
-                            <button type="button" class="lp-link" wire:click="startEdit(@js($row['id']))">{{ $t('own.edit') }}</button>
-                            <button type="button" class="lp-link" wire:click="removeInfo(@js($row['id']))" wire:confirm="{{ $t('own.remove_confirm') }}">{{ $t('own.remove') }}</button>
-                        @endif
-                    </div>
-                @endforeach
-
-                @forelse (array_slice($pages, 0, $limit) as $page)
-                    <div class="lp-row" data-page="{{ $page['id'] }}">
-                        <span class="lp-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
-                        <div class="lp-grow">
-                            <span class="lp-row-t">@if ($page['url'])<a href="{{ $page['url'] }}" target="_blank" rel="noopener">{{ $page['title'] }}</a>@else{{ $page['title'] }}@endif</span>
-                            <span class="lp-row-s">{{ $page['summary'] }}@if ($page['answered'] > 0) · {{ $t('page.answered', ['n' => number_format($page['answered'])]) }}@endif</span>
-                        </div>
-                        <span class="lp-pill" data-tone="{{ $page['read'] ? 'good' : '' }}"><i></i>{{ $page['read'] ? $t('page.read') : $t('page.waiting') }}</span>
-                    </div>
-                @empty
-                    @if ($own === [])<p class="lp-empty">{{ $t('page.none') }}</p>@endif
-                @endforelse
-                @if (count($pages) > $limit)
-                    <button type="button" class="lp-link" wire:click="more('general')">{{ $t('more', ['n' => count($pages) - $limit]) }}</button>
-                @endif
-            </section>
-        @elseif ($this->tab === 'posts')
-            @php($posts = $this->postRows())
-            @php($limit = $this->limits['posts'])
-            <section class="lp-card" data-pane="posts">
-                <div class="lp-fact"><b>{{ $t('posts.auto_title') }}</b> {{ $t('posts.auto_body') }}</div>
-                <form wire:submit="addPost" class="lp-inline">
-                    <input class="lp-input" type="url" wire:model="postUrl" dir="ltr" placeholder="{{ $t('posts.url_placeholder') }}" aria-label="{{ $t('posts.url_label') }}">
-                    <button type="submit" class="lp-btn lp-btn-primary">{{ $t('posts.add') }}</button>
-                </form>
-                @forelse (array_slice($posts, 0, $limit) as $post)
-                    <div class="lp-row lp-row-wrap" data-post="{{ $post['id'] }}">
-                        <span class="lp-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
-                        <div class="lp-grow">
-                            <span class="lp-row-t">@if ($post['url'])<a href="{{ $post['url'] }}" target="_blank" rel="noopener">{{ $post['title'] }}</a>@else{{ $post['title'] }}@endif</span>
-                            <span class="lp-row-s">
-                                @if ($post['read'])
-                                    {{ $t('posts.facts', ['n' => count($post['facts'])]) }}@if ($post['facts'] !== []) · "{{ \Illuminate\Support\Str::limit($post['facts'][0], 80) }}"@endif
-                                    @if ($post['read_at']) · {{ $t('posts.read_at', ['date' => \Illuminate\Support\Carbon::parse($post['read_at'])->timezone($tz)->format('j.n')]) }}@endif
-                                @elseif ($post['waiting'])
-                                    {{ $t('posts.waiting') }}
-                                @else
-                                    {{ $t('posts.not_read') }}
-                                @endif
-                            </span>
-                        </div>
-                        @if ($post['facts'] !== [])
-                            <button type="button" class="lp-link" wire:click="togglePost(@js($post['id']))" aria-expanded="{{ $this->openPost === $post['id'] ? 'true' : 'false' }}">{{ $this->openPost === $post['id'] ? $t('posts.close') : $t('posts.to_facts') }}</button>
-                        @endif
-                        @if ($this->openPost === $post['id'])
-                            <ul class="lp-facts">
-                                @foreach ($post['facts'] as $fact)
-                                    <li><span>{{ $fact }}</span><button type="button" class="lp-link" wire:click="removePostFact(@js($fact))" wire:confirm="{{ __('assistant::ui.knowledge.posts.remove_confirm') }}">{{ $t('remove') }}</button></li>
                                 @endforeach
-                            </ul>
-                        @endif
-                    </div>
-                @empty
-                    <p class="lp-empty">{{ $t('posts.none') }}</p>
-                @endforelse
-                @if (count($posts) > $limit)
-                    <button type="button" class="lp-link" wire:click="more('posts')">{{ $t('more', ['n' => count($posts) - $limit]) }}</button>
-                @endif
-            </section>
-        @elseif ($this->tab === 'found')
-            @php($found = $this->found())
-            @php($limit = $this->limits['found'])
-            <section class="lp-card" data-pane="found">
-                <p class="lp-note" style="margin: 0 0 6px">{{ $t('found.help') }}</p>
-                @forelse (array_slice($found, 0, $limit) as $row)
-                    <div class="lp-row" data-found="{{ $row['kind'] }}">
-                        <div class="lp-grow">
-                            <span class="lp-row-t">{{ $row['text'] }}</span>
-                            <span class="lp-row-s">{{ $row['from'] }}</span>
-                        </div>
-                        <button type="button" class="lp-link" wire:click="removeFound(@js($row['kind']), @js($row['key']))" wire:confirm="{{ $t('found.remove_confirm') }}">{{ $t('remove') }}</button>
-                    </div>
-                @empty
-                    <p class="lp-empty">{{ $t('found.none') }}</p>
-                @endforelse
-                @if (count($found) > $limit)
-                    <button type="button" class="lp-link" wire:click="more('found')">{{ $t('more', ['n' => count($found) - $limit]) }}</button>
-                @endif
-            </section>
-        @endif
-
-        @if ($this->tab === 'rules')
-            {{-- the team's rules of its products: written in its words, read into a plan, approved before anything changes --}}
-            @php($rules = $this->rules())
-            @php($reading = collect($rules)->contains(fn (array $r): bool => $r['status'] === 'reading'))
-            <section class="lp-card" data-pane="rules" @if ($reading) wire:poll.5s @endif>
-                <div class="lp-card-t"><h2>{{ $t('rules.title') }}</h2><span class="lp-note">{{ $t('rules.note') }}</span></div>
-                <form wire:submit="addRule" class="lp-stack">
-                    {{-- "@" and some words: the store's products, categories, posts and pages to choose from, as its search finds them --}}
-                    <div style="position: relative" data-mention
-                        x-data="{ open: false, items: [], at: -1, active: 0, timer: null, picked: [],
-                            look() {
-                                const el = $refs.box, before = el.value.slice(0, el.selectionStart), m = before.match(/@([^@\n]{0,40})$/);
-                                if (! m || this.picked.some(l => m[1].startsWith(l))) { this.open = false; return; }
-                                this.at = before.length - m[0].length;
-                                const q = m[1];
-                                clearTimeout(this.timer);
-                                if (q.trim() === '') { this.items = []; this.open = true; return; }
-                                this.timer = setTimeout(() => $wire.mentionSearch(q).then(r => { this.items = r || []; this.active = 0; this.open = true; }), 200);
-                            },
-                            key(e) {
-                                if (! this.open) { return; }
-                                if (e.key === 'Escape') { this.open = false; return; }
-                                if (! this.items.length) { return; }
-                                if (e.key === 'ArrowDown') { e.preventDefault(); this.active = (this.active + 1) % this.items.length; }
-                                else if (e.key === 'ArrowUp') { e.preventDefault(); this.active = (this.active + this.items.length - 1) % this.items.length; }
-                                else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); this.pick(this.active); }
-                            },
-                            pick(i) {
-                                const it = this.items[i], el = $refs.box;
-                                if (! it) { return; }
-                                const end = el.selectionStart;
-                                el.value = el.value.slice(0, this.at) + '@' + it.label + ' ' + el.value.slice(end);
-                                const pos = this.at + it.label.length + 2;
-                                this.picked.push(it.label);
-                                this.open = false;
-                                el.setSelectionRange(pos, pos);
-                                el.dispatchEvent(new Event('input'));
-                                $wire.addMention(it.type, it.id, it.label);
-                                el.focus();
-                            } }"
-                        @click.outside="open = false">
-                        <textarea class="lp-textarea" x-ref="box" wire:model="newRule" rows="3" maxlength="600" placeholder="{{ $t('rules.placeholder') }}" aria-label="{{ $t('rules.title') }}"
-                            @input="look()" @click="look()" @keydown="key($event)" aria-autocomplete="list"></textarea>
-                        <div x-show="open" x-cloak role="listbox" style="position: absolute; inset-inline: 0; top: 100%; z-index: 30; margin-top: 4px; max-height: 300px; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 12px 32px -12px rgb(11 11 12 / .35), 0 0 0 1px rgb(11 11 12 / .08); padding: 4px">
-                            <template x-if="! items.length"><p class="lp-note" style="margin: 8px 10px">{{ $t('rules.mention_hint') }}</p></template>
-                            <template x-for="(it, i) in items" :key="it.type + it.id">
-                                <button type="button" role="option" :aria-selected="i === active" @mousedown.prevent="pick(i)" @mouseenter="active = i"
-                                    :style="'display: flex; width: 100%; gap: 10px; align-items: center; padding: 6px 8px; border: 0; border-radius: 8px; text-align: start; cursor: pointer; background: ' + (i === active ? '#f2f2f3' : 'transparent')">
-                                    <template x-if="it.image"><img :src="it.image" alt="" style="width: 32px; height: 32px; object-fit: cover; border-radius: 6px; flex: none"></template>
-                                    <template x-if="! it.image"><span style="width: 32px; height: 32px; border-radius: 6px; background: #f2f2f3; flex: none"></span></template>
-                                    <span style="flex: 1; min-width: 0" dir="auto"><span x-text="it.label" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"></span></span>
-                                    <span class="lp-note" x-text="it.kind" style="flex: none"></span>
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="lp-actions">
-                        <button type="submit" class="lp-btn lp-btn-sm lp-btn-primary" wire:loading.attr="disabled" wire:target="addRule">{{ $t('rules.button') }}</button>
-                        <span class="lp-note">{{ $t('rules.checked') }} {{ $t('rules.mention_hint') }}</span>
-                    </div>
-                </form>
-                @forelse (array_slice($rules, 0, $this->limits['rules']) as $rule)
-                    <div class="lp-row" data-rule="{{ $rule['id'] }}" data-status="{{ $rule['status'] }}">
-                        <span class="lp-pill" data-tone="{{ ['proposed' => 'warn', 'applied' => 'good', 'unclear' => 'bad', 'failed' => 'bad'][$rule['status']] ?? '' }}"><i></i>{{ $t('rules.status.'.$rule['status']) }}</span>
-                        <div class="lp-grow">
-                            {{-- what it names with "@", in bold --}}
-                            @php($shown = e($rule['text']))
-                            @foreach ($rule['mentions'] ?? [] as $named)@php($shown = str_replace(e('@'.$named), '<b>'.e('@'.$named).'</b>', $shown))@endforeach
-                            <span class="lp-row-t" dir="auto">{!! $shown !!}</span>
-                            <span class="lp-row-s">{{ $t('rules.written', ['date' => \Illuminate\Support\Carbon::parse($rule['at'])->timezone($tz)->format('j.n')]) }}</span>
-                            @if ($rule['note'])<p class="lp-row-s" dir="auto" style="margin: 6px 0 0">@if (in_array($rule['status'], ['proposed', 'applied', 'rejected'], true))<b>{{ $t('rules.understood') }}</b> @endif{{ $rule['note'] }}</p>@endif
-                            @if ($rule['link'] ?? null)<p class="lp-row-s" dir="auto" style="margin: 4px 0 0"><b>{{ $t('rules.link') }}</b> {{ $rule['link'] }}</p>@endif
-                            @if ($rule['changes'] !== [])
-                                <ul class="lp-notes" data-changes>
-                                    @foreach ($rule['changes'] as $change)
-                                        <li dir="auto" style="display: flex; gap: 10px; align-items: flex-start">
-                                            @if ($change['image'])<img src="{{ $change['image'] }}" alt="" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; flex: none">@endif
-                                            <span>
-                                                <b>{{ $change['title'] }}</b>
-                                                @if ($change['add'] !== [])<br>{{ $t('rules.add') }} {{ implode(', ', $change['add']) }}@endif
-                                                @if ($change['remove'] !== [])<br>{{ $t('rules.remove') }} {{ implode(', ', $change['remove']) }}@endif
-                                                @if ($change['apart'] !== [])<br>{{ $t('rules.apart') }} {{ implode(', ', $change['apart']) }}@endif
-                                                @if ($change['alike'] !== [])<br>{{ $t('rules.alike') }} {{ implode(', ', $change['alike']) }}@endif
-                                            </span>
-                                        </li>
+                                @if (count($found) > $this->limits['found'])
+                                    <button type="button" class="lp-d-ghost lp-d-srow-more" wire:click="more('found')">{{ $n('pages.more_found', count($found) - $this->limits['found']) }}</button>
+                                @endif
+                            @endif
+                        </section>
+                    @elseif ($this->tab === 'products')
+                        {{-- a row of products, the ones missing a detail marked, and what was understood of the open one --}}
+                        @php($strip = $this->strip())
+                        @php($open = $this->openProduct())
+                        <section class="lp-d-card" data-pane="products">
+                            <div class="lp-d-kline lp-d-kline-top">
+                                <input type="search" wire:model.live.debounce.400ms="productSearch" placeholder="{{ $t('products.find') }}" aria-label="{{ $t('products.find') }}" dir="auto">
+                            </div>
+                            @if ($strip === [])
+                                <p class="lp-d-note">{{ $t('products.none') }}</p>
+                            @else
+                                <div class="lp-d-plist" role="group" aria-label="{{ $t('tabs.products') }}">
+                                    @foreach ($strip as $p)
+                                        <button type="button" wire:click="pick(@js($p['id']))" aria-pressed="{{ ($open['id'] ?? null) === $p['id'] ? 'true' : 'false' }}" title="{{ $p['title'] }}">
+                                            @if ($p['picture'])<img src="{{ $p['picture'] }}" alt="{{ $p['title'] }}" loading="lazy">@else<span class="lp-d-tile"></span>@endif
+                                            @if ($p['missing'])<span class="lp-d-plist-dot" title="{{ $t('products.missing_dot') }}"></span>@endif
+                                        </button>
                                     @endforeach
-                                </ul>
-                            @endif
-                            @if (in_array($rule['status'], ['failed', 'unclear'], true))
-                                <div class="lp-actions" style="margin-top: 10px">
-                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="retryRule(@js($rule['id']))" wire:loading.attr="disabled" wire:target="retryRule">{{ $t('rules.retry') }}</button>
                                 </div>
                             @endif
-                            @if ($rule['status'] === 'proposed')
-                                <div class="lp-actions" style="margin-top: 10px">
-                                    <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="decideRule(@js($rule['id']), true)" wire:loading.attr="disabled" wire:target="decideRule">{{ $t('rules.approve') }}</button>
-                                    <button type="button" class="lp-btn lp-btn-sm" wire:click="decideRule(@js($rule['id']), false)">{{ $t('rules.reject') }}</button>
+                            @if ($open !== null)
+                                <div class="lp-d-popen" data-product="{{ $open['id'] }}">
+                                    @if ($open['picture'])<img src="{{ $open['picture'] }}" alt="">@else<span class="lp-d-tile"></span>@endif
+                                    <div>
+                                        <h3 dir="auto">{{ $open['title'] }}</h3>
+                                        @if ($open['price'])<span class="lp-d-popen-price lp-d-num">{{ $open['price'] }}</span>@endif
+                                        <div class="lp-d-kv">
+                                            <div>
+                                                <h4>{{ $t('products.understood') }}</h4>
+                                                @if ($open['tags'] === [] && $open['missing'] === [])
+                                                    <p class="lp-d-note">{{ $t('products.nothing') }}</p>
+                                                @else
+                                                    <div class="lp-d-tags">
+                                                        @foreach ($open['tags'] as $tag)<span class="lp-d-tag"><bdi>{{ $tag['label'] }}</bdi> <i>{{ $t('products.from.'.$tag['from']) }}</i></span>@endforeach
+                                                        @foreach ($open['missing'] as $missing)<span class="lp-d-tag lp-d-tag-miss"><bdi>{{ $missing }}</bdi> <i>{{ $t('products.missing') }}</i></span>@endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            @if ($open['saw'])
+                                                <div><h4>{{ $t('products.saw') }}</h4><p class="lp-d-saw" dir="auto">{{ $open['saw'] }}</p></div>
+                                            @endif
+                                            <div class="lp-d-popen-do">
+                                                @if ($open['url'])<a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $open['url'] }}" target="_blank" rel="noopener">{{ $t('products.see') }}</a>@endif
+                                                @if ($open['fix'])<a class="lp-d-ghost" href="{{ $open['fix'] }}">{{ $t('products.wrong') }}</a>@endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             @endif
+                        </section>
+                    @elseif ($this->tab === 'notes')
+                        {{-- what the team added, each checked against the site --}}
+                        @php($checking = collect($own)->contains(fn (array $r): bool => $r['check'] === null && $r['at'] !== null && \Illuminate\Support\Carbon::parse($r['at'])->gt(now()->subMinutes(10))))
+                        <section class="lp-d-card" data-pane="notes" @if ($checking) wire:poll.5s @endif>
+                            @forelse (array_slice($own, 0, $this->limits['notes']) as $row)
+                                @php($check = $row['check'])
+                                <div class="lp-d-srow" data-own="{{ $row['id'] }}">
+                                    <span @class(['lp-d-srow-ic', 'is-new' => $row['at'] !== null && \Illuminate\Support\Carbon::parse($row['at'])->gt(now()->subMinutes(10))])>{!! $penIcon !!}</span>
+                                    <span class="lp-d-srow-main">
+                                        @if ($this->editing === $row['id'])
+                                            <form class="lp-d-kline" wire:submit="saveEdit">
+                                                <input wire:model="editText" maxlength="600" dir="auto" aria-label="{{ $t('notes.edit') }}">
+                                                <button type="submit" class="lp-d-btn lp-d-btn-ink lp-d-btn-sm">{{ $t('notes.save') }}</button>
+                                                <button type="button" class="lp-d-ghost" wire:click="cancelEdit">{{ $t('notes.cancel') }}</button>
+                                            </form>
+                                        @else
+                                            <b dir="auto">“{{ $row['text'] }}”</b>
+                                            <span class="lp-d-srow-l lp-d-srow-wrap">
+                                                @if ($row['at']){{ $t('notes.added', ['when' => $ago($row['at'])]) }} · @endif
+                                                @switch($check['status'] ?? null)
+                                                    @case('ok') {{ __('assistant::ui.centre.own.check_ok') }} @break
+                                                    @case('nothing') {{ __('assistant::ui.centre.own.check_nothing') }} @break
+                                                    @case('conflict') <b>{{ __('assistant::ui.centre.own.check_conflict') }}</b> @break
+                                                    @case('later') {{ __('assistant::ui.centre.own.check_later') }} @break
+                                                    @case('failed') {{ __('assistant::ui.centre.own.check_failed') }} @break
+                                                    @default {{ __('assistant::ui.centre.own.checking') }}
+                                                @endswitch
+                                            </span>
+                                            @if (($check['status'] ?? null) === 'conflict')
+                                                <ul class="lp-d-kfacts">@foreach ($check['notes'] as $note)<li><span dir="auto"><b>{{ $note['title'] }}:</b> {{ $note['why'] }}</span></li>@endforeach</ul>
+                                            @endif
+                                        @endif
+                                    </span>
+                                    @if ($this->editing !== $row['id'])
+                                        <button type="button" class="lp-d-ghost" wire:click="startEdit(@js($row['id']))">{{ $t('notes.edit') }}</button>
+                                        <button type="button" class="lp-d-ghost" wire:click="removeInfo(@js($row['id']))" wire:confirm="{{ $t('notes.remove_confirm') }}">{{ $t('notes.remove') }}</button>
+                                    @endif
+                                </div>
+                            @empty
+                                <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('notes.zero') }}</b><span>{{ $t('notes.zero_text') }}</span></div>
+                            @endforelse
+                        </section>
+                    @else
+                        {{-- the rules of the store's products: written in its words, read into a plan, approved before anything changes --}}
+                        @php($reading = collect($rules)->contains(fn (array $r): bool => $r['status'] === 'reading'))
+                        <section class="lp-d-card" data-pane="rules" @if ($reading) wire:poll.5s @endif>
+                            <p class="lp-d-card-sub lp-d-rules-sub">{{ $t('rules.sub') }}</p>
+                            @include('assistant::merchant.rule-form')
+                            @forelse (array_slice($rules, 0, $this->limits['rules']) as $rule)
+                                @php($shown = e($rule['text']))
+                                @foreach ($rule['mentions'] ?? [] as $named)@php($shown = str_replace(e('@'.$named), '<code>'.e('@'.$named).'</code>', $shown))@endforeach
+                                <div class="lp-d-rule" data-rule="{{ $rule['id'] }}" data-status="{{ $rule['status'] }}">
+                                    <div>
+                                        <p dir="auto">{!! $shown !!}</p>
+                                        <span>
+                                            @if (in_array($rule['status'], ['unclear', 'failed'], true) && $rule['note']){{ $rule['note'] }}
+                                            @else{{ $n('rules.applies', count($rule['changes'] ?? [])) }}@if ($rule['note'] && $rule['status'] !== 'reading') · {{ __('assistant::ui.centre.rules.understood') }} {{ $rule['note'] }}@endif
+                                            @endif
+                                        </span>
+                                        @if (($rule['link'] ?? null))<span class="lp-d-rule-l" dir="auto"><b>{{ __('assistant::ui.centre.rules.link') }}</b> {{ $rule['link'] }}</span>@endif
+                                        @if (($rule['changes'] ?? []) !== [])
+                                            <details class="lp-d-rule-changes" @if ($rule['status'] === 'proposed') open @endif>
+                                                <summary>{{ $t('rules.changes') }}</summary>
+                                                <ul>
+                                                    @foreach ($rule['changes'] as $change)
+                                                        <li dir="auto">
+                                                            @if ($change['image'])<img src="{{ $change['image'] }}" alt="">@endif
+                                                            <span><b>{{ $change['title'] }}</b>
+                                                                @if ($change['add'] !== [])<br>{{ __('assistant::ui.centre.rules.add') }} {{ implode(', ', $change['add']) }}@endif
+                                                                @if ($change['remove'] !== [])<br>{{ __('assistant::ui.centre.rules.remove') }} {{ implode(', ', $change['remove']) }}@endif
+                                                                @if ($change['apart'] !== [])<br>{{ __('assistant::ui.centre.rules.apart') }} {{ implode(', ', $change['apart']) }}@endif
+                                                                @if ($change['alike'] !== [])<br>{{ __('assistant::ui.centre.rules.alike') }} {{ implode(', ', $change['alike']) }}@endif
+                                                            </span>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </details>
+                                        @endif
+                                    </div>
+                                    <div class="lp-d-rule-do">
+                                        <span @class(['lp-d-chip', 'lp-d-chip-line' => $rule['status'] === 'applied', 'lp-d-chip-sun' => in_array($rule['status'], ['proposed', 'unclear', 'failed'], true), 'lp-d-chip-quiet' => in_array($rule['status'], ['reading', 'rejected'], true)])>{{ $t('rules.status.'.$rule['status']) }}</span>
+                                        @if ($rule['status'] === 'proposed')
+                                            <button type="button" class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" wire:click="decideRule(@js($rule['id']), true)" wire:loading.attr="disabled" wire:target="decideRule">{{ __('assistant::ui.centre.rules.approve') }}</button>
+                                            <button type="button" class="lp-d-ghost" wire:click="decideRule(@js($rule['id']), false)">{{ __('assistant::ui.centre.rules.reject') }}</button>
+                                        @elseif (in_array($rule['status'], ['failed', 'unclear'], true))
+                                            <button type="button" class="lp-d-btn lp-d-btn-line lp-d-btn-sm" wire:click="retryRule(@js($rule['id']))" wire:loading.attr="disabled" wire:target="retryRule">{{ __('assistant::ui.centre.rules.retry') }}</button>
+                                        @endif
+                                        @if ($rule['status'] !== 'reading')
+                                            <button type="button" class="lp-d-ghost" wire:click="removeRule(@js($rule['id']))" wire:confirm="{{ __('assistant::ui.centre.rules.remove_confirm') }}">{{ __('assistant::ui.centre.rules.remove_rule') }}</button>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('rules.zero') }}</b><span>{{ $t('rules.zero_text') }}</span></div>
+                            @endforelse
+                            @if (count($rules) > $this->limits['rules'])
+                                <button type="button" class="lp-d-ghost lp-d-srow-more" wire:click="more('rules')">{{ __('assistant::ui.centre.more', ['n' => count($rules) - $this->limits['rules']]) }}</button>
+                            @endif
+                        </section>
+                    @endif
+                </div>
+
+                <aside class="lp-d-imp-aside">
+                    <section class="lp-d-goal lp-d-knows">
+                        <h2 class="lp-d-card-title">{{ $t('knows.title') }}</h2>
+                        <div class="lp-d-knows-grid">
+                            <div><span>{{ $t('knows.products') }}</span><b class="lp-d-num">{{ number_format($knows['products']) }}</b></div>
+                            <div><span>{{ $t('knows.photos') }}</span><b class="lp-d-num">{{ number_format($knows['photos']) }}</b></div>
+                            <div><span>{{ $t('knows.pages') }}</span><b class="lp-d-num">{{ number_format($knows['pages'] + $knows['posts']) }}</b></div>
+                            <div><span>{{ $t('knows.added') }}</span><b class="lp-d-num">{{ number_format(count($own)) }}</b></div>
                         </div>
-                        @if ($rule['status'] !== 'reading')
-                            <button type="button" class="lp-link" wire:click="removeRule(@js($rule['id']))" wire:confirm="{{ $t('rules.remove_confirm') }}">{{ $t('rules.remove_rule') }}</button>
-                        @endif
-                    </div>
-                @empty
-                    <p class="lp-note">{{ $t('rules.none') }}</p>
-                @endforelse
-                @if (count($rules) > $this->limits['rules'])
-                    <button type="button" class="lp-link" wire:click="more('rules')">{{ $t('more', ['n' => count($rules) - $this->limits['rules']]) }}</button>
-                @endif
-            </section>
-        @endif
+                        <p>{!! $knows['read_at'] ? __('assistant::store_knowledge.knows.read', ['when' => e($ago($knows['read_at']))]) : e($t('knows.never')) !!}</p>
+                    </section>
+                    <section class="lp-d-tip"><b>{!! $mark !!}<span>{{ $t('tip.title') }}</span></b><span>{{ $t('tip.text') }}</span></section>
+                </aside>
+            </div>
+        </div>
     </div>
 </x-filament-panels::page>

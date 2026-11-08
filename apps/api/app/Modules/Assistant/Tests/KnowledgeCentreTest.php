@@ -129,13 +129,13 @@ final class KnowledgeCentreTest extends TestCase
 
         $page = Livewire::test(AboutStore::class)
             ->call('show', 'rules')
-            ->assertSee(__('assistant::ui.centre.rules.none'))
+            ->assertSee(__('assistant::store_knowledge.rules.zero'))
             ->assertDontSee('data-pane="found"', false)
             ->assertSet('ruleMentions', [])
             ->set('newRule', 'הספר "מפגש עם עצמי בגיהינום" לא מתאים לספרים כמו "דרקולה" ולא כמו @חרדי וטוב לו')
             ->call('addMention', 'product', '7', 'חרדי וטוב לו')
             ->call('addRule')
-            ->assertSee(__('assistant::ui.centre.rules.status.proposed'))
+            ->assertSee(__('assistant::store_knowledge.rules.status.proposed'))
             ->assertSee('הספר הוא ביוגרפיה.')
             ->assertSee(__('assistant::ui.centre.rules.link'))
             ->assertSee('מפגש עם עצמי בגיהינום')->assertSee(__('assistant::ui.centre.rules.add').' ביוגרפיה')->assertSee(__('assistant::ui.centre.rules.remove').' אימה')->assertSee(__('assistant::ui.centre.rules.apart').' דרקולה')
@@ -144,12 +144,12 @@ final class KnowledgeCentreTest extends TestCase
         $this->assertSame([['type' => 'product', 'id' => '7', 'label' => 'חרדי וטוב לו']], $rules->mentioned, 'what was chosen after "@" goes with the rule');
         $this->assertSame([], $page->get('ruleMentions'));
         $this->assertSame('מוצר', $page->instance()->mentionSearch('חרד')[0]['kind']);
-        $page->assertSeeHtml('<b>@חרדי וטוב לו</b>');
+        $page->assertSeeHtml('<code>@חרדי וטוב לו</code>');
 
-        $page->call('decideRule', 'r1', true)->assertSee(__('assistant::ui.centre.rules.status.applied'))->assertDontSee(__('assistant::ui.centre.rules.approve'));
+        $page->call('decideRule', 'r1', true)->assertSee(__('assistant::store_knowledge.rules.status.applied'))->assertDontSee(__('assistant::ui.centre.rules.approve'));
         $this->assertSame([['r1', true]], $rules->decided);
 
-        $page->call('removeRule', 'r1')->assertSee(__('assistant::ui.centre.rules.none'));
+        $page->call('removeRule', 'r1')->assertSee(__('assistant::store_knowledge.rules.zero'));
     }
 
     public function test_a_line_the_team_adds_joins_general_information_and_can_be_edited_and_removed(): void
@@ -157,7 +157,7 @@ final class KnowledgeCentreTest extends TestCase
         Queue::fake();
 
         $page = Livewire::test(AboutStore::class)
-            ->assertSee('להוסיף מידע')
+            ->assertSee('ללמד את Lets משהו')
             ->set('newInfo', 'חיתוך פלטות לפי מידה בחנות בלבד, 8 ש"ח לחיתוך.')
             ->call('addInfo')
             ->assertSet('newInfo', '')
@@ -193,7 +193,7 @@ final class KnowledgeCentreTest extends TestCase
         app(CheckOwnKnowledge::class)->handle($this->shop->id, $other);
         $this->assertCount(1, $this->calls, 'never asked twice');
 
-        Livewire::test(AboutStore::class)->assertSee('באתר כתוב אחרת')->assertSee('באתר: 10 ש"ח לחיתוך.');
+        Livewire::test(AboutStore::class)->call('show', 'notes')->assertSee('באתר כתוב אחרת')->assertSee('באתר: 10 ש"ח לחיתוך.');
     }
 
     public function test_nothing_on_the_site_near_the_line_means_no_model_is_asked(): void
@@ -218,8 +218,8 @@ final class KnowledgeCentreTest extends TestCase
         });
 
         Livewire::test(AboutStore::class)
-            ->assertSeeInOrder(['מדיניות החזרות', 'החזרה תוך 14 יום באריזה המקורית.', 'ענה על 8 שאלות', 'אודות'])
-            ->assertSee('ממתין לקריאה');
+            ->assertSeeHtmlInOrder(['מדיניות החזרות', 'החזרה תוך 14 יום באריזה המקורית.', '<b>8</b>תשובות', 'אודות'])
+            ->assertSee('עוד לא נקרא');
     }
 
     public function test_a_post_is_added_by_its_link_in_any_spelling_and_read_first(): void
@@ -228,11 +228,12 @@ final class KnowledgeCentreTest extends TestCase
         $post = $this->content(CatalogContent::POST, 'איך בוחרים לביד', 'https://shop.example.co.il/blog/lavid/', '<p>לביד סנדוויץ׳ עמיד יותר ללחות.</p>');
 
         Livewire::test(AboutStore::class)
-            ->call('show', 'posts')
+            ->call('show', 'pages')
             ->assertSee('איך בוחרים לביד')
             ->set('postUrl', 'http://www.shop.example.co.il/blog/lavid?utm_source=x')
             ->call('addPost')
-            ->assertSee('בתור לקריאה');
+            ->assertSet('tab', 'pages')
+            ->assertSee('ייקרא בקרוב');
 
         $this->assertSame([(string) $post->id], $this->inShop(fn (): array => app(BuildShopKnowledge::class)->wanted()));
         Queue::assertPushed(ReadPostKnowledgeJob::class);
@@ -250,7 +251,7 @@ final class KnowledgeCentreTest extends TestCase
         ]));
 
         Livewire::test(AboutStore::class)
-            ->call('show', 'found')
+            ->call('show', 'pages')
             ->assertSee('משלוח עד 5 ימי עסקים לכל הארץ')
             ->assertSee('חוזר בכ-1,840 דפי מוצר');
     }
