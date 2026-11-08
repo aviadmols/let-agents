@@ -413,10 +413,16 @@
   // shown: the "ask" row is already above (a question being typed): the words only, never the same button twice
   function askCardHtml(q, text, shown) {
     if (shown) { return text ? '<p class="ls-note__text">' + esc(text) + '</p>' : ''; }
-    return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') +
-      '<div class="ls-note"><button class="ls-ask" data-askcard data-from="' + esc(q) + '" data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"><span class="ls-ask__mark">' + mark() + '</span>' +
-      '<span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(q) + '</span></span>' +
-      '<span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
+    return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') + askCard(q, false, askFind(q));
+  }
+  // the AI asked to find the words across the whole catalogue ("תראה לי …": the set finder), from the ask card or the row
+  function askFind(q) { return 'data-askcard data-from="' + esc(q) + '" data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"'; }
+  // nothing found by the words nor by their meaning: never "not found" (Tomer's ask card, 8.11), the store's popular
+  // searches to start from, then the card that asks the AI
+  function popularHtml() {
+    var pop = (S.config.popular || []).slice(0, 5);
+    return pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + '</div><div class="ls-chips" style="margin-bottom:14px">' +
+      pop.map(function (x) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(x) + '">' + icon('trend', 'ls-icon--sm') + esc(x) + '</button>'; }).join('') + '</div>' : '';
   }
   function resultsHtml(turn) {
     if (turn.loading) { return thinking(); }
@@ -431,10 +437,10 @@
         html += '<p class="ls-noanswer__text">' + esc(t('didYouMean', { q: turn.q })) + '</p><div class="ls-chips" style="margin-bottom:14px">' +
           turn.focus.options.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') +
           (turn.focus.category ? '<button class="ls-chip ls-chip--quiet" data-q="' + esc(turn.focus.category.title) + '">' + esc(t('category', { t: turn.focus.category.title })) + '</button>' : '') + '</div>';
-      } else {
-        html += '<p class="ls-noanswer__text"><b>' + esc(t('noResults', { q: turn.q })) + '</b><br><span style="color:var(--ls-fg-muted)">' + esc(t('noResultsSub', { name: CFG.assistant })) + '</span></p>';
+      } else if (!turn.askShown) {
+        html += popularHtml();
       }
-      html += askCardHtml(turn.q, '', turn.askShown);
+      html += off('ask') ? '' : askCardHtml(turn.q, '', turn.askShown);
       return html;
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
@@ -460,8 +466,10 @@
     if (ga) { html += guidesHtml(guides, turn.q) + '<div class="ls-grid">' + list.slice(ga, n).map(card).join('') + '</div>'; }
     if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
     if (!guideFirst && !ga) { html += guidesHtml(guides, turn.q); }
-    // asked of the store's AI only over a few results (search.not_sure_max): a long list is narrowed by its filters first
-    if (!off('ask') && list.length <= notSureMax()) html += '<button class="ls-row" data-opt style="margin-top:8px;color:var(--ls-fg-muted)" data-not-sure="' + esc(turn.id) + '"><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span><span class="ls-row__text">' + esc(t('notSure', { name: CFG.assistant })) + '</span></button>' + (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
+    // results that may not be it: a quiet way to ask the store's AI to search the site (Tomer's ask card, 8.11), never
+    // for a question already asked above (its card is there), and only when the shopper presses it
+    if (!off('ask') && !turn.askShown) { html += askSmall(askFind(turn.q)); }
+    html += (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }
 

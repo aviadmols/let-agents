@@ -43,7 +43,7 @@
     if (qs.length) {
       html += '<div class="ls-stack" style="margin-bottom:14px">' + qs.map(function (q) {
         var act = q.about === 'similar_items' ? 'data-similar="' + esc(turn.id) + '"' : q.about === 'similar' && q.query ? 'data-q="' + esc(q.query) + '"' : q.about === 'compare' ? 'data-cmp-viewed="' + esc(turn.id) + '"' : 'data-ask="' + esc(q.question || q.text) + '"';
-        return '<button class="ls-row" ' + act + ' style="background:var(--ls-bg-sunken);min-height:48px">' + mark() + '<span class="ls-row__text">' + esc(q.text) + '</span><span class="ls-row__end" style="opacity:1">' + icon('fwd', 'ls-icon--sm') + '</span></button>';
+        return '<button class="ls-row" ' + act + ' style="background:var(--ls-bg-sunken);min-height:48px">' + markDot() + '<span class="ls-row__text">' + esc(q.text) + '</span><span class="ls-row__end" style="opacity:1">' + icon('fwd', 'ls-icon--sm') + '</span></button>';
       }).join('') + '</div>';
     }
     var seen = LEARN.recent && LEARN.recent.products;

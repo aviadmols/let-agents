@@ -181,8 +181,24 @@
       return '<div style="padding:4px 4px 8px"><button class="ls-ask ls-ask--saved' + (active ? ' is-active' : '') + '" data-opt data-saved-answer="' + esc(saved.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(saved.title) + '</span>' +
         '<span class="ls-ask__ans' + (fresh ? ' ls-words' : '') + '" dir="auto">' + (fresh ? words(saved.ans) : esc(saved.ans)) + '</span></span><span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
     }
-    return '<div style="padding:4px 4px 8px"><button class="ls-ask' + (active ? ' is-active' : '') + '" data-opt data-ask="' + esc(q) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q">' + esc(q) + '</span></span><span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
+    return askCard(q, active, 'data-ask="' + esc(q) + '"');
   }
+  // A question, or a search with nothing in the store (Tomer's ask card, approved 8.11): never "not found", but one clear
+  // action, a solid button that sends it to the store's AI. The AI runs only when the shopper asks (the button, or Enter
+  // on it as the selected option); nothing is asked on its own, so no search spends anything. act: the button's data-*.
+  function askCard(q, active, act) {
+    return '<div class="ls-askcard"><p class="ls-askcard__kicker"><span class="ls-askcard__mark">' + mark() + '</span>' + esc(t('askKicker')) + '</p>' +
+      '<p class="ls-askcard__q" dir="auto">“' + esc(String(q || '').replace(/[“”"]/g, '')) + '”</p>' +
+      '<button class="ls-askcard__btn' + (active ? ' is-active' : '') + '" data-opt ' + act + '><span>' + esc(t('askBtn')) + '</span></button>' +
+      '<p class="ls-askcard__sub">' + esc(t('askSub', { name: CFG.assistant })) + '</p></div>';
+  }
+  // a quieter way to ask, under results that may not be it: "Not it? Ask Lets · Search the site for me"
+  function askSmall(act) {
+    return '<div style="padding:4px 0"><button class="ls-row ls-row--ask" data-opt ' + act + '><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span>' +
+      '<span class="ls-row__text">' + esc(t('askOther', { name: CFG.assistant })) + '</span><span class="ls-row__go">' + esc(t('askBtn')) + '</span></button></div>';
+  }
+  // the Lets mark in a small white circle, at the start of a list row
+  function markDot() { return '<span class="ls-markdot" aria-hidden="true">' + mark() + '</span>'; }
   // the live view is the results turn itself, as Enter will keep it, with the words still being typed
   function liveHtml(lv) {
     // a question gets its "ask" row here, above the results: the results then say what they say without a second one

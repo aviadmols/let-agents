@@ -48,7 +48,22 @@
     // is about them (the server decides by the question's words whether it is); never a search behind the dashed line
     if (shown.length && ((S.ctx && turn.ctx) || !prev.prev)) { body.previous = shown; }
     visitStep('ask', { label: String(q).slice(0, 200) });
-    again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})), wait: 90000 }); }).then(function (r) {
+    // The same question again in this visit is answered from what this browser kept (Tomer's ask card, 8.11): no second
+    // call to the AI. Only answers that answered are kept, by the question, the product it is about and the products it
+    // was asked over ("מה הכי זול?" after another search is another question); a reply in a conversation is never kept.
+    var keepKey = extra ? null : [body.page ? 'page' : '', (body.products || []).slice(0, 12).join(','), (body.previous || []).join(','), String(q).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?؟.!]+$/, '')].join('|');
+    var kept = keepKey ? (store('session', 'ls_answers') || {}) : {};
+    (keepKey && kept[keepKey] ? Promise.resolve({ ok: true, body: kept[keepKey] }) : again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})), wait: 90000 }); }).then(function (r) {
+      var d0 = r.ok && r.body ? (r.body.data || r.body) : null;
+      if (keepKey && d0 && d0.outcome === 'answered') {
+        kept[keepKey] = r.body;
+        // a visit keeps its last 20 answers, the oldest let go first
+        var keys = Object.keys(kept);
+        if (keys.length > 20) { delete kept[keys[0]]; }
+        store('session', 'ls_answers', kept);
+      }
+      return r;
+    })).then(function (r) {
       clearTimeout(slow);
       if (!r.ok) { throw new Error('ask'); }
       var d = (r.body && r.body.data) || r.body || {};
@@ -170,7 +185,7 @@
     return out;
   }
   function answerHtml(turn) {
-    if (turn.loading) { return thinking(); }
+    if (turn.loading) { return thinking(t('thinkingAsk')); }
     if (turn.error) { return errorHtml(turn); }
     // asked for advice among a search's results: with no clear pick, those results to talk over with another AI, not a form
     // not "not found" but something else (the day's questions used, not the store's to answer, unavailable): said as it is

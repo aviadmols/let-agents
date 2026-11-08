@@ -89,12 +89,12 @@
 .ls-btn--ghost { color: var(--ls-fg); padding-inline: 12px; }
 /* a button that is a link ("Read more", "Product page") reads as a button, not underlined as a link is */
 a.ls-btn:not(.ls-btn--link) { text-decoration: none; }
-.ls-btn--link { --h: auto; padding: 0; color: var(--ls-fg-strong-muted); font-weight: 500; text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 4px; }
+.ls-btn--link { --h: auto; padding: 0; color: var(--ls-fg-strong-muted); font-weight: 600; }
 @media (hover: hover) and (pointer: fine) {
   .ls-btn--primary:hover:not(:disabled) { background: var(--ls-accent-hover); }
   .ls-btn--secondary:hover:not(:disabled) { background: var(--ls-bg-sunken); box-shadow: inset 0 0 0 1px var(--ls-fg-faint); }
   .ls-btn--quiet:hover:not(:disabled), .ls-btn--ghost:hover:not(:disabled) { background: var(--ls-bg-hover); }
-  .ls-btn--link:hover { color: var(--ls-fg); text-decoration-color: currentColor; }
+  .ls-btn--link:hover { color: var(--ls-fg); }
 }
 .ls-btn:disabled { cursor: not-allowed; }
 .ls-btn--primary:disabled { background: var(--ls-bg-pressed); color: var(--ls-fg-muted); }
@@ -274,7 +274,7 @@ button.ls-dot { cursor: pointer; }
 .ls-dot--clear { background: repeating-linear-gradient(45deg, #fff 0 3px, #e4e4e7 3px 6px); }
 .ls-dots__more { font-size: var(--lsp-text-xs, 12px); opacity: .7; }
 .ls-card__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ls-card__similar { font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); text-decoration: underline; text-decoration-color: var(--ls-line-strong); text-underline-offset: 3px; }
+.ls-card__similar { font-size: var(--lsp-text-sm); font-weight: 600; color: var(--ls-fg-strong-muted); }
 /* sold out: the picture shown is dimmed, never the second one under it */
 .ls-card.is-out .ls-card__media img:not(.ls-pic2), .ls-card.is-out:hover .ls-pic2 { opacity: .45; }
 @media (hover: hover) and (pointer: fine) { .ls-card:hover .ls-card__media img:has(+ .ls-pic2) { opacity: 0; } }
@@ -451,3 +451,25 @@ a.ls-pick__media { display: block; }
 .ls-which { margin: 0 0 12px; }
 .ls-which__t { font-size: 14px; font-weight: 600; color: var(--ls-fg); margin: 0 0 8px; }
 
+/* the ask card (Tomer, 8.11): a question, or nothing in the store, gets one clear action, so the AI runs only when asked */
+.ls-askcard { margin: 4px 4px 10px; padding: 16px; border-radius: var(--ls-r-card); background: var(--ls-bg-sunken); box-shadow: inset 0 0 0 1px var(--ls-line); }
+.ls-askcard__kicker { margin: 0; display: flex; align-items: center; gap: 8px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
+.ls-askcard__mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ls-accent); color: var(--ls-accent-fg); flex: none; }
+.ls-askcard__mark .ls-mark { --s: 11px; }
+.ls-askcard__q { margin: 8px 0 12px; font-size: var(--lsp-text-lg); font-weight: 500; line-height: 1.35; color: var(--ls-fg); overflow-wrap: anywhere; }
+.ls-askcard__btn { width: 100%; height: 48px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: var(--ls-r-control); background: var(--ls-accent); color: var(--ls-accent-fg); font: inherit; font-weight: 600; font-size: var(--lsp-text-base); letter-spacing: -.005em; line-height: 1; cursor: pointer; transition: background-color var(--lsp-dur-hover) ease, transform var(--lsp-dur-press) var(--lsp-ease-out); }
+.ls-askcard__btn:active { transform: scale(.985); }
+@media (hover: hover) and (pointer: fine) { .ls-askcard__btn:hover { background: var(--ls-accent-hover); } }
+.ls-askcard__btn:focus-visible, .ls-askcard__btn.is-active:focus-visible { outline: 2px solid var(--ls-accent); outline-offset: 3px; }
+.ls-askcard__sub { margin: 10px 0 0; font-size: var(--lsp-text-xs); color: var(--ls-fg-muted); text-align: center; }
+.ls-row--ask { color: var(--ls-fg-muted); }
+.ls-row--ask .ls-row__go { margin-inline-start: auto; font-size: var(--lsp-text-sm); font-weight: 600; color: var(--ls-fg); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .ls-askcard__btn { transition: none; } }
+
+/* the Lets mark in a small white circle, at the start of a list row */
+.ls-markdot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--ls-bg); color: var(--ls-fg); box-shadow: inset 0 0 0 1px var(--ls-line-strong); }
+.ls-markdot .ls-mark { --s: 11px; }
+
+/* buttons never carry an underline, even when they're links (a.ls-btn), and read a touch bolder */
+.ls-btn, a.ls-btn, .ls-btn:hover, .ls-btn:focus { text-decoration: none; }
+.ls-btn { font-weight: 600; }
