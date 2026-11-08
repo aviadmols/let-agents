@@ -6,5 +6,6 @@ return [
     'stuck_hours' => ['label' => 'A run that did not end', 'description' => 'After how many hours a run that started and did not end counts as stuck.'],
     'queue_minutes' => ['label' => 'A queue that does not move', 'description' => 'How many minutes work may wait in the queue before an email says the queue does not move.'],
     'sync_hours' => ['label' => 'A store not synced', 'description' => 'After how many hours without a successful sync of a live shop an email is sent.'],
+    'scheduler_minutes' => ['label' => 'A scheduler that stopped', 'description' => 'After how many minutes without a sign of life from the scheduler /api/v1/up/scheduler answers with an error, so an outside uptime monitor can alert. While the scheduler is down there is no sync, no search update and no alert email.'],
     'repeat_hours' => ['label' => 'Reminder of the same problem', 'description' => 'After how many hours a problem that still exists is told again. A budget problem is told once a month for each cap.'],
 ];

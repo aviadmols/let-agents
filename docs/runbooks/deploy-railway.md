@@ -104,6 +104,12 @@ BOOTSTRAP_OPERATOR_LOCALE=he
 
 פריסה שנכשלת לא מחליפה את הגרסה הרצה: Railway ממשיך להגיש את הפריסה הקודמת עד שבדיקת `/up` עוברת.
 
+## ניטור ה־scheduler
+
+ה־scheduler מריץ את הסנכרונים, את בניית אינדקס החיפוש ואת מיילי ההתראות. כשהוא נופל, אף אחד מאלה לא קורה, וגם לא נשלח מייל על זה. ב־4.11 הוא נפל ככה לארבעה ימים: נגמרו לו התהליכים, כי php רץ כתהליך 1 ולא ניקה תהליכים שסיימו. מאז ה־image רץ תחת `tini`.
+
+`GET https://agents.lets.co.il/api/v1/up/scheduler` מחזיר 200 כל עוד ה־scheduler מצליח להריץ פקודות (`alerts:beat` כל דקה), ו־503 אחרי `alerts.scheduler_minutes` דקות בלי סימן חיים. מחברים את הכתובת לשירות ניטור חיצוני (UptimeRobot, Better Stack) עם התראה במייל. בלוג, `posix_spawn() failed: Resource temporarily unavailable` או `failed with exit code [2]` על כל פקודה מתוזמנת הם הסימן לאותה תקלה. הפעלה מחדש של השירות פותרת אותה מיד.
+
 ## Bucket לתמונות (Try-On, ADR 0012)
 
 מתכנן, עדיין לא נוצר. Railway Bucket (S3-compatible) בפרויקט, מחובר ל‑api ול‑worker דרך משתני הסביבה של ה‑bucket (`AWS_*`, `AWS_USE_PATH_STYLE_ENDPOINT=true` ו‑`FILESYSTEM_DISK=s3` לפי מה ש‑Railway מציג; הדיסק `s3` כבר מוגדר ב‑`config/filesystems.php`). הקבצים פרטיים; הגשה לדפדפן ולמודל רק בכתובות חתומות קצרות. מחיקה אוטומטית אחרי 90 יום ב‑scheduler. לאמת את שם השירות והמשתנים בממשק כשיוצרים אותו.

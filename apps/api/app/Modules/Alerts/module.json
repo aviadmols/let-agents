@@ -17,6 +17,7 @@
         { "name": "stuck_hours", "type": "int", "default": 6, "min": 1, "max": 24, "scope": "global", "unit": "hours" },
         { "name": "queue_minutes", "type": "int", "default": 20, "min": 5, "max": 240, "scope": "global", "unit": "minutes" },
         { "name": "sync_hours", "type": "int", "default": 30, "min": 12, "max": 168, "scope": "global", "unit": "hours" },
+        { "name": "scheduler_minutes", "type": "int", "default": 5, "min": 2, "max": 60, "scope": "global", "unit": "minutes" },
         { "name": "repeat_hours", "type": "int", "default": 24, "min": 1, "max": 168, "scope": "global", "unit": "hours" }
     ]
 }

@@ -6,6 +6,13 @@
 
 FROM dunglas/frankenphp:1-php8.4-bookworm
 
+# tini as process 1 reaps the processes the scheduler leaves behind. Without it the scheduler (php as process 1)
+# never reaped the commands it ran in the background, they piled up until the container could start no process,
+# and from 4.11 every scheduled command failed (no sync, no search update, no alert) until a restart.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN install-php-extensions \
         bcmath \
         exif \
@@ -52,4 +59,4 @@ RUN chmod +x /usr/local/bin/upsell-entrypoint
 
 EXPOSE 8080
 
-ENTRYPOINT ["upsell-entrypoint"]
+ENTRYPOINT ["tini", "--", "upsell-entrypoint"]

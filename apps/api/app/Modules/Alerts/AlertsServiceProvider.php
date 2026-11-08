@@ -4,6 +4,7 @@ namespace App\Modules\Alerts;
 
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Ai\Events\SpendCapHit;
+use App\Modules\Alerts\Console\SchedulerBeatCommand;
 use App\Modules\Alerts\Console\SweepAlertsCommand;
 use App\Modules\Alerts\Listeners\RememberSpendCap;
 use Illuminate\Console\Scheduling\Schedule;
@@ -32,11 +33,18 @@ final class AlertsServiceProvider extends ModuleServiceProvider
                 ->withoutOverlapping()
                 ->onOneServer()
                 ->runInBackground();
+
+            // Its own process every minute, like every command above: a scheduler that can no longer start one
+            // stops beating, and /api/v1/up/scheduler answers 503 from the api (SchedulerBeat).
+            $schedule->command('alerts:beat')
+                ->everyMinute()
+                ->name('alerts:beat')
+                ->onOneServer();
         });
     }
 
     protected function moduleCommands(): array
     {
-        return [SweepAlertsCommand::class];
+        return [SweepAlertsCommand::class, SchedulerBeatCommand::class];
     }
 }
