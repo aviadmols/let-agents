@@ -4,6 +4,7 @@ namespace App\Modules\Leads;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\ShopperRequests;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Leads\Actions\DescribeLeadForm;
 use App\Modules\Leads\Actions\OfferCallToAction;
@@ -12,6 +13,7 @@ use App\Modules\Leads\Console\LeadsCommand;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Leads\Contracts\OffersCallsToAction;
 use App\Modules\Leads\Listeners\ForgetShopperLeads;
+use App\Modules\Leads\Support\LeadRequests;
 use App\Modules\Leads\Support\LeadShopperData;
 use App\Modules\Leads\Support\LeadTimeline;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
@@ -27,6 +29,8 @@ final class LeadsServiceProvider extends ModuleServiceProvider
     protected function registerModule(): void
     {
         $this->app->tag([LeadTimeline::class], TimelineSource::TAG);
+        // Lead forms not handled yet, on the Shoppers screen.
+        $this->app->tag([LeadRequests::class], ShopperRequests::TAG);
         // A shopper who asks the store for what it keeps about them: the leads they left.
         $this->app->tag([LeadShopperData::class], KeepsShopperData::TAG);
         $this->app->bind(OffersCallsToAction::class, OfferCallToAction::class);

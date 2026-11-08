@@ -5,6 +5,7 @@ namespace App\Modules\Analytics;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeNumbers;
+use App\Modules\Admin\Contracts\ShopperVisits;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Analytics\Console\ComputeScoresCommand;
 use App\Modules\Analytics\Filament\Widgets\ReportChart;
@@ -14,6 +15,7 @@ use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Analytics\Support\AnalyticsHomeNumbers;
 use App\Modules\Analytics\Support\AnalyticsReport;
 use App\Modules\Analytics\Support\BeaconSchema;
+use App\Modules\Analytics\Support\ShoppersVisits;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -28,6 +30,8 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
         $this->app->singleton(BeaconSchema::class);
         // The row of numbers at the top of the shop's home.
         $this->app->bind(HomeNumbers::class, AnalyticsHomeNumbers::class);
+        // The visits on the Shoppers screen.
+        $this->app->tag([ShoppersVisits::class], ShopperVisits::TAG);
     }
 
     protected function bootModule(): void

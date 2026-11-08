@@ -1,0 +1,108 @@
+<?php
+
+// The Shoppers screen (the designer's redesign, 11.2026).
+return [
+    'nav' => 'Shoppers',
+    'title' => 'Shoppers',
+    'lede' => 'Who’s waiting for you, how shoppers move through your store, and what they save for later.',
+
+    'kpi' => [
+        'visits' => 'Visits',
+        'searched' => '{0} none searched or asked|{1} :n of them searched or asked|[2,*] :n of them searched or asked',
+        'waiting' => 'Waiting for a reply',
+        'oldest' => 'Oldest: :when',
+        'none_waiting' => 'No one right now',
+        'signups' => 'Left their details',
+        'signups_l' => 'for updates and offers',
+        'lists' => 'Saved lists',
+        'products' => '{0} no products yet|{1} with :n product|[2,*] with :n products',
+    ],
+
+    'waiting' => [
+        'title' => 'Waiting for you',
+        'sub' => 'When the assistant didn’t know, these shoppers left their details',
+        'someone' => 'A shopper',
+        'whatsapp' => 'WhatsApp',
+        'email' => 'Email',
+        'reply_whatsapp' => 'Reply on WhatsApp',
+        'reply_email' => 'Reply by email',
+        'answered' => 'Mark as answered',
+        'done' => 'Marked as answered',
+        'no_reply' => 'This contact can’t be opened. It may already be answered.',
+        'more' => '{1} And one more waiting|[2,*] And :n more waiting',
+        'zero' => 'No one’s waiting',
+        'zero_text' => 'When the assistant doesn’t know, shoppers can leave their details or move to WhatsApp. Those requests show up here.',
+        'set_whatsapp' => 'Set up WhatsApp',
+    ],
+
+    'reply' => [
+        'subject' => 'About your question',
+        'text' => 'Hi :name, about your question: “:question”',
+        'text_plain' => 'Hi, about your question: “:question”',
+    ],
+
+    'sources' => [
+        'title' => 'Where they come from',
+        'sub' => 'Visits where shoppers searched',
+        'names' => [
+            'google' => 'Google',
+            'facebook' => 'Facebook',
+            'instagram' => 'Instagram',
+            'whatsapp' => 'WhatsApp',
+            'email' => 'Newsletter',
+            'direct' => 'Direct',
+            'other' => 'Other sites',
+        ],
+        'searchiest' => 'Shoppers from <b>:source</b> search the most.',
+        'campaign' => '{1} The “:name” campaign brought one visit.|[2,*] The “:name” campaign brought :n visits.',
+        'zero' => 'No searches yet',
+        'zero_text' => 'Once shoppers search, you’ll see where they came from.',
+    ],
+
+    'visits' => [
+        'title' => 'Recent visits',
+        'sub' => 'Each visit as a short story: what they searched, what they saw, how it ended',
+        'plain' => 'Also show visits without a search',
+        'log' => 'Every visit',
+        'zero' => 'No visits with a search yet',
+        'zero_text' => 'Each visit will show as a short story: what they searched, what they saw, how it ended.',
+        'who' => [
+            'returning' => 'Returning shopper',
+            'direct' => 'Direct visitor',
+            'other' => 'Shopper from another site',
+            'from' => 'Shopper from :source',
+        ],
+        'device' => [
+            'iphone' => 'iPhone',
+            'android' => 'Android',
+            'phone' => 'Phone',
+            'tablet' => 'Tablet',
+            'computer' => 'Desktop',
+        ],
+        'minutes' => ':n min',
+        'step' => [
+            'photo' => 'Searched with a photo',
+            'view' => 'Viewed :title',
+            'views' => 'Viewed :n products',
+            'heart' => '{1} Saved for later|[2,*] Saved :n for later',
+            'cart' => '{1} Added to cart|[2,*] Added :n to cart',
+            'order' => 'Bought',
+            'lead' => 'Left their details',
+            'browse' => '{1} Viewed one page without searching|[2,*] Browsed :n pages without searching',
+        ],
+        'end' => [
+            'order' => 'order',
+            'cart' => 'in cart',
+            'saved' => 'saved',
+        ],
+    ],
+
+    'saved' => [
+        'title' => 'What they save for later',
+        'sub' => 'The products most shoppers saved. A good moment for an offer or a reminder.',
+        'export' => 'Export to Excel',
+        'via' => '<b>:saved</b> saved · :bought bought',
+        'zero' => 'Nothing saved yet',
+        'zero_text' => 'When shoppers tap the heart on a product, the products saved most show up here.',
+    ],
+];

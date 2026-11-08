@@ -24,9 +24,10 @@ final class MerchantNavigation
 
     /**
      * Screens the redesign (11.2026) takes off the sidebar, their pages still open by their address and keep their tabs:
-     * analytics, which the Searches screen holds now, and the timeline, which is the operator's (the system's log).
+     * analytics, which the Searches screen holds now, the timeline, which is the operator's (the system's log), and the
+     * visits log, which the Shoppers screen tells as stories and links to ("Every visit").
      */
-    public const OFF_SIDEBAR = ['analytics', 'timeline'];
+    public const OFF_SIDEBAR = ['analytics', 'timeline', 'sessions'];
 
     /** Shown as a side menu instead of tabs, like Shopify's settings. */
     public const SIDE = ['settings'];

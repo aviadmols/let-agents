@@ -39,7 +39,7 @@ final class ViewerGuard
      * Calls that change something even on a reading screen: and a question put to the AI (the search check's "ask", paid
      * for by the shop) and hiding the home's steps for the whole team (1.11).
      */
-    public const CHANGING_CALLS = ['save', 'act', 'callMountedAction', 'markDone', 'undo', 'answer', 'approve', 'reject', 'remove', 'invite', 'resend', 'ask', 'hideSteps', 'approveFix', 'later', 'dismiss'];
+    public const CHANGING_CALLS = ['save', 'act', 'callMountedAction', 'markDone', 'undo', 'answer', 'approve', 'reject', 'remove', 'invite', 'resend', 'ask', 'hideSteps', 'approveFix', 'later', 'dismiss', 'replyTo', 'answered', 'exportSaved'];
 
     /**
      * Livewire's "call" listener: stops a viewer's call that would change the shop.

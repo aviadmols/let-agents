@@ -5,11 +5,13 @@ namespace App\Modules\Shortlist;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\SavedProducts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shortlist\Console\ForgetVisitsCommand;
 use App\Modules\Shortlist\Listeners\ForgetShopper;
+use App\Modules\Shortlist\Support\SavedForLater;
 use App\Modules\Shortlist\Support\ShortlistHome;
 use App\Modules\Shortlist\Support\ShortlistReport;
 use App\Modules\Shortlist\Support\WishlistShopperData;
@@ -26,6 +28,8 @@ final class ShortlistServiceProvider extends ModuleServiceProvider
         $this->app->tag([ShortlistReport::class], ShopReport::REPORT_TAG);
         // What this module shows on the shop's home and notices.
         $this->app->tag([ShortlistHome::class], HomeSource::TAG);
+        // What shoppers save for later, on the Shoppers screen.
+        $this->app->tag([SavedForLater::class], SavedProducts::TAG);
         // A shopper who asks the store for what it keeps about them: the wishlist in their account.
         $this->app->tag([WishlistShopperData::class], KeepsShopperData::TAG);
         //
