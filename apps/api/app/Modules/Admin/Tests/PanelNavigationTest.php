@@ -76,8 +76,7 @@ final class PanelNavigationTest extends TestCase
         $url = "/merchant/{$shop->slug}/overview";
 
         foreach (['he', 'en'] as $locale) {
-            $this->actingAs(User::factory()->operator()->create())
-                ->withHeader('Accept-Language', $locale)
+            $this->actingAs(User::factory()->operator()->locale($locale)->create())
                 ->get($url)
                 ->assertOk()
                 ->assertSee('data-operator-shortcut', false)

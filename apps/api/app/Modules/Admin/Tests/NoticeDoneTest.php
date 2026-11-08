@@ -5,7 +5,6 @@ namespace App\Modules\Admin\Tests;
 use App\Core\Facades\Features;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Admin\Filament\Merchant\Pages\ShopNotices;
-use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
 use App\Modules\Tenancy\Models\Shop;
@@ -62,14 +61,14 @@ final class NoticeDoneTest extends TestCase
         $this->assertContains($this->key, array_map(fn (ShopNotice $n): string => $n->key, app(Home::class)->notices($this->shop)));
     }
 
-    public function test_a_notice_marked_done_leaves_the_homes_attention_list_only_for_this_shop(): void
+    public function test_a_notice_marked_done_leaves_the_list_only_for_this_shop(): void
     {
         $other = Shop::factory()->create();
         Features::override('shortlist.wishlist', false, $other->id);
 
-        Livewire::test(ShopOverview::class)->assertSeeHtml('data-notice="'.$this->key.'"');
-        Livewire::test(ShopNotices::class)->call('markDone', $this->key);
-        Livewire::test(ShopOverview::class)->assertDontSeeHtml('data-notice="'.$this->key.'"');
+        // Today shows the fixes waiting (TodayImprovements); the notices keep their own screen
+        Livewire::test(ShopNotices::class)->assertSeeHtml('data-notice="'.$this->key.'"')->call('markDone', $this->key);
+        Livewire::test(ShopNotices::class)->assertDontSeeHtml('data-notice="'.$this->key.'"');
 
         $this->assertContains($this->key, array_map(fn (ShopNotice $n): string => $n->key, app(Home::class)->notices($other)));
     }

@@ -1,45 +1,18 @@
 {{--
-    The shop's top bar, as the designer's panel draws it, at the top of every screen: the store and whether
-    Lets is live in it, then the language, the store itself, and the person with their menu. An operator
-    who opened someone else's store is told so here, with the way back. Inside a platform's admin (HostedPanel), no sign-out.
+    The shop's top bar (the redesign, 11.2026): light, at the end of the row above every screen. The store, whether
+    search is live in it and the language moved to the sidebar (merchant-store, merchant-foot); here are the store
+    itself and the person with their menu. An operator who opened someone else's store is told so here, with the way
+    back. Inside a platform's admin (HostedPanel), no sign-out.
 --}}
 @php($t = fn (string $key, array $params = []) => __('admin::panels.top.'.$key, $params))
 <div class="lp-topbar" data-merchant-topbar data-shop-banner="{{ $shop->slug }}">
     <div class="lp-top-shop">
-        <span class="lp-mark lp-mark-top" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14a7 7 0 0 1-14 0zM5 21h14a7 7 0 0 0-14 0z" fill="currentColor"/></svg></span>
-        @if (count($shops) > 1)
-            <div class="lp-drop" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
-                <button type="button" class="lp-top-name" @click="open = !open" :aria-expanded="open.toString()" aria-haspopup="menu">
-                    <b>{{ $shop->name }}</b>
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                </button>
-                <div class="lp-menu lp-menu-start" x-show="open" x-cloak x-transition.opacity role="menu">
-                    <div class="lp-menu-head">{{ __('admin::panels.account.switch') }}</div>
-                    @foreach ($shops as $other)
-                        <a role="menuitem" href="{{ $other['url'] }}" @if ($other['current']) aria-current="true" @endif>{{ $other['name'] }}</a>
-                    @endforeach
-                </div>
-            </div>
-        @else
-            <b class="lp-top-name">{{ $shop->name }}</b>
-        @endif
-        <span class="lp-pill" data-tone="{{ $live ? 'good' : 'warn' }}" data-live="{{ $live ? '1' : '0' }}"><i></i>{{ $t($live ? 'live' : 'preview') }}</span>
         @if ($operator)
             <a class="lp-pill" data-tone="bad" href="{{ $operatorUrl }}" title="{{ __('admin::panels.account.as_operator', ['shop' => $shop->name]) }}" data-operator-shortcut><i></i>{{ $t('as_operator') }}</a>
         @endif
     </div>
 
     <div class="lp-top-end">
-        <nav class="lp-lang" aria-label="{{ __('admin::panels.locale.label') }}">
-            @foreach ($locales as $locale)
-                @if ($locale === $current)
-                    <span aria-current="true" lang="{{ $locale }}">{{ __("admin::panels.locale.names.{$locale}", [], $locale) }}</span>
-                @else
-                    <a href="{{ route('admin.locale', ['locale' => $locale]) }}" lang="{{ $locale }}">{{ __("admin::panels.locale.names.{$locale}", [], $locale) }}</a>
-                @endif
-            @endforeach
-        </nav>
-
         @if ($storeUrl)
             <a class="lp-btn lp-btn-sm lp-top-store" href="{{ $storeUrl }}" target="_blank" rel="noopener" aria-label="{{ $t('open_store') }}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M19 14v6H4V5h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>

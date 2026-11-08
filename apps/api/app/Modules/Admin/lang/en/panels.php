@@ -56,6 +56,11 @@ return [
             'system' => 'System',
         ],
         'brand' => 'Store panel',
+        'search_live' => 'Search is live',
+        'plan_trial' => ':plan · trial',
+        'trial_left' => '{0} Your free trial ends today|{1} 1 day left in your free trial|[2,*] :n days left in your free trial',
+        'choose_plan' => 'Choose a plan',
+        'see_plan' => 'Plan and billing',
     ],
     // The shop's screens, top to bottom (MerchantNavigation::SECTIONS).
     'screens' => [

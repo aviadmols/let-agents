@@ -74,13 +74,13 @@ final class ShopAllowanceTest extends TestCase
         $merchant->attachShop($shop);
         $this->spend($shop, 12.6, '2026-10-03 08:00:00');
 
-        // Below the warning line the strip stays away; the home's card shows the share.
+        // Below the warning line the strip stays away; the month's use is not Today's (the redesign, 11.2026: it
+        // belongs with the plan, not in the owner's daily news).
         $this->actingAs($merchant)->withHeader('Accept-Language', 'he')
             ->get("/merchant/{$shop->slug}/overview")
             ->assertOk()
             ->assertDontSee('data-usage-strip', false)
-            ->assertSee('data-card="ai"', false)
-            ->assertSee('42%');
+            ->assertDontSee('data-card="ai"', false);
 
         $this->spend($shop, 15.0, '2026-10-04 08:00:00');
 

@@ -33,11 +33,15 @@ final class AssistantHomeTest extends TestCase
             ]);
         });
 
-        $this->actingAs($merchant)->withHeader('Accept-Language', 'he')
+        // Today's "Waiting for you": the question, asked often, and the way to answer it (AssistantToday)
+        $this->actingAs($merchant)
             ->get("/merchant/{$shop->slug}/overview")
             ->assertOk()
-            ->assertSee('שאלה אחת של גולשים מחכה לתשובה')
-            ->assertSee('״אפשר להחזיר?״ נשאלה 4 פעמים');
+            ->assertSee('data-fix="question:', false)
+            ->assertSee('“אפשר להחזיר?”', false)
+            ->assertSee('שאלה חוזרת')
+            ->assertSee('4 פעמים')
+            ->assertSee('לכתוב תשובה');
 
         $this->get("/merchant/{$shop->slug}/notices")->assertOk()->assertSee('לענות עכשיו');
     }
@@ -97,7 +101,8 @@ final class AssistantHomeTest extends TestCase
         $this->assertSame('The shopper got no answer.', $asked['rows'][2]->detail, 'said plainly when nothing was shown');
 
         // the analytics screen, by its address (the Analytics module is not this one's to import)
-        $this->withHeader('Accept-Language', 'en')->get("/merchant/{$shop->slug}/analytics")
+        $merchant->forceFill(['locale' => 'en'])->save();
+        $this->get("/merchant/{$shop->slug}/analytics")
             ->assertOk()
             ->assertSeeInOrder(['Questions', '5', '3 answered · 1 unanswered · 1 not about the store'])
             ->assertSee('Top customer questions')

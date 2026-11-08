@@ -2,7 +2,7 @@
 
 // The shop manager's home and notices (Admin\Filament\Merchant\Pages\ShopOverview, ShopNotices).
 return [
-    'nav' => 'דף הבית',
+    'nav' => 'היום',
     'greeting' => [
         'morning' => 'בוקר טוב, :name',
         'noon' => 'צהריים טובים, :name',

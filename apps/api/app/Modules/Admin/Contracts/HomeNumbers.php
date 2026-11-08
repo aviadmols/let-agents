@@ -13,9 +13,10 @@ interface HomeNumbers
 {
     /**
      * The last $days days, or the dates the manager chose ($since to $until), against the period of the
-     * same length before.
+     * same length before. series: the money and the orders by ReportSeries::key() at the period's scale, for
+     * Today's line under the big number.
      *
-     * @return array{currency: string, visitors: array{now: int, before: int}, adds: array{now: int, before: int}, orders: array{now: int, before: int}, revenue: array{now: float, before: float}, all_orders: int}
+     * @return array{currency: string, visitors: array{now: int, before: int}, adds: array{now: int, before: int}, orders: array{now: int, before: int}, revenue: array{now: float, before: float}, all_orders: int, series?: array{revenue: array<string, float>, orders: array<string, int>}}
      */
     public function numbers(Shop $shop, int $days, ?CarbonInterface $since = null, ?CarbonInterface $until = null): array;
 }

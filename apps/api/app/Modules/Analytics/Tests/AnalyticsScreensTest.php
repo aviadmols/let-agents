@@ -77,8 +77,9 @@ final class AnalyticsScreensTest extends TestCase
         $merchant->attachShop($this->shop);
 
         foreach (['he', 'en'] as $locale) {
+            // the shop's panel speaks the person's chosen language, not the browser's
+            $merchant->forceFill(['locale' => $locale])->save();
             $this->actingAs($merchant)
-                ->withHeader('Accept-Language', $locale)
                 ->get("/merchant/{$this->shop->slug}/analytics")
                 ->assertOk()
                 // The design's one screen: the store's numbers, then the lists.

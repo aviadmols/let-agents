@@ -6,11 +6,13 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\DailySummaries;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\TimelineSource;
+use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Admin\Contracts\WritesPosts;
 use App\Modules\Improvement\Console\ImprovementCommand;
 use App\Modules\Improvement\Support\ImprovementDailySummaries;
 use App\Modules\Improvement\Support\ImprovementHome;
 use App\Modules\Improvement\Support\ImprovementTimeline;
+use App\Modules\Improvement\Support\ImprovementToday;
 use App\Modules\Improvement\Support\QuestionPosts;
 use Illuminate\Console\Scheduling\Schedule;
 
@@ -23,6 +25,8 @@ final class ImprovementServiceProvider extends ModuleServiceProvider
         // What this module shows on the shop's home and notices.
         $this->app->tag([ImprovementHome::class], HomeSource::TAG);
         $this->app->tag([ImprovementDailySummaries::class], DailySummaries::TAG);
+        // Today's "Waiting for you": the review's proposals.
+        $this->app->tag([ImprovementToday::class], TodayImprovements::TAG);
     }
 
     protected function bootModule(): void

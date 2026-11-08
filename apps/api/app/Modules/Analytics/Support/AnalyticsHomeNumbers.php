@@ -3,6 +3,7 @@
 namespace App\Modules\Analytics\Support;
 
 use App\Modules\Admin\Contracts\HomeNumbers;
+use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsOrder;
 use App\Modules\Tenancy\Models\Shop;
@@ -34,7 +35,32 @@ final class AnalyticsHomeNumbers implements HomeNumbers
             'orders' => ['now' => $now['orders'], 'before' => $then['orders']],
             'revenue' => ['now' => $now['revenue'], 'before' => $then['revenue']],
             'all_orders' => $now['all_orders'],
+            'series' => $this->series($since, $until),
         ];
+    }
+
+    /**
+     * The money and the orders through the system by step of the period (ReportSeries: hours, days or months),
+     * for Today's line under the big number.
+     *
+     * @return array{revenue: array<string, float>, orders: array<string, int>}
+     */
+    private function series(Carbon $from, Carbon $to): array
+    {
+        $format = ReportSeries::scale($from, $to)['format'];
+        $revenue = [];
+        $orders = [];
+
+        AnalyticsOrder::query()->where('source', AnalyticsOrder::SOURCE_LIVE)->where('ordered_at', '>=', $from)->where('ordered_at', '<', $to)
+            ->where(fn (Builder $q) => $q->where('assisted', true)->orWhere('search_total', '>', 0))
+            ->get(['ordered_at', 'attributed_total', 'search_total'])
+            ->each(function (AnalyticsOrder $order) use ($format, &$revenue, &$orders): void {
+                $key = ReportSeries::key($order->ordered_at, $format);
+                $revenue[$key] = round(($revenue[$key] ?? 0) + (float) $order->attributed_total + (float) $order->search_total, 2);
+                $orders[$key] = ($orders[$key] ?? 0) + 1;
+            });
+
+        return ['revenue' => $revenue, 'orders' => $orders];
     }
 
     /** @return array{visitors: int, adds: int, orders: int, revenue: float, all_orders: int} */

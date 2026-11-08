@@ -2,10 +2,12 @@
 
 namespace App\Modules\Admin\Panels;
 
+use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationBuilder;
 use Filament\Navigation\NavigationItem;
 use Filament\Pages\Page;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
 
 /**
@@ -23,20 +25,31 @@ final class MerchantNavigation
     /** Shown as a side menu instead of tabs, like Shopify's settings. */
     public const SIDE = ['settings'];
 
+    /** Each screen's icon in the sidebar (the redesign, 11.2026: thin strokes, round caps). */
+    public const ICONS = [
+        'analytics' => Heroicon::OutlinedMagnifyingGlass,
+        'sessions' => Heroicon::OutlinedUsers,
+        'timeline' => Heroicon::OutlinedClock,
+        'inbox' => Heroicon::OutlinedSparkles,
+        'knowledge' => Heroicon::OutlinedBookOpen,
+        'scan' => Heroicon::OutlinedPhoto,
+        'settings' => Heroicon::OutlinedCog6Tooth,
+    ];
+
     public static function build(NavigationBuilder $builder): NavigationBuilder
     {
         $items = [];
         $sort = 0;
 
         foreach (self::loose() as $page) {
-            $items[] = self::item($page, [$page], $page::getNavigationLabel(), ++$sort);
+            $items[] = self::item($page, [$page], $page::getNavigationLabel(), ++$sort, $page::getNavigationIcon());
         }
 
         foreach (self::SECTIONS as $key) {
             $pages = self::pages($key);
 
             if ($pages !== []) {
-                $items[] = self::item($pages[0], $pages, __("admin::panels.screens.{$key}"), ++$sort);
+                $items[] = self::item($pages[0], $pages, __("admin::panels.screens.{$key}"), ++$sort, self::ICONS[$key] ?? null);
             }
         }
 
@@ -84,7 +97,7 @@ final class MerchantNavigation
     }
 
     /** @param list<class-string<Page>> $pages */
-    private static function item(string $first, array $pages, string $label, int $sort): NavigationItem
+    private static function item(string $first, array $pages, string $label, int $sort, string|BackedEnum|null $icon = null): NavigationItem
     {
         $badge = null;
         foreach ($pages as $page) {
@@ -95,6 +108,7 @@ final class MerchantNavigation
             ->url(fn (): string => $first::getUrl())
             ->isActiveWhen(fn (): bool => collect($pages)->contains(fn (string $page): bool => request()->routeIs($page::getNavigationItemActiveRoutePattern())))
             ->badge($badge)
+            ->icon($icon)
             ->sort($sort);
     }
 

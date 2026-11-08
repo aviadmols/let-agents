@@ -8,6 +8,7 @@ use App\Modules\Admin\Contracts\HomeCards;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Admin\Contracts\ScanProgress;
 use App\Modules\Admin\Contracts\ShopFacts;
+use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Catalog\Events\CatalogProductsChanged;
 use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Enrichment\Actions\RereadPage;
@@ -20,6 +21,7 @@ use App\Modules\Enrichment\Support\EnrichmentHome;
 use App\Modules\Enrichment\Support\EnrichmentScanDetails;
 use App\Modules\Enrichment\Support\EnrichmentScanProgress;
 use App\Modules\Enrichment\Support\EnrichmentShopFacts;
+use App\Modules\Enrichment\Support\EnrichmentToday;
 use App\Modules\Enrichment\Support\FactNotes;
 use App\Modules\Enrichment\Support\StoredCards;
 use App\Modules\Enrichment\Support\WrittenSectionQuestions;
@@ -34,6 +36,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
     {
         $this->app->tag([EnrichmentHome::class], HomeCards::CARDS_TAG);
         $this->app->tag([EnrichmentHome::class], FirstSteps::STEPS_TAG);
+        // Today's "Waiting for you": details read from photos, waiting for a person.
+        $this->app->tag([EnrichmentToday::class], TodayImprovements::TAG);
         // What this module learned, under its step of the store's scan.
         $this->app->tag([EnrichmentScanDetails::class], ScanDetails::TAG);
         $this->app->tag([EnrichmentScanProgress::class], ScanProgress::TAG);

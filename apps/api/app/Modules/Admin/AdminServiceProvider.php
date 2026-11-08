@@ -11,6 +11,7 @@ use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Admin\Http\Responses\RoleAwareLoginResponse;
+use App\Modules\Admin\Livewire\TodayFeed;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Panels\MerchantPanelProvider;
 use App\Modules\Admin\Panels\OperatorPanelProvider;
@@ -24,6 +25,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Livewire;
 
 final class AdminServiceProvider extends ModuleServiceProvider
 {
@@ -46,6 +48,9 @@ final class AdminServiceProvider extends ModuleServiceProvider
         // What a person may do in a shop: change it (everyone but a viewer), manage its people and connection (an owner).
         Gate::define('edit-shop', fn (User $user, Shop|string $shop): bool => $user->canEditShop($shop));
         Gate::define('manage-shop', fn (User $user, Shop|string $shop): bool => $user->managesShop($shop));
+
+        // Today's live searches, refreshed on their own so the page around them is not drawn again.
+        Livewire::component(TodayFeed::NAME, TodayFeed::class);
 
         // A viewer reads the panel and changes nothing: every button press passes the guard first.
         \Livewire\on('call', ViewerGuard::call(...));

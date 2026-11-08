@@ -43,8 +43,9 @@ final class PanelSidebarTest extends TestCase
         $merchant->attachShop($shop);
 
         foreach (['he', 'en'] as $locale) {
+            // the shop's panel speaks the person's chosen language, not the browser's
+            $merchant->forceFill(['locale' => $locale])->save();
             $html = $this->actingAs($merchant)
-                ->withHeader('Accept-Language', $locale)
                 ->get("/merchant/{$shop->slug}/overview")
                 ->assertOk()
                 ->getContent();

@@ -32,14 +32,14 @@ final class ViewerGuard
         '$refresh', '$set', '$toggle', '__dispatch', '__lazyLoad',
         'open', 'close', 'show', 'hide', 'more', 'pick', 'select', 'filter', 'sortBy', 'setDays', 'narrowTo',
         'toggleGroup', 'toggleInspect', 'showFailed', 'setShow', 'reveal', 'downloadPlugin',
-        'mountAction', 'unmountAction', 'gotoPage', 'nextPage', 'previousPage', 'setPage', 'resetPage',
+        'mountAction', 'unmountAction', 'gotoPage', 'nextPage', 'previousPage', 'setPage', 'resetPage', 'toggle',
     ];
 
     /**
      * Calls that change something even on a reading screen: and a question put to the AI (the search check's "ask", paid
      * for by the shop) and hiding the home's steps for the whole team (1.11).
      */
-    public const CHANGING_CALLS = ['save', 'act', 'callMountedAction', 'markDone', 'undo', 'answer', 'approve', 'reject', 'remove', 'invite', 'resend', 'ask', 'hideSteps'];
+    public const CHANGING_CALLS = ['save', 'act', 'callMountedAction', 'markDone', 'undo', 'answer', 'approve', 'reject', 'remove', 'invite', 'resend', 'ask', 'hideSteps', 'approveFix', 'later'];
 
     /**
      * Livewire's "call" listener: stops a viewer's call that would change the shop.

@@ -1,5 +1,6 @@
-{{-- The Lets mark on ink, as in the drawer the shoppers see: two half discs in a circle, the word, and what this panel is. --}}
+{{-- The Lets mark in lime on the ink sidebar (the redesign, 11.2026): two half discs, and the word. --}}
 <span class="lp-brand">
-    <span class="lp-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14a7 7 0 0 1-14 0zM5 21h14a7 7 0 0 0-14 0z" fill="currentColor"/></svg></span>
-    <span><span dir="ltr">Lets</span><small>{{ __('admin::panels.top.brand') }}</small></span>
+    <svg class="lp-brand-mark" viewBox="0 0 225 225" fill="currentColor" aria-hidden="true"><path d="m0,225c0-62.13,50.37-112.5,112.5-112.5s112.5,50.37,112.5,112.5H0Z"/><path d="m225,0c0,62.13-50.37,112.5-112.5,112.5S0,62.13,0,0h225Z"/></svg>
+    <b dir="ltr">Let’s</b>
+    <small class="sr-only">{{ __('admin::panels.top.brand') }}</small>
 </span>

@@ -2,7 +2,7 @@
 
 // The shop manager's home and notices (Admin\Filament\Merchant\Pages\ShopOverview, ShopNotices).
 return [
-    'nav' => 'Home',
+    'nav' => 'Today',
     'greeting' => [
         'morning' => 'Good morning, :name',
         'noon' => 'Good afternoon, :name',

@@ -54,6 +54,9 @@ final class MerchantPanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::HEAD_START, fn (): HtmlString => self::theme())
             ->renderHook(PanelsRenderHook::BODY_END, fn (): HtmlString => Tips::script())
             ->renderHook(PanelsRenderHook::CONTENT_START, fn (): HtmlString => self::topbar())
+            // The redesign's sidebar (11.2026): the store and whether search is live on top, the plan and the language at the foot.
+            ->renderHook(PanelsRenderHook::SIDEBAR_NAV_START, fn (): HtmlString => self::sidebarStore())
+            ->renderHook(PanelsRenderHook::SIDEBAR_FOOTER, fn (): HtmlString => self::sidebarFoot())
             // One flat list of screens; a screen's other pages are its tabs, or the settings side menu.
             ->navigation(fn (NavigationBuilder $builder): NavigationBuilder => MerchantNavigation::build($builder))
             ->renderHook(PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE, fn (array $scopes): HtmlString => MerchantNavigation::section($scopes));
@@ -66,6 +69,73 @@ final class MerchantPanelProvider extends PanelProvider
             ->brandLogo(fn (): HtmlString => new HtmlString(view('admin::panel.merchant-brand')->render()))
             ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): HtmlString => PanelTheme::merchant())
             ->renderHook(PanelsRenderHook::BODY_END, fn (): HtmlString => PanelTheme::designBar());
+    }
+
+    /** The store at the top of the sidebar: its name, whether search is live in it, and the other stores of the person. */
+    private static function sidebarStore(): HtmlString
+    {
+        $shop = Filament::getTenant();
+        $user = Auth::user();
+
+        if (! $shop instanceof Shop || ! $user instanceof User) {
+            return new HtmlString('');
+        }
+
+        return new HtmlString(view('admin::panel.merchant-store', [
+            'shop' => $shop,
+            'live' => self::liveAndStore($shop)[0],
+            'shops' => $user->shops()->orderBy('name')->get()->map(fn (Shop $s): array => [
+                'name' => $s->name,
+                'url' => ShopOverview::getUrl(tenant: $s),
+                'current' => $s->is($shop),
+            ])->all(),
+        ])->render());
+    }
+
+    /** The foot of the sidebar: the plan with its trial, and the language switch. */
+    private static function sidebarFoot(): HtmlString
+    {
+        $shop = Filament::getTenant();
+
+        if (! $shop instanceof Shop) {
+            return new HtmlString('');
+        }
+
+        $plan = null;
+        $current = $shop->currentPlan();
+        if ($current !== null) {
+            $trial = $shop->onTrial();
+            $days = $trial ? $shop->trialDaysLeft() : 0;
+            $ends = $shop->trial_ends_at;
+            $length = $trial && $ends !== null && $shop->created_at !== null ? max(1, (int) ceil($shop->created_at->diffInDays($ends, true))) : 14;
+            $plan = [
+                'name' => (string) $current->name,
+                'trial' => $trial,
+                'days' => $days,
+                'used' => $trial ? max(4, min(100, (int) round(100 * ($length - $days) / $length))) : 100,
+                'url' => ConnectionSettings::getUrl(tenant: $shop),
+            ];
+        }
+
+        return new HtmlString(view('admin::panel.merchant-foot', [
+            'plan' => $plan,
+            'locales' => Locales::supported(),
+            'current' => app()->getLocale(),
+        ])->render());
+    }
+
+    /**
+     * Whether shoppers see Lets, and where the store is: from the first steps, at most every 5 minutes.
+     *
+     * @return array{0: bool, 1: string|null}
+     */
+    private static function liveAndStore(Shop $shop): array
+    {
+        return Cache::remember("merchant-topbar:{$shop->id}", 300, function () use ($shop): array {
+            $steps = collect(app(Home::class)->steps($shop))->keyBy('key');
+
+            return [(bool) ($steps->get('on')?->done ?? false), $steps->get('look')?->url];
+        });
     }
 
     private static function shopName(): string
@@ -88,12 +158,7 @@ final class MerchantPanelProvider extends PanelProvider
             return new HtmlString('');
         }
 
-        // Whether shoppers see Lets, and where the store is: from the first steps, at most every 5 minutes.
-        [$live, $storeUrl] = Cache::remember("merchant-topbar:{$shop->id}", 300, function () use ($shop): array {
-            $steps = collect(app(Home::class)->steps($shop))->keyBy('key');
-
-            return [(bool) ($steps->get('on')?->done ?? false), $steps->get('look')?->url];
-        });
+        [$live, $storeUrl] = self::liveAndStore($shop);
 
         $role = $user->shops()->whereKey($shop->getKey())->first()?->pivot?->role;
         $operator = self::viewerIsOperator();

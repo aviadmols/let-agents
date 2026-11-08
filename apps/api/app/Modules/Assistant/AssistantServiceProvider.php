@@ -14,6 +14,7 @@ use App\Modules\Admin\Contracts\ReadsContentAgain;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\ShopReport;
 use App\Modules\Admin\Contracts\TimelineSource;
+use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\SuggestQuestions;
@@ -39,6 +40,7 @@ use App\Modules\Assistant\Support\AssistantHome;
 use App\Modules\Assistant\Support\AssistantReport;
 use App\Modules\Assistant\Support\AssistantShopFacts;
 use App\Modules\Assistant\Support\AssistantTimeline;
+use App\Modules\Assistant\Support\AssistantToday;
 use App\Modules\Assistant\Support\ContentReadAgain;
 use App\Modules\Catalog\Events\CatalogLinksMoved;
 use App\Modules\Catalog\Events\CatalogUpdated;
@@ -60,6 +62,8 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         $this->app->tag([AssistantHome::class], HomeCards::CARDS_TAG);
         $this->app->tag([AssistantDailySummaries::class], DailySummaries::TAG);
         $this->app->tag([AssistantHome::class], FirstSteps::STEPS_TAG);
+        // Today's "Waiting for you": the questions it could not answer.
+        $this->app->tag([AssistantToday::class], TodayImprovements::TAG);
         // What this module counted, for the first-run screens.
         $this->app->tag([AssistantShopFacts::class], ShopFacts::TAG);
         $this->app->bind(SuggestsQuestions::class, SuggestQuestions::class);

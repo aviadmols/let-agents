@@ -56,6 +56,11 @@ return [
             'system' => 'כמו המערכת',
         ],
         'brand' => 'הפאנל לחנות',
+        'search_live' => 'החיפוש פועל באתר',
+        'plan_trial' => ':plan · ניסיון',
+        'trial_left' => '{0} הניסיון החינמי נגמר היום|{1} נשאר יום אחד לניסיון החינמי|[2,*] נשארו :n ימים לניסיון החינמי',
+        'choose_plan' => 'לבחור תוכנית',
+        'see_plan' => 'תוכנית וחיוב',
     ],
     // The shop's screens, top to bottom (MerchantNavigation::SECTIONS).
     'screens' => [
