@@ -41,12 +41,33 @@ final class Today
         return $fixes;
     }
 
-    /** @return string|null what changed, or null when no module knew the fix */
-    public function approve(Shop $shop, string $key, ?int $userId): ?string
+    /**
+     * "Not relevant": the module that brought the fix dismisses it for good; one that keeps no such decision puts it off
+     * like "Not now".
+     */
+    public function dismiss(Shop $shop, string $key, ?int $userId): void
     {
         foreach (app()->tagged(TodayImprovements::TAG) as $source) {
             try {
-                $said = $this->tenant->run((string) $shop->id, fn (): ?string => $source->approve($shop, $key, $userId));
+                if ($this->tenant->run((string) $shop->id, fn (): bool => $source->dismiss($shop, $key, $userId))) {
+                    return;
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+        $this->later($shop, $key, $userId);
+    }
+
+    /**
+     * @param  string|null  $text  the suggestion as the owner left it (an edited answer)
+     * @return string|null what changed, or null when no module knew the fix
+     */
+    public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
+    {
+        foreach (app()->tagged(TodayImprovements::TAG) as $source) {
+            try {
+                $said = $this->tenant->run((string) $shop->id, fn (): ?string => $source->approve($shop, $key, $userId, $text));
             } catch (Throwable $e) {
                 report($e);
 

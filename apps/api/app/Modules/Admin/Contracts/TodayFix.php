@@ -31,6 +31,14 @@ final readonly class TodayFix
      * @param  list<string>  $pictures  product photos, at most two are shown
      * @param  bool  $oneTap  true: the button approves here (approve()); false: it opens $url
      * @param  int  $impact  searches or questions it would help, for the ranking
+     * @param  string  $kind  what shoppers ran into, for the Improvements screen's filter: nothing (found nothing), noclick
+     *                        (found what nobody opens), question, info (a product detail) or idea
+     * @param  array<string, mixed>  $suggestion  what the fix would do, shown before it is approved: type rule (from, to and
+     *                                            the products they'll see), products, answer (a draft the owner may edit), facts
+     *                                            (each product with what its photo showed) or idea; plain values only
+     * @param  list<array{text: string, n: int}>  $typed  what exactly shoppers typed or asked, the most first
+     * @param  array{label: string, url: string}|null  $secondary  the other way to fix it, on its own screen
+     * @param  bool  $editable  the owner may change the suggestion's text before approving (an answer)
      */
     public function __construct(
         public string $key,
@@ -45,5 +53,12 @@ final readonly class TodayFix
         public ?string $struck = null,
         public array $pictures = [],
         public int $impact = 0,
+        public string $kind = 'nothing',
+        public array $suggestion = [],
+        public array $typed = [],
+        public ?array $secondary = null,
+        public bool $editable = false,
     ) {}
+
+    public const KINDS = ['nothing', 'noclick', 'question', 'info', 'idea'];
 }

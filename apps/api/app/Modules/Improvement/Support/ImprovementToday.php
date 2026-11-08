@@ -2,6 +2,7 @@
 
 namespace App\Modules\Improvement\Support;
 
+use App\Core\Localization\Money;
 use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -13,24 +14,31 @@ use App\Modules\Tenancy\Models\Shop;
 use Throwable;
 
 /**
- * The review's proposals on Today's "Waiting for you": a word that found nothing and the word it means, approved in
- * one tap ("Quick win", with the products shoppers will see); a question shoppers ask with a drafted answer to check
- * ("Asked often"); a page or post the store lacks ("Bigger idea"). Ranked by the searches and questions behind each.
- * What they did once approved is the search's to count (SearchFixesToday). No model here.
+ * The review's proposals on Today's "Waiting for you" and the Improvements screen: a word that found nothing and the
+ * word it means, approved in one tap, with the products shoppers will see then ("Quick win"); a question shoppers ask,
+ * with its drafted answer to read, edit and publish in one tap ("Asked often"); a page or post the store lacks ("Bigger
+ * idea"). Each with what exactly shoppers typed or asked. Ranked by the searches and questions behind each. "Not
+ * relevant" rejects a proposal, as the suggestions screen does. What they did once approved is the search's to count
+ * (SearchFixesToday). No model here.
  */
 final class ImprovementToday implements TodayImprovements
 {
+    /** Products the suggestion shows, at most; the rest is "+N more". */
+    private const PREVIEW = 3;
+
     public function waiting(Shop $shop): array
     {
         $url = SiteSuggestions::getUrl(panel: 'merchant', tenant: $shop);
         $fixes = [];
 
         foreach (ImprovementProposal::query()->where('status', ImprovementProposal::PENDING)->latest()->get(['id', 'kind', 'title', 'detail', 'evidence']) as $proposal) {
-            $demand = self::demand((array) $proposal->evidence);
+            $evidence = (array) $proposal->evidence;
+            $demand = self::demand($evidence);
             $detail = (array) $proposal->detail;
+            $typed = self::typed($evidence);
 
             $fixes[] = match ($proposal->kind) {
-                ImprovementProposal::SYNONYM => $this->synonym($shop, $proposal, $detail, $demand, $url),
+                ImprovementProposal::SYNONYM => $this->synonym($shop, $proposal, $detail, $demand, $typed, $url),
                 ImprovementProposal::FAQ => new TodayFix(
                     key: 'proposal:'.$proposal->id,
                     chip: TodayFix::ASKED,
@@ -38,10 +46,16 @@ final class ImprovementToday implements TodayImprovements
                     unit: 'times',
                     title: '“'.trim((string) ($detail['question'] ?? $proposal->title)).'”',
                     text: __('improvement::today.faq.text'),
-                    action: __('improvement::today.faq.action'),
-                    oneTap: false,
+                    action: trim((string) ($detail['answer'] ?? '')) !== '' ? __('improvement::today.faq.publish') : __('improvement::today.faq.action'),
+                    // a drafted answer is published here, as the owner leaves it; none yet: the suggestions screen writes one
+                    oneTap: trim((string) ($detail['answer'] ?? '')) !== '',
                     url: $url,
                     impact: $demand,
+                    kind: 'question',
+                    suggestion: trim((string) ($detail['answer'] ?? '')) === '' ? [] : ['type' => 'answer', 'answer' => trim((string) $detail['answer'])],
+                    typed: $typed,
+                    secondary: ['label' => __('improvement::today.faq.open'), 'url' => $url],
+                    editable: true,
                 ),
                 default => new TodayFix(
                     key: 'proposal:'.$proposal->id,
@@ -55,6 +69,9 @@ final class ImprovementToday implements TodayImprovements
                     url: $url,
                     // a page is more than a tap: it waits behind a quick fix of the same weight
                     impact: intdiv($demand, 2),
+                    kind: 'idea',
+                    suggestion: ['type' => 'idea'],
+                    typed: $typed,
                 ),
             };
         }
@@ -62,18 +79,31 @@ final class ImprovementToday implements TodayImprovements
         return $fixes;
     }
 
-    public function approve(Shop $shop, string $key, ?int $userId): ?string
+    public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
     {
-        if (! str_starts_with($key, 'proposal:')) {
+        $proposal = $this->proposal($key);
+        if ($proposal === null || ! in_array($proposal->kind, [ImprovementProposal::SYNONYM, ImprovementProposal::FAQ], true)) {
             return null;
         }
-        $proposal = ImprovementProposal::query()->whereKey((int) substr($key, 9))->where('kind', ImprovementProposal::SYNONYM)->first();
-        if ($proposal === null) {
-            return null;
+        $why = app(DecideProposal::class)->approve($proposal, $userId, $proposal->kind === ImprovementProposal::FAQ ? $text : null);
+        if ($why !== null) {
+            return __($why);
         }
-        $why = app(DecideProposal::class)->approve($proposal, $userId);
 
-        return $why === null ? __('improvement::today.synonym.done', ['term' => (string) ($proposal->detail['term'] ?? '')]) : __($why);
+        return $proposal->kind === ImprovementProposal::FAQ
+            ? __('improvement::today.faq.done')
+            : __('improvement::today.synonym.done', ['term' => (string) ($proposal->detail['term'] ?? '')]);
+    }
+
+    public function dismiss(Shop $shop, string $key, ?int $userId): bool
+    {
+        $proposal = $this->proposal($key);
+        if ($proposal === null) {
+            return false;
+        }
+        app(DecideProposal::class)->reject($proposal, $userId);
+
+        return true;
     }
 
     /** The search counts what an approved synonym did (SearchFixesToday reads search_synonyms). */
@@ -82,8 +112,18 @@ final class ImprovementToday implements TodayImprovements
         return [];
     }
 
-    /** @param array<string, mixed> $detail */
-    private function synonym(Shop $shop, ImprovementProposal $proposal, array $detail, int $demand, string $url): TodayFix
+    private function proposal(string $key): ?ImprovementProposal
+    {
+        return str_starts_with($key, 'proposal:')
+            ? ImprovementProposal::query()->whereKey(substr($key, 9))->where('status', ImprovementProposal::PENDING)->first()
+            : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $detail
+     * @param  list<array{text: string, n: int}>  $typed
+     */
+    private function synonym(Shop $shop, ImprovementProposal $proposal, array $detail, int $demand, array $typed, string $url): TodayFix
     {
         $term = trim((string) ($detail['term'] ?? ''));
         $means = trim((string) ($detail['means'] ?? ''));
@@ -93,7 +133,13 @@ final class ImprovementToday implements TodayImprovements
         } catch (Throwable $e) {
             report($e);
         }
-        $pictures = CatalogProduct::query()->whereIn('external_id', array_slice($ids, 0, 2))->whereNotNull('image_url')->pluck('image_url')->map(fn ($u): string => (string) $u)->all();
+        $products = CatalogProduct::query()->whereIn('external_id', array_slice($ids, 0, self::PREVIEW))->get(['external_id', 'title', 'image_url', 'price'])->keyBy('external_id');
+        $currency = (string) ($shop->currency ?: 'ILS');
+        $preview = array_values(array_filter(array_map(fn (string $id): ?array => isset($products[$id]) ? [
+            'title' => (string) $products[$id]->title,
+            'picture' => $products[$id]->image_url,
+            'price' => $products[$id]->price === null ? null : Money::total((float) $products[$id]->price, $currency),
+        ] : null, array_slice($ids, 0, self::PREVIEW))));
 
         return new TodayFix(
             key: 'proposal:'.$proposal->id,
@@ -108,8 +154,12 @@ final class ImprovementToday implements TodayImprovements
             oneTap: true,
             url: $url,
             struck: $term,
-            pictures: $pictures,
+            pictures: array_values(array_filter(array_column($preview, 'picture'))),
             impact: $demand,
+            kind: 'nothing',
+            suggestion: ['type' => 'rule', 'from' => $term, 'to' => $means, 'products' => $preview, 'more' => max(0, count($ids) - count($preview))],
+            typed: $typed,
+            secondary: ['label' => __('improvement::today.synonym.other'), 'url' => $url],
         );
     }
 
@@ -117,5 +167,23 @@ final class ImprovementToday implements TodayImprovements
     private static function demand(array $evidence): int
     {
         return (int) array_sum(array_map(fn ($e): int => is_array($e) ? (int) ($e['searches'] ?? $e['asked'] ?? $e['count'] ?? 0) : 0, $evidence));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $evidence
+     * @return list<array{text: string, n: int}> what exactly shoppers typed or asked, the most first
+     */
+    private static function typed(array $evidence): array
+    {
+        $out = [];
+        foreach ($evidence as $e) {
+            $text = is_array($e) ? trim((string) ($e['query'] ?? $e['question'] ?? '')) : '';
+            if ($text !== '') {
+                $out[] = ['text' => $text, 'n' => (int) ($e['searches'] ?? $e['asked'] ?? $e['count'] ?? 0)];
+            }
+        }
+        usort($out, fn (array $a, array $b): int => $b['n'] <=> $a['n']);
+
+        return array_slice($out, 0, 6);
     }
 }

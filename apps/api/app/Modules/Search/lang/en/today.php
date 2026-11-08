@@ -32,6 +32,10 @@ return [
             'text' => '{1} Read them as one word, so each finds what the others find?|[2,*] Read these :n words as one, so each finds what the others find?',
             'action' => 'Yes, read them as one',
             'done' => 'Done. Search reads them as one in a minute.',
+            'edit' => 'Edit the words',
         ],
+    ],
+    'auto' => [
+        'undone' => 'Undone. Searching “:words” works as it did before.',
     ],
 ];

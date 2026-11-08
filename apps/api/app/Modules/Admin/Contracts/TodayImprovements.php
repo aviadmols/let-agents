@@ -19,9 +19,13 @@ interface TodayImprovements
     /**
      * Approve a fix whose oneTap is true, as the owner. Null when the key is not this source's.
      *
+     * @param  string|null  $text  the suggestion as the owner left it, for an editable one (an answer); its draft when null
      * @return string|null what changed, for the toast
      */
-    public function approve(Shop $shop, string $key, ?int $userId): ?string;
+    public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string;
+
+    /** "Not relevant": the fix is dismissed for good, where its source keeps such a decision. False when it is not this source's. */
+    public function dismiss(Shop $shop, string $key, ?int $userId): bool;
 
     /** @return list<TodayWin> the latest approved first */
     public function wins(Shop $shop, int $limit): array;

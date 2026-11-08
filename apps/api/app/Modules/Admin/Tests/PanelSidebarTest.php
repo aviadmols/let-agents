@@ -54,7 +54,7 @@ final class PanelSidebarTest extends TestCase
             // Searches now) and the timeline (the operator's) are off the sidebar (the redesign, 11.2026).
             $this->assertSame([''], array_values(array_unique($this->groupLabels($html))));
             $this->assertSame(
-                [__('admin::home.nav', [], $locale), __('admin::searches.nav', [], $locale), ...array_map(
+                [__('admin::home.nav', [], $locale), __('admin::searches.nav', [], $locale), __('admin::improvements.nav', [], $locale), ...array_map(
                     fn (string $key): string => __("admin::panels.screens.{$key}", [], $locale),
                     ['sessions', 'inbox', 'knowledge', 'scan', 'settings'],
                 )],

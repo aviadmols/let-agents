@@ -17,6 +17,7 @@ use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The search's fixes on Today. Waiting: the word families written for the store and not decided yet, each one tap
@@ -48,13 +49,46 @@ final class SearchFixesToday implements TodayImprovements
                 url: WordFamilies::getUrl(),
                 pictures: $this->pictures($plain, now()->subDays(self::DAYS)),
                 impact: $searches,
+                kind: 'nothing',
+                // the words, each as searched, read as one from now on
+                suggestion: ['type' => 'words', 'words' => array_map(fn (string $w): string => HebrewSearch::withFinals($w), $words)],
+                typed: $this->typed($plain),
+                secondary: ['label' => __('search::today.fix.family.edit'), 'url' => WordFamilies::getUrl()],
             );
         }
 
         return $fixes;
     }
 
-    public function approve(Shop $shop, string $key, ?int $userId): ?string
+    /** "Not relevant": not one family, never offered again as one (the word families screen's "wrong"). */
+    public function dismiss(Shop $shop, string $key, ?int $userId): bool
+    {
+        if (! str_starts_with($key, 'family:')) {
+            return false;
+        }
+        foreach (StoreFamilies::waiting() as $words) {
+            if ('family:'.StoreFamilies::key($words) === $key) {
+                app(ChooseWordFamily::class)->handle((string) $shop->id, SearchFamilyChoice::REJECTED, $words);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<string>  $plain
+     * @return list<array{text: string, n: int}> how often each word was searched in the last month
+     */
+    private function typed(array $plain): array
+    {
+        return SearchTerm::query()->whereIn('query', $plain)->where('day', '>=', now()->subDays(self::DAYS)->toDateString())
+            ->select('query')->selectRaw('SUM(searches) as n')->groupBy('query')->orderByDesc(DB::raw('SUM(searches)'))->get()
+            ->map(fn ($r): array => ['text' => HebrewSearch::withFinals((string) $r->query), 'n' => (int) $r->n])->all();
+    }
+
+    public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
     {
         if (! str_starts_with($key, 'family:')) {
             return null;

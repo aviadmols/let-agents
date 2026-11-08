@@ -446,9 +446,10 @@ final class ShopOverview extends Page
         return Money::total($amount, $currency);
     }
 
+    /** "All N improvements": the Improvements screen, where every fix waits. */
     public function inboxUrl(): string
     {
-        return ShopNotices::getUrl();
+        return Improvements::getUrl();
     }
 
     protected function periodChanged(): void

@@ -44,12 +44,23 @@ final class AssistantToday implements TodayImprovements
             url: $url,
             pictures: $answer->product_id !== null && isset($pictures[$answer->product_id]) ? [(string) $pictures[$answer->product_id]] : [],
             impact: (int) $answer->asked_count,
+            kind: 'question',
         ))->all();
     }
 
-    public function approve(Shop $shop, string $key, ?int $userId): ?string
+    public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
     {
         return null;
+    }
+
+    /** "Not relevant": the question is hidden, as the questions screen hides one; it no longer waits. */
+    public function dismiss(Shop $shop, string $key, ?int $userId): bool
+    {
+        if (! str_starts_with($key, 'question:')) {
+            return false;
+        }
+
+        return AssistantAnswer::query()->whereKey(substr($key, 9))->update(['status' => AssistantAnswer::HIDDEN]) > 0;
     }
 
     public function wins(Shop $shop, int $limit): array

@@ -5,6 +5,7 @@ namespace App\Modules\Search;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Admin\Contracts\AutoFixes;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\ScanDetails;
@@ -31,6 +32,7 @@ use App\Modules\Search\Listeners\RebuildSearchIndex;
 use App\Modules\Search\Support\DescribedProductsSaying;
 use App\Modules\Search\Support\HebrewPriceRange;
 use App\Modules\Search\Support\PopularProducts;
+use App\Modules\Search\Support\SearchAutoFixes;
 use App\Modules\Search\Support\SearchFirstSteps;
 use App\Modules\Search\Support\SearchFixesToday;
 use App\Modules\Search\Support\SearchHome;
@@ -67,6 +69,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
         $this->app->tag([SearchFixesToday::class], TodayImprovements::TAG);
         // the Searches screen: what shoppers look for, in their own words, and what they find
         $this->app->tag([SearchScreen::class], SearchesScreen::TAG);
+        // "Fixed by Lets": what the search fixed on its own, with its undo
+        $this->app->tag([SearchAutoFixes::class], AutoFixes::TAG);
     }
 
     protected function bootModule(): void

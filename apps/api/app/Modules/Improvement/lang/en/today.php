@@ -3,6 +3,7 @@
 // The review's proposals on Today's "Waiting for you" (ImprovementToday).
 return [
     'synonym' => [
+        'other' => 'Choose other products',
         'title' => 'Shoppers typed :term and found nothing',
         'text' => '{1} Looks like they mean “:means”. Show them your matching product?|[2,*] Looks like they mean “:means”. Show them your :n matching products?',
         'text_plain' => 'Looks like they mean “:means”. Show them what you have?',
@@ -10,6 +11,9 @@ return [
         'done' => 'Done. Searching “:term” now finds it.',
     ],
     'faq' => [
+        'publish' => 'Publish the answer',
+        'open' => 'Edit on the suggestions screen',
+        'done' => 'Published. The assistant answers it from now on.',
         'text' => 'Shoppers keep asking. We drafted an answer, it just needs your OK.',
         'action' => 'Review the answer',
     ],

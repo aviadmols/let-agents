@@ -28,8 +28,10 @@ final class EnrichmentToday implements TodayImprovements
             if ($waiting === []) {
                 continue;
             }
-            $pictures = CatalogProduct::query()->whereIn('external_id', array_slice(array_column($waiting, 'external_id'), 0, 2))->whereNotNull('image_url')
-                ->pluck('image_url')->map(fn ($u): string => (string) $u)->all();
+            $images = CatalogProduct::query()->whereIn('external_id', array_slice(array_column($waiting, 'external_id'), 0, 6))->pluck('image_url', 'external_id');
+            $pictures = array_values(array_filter(array_map(fn (array $p): ?string => $images[$p['external_id']] ?? null, array_slice($waiting, 0, 2))));
+            // what each photo showed, as the Improvements screen lists it before the owner approves
+            $facts = array_map(fn (array $p): array => ['title' => (string) $p['title'], 'picture' => $images[$p['external_id']] ?? null, 'label' => (string) $gap['attribute_label'], 'value' => (string) ($p['waiting'] ?? '')], array_slice($waiting, 0, 6));
             $fixes[] = new TodayFix(
                 key: self::key($gap),
                 chip: TodayFix::NICE,
@@ -42,13 +44,16 @@ final class EnrichmentToday implements TodayImprovements
                 url: MissingInfo::getUrl(panel: 'merchant', tenant: $shop),
                 pictures: $pictures,
                 impact: count($waiting),
+                kind: 'info',
+                suggestion: ['type' => 'facts', 'facts' => $facts, 'more' => max(0, count($waiting) - count($facts))],
+                secondary: ['label' => __('enrichment::today.gap.one_by_one'), 'url' => MissingInfo::getUrl(panel: 'merchant', tenant: $shop)],
             );
         }
 
         return $fixes;
     }
 
-    public function approve(Shop $shop, string $key, ?int $userId): ?string
+    public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
     {
         if (! str_starts_with($key, 'gap:')) {
             return null;
@@ -68,6 +73,12 @@ final class EnrichmentToday implements TodayImprovements
         }
 
         return null;
+    }
+
+    /** A detail read from photos is checked one by one on the missing-details screen, never dismissed for every product at once. */
+    public function dismiss(Shop $shop, string $key, ?int $userId): bool
+    {
+        return false;
     }
 
     public function wins(Shop $shop, int $limit): array
