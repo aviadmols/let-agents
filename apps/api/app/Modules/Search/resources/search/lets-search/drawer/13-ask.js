@@ -276,6 +276,15 @@
       (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
       '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary">' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
   }
+  // the code sent to the email they left (shoppers' sign-up): typed back, their browsing follows them to other devices;
+  // skipped, they are still called back
+  function codeForm(turn) {
+    var err = turn.codeErr || '';
+    return '<form class="ls-form" data-lead-code="' + turn.id + '" novalidate>' +
+      '<p class="ls-noanswer__text" style="margin:0">' + esc(t('codeSent', { contact: turn.leadMasked || '' })) + '</p>' +
+      '<div class="ls-input"><label for="lcode-' + turn.id + '">' + esc(t('codeLabel')) + '</label><input id="lcode-' + turn.id + '" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" dir="ltr" style="text-align:' + (DIR === 'rtl' ? 'right' : 'left') + ';letter-spacing:.2em"' + (err ? ' aria-invalid="true" aria-describedby="lcode-e-' + turn.id + '"' : '') + '>' + (err ? '<span class="ls-input__err" id="lcode-e-' + turn.id + '">' + esc(err) + '</span>' : '') + '</div>' +
+      '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary"' + (turn.codeBusy ? ' disabled' : '') + '>' + esc(t('codeConfirm')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-code-skip="' + turn.id + '">' + esc(t('codeSkip')) + '</button></div></form>';
+  }
   // an answer that could not be checked is never shown: what the store's pages say, quoted as they are, each
   // with its page, under a line that says so; and the team, for anyone who wants to be sure
   function quotedHtml(turn) {
@@ -346,8 +355,8 @@
     // the opening hours, details outside them), details (always the form, never WhatsApp), none ("not found" only)
     var offer = noAnswerOf(turn), h = hours(), link = offer === 'team' ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null, html = '';
     var form = leadFormOf(turn), own = turn.notFound ? String(turn.notFound) : '';
-    if (turn.lead === 'done') {
-      html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>';
+    if (turn.lead === 'done' || turn.lead === 'code') {
+      html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(turn.leadVerified ? t('codeDone') : t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>' + (turn.lead === 'code' ? codeForm(turn) : '');
     } else if (turn.lead === 'no') {
       html = '<p class="ls-noanswer__text">' + esc(t('leadDeclined')) + '</p>';
     } else if (offer === 'none') {

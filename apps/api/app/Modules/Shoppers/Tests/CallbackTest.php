@@ -8,6 +8,7 @@ use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
+use App\Modules\Shoppers\Mail\VerificationCode;
 use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
 use App\Modules\Shoppers\Support\ShopperContactData;
@@ -64,7 +65,7 @@ final class CallbackTest extends TestCase
         ));
     }
 
-    public function test_from_the_search_chat_a_name_comes_with_the_way_back_and_no_code_to_type(): void
+    public function test_from_the_search_chat_a_name_comes_with_the_way_back_and_an_email_gets_a_code(): void
     {
         Mail::fake();
 
@@ -73,8 +74,9 @@ final class CallbackTest extends TestCase
         ], content: json_encode(['vid' => self::VID, 'contact' => 'dana@example.com', 'name' => 'דנה כהן', 'consent' => true, 'locale' => 'he',
             'question' => 'יש לכם משלוח לאילת?', 'type' => 'search', 'id' => '01m4vd6kdtaj9fmtjyhf99fx1e'], JSON_UNESCAPED_UNICODE));
 
-        $this->assertSame('saved', $response->assertOk()->json('data.status'), 'asked to be called back about one question: nothing to type back');
-        Mail::assertNothingSent();
+        // the drawer asks for the code; skipped, the shopper is still called back
+        $this->assertSame('code_sent', $response->assertOk()->json('data.status'));
+        Mail::assertSent(VerificationCode::class, fn (VerificationCode $mail): bool => $mail->hasTo('dana@example.com'));
         $callback = app(TenantContext::class)->run($this->shop->id, fn () => ShopperCallback::query()->sole());
         $this->assertSame(['search', '01m4vd6kdtaj9fmtjyhf99fx1e', 'דנה כהן'], [$callback->page_type, $callback->page_id, $callback->name]);
         $this->assertStringNotContainsString('דנה', (string) $callback->getRawOriginal('name'), 'kept encrypted, like the contact');

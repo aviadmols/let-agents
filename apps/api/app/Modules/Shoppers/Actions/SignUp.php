@@ -85,8 +85,9 @@ final class SignUp
                 ]);
             }
 
-            // Asked in the search chat to be called back about one question: nothing to type back.
-            if (! Channels::canVerify($contact->channel, $shopId) || ($waitingFor['type'] ?? null) === 'search') {
+            // A code wherever one can arrive, the search chat's callbacks too (11.2026): the drawer asks for it, and a
+            // shopper who skips it is still called back, only not followed to another browser.
+            if (! Channels::canVerify($contact->channel, $shopId)) {
                 return ['status' => 'saved', 'channel' => $contact->channel, 'masked' => $contact->masked];
             }
 

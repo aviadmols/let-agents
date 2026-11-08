@@ -53,8 +53,23 @@
         if (status === 'invalid_contact') { turn.errs = { contact: true }; render(); return; }
         if (status !== 'saved' && status !== 'code_sent') { throw new Error('lead'); }
         visitStep('lead');
-        update(turn, { lead: 'done', leadName: name, leadErr: false });
+        // a code went to their email: ask for it under "we got it"
+        update(turn, status === 'code_sent' ? { lead: 'code', leadName: name, leadMasked: r.body.data.masked || contact, leadErr: false, codeErr: '' } : { lead: 'done', leadName: name, leadErr: false });
       }).catch(function () { update(turn, { leadErr: true }); });
+      return;
+    }
+    if (f.matches('[data-lead-code]')) {
+      var ct = turnById(f.dataset.leadCode), code = f.code ? f.code.value.replace(/\D/g, '') : '';
+      if (!ct || ct.codeBusy) { return; }
+      if (code.length < 4) { ct.codeErr = t('codeWrong'); render(); return; }
+      ct.codeBusy = true; ct.codeErr = ''; render();
+      json(API + '/widget/' + SITE + '/confirm', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ vid: visitor(), code: code }) }).then(function (r) {
+        var st = r.body && r.body.data ? r.body.data.status : null;
+        ct.codeBusy = false;
+        if (st === 'verified') { update(ct, { lead: 'done', leadVerified: true, codeErr: '' }); return; }
+        if (st === 'expired' || st === 'too_many') { update(ct, { lead: 'done', codeErr: '', leadPromise: t('codeExpired') }); return; }
+        update(ct, { codeErr: t('codeWrong') });
+      }).catch(function () { ct.codeBusy = false; update(ct, { codeErr: t('leadError') }); });
       return;
     }
     if (f.matches('[data-shop-lead]')) { var st = turnById(f.dataset.shopLead); if (st) { sendShopLead(st, f); } return; }
@@ -251,6 +266,7 @@
       return;
     }
     if (d.leadFlowNo) { var ln = turnById(d.leadFlowNo); if (ln && ln.leadFlow && !ln.leadFlow.busy) { leadStep(ln, { declined: true }); } return; }
+    if (d.leadCodeSkip) { var cs = turnById(d.leadCodeSkip); if (cs) { update(cs, { lead: 'done', codeErr: '' }); } return; }
     if (d.leadNo) { var lt2 = S.turns.filter(function (x) { return x.id === d.leadNo; })[0]; update(lt2, { lead: 'no' }); return; }
     if (d.tagOff) { var pr = d.tagOff.split(':'), pt = S.turns.filter(function (x) { return x.id === pr[0]; })[0]; pt.off[pr[1]] = !pt.off[pr[1]]; persist(); render(); return; }
     if (d.photoItem) {
