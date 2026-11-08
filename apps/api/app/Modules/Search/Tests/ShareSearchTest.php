@@ -157,6 +157,39 @@ final class ShareSearchTest extends TestCase
         $this->assertSame('https://claude.ai/new?q='.rawurlencode($asked['prompt']), $asked['open']['claude']);
     }
 
+    public function test_a_shared_link_opens_what_was_on_screen_an_answer_or_a_photos_results(): void
+    {
+        // Aviad, 8.11: a shared link searched its words again, so an answer, or a photo's results, opened as something else
+        $post = fn (array $body): array => $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'], json_encode($body))->assertCreated()->json();
+
+        $answer = $post(['q' => 'איזו טבעת מתאימה לאירוסין?', 'ids' => ['1'], 'view' => [
+            'kind' => 'answer', 'answer' => 'לאירוסין מתאימה טבעת הסוליטר מזהב לבן.',
+            'picks' => [['id' => '1', 'why' => 'סוליטר מזהב לבן'], ['id' => '<script>', 'why' => 'x']],
+            'sources' => [['title' => 'מדריך טבעות', 'url' => 'https://www.rings.test/guide'], ['title' => 'רע', 'url' => 'javascript:alert(1)']],
+        ]]);
+        $this->assertMatchesRegularExpression('/^[a-z0-9]{12}$/', $answer['token'], 'the drawer\'s own link names it');
+        $this->getJson("/api/v1/search/{$this->site}/shared/{$answer['token']}", self::ORIGIN)->assertOk()->assertExactJson([
+            'q' => 'איזו טבעת מתאימה לאירוסין?',
+            'ids' => ['1'],
+            'view' => ['kind' => 'answer', 'answer' => 'לאירוסין מתאימה טבעת הסוליטר מזהב לבן.', 'picks' => [['id' => '1', 'why' => 'סוליטר מזהב לבן']], 'sources' => [['title' => 'מדריך טבעות', 'url' => 'https://www.rings.test/guide']]],
+        ]);
+
+        // a photo's results are those products, never what its words would search
+        $photo = $post(['q' => 'טבעת עם אבן סגולה', 'ids' => ['3', '1'], 'view' => ['kind' => 'photo', 'seen' => 'טבעת עם אבן סגולה']]);
+        $this->assertNotSame($answer['token'], $photo['token']);
+        $this->getJson("/api/v1/search/{$this->site}/shared/{$photo['token']}", self::ORIGIN)->assertOk()
+            ->assertJsonPath('ids', ['3', '1'])->assertJsonPath('view', ['kind' => 'photo', 'seen' => 'טבעת עם אבן סגולה']);
+
+        // an answer with no products stays without: its words are not searched for some
+        $bare = $post(['q' => 'יש משלוח לאילת?', 'ids' => [], 'view' => ['kind' => 'answer', 'answer' => 'כן, שולחים לכל הארץ.']]);
+        $this->getJson("/api/v1/search/{$this->site}/shared/{$bare['token']}", self::ORIGIN)->assertOk()->assertJsonPath('ids', []);
+
+        // only this store's links, until they end
+        $this->getJson("/api/v1/search/{$this->site}/shared/nosuchtoken1", self::ORIGIN)->assertNotFound();
+        app(TenantContext::class)->runUnscoped(fn () => SearchShare::query()->update(['expires_at' => now()->subMinute()]));
+        $this->getJson("/api/v1/search/{$this->site}/shared/{$answer['token']}", self::ORIGIN)->assertNotFound();
+    }
+
     public function test_without_products_the_words_find_them_and_an_expired_link_says_so(): void
     {
         $sent = $this->call('POST', "/api/v1/search/{$this->site}/share", [], [], [], ['HTTP_ORIGIN' => 'https://www.rings.test', 'CONTENT_TYPE' => 'text/plain'],

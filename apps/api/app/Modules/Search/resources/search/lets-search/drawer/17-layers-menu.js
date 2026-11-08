@@ -94,12 +94,25 @@
   // as filtered. With no search yet they send the store itself, as the product scripts do.
   var AI_OPEN = { chatgpt: 'https://chatgpt.com/?q={q}', claude: 'https://claude.ai/new?q={q}', gemini: 'https://gemini.google.com/app?q={q}' };
   var AIS = [['chatgpt', 'ChatGPT'], ['claude', 'Claude'], ['gemini', 'Gemini']];
+  // What is on screen, as it is: the live results, the wide grid, or the newest search, answer, photo search or like of a
+  // product. The link opens that very view (Aviad, 8.11: a shared link opened a new search for the same words, so an
+  // answer, or a photo's results, came out as something else): the server keeps it (view), the link names it (?la_s=).
   function shareCtx() {
     var turn = (S.live && SUG.classList.contains('is-on') && S.live) || (S.wide && turnById(S.wide)) ||
-      S.turns.slice().reverse().filter(function (x) { return (x.kind === 'results' || x.kind === 'similar') && x.ids && x.ids.length; })[0] || null;
-    if (turn && (turn.kind === 'compare' || !turn.ids)) { turn = null; }
-    var q = !turn ? '' : turn.kind === 'similar' ? decode((rec(turn.of) || {}).title || '').split('|')[0].trim() : turn.q;
-    return { q: q || '', ids: turn ? filtered(turn).slice(0, 24).map(function (r) { return pid(r.id); }) : [], turn: turn };
+      S.turns.slice().reverse().filter(function (x) {
+        return !x.loading && (((x.kind === 'results' || x.kind === 'similar' || x.kind === 'photo') && x.ids && x.ids.length) || (x.kind === 'answer' && x.answer));
+      })[0] || null;
+    if (turn && (turn.kind === 'compare' || (turn.kind !== 'answer' && !turn.ids))) { turn = null; }
+    if (!turn) { return { q: '', ids: [], turn: null, view: { kind: 'results' } }; }
+    if (turn.kind === 'answer') {
+      var picks = (turn.picks || []).map(function (p) { return { id: pid(p.id), why: p.why || '' }; });
+      return { q: turn.q || '', ids: (picks.length ? picks.map(function (p) { return p.id; }) : (turn.ids || []).map(pid)).slice(0, 24), turn: turn,
+        view: { kind: 'answer', answer: turn.answer, picks: picks, sources: (turn.sources || []).map(function (s) { return { title: s.title || '', url: s.url || '' }; }) } };
+    }
+    var ids = (turn.kind === 'results' ? filtered(turn) : turn.ids.map(rec).filter(Boolean)).slice(0, 24).map(function (r) { return pid(r.id); });
+    if (turn.kind === 'photo') { return { q: turn.seen || t('yourPhoto'), ids: ids, turn: turn, view: { kind: 'photo', seen: turn.seen || '' } }; }
+    if (turn.kind === 'similar') { return { q: decode((rec(turn.of) || {}).title || '').split('|')[0].trim(), ids: ids, turn: turn, view: { kind: 'similar', of: pid(turn.of) } }; }
+    return { q: turn.q || '', ids: ids, turn: turn, view: { kind: 'results' } };
   }
   // the store itself, opening this search with the filters chosen: the link format the product scripts
   // made, so links already shared (and the AI connector's) open the same way (?la_q=…&la_f=…)
@@ -131,10 +144,11 @@
   // the AI's link: from the server (a snapshot it reads), or, when that fails, the store's own link
   var SHARES = {};
   function shareFor(cx) {
-    var key = cx.q + '|' + cx.ids.join(',') + (cx.asked ? '|asked' : '');
+    var view = cx.view || { kind: 'results' };
+    var key = cx.q + '|' + cx.ids.join(',') + (cx.asked ? '|asked' : '') + '|' + view.kind + '|' + String(view.answer || view.seen || view.of || '').length;
     if (!SHARES[key]) {
       // text/plain, so the request needs no preflight; the body is JSON either way
-      SHARES[key] = json(API + '/search/' + SITE + '/share', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ q: cx.q, ids: cx.ids, locale: LANG, asked: !!cx.asked }) }).then(function (r) {
+      SHARES[key] = json(API + '/search/' + SITE + '/share', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ q: cx.q, ids: cx.ids, locale: LANG, asked: !!cx.asked, view: view }) }).then(function (r) {
         var d = r.ok && r.body && (r.body.data || r.body);
         if (d && d.prompt && d.open) { return d; }
         throw new Error('share');
@@ -162,6 +176,7 @@
         menuRow('data-ai="copy"', '<span class="ls-menu__logo">' + icon('link', 'ls-icon--sm') + '</span>', t('aiCopy')) + '<div class="ls-menu__note" role="status" data-menu-note></div>';
     }
     if (S.menu === 'share') {
+      linkFor(cx).catch(function () { /* the words' link stands in */ });
       return back(t(whole ? 'shareStore' : 'shareSearch')) + '<p class="ls-menu__help">' + esc(t(whole ? 'shareStoreHelp' : 'shareHelp')) + (whole ? '' : '<span class="ls-menu__for" dir="auto">"' + esc(cx.q) + '"</span>') + '</p>' +
         menuRow('data-share="whatsapp"', '<span class="ls-menu__logo ls-menu__logo--wa">' + icon('whatsapp', 'ls-icon--sm') + '</span>', 'WhatsApp') +
         menuRow('data-share="link"', '<span class="ls-menu__logo">' + icon('link', 'ls-icon--sm') + '</span>', t('aiCopy')) +
@@ -301,12 +316,39 @@
       if (tab) { try { tab.opener = null; } catch (e) { /* fine */ } tab.location.href = data.open[choice]; } else { win.location.href = data.open[choice]; }
     }, function () { if (tab) { tab.close(); } menuNote(t('aiFailed')); });
   }
+  // The link a friend opens: the store's own address with the snapshot of what is on screen (?la_s=), so it opens as it
+  // was; the words stay beside it (?la_q=) for a script that does not read snapshots yet. When the snapshot cannot be
+  // kept (sharing off, offline), the words alone, as before. Asked for as soon as the share menu opens, so the press
+  // that copies or shares finds it ready (a browser lets a page copy only inside the press).
+  var LINKS = {};
+  function linkFor(cx) {
+    var key = cx.q + '|' + cx.ids.join(',') + '|' + (cx.view || {}).kind;
+    if (!cx.q && !cx.ids.length) { return Promise.resolve(shareLink(cx)); }
+    if (!LINKS[key]) {
+      LINKS[key] = shareFor(cx).then(function (d) {
+        var home = CFG.homeUrl || (win.location.origin + '/');
+        var url = d && d.token ? home + (home.indexOf('?') >= 0 ? '&' : '?') + 'la_s=' + encodeURIComponent(d.token) + (cx.q ? '&la_q=' + encodeURIComponent(cx.q) : '') : shareLink(cx);
+        LINKS[key].ready = url;
+        return url;
+      });
+    }
+    return LINKS[key];
+  }
   function shareGo(choice) {
-    var cx = shareCtx(), link = shareLink(cx), shop = S.config.shopName || '';
+    var cx = shareCtx(), shop = S.config.shopName || '', pending = linkFor(cx);
     var said = cx.q ? t('shareText', { store: shop, q: cx.q }) : t('shareStoreText', { store: shop });
-    if (choice === 'whatsapp') { var w = win.open('https://wa.me/?text=' + encodeURIComponent(said + ' ' + link), '_blank'); if (w) { try { w.opener = null; } catch (e) { /* fine */ } } return; }
-    if (choice === 'more') { win.navigator.share({ title: t(cx.q ? 'shareSearch' : 'shareStore'), text: said, url: link }).catch(function () { /* closed */ }); return; }
-    copyText(link, function () { menuNote(t('shareCopied')); });
+    // WhatsApp opens its tab inside the press, so no popup blocker stops it, and goes to the link once it is ready
+    var tab = choice === 'whatsapp' ? win.open('about:blank', '_blank') : null;
+    var go = function (link) {
+      if (choice === 'whatsapp') {
+        var to = 'https://wa.me/?text=' + encodeURIComponent(said + ' ' + link);
+        if (tab) { try { tab.opener = null; } catch (e) { /* fine */ } tab.location.href = to; } else { win.location.href = to; }
+        return;
+      }
+      if (choice === 'more') { win.navigator.share({ title: t(cx.q ? 'shareSearch' : 'shareStore'), text: said, url: link }).catch(function () { /* closed */ }); return; }
+      copyText(link, function () { menuNote(t('shareCopied')); });
+    };
+    if (pending.ready) { go(pending.ready); } else { pending.then(go, function () { go(shareLink(cx)); }); }
   }
   // large view on a desktop: the side of the drawer, or the menu, makes it wide; again makes it narrow
   function toggleExpand() {

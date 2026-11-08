@@ -6,11 +6,12 @@ use App\Core\Facades\Features;
 use App\Modules\Search\Actions\ShareSearch;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Support\AgentCatalog;
+use App\Modules\Search\Support\ShareView;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /api/v1/search/{site}/share {q, ids[]}
+ * POST /api/v1/search/{site}/share {q, ids[], view?}: view is what the drawer showed (ShareView), so the shopper's link opens it as it was
  *
  * A shopper's search handed to their own AI: a short link to the snapshot (ShareSearch), the
  * words to send with it, and where to open them. Nothing about the shopper is sent or kept, and
@@ -52,7 +53,7 @@ final class ShareController
             return response()->json(['error' => 'nothing_to_share'], 422);
         }
 
-        $saved = $share->handle($connection, $query, $ids);
+        $saved = $share->handle($connection, $query, $ids, ShareView::from($body['view'] ?? null));
         $locale = in_array($body['locale'] ?? null, ['he', 'en'], true) ? (string) $body['locale'] : (string) ($connection->shop?->content_locale ?? 'he');
         $url = AgentCatalog::publicUrl('s/'.$saved->token);
         // One sentence and one link: the JSON holds the rest (the instructions, the tasks, the commands,
@@ -66,6 +67,8 @@ final class ShareController
             : __('search::share.ask', $store, $locale);
 
         return response()->json([
+            // the drawer's own link opens the snapshot by this, on the store's address (?la_s=)
+            'token' => $saved->token,
             'url' => $url,
             'prompt' => $words,
             'open' => array_map(fn (string $at): string => str_replace('{q}', rawurlencode($words), $at), self::OPEN),

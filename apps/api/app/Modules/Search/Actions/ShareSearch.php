@@ -30,24 +30,30 @@ final class ShareSearch
         private readonly SpellingProductsForQuery $spelling,
     ) {}
 
-    /** @param list<string> $externalIds the products the shopper saw, best first; none to search again */
-    public function handle(StoreConnection $connection, string $query, array $externalIds = []): SearchShare
+    /**
+     * @param  list<string>  $externalIds  the products the shopper saw, best first; none to search again
+     * @param  array<string, mixed>  $view  what the drawer showed, so a shared link opens it as it was (ShareView): a
+     *                                      search, an answer with its picks and sources, a photo's results, the like of a product
+     */
+    public function handle(StoreConnection $connection, string $query, array $externalIds = [], array $view = []): SearchShare
     {
         $shopId = (string) $connection->shop_id;
 
-        return $this->tenant->run($shopId, function () use ($connection, $shopId, $query, $externalIds): SearchShare {
+        return $this->tenant->run($shopId, function () use ($connection, $shopId, $query, $externalIds, $view): SearchShare {
             $query = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $query)), 0, 200);
             $limit = min(self::MAX_PRODUCTS, (int) Settings::get('search.ai_share_products', $shopId));
             $ids = array_slice(array_values(array_unique(array_filter(array_map('strval', $externalIds), fn (string $id): bool => preg_match('/^[A-Za-z0-9_.:-]{1,64}$/', $id) === 1))), 0, $limit);
+            $kind = (string) ($view['kind'] ?? 'results');
 
-            if ($ids === [] && $query !== '') {
+            // a search with none sent is searched again; an answer or a photo's results are what they were, products or none
+            if ($ids === [] && $query !== '' && $kind === 'results') {
                 $ids = $this->spelling->find($shopId, $query, $limit);
             }
             // Only the store's own products, in the order sent.
             $known = array_flip(CatalogProduct::query()->whereIn('external_id', $ids)->whereNull('removed_at')->pluck('external_id')->map(fn ($id): string => (string) $id)->all());
             $ids = array_values(array_filter($ids, fn (string $id): bool => isset($known[$id])));
 
-            $fingerprint = hash('sha256', $shopId."\n".$query."\n".implode(',', $ids));
+            $fingerprint = hash('sha256', $shopId."\n".$query."\n".implode(',', $ids)."\n".json_encode($view, JSON_UNESCAPED_UNICODE));
             $kept = SearchShare::query()->where('fingerprint', $fingerprint)->where('created_at', '>', now()->subHour())->where('expires_at', '>', now())->latest()->first();
 
             if ($kept !== null) {
@@ -65,6 +71,9 @@ final class ShareSearch
                     'products' => AgentCatalog::products($ids, AgentCatalog::store($connection)),
                     'policies' => AgentCatalog::policies(),
                     'as_of' => AgentCatalog::asOf($ids),
+                    // what the drawer showed, in its order, for the drawer that opens the link (SharedViewController)
+                    'ids' => $ids,
+                    'view' => $view === [] ? ['kind' => 'results'] : $view,
                 ],
                 'expires_at' => now()->addDays((int) Settings::get('search.ai_share_days', $shopId)),
             ]);

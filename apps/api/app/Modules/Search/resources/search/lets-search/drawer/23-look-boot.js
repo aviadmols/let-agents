@@ -145,6 +145,32 @@
     // ?la_order=…: the order a shopper's AI wrote, completed into this store's cart
     var laOrder = String(URLQ.la_order || '').trim().slice(0, 2000);
     if (laOrder) { loadIndex().then(function () { open({ focus: false }); orderTurn(laOrder); }); }
+    else if (/^[a-z0-9]{8,16}$/.test(String(URLQ.la_s || ''))) {
+      // a shared view (?la_s=): what the sharer had on screen, as it was (SharedViewController): an answer with its picks
+      // and sources, a photo's results, the like of a product, or a search with its products. No search and no AI run
+      // again; a link that ended falls back to its words (?la_q=), as before.
+      loadIndex().then(function () {
+        open({ focus: false });
+        json(API + '/search/' + SITE + '/shared/' + encodeURIComponent(URLQ.la_s)).then(function (r) {
+          var d = r.ok && r.body;
+          if (!d || !d.view) { throw new Error('shared'); }
+          var v = d.view, ids = (d.ids || []).map(function (id) { return pid(id); });
+          return products(ids).then(function () {
+            var have = ids.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); });
+            if (v.kind === 'answer' && v.answer) {
+              addTurn({ kind: 'answer', q: d.q || '', loading: false, answer: v.answer, follow: [], shared: true,
+                picks: (v.picks || []).map(function (p) { return { id: pid(p.id), why: p.why || '' }; }).filter(function (p) { return !!rec(p.id); }),
+                sources: (v.sources || []).filter(function (s) { return s && /^https?:\/\//i.test(String(s.url || '')); }) });
+            } else {
+              addTurn({ kind: 'results', q: d.q || '', loading: false, ids: have, total: have.length, server: true, shared: true, c: blankC() });
+            }
+          });
+        }).catch(function () {
+          var words = String(URLQ.la_q || '').trim().slice(0, 120);
+          if (words) { S.spellingNext = true; submit(words, 'search'); }
+        });
+      });
+    }
     else if (String(URLQ.la_q || '').trim()) {
       // a shared search: kept as a turn, with the filters it was shared with, by spelling only
       var laQ = String(URLQ.la_q).trim().slice(0, 120);
