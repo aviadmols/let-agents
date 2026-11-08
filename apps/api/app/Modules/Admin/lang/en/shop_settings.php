@@ -3,7 +3,7 @@
 // The shop's settings pages, as the designer's panel words them (EditsShopSettings, x-lp::*).
 return [
     'title' => 'Settings',
-    'subheading' => 'How Lets looks in the store, when the team replies, the connection and the users.',
+    'subheading' => 'Your plan, the store connection, your team and your account.',
     'save' => 'Save changes',
     'save_note' => 'Shoppers see the change within a few minutes',
     'saved' => 'Saved. Shoppers see the change within a few minutes',
@@ -32,7 +32,7 @@ return [
     'owners_only' => 'Only the account owners can do this',
     'read_only' => 'You can view only. Nothing can be changed here.',
     'connection' => [
-        'title' => 'Connection and plan',
+        'title' => 'Store connection',
         'connected' => 'Connected',
         'not_connected' => 'Not connected',
         'platform' => 'Platform',
@@ -92,7 +92,7 @@ return [
         'check_none' => 'There is no connection to check yet. Create a token first.',
     ],
     'users' => [
-        'title' => 'Users',
+        'title' => 'Team',
         'who' => 'Who signs in to the account',
         'count' => '{1} one user|[2,*] :count users',
         'waiting' => 'Waiting',

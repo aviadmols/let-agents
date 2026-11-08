@@ -5,6 +5,7 @@ namespace App\Modules\Connections\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\PlanSettings;
 use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Enums\ConnectionStatus;
 use App\Modules\Connections\Models\StoreConnection;
@@ -61,17 +62,17 @@ final class MerchantConnectionTest extends TestCase
         file_put_contents($this->directory.DIRECTORY_SEPARATOR.'let-agents-0.13.0.zip', 'PK');
 
         Livewire::test(ConnectionSettings::class)
-            ->assertSee('חיבור ומנוי')
+            ->assertSee('data-connection', false)
             ->assertSee('לא מחובר')
             ->assertSee('WooCommerce · התוסף עוד לא ענה')
             ->assertSee('rocks.example.com')
             ->assertSee('עוד לא נקרא')
-            ->assertSee('Lets Pro')
-            ->assertSee('ניצול AI החודש')
             ->assertSee('להוריד את התוסף')
             ->assertSee('גרסה 0.13.0')
             ->assertSee('ליצור טוקן חיבור')
             ->assertDontSee('הטוקן החדש. מעתיקים אותו עכשיו');
+        // the plan and the month's use: Plan and billing (the redesign, 11.2026)
+        Livewire::test(PlanSettings::class)->assertSee('Lets Pro')->assertSee('ניצול AI החודש');
     }
 
     public function test_the_plugin_zip_downloads_from_the_merchant_panel(): void

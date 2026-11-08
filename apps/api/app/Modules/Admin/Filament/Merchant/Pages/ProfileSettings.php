@@ -28,7 +28,7 @@ use UnitEnum;
  */
 class ProfileSettings extends Page
 {
-    public static string $sideGroup = 'account';
+    public static string $sideGroup = 'people';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
 

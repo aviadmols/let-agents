@@ -5,6 +5,7 @@ namespace App\Modules\Shopify\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\PlanSettings;
 use App\Modules\Admin\Models\User;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Tenancy\Enums\ShopPlatform;
@@ -40,9 +41,10 @@ final class ShopifyConnectionFactsTest extends TestCase
             ->assertSee('מחובר')
             ->assertSee('Shopify · האפליקציה מותקנת')
             ->assertSee('rocks.myshopify.com')
-            ->assertSee('מתחדש 8.11.2026')
             ->assertDontSee('להוריד את התוסף')
             ->assertDontSee('ליצור טוקן חיבור');
+        // the plan and when it renews: Plan and billing (the redesign, 11.2026)
+        Livewire::test(PlanSettings::class)->assertSee('8.11.2026');
     }
 
     /** The line says the shop's plan, never the app's name: free while charging is off, the days left of a trial. */

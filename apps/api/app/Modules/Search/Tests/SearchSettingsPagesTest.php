@@ -288,9 +288,11 @@ final class SearchSettingsPagesTest extends TestCase
 
         $this->get("/merchant/{$this->shop->slug}/search/display")->assertOk();
         $this->get("/merchant/{$this->shop->slug}/search/terms")->assertOk();
-        // the settings side menu leads to the new pages, never to the old ones
+        // the settings side menu is the store, its people and the account; the search window's page opens from What
+        // shoppers see (the redesign, 11.2026); never the old pages
+        $this->get("/merchant/{$this->shop->slug}/see")->assertOk()->assertSee("/merchant/{$this->shop->slug}/settings/search", false);
         $this->get("/merchant/{$this->shop->slug}/settings/look")->assertOk()
-            ->assertSee("/merchant/{$this->shop->slug}/settings/search", false)
+            ->assertSee("/merchant/{$this->shop->slug}/settings/plan", false)
             ->assertSee("/merchant/{$this->shop->slug}/settings/manual", false)
             ->assertDontSee("/merchant/{$this->shop->slug}/search/display", false)
             ->assertDontSee("/merchant/{$this->shop->slug}/search/terms", false);

@@ -110,12 +110,15 @@ final class SearchDisplayTest extends TestCase
         ]);
         Settings::set('search.show_price', false, $shop->id);
         Settings::set('search.image_fit', 'frame', $shop->id);
+        // results wait for Enter (What shoppers see: "Suggestions while typing" off)
+        Features::override('search.suggest', false, $shop->id);
 
         $this->assertSame('succeeded', app(BuildSearchIndex::class)->handle($shop->id)->status->value);
 
         $index = $this->getJson('/api/v1/search/'.SiteKeys::site(self::TOKEN).'/index', ['Origin' => 'https://www.rings.test'])->assertOk()->json();
 
         $this->assertFalse($index['config']['price']);
+        $this->assertFalse($index['config']['suggest']);
         $this->assertTrue($index['config']['cart']);
         $this->assertSame('frame', $index['config']['images']);
         // Only what the drawer reads: the old search box's display modes are gone.

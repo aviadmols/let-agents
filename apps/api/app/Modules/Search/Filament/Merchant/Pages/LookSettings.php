@@ -23,7 +23,7 @@ class LookSettings extends Page
 
     public const NAME_MAX = 60;
 
-    public static string $sideGroup = 'store';
+    public static string $sideGroup = 'shoppers';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSwatch;
 

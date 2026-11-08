@@ -29,13 +29,13 @@ class ManualConnectSettings extends Page
     /** Searches from the site in this many days: Lets is on the box. */
     public const SEEN_DAYS = 14;
 
-    public static string $sideGroup = 'connect';
+    public static string $sideGroup = 'store';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCodeBracket;
 
     protected static string|UnitEnum|null $navigationGroup = 'settings';
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 116;
 
     protected static ?string $slug = 'settings/manual';
 

@@ -14,6 +14,8 @@
     // one letter is not a search yet ("ס" is in an author's initial): the results wait for a second one
     if (q.replace(/[^\p{L}\p{N}]/gu, '').length < 2) { hideLive(); return; }
     if (!S.open) { return; }
+    // the store turned suggestions off (What shoppers see): the results wait for Enter
+    if (S.config && S.config.suggest === false) { hideLive(); return; }
     // the search on screen, left in the field: nothing new to show until the words change
     if (q === S.keptQ) { hideLive(); return; }
     if (/\s$/.test(INPUT.value)) { liveFor(q); return; }

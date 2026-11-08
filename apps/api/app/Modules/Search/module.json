@@ -61,6 +61,10 @@
             "default": false
         },
         {
+            "name": "suggest",
+            "default": true
+        },
+        {
             "name": "resolve_empty",
             "default": true
         },

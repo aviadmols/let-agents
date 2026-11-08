@@ -7,7 +7,7 @@ use App\Core\Usage\MonthlyUsage;
 use App\Modules\Admin\Actions\DeleteOwnAccount;
 use App\Modules\Admin\Contracts\CancelsSubscription;
 use App\Modules\Admin\Enums\ShopRole;
-use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\PlanSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Mail\ShopLeavingMail;
 use App\Modules\Admin\Mail\TeamNoticeMail;
@@ -127,7 +127,7 @@ final class PrivacySettingsTest extends TestCase
         Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::PLAN_ENDED && ! $mail->billedByHand && $mail->until !== null);
 
         Livewire::test(PrivacySettings::class)->assertSee('עד '.$until.', סוף התקופה שכבר שולמה')->assertSee('אפשר לבחור חבילה מחדש בכל רגע');
-        Livewire::test(ConnectionSettings::class)->assertSee('בוטל · החיפוש נשאר באתר שלכם עד '.now()->addDays(10)->format('j.n.Y'));
+        Livewire::test(PlanSettings::class)->assertSee('בוטל · החיפוש נשאר באתר שלכם עד '.now()->addDays(10)->format('j.n.Y'));
 
         // In English too.
         $this->owner->forceFill(['locale' => 'en'])->save();

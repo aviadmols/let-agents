@@ -4,6 +4,7 @@ namespace App\Modules\Admin\Tests;
 
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\PlanSettings;
 use App\Modules\Admin\Mail\TeamNoticeMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Tenancy\Models\Shop;
@@ -39,7 +40,8 @@ final class PlanChoiceTest extends TestCase
 
     public function test_the_plans_show_side_by_side_with_the_shops_own_marked(): void
     {
-        $plans = collect(Livewire::test(ConnectionSettings::class)->assertSee('התוכניות')->assertSee('התוכנית שלכם')->instance()->details()['plans'])->keyBy('code');
+        // Plan and billing (the redesign, 11.2026)
+        $plans = collect(Livewire::test(PlanSettings::class)->assertSee('לבחור חבילה')->assertSee('התוכנית שלכם')->instance()->details()['plans'])->keyBy('code');
 
         $this->assertTrue($plans['starter']['current']);
         $this->assertSame('upgrade', $plans['growth']['move']);
@@ -60,7 +62,7 @@ final class PlanChoiceTest extends TestCase
         $member->attachShop($this->shop, ShopRole::Member);
         $this->actingAs($member);
 
-        Livewire::test(ConnectionSettings::class)->assertDontSee('data-plan-move', false)->call('askPlan', 'growth');
+        Livewire::test(PlanSettings::class)->assertDontSee('data-plan-move', false)->call('askPlan', 'growth');
 
         Mail::assertNotSent(TeamNoticeMail::class);
     }

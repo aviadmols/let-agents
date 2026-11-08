@@ -58,6 +58,8 @@ final class SearchIndexController
             // The camera shows only where the shop's pictures already have vectors, and how a product looks matters.
             'photos' => Features::enabled('search.photos', $shopId) && Looks::matter($shopId) && $tenant->run($shopId, fn (): bool => app(SemanticSearch::class)->picturesReady()),
             'photoMaxKb' => (int) Settings::get('search.photo_max_kb'),
+            // Results while typing; off, they show on Enter (What shoppers see, 11.2026).
+            'suggest' => Features::enabled('search.suggest', $shopId),
             // A question may be sent to the assistant, only when the shopper presses Enter.
             'ask' => Features::enabled('assistant.on_search', $shopId),
             // What the site does not answer goes to the shop's WhatsApp, when the shop has one.

@@ -3,7 +3,7 @@
 // The shop's settings pages, as the designer's panel words them (EditsShopSettings, x-lp::*).
 return [
     'title' => 'הגדרות',
-    'subheading' => 'איך Lets נראה בחנות, מתי הצוות עונה, החיבור והמשתמשים.',
+    'subheading' => 'החבילה, החיבור לחנות, הצוות והחשבון שלכם.',
     'save' => 'שמירת השינויים',
     'save_note' => 'הגולשים יראו את השינוי בתוך כמה דקות',
     'saved' => 'נשמר. הגולשים יראו את השינוי בתוך כמה דקות',
@@ -32,7 +32,7 @@ return [
     'owners_only' => 'רק בעלי החשבון יכולים לעשות את זה',
     'read_only' => 'יש לכם הרשאת צפייה בלבד. אי אפשר לשנות כאן דבר.',
     'connection' => [
-        'title' => 'חיבור ומנוי',
+        'title' => 'החיבור לחנות',
         'connected' => 'מחובר',
         'not_connected' => 'לא מחובר',
         'platform' => 'פלטפורמה',
@@ -92,7 +92,7 @@ return [
         'check_none' => 'עוד אין חיבור לבדוק. צרו טוקן קודם.',
     ],
     'users' => [
-        'title' => 'משתמשים',
+        'title' => 'צוות',
         'who' => 'מי נכנס לחשבון',
         'count' => '{1} משתמש אחד|[2,*] :count משתמשים',
         'waiting' => 'ממתין',

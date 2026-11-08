@@ -25,13 +25,20 @@ final class MerchantNavigation
     /**
      * Screens the redesign (11.2026) takes off the sidebar, their pages still open by their address and keep their tabs:
      * analytics, which the Searches screen holds now, the timeline, which is the operator's (the system's log), and the
-     * visits log, which the Shoppers screen tells as stories and links to ("Every visit"), and the knowledge centre,
-     * which is Store knowledge now (its word families still open by their address).
+     * visits log, which the Shoppers screen tells as stories and links to ("Every visit"), the knowledge centre, which is
+     * Store knowledge now (its word families still open by their address), the notices and insights, which Improvements,
+     * Shoppers and Searches hold now, and the scan summary, which Store knowledge shows and opens ("Something wrong?").
      */
-    public const OFF_SIDEBAR = ['analytics', 'timeline', 'sessions', 'knowledge'];
+    public const OFF_SIDEBAR = ['analytics', 'timeline', 'sessions', 'knowledge', 'inbox', 'scan'];
 
     /** Shown as a side menu instead of tabs, like Shopify's settings. */
     public const SIDE = ['settings'];
+
+    /**
+     * Side-menu groups the redesign (11.2026) moved to What shoppers see: their pages keep their address and open from
+     * its "More options" and "Change", but the settings menu is the store, its people and the account.
+     */
+    public const SIDE_ELSEWHERE = ['shoppers', 'team'];
 
     /** Each screen's icon in the sidebar (the redesign, 11.2026: thin strokes, round caps). */
     public const ICONS = [
@@ -57,7 +64,9 @@ final class MerchantNavigation
             $pages = self::pages($key);
 
             if ($pages !== []) {
-                $items[] = self::item($pages[0], $pages, __("admin::panels.screens.{$key}"), ++$sort, self::ICONS[$key] ?? null);
+                // a screen opens on its first page, or the one that says it opens the screen (settings: the plan)
+                $first = collect($pages)->first(fn (string $page): bool => property_exists($page, 'opensSection') && $page::$opensSection === true) ?? $pages[0];
+                $items[] = self::item($first, $pages, __("admin::panels.screens.{$key}"), ++$sort, self::ICONS[$key] ?? null);
             }
         }
 
@@ -129,7 +138,7 @@ final class MerchantNavigation
     {
         $current = collect($scopes)->first(fn (string $scope): bool => is_subclass_of($scope, Page::class));
         $key = $current === null ? null : self::sectionOf($current);
-        $pages = self::pages($key);
+        $pages = array_values(array_filter(self::pages($key), fn (string $page): bool => ! (property_exists($page, 'sideGroup') && in_array($page::$sideGroup, self::SIDE_ELSEWHERE, true))));
 
         if ($key === null) {
             return new HtmlString('');
@@ -149,7 +158,8 @@ final class MerchantNavigation
                 'label' => $page::getNavigationLabel(),
                 'url' => $page::getUrl(),
                 'badge' => $page::getNavigationBadge(),
-                'current' => $page === $current || is_subclass_of($current, $page),
+                // a page its own item, or the one it extends when it has none (Plan and billing extends the connection's)
+                'current' => $page === $current || (is_subclass_of($current, $page) && ! in_array($current, $pages, true)),
                 // In a side menu, the group a page stands under ("the store", "what shoppers see"), when it says one.
                 'group' => property_exists($page, 'sideGroup') ? __("admin::panels.side_groups.{$page::$sideGroup}") : null,
             ], $pages),

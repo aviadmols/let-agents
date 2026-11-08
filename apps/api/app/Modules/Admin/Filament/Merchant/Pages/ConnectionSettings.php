@@ -41,7 +41,7 @@ class ConnectionSettings extends Page
     /** The bar turns amber from this share of the month's allowance. */
     private const WARN_PERCENT = 80;
 
-    public static string $sideGroup = 'connect';
+    public static string $sideGroup = 'store';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLink;
 
@@ -290,7 +290,7 @@ class ConnectionSettings extends Page
     }
 
     /** @return array<string, mixed> */
-    private function facts(Shop $shop): array
+    protected function facts(Shop $shop): array
     {
         $facts = [];
 
@@ -312,7 +312,7 @@ class ConnectionSettings extends Page
         return app()->bound(StorePlugin::class) ? app(StorePlugin::class) : null;
     }
 
-    private function shop(): Shop
+    protected function shop(): Shop
     {
         /** @var Shop $shop */
         $shop = Filament::getTenant();

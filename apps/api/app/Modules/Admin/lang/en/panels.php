@@ -73,11 +73,12 @@ return [
         'settings' => 'Settings',
     ],
     'side_groups' => [
-        'store' => 'The store',
+        'store' => 'Store',
         'shoppers' => 'What shoppers see',
         'team' => 'The team and replies',
         'connect' => 'Connection',
-        'account' => 'The account',
+        'people' => 'People',
+        'account' => 'Account',
     ],
     'close' => 'Close',
     // A short hint the first time each screen opens (merchant-section).

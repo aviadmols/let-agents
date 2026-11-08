@@ -29,7 +29,7 @@ use UnitEnum;
  */
 class UsersSettings extends Page
 {
-    public static string $sideGroup = 'account';
+    public static string $sideGroup = 'people';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
