@@ -26,6 +26,7 @@ final class LeadRequests implements ShopperRequests
                 'channel' => $lead->channel === 'email' ? 'email' : 'phone',
                 'question' => self::said($lead),
                 'at' => $lead->created_at,
+                'visitor' => is_string($lead->visitor_hash) && $lead->visitor_hash !== '' ? $lead->visitor_hash : null,
             ])->all();
     }
 

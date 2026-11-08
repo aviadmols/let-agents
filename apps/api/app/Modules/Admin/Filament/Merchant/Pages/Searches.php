@@ -209,9 +209,26 @@ final class Searches extends Page
         return Route::has($route) ? route($route, ['tenant' => $this->shop()]) : ShopNotices::getUrl();
     }
 
+    /** Every question, with the answer it got (the questions list), behind "All questions". */
+    public function questionsUrl(): ?string
+    {
+        return $this->pageUrl('filament.merchant.pages.assistant.questions');
+    }
+
+    /** Every photo search, with what it found (the photo searches list), behind "All photo searches". */
+    public function photosUrl(): ?string
+    {
+        return $this->pageUrl('filament.merchant.pages.search.photos');
+    }
+
     public function money(float $amount): string
     {
         return Money::total($amount, (string) ($this->shop()->currency ?: 'ILS'));
+    }
+
+    private function pageUrl(string $route): ?string
+    {
+        return Route::has($route) ? route($route, ['tenant' => $this->shop()]) : null;
     }
 
     /** @return array{0: Carbon, 1: Carbon, 2: Carbon} the period, and the start of the one of the same length before it */

@@ -1950,3 +1950,64 @@ html.dark .fi-panel-merchant .lp-d-task:hover { background: var(--lp-d-card); }
     .fi-panel-merchant .lp-d-plan-now { grid-template-columns: minmax(0, 1fr); padding: 20px; }
     .fi-panel-merchant .lp-d-plans { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ------------------------------------------------------------------ Shoppers: find a visit, open a visit (11.2026) */
+.fi-panel-merchant .lp-d-visits-find { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.fi-panel-merchant .lp-d-find { flex: 1 1 240px; display: flex; align-items: center; gap: 8px; height: 40px; padding-inline: 14px; border-radius: 999px; background: var(--lp-d-ground); box-shadow: inset 0 0 0 1px var(--lp-d-line); min-width: 0; }
+.fi-panel-merchant .lp-d-find:focus-within { background: var(--lp-d-paper); box-shadow: inset 0 0 0 1.5px var(--lp-d-ink); }
+.fi-panel-merchant .lp-d-find svg { width: 16px; height: 16px; stroke: var(--lp-d-muted); fill: none; stroke-width: 1.8; flex: none; }
+.fi-panel-merchant .lp-d-find input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: var(--lp-d-ink); box-shadow: none; padding: 0; }
+.fi-panel-merchant .lp-d-find input::-webkit-search-cancel-button { cursor: pointer; }
+.fi-panel-merchant .lp-d-pick { height: 40px; padding-block: 0; padding-inline: 14px 34px; border: 0; border-radius: 999px; background-color: var(--lp-d-ground); box-shadow: inset 0 0 0 1px var(--lp-d-line); font: inherit; font-size: 13.5px; color: var(--lp-d-ink-soft); cursor: pointer; max-width: 100%; background-position: right 12px center; }
+[dir="rtl"] .fi-panel-merchant .lp-d-pick { padding-inline: 14px 34px; background-position: left 12px center; }
+.fi-panel-merchant .lp-d-pick:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--lp-d-ink); }
+.fi-panel-merchant .lp-d-pick.is-on { background-color: var(--lp-d-night); color: #fff; box-shadow: none; }
+.fi-panel-merchant .lp-d-visit-open { position: relative; border-radius: 14px; transition: background-color .2s; }
+.fi-panel-merchant .lp-d-visit-open:hover { background: var(--lp-d-ground); }
+.fi-panel-merchant .lp-d-visit-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.fi-panel-merchant .lp-d-visit-link:focus-visible { outline: 2px solid var(--lp-d-ink); outline-offset: -2px; }
+.fi-panel-merchant .lp-d-visits-more { display: flex; justify-content: center; padding-top: 12px; }
+.fi-panel-merchant a.lp-d-lead-name { font-weight: 500; font-size: 15px; color: var(--lp-d-ink); text-decoration: underline; text-decoration-color: var(--lp-d-line); text-underline-offset: 4px; }
+.fi-panel-merchant a.lp-d-lead-name:hover { text-decoration-color: currentColor; }
+.fi-panel-merchant .lp-d-lead-visit { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--lp-d-ink-soft); text-decoration: none; }
+.fi-panel-merchant .lp-d-lead-visit:hover { color: var(--lp-d-ink); }
+.fi-panel-merchant .lp-d-lead-visit svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+.fi-panel-merchant .lp-d-lead-body > .lp-d-lead-visit { display: flex; width: fit-content; }
+@media (max-width: 640px) {
+    .fi-panel-merchant .lp-d-find { flex-basis: 100%; }
+    .fi-panel-merchant .lp-d-pick { flex: 1 1 calc(50% - 4px); }
+}
+
+/* ------------------------------------------------------------------ Searches: a question opens to its answer; a photo with what it showed (11.2026) */
+.fi-panel-merchant .lp-d-head-links { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: flex-end; }
+.fi-panel-merchant .lp-d-q-item { list-style: none; }
+.fi-panel-merchant .lp-d-q-open { border-radius: 16px; background: var(--lp-d-ground); }
+.fi-panel-merchant .lp-d-q-open > summary { list-style: none; cursor: pointer; background: transparent; }
+.fi-panel-merchant .lp-d-q-open > summary::-webkit-details-marker { display: none; }
+.fi-panel-merchant .lp-d-q-open > summary:focus-visible { outline: 2px solid var(--lp-d-ink); outline-offset: -2px; border-radius: 16px; }
+.fi-panel-merchant .lp-d-q-end { display: inline-flex; align-items: center; gap: 8px; }
+.fi-panel-merchant .lp-d-q-caret { width: 16px; height: 16px; stroke: var(--lp-d-muted); fill: none; stroke-width: 2; transition: transform .3s; flex: none; }
+.fi-panel-merchant .lp-d-q-open[open] .lp-d-q-caret { transform: rotate(180deg); }
+.fi-panel-merchant .lp-d-q-answer { margin: 0 14px 14px; margin-inline-start: 68px; padding: 12px 14px; border-radius: 14px; background: var(--lp-d-paper); display: grid; gap: 6px; justify-items: start; }
+.fi-panel-merchant .lp-d-q-when { margin: 0; font-size: 12.5px; color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-q-label { font-size: 12px; color: var(--lp-d-muted); text-transform: none; }
+.fi-panel-merchant .lp-d-q-text { margin: 0; font-size: 14px; line-height: 1.55; color: var(--lp-d-ink); overflow-wrap: anywhere; white-space: normal; }
+.fi-panel-merchant .lp-d-q-none { color: var(--lp-d-muted); }
+.fi-panel-merchant .lp-d-q-answer .lp-d-btn { margin-top: 4px; }
+.fi-panel-merchant .lp-d-ph-found { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 4px; aspect-ratio: 1 / 1; min-width: 0; }
+.fi-panel-merchant .lp-d-ph-found img { width: 100%; height: 100%; min-height: 0; object-fit: cover; border-radius: 8px; background: var(--lp-d-paper); }
+.fi-panel-merchant .lp-d-ph-found.is-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.fi-panel-merchant .lp-d-ph-found.is-1 img { border-radius: 12px; }
+.fi-panel-merchant .lp-d-ph-found.is-2 { grid-template-rows: 1fr; }
+.fi-panel-merchant .lp-d-ph-found.is-3 img:first-child { grid-row: span 2; }
+.fi-panel-merchant .lp-d-ph-found img.is-missing { visibility: hidden; }
+.fi-panel-merchant .lp-d-ph-item p.lp-d-ph-meta { margin-top: -2px; font-size: 12px; }
+.fi-panel-merchant .lp-d-ph-link { position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.fi-panel-merchant .lp-d-ph-link:focus-visible { outline: 2px solid var(--lp-d-ink); outline-offset: 2px; }
+.fi-panel-merchant .lp-d-ph-item:has(.lp-d-ph-link):hover { background: var(--lp-d-card); }
+@media (max-width: 640px) {
+    .fi-panel-merchant .lp-d-q-answer { margin-inline-start: 14px; }
+}
+.fi-panel-merchant .lp-d-q-open[open] { padding-bottom: 14px; }
+.fi-panel-merchant .lp-d-q-open .lp-d-q-answer { margin-bottom: 0; }
+.fi-panel-merchant .lp-d-ph-item p.lp-d-ph-meta { white-space: normal; overflow: visible; }

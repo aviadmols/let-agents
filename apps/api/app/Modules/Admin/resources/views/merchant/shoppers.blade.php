@@ -4,6 +4,13 @@
     @php($n = fn (string $key, int $count, array $params = []) => trans_choice('admin::shoppers.'.$key, $count, ['n' => number_format($count)] + $params))
     @php($locale = app()->getLocale())
     @php($ago = fn ($at) => $at === null ? '' : \Illuminate\Support\Carbon::instance($at)->locale($locale)->diffForHumans())
+    {{-- the date and hour on the store's clock ("Nov 8, 14:32"), the year only when it isn't this one --}}
+    @php($tz = (string) (\Filament\Facades\Filament::getTenant()?->timezone ?: 'Asia/Jerusalem'))
+    @php($when = function ($at) use ($tz, $locale): string {
+        if ($at === null) { return ''; }
+        $local = \Illuminate\Support\Carbon::instance($at)->timezone($tz)->locale($locale);
+        return $local->translatedFormat(__($local->year === now($tz)->year ? 'admin::shoppers.when' : 'admin::shoppers.when_year'));
+    })
     @php($mark = '<svg viewBox="0 0 225 225" fill="currentColor" aria-hidden="true"><path d="m0,225c0-62.13,50.37-112.5,112.5-112.5s112.5,50.37,112.5,112.5H0Z"/><path d="m225,0c0,62.13-50.37,112.5-112.5,112.5S0,62.13,0,0h225Z"/></svg>')
     @php($chev = '<svg class="lp-d-flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>')
     @php($icons = [
@@ -66,9 +73,11 @@
                         <article class="lp-d-lead" wire:key="lead-{{ $lead['key'] }}">
                             <span class="lp-d-avatar" aria-hidden="true">@if ($lead['name'] !== null){{ mb_strtoupper(mb_substr($lead['name'], 0, 1)) }}@else<svg viewBox="0 0 24 24">{!! $icons['ask'] !!}</svg>@endif</span>
                             <div class="lp-d-lead-body">
-                                <b dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</b>
-                                <span class="lp-d-lead-meta">· {{ $t('waiting.'.($lead['channel'] === 'email' ? 'email' : 'whatsapp')) }} · {{ $ago($lead['at']) }}</span>
+                                {{-- the name opens the visit they asked from: what they searched and saw before asking --}}
+                                @if ($lead['visit'])<a class="lp-d-lead-name" href="{{ $lead['visit'] }}" title="{{ $t('waiting.see_visit') }}" dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</a>@else<b dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</b>@endif
+                                <span class="lp-d-lead-meta">· {{ $t('waiting.'.($lead['channel'] === 'email' ? 'email' : 'whatsapp')) }} · <time datetime="{{ $lead['at']?->toIso8601String() }}" title="{{ $ago($lead['at']) }}"><bdi>{{ $when($lead['at']) }}</bdi></time> · {{ $ago($lead['at']) }}</span>
                                 <p class="lp-d-lead-q" dir="auto">{{ $lead['question'] }}</p>
+                                @if ($lead['visit'])<a class="lp-d-lead-visit" href="{{ $lead['visit'] }}"><span>{{ $t('waiting.see_visit') }}</span>{!! $chev !!}</a>@endif
                             </div>
                             <div class="lp-d-lead-do">
                                 <button class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" type="button" wire:click="replyTo(@js($lead['key']))">{{ $t('waiting.'.($lead['channel'] === 'email' ? 'reply_email' : 'reply_whatsapp')) }}</button>
@@ -104,7 +113,9 @@
                 </section>
 
                 {{-- recent visits --}}
-                @php($stories = $this->stories())
+                @php($found = $this->stories())
+                @php($stories = array_slice($found, 0, $this->shown))
+                @php($narrowed = $this->visitFilter() !== [])
                 <section class="lp-d-card lp-d-visits" aria-labelledby="v-title" data-visits>
                     <div class="lp-d-card-head">
                         <div><h2 class="lp-d-card-title" id="v-title">{{ $t('visits.title') }}</h2><p class="lp-d-card-sub">{{ $t('visits.sub') }}</p></div>
@@ -113,11 +124,40 @@
                             @if ($url = $this->visitsLogUrl())<a class="lp-d-more" href="{{ $url }}"><span>{{ $t('visits.log') }}</span>{!! $chev !!}</a>@endif
                         </div>
                     </div>
+                    {{-- search and narrow: a word or a product, where they came from, the device, how it ended --}}
+                    <div class="lp-d-visits-find" role="search" data-visits-find>
+                        <label class="lp-d-find">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">{!! $icons['search'] !!}</svg>
+                            <input type="search" wire:model.live.debounce.400ms="visitQ" placeholder="{{ $t('visits.find') }}" aria-label="{{ $t('visits.find') }}" dir="auto" maxlength="80" autocomplete="off">
+                        </label>
+                        <select wire:model.live="visitFrom" aria-label="{{ $t('visits.filter.from') }}" @class(['lp-d-pick', 'is-on' => $visitFrom !== ''])>
+                            <option value="">{{ $t('visits.filter.from_any') }}</option>
+                            @foreach (\App\Modules\Admin\Filament\Merchant\Pages\Shoppers::WHO as $who)
+                                <option value="{{ $who }}">{{ $who === 'returning' ? $t('visits.filter.returning') : $t('sources.names.'.$who) }}</option>
+                            @endforeach
+                        </select>
+                        <select wire:model.live="visitDevice" aria-label="{{ $t('visits.filter.device') }}" @class(['lp-d-pick', 'is-on' => $visitDevice !== ''])>
+                            <option value="">{{ $t('visits.filter.device_any') }}</option>
+                            @foreach (\App\Modules\Admin\Filament\Merchant\Pages\Shoppers::DEVICES as $device)
+                                <option value="{{ $device }}">{{ $t('visits.device.'.$device) }}</option>
+                            @endforeach
+                        </select>
+                        <select wire:model.live="visitEnded" aria-label="{{ $t('visits.filter.ended') }}" @class(['lp-d-pick', 'is-on' => $visitEnded !== ''])>
+                            <option value="">{{ $t('visits.filter.ended_any') }}</option>
+                            @foreach (\App\Modules\Admin\Filament\Merchant\Pages\Shoppers::ENDED as $ended)
+                                <option value="{{ $ended }}">{{ $t('visits.filter.ends.'.$ended) }}</option>
+                            @endforeach
+                        </select>
+                        @if ($narrowed)<button class="lp-d-ghost" type="button" wire:click="filter">{{ $t('visits.filter.clear') }}</button>@endif
+                    </div>
                     @forelse ($stories as $visit)
-                        <div class="lp-d-visit">
+                        @php($open = isset($visit['id']) ? $this->visitUrl((int) $visit['id']) : null)
+                        <div @class(['lp-d-visit', 'lp-d-visit-open' => $open !== null]) wire:key="visit-{{ $visit['id'] ?? $loop->index }}">
                             <div class="lp-d-visit-who">
+                                {{-- the whole row opens the visit, with every step in order --}}
+                                @if ($open)<a class="lp-d-visit-link" href="{{ $open }}" aria-label="{{ $t('visits.open') }}"></a>@endif
                                 <b>{{ match ($visit['who']) { 'returning', 'direct', 'other' => $t('visits.who.'.$visit['who']), default => $t('visits.who.from', ['source' => $t('sources.names.'.$visit['who'])]) } }}</b>
-                                <span>{{ $t('visits.device.'.$visit['device']) }} · {{ $t('visits.minutes', ['n' => $visit['minutes']]) }} · {{ $ago(\Illuminate\Support\Carbon::createFromTimestamp($visit['at'])) }}</span>
+                                <span title="{{ $when(\Illuminate\Support\Carbon::createFromTimestamp($visit['at'])) }}">{{ $t('visits.device.'.$visit['device']) }} · {{ $t('visits.minutes', ['n' => $visit['minutes']]) }} · {{ $ago(\Illuminate\Support\Carbon::createFromTimestamp($visit['at'])) }}</span>
                             </div>
                             <div class="lp-d-journey">
                                 @foreach ($visit['steps'] as $i => $step)
@@ -143,8 +183,23 @@
                             </div>
                         </div>
                     @empty
-                        <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('visits.zero') }}</b><span>{{ $t('visits.zero_text') }}</span></div>
+                        @if ($narrowed)
+                            <div class="lp-d-zero" data-visits-none><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('visits.none_match') }}</b><span>{{ $t('visits.none_match_text') }}</span>
+                                <button class="lp-d-btn lp-d-btn-line lp-d-btn-sm" type="button" wire:click="filter">{{ $t('visits.filter.clear') }}</button>
+                            </div>
+                        @else
+                            <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('visits.zero') }}</b><span>{{ $t('visits.zero_text') }}</span></div>
+                        @endif
                     @endforelse
+                    @if (count($found) > count($stories))
+                        <div class="lp-d-visits-more">
+                            @if ($this->canShowMore())
+                                <button class="lp-d-btn lp-d-btn-line lp-d-btn-sm" type="button" wire:click="more" wire:loading.attr="disabled">{{ $t('visits.more') }}</button>
+                            @elseif ($url = $this->visitsLogUrl())
+                                <a class="lp-d-more" href="{{ $url }}"><span>{{ $t('visits.log') }}</span>{!! $chev !!}</a>
+                            @endif
+                        </div>
+                    @endif
                 </section>
 
                 {{-- what they save for later --}}

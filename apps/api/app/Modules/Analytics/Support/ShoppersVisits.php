@@ -72,12 +72,13 @@ final class ShoppersVisits implements ShopperVisits
         ];
     }
 
-    public function stories(Shop $shop, CarbonInterface $since, CarbonInterface $until, bool $plain, int $limit): array
+    public function stories(Shop $shop, CarbonInterface $since, CarbonInterface $until, bool $plain, int $limit, array $filter = []): array
     {
         $query = $this->visits($since, $until);
         if (! $plain) {
             $this->searched($query);
         }
+        $this->narrow($query, $filter);
         $visits = $query->latest('started_at')->orderByDesc('id')->limit($limit)->get();
         if ($visits->isEmpty()) {
             return [];
@@ -93,6 +94,7 @@ final class ShoppersVisits implements ShopperVisits
             $own = $steps->get($visit->id, collect())->all();
 
             return [
+                'id' => (int) $visit->id,
                 'who' => $visit->visit_number > 1 ? 'returning' : (in_array($visit->source, AnalyticsVisit::SOURCES, true) ? (string) $visit->source : 'other'),
                 'device' => self::device($visit),
                 'minutes' => max(1, (int) round($visit->duration() / 60)),
@@ -101,6 +103,64 @@ final class ShoppersVisits implements ShopperVisits
                 'end' => $this->end($visit, $own, $products, $currency),
             ];
         })->all();
+    }
+
+    public function visitOf(Shop $shop, string $visitor, CarbonInterface $at): ?int
+    {
+        $mine = fn (): Builder => AnalyticsVisit::query()->where('preview', false)->where('visitor_hash', $visitor);
+        $id = $mine()->where('started_at', '<=', $at->copy()->addMinutes(2))->where('started_at', '>=', $at->copy()->subDay())
+            ->latest('started_at')->orderByDesc('id')->value('id')
+            ?? $mine()->where('started_at', '>', $at)->where('started_at', '<=', $at->copy()->addDay())->oldest('started_at')->orderBy('id')->value('id');
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * The story list narrowed as the screen asks: by the shopper's words or a product they met, where they came from
+     * (as the story names it), the device, and how it ended.
+     *
+     * @param  Builder<AnalyticsVisit>  $query
+     * @param  array{q?: string, who?: string, device?: string, ended?: string}  $filter
+     */
+    private function narrow(Builder $query, array $filter): void
+    {
+        $q = mb_strtolower(trim((string) ($filter['q'] ?? '')));
+        if ($q !== '') {
+            $like = '%'.addcslashes($q, '%_\\').'%';
+            $items = CatalogProduct::query()->whereRaw('lower(title) like ?', [$like])->limit(200)->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
+            $query->where(function (Builder $w) use ($like, $items): void {
+                $w->where('words', 'like', $like);
+                if ($items !== []) {
+                    $w->orWhereIn('id', AnalyticsVisitStep::query()->select('visit_id')->whereIn('item', $items));
+                }
+            });
+        }
+
+        $named = array_values(array_diff(AnalyticsVisit::SOURCES, ['other']));
+        $who = (string) ($filter['who'] ?? '');
+        match (true) {
+            $who === 'returning' => $query->where('visit_number', '>', 1),
+            in_array($who, $named, true) => $query->where('visit_number', '<=', 1)->where('source', $who),
+            $who === 'other' => $query->where('visit_number', '<=', 1)->where(fn (Builder $w) => $w->whereNull('source')->orWhereNotIn('source', $named)),
+            default => null,
+        };
+
+        match ((string) ($filter['device'] ?? '')) {
+            'phone' => $query->whereNotNull('device')->whereNotIn('device', ['computer', 'tablet']),
+            'tablet' => $query->where('device', 'tablet'),
+            'computer' => $query->where(fn (Builder $w) => $w->whereNull('device')->orWhere('device', 'computer')),
+            default => null,
+        };
+
+        // as the story's end reads it: an order first, then the cart, then what was saved
+        $noOrder = fn (Builder $w) => $w->whereNull('order_total')->orWhere('order_total', '<=', 0);
+        match ((string) ($filter['ended'] ?? '')) {
+            'order' => $query->where('order_total', '>', 0),
+            'cart' => $query->where($noOrder)->where('did', 'like', '%"cart"%'),
+            'saved' => $query->where($noOrder)->where('did', 'not like', '%"cart"%')->where('did', 'like', '%"heart"%'),
+            'none' => $query->where($noOrder)->where(fn (Builder $w) => $w->whereNull('did')->orWhere(fn (Builder $x) => $x->where('did', 'not like', '%"cart"%')->where('did', 'not like', '%"heart"%'))),
+            default => null,
+        };
     }
 
     public function bought(Shop $shop, array $ids, CarbonInterface $since, CarbonInterface $until): array

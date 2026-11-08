@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Core\Facades\Features;
 use App\Core\Filament\HasPeriod;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\SavedProducts;
@@ -18,6 +19,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
+use Livewire\Attributes\Url;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use UnitEnum;
@@ -44,10 +46,35 @@ final class Shoppers extends Page
 
     private const STORIES = 8;
 
+    /** "Show more" stops here; the visits log holds the rest. */
+    private const STORIES_MAX = 64;
+
     private const SAVED_SHOWN = 5;
+
+    /** Where a story's shopper came from, as the story names it. */
+    public const WHO = ['returning', 'google', 'facebook', 'instagram', 'whatsapp', 'email', 'direct', 'other'];
+
+    public const DEVICES = ['phone', 'tablet', 'computer'];
+
+    public const ENDED = ['order', 'cart', 'saved', 'none'];
 
     /** Also the visits with no search. */
     public bool $plain = false;
+
+    /** Recent visits narrowed: a word the shopper typed or a product they met. */
+    #[Url(as: 'vq')]
+    public string $visitQ = '';
+
+    #[Url(as: 'vfrom')]
+    public string $visitFrom = '';
+
+    #[Url(as: 'vdevice')]
+    public string $visitDevice = '';
+
+    #[Url(as: 'vend')]
+    public string $visitEnded = '';
+
+    public int $shown = self::STORIES;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
@@ -124,10 +151,17 @@ final class Shoppers extends Page
         return $counts + ['waiting' => count($waiting), 'oldest' => $waiting === [] ? null : end($waiting)['at']];
     }
 
-    /** @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface}> who waits, the newest first */
+    /** @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface, visit: string|null}> who waits, the newest first, each with the visit they asked from */
     public function waiting(): array
     {
-        return array_slice(self::waitingOf($this->shop(), self::WAITING), 0, self::WAITING_SHOWN);
+        return array_map(function (array $w): array {
+            $id = is_string($w['visitor'] ?? null) && $w['at'] instanceof CarbonInterface
+                ? $this->visits(fn (ShopperVisits $v): ?int => $v->visitOf($this->shop(), $w['visitor'], $w['at']))
+                : null;
+            unset($w['visitor']);
+
+            return $w + ['visit' => is_int($id) ? $this->visitUrl($id) : null];
+        }, array_slice(self::waitingOf($this->shop(), self::WAITING), 0, self::WAITING_SHOWN));
     }
 
     /** "Reply on WhatsApp" / "Reply by email": the module that keeps the request opens the reply; the contact never sits on the page. */
@@ -164,16 +198,62 @@ final class Shoppers extends Page
         return $this->cached('sources', fn (): array => $this->visits(fn (ShopperVisits $v): array => $v->sources($this->shop(), $since, $until)) ?? ['rows' => [], 'searchiest' => null, 'campaign' => null]);
     }
 
-    /** @return list<array<string, mixed>> */
+    /** @return list<array<string, mixed>> one more than shown, so the screen knows there are more */
     public function stories(): array
     {
         [$since, $until] = $this->range();
+        $filter = $this->visitFilter();
+        $limit = min($this->shown, self::STORIES_MAX) + 1;
 
         // kept as plain values: the time as a timestamp (the cache keeps no objects)
-        return $this->cached('stories-'.($this->plain ? 'all' : 'searched'), fn (): array => array_map(
+        return $this->cached('stories-'.($this->plain ? 'all' : 'searched').'-'.$limit.'-'.md5((string) json_encode($filter)), fn (): array => array_map(
             fn (array $s): array => ['at' => $s['at']->getTimestamp()] + $s,
-            $this->visits(fn (ShopperVisits $v): array => $v->stories($this->shop(), $since, $until, $this->plain, self::STORIES)) ?? [],
+            $this->visits(fn (ShopperVisits $v): array => $v->stories($this->shop(), $since, $until, $this->plain, $limit, $filter)) ?? [],
         ));
+    }
+
+    /** @return array{q?: string, who?: string, device?: string, ended?: string} the filters that hold a known value */
+    public function visitFilter(): array
+    {
+        return array_filter([
+            'q' => mb_substr(trim($this->visitQ), 0, 80),
+            'who' => in_array($this->visitFrom, self::WHO, true) ? $this->visitFrom : '',
+            'device' => in_array($this->visitDevice, self::DEVICES, true) ? $this->visitDevice : '',
+            'ended' => in_array($this->visitEnded, self::ENDED, true) ? $this->visitEnded : '',
+        ], fn (string $v): bool => $v !== '');
+    }
+
+    /** A narrower list starts again from the first few. */
+    public function updated(string $name): void
+    {
+        if (in_array($name, ['visitQ', 'visitFrom', 'visitDevice', 'visitEnded', 'plain'], true)) {
+            $this->shown = self::STORIES;
+        }
+    }
+
+    public function more(): void
+    {
+        $this->shown = min($this->shown + self::STORIES, self::STORIES_MAX);
+    }
+
+    public function canShowMore(): bool
+    {
+        return $this->shown < self::STORIES_MAX;
+    }
+
+    /** "Clear": every visit filter off. */
+    public function filter(): void
+    {
+        $this->visitQ = $this->visitFrom = $this->visitDevice = $this->visitEnded = '';
+        $this->shown = self::STORIES;
+    }
+
+    /** One visit, open over the visits log with every step in order. */
+    public function visitUrl(int $id): ?string
+    {
+        $route = 'filament.merchant.pages.sessions';
+
+        return Route::has($route) && Features::enabled('analytics.sessions', $this->shop()->id) ? route($route, ['tenant' => $this->shop(), 'session' => $id]) : null;
     }
 
     /** @return list<array{id: string, title: string, picture: string|null, saved: int, bought: int}> */

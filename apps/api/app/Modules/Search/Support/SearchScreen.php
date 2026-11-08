@@ -32,6 +32,9 @@ final class SearchScreen implements SearchesScreen
 {
     private const PHOTO = '[photo]';
 
+    /** How many of a photo search's results show beside the shopper's photo. */
+    private const PHOTO_FOUND = 4;
+
     /** A word with fewer searches than this is not "rising" on its growth alone. */
     private const RISING_MIN = 3;
 
@@ -135,7 +138,7 @@ final class SearchScreen implements SearchesScreen
     {
         return AssistantAnswer::query()->where('status', AssistantAnswer::SHOWN)->whereIn('outcome', [AssistantAnswer::ANSWERED, AssistantAnswer::NO_INFO])
             ->where('last_asked_at', '>=', $since)->where('last_asked_at', '<', $until)
-            ->orderByDesc('asked_count')->orderByDesc('last_asked_at')->limit($limit)->get(['question', 'asked_count', 'outcome', 'source', 'sources', 'product_id'])
+            ->orderByDesc('asked_count')->orderByDesc('last_asked_at')->limit($limit)->get(['question', 'answer', 'asked_count', 'outcome', 'source', 'sources', 'product_id', 'created_at', 'last_asked_at'])
             ->map(function (AssistantAnswer $a): array {
                 $answered = $a->outcome === AssistantAnswer::ANSWERED;
                 $page = collect((array) $a->sources)->first(fn ($s): bool => is_array($s) && trim((string) ($s['title'] ?? '')) !== '');
@@ -147,26 +150,42 @@ final class SearchScreen implements SearchesScreen
                     default => 'general',
                 };
 
-                return ['question' => trim((string) $a->question), 'times' => max(1, (int) $a->asked_count), 'answered' => $answered, 'from' => $from, 'where' => $page === null ? null : trim((string) $page['title'])];
+                $answer = trim((string) $a->answer);
+                $last = $a->last_asked_at?->getTimestamp() ?? 0;
+
+                return [
+                    'question' => trim((string) $a->question), 'times' => max(1, (int) $a->asked_count), 'answered' => $answered, 'from' => $from,
+                    'where' => $page === null ? null : trim((string) $page['title']),
+                    'answer' => $answer === '' ? null : mb_substr($answer, 0, 1200),
+                    'first' => min($a->created_at?->getTimestamp() ?? $last, $last), 'last' => $last,
+                ];
             })->all();
     }
 
     public function photos(Shop $shop, CarbonInterface $since, CarbonInterface $until, int $limit): array
     {
         return SearchPhotoAsk::query()->where('created_at', '>=', $since)->where('created_at', '<', $until)->where('total', '>', 0)
-            ->latest()->limit($limit)->get(['thumb', 'object', 'results'])
+            ->latest()->limit($limit)->get(['thumb', 'object', 'results', 'total', 'created_at'])
             ->map(function (SearchPhotoAsk $ask): ?array {
                 $first = (array) (((array) $ask->results)[0] ?? []);
                 if (! isset($first['title'])) {
                     return null;
                 }
                 $thumb = (string) ($ask->thumb ?? '');
+                // the first few the shopper was shown, as small pictures beside their photo
+                $found = array_values(array_filter(array_map(
+                    fn ($p): ?array => is_array($p) && isset($p['title']) ? ['title' => (string) $p['title'], 'picture' => isset($p['image']) && $p['image'] !== '' ? (string) $p['image'] : null] : null,
+                    array_slice((array) $ask->results, 0, self::PHOTO_FOUND),
+                )));
 
                 return [
                     'photo' => $thumb !== '' && preg_match('/^[A-Za-z0-9+\/=]+$/', $thumb) === 1 ? 'data:image/jpeg;base64,'.$thumb : null,
                     'title' => (string) $first['title'],
                     'picture' => isset($first['image']) ? (string) $first['image'] : null,
                     'seen' => $ask->object ? (string) $ask->object : null,
+                    'found' => $found,
+                    'total' => max((int) $ask->total, count($found)),
+                    'at' => $ask->created_at?->getTimestamp() ?? 0,
                 ];
             })->filter()->values()->all();
     }

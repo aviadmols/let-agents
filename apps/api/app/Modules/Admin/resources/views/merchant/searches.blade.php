@@ -9,6 +9,12 @@
     @php($arrow = app()->getLocale() === 'he' ? '←' : '→')
     @php($change = fn (int $now, int $before): array => \App\Modules\Admin\Filament\Merchant\Pages\ShopOverview::change($now, $before))
     @php($first = $this->firstDay())
+    {{-- a timestamp as a date and hour on the store's clock ("Nov 8, 14:32"), the year only when it isn't this one --}}
+    @php($tz = (string) (\Filament\Facades\Filament::getTenant()?->timezone ?: 'Asia/Jerusalem'))
+    @php($when = function (int $ts) use ($tz): string {
+        $local = \Illuminate\Support\Carbon::createFromTimestamp($ts)->timezone($tz)->locale(app()->getLocale());
+        return $local->translatedFormat(__($local->year === now($tz)->year ? 'admin::shoppers.when' : 'admin::shoppers.when_year'));
+    })
 
     <div class="lp-page lp-d" data-searches>
         <div class="lp-d-grid">
@@ -145,17 +151,46 @@
                 <section class="lp-d-card lp-d-questions" aria-labelledby="q-title" data-questions>
                     <div class="lp-d-card-head">
                         <div><h2 class="lp-d-card-title" id="q-title">{{ $t('questions.title') }}</h2><p class="lp-d-card-sub">{{ $t('questions.sub') }}</p></div>
-                        <a class="lp-d-more" href="{{ $this->improvementsUrl() }}"><span>{{ $t('questions.unanswered') }}</span>{!! $more !!}</a>
+                        <div class="lp-d-head-links">
+                            @if ($url = $this->questionsUrl())<a class="lp-d-more" href="{{ $url }}" data-all-questions><span>{{ $t('questions.all') }}</span>{!! $more !!}</a>@endif
+                            <a class="lp-d-more" href="{{ $this->improvementsUrl() }}"><span>{{ $t('questions.unanswered') }}</span>{!! $more !!}</a>
+                        </div>
                     </div>
                     @if ($questions === [])
                         <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('questions.none') }}</b><span>{{ $t('questions.none_body') }}</span></div>
                     @else
                         <ul class="lp-d-qs">
                             @foreach ($questions as $q)
-                                <li class="lp-d-q">
-                                    <span class="lp-d-q-icon"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0-6.8 12.2L4 20l3.9-1.2A8 8 0 1 0 12 4z"/></svg></span>
-                                    <span><b dir="auto">{{ $q['question'] }}</b><span class="lp-d-num">{{ $n('questions.times', $q['times']) }} · {{ $q['from'] === 'page' ? $t('questions.from.page', ['page' => $q['where']]) : $t('questions.from.'.$q['from']) }}</span></span>
-                                    @if ($q['answered'])<span class="lp-d-chip lp-d-chip-line">{{ $t('questions.answered') }}</span>@else<a class="lp-d-chip lp-d-chip-sun" href="{{ $this->improvementsUrl() }}">{{ $t('questions.open') }}</a>@endif
+                                {{-- a question opens to the answer the shopper got, and when it was asked --}}
+                                <li class="lp-d-q-item" wire:key="q-{{ $loop->index }}-{{ md5($q['question']) }}">
+                                    <details class="lp-d-q-open">
+                                        <summary class="lp-d-q">
+                                            <span class="lp-d-q-icon"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0-6.8 12.2L4 20l3.9-1.2A8 8 0 1 0 12 4z"/></svg></span>
+                                            <span><b dir="auto">{{ $q['question'] }}</b><span class="lp-d-num">{{ $n('questions.times', $q['times']) }} · {{ $q['from'] === 'page' ? $t('questions.from.page', ['page' => $q['where']]) : $t('questions.from.'.$q['from']) }}</span></span>
+                                            <span class="lp-d-q-end">
+                                                @if ($q['answered'])<span class="lp-d-chip lp-d-chip-line">{{ $t('questions.answered') }}</span>@else<span class="lp-d-chip lp-d-chip-sun">{{ $t('questions.open') }}</span>@endif
+                                                <svg class="lp-d-q-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                            </span>
+                                        </summary>
+                                        <div class="lp-d-q-answer" data-answer>
+                                            <p class="lp-d-q-when">
+                                                @if (($q['last'] ?? 0) > 0)
+                                                    @if ($q['times'] > 1 && ($q['first'] ?? 0) > 0 && $when($q['first']) !== $when($q['last']))
+                                                        {{ $t('questions.asked_last') }} <bdi>{{ $when($q['last']) }}</bdi> · {{ $t('questions.asked_first') }} <bdi>{{ $when($q['first']) }}</bdi>
+                                                    @else
+                                                        {{ $t('questions.asked') }} <bdi>{{ $when($q['last']) }}</bdi>
+                                                    @endif
+                                                @endif
+                                            </p>
+                                            @if (($q['answer'] ?? null) !== null)
+                                                <span class="lp-d-q-label">{{ $t('questions.they_got') }}</span>
+                                                <p class="lp-d-q-text" dir="auto">{!! nl2br(e($q['answer'])) !!}</p>
+                                            @else
+                                                <p class="lp-d-q-text lp-d-q-none">{{ $t('questions.no_answer') }}</p>
+                                            @endif
+                                            @unless ($q['answered'])<a class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" href="{{ $this->improvementsUrl() }}">{{ $t('questions.answer_it') }}</a>@endunless
+                                        </div>
+                                    </details>
                                 </li>
                             @endforeach
                         </ul>
@@ -165,17 +200,35 @@
                 {{-- photo searches --}}
                 @php($photos = $this->photos())
                 <section class="lp-d-card lp-d-photos" aria-labelledby="ph-title" data-photos>
-                    <div class="lp-d-card-head"><div><h2 class="lp-d-card-title" id="ph-title">{{ $t('photos.title') }}</h2><p class="lp-d-card-sub">{{ $t('photos.sub') }}</p></div></div>
+                    @php($allPhotos = $this->photosUrl())
+                    <div class="lp-d-card-head">
+                        <div><h2 class="lp-d-card-title" id="ph-title">{{ $t('photos.title') }}</h2><p class="lp-d-card-sub">{{ $t('photos.sub') }}</p></div>
+                        @if ($allPhotos)<a class="lp-d-more" href="{{ $allPhotos }}" data-all-photos><span>{{ $t('photos.all') }}</span>{!! $more !!}</a>@endif
+                    </div>
                     @if ($photos === [])
                         <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('photos.none') }}</b><span>{{ $t('photos.none_body') }}</span></div>
                     @else
                         <div class="lp-d-ph">
                             @foreach ($photos as $p)
+                                {{-- the shopper's photo, and the first few products it showed them --}}
+                                @php($found = array_values(array_filter($p['found'] ?? [['title' => $p['title'], 'picture' => $p['picture']]], fn ($f) => ($f['picture'] ?? null) !== null)))
                                 <div class="lp-d-ph-item">
                                     @if ($p['photo'])<img src="{{ $p['photo'] }}" alt="{{ $t('photos.theirs') }}">@else<span class="lp-d-tile">{!! $mark !!}</span>@endif
-                                    @if ($p['picture'])<img src="{{ $p['picture'] }}" alt="" loading="lazy" onerror="this.classList.add('is-missing')">@else<span class="lp-d-tile">{!! $mark !!}</span>@endif
+                                    @if ($found === [])
+                                        <span class="lp-d-tile">{!! $mark !!}</span>
+                                    @else
+                                        <span @class(['lp-d-ph-found', 'is-'.min(count($found), 4)])>
+                                            @foreach (array_slice($found, 0, 4) as $f)
+                                                <img src="{{ $f['picture'] }}" alt="{{ $f['title'] }}" title="{{ $f['title'] }}" loading="lazy" onerror="this.classList.add('is-missing')">
+                                            @endforeach
+                                        </span>
+                                    @endif
                                     <span class="lp-d-ph-arrow"><svg class="lp-d-flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
                                     <p><b dir="auto">{{ $p['title'] }}</b></p>
+                                    @if (isset($p['total']) || isset($p['at']))
+                                        <p class="lp-d-ph-meta">@isset($p['total']){{ $n('photos.found', (int) $p['total']) }}@endisset @if (($p['at'] ?? 0) > 0)· <bdi>{{ $when($p['at']) }}</bdi>@endif</p>
+                                    @endif
+                                    @if ($allPhotos)<a class="lp-d-ph-link" href="{{ $allPhotos }}" aria-label="{{ $t('photos.all') }}"></a>@endif
                                 </div>
                             @endforeach
                         </div>

@@ -42,15 +42,17 @@ interface SearchesScreen
 
     /**
      * The questions asked most, and where the answer came from. from: page (its title in where), product, team, general, or none.
+     * answer: what the shopper was told (null when nothing); first and last: when it was first and last asked (timestamps).
      *
-     * @return list<array{question: string, times: int, answered: bool, from: string, where: string|null}>
+     * @return list<array{question: string, times: int, answered: bool, from: string, where: string|null, answer: string|null, first: int, last: int}>
      */
     public function questions(Shop $shop, CarbonInterface $since, CarbonInterface $until, int $limit): array;
 
     /**
-     * The latest photo searches that found something: the shopper's photo, and the product it found.
+     * The latest photo searches that found something: the shopper's photo, the product it found first, the first few it
+     * showed (found: title and picture each), how many in all, and when (a timestamp).
      *
-     * @return list<array{photo: string|null, title: string, picture: string|null, seen: string|null}>
+     * @return list<array{photo: string|null, title: string, picture: string|null, seen: string|null, found: list<array{title: string, picture: string|null}>, total: int, at: int}>
      */
     public function photos(Shop $shop, CarbonInterface $since, CarbonInterface $until, int $limit): array;
 

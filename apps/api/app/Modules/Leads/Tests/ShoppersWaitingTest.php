@@ -7,11 +7,13 @@ use App\Modules\Admin\Contracts\ReplyLink;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\Shoppers;
 use App\Modules\Admin\Models\User;
+use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Leads\Enums\LeadGoal;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadFlow;
 use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
+use App\Modules\Shoppers\Models\ShopperVisitor;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,6 +66,29 @@ final class ShoppersWaitingTest extends TestCase
                 'answers' => ['name' => 'Jonah K.', 'question' => 'Do you gift wrap?'], 'consented_at' => now(), 'consent_wording' => 'y', 'quality' => 75, 'status' => Lead::NEW,
             ]);
         });
+    }
+
+    public function test_each_name_opens_the_visit_they_asked_from_and_shows_when_they_asked(): void
+    {
+        [$leadVisit, $callbackVisit] = app(TenantContext::class)->run($this->shop->id, function (): array {
+            $this->lead->forceFill(['visitor_hash' => 'vh-jonah'])->save();
+            ShopperVisitor::query()->create(['shop_id' => $this->shop->id, 'visitor_hash' => 'vh-dana', 'identity_id' => $this->callback->identity_id, 'verified' => false, 'linked_at' => now()->subHours(2)]);
+            $visit = fn (string $visitor, int $minutesAgo): int => (int) AnalyticsVisit::query()->create([
+                'shop_id' => $this->shop->id, 'session_id' => 's-'.$visitor, 'visitor_hash' => $visitor, 'visit_number' => 1,
+                'started_at' => now()->subMinutes($minutesAgo), 'last_at' => now()->subMinutes($minutesAgo - 5), 'source' => 'direct', 'device' => 'phone',
+                'pages' => 2, 'steps' => 2, 'did' => ['search'], 'preview' => false,
+            ])->id;
+
+            return [$visit('vh-jonah', 10), $visit('vh-dana', 125)];
+        });
+
+        $asked = $this->callback->created_at->copy()->timezone($this->shop->timezone ?: 'Asia/Jerusalem')->format('M j, H:i');
+        $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/shoppers")
+            ->assertOk()
+            ->assertSee('session='.$leadVisit, false)
+            ->assertSee('session='.$callbackVisit, false)
+            ->assertSee('See their visit')
+            ->assertSee($asked);
     }
 
     public function test_both_kinds_wait_in_one_list_the_newest_first_and_no_contact_on_the_page(): void

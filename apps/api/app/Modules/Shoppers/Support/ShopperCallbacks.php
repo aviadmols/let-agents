@@ -6,6 +6,7 @@ use App\Modules\Admin\Contracts\ReplyLink;
 use App\Modules\Admin\Contracts\ShopperRequests;
 use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
+use App\Modules\Shoppers\Models\ShopperVisitor;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 
@@ -19,15 +20,20 @@ final class ShopperCallbacks implements ShopperRequests
 
     public function waiting(Shop $shop, int $limit): array
     {
-        return ShopperCallback::query()->with('identity:id,channel')->whereNull('answered_at')
-            ->latest('created_at')->orderByDesc('id')->limit($limit)->get()
-            ->map(fn (ShopperCallback $row): array => [
-                'key' => self::PREFIX.$row->id,
-                'name' => is_string($row->name) && trim($row->name) !== '' ? trim($row->name) : null,
-                'channel' => $row->identity?->channel === Contact::EMAIL ? 'email' : 'phone',
-                'question' => trim((string) $row->question),
-                'at' => $row->created_at,
-            ])->all();
+        $rows = ShopperCallback::query()->with('identity:id,channel')->whereNull('answered_at')
+            ->latest('created_at')->orderByDesc('id')->limit($limit)->get();
+        // the browser each identity was last linked from (the later link wins), for "see their visit"
+        $visitors = $rows->isEmpty() ? collect() : ShopperVisitor::query()->whereIn('identity_id', $rows->pluck('identity_id')->unique()->values())
+            ->orderBy('linked_at')->orderBy('id')->pluck('visitor_hash', 'identity_id');
+
+        return $rows->map(fn (ShopperCallback $row): array => [
+            'key' => self::PREFIX.$row->id,
+            'name' => is_string($row->name) && trim($row->name) !== '' ? trim($row->name) : null,
+            'channel' => $row->identity?->channel === Contact::EMAIL ? 'email' : 'phone',
+            'question' => trim((string) $row->question),
+            'at' => $row->created_at,
+            'visitor' => $visitors->get($row->identity_id),
+        ])->all();
     }
 
     public function replyUrl(Shop $shop, string $key, ?int $userId): ?string

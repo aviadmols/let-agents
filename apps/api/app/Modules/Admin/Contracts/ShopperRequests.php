@@ -16,9 +16,10 @@ interface ShopperRequests
     public const TAG = 'admin.shopper_requests';
 
     /**
-     * Who is waiting, the newest first. channel: phone or email. name: what they gave, or null.
+     * Who is waiting, the newest first. channel: phone or email. name: what they gave, or null. visitor: the shopper's
+     * visitor hash as the visits log keeps it, so the screen can open the visit they asked from; null when unknown.
      *
-     * @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface}>
+     * @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface, visitor: string|null}>
      */
     public function waiting(Shop $shop, int $limit): array;
 

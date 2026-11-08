@@ -9,6 +9,7 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Models\SearchClick;
+use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Models\SearchTerm;
 use App\Modules\Search\Support\SearchScreen;
 use App\Modules\Tenancy\Models\Shop;
@@ -52,6 +53,13 @@ final class SearchesScreenTest extends TestCase
             }
             AssistantAnswer::query()->create(['shop_id' => $id, 'question' => 'יש משלוח לאילת?', 'question_key' => 'eilat', 'answer' => 'כן.', 'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN,
                 'source' => 'store', 'sources' => [['title' => 'משלוחים', 'url' => 'https://shop.test/shipping']], 'prompt_version' => 1, 'asked_count' => 7, 'last_asked_at' => now()->subDay()]);
+            SearchPhotoAsk::query()->create(['shop_id' => $id, 'photo_hash' => hash('sha256', 'ring'), 'thumb' => 'AAAA', 'object' => 'ring', 'tags' => [], 'total' => 9, 'results' => [
+                ['external_id' => '11', 'title' => 'טבעת רחבה', 'image' => 'https://shop.test/ring-1.jpg'],
+                ['external_id' => '12', 'title' => 'טבעת דקה', 'image' => 'https://shop.test/ring-2.jpg'],
+                ['external_id' => '13', 'title' => 'טבעת חותם', 'image' => 'https://shop.test/ring-3.jpg'],
+                ['external_id' => '14', 'title' => 'טבעת וינטג׳', 'image' => 'https://shop.test/ring-4.jpg'],
+                ['external_id' => '15', 'title' => 'טבעת חמישית', 'image' => 'https://shop.test/ring-5.jpg'],
+            ]])->forceFill(['created_at' => now()->subHours(3)])->save();
         });
     }
 
@@ -67,7 +75,17 @@ final class SearchesScreenTest extends TestCase
             ->assertSee('מחכה לתיקון', false)
             ->assertSee('מהעמוד ״משלוחים״', false)
             ->assertSee('במילים שלהם')
-            ->assertSee('לנסות חיפוש');
+            ->assertSee('לנסות חיפוש')
+            // every question opens to its answer and when it was asked; every photo search is one link away
+            ->assertSee('התשובה שקיבלו')
+            ->assertSee('כן.')
+            ->assertSee('נשאלה <bdi>', false)
+            ->assertSee('data-all-questions', false)
+            ->assertSee('assistant/questions', false)
+            ->assertSee('data-all-photos', false)
+            ->assertSee('search/photos', false)
+            ->assertSee('https://shop.test/ring-3.jpg', false)
+            ->assertSee('נמצאו 9 מוצרים');
     }
 
     public function test_the_numbers_count_what_search_recorded(): void
@@ -93,6 +111,13 @@ final class SearchesScreenTest extends TestCase
 
         $q = $this->inShop(fn () => $screen->questions($this->shop, $since, now(), 5))[0];
         $this->assertSame(['יש משלוח לאילת?', 7, true, 'page', 'משלוחים'], [$q['question'], $q['times'], $q['answered'], $q['from'], $q['where']]);
+        // the answer the shopper got, and when it was last asked
+        $this->assertSame(['כן.', now()->subDay()->getTimestamp()], [$q['answer'], $q['last']]);
+
+        // a photo search: the shopper's photo, the first four it showed, how many in all
+        $photo = $this->inShop(fn () => $screen->photos($this->shop, $since, now(), 4))[0];
+        $this->assertSame(['טבעת רחבה', 9, 4], [$photo['title'], $photo['total'], count($photo['found'])]);
+        $this->assertSame('https://shop.test/ring-4.jpg', $photo['found'][3]['picture']);
     }
 
     public function test_the_owner_switches_the_days_and_the_order_and_tries_a_search(): void

@@ -147,6 +147,57 @@ final class ShoppersScreenTest extends TestCase
             ->assertSee('Browsed 4 pages without searching');
     }
 
+    public function test_the_visits_narrow_by_words_a_product_where_from_the_device_and_the_ending(): void
+    {
+        $visits = app(ShoppersVisits::class);
+        $who = fn (array $filter, bool $plain = false): array => array_map(
+            fn (array $s): string => $s['who'].'/'.($s['end']['kind'] ?? '-'),
+            $this->inShop(fn () => $visits->stories($this->shop, now()->subDays(7), now(), $plain, 10, $filter)),
+        );
+
+        // the shopper's words, or a product they saw, saved or added (the bag: the photo search's cart and the saved list)
+        $this->assertSame(['instagram/order'], $who(['q' => 'חתונה']));
+        $this->assertSame(['google/cart', 'returning/saved'], $who(['q' => 'תיק']));
+        $this->assertSame([], $who(['q' => 'owner-preview-xq']));
+        $this->assertSame(['returning/saved'], $who(['who' => 'returning']));
+        $this->assertSame(['instagram/order'], $who(['who' => 'instagram']));
+        $this->assertSame(['google/cart'], $who(['device' => 'computer']));
+        $this->assertSame(['instagram/order', 'returning/saved'], $who(['device' => 'phone']));
+        $this->assertSame(['returning/saved'], $who(['ended' => 'saved']));
+        $this->assertSame(['google/cart'], $who(['ended' => 'cart', 'device' => 'computer']));
+        $this->assertSame(['direct/-'], $who(['ended' => 'none'], plain: true));
+
+        // the visit a shopper asked from: their visit begun last before the moment
+        $first = $this->inShop(fn () => AnalyticsVisit::query()->where('visitor_hash', 'v1')->value('id'));
+        $this->assertSame((int) $first, $this->inShop(fn () => $visits->visitOf($this->shop, 'v1', now())));
+        $this->assertNull($this->inShop(fn () => $visits->visitOf($this->shop, 'v1', now()->subDays(3))));
+    }
+
+    public function test_the_screen_searches_and_filters_the_visits_and_each_row_opens_its_visit(): void
+    {
+        $this->merchant->forceFill(['locale' => 'en'])->save();
+        $this->actingAs($this->merchant);
+        Filament::setCurrentPanel('merchant');
+        Filament::setTenant($this->shop);
+        app()->setLocale('en');
+        $bought = (int) $this->inShop(fn () => AnalyticsVisit::query()->where('visitor_hash', 'v1')->value('id'));
+
+        Livewire::test(Shoppers::class)
+            ->assertSee('data-visits-find', false)
+            ->assertSee('session='.$bought, false)
+            ->set('visitQ', 'חתונה')
+            ->assertSee('שמלה לחתונה')
+            ->assertDontSee('מתנה לאמא')
+            ->set('visitQ', 'nothing-like-this')
+            ->assertSee('No visit matches')
+            ->call('filter')
+            ->assertSet('visitQ', '')
+            ->assertSee('מתנה לאמא')
+            ->set('visitEnded', 'saved')
+            ->assertSee('מתנה לאמא')
+            ->assertDontSee('שמלה לחתונה');
+    }
+
     public function test_a_store_with_nothing_yet_sees_the_empty_cards(): void
     {
         $empty = Shop::factory()->create();
@@ -168,7 +219,7 @@ final class ShoppersScreenTest extends TestCase
         $visit = AnalyticsVisit::query()->create([
             'shop_id' => $this->shop->id, 'session_id' => 's'.++$this->sequence, 'visitor_hash' => 'v'.$this->sequence, 'visit_number' => $number,
             'started_at' => $start, 'last_at' => $start->copy()->addMinutes(6), 'source' => $source, 'device' => $device, 'os' => $os, 'browser' => 'Safari',
-            'pages' => $pages, 'steps' => count($steps), 'did' => $did, 'order_total' => $order, 'preview' => $preview, 'ip' => '10.0.0.'.$this->sequence,
+            'pages' => $pages, 'steps' => count($steps), 'words' => mb_strtolower(implode(' | ', array_filter(array_map(fn (array $s): ?string => in_array($s[0], ['search', 'ask'], true) ? $s[2] : null, $steps)))) ?: null, 'did' => $did, 'order_total' => $order, 'preview' => $preview, 'ip' => '10.0.0.'.$this->sequence,
         ]);
         foreach ($steps as $i => [$kind, $item, $label]) {
             AnalyticsVisitStep::query()->create([

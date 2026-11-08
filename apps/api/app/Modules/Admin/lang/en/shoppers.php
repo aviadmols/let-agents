@@ -5,6 +5,9 @@ return [
     'nav' => 'Shoppers',
     'title' => 'Shoppers',
     'lede' => 'Who’s waiting for you, how shoppers move through your store, and what they save for later.',
+    // a date and hour as the screen writes them (Carbon's format letters)
+    'when' => 'M j, H:i',
+    'when_year' => 'M j, Y, H:i',
 
     'kpi' => [
         'visits' => 'Visits',
@@ -33,6 +36,7 @@ return [
         'zero' => 'No one’s waiting',
         'zero_text' => 'When the assistant doesn’t know, shoppers can leave their details or move to WhatsApp. Those requests show up here.',
         'set_whatsapp' => 'Set up WhatsApp',
+        'see_visit' => 'See their visit',
     ],
 
     'reply' => [
@@ -64,6 +68,27 @@ return [
         'sub' => 'Each visit as a short story: what they searched, what they saw, how it ended',
         'plain' => 'Also show visits without a search',
         'log' => 'Every visit',
+        'find' => 'Search a word or a product',
+        'filter' => [
+            'from' => 'Where they came from',
+            'from_any' => 'From anywhere',
+            'returning' => 'Returning shoppers',
+            'device' => 'Device',
+            'device_any' => 'Any device',
+            'ended' => 'How it ended',
+            'ended_any' => 'Any ending',
+            'ends' => [
+                'order' => 'Bought',
+                'cart' => 'Added to cart',
+                'saved' => 'Saved for later',
+                'none' => 'Left without buying',
+            ],
+            'clear' => 'Clear',
+        ],
+        'none_match' => 'No visit matches',
+        'none_match_text' => 'Try another word, or clear the filters.',
+        'more' => 'Show more',
+        'open' => 'See the whole visit',
         'zero' => 'No visits with a search yet',
         'zero_text' => 'Each visit will show as a short story: what they searched, what they saw, how it ended.',
         'who' => [
