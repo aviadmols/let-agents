@@ -182,13 +182,18 @@ final class AnswerSiteQuestion implements TriesQuestions
         'בין', 'מכל', 'ביותר', 'המוצרים', 'מוצרים', 'המוצר', 'מוצר', 'הפריטים', 'פריטים', 'הפריט', 'פריט', 'באתר', 'בחנות', 'האתר', 'החנות', 'שיש', 'כאן', 'משהו', 'דבר',
         'products', 'product', 'items', 'item', 'store', 'shop', 'site', 'all', 'have', 'you', 'here', 'something', 'anything',
         // Words for the products just shown: "איזה מהם הכי זול" names none either.
-        'מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'אלה', 'אלו', 'them', 'these', 'those', 'ones'];
+        'מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'אלה', 'אלו', 'them', 'these', 'those', 'ones',
+        // What the shopper asks the store to do, never what they ask for (Rocks, 8.11: "תראה לי מה המוצר הכי יקר" named "תרא",
+        // and the dearest of what those letters found was shown as the store's dearest).
+        'תראה', 'תראי', 'תראו', 'הראה', 'הראי', 'הראו', 'תציג', 'תציגי', 'תציגו', 'הצג', 'הציגו', 'תמצא', 'תמצאי', 'תמצאו', 'תן', 'תני', 'תנו',
+        'אני', 'רוצה', 'רוצים', 'מחפש', 'מחפשת', 'מחפשים', 'צריך', 'צריכה', 'צריכים', 'אשמח', 'לראות', 'למצוא', 'לקנות', 'אותי', 'אותנו',
+        'show', 'find', 'give', 'tell', 'want', 'looking', 'need', 'please', 'see'];
 
     /** Words that point back at the products the conversation just showed. */
     private const REFERS = ['מהם', 'מהן', 'ביניהם', 'ביניהן', 'מביניהם', 'מתוכם', 'מתוכן', 'מאלה', 'מאלו', 'האלה', 'האלו', 'התוצאות', 'them', 'these', 'those', 'ones', 'results'];
 
     /** Words that ask about the whole store, whatever was shown before: "מה הכי זול באתר". */
-    private const STORE_WIDE = ['באתר', 'בחנות', 'מכל', 'האתר', 'החנות', 'בכל', 'store', 'shop', 'site', 'all'];
+    private const STORE_WIDE = ['באתר', 'בחנות', 'מכל', 'האתר', 'החנות', 'בכל', 'לכם', 'אצלכם', 'store', 'shop', 'site', 'all', 'you'];
 
     private const MIN_CHARS = 3;
 
@@ -788,7 +793,26 @@ final class AnswerSiteQuestion implements TriesQuestions
             }
         }
 
-        return $words;
+        // "החנות פתוחה עכשיו", "are you open on Friday": whether the store is open is its opening hours, though the words
+        // never say "שעות פתיחה" (Rocks, 8.11: the hours were on its pages and in its own answers, and it said it did
+        // not know). The pages and the team's rows that give the hours are then read, beside the store's clock.
+        if (self::asksIfOpen($question)) {
+            array_push($words, ...PrepareStoreAnswers::TOPICS['hours']);
+        }
+
+        return array_values(array_unique($words));
+    }
+
+    /**
+     * Whether a question asks if the store is open or closed: an open or closed word with a time or the store itself
+     * ("החנות פתוחה עכשיו", "אתם פתוחים בשישי?", "are you open on Sunday"), never a product's ("שמלה פתוחה בגב").
+     */
+    public static function asksIfOpen(string $question): bool
+    {
+        $open = '/(?<!\p{L})[וש]?(?:פתוח|פתוחה|פתוחים|פתוחות|סגור|סגורה|סגורים|סגורות|נפתח|נפתחת|נפתחים|נסגר|נסגרת|נסגרים|עובדים|open|opens|closed|closes)(?!\p{L})/iu';
+        $when = '/(?<!\p{L})[בוה]?(?:עכשיו|כעת|כרגע|היום|מחר|הערב|הלילה|הבוקר|שעה|שעות|יום|ימי|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|חג|חגים|החנות|חנות|הסניף|אתם|now|today|tomorrow|tonight|hours?|sunday|monday|tuesday|wednesday|thursday|friday|saturday|weekend|holidays?|store|shop|you)(?!\p{L})/iu';
+
+        return preg_match($open, $question) === 1 && preg_match($when, $question) === 1;
     }
 
     /**
@@ -801,7 +825,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             return $found;
         }
 
-        $words = $this->words($question);
+        // the question's words, and its topic's when it asks if the store is open ("שעות פתיחה" for "פתוחים עכשיו?")
+        $words = array_values(array_unique([...$this->words($question), ...(self::asksIfOpen($question) ? PrepareStoreAnswers::TOPICS['hours'] : [])]));
         $first = [];
 
         // The team's own words first, then its answers, then what every product page repeats, then
@@ -1012,8 +1037,11 @@ final class AnswerSiteQuestion implements TriesQuestions
             $this->passages->near($shopId, $question, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
             fn (array $p): bool => $p['similarity'] >= $floor,
         ));
-        // The second look: what the question's other wordings find too, at the same floor, the nearest kept.
-        foreach ($this->widenWith as $wording) {
+        // The second look: what the question's other wordings find too, at the same floor, the nearest kept. Asked if the
+        // store is open, its opening hours are looked up by meaning too: they are often in a page's body (a footer, the
+        // contact page), which no title and no word of "פתוחים עכשיו?" leads to.
+        $wordings = self::asksIfOpen($question) ? [...$this->widenWith, (string) __('assistant::prepared.hours', [], preg_match('/\p{Hebrew}/u', $question) === 1 ? 'he' : 'en')] : $this->widenWith;
+        foreach (array_values(array_unique($wordings)) as $wording) {
             $found = self::merged($found, array_values(array_filter(
                 $this->passages->near($shopId, $wording, ['product', 'content'], (int) Settings::get('assistant.site_passages', $shopId)),
                 fn (array $p): bool => $p['similarity'] >= $floor,
@@ -2408,8 +2436,10 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         foreach ($words as $word) {
             // Not an amount or its currency either: "עד 500 ש״ח" names no product.
+            // "product" with the letters Hebrew joins to it ("מהמוצר", "שבמוצרים") is the store's products in general, never a name
             if (mb_strlen($word) >= 3 && ! in_array($word, self::NOT_NAMES, true) && preg_match('/\d/u', $word) !== 1
-                && preg_match('/^(זול|יקר|במבצע|מבצע|הנחה|שקל|cheap|expensive)/u', $word) !== 1) {
+                && preg_match('/^(זול|יקר|במבצע|מבצע|הנחה|שקל|cheap|expensive)/u', $word) !== 1
+                && preg_match('/^(?:[ומשבלכ]?ה?|מה)(?:מוצר|מוצרים|פריט|פריטים)$/u', $word) !== 1) {
                 $out[] = self::stem($word);
             }
         }

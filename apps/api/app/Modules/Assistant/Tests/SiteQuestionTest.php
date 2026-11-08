@@ -641,6 +641,11 @@ final class SiteQuestionTest extends TestCase
         }
 
         $this->assertSame(['901', '902', '904'], array_column($this->askWith('מה הכי יקר שיש לכם?', [])->json('data.picks'), 'external_id'), 'and the dearest, even when the words found nothing');
+        // Rocks, 8.11: "show me" is not a product, nor "the product" joined to the word before it; and after a search,
+        // "that you have" still means the whole store
+        foreach (['תראה לי מהמוצר הכי יקר שיש לכם', 'תראה לי מה המוצר הכי יקר שיש לכם', 'show me the most expensive product you have'] as $question) {
+            $this->assertSame(['901', '902', '904'], array_column($this->askWith($question, ['902', '903'], ['902', '903'])->json('data.picks'), 'external_id'), $question);
+        }
         $this->assertSame([], $this->calls, 'no model for arithmetic');
 
         // A product named still means that product, of what was found.
@@ -926,6 +931,36 @@ final class SiteQuestionTest extends TestCase
         $this->ask('כמה ברגים צריך למטר דק?');
         $this->assertArrayNotHasKey('now', json_decode($this->calls[4]['user'], true));
         $this->assertSame(1, $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->count()));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_asked_if_the_store_is_open_its_opening_hours_are_read_beside_its_clock(): void
+    {
+        // Rocks, 8.11: "החנות פתוחה עכשיו" was told "I don't know", though its pages' footer and its own answers gave the
+        // hours: the words never said "שעות פתיחה", so the page that gives them was never read.
+        $this->shop->forceFill(['timezone' => 'Asia/Jerusalem'])->save();
+        Carbon::setTestNow(Carbon::parse('2026-11-08 12:00:00', 'UTC'));
+        $contact = $this->article('700', 'צור קשר', 'כתובת החנות: שבזי 31 תל אביב. ראשון-חמישי 10.30-18.30, שישי 10-15. שעות פתיחה מעודכנות באתר.');
+        $this->byText['מה שעות הפתיחה של החנות?'] = [['source' => 'content', 'source_id' => $contact->id, 'external_id' => '700', 'title' => 'צור קשר', 'text' => 'כתובת החנות: שבזי 31 תל אביב. ראשון-חמישי 10.30-18.30, שישי 10-15.', 'similarity' => 0.66]];
+        $this->replies = [
+            ['found' => true, 'answer' => 'כן, החנות פתוחה עכשיו, עד 18:30.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->ask('החנות פתוחה עכשיו')->json('data');
+
+        $this->assertContains('מה שעות הפתיחה של החנות?', $this->searched, 'its opening hours are looked up by meaning too');
+        $sent = json_decode($this->calls[0]['user'], true);
+        $this->assertSame('14:00', $sent['now']['time']);
+        $this->assertStringContainsString('10.30-18.30', implode("\n", array_column($sent['passages'], 'text')), 'the hours reach the writer beside the clock');
+        $this->assertSame('answered', $data['outcome']);
+
+        // which questions are about the store being open, and which are not
+        foreach (['החנות פתוחה עכשיו' => true, 'אתם פתוחים בשישי?' => true, 'מתי אתם נסגרים היום?' => true, 'are you open on Sunday?' => true,
+            'שמלה פתוחה בגב' => false, 'טבעת פתוחה מזהב' => false, 'open back dress' => false] as $question => $open) {
+            $this->assertSame($open, AnswerSiteQuestion::asksIfOpen($question), $question);
+        }
 
         Carbon::setTestNow();
     }
