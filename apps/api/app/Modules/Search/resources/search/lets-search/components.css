@@ -267,10 +267,11 @@ img:not(.ls-pic2):has(+ .ls-pic2) { transition: opacity 320ms ease, transform 50
 .ls-card__badge { position: absolute; inset-block-start: 10px; inset-inline-start: 10px; height: 24px; padding-inline: 10px; border-radius: 999px; display: inline-flex; align-items: center; background: var(--ls-bg); font-size: var(--lsp-text-xs); font-weight: 500; box-shadow: var(--lsp-shadow-sm); }
 .ls-card__title { font-size: var(--lsp-text-md); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; color: inherit; text-decoration: none; }
 /* the colours it comes in: a dot each under its name; the one shown, ringed */
-.ls-dots { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
-.ls-dot { width: 16px; height: 16px; border-radius: 50%; padding: 0; border: 1px solid rgba(0,0,0,.18); background: var(--sw, #ccc); flex: none; cursor: default; }
+.ls-dots { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 2px; }
+.ls-dot { width: 18px; height: 18px; border-radius: 50%; padding: 0; border: 1px solid rgba(0,0,0,.22); background: var(--sw, #ccc); flex: none; cursor: default; }
 button.ls-dot { cursor: pointer; }
-.ls-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lsp-bg, #fff), 0 0 0 3px currentColor; }
+.ls-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lsp-bg, #fff), 0 0 0 3.5px currentColor; }
+button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp-bg, #fff), 0 0 0 3px rgba(0,0,0,.25); }
 .ls-dot--clear { background: repeating-linear-gradient(45deg, #fff 0 3px, #e4e4e7 3px 6px); }
 .ls-dots__more { font-size: var(--lsp-text-xs, 12px); opacity: .7; }
 .ls-card__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -386,8 +387,9 @@ button.ls-dot { cursor: pointer; }
 /* no answer */
 .ls-noanswer__text { font-size: var(--lsp-text-base); line-height: 1.6; margin: 0 0 14px; }
 .ls-hours { display: inline-flex; align-items: center; gap: 6px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); margin-bottom: 14px; }
-.ls-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ls-success); box-shadow: 0 0 0 3px var(--ls-success-soft); }
-.ls-dot--off { background: var(--ls-fg-faint); box-shadow: 0 0 0 3px var(--ls-bg-sunken); }
+/* the team-online dot: its own place only, never a colour swatch of a card (.ls-dot above turned every swatch green) */
+.ls-hours .ls-dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--ls-success); box-shadow: 0 0 0 3px var(--ls-success-soft); }
+.ls-hours .ls-dot--off { background: var(--ls-fg-faint); box-shadow: 0 0 0 3px var(--ls-bg-sunken); }
 
 /* small form inside a turn */
 .ls-form { display: grid; gap: 10px; margin-top: 4px; }
