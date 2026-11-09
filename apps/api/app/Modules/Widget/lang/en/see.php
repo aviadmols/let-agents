@@ -9,6 +9,8 @@ return [
     'saved' => 'Saved. Your site shows it within a few minutes.',
     'more' => 'More options',
     'held' => 'Set by your plan',
+    'upgrade' => 'Requires upgrade',
+    'upgrade_text' => 'Included in a higher plan. Click to see the plans.',
 
     'preview' => [
         'label' => 'Preview',

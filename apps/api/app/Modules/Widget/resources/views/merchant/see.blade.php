@@ -11,18 +11,31 @@
         'save' => '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>',
         'whatsapp' => '<path d="M12 4a8 8 0 0 0-6.8 12.2L4 20l3.9-1.2A8 8 0 1 0 12 4z"/>',
     ])
-    @php($toggle = function (string $name) use ($on, $held, $t): string {
+    {{-- a control the plan holds: shown as it is, and beside it the way to the plan that opens it --}}
+    @php($upgrade = $this->more('plan'))
+    @php($withUpgrade = function (string $name, string $control) use ($held, $upgrade, $t): string {
+        if (! in_array($name, $held, true)) {
+            return $control;
+        }
+        $mark = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>'.e($t('upgrade'));
+        $pill = $upgrade !== null
+            ? '<a class="lp-d-up" href="'.e($upgrade).'" title="'.e($t('upgrade_text')).'">'.$mark.'</a>'
+            : '<span class="lp-d-up" title="'.e($t('upgrade_text')).'">'.$mark.'</span>';
+
+        return '<div class="lp-d-set-ctl">'.$pill.$control.'</div>';
+    })
+    @php($toggle = function (string $name) use ($on, $held, $t, $withUpgrade): string {
         $label = e($t('held'));
 
-        return '<label class="lp-d-toggle lp-d-toggle-lg"'.(in_array($name, $held, true) ? ' title="'.$label.'"' : '').'><input type="checkbox" wire:click.prevent="turn(\''.$name.'\')" wire:loading.attr="disabled"'.($on[$name] ? ' checked' : '').(in_array($name, $held, true) ? ' disabled' : '').'><span class="sr-only">'.e($on[$name] ? 'On' : 'Off').'</span></label>';
+        return $withUpgrade($name, '<label class="lp-d-toggle lp-d-toggle-lg"'.(in_array($name, $held, true) ? ' title="'.$label.'"' : '').'><input type="checkbox" wire:click.prevent="turn(\''.$name.'\')" wire:loading.attr="disabled"'.($on[$name] ? ' checked' : '').(in_array($name, $held, true) ? ' disabled' : '').'><span class="sr-only">'.e($on[$name] ? 'On' : 'Off').'</span></label>');
     })
-    @php($seg = function (string $name, array $options) use ($pick, $held, $t): string {
+    @php($seg = function (string $name, array $options) use ($pick, $held, $t, $withUpgrade): string {
         $out = '<div class="lp-d-seg" role="group">';
         foreach ($options as $value => $label) {
             $out .= '<button type="button" wire:click="choose(\''.$name.'\', \''.$value.'\')" aria-pressed="'.($pick[$name] === $value ? 'true' : 'false').'"'.(in_array($name, $held, true) ? ' disabled title="'.e($t('held')).'"' : '').'>'.e($label).'</button>';
         }
 
-        return $out.'</div>';
+        return $withUpgrade($name, $out.'</div>');
     })
 
     <div class="lp-page lp-d" data-see>

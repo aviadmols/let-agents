@@ -93,6 +93,28 @@ final class WhatShoppersSeeTest extends TestCase
         $this->assertFalse(Features::enabled('widget.whatsapp', $id));
     }
 
+    /**
+     * A control the plan holds says so where it stands: "Requires upgrade" beside it, the way to the plan page, and it
+     * stays as the plan has it. A shop whose plan holds nothing sees no such mark.
+     */
+    public function test_a_control_the_plan_holds_is_marked_as_needing_an_upgrade(): void
+    {
+        $url = "/merchant/{$this->shop->slug}/see";
+        $this->get($url)->assertOk()->assertDontSee('Requires upgrade');
+
+        // Starter: the store's own look comes with Growth and up
+        $this->shop->forceFill(['plan' => 'starter'])->save();
+        $page = Livewire::test(WhatShoppersSee::class);
+        $this->assertContains('look', $page->instance()->held());
+        $this->get($url)->assertOk()
+            ->assertSee('Requires upgrade')
+            ->assertSee('lp-d-up', false)
+            ->assertSee("/merchant/{$this->shop->slug}/settings/plan", false);
+
+        $page->call('choose', 'look', 'store');
+        $this->assertSame('lets', Settings::get('search.theme', $this->shop->id), 'the plan still holds it');
+    }
+
     public function test_a_viewer_changes_nothing(): void
     {
         $viewer = User::factory()->create(['locale' => 'en']);

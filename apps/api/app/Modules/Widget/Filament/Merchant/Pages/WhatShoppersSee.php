@@ -5,6 +5,7 @@ namespace App\Modules\Widget\Filament\Merchant\Pages;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Localization\Money;
+use App\Core\Plans\PlanCeilings;
 use App\Core\Settings\InvalidSettingValue;
 use App\Core\Settings\ValueSource;
 use App\Core\Tenancy\TenantContext;
@@ -109,14 +110,24 @@ final class WhatShoppersSee extends Page
         return $out;
     }
 
-    /** @return list<string> the controls the shop's plan holds: shown as they are, not changed here */
+    /**
+     * The controls the shop's plan holds: shown as they are, not changed here, "Requires upgrade" beside them. Held is
+     * what the plan keeps from the shop (a feature it does not include, a choice it makes), whether or not the shop's
+     * value happens to be the plan's now: Starter with the Lets look still cannot pick the store's own.
+     *
+     * @return list<string>
+     */
     public function held(): array
     {
+        $shop = $this->shopId();
+        $ceilings = app(PlanCeilings::class)->for($shop);
         $held = [];
         foreach ([...array_map(fn (array $keys): array => $keys, self::SWITCHES), ...array_map(fn (array $c): array => [$c[0]], self::CHOICES)] as $name => $keys) {
             foreach ($keys as $source) {
                 [$kind, $key] = explode(':', $source, 2);
-                if (($kind === 'feature' ? Features::source($key, $this->shopId()) : Settings::source($key, $this->shopId())) === ValueSource::Plan) {
+                $ceiling = $ceilings[$kind === 'feature' ? 'features' : 'settings'][$key] ?? null;
+                $keeps = $ceiling === false || is_string($ceiling);
+                if ($keeps || ($kind === 'feature' ? Features::source($key, $shop) : Settings::source($key, $shop)) === ValueSource::Plan) {
                     $held[] = (string) $name;
                 }
             }
