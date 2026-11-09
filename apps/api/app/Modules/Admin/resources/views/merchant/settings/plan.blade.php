@@ -57,7 +57,10 @@
         @endif
 
         <section class="lp-d-panel">
+            {{-- the full comparison lives on lets.co.il: a Shopify store pays only through Shopify, so it is never sent there --}}
+            @if ($d['woo'])
             <div class="lp-d-set"><div><b>{{ $t('compare') }}</b><span>{{ $t('compare_text') }}</span></div><a class="lp-d-more" href="{{ \App\Modules\Admin\Filament\Merchant\Pages\PlanSettings::PRICING_URL }}" target="_blank" rel="noopener">{{ $t('pricing') }}</a></div>
+            @endif
             <div class="lp-d-set"><div><b>{{ $t('billing') }}</b><span>{{ $d['woo'] ? $t('billing_team') : $t('billing_shopify') }}</span></div>@if ($d['plans_url'])<a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $d['plans_url'] }}" target="_top">{{ $t('view') }}</a>@endif</div>
         </section>
     </div>

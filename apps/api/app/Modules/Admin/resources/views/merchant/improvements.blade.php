@@ -11,7 +11,7 @@
         'info' => '<path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8-9.1 9.1z"/><circle cx="8.5" cy="8.5" r="1.4"/>',
         'idea' => '<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
     ])
-    @php($chips = ['quick' => 'lime', 'asked' => 'sun', 'nice' => 'quiet', 'bigger' => 'ink'])
+    @php($chips = ['required' => 'sun', 'quick' => 'lime', 'asked' => 'sun', 'nice' => 'quiet', 'bigger' => 'ink'])
     @php($approved = $this->approved())
     @php($tally = $this->tally($approved))
     @php($fixes = $this->fixes())

@@ -24,7 +24,7 @@ final class Today
     public const LATER = 'today.later.';
 
     /** The order of the kinds when two fixes weigh the same: a quick win first. */
-    private const CHIP_ORDER = [TodayFix::QUICK => 0, TodayFix::ASKED => 1, TodayFix::NICE => 2, TodayFix::BIGGER => 3];
+    private const CHIP_ORDER = [TodayFix::REQUIRED => -1, TodayFix::QUICK => 0, TodayFix::ASKED => 1, TodayFix::NICE => 2, TodayFix::BIGGER => 3];
 
     public function __construct(private readonly TenantContext $tenant) {}
 
@@ -34,7 +34,8 @@ final class Today
         $later = array_fill_keys(DB::table('shop_notices_done')->where('shop_id', $shop->id)->where('key', 'like', self::LATER.self::week().'.%')->pluck('key')->all(), true);
         $fixes = array_values(array_filter(
             $this->each(TodayImprovements::TAG, $shop, fn (TodayImprovements $source): array => $source->waiting($shop)),
-            fn (TodayFix $fix): bool => ! isset($later[self::laterKey($fix->key)]),
+            // a duty with a date (TodayFix::REQUIRED) is never put off
+            fn (TodayFix $fix): bool => $fix->chip === TodayFix::REQUIRED || ! isset($later[self::laterKey($fix->key)]),
         ));
         usort($fixes, fn (TodayFix $a, TodayFix $b): int => [$b->impact, self::CHIP_ORDER[$a->chip] ?? 9, $a->key] <=> [$a->impact, self::CHIP_ORDER[$b->chip] ?? 9, $b->key]);
 

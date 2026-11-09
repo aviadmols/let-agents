@@ -3,9 +3,11 @@
 namespace App\Modules\Shopify\Tests;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
+use App\Modules\Admin\Support\Today;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Mail\ShopperDataRequestMail;
@@ -94,6 +96,27 @@ final class ShopperDataReportTest extends TestCase
         $notice = collect(app(Home::class)->notices($this->shop))->firstWhere('key', 'shopify.data_report.'.$report->id);
         $this->assertSame(['todo', 'קונה ביקש את המידע שלו'], [$notice?->kind, $notice?->title]);
         $this->assertStringNotContainsString('dana', (string) $notice?->body);
+    }
+
+    public function test_the_request_is_the_first_thing_on_today_until_it_is_downloaded_and_is_never_put_off(): void
+    {
+        // Shopify's review sends customers/data_request and looks for it in the app: since the redesign, Today shows only
+        // what modules bring it, and the notices left the sidebar (audit, 9.11)
+        $this->webhook('customers/data_request', self::request(9003))->assertOk();
+        $report = app(TenantContext::class)->run($this->shop->id, fn () => ShopperDataReport::query()->sole());
+        app()->setLocale('he');
+
+        $fixes = app(Today::class)->fixes($this->shop);
+        $this->assertSame('shopify.data_report.'.$report->id, $fixes[0]->key ?? null, 'first, above any improvement');
+        $this->assertSame([TodayFix::REQUIRED, 'קונה ביקש את המידע שלו', false, route('shopify.data_report', ['report' => $report->id])], [$fixes[0]->chip, $fixes[0]->title, $fixes[0]->oneTap, $fixes[0]->url]);
+        $this->assertStringNotContainsString('dana', $fixes[0]->text, 'nothing about the shopper on the screen');
+
+        // "Not now" is not offered, and a crafted one does not hide it
+        app(Today::class)->later($this->shop, $fixes[0]->key, $this->owner->id);
+        $this->assertSame('shopify.data_report.'.$report->id, app(Today::class)->fixes($this->shop)[0]->key ?? null);
+
+        $this->actingAs($this->owner)->get(route('shopify.data_report', ['report' => $report->id]))->assertOk();
+        $this->assertSame([], array_filter(app(Today::class)->fixes($this->shop), fn (TodayFix $f): bool => str_starts_with($f->key, 'shopify.data_report.')), 'taken: off Today');
     }
 
     public function test_only_the_shops_owners_download_the_file(): void

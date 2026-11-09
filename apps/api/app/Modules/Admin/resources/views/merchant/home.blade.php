@@ -102,7 +102,7 @@
                                 </div>
                                 <div>
                                     <div class="lp-d-task-tags">
-                                        <span class="lp-d-chip lp-d-chip-{{ ['quick' => 'lime', 'asked' => 'sun', 'nice' => 'quiet', 'bigger' => 'ink'][$fix->chip] ?? 'quiet' }}">{{ $t('chips.'.$fix->chip) }}</span>
+                                        <span class="lp-d-chip lp-d-chip-{{ ['required' => 'sun', 'quick' => 'lime', 'asked' => 'sun', 'nice' => 'quiet', 'bigger' => 'ink'][$fix->chip] ?? 'quiet' }}">{{ $t('chips.'.$fix->chip) }}</span>
                                         @if ($fix->count > 0)<span class="lp-d-chip lp-d-chip-quiet lp-d-num">{{ $n('units.'.$fix->unit, $fix->count) }}</span>@endif
                                     </div>
                                     @php($title = e($fix->title))
@@ -120,7 +120,9 @@
                                     @elseif ($fix->url)
                                         <a class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" href="{{ $fix->url }}"><span>{{ $fix->action }}</span></a>
                                     @endif
-                                    <button type="button" class="lp-d-link" wire:click="later(@js($fix->key))">{{ $t('todo.later') }}</button>
+                                    @if ($fix->chip !== 'required')
+                                        <button type="button" class="lp-d-link" wire:click="later(@js($fix->key))">{{ $t('todo.later') }}</button>
+                                    @endif
                                 </div>
                             </article>
                         @empty

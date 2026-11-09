@@ -21,7 +21,10 @@ final readonly class TodayFix
     /** More than a tap: a page, a post ("Bigger idea"). */
     public const BIGGER = 'bigger';
 
-    public const CHIPS = [self::QUICK, self::ASKED, self::NICE, self::BIGGER];
+    /** Not an improvement but a duty with a date (a shopper's data request): first, and never put off. */
+    public const REQUIRED = 'required';
+
+    public const CHIPS = [self::REQUIRED, self::QUICK, self::ASKED, self::NICE, self::BIGGER];
 
     /**
      * @param  string  $key  stable across requests, sent back with approve(): "proposal:12", "family:…", "gap:…"

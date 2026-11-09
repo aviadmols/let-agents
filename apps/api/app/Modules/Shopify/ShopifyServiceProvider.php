@@ -7,6 +7,7 @@ use App\Modules\Admin\Contracts\CancelsSubscription;
 use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\PanelHost;
+use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Shopify\Console\ConnectPixelCommand;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Feed\ShopifyBlog;
@@ -19,6 +20,7 @@ use App\Modules\Shopify\Support\ShopifyConnectionFacts;
 use App\Modules\Shopify\Support\ShopifyPanelHost;
 use App\Modules\Shopify\Support\ShopifySubscription;
 use App\Modules\Shopify\Support\ShopperDataHome;
+use App\Modules\Shopify\Support\ShopperDataToday;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -40,6 +42,8 @@ final class ShopifyServiceProvider extends ModuleServiceProvider
         $this->app->tag([ShopifySubscription::class], CancelsSubscription::TAG);
         // A shopper who asked for what the store keeps about them: the notice, until an owner downloads it.
         $this->app->tag([ShopperDataHome::class], HomeSource::TAG);
+        // Today shows only what modules bring it: an undownloaded data request is its first line (ShopperDataToday)
+        $this->app->tag([ShopperDataToday::class], TodayImprovements::TAG);
         // Inside the Shopify admin, Shopify signed the merchant in: the panel offers no sign-out and no password.
         $this->app->tag([ShopifyPanelHost::class], PanelHost::TAG);
     }

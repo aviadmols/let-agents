@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Panels;
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ConnectionSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\PlanSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ProfileSettings;
 use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
@@ -113,7 +114,7 @@ final class MerchantPanelProvider extends PanelProvider
                 'trial' => $trial,
                 'days' => $days,
                 'used' => $trial ? max(4, min(100, (int) round(100 * ($length - $days) / $length))) : 100,
-                'url' => ConnectionSettings::getUrl(tenant: $shop),
+                'url' => PlanSettings::getUrl(tenant: $shop),
             ];
         }
 
@@ -183,7 +184,8 @@ final class MerchantPanelProvider extends PanelProvider
                 : (ShopRole::tryFrom((string) $role) ?? ShopRole::Member)->label().' · '.$shop->name,
             'links' => [
                 ['label' => __('admin::shop_settings.profile.title'), 'url' => ProfileSettings::getUrl(tenant: $shop)],
-                ['label' => __('admin::home.connection'), 'url' => ConnectionSettings::getUrl(tenant: $shop)],
+                ['label' => ConnectionSettings::getNavigationLabel(), 'url' => ConnectionSettings::getUrl(tenant: $shop)],
+                ['label' => PlanSettings::getNavigationLabel(), 'url' => PlanSettings::getUrl(tenant: $shop)],
                 ['label' => __('admin::privacy.title'), 'url' => PrivacySettings::getUrl(tenant: $shop)],
             ],
             // inside a platform's admin (Shopify's), which signed the person in, there is nothing to sign out of

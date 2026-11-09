@@ -53,7 +53,9 @@ final class MerchantHomeTest extends TestCase
 
         $this->get("/merchant/{$shop->slug}/notices")->assertOk()->assertSee('הודעות ותובנות');
         $this->get("/merchant/{$shop->slug}/connection")->assertRedirect("/merchant/{$shop->slug}/settings/connection");
-        $this->get("/merchant/{$shop->slug}/settings/connection")->assertOk()->assertSee('חיבור ומנוי');
+        // the user menu: the connection and the plan, each to its own page (the plan left the connection page in the redesign)
+        $this->get("/merchant/{$shop->slug}/settings/connection")->assertOk()->assertSee('החיבור לחנות')
+            ->assertSee('חבילה וחיוב')->assertSee("/merchant/{$shop->slug}/settings/plan", false);
     }
 
     public function test_the_panel_opens_in_english_and_keeps_a_chosen_hebrew(): void

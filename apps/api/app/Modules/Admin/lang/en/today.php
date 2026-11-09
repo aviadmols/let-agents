@@ -38,6 +38,7 @@ return [
     ],
 
     'chips' => [
+        'required' => 'Required, with a date',
         'quick' => 'Quick win',
         'asked' => 'Asked often',
         'nice' => 'Nice to have',
