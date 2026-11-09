@@ -77,6 +77,15 @@
                                 @if ($lead['visit'])<a class="lp-d-lead-name" href="{{ $lead['visit'] }}" title="{{ $t('waiting.see_visit') }}" dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</a>@else<b dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</b>@endif
                                 <span class="lp-d-lead-meta">· {{ $t('waiting.'.($lead['channel'] === 'email' ? 'email' : 'whatsapp')) }} · <time datetime="{{ $lead['at']?->toIso8601String() }}" title="{{ $ago($lead['at']) }}"><bdi>{{ $when($lead['at']) }}</bdi></time> · {{ $ago($lead['at']) }}</span>
                                 <p class="lp-d-lead-q" dir="auto">{{ $lead['question'] }}</p>
+                                {{-- the page they asked on: what the question is about --}}
+                                @if (! empty($lead['page']['title']))
+                                    @php($page = $lead['page'])
+                                    <div class="lp-d-lead-page">
+                                        @if (! empty($page['image']))<img src="{{ $page['image'] }}" alt="" loading="lazy" onerror="this.remove()">@endif
+                                        <span>{{ $t('waiting.asked_on.'.($page['kind'] === 'product' ? 'product' : 'content')) }}</span>
+                                        @if (! empty($page['url']))<a href="{{ $page['url'] }}" target="_blank" rel="noopener" dir="auto">{{ $page['title'] }}</a>@else<b dir="auto">{{ $page['title'] }}</b>@endif
+                                    </div>
+                                @endif
                                 @if ($lead['visit'])<a class="lp-d-lead-visit" href="{{ $lead['visit'] }}"><span>{{ $t('waiting.see_visit') }}</span>{!! $chev !!}</a>@endif
                             </div>
                             <div class="lp-d-lead-do">

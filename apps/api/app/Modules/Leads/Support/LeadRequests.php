@@ -4,6 +4,8 @@ namespace App\Modules\Leads\Support;
 
 use App\Modules\Admin\Contracts\ReplyLink;
 use App\Modules\Admin\Contracts\ShopperRequests;
+use App\Modules\Catalog\Models\CatalogContent;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
@@ -19,7 +21,10 @@ final class LeadRequests implements ShopperRequests
 
     public function waiting(Shop $shop, int $limit): array
     {
-        return Lead::query()->where('status', Lead::NEW)->latest('created_at')->orderByDesc('id')->limit($limit)->get()
+        $leads = Lead::query()->where('status', Lead::NEW)->latest('created_at')->orderByDesc('id')->limit($limit)->get();
+        $pages = self::pages($leads);
+
+        return $leads
             ->map(fn (Lead $lead): array => [
                 'key' => self::PREFIX.$lead->id,
                 'name' => self::name($lead),
@@ -27,7 +32,41 @@ final class LeadRequests implements ShopperRequests
                 'question' => self::said($lead),
                 'at' => $lead->created_at,
                 'visitor' => is_string($lead->visitor_hash) && $lead->visitor_hash !== '' ? $lead->visitor_hash : null,
+                // the page they asked on: what the question is about
+                'page' => $pages[$lead->page_type.'|'.$lead->page_external_id] ?? null,
             ])->all();
+    }
+
+    /**
+     * The pages these were asked on, by their type and id: a product with its title, link and picture, an article with
+     * its title and link; none for the search box, or a page no longer in the catalogue.
+     *
+     * @param  iterable<object>  $rows
+     * @return array<string, array{kind: string, title: string, url: string|null, image: string|null}> "type|id" => page
+     */
+    private static function pages(iterable $rows): array
+    {
+        $ids = ['product' => [], 'content' => []];
+        foreach ($rows as $row) {
+            $type = (string) $row->page_type;
+            if (isset($ids[$type]) && (string) $row->page_external_id !== '') {
+                $ids[$type][] = (string) $row->page_external_id;
+            }
+        }
+
+        $pages = [];
+        if ($ids['product'] !== []) {
+            foreach (CatalogProduct::query()->whereIn('external_id', array_unique($ids['product']))->get(['external_id', 'title', 'url', 'image_url']) as $p) {
+                $pages['product|'.$p->external_id] = ['kind' => 'product', 'title' => (string) $p->title, 'url' => $p->url, 'image' => $p->image_url];
+            }
+        }
+        if ($ids['content'] !== []) {
+            foreach (CatalogContent::query()->whereIn('external_id', array_unique($ids['content']))->get(['external_id', 'title', 'url']) as $c) {
+                $pages['content|'.$c->external_id] = ['kind' => 'content', 'title' => (string) $c->title, 'url' => $c->url, 'image' => null];
+            }
+        }
+
+        return $pages;
     }
 
     public function replyUrl(Shop $shop, string $key, ?int $userId): ?string

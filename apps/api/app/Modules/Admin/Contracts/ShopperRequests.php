@@ -17,9 +17,11 @@ interface ShopperRequests
 
     /**
      * Who is waiting, the newest first. channel: phone or email. name: what they gave, or null. visitor: the shopper's
-     * visitor hash as the visits log keeps it, so the screen can open the visit they asked from; null when unknown.
+     * visitor hash as the visits log keeps it, so the screen can open the visit they asked from; null when unknown. page:
+     * the page they asked on (a product, with its picture, or an article), so the store knows what the question is about;
+     * null when asked from the search box or the page is gone.
      *
-     * @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface, visitor: string|null}>
+     * @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface, visitor: string|null, page?: array{kind: string, title: string, url: string|null, image: string|null}|null}>
      */
     public function waiting(Shop $shop, int $limit): array;
 

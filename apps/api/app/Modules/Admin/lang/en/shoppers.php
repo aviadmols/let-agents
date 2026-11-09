@@ -37,6 +37,7 @@ return [
         'zero_text' => 'When the assistant doesn’t know, shoppers can leave their details or move to WhatsApp. Those requests show up here.',
         'set_whatsapp' => 'Set up WhatsApp',
         'see_visit' => 'See their visit',
+        'asked_on' => ['product' => 'Asked about:', 'content' => 'Asked on:'],
     ],
 
     'reply' => [

@@ -1972,6 +1972,10 @@ html.dark .fi-panel-merchant .lp-d-task:hover { background: var(--lp-d-card); }
 .fi-panel-merchant .lp-d-lead-visit { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--lp-d-ink-soft); text-decoration: none; }
 .fi-panel-merchant .lp-d-lead-visit:hover { color: var(--lp-d-ink); }
 .fi-panel-merchant .lp-d-lead-visit svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+.fi-panel-merchant .lp-d-lead-page { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--lp-d-ink-soft); min-width: 0; }
+.fi-panel-merchant .lp-d-lead-page img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; flex: none; background: var(--lp-d-paper); }
+.fi-panel-merchant .lp-d-lead-page a, .fi-panel-merchant .lp-d-lead-page b { color: var(--lp-d-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fi-panel-merchant .lp-d-lead-page b { text-decoration: none; }
 .fi-panel-merchant .lp-d-lead-body > .lp-d-lead-visit { display: flex; width: fit-content; }
 @media (max-width: 640px) {
     .fi-panel-merchant .lp-d-find { flex-basis: 100%; }

@@ -8,6 +8,7 @@ use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\Shoppers;
 use App\Modules\Admin\Models\User;
 use App\Modules\Analytics\Models\AnalyticsVisit;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Leads\Enums\LeadGoal;
 use App\Modules\Leads\Models\Lead;
 use App\Modules\Leads\Models\LeadFlow;
@@ -89,6 +90,21 @@ final class ShoppersWaitingTest extends TestCase
             ->assertSee('session='.$callbackVisit, false)
             ->assertSee('See their visit')
             ->assertSee($asked);
+    }
+
+    public function test_each_request_says_the_product_it_was_asked_about(): void
+    {
+        // Aviad, 9.11: "so I understand which product or page the question is about"
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '11', 'type' => 'simple', 'status' => 'publish', 'title' => 'Linen dress, olive', 'url' => 'https://store.test/linen-dress', 'image_url' => 'https://store.test/linen.jpg', 'price' => 300, 'in_stock' => true, 'purchasable' => true, 'hash' => 'h11', 'payload' => []]);
+            CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => '10', 'type' => 'simple', 'status' => 'publish', 'title' => 'Gift box', 'url' => 'https://store.test/gift-box', 'price' => 20, 'in_stock' => true, 'purchasable' => true, 'hash' => 'h10', 'payload' => []]);
+        });
+
+        $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/shoppers")
+            ->assertOk()
+            ->assertSeeInOrder(['Do you gift wrap?', 'Asked about:', 'Gift box', 'Can I order the linen dress in olive green?', 'Asked about:', 'Linen dress, olive'])
+            ->assertSee('https://store.test/linen-dress', false)
+            ->assertSee('https://store.test/linen.jpg', false);
     }
 
     public function test_both_kinds_wait_in_one_list_the_newest_first_and_no_contact_on_the_page(): void
