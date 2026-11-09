@@ -66,5 +66,11 @@
         "question": "האם ניתן להגיע לחנות ולקנות שם את הטבעות?",
         "note": "Rocks, 9.11: another site assistant answered with the visit, the hours and an offer. answer_site v20: a yes to coming over comes with the address.",
         "expect": {"outcome": "answered", "contains": ["שבזי"]}
+    },
+    {
+        "question": "אפשר לשריין את הטבעת הזו?",
+        "products": ["7677089742913"],
+        "note": "Rocks, 9.11: a ring of 650 was told it can be reserved in Layaway, which the store gives from 2,000 up; the team wrote ובהם הטבעת הזו. answer_site v21: the least price first (000 matches 2,000 and 2000).",
+        "expect": {"outcome": "answered", "contains": ["000"]}
     }
 ]

@@ -1283,6 +1283,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         // is on sale, the brands, and whether the question asks for the cheapest or the dearest.
         // The model gets ranks, never prices: the page shows the current price.
         $analysis = self::analysis($question, $productsByRef, $popular);
+        // and the amounts a page sets as a least price for something ("2,000 ש״ח ומעלה" for Layaway), with which products
+        // are under them: a model reads "ובהם הטבעת הזו" over a price of ₪650 (Rocks, 9.11). Only when there are some.
+        if (($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21 && ($minimums = self::priceMinimums($byRef, $productsByRef)) !== []) {
+            $analysis['price_minimums'] = $minimums;
+        }
         $forModel = $this->forModel($productsByRef, $analysis);
 
         if ($mode === AnswerContext::DYNAMIC) {
@@ -2442,6 +2447,64 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $out;
+    }
+
+    /** A least price is read only from this much: below it, "10%" or a small fee is no price a product is held to. */
+    private const MINIMUM_FROM = 50;
+
+    private const MINIMUMS = 3;
+
+    /**
+     * The amounts the passages set as a least price for something, by code ("לפריטים שמחירם 2,000 ש״ח ומעלה", "משלוח
+     * חינם בהזמנה מעל 300 ש״ח", "orders over $50"), each with the passage it is in and which of the products found are
+     * under it and which are not. Only a sum with a word that makes it a least ("מעל", "החל מ", "לפחות", "ומעלה",
+     * "ויותר", "over", "above", "at least", "and up"), never a sum alone; none when no product has a price.
+     *
+     * @param  array<string, array<string, mixed>>  $byRef  passages by ref
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @return list<array{amount: string, ref: string, below: list<string>, at_or_above: list<string>}>
+     */
+    public static function priceMinimums(array $byRef, array $productsByRef): array
+    {
+        $priced = array_filter($productsByRef, fn (array $p): bool => ($p['price'] ?? null) !== null && (float) $p['price'] > 0);
+        if ($priced === []) {
+            return [];
+        }
+
+        $money = '(?:ש["״]ח|₪|שקל(?:ים)?|NIS|ILS)';
+        $sum = '(\d{1,3}(?:[,.]\d{3})+|\d+)';
+        $patterns = [
+            // "מעל 300 ש״ח", "החל מ־2,000 ש״ח", "לפחות 500 ₪", "שמחירם 2,000 ש״ח ומעלה", "₪2,000 ומעלה"
+            '/(?:מעל|החל\s+מ[־\-]?|לפחות)\s*'.$sum.'\s*'.$money.'/u',
+            '/'.$sum.'\s*'.$money.'\s*(?:ומעלה|ויותר|והלאה)/u',
+            '/₪\s*'.$sum.'\s*(?:ומעלה|ויותר|והלאה)/u',
+            '/(?:over|above|at\s+least|from)\s*(?:₪|\$|€|£)\s*'.$sum.'/iu',
+            '/(?:₪|\$|€|£)\s*'.$sum.'\s*(?:and\s+(?:up|above|over)|or\s+more)/iu',
+        ];
+
+        $out = [];
+        foreach ($byRef as $ref => $passage) {
+            $text = strip_tags((string) ($passage['text'] ?? ''));
+            foreach ($patterns as $pattern) {
+                if (preg_match_all($pattern, $text, $m, PREG_SET_ORDER) < 1) {
+                    continue;
+                }
+                foreach ($m as $match) {
+                    $amount = (float) str_replace([',', '.'], '', $match[1]);
+                    if ($amount < self::MINIMUM_FROM || isset($out[(string) $amount])) {
+                        continue;
+                    }
+                    $out[(string) $amount] = [
+                        'amount' => trim($match[0]),
+                        'ref' => (string) $ref,
+                        'below' => array_keys(array_filter($priced, fn (array $p): bool => (float) $p['price'] < $amount)),
+                        'at_or_above' => array_keys(array_filter($priced, fn (array $p): bool => (float) $p['price'] >= $amount)),
+                    ];
+                }
+            }
+        }
+
+        return array_slice(array_values($out), 0, self::MINIMUMS);
     }
 
     /** "מה הספר הכי מומלץ", "הכי נמכר", "רב מכר", "best seller": what the store's customers choose most. */

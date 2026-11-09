@@ -579,7 +579,7 @@ final class SearchAsksTest extends TestCase
         $this->assertSame([], $this->calls, 'importing asks no model');
 
         $this->artisan('assistant:quality-cases', ['shop' => $this->shop->slug, '--import' => base_path('app/Modules/Assistant/resources/evals/rocks-conversations.json')])
-            ->expectsOutputToContain('10 cases imported')->assertSuccessful();
+            ->expectsOutputToContain('11 cases imported')->assertSuccessful();
         $reply = $this->inShop(fn () => AssistantQualityCase::query()->where('question', 'ומה עם עד 5000?')->sole());
         $this->assertCount(1, $reply->thread, 'a reply with the conversation it was asked in');
         $this->assertNull($reply->snapshot_at, 'nothing of a reply is frozen');
