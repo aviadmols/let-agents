@@ -532,8 +532,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
             return [
                 'outcome' => AssistantAnswer::ANSWERED,
-                // kept from before answers were ended whole
-                'answer' => self::endsWhole((string) $saved->answer),
+                // kept from before answers were ended whole, or before the store's plural was kept by code (StoreVoice);
+                // the team's own words are theirs, as written
+                'answer' => $saved->source === 'team' ? self::endsWhole((string) $saved->answer) : StoreVoice::plural(self::endsWhole((string) $saved->answer)),
                 'from' => 'bank',
                 'sources' => (array) $saved->sources,
                 'picks' => $this->present((array) $saved->picks),
