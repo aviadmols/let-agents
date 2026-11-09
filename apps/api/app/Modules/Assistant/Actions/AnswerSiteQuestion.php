@@ -94,8 +94,12 @@ final class AnswerSiteQuestion implements TriesQuestions
      * coming over; the store's chosen tone (assistant.answer_tone); a service it does not give answered with what it does.
      * Released with scope_site v10 after four runs on Rocks, 9.11: expected cases 9,9,9,8 of 9 (as-is 7,8), answered 72-75%
      * as before, cost per answer +20% (longer answers).
+     * 21: a least price a page sets (Layaway "2,000 ש״ח ומעלה", free shipping over a sum) compared by code with each product,
+     * for a question of the store's offers; an offer under its sum is said not to apply, with what applies instead.
+     * Released after runs live on Rocks, 9.11: "אפשר לשריין את הטבעת הזו?" (₪650) right 6 of 6 (v20: told yes), expected
+     * cases 9,10,8 of 10 (v20: 9), supported 78-88% (v20: 78%).
      */
-    public const PROMPT_VERSION = 20;
+    public const PROMPT_VERSION = 21;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
