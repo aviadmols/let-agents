@@ -88,6 +88,23 @@ final class SearchesScreenTest extends TestCase
             ->assertSee('נמצאו 9 מוצרים');
     }
 
+    public function test_a_question_says_the_product_it_was_asked_about(): void
+    {
+        // Aviad, 9.11: "here too I want to see from which page or product it was asked"
+        $this->inShop(function (): void {
+            $product = CatalogProduct::query()->where('external_id', '11')->sole();
+            $product->forceFill(['url' => 'https://shop.test/dress'])->save();
+            AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'question' => 'מאיזה בד היא?', 'question_key' => 'fabric', 'answer' => 'פשתן.', 'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN,
+                'source' => 'store', 'prompt_version' => 1, 'asked_count' => 9, 'last_asked_at' => now()->subDay()]);
+        });
+
+        $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/searches")
+            ->assertOk()
+            ->assertSeeInOrder(['מאיזה בד היא?', 'נשאל על המוצר:', 'שמלת פשתן לבנה'])
+            ->assertSee('https://shop.test/dress', false)
+            ->assertSee('https://shop.test/dress.jpg', false);
+    }
+
     public function test_the_numbers_count_what_search_recorded(): void
     {
         $screen = app(SearchScreen::class);

@@ -166,7 +166,16 @@
                                     <details class="lp-d-q-open">
                                         <summary class="lp-d-q">
                                             <span class="lp-d-q-icon"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0-6.8 12.2L4 20l3.9-1.2A8 8 0 1 0 12 4z"/></svg></span>
-                                            <span><b dir="auto">{{ $q['question'] }}</b><span class="lp-d-num">{{ $n('questions.times', $q['times']) }} · {{ $q['from'] === 'page' ? $t('questions.from.page', ['page' => $q['where']]) : $t('questions.from.'.$q['from']) }}</span></span>
+                                            <span><b dir="auto">{{ $q['question'] }}</b><span class="lp-d-num">{{ $n('questions.times', $q['times']) }} · {{ $q['from'] === 'page' ? $t('questions.from.page', ['page' => $q['where']]) : $t('questions.from.'.$q['from']) }}</span>
+                                                {{-- the page it was asked on: what the question is about --}}
+                                                @if (! empty($q['asked_on']['title']))
+                                                    <span class="lp-d-lead-page lp-d-q-page">
+                                                        @if (! empty($q['asked_on']['image']))<img src="{{ $q['asked_on']['image'] }}" alt="" loading="lazy" onerror="this.remove()">@endif
+                                                        <span>{{ __('admin::shoppers.waiting.asked_on.'.($q['asked_on']['kind'] === 'product' ? 'product' : 'content')) }}</span>
+                                                        @if (! empty($q['asked_on']['url']))<a href="{{ $q['asked_on']['url'] }}" target="_blank" rel="noopener" dir="auto" onclick="event.stopPropagation()">{{ $q['asked_on']['title'] }}</a>@else<b dir="auto">{{ $q['asked_on']['title'] }}</b>@endif
+                                                    </span>
+                                                @endif
+                                            </span>
                                             <span class="lp-d-q-end">
                                                 @if ($q['answered'])<span class="lp-d-chip lp-d-chip-line">{{ $t('questions.answered') }}</span>@else<span class="lp-d-chip lp-d-chip-sun">{{ $t('questions.open') }}</span>@endif
                                                 <svg class="lp-d-q-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>

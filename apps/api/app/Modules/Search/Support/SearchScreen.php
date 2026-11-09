@@ -9,6 +9,7 @@ use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Analytics\Models\AnalyticsVisitStep;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Models\SearchClick;
@@ -136,10 +137,22 @@ final class SearchScreen implements SearchesScreen
 
     public function questions(Shop $shop, CarbonInterface $since, CarbonInterface $until, int $limit): array
     {
-        return AssistantAnswer::query()->where('status', AssistantAnswer::SHOWN)->whereIn('outcome', [AssistantAnswer::ANSWERED, AssistantAnswer::NO_INFO])
+        $rows = AssistantAnswer::query()->where('status', AssistantAnswer::SHOWN)->whereIn('outcome', [AssistantAnswer::ANSWERED, AssistantAnswer::NO_INFO])
             ->where('last_asked_at', '>=', $since)->where('last_asked_at', '<', $until)
-            ->orderByDesc('asked_count')->orderByDesc('last_asked_at')->limit($limit)->get(['question', 'answer', 'asked_count', 'outcome', 'source', 'sources', 'product_id', 'created_at', 'last_asked_at'])
-            ->map(function (AssistantAnswer $a): array {
+            ->orderByDesc('asked_count')->orderByDesc('last_asked_at')->limit($limit)->get(['question', 'answer', 'asked_count', 'outcome', 'source', 'sources', 'product_id', 'content_id', 'created_at', 'last_asked_at']);
+        // the page each was asked on (Aviad, 9.11: "from which page or product it was asked"): a product with its picture, an article
+        $products = CatalogProduct::query()->whereIn('id', $rows->pluck('product_id')->filter()->unique()->values())->get(['id', 'title', 'url', 'image_url'])->keyBy('id');
+        $contents = CatalogContent::query()->whereIn('id', $rows->pluck('content_id')->filter()->unique()->values())->get(['id', 'title', 'url'])->keyBy('id');
+
+        return $rows
+            ->map(function (AssistantAnswer $a) use ($products, $contents): array {
+                $product = $a->product_id !== null ? $products->get($a->product_id) : null;
+                $content = $a->content_id !== null ? $contents->get($a->content_id) : null;
+                $askedOn = match (true) {
+                    $product !== null => ['kind' => 'product', 'title' => (string) $product->title, 'url' => $product->url, 'image' => $product->image_url],
+                    $content !== null => ['kind' => 'content', 'title' => (string) $content->title, 'url' => $content->url, 'image' => null],
+                    default => null,
+                };
                 $answered = $a->outcome === AssistantAnswer::ANSWERED;
                 $page = collect((array) $a->sources)->first(fn ($s): bool => is_array($s) && trim((string) ($s['title'] ?? '')) !== '');
                 $from = match (true) {
@@ -158,6 +171,7 @@ final class SearchScreen implements SearchesScreen
                     'where' => $page === null ? null : trim((string) $page['title']),
                     'answer' => $answer === '' ? null : mb_substr($answer, 0, 1200),
                     'first' => min($a->created_at?->getTimestamp() ?? $last, $last), 'last' => $last,
+                    'asked_on' => $askedOn,
                 ];
             })->all();
     }
