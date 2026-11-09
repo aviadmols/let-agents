@@ -97,6 +97,19 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     public const PROMPT_VERSION = 20;
 
+    /**
+     * How the writer is given the store's own words, kept with each saved answer: one written from less is written
+     * again when next asked, found or not. 2: the team's text in whole pieces, never cut off at its end; the address
+     * and the hours for a visit; what the store sells beside a "do you…" (Rocks, 9.11).
+     */
+    public const READ_VERSION = 2;
+
+    /** Whether a saved answer was written before the writer was given what it is given now (READ_VERSION). */
+    private static function readBefore(AssistantAnswer $saved): bool
+    {
+        return $saved->source !== 'team' && (int) (((array) $saved->flags)['read'] ?? 1) < self::READ_VERSION;
+    }
+
     /** The tone the prompt writes in when the store chose none (assistant.answer_tone). */
     public const TONE_DEFAULT = 'warm';
 
@@ -465,6 +478,10 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         // the store changed the tone its answers are written in: written again in the new one
         if ((((array) $saved->flags)['tone'] ?? null) !== self::toneKey(app(TenantContext::class)->id())) {
+            return true;
+        }
+
+        if (self::readBefore($saved)) {
             return true;
         }
 
@@ -863,6 +880,92 @@ final class AnswerSiteQuestion implements TriesQuestions
         return preg_match($open, $question) === 1 && preg_match($when, $question) === 1;
     }
 
+    /** Words of the rows that tell where the store is, read beside the question when it asks about coming over. */
+    private const VISIT_WORDS = ['כתובת', 'רחוב', 'address'];
+
+    /** The team's own words past one passage go on in at most this many more, never cut off at their end. */
+    private const OWN_PIECES = 3;
+
+    /** What the store sells, by its categories, at most this many: the "what it does" a "no" opens with. */
+    private const SELLS_CATEGORIES = 10;
+
+    /**
+     * Whether a question asks about coming to the store: to come, visit, measure, see or buy there, or where it is
+     * ("אפשר לבוא למדוד אצלכם?", "האם ניתן להגיע לחנות ולקנות שם?", "can I visit the store?").
+     */
+    public static function asksAboutVisit(string $question): bool
+    {
+        return preg_match('/(?<!\p{L})[וש]?(?:להגיע|לבוא|לבקר|לקפוץ|להיכנס|אגיע|נגיע|אבוא|נבוא|ביקור|לחנות|בחנות|החנות\s+(?:נמצאת|ממוקמת)|בסניף|לסניף|אצלכם|כתובת|איפה\s+(?:אתם|החנות|הסניף|נמצאת?)|visit|come\s+(?:to|by|in|over)|in\s+(?:the\s+)?store|your\s+(?:store|shop|address)|where\s+are\s+you)(?!\p{L})/iu', $question) === 1;
+    }
+
+    /**
+     * Whether a question asks whether the store has or does something ("אתם מחליפים סוללות לשעונים?", "יש לכם תיקונים?",
+     * "do you engrave?"): its answer may be no, and a no opens with what the store does.
+     */
+    public static function asksWhatStoreDoes(string $question): bool
+    {
+        return preg_match('/^\s*(?:ה?אם\s+)?(?:אתם|אצלכם|יש\s+לכם|יש\s+אצלכם|אפשר\s+אצלכם|do\s+you|are\s+you|can\s+you|does\s+the\s+(?:store|shop))(?!\p{L})/iu', $question) === 1;
+    }
+
+    /**
+     * Rows in whole pieces of at most $chars each, at most $pieces of them; a row longer than $chars alone is a piece
+     * of its own, cut.
+     *
+     * @param  list<string>  $rows
+     * @return list<string>
+     */
+    public static function rowChunks(array $rows, int $chars, int $pieces): array
+    {
+        $out = [];
+        $piece = [];
+
+        foreach ($rows as $row) {
+            if ($piece !== [] && mb_strlen(implode("\n", [...$piece, $row])) > $chars) {
+                $out[] = implode("\n", $piece);
+                $piece = [];
+            }
+            $piece[] = $row;
+        }
+        if ($piece !== []) {
+            $out[] = implode("\n", $piece);
+        }
+
+        return array_slice(array_values(array_filter(array_map(fn (string $p): string => trim(mb_substr($p, 0, $chars)), $out), fn (string $p): bool => $p !== '')), 0, $pieces + 1);
+    }
+
+    /**
+     * What the store sells, as a passage the writer may open a "no" with: its name and its biggest categories in its
+     * own language (and what it said it sells, when it did). Shown to no shopper as a source.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function sellsPassage(string $shopId): ?array
+    {
+        $shop = Shop::query()->whereKey($shopId)->first(['id', 'name', 'content_locale', 'profile']);
+        if ($shop === null) {
+            return null;
+        }
+
+        $hebrew = (string) $shop->content_locale !== 'en';
+        $names = array_values(array_unique(array_filter(
+            [...(array) ($shop->profile['sells'] ?? []), ...CatalogCategory::query()->whereNull('removed_at')->where('product_count', '>', 0)->orderByDesc('product_count')->limit(self::SELLS_CATEGORIES * 3)->pluck('name')->all()],
+            // a category in another language than the store's ("Not Sale" in a Hebrew store) is a mark of the store's own, not what it sells
+            fn ($name): bool => is_string($name) && trim($name) !== '' && (! $hebrew || preg_match('/\p{Hebrew}/u', $name) === 1),
+        )));
+        if ($names === []) {
+            return null;
+        }
+
+        $locale = $hebrew ? 'he' : 'en';
+
+        return [
+            'source' => 'store', 'source_id' => 'sells', 'external_id' => null,
+            'title' => (string) __('assistant::answers.store_sells.title', [], $locale),
+            'text' => (string) __('assistant::answers.store_sells.text', ['name' => (string) $shop->name, 'list' => implode(', ', array_slice($names, 0, self::SELLS_CATEGORIES))], $locale),
+            'similarity' => 1.0, 'kind' => 'knowledge', 'from' => null,
+        ];
+    }
+
     /**
      * The store's knowledge entries as the first passages: what its product pages repeat and what
      * its team wrote, whole; of the team's answers, only those that share a word with the question.
@@ -873,8 +976,13 @@ final class AnswerSiteQuestion implements TriesQuestions
             return $found;
         }
 
-        // the question's words, and its topic's when it asks if the store is open ("שעות פתיחה" for "פתוחים עכשיו?")
-        $words = array_values(array_unique([...$this->words($question), ...(self::asksIfOpen($question) ? PrepareStoreAnswers::TOPICS['hours'] : [])]));
+        // the question's words, and its topic's when it asks if the store is open ("שעות פתיחה" for "פתוחים עכשיו?"), or
+        // about coming over: the rows with the address and the hours ("אפשר לבוא למדוד אצלכם?", Rocks 9.11)
+        $words = array_values(array_unique([
+            ...$this->words($question),
+            ...(self::asksIfOpen($question) || self::asksAboutVisit($question) ? PrepareStoreAnswers::TOPICS['hours'] : []),
+            ...(self::asksAboutVisit($question) ? self::VISIT_WORDS : []),
+        ]));
         $first = [];
 
         // The team's own words first, then its answers, then what every product page repeats, then
@@ -897,6 +1005,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         foreach ($entries as $entry) {
             $text = trim((string) $entry->body);
+            $more = [];
 
             if ($entry->external_id === BuildShopKnowledge::TEAM) {
                 $text = implode("\n\n", array_slice(array_filter(preg_split('/\n{2,}/u', $text) ?: [], $speaks), 0, self::TEAM_PAIRS));
@@ -925,7 +1034,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $first[] = $passage($whole($said));
                     $rows = array_values(array_filter($rows, fn (string $row): bool => ! $speaks($row)));
                 }
-                $text = $whole($rows);
+                // the rest in whole pieces, never cut off at the end: a team that wrote much lost its last rows, and
+                // Rocks' address and hours were among them (9.11)
+                $more = self::rowChunks($rows, self::KNOWLEDGE_CHARS, self::OWN_PIECES);
+                $text = (string) array_shift($more);
             }
 
             // what every page repeats, without a banner's line whose day is gone ("המשלוח הבא יוצא ב־15.9"):
@@ -940,6 +1052,15 @@ final class AnswerSiteQuestion implements TriesQuestions
                     // Cut to what speaks of the question: kept for a question about a product too.
                     + ($entry->external_id === BuildShopKnowledge::POSTS ? ['speaks' => true] : []);
             }
+            foreach ($more as $piece) {
+                $first[] = $passage($piece);
+            }
+        }
+
+        // asked whether the store has or does something ("אתם מחליפים סוללות לשעונים?"): what it sells, so a "no" can
+        // open with what it does ("אנחנו מתמחים בתכשיטי זהב…", as another assistant answered on Rocks, 9.11)
+        if (self::asksWhatStoreDoes($question) && ($sells = $this->sellsPassage($shopId)) !== null) {
+            $first[] = $sells;
         }
 
         $ids = array_map(fn (array $p): string => $p['source_id'], $first);
@@ -959,7 +1080,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             return true;
         }
 
-        if ($saved->prompt_version < self::PROMPT_VERSION) {
+        if ($saved->prompt_version < self::PROMPT_VERSION || self::readBefore($saved)) {
             return true;
         }
 
@@ -3021,6 +3142,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         $seen = [];
 
         foreach ($cited as $passage) {
+            // what code wrote of the store (what it sells) is no page of it
+            if ($passage['source'] === 'store') {
+                continue;
+            }
             $key = $passage['source'].'|'.$passage['source_id'];
 
             if (isset($seen[$key])) {
@@ -3197,7 +3322,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             'cost_usd' => round($cost, 6),
             'run_id' => $run->runId,
             // a "not on the site" remembers what the scan knew of the products then (stale())
-            'flags' => $outcome === AssistantAnswer::NO_INFO ? ['learned' => self::learned()] + (array) $flags : $flags,
+            // every answer kept says how the writer was given the store's words (READ_VERSION), whatever its path
+            'flags' => ['read' => self::READ_VERSION] + ($outcome === AssistantAnswer::NO_INFO ? ['learned' => self::learned()] + (array) $flags : (array) $flags),
             'last_asked_at' => now(),
         ];
 

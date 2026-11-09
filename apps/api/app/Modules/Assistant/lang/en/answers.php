@@ -8,6 +8,11 @@ return [
     'unavailable' => 'We could not answer right now. Please try again later.',
     'personal_data' => 'To keep your details private, please do not write a phone number, email, address or payment details here. Ask without them, or contact the store team directly.',
     'blocked' => 'Questions are not available here right now. The store team will be glad to help.',
+    // What the store sells, by its categories, as the writer is given it (never shown as a source).
+    'store_sells' => [
+        'title' => 'What the store sells',
+        'text' => ':name sells: :list.',
+    ],
     // A store's policy pages under the names Shopify gives them in English, as sources in the store's language.
     'policies' => [
         'refund-policy' => 'Refund policy',

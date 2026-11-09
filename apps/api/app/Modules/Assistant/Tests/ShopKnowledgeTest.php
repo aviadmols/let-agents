@@ -11,6 +11,7 @@ use App\Modules\Assistant\Filament\Merchant\Pages\AboutStore;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\RepeatedText;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Tenancy\Models\Shop;
@@ -154,6 +155,53 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertStringEndsWith('החזרות', trim($passages[1]['text']), 'and no row cut in its middle');
     }
 
+    public function test_a_visit_brings_the_address_and_hours_however_much_the_team_wrote_and_a_no_opens_with_what_the_store_sells(): void
+    {
+        // Rocks, 9.11: "אפשר לבוא למדוד אצלכם את המוצר?" was answered without the address: the team's text ran past one
+        // passage, and its last rows, the address and the hours among them, were cut off
+        $this->shop = Shop::factory()->create(['name' => 'Rocks and Gold', 'content_locale' => 'he']);
+        $rows = array_map(fn (int $n): string => "שורה {$n} ".str_repeat('מידע על משלוחים והחזרות ', 24), range(1, 6));
+        $address = 'שבזי 31 תל אביב. שעות פתיחה רגילות: ראשון עד חמישי 10.30 עד 18.30, שישי 10 עד 15.';
+        $diamonds = 'כל היהלומים באתר שלנו הם יהלומים טבעיים לחלוטין.';
+        $this->inShop(function () use ($rows, $address, $diamonds): void {
+            app(BuildShopKnowledge::class)->own(implode("\n", [...$rows, $address, $diamonds]));
+            foreach ([['טבעות זהב צהוב', 120], ['עגילים', 80], ['Not Sale', 300], ['שרשראות', 40]] as $i => [$name, $count]) {
+                CatalogCategory::query()->create(['external_id' => 'c'.$i, 'name' => $name, 'path' => [$name], 'product_count' => $count, 'hash' => 'c'.$i]);
+            }
+        });
+        $knowledge = fn (string $question): array => $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), $question, $this->shop->id, []));
+
+        $passages = $knowledge('אפשר לבוא למדוד אצלכם את המוצר?');
+        $this->assertSame('- '.$address, $passages[0]['text'], 'the address and the hours, a passage of their own, first');
+        $this->assertStringContainsString($diamonds, implode("\n", array_column($passages, 'text')), 'and no row of the team\'s lost at the end');
+        $this->assertNotContains('store', array_column($passages, 'source'), 'not a question whether the store does something');
+
+        $passages = $knowledge('אתם מחליפים סוללות לשעונים?');
+        $sells = collect($passages)->firstWhere('source', 'store');
+        $this->assertSame('Rocks and Gold מוכרת: טבעות זהב צהוב, עגילים, שרשראות.', $sells['text'] ?? null, 'its biggest categories in its own language, the most first');
+        $sources = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'sources'))->invoke(app(AnswerSiteQuestion::class), [$sells]));
+        $this->assertSame([], $sources, 'never shown to a shopper as a page of the store');
+    }
+
+    public function test_which_questions_ask_about_a_visit_and_which_ask_what_the_store_does(): void
+    {
+        foreach (['אפשר לבוא למדוד אצלכם את המוצר?', 'האם ניתן להגיע לחנות ולקנות שם את הטבעות?', 'איפה החנות?', 'can I visit the store?'] as $q) {
+            $this->assertTrue(AnswerSiteQuestion::asksAboutVisit($q), $q);
+        }
+        foreach (['טבעת זהב לבן עד 3000', 'מה מדיניות ההחזרות?', 'כמה זמן לוקח משלוח?'] as $q) {
+            $this->assertFalse(AnswerSiteQuestion::asksAboutVisit($q), $q);
+        }
+        foreach (['אתם מחליפים סוללות לשעונים', 'יש לכם תכשיטים בכסף?', 'האם אתם עושים חריטה?', 'do you engrave?'] as $q) {
+            $this->assertTrue(AnswerSiteQuestion::asksWhatStoreDoes($q), $q);
+        }
+        foreach (['מה זאת תוכנית layaway?', 'טבעת סוליטר', 'מה מתאים למתנה?'] as $q) {
+            $this->assertFalse(AnswerSiteQuestion::asksWhatStoreDoes($q), $q);
+        }
+        $rows = ['א'.str_repeat('ב', 30), 'ג'.str_repeat('ד', 30), 'ה'.str_repeat('ו', 30)];
+        $this->assertSame([$rows[0]."\n".$rows[1], $rows[2]], AnswerSiteQuestion::rowChunks($rows, 70, 3), 'whole rows, none lost');
+    }
+
     public function test_what_the_team_wrote_writes_a_saved_answer_again(): void
     {
         // Rocks, 2.11: the team added where its parking is, and the answer kept from the accessibility page was shown
@@ -161,7 +209,7 @@ final class ShopKnowledgeTest extends TestCase
         $stale = fn (AssistantAnswer $answer): bool => (new ReflectionMethod(AnswerSiteQuestion::class, 'stale'))->invoke(app(AnswerSiteQuestion::class), $answer, $this->shop->id);
         $saved = fn (array $flags): AssistantAnswer => AssistantAnswer::query()->create([
             'question_key' => Question::key('איפה החניון?'), 'question' => 'איפה החניון?', 'answer' => 'בחניון התחנה.', 'outcome' => AssistantAnswer::ANSWERED,
-            'status' => AssistantAnswer::SHOWN, 'prompt_version' => AnswerSiteQuestion::PROMPT_VERSION, 'flags' => $flags, 'last_asked_at' => now(),
+            'status' => AssistantAnswer::SHOWN, 'prompt_version' => AnswerSiteQuestion::PROMPT_VERSION, 'flags' => $flags + ['read' => AnswerSiteQuestion::READ_VERSION], 'last_asked_at' => now(),
         ]);
 
         $this->inShop(function () use ($stale, $saved): void {
@@ -172,8 +220,12 @@ final class ShopKnowledgeTest extends TestCase
             $this->assertTrue($stale($answer), 'the team wrote since: written again when next asked');
 
             $hash = CatalogContent::query()->where('external_id', BuildShopKnowledge::OWN)->value('hash');
-            $answer->forceFill(['flags' => ['own' => $hash]])->save();
+            $answer->forceFill(['flags' => ['own' => $hash, 'read' => AnswerSiteQuestion::READ_VERSION]])->save();
             $this->assertFalse($stale($answer), 'written from what it says now');
+
+            // written before the writer was given the team's whole text and the address for a visit (9.11): written again
+            $answer->forceFill(['flags' => ['own' => $hash]])->save();
+            $this->assertTrue($stale($answer), 'written from less than it is given now');
         });
     }
 
