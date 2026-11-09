@@ -1004,7 +1004,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         };
 
         foreach ($entries as $entry) {
-            $text = trim((string) $entry->body);
+            $text = self::withoutThisProduct(trim((string) $entry->body));
             $more = [];
 
             if ($entry->external_id === BuildShopKnowledge::TEAM) {
@@ -2464,6 +2464,26 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $out;
+    }
+
+    /**
+     * What the store knows about itself, without a pointer at a product it was written beside ("לפריטים מ־2,000 ש״ח
+     * ומעלה, ובהם הטבעת הזו, …", Rocks 9.11, copied from an answer about one ring): knowledge is about the store, and
+     * "this ring" read beside another product tells the writer it is that one. Only the pointer goes ("ובהם הטבעת הזו",
+     * "כמו המוצר הזה", "(כמו הטבעת הזו)", "including this item"); the rule it was said beside stays.
+     */
+    public static function withoutThisProduct(string $text): string
+    {
+        $joins = '(?:ובהם|ובהן|ביניהם|ביניהן|ובכלל\s+זה|כולל|כמו|למשל|including|like|such\s+as)';
+        $thing = '(?:(?:(?:ה\p{L}+|את\s+ה\p{L}+)\s+)?(?:הזו|הזה|הזאת|הללו|האלה)|this\s+(?:\p{L}+\s+)?(?:one|item|product|ring|piece)|this\s+\p{L}+)';
+        $out = preg_replace([
+            // "(כמו הטבעת הזו)"
+            '/\s*\(\s*'.$joins.'\s+'.$thing.'\s*\)/iu',
+            // ", ובהם הטבעת הזו," / ", including this ring,"
+            '/\s*,\s*'.$joins.'\s+'.$thing.'\s*(?=[,.;:)\n]|$)/iu',
+        ], '', $text);
+
+        return is_string($out) ? $out : $text;
     }
 
     /**

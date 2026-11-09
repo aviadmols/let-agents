@@ -31,6 +31,19 @@ final class PriceMinimumsTest extends TestCase
         $this->assertSame([], AnswerSiteQuestion::priceMinimums(['s1' => ['text' => 'משלוח חינם מעל 300 ש״ח']], ['p1' => ['price' => null]]), 'no product with a price: nothing to compare');
     }
 
+    public function test_the_stores_knowledge_never_points_at_a_product_it_was_written_beside(): void
+    {
+        $this->assertSame(
+            'לפריטים שמחירם 2,000 ש״ח ומעלה, ניתן לשריין את הפריט בתוכנית Layaway.',
+            AnswerSiteQuestion::withoutThisProduct('לפריטים שמחירם 2,000 ש״ח ומעלה, ובהם הטבעת הזו, ניתן לשריין את הפריט בתוכנית Layaway.'),
+        );
+        $this->assertSame('עבור מוצרים החל מ-2,000 ש"ח, ניתן להצטרף לתוכנית.', AnswerSiteQuestion::withoutThisProduct('עבור מוצרים החל מ-2,000 ש"ח (כמו הטבעת הזו), ניתן להצטרף לתוכנית.'));
+        $this->assertSame('Free engraving on rings over $500.', AnswerSiteQuestion::withoutThisProduct('Free engraving on rings over $500, including this ring.'));
+        foreach (['החנות הזו פתוחה עד 18:00.', 'הטבעת הזו היא דוגמה לסגנון ארט דקו.', 'משלוח חינם מעל 300 ש״ח.'] as $text) {
+            $this->assertSame($text, AnswerSiteQuestion::withoutThisProduct($text), 'no pointer joined to a rule: as written');
+        }
+    }
+
     public function test_a_question_pointing_at_the_one_product_on_screen_is_about_it(): void
     {
         foreach (['האם אפשר לשריין אותה?', 'אפשר לשריין את הטבעת הזו?', 'יש את זה במידה 7?', 'is this one in stock?', 'can I reserve it?'] as $q) {
