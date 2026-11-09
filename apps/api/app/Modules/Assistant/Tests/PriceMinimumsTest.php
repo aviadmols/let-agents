@@ -30,4 +30,14 @@ final class PriceMinimumsTest extends TestCase
         $this->assertSame([], $read('מקדמה של לפחות 10% מסך ההזמנה'), 'a percentage is no price');
         $this->assertSame([], AnswerSiteQuestion::priceMinimums(['s1' => ['text' => 'משלוח חינם מעל 300 ש״ח']], ['p1' => ['price' => null]]), 'no product with a price: nothing to compare');
     }
+
+    public function test_a_question_pointing_at_the_one_product_on_screen_is_about_it(): void
+    {
+        foreach (['האם אפשר לשריין אותה?', 'אפשר לשריין את הטבעת הזו?', 'יש את זה במידה 7?', 'is this one in stock?', 'can I reserve it?'] as $q) {
+            $this->assertTrue(AnswerSiteQuestion::pointsAtOne($q), $q);
+        }
+        foreach (['אפשר לשריין מוצר בתשלומים?', 'מה מדיניות ההחזרות?', 'טבעת זהב לבן'] as $q) {
+            $this->assertFalse(AnswerSiteQuestion::pointsAtOne($q), $q);
+        }
+    }
 }

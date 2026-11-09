@@ -1296,6 +1296,12 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         // The product whose page the question was asked from, by its ref.
         $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
+        // one product on screen and a question pointing at it ("אפשר לשריין אותה?" under its card, Rocks 9.11): it is the
+        // product asked about, as on its own page (answer_site v21 on; an older prompt is given what it was)
+        if (! is_string($viewingRef) && count($productsByRef) === 1 && self::pointsAtOne($question)
+            && ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21) {
+            $viewingRef = (string) array_key_first($productsByRef);
+        }
 
         // "החנות פתוחה עכשיו": the store's own day and hour, only for a question that depends on when it is asked
         $now = AssistantAnswer::asksTheClock($question) ? self::clock($shopId) : null;
@@ -2447,6 +2453,15 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $out;
+    }
+
+    /**
+     * Whether a question points at one thing it does not name: "אותה", "הזו", "הזה", "זאת", "it", "this one" ("אפשר
+     * לשריין אותה?", "is this one in stock?").
+     */
+    public static function pointsAtOne(string $question): bool
+    {
+        return preg_match('/(?<!\p{L})(?:[וש]?אותה|[וש]?אותו|ה?זו|ה?זה|ה?זאת|it|this(?:\s+one)?|that\s+one)(?!\p{L})/iu', $question) === 1;
     }
 
     /** A least price is read only from this much: below it, "10%" or a small fee is no price a product is held to. */
