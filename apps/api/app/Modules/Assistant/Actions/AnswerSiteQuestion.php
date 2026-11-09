@@ -36,6 +36,7 @@ use App\Modules\Assistant\Support\QuestionLinks;
 use App\Modules\Assistant\Support\RelatedGroups;
 use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Assistant\Support\StoreSpelling;
+use App\Modules\Assistant\Support\StoreVoice;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -1631,7 +1632,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
-                $answer = self::endsWhole($answer);
+                // and in the store's own plural, never "אני יכול" (StoreVoice, Rocks 9.11): the answer, its not-found line, each pick's why
+                $answer = StoreVoice::plural(self::endsWhole($answer));
+                $notFound = isset($notFound) ? StoreVoice::plural($notFound) : null;
+                $picks = array_map(fn (array $pick): array => ['why' => StoreVoice::plural((string) ($pick['why'] ?? ''))] + $pick, $picks);
                 $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
                 // what it recommends by name that is none of its products ("שיטאקה"): only names the answer, as checked, still says
                 $names = $refusal === null ? self::names($reply->data['names'] ?? null, $answer) : [];
