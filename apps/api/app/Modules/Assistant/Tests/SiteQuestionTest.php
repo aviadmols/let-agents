@@ -30,6 +30,7 @@ use App\Modules\Runs\Models\Run;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -410,6 +411,32 @@ final class SiteQuestionTest extends TestCase
         $this->replies = [$answer, $checked];
         $this->ask('על מה הספר עדן?');
         $this->assertStringContainsString('שלושה דורות', $this->calls[0]['user'], '"עדן" names "העדן"');
+    }
+
+    public function test_a_budget_names_no_product_whose_title_holds_the_same_number(): void
+    {
+        // Take Me Home, 9.11: "סל מתנה לתינוק עד 400 ש"ח" named the two shampoos of "400 מ"ל", and nothing the shopper
+        // had seen reached the writer
+        $this->product('700', 'שמפו אל דמע לתינוק 400 מ"ל', 'שמפו עדין.', [], ['price' => '29.90']);
+        $this->product('701', 'שמפו 2 ב-1 400 מ"ל', 'שמפו וסבון.', [], ['price' => '29.90']);
+        $this->product('702', 'שמיכת במבוק כדור פורח', 'שמיכה רכה לתינוק.', [], ['price' => '63.92']);
+        $answer = ['found' => true, 'answer' => 'תשובה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'מתנה']]];
+        $checked = ['supported' => true, 'on_topic' => true, 'safe' => true];
+
+        $this->replies = [$answer, $checked];
+        $this->askWith('תרכיב לי סל מתנה עד 400 ש"ח', ['702']);
+        $this->assertStringContainsString('שמיכת במבוק כדור פורח', $this->calls[0]['user'], 'what the shopper saw stays');
+
+        // a number alone names nothing either; with a word of the title it still does
+        $this->calls = [];
+        $this->replies = [$answer, $checked];
+        $this->askWith('יש משהו ב 400?', ['702']);
+        $this->assertStringContainsString('שמיכת במבוק כדור פורח', $this->calls[0]['user']);
+
+        $this->calls = [];
+        $this->replies = [$answer, $checked];
+        $this->askWith('ממה עשוי השמפו 2 ב-1?', ['702']);
+        $this->assertStringContainsString('שמפו וסבון', $this->calls[0]['user'], 'named by its words');
     }
 
     public function test_nothing_near_the_question_asks_no_writer_and_is_asked_again_once_the_store_says_more(): void

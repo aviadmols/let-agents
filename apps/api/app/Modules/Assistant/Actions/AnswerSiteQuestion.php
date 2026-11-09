@@ -619,8 +619,18 @@ final class AnswerSiteQuestion implements TriesQuestions
         $scores = [];
         $titles = [];
         $startsWord = fn (string $text, string $word): bool => preg_match('/(?<![\p{L}\p{N}])ה?'.preg_quote($word, '/').'/u', $text) === 1;
+        // The amount a question keeps to is a price, not a word of a title: "סל מתנה לתינוק עד 400 ש"ח" named the two
+        // shampoos of "400 מ"ל" and nothing the shopper had seen reached the writer (Take Me Home, 9.11).
+        $range = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        $amounts = array_map('floatval', array_values(array_filter([$range['min'], $range['max']], fn ($v): bool => $v !== null)));
+        // and a number alone names nothing: a title is named by a word of it ("שמפו 400" still names the shampoo)
+        $byWord = [];
 
         foreach ($tokens as $token) {
+            $numeric = preg_match('/^\p{N}+$/u', $token) === 1;
+            if ($numeric && in_array((float) $token, $amounts, true)) {
+                continue;
+            }
             $matched = [];
             foreach (Question::words($token) as $word) {
                 $found = CatalogProduct::query()->whereNull('removed_at')
@@ -643,8 +653,10 @@ final class AnswerSiteQuestion implements TriesQuestions
 
             foreach ($matched as $id => $part) {
                 $scores[$id] = ($scores[$id] ?? 0) + $part / count($matched);
+                $byWord[$id] = ($byWord[$id] ?? false) || ! $numeric;
             }
         }
+        $scores = array_filter($scores, fn (string|int $id): bool => $byWord[$id] ?? false, ARRAY_FILTER_USE_KEY);
 
         // A title the question names whole: every word of its name is a word of the question (a prefix before it too).
         $asked = ' '.implode(' ', $tokens).' ';
