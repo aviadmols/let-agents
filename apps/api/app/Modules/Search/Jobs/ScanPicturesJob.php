@@ -31,8 +31,11 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
     /** A part stopped for these reasons leaves work for the next one. */
     public const GO_ON = ['more', 'time_budget'];
 
-    /** A part stopped for these reasons still lets the pictures it saw be described. */
-    public const DESCRIBE_ANYWAY = ['provider_error'];
+    /**
+     * A part stopped for these reasons still lets the pictures seen be described: the picture model failing on some, and
+     * another scan holding the pictures (or the lock of one a deploy cut off), as `retrieval pictures` does.
+     */
+    public const DESCRIBE_ANYWAY = ['provider_error', 'already_running'];
 
     public function __construct(
         public readonly string $shopId,

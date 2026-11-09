@@ -59,9 +59,11 @@ final class ScanPicturesJobTest extends TestCase
                 throw new \LogicException('not here');
             }
 
+            public array $stops = ['provider_error', 'already_running'];
+
             public function images(string $shopId): Run
             {
-                return (new Run)->forceFill(['output' => ['stopped' => 'provider_error']]);
+                return (new Run)->forceFill(['output' => ['stopped' => array_shift($this->stops)]]);
             }
 
             public function match(string $shopId, ?array $productIds = null): Run
@@ -83,7 +85,10 @@ final class ScanPicturesJobTest extends TestCase
         $this->app->instance(CaptionsPictures::class, $captions);
 
         ScanPicturesJob::dispatch('shop-1');
-
         $this->assertSame(1, $captions->asked);
+
+        // and a scan whose pictures another holds (a lock a deploy left behind): those seen are described all the same
+        ScanPicturesJob::dispatch('shop-1');
+        $this->assertSame(2, $captions->asked);
     }
 }
