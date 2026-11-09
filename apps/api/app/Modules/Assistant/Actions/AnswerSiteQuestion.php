@@ -35,6 +35,7 @@ use App\Modules\Assistant\Support\QuestionGuard;
 use App\Modules\Assistant\Support\QuestionLinks;
 use App\Modules\Assistant\Support\RelatedGroups;
 use App\Modules\Assistant\Support\RepeatedText;
+use App\Modules\Assistant\Support\StoreSpelling;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -3249,10 +3250,18 @@ final class AnswerSiteQuestion implements TriesQuestions
     private function storeSays(string $shopId, string $question): array
     {
         $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
+        $near = $this->passages->near($shopId, $question, ['product', 'content'], self::SAYS_PIECES);
+
+        // a word misspelled is looked up as the store's word it is closest to, beside the question as typed ("lawyawy" →
+        // the Layaway page, Rocks 9.11): one more lookup, only when a word was read so
+        $fixed = StoreSpelling::fix($shopId, $question);
+        if ($fixed !== null) {
+            $near = self::merged($this->passages->near($shopId, $fixed, ['product', 'content'], self::SAYS_PIECES), $near, self::SAYS_PIECES);
+        }
 
         return array_values(array_map(
             fn (array $p): array => ['title' => (string) $p['title'], 'text' => mb_substr(trim((string) preg_replace('/\s+/u', ' ', (string) $p['text'])), 0, self::SAYS_CHARS)],
-            array_filter($this->passages->near($shopId, $question, ['product', 'content'], self::SAYS_PIECES), fn (array $p): bool => $p['similarity'] >= $floor),
+            array_slice(array_values(array_filter($near, fn (array $p): bool => $p['similarity'] >= $floor)), 0, self::SAYS_PIECES),
         ));
     }
 
