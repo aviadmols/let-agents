@@ -4,6 +4,7 @@ namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
@@ -102,6 +103,10 @@ final class QueryActionsTest extends TestCase
         $this->assertSame(['2', '1', '3'], $ids('טבעת יהלום הכי זולה'), 'by price, in stock first');
         $this->assertSame(['1', '2', '3'], $ids('טבעת יהלום הכי יקרה'));
         $this->assertSame(['2'], $ids('טבעת יהלום במבצע'));
+        // the bare words ask for what is on sale too, and so does a share of it (Take Me Home, 9.11: "מבצעים" found nothing)
+        $this->assertSame(['2'], $ids('טבעת יהלום מבצעים'));
+        $this->assertSame(['2'], $ids('טבעת יהלום מבצע 50%'));
+        $this->assertSame(['2'], $ids('טבעת יהלום sale'));
         $this->assertSame(['2'], $ids('טבעת יהלום גדולה מ-20'));
         $this->assertSame(['3'], $ids('טבעת יהלום קטנה מ-17'));
         $this->assertSame(['2', '1', '3'], $ids('טבעת יהלום גדולה'), 'the biggest first');
@@ -126,7 +131,7 @@ final class QueryActionsTest extends TestCase
             ['id' => 'p:3', 'pr' => 300, 's' => 0, 'z' => 16], ['id' => 'p:4', 'pr' => 700, 's' => 1, 'sl' => 1], ['id' => 'p:5', 's' => 1, 'z' => 20],
         ];
         $queries = ['טבעת הכי זולה', 'טבעת יהלום הכי יקרה במבצע', 'עגילים גדולים מ-2,5', 'טבעת שווה ל 20', 'הכי חדש', 'טבעת קטנה', 'או טבעת או עגילים במלאי', 'טבעת גדולה במלאי', 'cheapest ring on sale',
-            'טבעת רובי במידה גדולה', 'טבעת במידות קטנות', 'ring in large sizes'];
+            'טבעת רובי במידה גדולה', 'טבעת במידות קטנות', 'ring in large sizes', 'מבצעים', 'מבצע 50%', '50% הנחה', 'sale 30%'];
 
         $harness = 'const e=require('.json_encode(realpath(self::SCRIPT)).');const reg='.json_encode($registry, JSON_UNESCAPED_UNICODE).';const recs='.json_encode($records).';const out={};'
             .'for(const q of '.json_encode($queries, JSON_UNESCAPED_UNICODE).'){const r=e.readActions(q,reg);out[q]={query:r.query,actions:r.actions,either:e.either(r.query),order:e.applyActions(recs,r.actions).map(x=>x.id)};}'
@@ -146,6 +151,25 @@ final class QueryActionsTest extends TestCase
         $this->assertSame('טבעת רובי', $browser['טבעת רובי במידה גדולה']['query']);
         $this->assertSame(['p:2'], $browser['טבעת רובי במידה גדולה']['order']);
         $this->assertSame(['p:3'], $browser['טבעת במידות קטנות']['order']);
+        $this->assertSame('', $browser['מבצע 50%']['query'], 'the share is part of the ask, never a word to find');
+        $this->assertSame(['p:2', 'p:4'], $browser['מבצעים']['order']);
+    }
+
+    public function test_the_stores_sale_collections_are_a_filter_of_their_own(): void
+    {
+        // Take Me Home, 9.11: "SALE 50%" was left out of the categories as a campaign, and so it was nowhere
+        $this->inShop(function (): void {
+            $sale = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 's50', 'name' => 'SALE 50%', 'path' => ['SALE 50%'], 'depth' => 0, 'hash' => 's50', 'product_count' => 3]);
+            $sale->products()->sync(CatalogProduct::query()->whereIn('external_id', ['1', '2', '3'])->pluck('id')->all());
+        });
+
+        $data = $this->build();
+        $deal = collect($data['facets'])->firstWhere('k', 'deal');
+
+        $this->assertSame(['SALE 50%'], array_column($deal['v'] ?? [], 'l'));
+        $this->assertNotContains('SALE 50%', array_column(collect($data['facets'])->firstWhere('k', 'category')['v'] ?? [], 'l'), 'never one of the kinds');
+        $at = array_search('deal', array_column($data['facets'], 'k'), true);
+        $this->assertContains($at * 1000, collect($data['items'])->firstWhere('id', 'p:2')['f']);
     }
 
     public function test_a_size_band_reads_the_sizes_there_are_and_is_said_to_the_drawer_without_them(): void

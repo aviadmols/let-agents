@@ -9,6 +9,7 @@ return [
     'similar' => 'Similar items',
     'facet_type' => 'Product type',
     'facet_category' => 'Category',
+    'facet_deal' => 'Deals',
     'facet_audience' => 'For',
     'facet_tags' => 'Tags',
     'facet_brand' => 'Brand',

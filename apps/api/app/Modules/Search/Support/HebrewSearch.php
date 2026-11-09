@@ -381,10 +381,15 @@ final class HebrewSearch
 
         foreach ($registry as $entry) {
             foreach ((array) ($entry['patterns'] ?? []) as $pattern) {
-                if (@preg_match('~(^|\s)(?:'.$pattern.')(?=\s|$)~iu', $text, $m) !== 1) {
+                // matched as written, its last letters final ("במבצעים", "הכי זולים"): a search arrives normalized
+                // ("מבצעימ"), and a phrase ending in a final letter was never read here, only in the browser (Take Me
+                // Home, 9.11: "מבצעים" was searched for as a word). The same letters at the same places: cut from the text.
+                $seen = (string) preg_replace_callback('/(?<=\p{L})([כמנפצ])(?=\s|$)/u', fn (array $l): string => array_flip(self::FINALS)[$l[1]], $text);
+                if (@preg_match('~(^|\s)(?:'.$pattern.')(?=\s|$)~iu', $seen, $m, PREG_OFFSET_CAPTURE) !== 1) {
                     continue;
                 }
-                $text = self::replaceFirst($text, $m[0], $m[1].' ');
+                $text = substr_replace($text, $m[1][0].' ', $m[0][1], strlen($m[0][0]));
+                $m = array_map(fn ($group) => is_array($group) ? $group[0] : $group, $m);
                 $do = (array) ($entry['do'] ?? []);
                 if (isset($do['sort']) && $found['sort'] === null) {
                     [$found['sort'], $found['dir']] = [(string) $do['sort'], (string) ($do['dir'] ?? 'asc')];

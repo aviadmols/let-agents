@@ -9,6 +9,7 @@ return [
     'similar' => 'פריטים דומים',
     'facet_type' => 'סוג מוצר',
     'facet_category' => 'קטגוריה',
+    'facet_deal' => 'מבצעים',
     'facet_audience' => 'למי',
     'facet_tags' => 'תגיות',
     'facet_brand' => 'מותג',

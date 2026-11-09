@@ -92,6 +92,9 @@ final class BuildSearchIndex
     private array $contentTags = [];
 
     /** Words that say a collection is a campaign or a shelf of the moment, not a kind of product. */
+    /** A collection of what is on sale: a filter of its own (dealFacet), never one of the kinds. */
+    private const DEAL_WORDS = '~sale|מבצע|סייל|הנח(ה|ות)|outlet|אאוטלט|\d+\s*%~iu';
+
     private const CAMPAIGN_WORDS = '~sale|friday|cyber|valentine|summer|winter|edit|black|gift ?guide|new ?arrivals?|best ?sellers?|trending|shop ?all|מבצע|סייל|סוף[- ]?שנה|חג|הגיעו לאחרונה|חדש(ים|ות)? באתר|המלצות|עולות|הכי נמכר|רבי מכר|קולקציית|מתנות ל~iu';
 
     /** Whether a category's name is a kind a shopper narrows by: not an address, not a campaign. */
@@ -306,6 +309,9 @@ final class BuildSearchIndex
         $paged = $this->pageSizeFacet($facets['facets'], $pageSizes->map(fn (float $z, string $id): array => array_values(array_unique([$z, ...array_map('floatval', (array) ($offered[$id] ?? []))])))->all(), $this->locale($shopId));
         // The store's own categories, a filter of their own: the shopper narrows by them.
         $categories = $this->categoryFacet($facets['facets'], $this->locale($shopId));
+        // The store's sale collections, a filter of their own beside the kinds ("SALE 50%", "SHOP SALE"): kept out of the
+        // categories as campaigns, they were nowhere, and "מבצע 50%" found nothing to narrow by (Take Me Home, 9.11).
+        $deals = $this->dealFacet($facets['facets'], $this->locale($shopId));
         // Whom each product is for, where the store says it of enough of them (clothes, shoes): "חולצה לגברים" reads it.
         $audiences = $whom === null ? [] : $this->audienceFacet($facets['facets'], $this->locale($shopId), $whom);
         // The tags sure enough to narrow by, where the shop has them as filters: a group each ("ז'אנר").
@@ -336,7 +342,7 @@ final class BuildSearchIndex
             // The names of what the store's approved facts say it is ("אמרלד קאט", "קרנליאן", "ספר מודפס") are words it
             // is found by, whatever its own text calls them ("קרנליון"): a filter's name finds what the filter holds.
             $named = array_map(fn (int $code): string => (string) ($facets['facets'][intdiv($code, 1000)]['v'][$code % 1000]['l'] ?? ''), $read['f'] ?? []);
-            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($brands[$product->id] ?? []), ...($storeTags[$product->id] ?? []), ...($lengths['codes'][$product->id] ?? []), ...($fields[$product->id] ?? [])];
+            $codes = [...($read['f'] ?? []), ...($variants[$product->id]['f'] ?? []), ...($paged[$product->id] ?? []), ...($categories[$product->id] ?? []), ...($deals[$product->id] ?? []), ...($audiences[$product->id] ?? []), ...($tagFilters[$product->id] ?? []), ...($brands[$product->id] ?? []), ...($storeTags[$product->id] ?? []), ...($lengths['codes'][$product->id] ?? []), ...($fields[$product->id] ?? [])];
             if ($codes !== []) {
                 $codes = array_values(array_unique($codes));
                 sort($codes);
@@ -1056,6 +1062,43 @@ final class BuildSearchIndex
             'v' => array_map(fn (string $a): array => ['k' => $a, 'l' => (string) __('search::storefront.audience.'.$a, [], $locale)], $present)];
 
         return array_map(fn (array $as): array => array_map(fn (string $a): int => $at * 1000 + $code[$a], array_values(array_filter($as, fn (string $a): bool => isset($code[$a])))), $of);
+    }
+
+    /**
+     * The store's sale collections ("SALE 50%", "SHOP SALE", "מבצעי סוף עונה"), each with products, as a filter of its own:
+     * the categories leave them out as campaigns. Only where there are some.
+     *
+     * @return array<string, list<int>> product id => codes
+     */
+    private function dealFacet(array &$facets, string $locale): array
+    {
+        $names = CatalogCategory::query()->get(['id', 'name'])->filter(fn (CatalogCategory $c): bool => preg_match(self::DEAL_WORDS, (string) $c->name) === 1)->pluck('name', 'id');
+        if ($names->isEmpty()) {
+            return [];
+        }
+        $used = DB::table('catalog_category_product as cp')
+            ->join('catalog_products as p', 'p.id', '=', 'cp.product_id')
+            ->where('p.shop_id', $this->tenant->id())->whereNull('p.removed_at')->whereIn('cp.category_id', $names->keys()->all())
+            ->select('cp.category_id')->selectRaw('count(*) as n')->groupBy('cp.category_id')
+            ->havingRaw('count(*) >= '.self::CATEGORY_MIN_PRODUCTS)->orderByRaw('count(*) desc')->orderBy('cp.category_id')->limit(self::MAX_CATEGORIES)
+            ->pluck('n', 'category_id');
+        if ($used->isEmpty()) {
+            return [];
+        }
+        $at = count($facets);
+        $index = [];
+        $values = [];
+        foreach ($used as $id => $n) {
+            $index[(string) $id] = $at * 1000 + count($values);
+            $values[] = ['k' => (string) $id, 'l' => trim((string) $names[$id])];
+        }
+        $facets[] = ['k' => 'deal', 'l' => (string) __('search::storefront.facet_deal', [], $locale), 'v' => $values];
+        $products = [];
+        foreach (DB::table('catalog_category_product')->whereIn('category_id', array_keys($index))->orderBy('product_id')->get(['product_id', 'category_id']) as $row) {
+            $products[(string) $row->product_id][] = $index[(string) $row->category_id];
+        }
+
+        return $products;
     }
 
     private function categoryFacet(array &$facets, string $locale): array
