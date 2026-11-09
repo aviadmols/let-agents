@@ -98,8 +98,12 @@ final class AnswerSiteQuestion implements TriesQuestions
      * for a question of the store's offers; an offer under its sum is said not to apply, with what applies instead.
      * Released after runs live on Rocks, 9.11: "אפשר לשריין את הטבעת הזו?" (₪650) right 6 of 6 (v20: told yes), expected
      * cases 9,10,8 of 10 (v20: 9), supported 78-88% (v20: 78%).
+     * 22: when several passages answer the question, each its own way, one answer that brings them together, each
+     * condition with what it applies to, every detail cited; never "two versions" (Take Me Home's returns, 9.11).
+     * Released after two paired runs on Rocks, 9.11: answered 75.7% as v21, supported 82.1% (v21 78.6%), expected 9 of 10
+     * (v21 8); Take Me Home's returns brought together in 3 of 6 (v21 none).
      */
-    public const PROMPT_VERSION = 21;
+    public const PROMPT_VERSION = 22;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
