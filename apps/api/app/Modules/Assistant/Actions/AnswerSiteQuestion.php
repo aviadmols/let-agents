@@ -1301,6 +1301,16 @@ final class AnswerSiteQuestion implements TriesQuestions
             $forModel = array_map(fn (array $entry): array => AnswerContext::fields($type, $entry, $productsByRef[$entry['ref']], $question), $forModel);
         }
 
+        // and on each product, the least prices it is under, beside its own price: read in the list alone, a writer still
+        // told "yes" for the ring of ₪650 one run in two (Rocks, 9.11)
+        if (isset($analysis['price_minimums'])) {
+            $forModel = array_map(function (array $entry) use ($analysis): array {
+                $under = array_values(array_map(fn (array $m): string => $m['amount'], array_filter($analysis['price_minimums'], fn (array $m): bool => in_array($entry['ref'], $m['below'], true))));
+
+                return $under === [] ? $entry : $entry + ['under_minimum' => $under];
+            }, $forModel);
+        }
+
         // The product whose page the question was asked from, by its ref.
         $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
 
