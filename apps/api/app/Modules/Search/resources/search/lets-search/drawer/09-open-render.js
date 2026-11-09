@@ -48,8 +48,10 @@
         else if (back.q) { opts.text = back.q; }
       }
       // "about this product" only from the product page's own search row; the header's search is the store's search
-      if (opts.about && S.ctx && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
+      if (opts.about && S.ctx && productAsks() && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
     }
+    // the product's own view only where the store answers about it; elsewhere the drawer is the store's search
+    if (opts.about && !productAsks()) { opts.about = false; }
     S.askMode = !!(opts.about && S.ctx);
     // opened from the product page's own search row: only the product's information, and under it only
     // the line that loads the previous conversation (everything asked before, on this page too, waits there)

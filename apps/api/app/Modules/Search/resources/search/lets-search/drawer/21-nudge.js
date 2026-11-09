@@ -86,8 +86,13 @@
     timers.push(setTimeout(gone, force ? 60000 : CFG.nudgeFor));
   }
   // On a product page: a search row under "add to cart". Typing in it opens the drawer, the words going with it.
+  // Only where the store answers about its products (its plan and settings: the page's bank says ask): a row that asks
+  // and answers nothing is not shown at all (Take Me Home on Starter, 9.11: "אפשר לשאול שאלה קצרה על המוצר הזה").
   function inlineField() {
     if (!CFG.inlineInto || CFG.inlineInto === 'none' || !S.ctx) { return; }
+    bankFor(pid(S.ctx)).then(function (b) { if (productAsks(b)) { inlineRow(); } });
+  }
+  function inlineRow() {
     var at = doc.querySelector(CFG.inlineInto === 'auto' ? (SHOPIFY ? 'product-form, form[action*="/cart/add"]' : 'form.cart') : CFG.inlineInto);
     if (!at || at.__letsInline) { return; }
     at.__letsInline = true;

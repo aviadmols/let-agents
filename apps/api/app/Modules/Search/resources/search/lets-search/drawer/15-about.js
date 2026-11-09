@@ -15,6 +15,12 @@
     }
     return BANKS[id];
   }
+  // whether this page answers about its product: the bank built for it says so (widget.on_products and
+  // assistant.on_products, as the shop's plan and settings allow); without it, the product page is searched like any other
+  function productAsks(b) {
+    b = b === undefined ? LEARN.bank : b;
+    return !!(b && b.enabled === true && b.ask === true);
+  }
   function aboutTurn(id) {
     id = String(id);
     var ready = BANK_READY[id];

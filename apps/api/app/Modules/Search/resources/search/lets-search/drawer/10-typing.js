@@ -107,7 +107,7 @@
   }
   // opened from the product page's row: the words are about this product, and its information stays, until they
   // plainly search for other products ("טבעת זהב"); a letter or two, or a question, never switch to results
-  function aboutProduct(q) { return !!(S.askMode && S.ctx && rec(S.ctx) && (asksAboutIt(q) || !productSearch(q)) && !(LEARN.bank && LEARN.bank.ask === false)); }
+  function aboutProduct(q) { return !!(S.askMode && S.ctx && rec(S.ctx) && (asksAboutIt(q) || !productSearch(q)) && productAsks()); }
   function askOnly(q) {
     clearTimeout(liveTimer);
     S.live = null;
