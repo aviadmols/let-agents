@@ -1195,6 +1195,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     private function prepare(string $shopId, string $question, array $shown, string $mode, ?string $viewing = null, bool $followUp = false): array
     {
+        // one product on the shopper's screen and a question pointing at it ("אפשר לשריין אותה?" under its card, Rocks
+        // 9.11): it is the product asked about, as on its own page, whatever else the search brings beside it
+        // (answer_site v21 on; an older prompt is given what it was)
+        if ($viewing === null && count($shown) === 1 && self::pointsAtOne($question)
+            && ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21) {
+            $viewing = (string) $shown[0];
+        }
         // A question about a product it names ("על מה הספר החטוף?"): that product, when the search before it
         // showed none of those it names; a question about what was shown stays about what was shown.
         $named = $viewing === null ? $this->namedProducts($question) : [];
@@ -1296,12 +1303,6 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         // The product whose page the question was asked from, by its ref.
         $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
-        // one product on screen and a question pointing at it ("אפשר לשריין אותה?" under its card, Rocks 9.11): it is the
-        // product asked about, as on its own page (answer_site v21 on; an older prompt is given what it was)
-        if (! is_string($viewingRef) && count($productsByRef) === 1 && self::pointsAtOne($question)
-            && ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21) {
-            $viewingRef = (string) array_key_first($productsByRef);
-        }
 
         // "החנות פתוחה עכשיו": the store's own day and hour, only for a question that depends on when it is asked
         $now = AssistantAnswer::asksTheClock($question) ? self::clock($shopId) : null;
