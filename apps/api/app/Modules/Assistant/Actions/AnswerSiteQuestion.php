@@ -1307,7 +1307,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         $analysis = self::analysis($question, $productsByRef, $popular);
         // and the amounts a page sets as a least price for something ("2,000 ש״ח ומעלה" for Layaway), with which products
         // are under them: a model reads "ובהם הטבעת הזו" over a price of ₪650 (Rocks, 9.11). Only when there are some.
-        if (($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21 && ($minimums = self::priceMinimums($byRef, $productsByRef)) !== []) {
+        // Only for a question of the store's offers (reserve, pay, ship, return): beside "טבעות עד 5000" the writer told of
+        // free shipping nobody asked about, and the checker refused it (measured 9.11).
+        if (($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21 && self::asksOfTheStore($question)
+            && ($minimums = self::priceMinimums($byRef, $productsByRef)) !== []) {
             $analysis['price_minimums'] = $minimums;
         }
         $forModel = $this->forModel($productsByRef, $analysis);
