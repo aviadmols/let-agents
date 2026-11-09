@@ -80,7 +80,7 @@
 
 1. Partners ← Create app. אותן כתובות והרשאות כמו בציבורית, בלי legacy install flow. Distribution ← Custom ← כתובת החנות.
 2. ב־Railway (api, worker, scheduler) מוסיפים ל־`SHOPIFY_MORE_APPS` את `client_id:secret`. כמה אפליקציות מפרידים בפסיק.
-3. ב־`extensions/shopify` מעתיקים את `shopify.app.toml` ל־`shopify.app.<חנות>.toml` עם ה־`client_id` שלה, ומריצים `npx shopify app deploy --config <חנות> --allow-updates`.
+3. ב־`extensions/shopify` מעתיקים את `shopify.app.toml` ל־`shopify.app.<חנות>.toml` עם ה־`client_id` שלה, ומריצים `npx shopify app deploy --config <חנות> --allow-updates`. מאז 11.2026 שופיפיי דורש מאפליקציה עם App Proxy גם את ההרשאה `write_app_proxy`, אז מוסיפים אותה ל־`scopes` של הקובץ החדש. האפליקציה נוצרת בלי דפדפן כך: `shopify app init --name "..." --organization-id 128972608 --template none` בתיקייה ריקה.
 4. מתקינים מהקישור שנוצר ב־Distribution.
 
 כשהציבורית מאושרת, החנות יכולה לעבור אליה: מסירים את הפרטית ומתקינים את הציבורית. החנות אצלנו נשארת אותה חנות, כי היא מזוהה לפי כתובת ה־myshopify.
