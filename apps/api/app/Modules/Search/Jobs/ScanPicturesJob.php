@@ -31,6 +31,9 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
     /** A part stopped for these reasons leaves work for the next one. */
     public const GO_ON = ['more', 'time_budget'];
 
+    /** A part stopped for these reasons still lets the pictures it saw be described. */
+    public const DESCRIBE_ANYWAY = ['provider_error'];
+
     public function __construct(
         public readonly string $shopId,
         public readonly int $part = 1,
@@ -48,8 +51,12 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
     {
         $run = $retrieval->images($this->shopId);
 
-        // Once every picture has its look, each gets its content: a part of descriptions at a time.
-        if (! in_array($run->output['stopped'] ?? null, self::GO_ON, true) && ($run->output['stopped'] ?? null) === null) {
+        // Once every picture has its look, each gets its content: a part of descriptions at a time. The picture model
+        // failing on some (a gallery it could not read) holds back none of the descriptions of those it saw: they come
+        // now, and the rest wait for their own retry. It held a whole store's colours back, every few minutes again
+        // (Take Me Home, 9.11: 89 pictures seen, 0 described).
+        $stopped = $run->output['stopped'] ?? null;
+        if ($stopped === null || in_array($stopped, self::DESCRIBE_ANYWAY, true)) {
             $run = $captions->captions($this->shopId);
         }
 

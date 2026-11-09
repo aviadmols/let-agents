@@ -91,8 +91,9 @@ final class RetrievalCommand extends Command
                 continue;
             }
 
-            // Descriptions only once every picture has its look.
-            if ($stopped !== null) {
+            // Descriptions only once every picture has its look; the picture model failing on some (a gallery it could not
+            // read) still lets those it saw be described (Take Me Home, 9.11).
+            if ($stopped !== null && $stopped !== 'provider_error') {
                 break;
             }
         }

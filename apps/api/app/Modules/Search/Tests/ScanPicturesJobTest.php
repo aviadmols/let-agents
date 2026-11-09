@@ -48,4 +48,42 @@ final class ScanPicturesJobTest extends TestCase
         $this->assertSame(3, $fake->parts);
         $this->assertGreaterThan(1200, (new ScanPicturesJob('x'))->timeout, 'the worker never cuts a part off before its own budget');
     }
+
+    public function test_the_picture_model_failing_on_some_pictures_holds_back_no_description_of_the_others(): void
+    {
+        // Take Me Home, 9.11: the gallery failed at the picture model, and none of the 89 pictures it saw was described
+        $this->app->instance(RunsRetrieval::class, new class implements RunsRetrieval
+        {
+            public function index(string $shopId): Run
+            {
+                throw new \LogicException('not here');
+            }
+
+            public function images(string $shopId): Run
+            {
+                return (new Run)->forceFill(['output' => ['stopped' => 'provider_error']]);
+            }
+
+            public function match(string $shopId, ?array $productIds = null): Run
+            {
+                throw new \LogicException('not here');
+            }
+        });
+        $captions = new class implements CaptionsPictures
+        {
+            public int $asked = 0;
+
+            public function captions(string $shopId): Run
+            {
+                $this->asked++;
+
+                return (new Run)->forceFill(['output' => ['stopped' => null]]);
+            }
+        };
+        $this->app->instance(CaptionsPictures::class, $captions);
+
+        ScanPicturesJob::dispatch('shop-1');
+
+        $this->assertSame(1, $captions->asked);
+    }
 }
