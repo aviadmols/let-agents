@@ -289,8 +289,9 @@
       c.words[key] = { label: not ? w + ' ' + bare : (whole || bare), at: not ? [i, i + 1] : [i], forms: useForms, not: !!not, share: share, colour: whole ? null : colour, shown: words.length === 1 };
       if (not) { used.push(i + 1); }
     });
-    // never emptying: while nothing holds them all, the broadest goes first ("פטריה" before "פוקוס")
-    var keys = Object.keys(c.words).sort(function (a, b) { return c.words[b].share - c.words[a].share; });
+    // never emptying: while nothing holds them all, a colour goes first, then the broadest ("פטריה" before "פוקוס"). What
+    // the thing is stays: "חולצה כחולה" with no blue shirt shows shirts, never blue diapers (Take Me Home, 9.11)
+    var keys = Object.keys(c.words).sort(function (a, b) { return (c.words[b].colour ? 1 : 0) - (c.words[a].colour ? 1 : 0) || c.words[b].share - c.words[a].share; });
     while (keys.length && !filtered(turn).length) { delete c.words[keys.shift()]; }
     c.suggest = suggestFor(turn, all, words);
   }
