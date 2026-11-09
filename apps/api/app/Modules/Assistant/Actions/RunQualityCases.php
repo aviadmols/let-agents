@@ -73,7 +73,8 @@ final class RunQualityCases
                 'failure' => AnswerFailure::classify((string) ($out['result']['outcome'] ?? ''), $out['result']['reason'] ?? null, $verdict, (array) ($out['answered']['trace'] ?? [])),
                 'passed' => $problems === null ? null : $problems === [],
                 'problems' => $problems ?? [],
-                'answer' => mb_substr((string) ($out['result']['answer'] ?? ''), 0, 2000),
+                // a "not found" is read by its own line when the writer wrote one: what the shopper sees, not the fixed words
+                'answer' => mb_substr((string) (($out['result']['not_found'] ?? '') !== '' ? $out['result']['not_found'] : ($out['result']['answer'] ?? '')), 0, 2000),
                 'picks' => array_values(array_map(fn ($p): string => (string) (is_array($p) ? ($p['external_id'] ?? '') : $p), (array) ($out['result']['picks'] ?? []))),
                 'cost_usd' => (float) ($out['answered']['cost_usd'] ?? 0),
                 'duration_ms' => $out['answered']['duration_ms'] ?? null,
