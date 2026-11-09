@@ -277,6 +277,36 @@ final class SearchFlowTest extends TestCase
         $this->assertNotContains('805', $ids, 'only somewhat near, when the words found four: left out');
     }
 
+    public function test_when_the_words_found_two_what_meaning_or_pictures_add_is_near_them(): void
+    {
+        // Take Me Home, 9.11: "בקבוק" found its two bottles at .53, and bags and towels at .3 (their pictures .56) filled the
+        // drawer under them
+        $this->product('811', 'בקבוק שתייה לילדים');
+        $this->product('812', 'בקבוק נירוסטה');
+        $this->product('813', 'מימייה לטיולים');
+        $this->product('814', 'תיק רחצה מבד מגבת');
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->meaning = [
+            ['source' => 'product', 'source_id' => 'a', 'external_id' => '812', 'title' => 'בקבוק נירוסטה', 'similarity' => 0.53],
+            ['source' => 'product', 'source_id' => 'b', 'external_id' => '811', 'title' => 'בקבוק שתייה לילדים', 'similarity' => 0.52],
+            ['source' => 'product', 'source_id' => 'c', 'external_id' => '813', 'title' => 'מימייה לטיולים', 'similarity' => 0.46],
+            ['source' => 'product', 'source_id' => 'd', 'external_id' => '814', 'title' => 'תיק רחצה מבד מגבת', 'similarity' => 0.31],
+        ];
+        $this->pictures = [
+            ['product_id' => 'd', 'external_id' => '814', 'title' => 'תיק רחצה מבד מגבת', 'similarity' => 0.56],
+        ];
+
+        $ids = array_column($this->search('בקבוק')->json('groups.product'), 'external_id');
+
+        $this->assertContains('811', $ids);
+        $this->assertContains('812', $ids);
+        $this->assertContains('813', $ids, 'as near as the bottles by meaning: what the store calls a bottle otherwise stays');
+        $this->assertNotContains('814', $ids, 'far from the bottles, by meaning or by its picture');
+
+        Settings::set('search.meaning_near_words', 0, $this->shop->id);
+        $this->assertContains('814', array_column($this->search('בקבוק')->json('groups.product'), 'external_id'), 'off: as before');
+    }
+
     public function test_a_sentence_no_product_holds_whole_shows_what_says_most_of_it_first(): void
     {
         // Story: "חולצה לבנה עם כיס קטן בצד לגברים" is held whole by no product, so meaning and pictures found it, and put

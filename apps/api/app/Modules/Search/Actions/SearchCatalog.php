@@ -598,6 +598,14 @@ final class SearchCatalog
             // more than any other, and the pictures would only pad them ("השבט", "העדן" after the books about captivity).
             $pictures = $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)) ? $this->pictures($shopId, $query, $index['records']) : [];
             $this->trace?->step('pictures', ['ran' => $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)), 'words_found' => count($spelled)]);
+            // The words found some and say nothing of how it looks: a picture adds only what the meaning kept beside them.
+            // Every bag's picture is about as near to "בקבוק" as a bottle's (.56 and .62, Take Me Home 9.11).
+            if ($spelled !== [] && $pictures !== [] && ! HebrewSearch::visual($query)) {
+                $kept = array_flip([...$spelled, ...$near['products']]);
+                $before = $pictures;
+                $pictures = array_values(array_filter($pictures, fn (string $id): bool => isset($kept[$id])));
+                $this->trace?->dropped($before, $pictures, 'picture_far_from_words');
+            }
             // a question about a need ("איך מחברים קרשים לדק?") is not held to it: its guide and what the guide names answer it
             // ...unless the store itself answered a question holding the words ("לישון" in its own "מה טוב לישון?"): what
             // it answered about is its own, and the nearest by meaning are shown as for that question
@@ -2184,15 +2192,27 @@ final class SearchCatalog
         $usual = (float) Settings::get('search.semantic_min_similarity', $shopId);
         $strict = max($usual, (float) Settings::get('search.meaning_only_min_similarity', $shopId));
         $found = array_flip($spelled);
-        $floor = fn (string $id): float => count($found) >= self::SPELLED_ENOUGH && ! isset($found[$id]) ? $strict : $usual;
+        // the words as written, final letters at their ends ("לישון", never "לישונ"): a vector reads words, and a word
+        // without its final letter is no word (a shop's sleep product fell from .45 to .18)
+        $hits = $this->semantic->nearText($shopId, HebrewSearch::withFinals($query), ['product', 'content'], $limit);
+        // A few found by the words: what the meaning alone adds is near them, never merely near the store. "בקבוק" found
+        // its two bottles at .53, and toiletry bags and towels at .3 filled the drawer under them (Take Me Home, 9.11).
+        // A synonym the store writes ("סוללה" for "בטריה") is about as near as they are, and stays.
+        $share = (float) Settings::get('search.meaning_near_words', $shopId);
+        $wordsBest = 0.0;
+        foreach ($hits as $hit) {
+            if ($hit['source'] === 'product' && isset($found['p:'.$hit['external_id']])) {
+                $wordsBest = max($wordsBest, (float) $hit['similarity']);
+            }
+        }
+        $near = $share > 0 ? min($strict, $wordsBest * $share) : 0.0;
+        $floor = fn (string $id): float => isset($found[$id]) ? $usual : (count($found) >= self::SPELLED_ENOUGH ? $strict : max($usual, $near));
         // best: how near the nearest product is, whatever the floor
         $out = ['products' => [], 'content' => [], 'best' => 0.0];
         // the nearest that stayed under the floor, for the check screen: what a lower floor would have let in
         $below = [];
 
-        // the words as written, final letters at their ends ("לישון", never "לישונ"): a vector reads words, and a word
-        // without its final letter is no word (a shop's sleep product fell from .45 to .18)
-        foreach ($this->semantic->nearText($shopId, HebrewSearch::withFinals($query), ['product', 'content'], $limit) as $hit) {
+        foreach ($hits as $hit) {
             if ($hit['source'] !== 'product') {
                 $out['content'][] = ['external_id' => (string) $hit['external_id'], 'similarity' => (float) $hit['similarity']];
 
@@ -2210,7 +2230,7 @@ final class SearchCatalog
             }
         }
 
-        $this->trace?->step('meaning', ['best' => round($out['best'], 3), 'floor' => $usual, 'strict' => $strict, 'strict_used' => count($found) >= self::SPELLED_ENOUGH, 'below' => $below]);
+        $this->trace?->step('meaning', ['best' => round($out['best'], 3), 'floor' => $usual, 'strict' => $strict, 'strict_used' => count($found) >= self::SPELLED_ENOUGH, 'near_words' => round($near, 3), 'below' => $below]);
 
         return $out;
     }

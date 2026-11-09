@@ -62,6 +62,10 @@ return [
         'label' => 'When no product holds the words',
         'description' => 'When no product holds the search words ("science fiction" in a store with none), products by meaning are shown only if the nearest is at least this close. Otherwise the search says nothing was found and offers to ask the AI. A store whose names say little may set it lower.',
     ],
+    'meaning_near_words' => [
+        'label' => 'Products by meaning beside what the words found',
+        'description' => 'When the search words found products ("bottle": two bottles), a product found by meaning alone is shown only if it is at least this share as close as the products the words found. A synonym stays; bags and towels do not fill the results. 0: off.',
+    ],
     'check_questions_per_day' => [
         'label' => 'AI questions a day from the search check',
         'description' => 'How many questions to the AI the store\'s "Search check" screen may send a day. Each goes the whole way a shopper\'s question goes and costs as much; a search without the AI is not counted.',
