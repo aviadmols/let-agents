@@ -55,7 +55,7 @@ final class AskController
         // this page's assistant reads the product alone (Rocks, 9.11: "האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?"
         // was refused as not about the product). So is one this page's assistant could not answer.
         $site = fn (): array => app(AnswerSiteQuestion::class)->handle($connection->shop_id, $question, $visitorHash, $locale, [$id], [], true);
-        // only where the store has its site's assistant on: one that turned it off keeps this page's alone
+        // only where the store has its site's assistant on (assistant.on_search): one that turned it off keeps this page's alone
         $siteOn = $pageType === 'product' && Features::enabled('assistant.on_search', $connection->shop_id);
 
         if ($siteOn && AnswerSiteQuestion::asksOfTheStore($question)) {
