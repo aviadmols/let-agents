@@ -25,6 +25,12 @@ class AssistantSettings extends Page
 
     private const PLACES = ['on_products', 'on_content', 'on_search'];
 
+    /** The tones an answer can be written in, the default first (assistant.answer_tone). */
+    public const TONES = ['warm', 'friendly', 'professional', 'brief'];
+
+    /** The store's own words for its tone, at most (assistant.answer_tone_note). */
+    public const TONE_NOTE_CHARS = 400;
+
     public static string $sideGroup = 'shoppers';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
@@ -68,6 +74,8 @@ class AssistantSettings extends Page
             'per_visitor' => 'setting:assistant.questions_per_visitor_per_day',
             'per_shop' => 'setting:assistant.questions_per_shop_per_day',
             'no_answer' => 'setting:assistant.no_answer',
+            'tone' => 'setting:assistant.answer_tone',
+            'tone_note' => 'setting:assistant.answer_tone_note',
             'not_sure' => 'setting:search.not_sure',
         ];
     }
@@ -97,6 +105,13 @@ class AssistantSettings extends Page
         if (! in_array($this->data['no_answer'] ?? null, NoAnswer::ALL, true)) {
             $this->data['no_answer'] = NoAnswer::TEAM;
         }
+
+        if (! in_array($this->data['tone'] ?? null, self::TONES, true)) {
+            $this->data['tone'] = self::TONES[0];
+        }
+
+        // the store's own words for its tone: one paragraph, at most what the setting holds
+        $this->data['tone_note'] = mb_substr(trim((string) preg_replace('/\s+/u', ' ', (string) ($this->data['tone_note'] ?? ''))), 0, self::TONE_NOTE_CHARS);
 
         if (! in_array($this->data['not_sure'] ?? null, ['inside', 'outside'], true)) {
             $this->data['not_sure'] = 'inside';

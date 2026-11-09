@@ -91,6 +91,9 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     public const PROMPT_VERSION = 19;
 
+    /** The tone the prompt writes in when the store chose none (assistant.answer_tone). */
+    public const TONE_DEFAULT = 'warm';
+
     /** Names an answer recommends that are none of its products, at most, and products shown for them, at most. */
     private const MAX_NAMES = 3;
 
@@ -107,7 +110,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = [];
+    public const CANDIDATES = ['scope_site' => [10]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -408,6 +411,38 @@ final class AnswerSiteQuestion implements TriesQuestions
         return 'answered';
     }
 
+    /**
+     * The tone the store chose for its answers (assistant.answer_tone, and its own words for it in
+     * assistant.answer_tone_note), as the writer is given it; null for the default, warm and with no words of
+     * its own, which the prompt itself writes in: the input of most stores stays as it was.
+     *
+     * @return array{style: string, note?: string}|null
+     */
+    public static function tone(?string $shopId): ?array
+    {
+        if ($shopId === null || $shopId === '') {
+            return null;
+        }
+
+        $style = (string) Settings::get('assistant.answer_tone', $shopId);
+        // the store's own words: one paragraph, no link (a tone, never a place to send shoppers to)
+        $note = trim((string) preg_replace(['~https?://\S+|www\.\S+~iu', '/\s+/u'], ['', ' '], (string) Settings::get('assistant.answer_tone_note', $shopId)));
+
+        if (($style === '' || $style === self::TONE_DEFAULT) && $note === '') {
+            return null;
+        }
+
+        return ['style' => $style === '' ? self::TONE_DEFAULT : $style] + ($note === '' ? [] : ['note' => $note]);
+    }
+
+    /** The tone as one short key, kept with a saved answer: an answer kept in another tone is written again. */
+    public static function toneKey(?string $shopId): ?string
+    {
+        $tone = self::tone($shopId);
+
+        return $tone === null ? null : substr(hash('sha256', (string) json_encode($tone, JSON_UNESCAPED_UNICODE)), 0, 16);
+    }
+
     /** What the team wrote in the knowledge centre, as its hash; null when it wrote nothing. */
     private static function ownWord(): ?string
     {
@@ -419,6 +454,11 @@ final class AnswerSiteQuestion implements TriesQuestions
     {
         // what the team wrote changed: whatever the answer cited, it may now have the store's own word to say (Rocks, 2.11)
         if ((((array) $saved->flags)['own'] ?? null) !== self::ownWord()) {
+            return true;
+        }
+
+        // the store changed the tone its answers are written in: written again in the new one
+        if ((((array) $saved->flags)['tone'] ?? null) !== self::toneKey(app(TenantContext::class)->id())) {
             return true;
         }
 
@@ -502,7 +542,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             }
             $outcome = $saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : ($products === [] ? 'no_info' : 'no_match');
 
-            return $this->fixed($outcome, $locale, 'bank') + ['answer_id' => $saved->id]
+            // kept "not about the store" is only ever that (harm and instructions are never kept): the shopper is shown the team
+            return $this->fixed($outcome, $locale, 'bank') + ['answer_id' => $saved->id] + ($outcome === 'out_of_scope' ? ['reason' => 'not_about_store'] : [])
                 + ($saved->outcome === AssistantAnswer::NO_INFO && trim((string) $saved->answer) !== '' ? ['not_found' => (string) $saved->answer] : []);
         }
 
@@ -1130,7 +1171,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             'question' => $question,
         ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation])
             + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
-            + ($now === null ? [] : ['now' => $now]) + [
+            + ($now === null ? [] : ['now' => $now])
+            + (($tone = self::tone($shopId)) === null ? [] : ['tone' => $tone]) + [
                 'products' => $forModel,
                 'analysis' => $analysis,
                 'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
@@ -1589,7 +1631,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 // what it recommends by name that is none of its products ("שיטאקה"): only names the answer, as checked, still says
                 $names = $refusal === null ? self::names($reply->data['names'] ?? null, $answer) : [];
                 $flags = $names === [] ? $flags : (array) $flags + ['names' => $names];
-                $flags = (array) $flags + ['own' => self::ownWord()];
+                $flags = (array) $flags + ['own' => self::ownWord(), 'tone' => self::toneKey(app(TenantContext::class)->id())];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $unfit ??= false;
                 $notFound ??= null;

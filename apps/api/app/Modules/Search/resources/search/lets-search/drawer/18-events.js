@@ -1,4 +1,15 @@
   // ---------------------------------------------------------------- events
+  // The words found nothing and "חפשו לי באתר" is on screen for them (Aviad, 9.11): the arrow and Enter press it, as
+  // the card's own button does, instead of keeping a search that found nothing. Only the card for these very words.
+  function askCardFor(q) {
+    var want = String(q || '').trim().replace(/\s+/g, ' ');
+    if (!want) { return null; }
+    var cards = D.querySelectorAll('[data-askcard]');
+    for (var i = cards.length - 1; i >= 0; i--) {
+      if (String(cards[i].dataset.from || '').trim().replace(/\s+/g, ' ') === want && cards[i].offsetParent !== null) { return cards[i]; }
+    }
+    return null;
+  }
   INPUT.addEventListener('input', onType);
   INPUT.addEventListener('focus', function () { setTimeout(onType, 0); });
   INPUT.addEventListener('keydown', function (e) {
@@ -15,6 +26,8 @@
       if (o && o.dataset.notSure) { notSure(turnById(o.dataset.notSure)); return; }
       if (o && o.dataset.ask) { submit(INPUT.value, 'ask'); return; }
       if (o) { o.click(); return; }
+      var card = askCardFor(INPUT.value);
+      if (card) { card.click(); return; }
       submit(INPUT.value, undefined, false, true);
     } else if (e.key === 'Escape') {
       if (SUG.classList.contains('is-on') && INPUT.value) { e.preventDefault(); e.stopPropagation(); INPUT.value = ''; onType(); }
@@ -201,7 +214,7 @@
       return;
     }
     if (d.clear !== undefined) { e.preventDefault(); INPUT.value = ''; INPUT.focus(); onType(); return; }
-    if (d.submit !== undefined) { e.preventDefault(); submit(INPUT.value, undefined, false, true); return; }
+    if (d.submit !== undefined) { e.preventDefault(); var askC = askCardFor(INPUT.value); if (askC) { askC.click(); return; } submit(INPUT.value, undefined, false, true); return; }
     // one of the shopper's own recent searches, run again: still theirs, so it comes first
     if (d.recent) { e.preventDefault(); submit(d.recent, 'search', false, true); return; }
     if (d.photo !== undefined) { e.preventDefault(); photoPick(); return; }

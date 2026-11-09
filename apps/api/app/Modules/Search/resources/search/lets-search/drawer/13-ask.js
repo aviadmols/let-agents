@@ -33,7 +33,7 @@
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
         } else {
-          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: related(q, d.range), h: hours(), noAnswer: d.no_answer || null, notFound: d.not_found || null });
+          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: related(q, d.range), h: hours(), noAnswer: d.no_answer || null, notFound: notFoundOf(d) });
           announce(t('noInfo'));
         }
       }).catch(function () { clearTimeout(slow); update(turn, { loading: false, error: true }); });
@@ -91,7 +91,7 @@
           announce(t('quotedTitle'));
         } else {
           var rel = related(q, d.range);
-          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: rel, h: hours(), noAnswer: d.no_answer || null, notFound: d.not_found || null });
+          update(turn, { loading: false, noInfo: true, said: saidOf(d), rel: rel, h: hours(), noAnswer: d.no_answer || null, notFound: notFoundOf(d) });
           announce(t('noInfo'));
         }
       });

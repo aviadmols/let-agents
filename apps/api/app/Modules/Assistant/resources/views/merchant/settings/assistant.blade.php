@@ -38,6 +38,16 @@
         <x-lp::row :title="$t('no_answer')" :sub="$t('no_answer_sub')">
             <x-lp::chips model="data.no_answer" :options="__('assistant::shop_settings.no_answer_options')" :sm="true" :label="$t('no_answer')" />
         </x-lp::row>
+        <div class="lp-set-label">{{ $t('tone_label') }}</div>
+        <x-lp::row :title="$t('tone')" :sub="$t('tone_sub')">
+            <x-lp::chips model="data.tone" :options="__('assistant::shop_settings.tone_options')" :sm="true" :label="$t('tone')" />
+        </x-lp::row>
+        <div style="padding: 4px 0 12px">
+            <label class="lp-set-label" for="lp-tone-note" style="margin-top: 0">{{ $t('tone_note') }}</label>
+            <textarea id="lp-tone-note" class="lp-textarea" wire:model="data.tone_note" rows="3" maxlength="{{ $this::TONE_NOTE_CHARS }}" placeholder="{{ $t('tone_note_placeholder') }}" style="width: 100%"></textarea>
+            <p class="lp-note" style="margin: 4px 0 0">{{ $t('tone_note_sub') }}</p>
+            @if ($this->problem('tone_note'))<span class="lp-set-error" role="alert">{{ $this->problem('tone_note') }}</span>@endif
+        </div>
         <x-lp::row :title="$t('not_sure')" :sub="$t('not_sure_sub')">
             <x-lp::chips model="data.not_sure" :options="__('assistant::shop_settings.not_sure_options')" :sm="true" :label="$t('not_sure')" />
         </x-lp::row>

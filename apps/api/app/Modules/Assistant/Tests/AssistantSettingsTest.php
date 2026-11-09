@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Filament\Merchant\Pages\AssistantSettings;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\NoAnswer;
@@ -84,6 +85,33 @@ final class AssistantSettingsTest extends TestCase
         $this->assertFalse(Features::enabled('assistant.on_content', $this->shop->id));
         $this->assertTrue(Features::enabled('assistant.on_products', $this->shop->id));
         $this->assertNull(Settings::overrideFor('assistant.no_answer', Shop::factory()->create()->id), 'another shop keeps the default');
+    }
+
+    public function test_the_shop_chooses_its_answers_tone_in_its_own_words_and_the_writer_is_given_it(): void
+    {
+        // the default (warm, no words of its own) is the prompt's own: the writer's input stays as it was
+        $this->assertNull(AnswerSiteQuestion::tone($this->shop->id));
+        $this->assertNull(AnswerSiteQuestion::toneKey($this->shop->id));
+
+        Livewire::test(AssistantSettings::class)
+            ->assertSee('טון התשובות')
+            ->assertSee('חם ושירותי')
+            ->set('data.tone', 'friendly')
+            ->set('data.tone_note', "  חנות משפחתית,\n מדברים בגובה העיניים. https://example.com/tone  ")
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame('friendly', Settings::get('assistant.answer_tone', $this->shop->id));
+        // one paragraph; a link is never part of a tone
+        $this->assertSame(['style' => 'friendly', 'note' => 'חנות משפחתית, מדברים בגובה העיניים.'], AnswerSiteQuestion::tone($this->shop->id));
+        $key = AnswerSiteQuestion::toneKey($this->shop->id);
+        $this->assertNotNull($key);
+
+        // a tone that is not one of ours falls back to the default, and the key follows the words
+        Livewire::test(AssistantSettings::class)->set('data.tone', 'shouting')->set('data.tone_note', 'קצר יותר')->call('save');
+        $this->assertSame('warm', Settings::get('assistant.answer_tone', $this->shop->id));
+        $this->assertNotSame($key, AnswerSiteQuestion::toneKey($this->shop->id));
+        $this->assertNull(AnswerSiteQuestion::tone(Shop::factory()->create()->id), 'another shop keeps the default');
     }
 
     public function test_the_master_switch_turns_every_place_off_and_back_on(): void

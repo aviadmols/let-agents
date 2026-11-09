@@ -56,5 +56,15 @@
         ],
         "note": "The same reply after a question without a budget: no price holds, only the kind and the colour.",
         "expect": {"outcome": "answered", "picks_say_any": ["זהב צהוב", "צהוב"], "picks_title_any": ["טבעת"]}
+    },
+    {
+        "question": "אתם מחליפים סוללות לשעונים",
+        "note": "Rocks, 9.11: a service the store does not give was refused as not about the store (scope_site v9), with a fixed line and no way to the team. Asked of the store, it is the store's to answer: never out_of_scope.",
+        "expect": {"outcome": "no_info"}
+    },
+    {
+        "question": "האם ניתן להגיע לחנות ולקנות שם את הטבעות?",
+        "note": "Rocks, 9.11: another site assistant answered with the visit, the hours and an offer. answer_site v20: a yes to coming over comes with the address.",
+        "expect": {"outcome": "answered", "contains": ["שבזי"]}
     }
 ]

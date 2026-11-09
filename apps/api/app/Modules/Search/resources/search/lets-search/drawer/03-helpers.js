@@ -79,7 +79,11 @@
   // A question's request cut off on the way (a network blip, the server switching to a new version): asked once
   // more a moment later. The answer, if it was written meanwhile, is kept there and comes back at once.
   // what the server said when it is not "not found": the limit of the day, a question not the store's, unavailable
-  function saidOf(d) { return d && d.answer && d.outcome !== 'no_info' && d.outcome !== 'no_match' ? String(d.answer) : null; }
+  function saidOf(d) { return d && d.answer && d.outcome !== 'no_info' && d.outcome !== 'no_match' && !teamFor(d) ? String(d.answer) : null; }
+  // a question the topic check found not about the store ("אתם מחליפים סוללות?" before scope_site v10): its line, then
+  // the team, as a "not found" shows it; never for harm or instructions, which get the line alone
+  function teamFor(d) { return !!(d && d.outcome === 'out_of_scope' && d.reason === 'not_about_store'); }
+  function notFoundOf(d) { return d ? (d.not_found || (teamFor(d) && d.answer ? String(d.answer) : null)) : null; }
   function again(send) {
     return send().catch(function () { return new Promise(function (go) { setTimeout(go, 1500); }).then(send); });
   }

@@ -161,6 +161,20 @@ return [
         'label' => 'Provider of the small checking model',
         'description' => 'Checks the question is about the page and the answer rests on it. Best from another family than the answering model.',
     ],
+    'answer_tone' => [
+        'label' => 'Answer tone',
+        'description' => 'How the assistant words its answers on this site: warm and helpful (the default), light and friendly, plain and professional, or short. Changes the style only, never the facts.',
+        'options' => [
+            'warm' => 'Warm and helpful',
+            'friendly' => 'Light and friendly',
+            'professional' => 'Plain and professional',
+            'brief' => 'Short and to the point',
+        ],
+    ],
+    'answer_tone_note' => [
+        'label' => 'The tone in the store’s words',
+        'description' => 'The store’s own free text about its voice, up to 400 characters, no links. The assistant fits its wording to it, nothing more.',
+    ],
     'no_answer' => [
         'label' => 'When the site has no answer',
         'description' => 'What the shopper sees when nothing was found: the team on WhatsApp (in opening hours, leaving details outside them), leaving details only, or just "not found".',

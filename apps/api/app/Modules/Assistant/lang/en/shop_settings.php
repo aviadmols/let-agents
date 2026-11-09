@@ -33,6 +33,18 @@ return [
         'details' => 'Leave details',
         'none' => 'Just "not found"',
     ],
+    'tone_label' => 'How the assistant speaks',
+    'tone' => 'Answer tone',
+    'tone_sub' => 'An answer already saved is written again in the new tone the next time it is asked',
+    'tone_options' => [
+        'warm' => 'Warm and helpful',
+        'friendly' => 'Light and friendly',
+        'professional' => 'Plain and professional',
+        'brief' => 'Short and to the point',
+    ],
+    'tone_note' => 'Your own words about the tone (optional)',
+    'tone_note_placeholder' => 'For example: we are a family shop, we speak at eye level, no big words. We love telling the story behind each piece.',
+    'tone_note_sub' => 'Changes the style only. Facts, prices and policies always come from the site.',
     'not_sure' => '"Not sure what fits?" under the results',
     'not_sure_sub' => 'In the chat: our AI recommends among the results, with an outside AI to go on with below. Outside: straight to an outside AI',
     'not_sure_options' => [
