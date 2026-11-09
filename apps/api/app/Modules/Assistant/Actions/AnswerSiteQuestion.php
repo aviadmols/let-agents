@@ -88,8 +88,12 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 13: a reply in the conversation (its earlier questions and answers), the shopper spoken to in the plural, never as a
      * man or a woman, and an offer to advise ends in one question they can reply to (answer_site only).
      * 14: the names of what it recommends that are none of its products ("שיטאקה"), for the products that hold them (answer_site only).
+     * 20: the answer, then what the shopper needs next, then one offer; warm without emoji; lists; the address with a yes to
+     * coming over; the store's chosen tone (assistant.answer_tone); a service it does not give answered with what it does.
+     * Released with scope_site v10 after four runs on Rocks, 9.11: expected cases 9,9,9,8 of 9 (as-is 7,8), answered 72-75%
+     * as before, cost per answer +20% (longer answers).
      */
-    public const PROMPT_VERSION = 19;
+    public const PROMPT_VERSION = 20;
 
     /** The tone the prompt writes in when the store chose none (assistant.answer_tone). */
     public const TONE_DEFAULT = 'warm';
@@ -110,7 +114,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['scope_site' => [10]];
+    public const CANDIDATES = [];
 
     private const THREAD_QUESTION_CHARS = 300;
 
