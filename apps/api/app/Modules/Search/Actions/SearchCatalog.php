@@ -379,10 +379,12 @@ final class SearchCatalog
      * @param  list<string>|null  $only
      * @return array<string, mixed>
      */
-    private function ofLength(string $shopId, array $index, int $days, ?float $minPrice, ?float $maxPrice, array $actions, ?array $only, bool $count, ?int $perGroup, array $visit): array
+    private function ofLength(string $shopId, array $index, ?int $days, ?float $minPrice, ?float $maxPrice, array $actions, ?array $only, bool $count, ?int $perGroup, array $visit): array
     {
+        // no length: every product (a search of actions alone, "מבצעים"); a price only when one was asked
         $products = array_values(array_filter((array) $index['records'], fn (array $r): bool => ($r['t'] ?? null) === 'product'
-            && isset($r['dy']) && abs((int) $r['dy'] - $days) <= self::DAYS_EITHER_WAY && HebrewSearch::inRange($r['pr'] ?? null, $minPrice, $maxPrice)));
+            && ($days === null || (isset($r['dy']) && abs((int) $r['dy'] - $days) <= self::DAYS_EITHER_WAY))
+            && ($minPrice === null && $maxPrice === null || HebrewSearch::inRange($r['pr'] ?? null, $minPrice, $maxPrice))));
         $products = [...array_values(array_filter($products, fn (array $r): bool => ($r['s'] ?? 0) === 1)), ...array_values(array_filter($products, fn (array $r): bool => ($r['s'] ?? 0) !== 1))];
         $products = HebrewSearch::applyActions($products, $actions);
         $total = count($products);
@@ -462,6 +464,10 @@ final class SearchCatalog
                 if ($days !== null && trim($query) === '') {
                     return $this->ofLength($shopId, $index, $days, $minPrice, $maxPrice, $actions, $only, $count, $perGroup, $visit);
                 }
+            }
+            // "מבצעים", "הכי זול": nothing but what to do asked, every product as asked (Take Me Home, 9.11: "מבצעים" found none)
+            if ($index !== null && trim($query) === '' && $actions['ids'] !== []) {
+                return $this->ofLength($shopId, $index, null, $minPrice, $maxPrice, $actions, $only, $count, $perGroup, $visit);
             }
             // "אני רוצה לקנות מתנה לאשתי טבעת יהלום": a sentence no product holds is searched by what it asks for ("טבעת
             // יהלומ"), then read for filters like any search. Words a product holds together are searched as typed. The

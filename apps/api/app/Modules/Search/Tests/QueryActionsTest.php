@@ -107,6 +107,10 @@ final class QueryActionsTest extends TestCase
         $this->assertSame(['2'], $ids('טבעת יהלום מבצעים'));
         $this->assertSame(['2'], $ids('טבעת יהלום מבצע 50%'));
         $this->assertSame(['2'], $ids('טבעת יהלום sale'));
+        // nothing but the ask: every product as asked
+        $this->assertEqualsCanonicalizing(['2', '4'], $ids('מבצעים'));
+        $this->assertEqualsCanonicalizing(['2', '4'], $ids('מבצע 50%'));
+        $this->assertSame(['2', '4', '1', '3'], $ids('הכי זול'), 'by price, in stock first');
         $this->assertSame(['2'], $ids('טבעת יהלום גדולה מ-20'));
         $this->assertSame(['3'], $ids('טבעת יהלום קטנה מ-17'));
         $this->assertSame(['2', '1', '3'], $ids('טבעת יהלום גדולה'), 'the biggest first');
