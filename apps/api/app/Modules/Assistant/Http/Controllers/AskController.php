@@ -2,7 +2,9 @@
 
 namespace App\Modules\Assistant\Http\Controllers;
 
+use App\Core\Facades\Features;
 use App\Modules\Assistant\Actions\AnswerQuestion;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\NoAnswer;
 use App\Modules\Connections\Models\StoreConnection;
@@ -47,7 +49,27 @@ final class AskController
         }
 
         // The visitor only counts toward a daily limit, as a hash salted per shop, like analytics.
-        $result = $answer->handle($connection->shop_id, $pageType, $id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale);
+        $visitorHash = hash('sha256', $connection->shop_id.'|'.$visitor);
+        // On a product's page, a question of the store's (to reserve it, come and see it, return it, its shipping or
+        // payments) is the site's assistant's, about this product: it reads what the store knows and its conditions, where
+        // this page's assistant reads the product alone (Rocks, 9.11: "האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?"
+        // was refused as not about the product). So is one this page's assistant could not answer.
+        $site = fn (): array => app(AnswerSiteQuestion::class)->handle($connection->shop_id, $question, $visitorHash, $locale, [$id], [], true);
+        // only where the store has its site's assistant on: one that turned it off keeps this page's alone
+        $siteOn = $pageType === 'product' && Features::enabled('assistant.on_search', $connection->shop_id);
+
+        if ($siteOn && AnswerSiteQuestion::asksOfTheStore($question)) {
+            $result = $site();
+        } else {
+            $result = $answer->handle($connection->shop_id, $pageType, $id, $question, $visitorHash, $locale);
+
+            // the site's assistant's word only when it answers: else this page's own "not found" stands
+            if ($siteOn && (($result['outcome'] ?? null) === AssistantAnswer::NO_INFO
+                || (($result['outcome'] ?? null) === AssistantAnswer::OUT_OF_SCOPE && ($result['reason'] ?? null) === 'not_about_page'))) {
+                $fromSite = $site();
+                $result = ($fromSite['outcome'] ?? null) === AssistantAnswer::ANSWERED ? $fromSite : $result;
+            }
+        }
 
         // Not an answer: what the storefront offers instead, as the shop chose it (the team, leaving details, or nothing).
         if (isset($result['outcome']) && $result['outcome'] !== AssistantAnswer::ANSWERED) {

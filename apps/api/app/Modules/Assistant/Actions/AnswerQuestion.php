@@ -143,7 +143,9 @@ final class AnswerQuestion
             if ($saved !== null && ! $answered) {
                 $saved->forceFill(['last_asked_at' => now()])->save();
 
-                return $this->fixed($saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : 'no_info', $locale, 'bank');
+                // a kept "not about this page" is only ever that (harm and instructions are never kept)
+                return $this->fixed($saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? 'out_of_scope' : 'no_info', $locale, 'bank')
+                    + ($saved->outcome === AssistantAnswer::OUT_OF_SCOPE ? ['reason' => 'not_about_page'] : []);
             }
 
             if (! $this->withinDailyLimits($shopId, $visitorHash)) {
@@ -220,7 +222,8 @@ final class AnswerQuestion
 
                     if (($scope->data['about_product'] ?? null) !== true) {
                         $this->save($subject, $question, AssistantAnswer::OUT_OF_SCOPE, null, null, $checkModel, $replies, $run);
-                        $result = $this->fixed('out_of_scope', $locale, 'model');
+                        // not about this page, and not harm: the site's assistant may answer it about the store (AskController)
+                        $result = $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'not_about_page'];
                         $run->output(['outcome' => AssistantAnswer::OUT_OF_SCOPE])->summary('assistant::runs.out_of_scope');
 
                         return;

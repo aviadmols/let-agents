@@ -899,6 +899,21 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /**
+     * Whether a question asked on a product's page is the store's to answer rather than the product's: to reserve or
+     * hold it, come and see it, buy it in the store, return or exchange it, its shipping, pickup, payments or warranty
+     * ("האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?", "אפשר לשריין?", "is there free shipping?"). What the product
+     * is (its material, size, stones) stays the page's.
+     */
+    public static function asksOfTheStore(string $question): bool
+    {
+        if (self::asksAboutVisit($question) || self::asksIfOpen($question)) {
+            return true;
+        }
+
+        return preg_match('/(?<!\p{L})[וש]?(?:ל?שריי?ן|שריון|לשמור|שמירה|להחזיק|תשלום\s+חלקי|layaway|תשלומים|פריסה|לפרוס|ל?החזיר|החזרה|החזר|להחליף|החלפה|ל?בטל|ביטול|משלוח|משלוחים|שליח|אספקה|איסוף|לאסוף|אחריות|reserve|hold|layby|installments?|returns?|refund|exchange|shipping|delivery|pick\s*up|warranty)(?!\p{L})/iu', $question) === 1;
+    }
+
+    /**
      * Whether a question asks whether the store has or does something ("אתם מחליפים סוללות לשעונים?", "יש לכם תיקונים?",
      * "do you engrave?"): its answer may be no, and a no opens with what the store does.
      */

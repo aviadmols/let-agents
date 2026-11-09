@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
@@ -45,6 +46,8 @@ final class AnswerQuestionTest extends TestCase
             'shop_id' => $this->shop->id, 'site_url' => 'https://store.test', 'access_token' => self::TOKEN,
         ]));
         $this->product('31538', 'טיק ברומזי 19x120 מ"מ מחורץ', 'מתאים לשימוש חוץ ופנים. מומלץ להשתמש בברגים לעץ קשה.', []);
+        // this page's assistant alone: where the site's assistant is on, a store's question goes to it (the last tests here)
+        Features::override('assistant.on_search', false, $this->shop->id);
 
         $this->model = new class implements ChatModel
         {
@@ -259,6 +262,58 @@ final class AnswerQuestionTest extends TestCase
         $suggested = $this->getJson('/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/questions?id=900&type=content')->json('data.suggested');
         $this->assertContains('תסכם לי את המאמר בכמה מילים', $suggested);
         $this->assertNotContains('מה עוד צריך לקנות יחד איתו?', $suggested, 'a guide is not a product');
+    }
+
+    public function test_on_a_products_page_a_question_of_the_stores_goes_to_the_sites_assistant_about_this_product(): void
+    {
+        // Rocks, 9.11: "האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?" was refused as not about the product
+        Features::clearOverride('assistant.on_search', $this->shop->id);
+        $site = new class
+        {
+            /** @var list<array<string, mixed>> */
+            public array $asked = [];
+
+            public array $reply = ['outcome' => 'answered', 'answer' => 'כן, אפשר להגיע לחנות ולראות אותו.', 'from' => 'model', 'sources' => [], 'picks' => []];
+
+            public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false, array $thread = []): array
+            {
+                $this->asked[] = compact('question', 'products', 'fromPage');
+
+                return $this->reply;
+            }
+        };
+        $this->app->instance(AnswerSiteQuestion::class, $site);
+
+        // a store's question: straight to the site's assistant, about this page's product; this page's never asked
+        $this->assertSame('כן, אפשר להגיע לחנות ולראות אותו.', $this->ask('האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?')->json('data.answer'));
+        $this->assertSame([['question' => 'האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?', 'products' => ['31538'], 'fromPage' => true]], $site->asked);
+        $this->assertSame([], $this->model->calls);
+
+        // the product's own question: this page's; refused as not about it, the site's assistant is asked, and its answer stands
+        $this->model->replies = [['about_product' => false]];
+        $this->assertSame('answered', $this->ask('מה ההבדל בינו לבין הדק הרגיל?')->json('data.outcome'));
+        $this->assertCount(2, $site->asked);
+
+        // the site's assistant has no answer either: this page's own refusal stands
+        $site->reply = ['outcome' => 'no_info', 'answer' => 'לא מצאתי', 'from' => 'model'];
+        $this->model->replies = [['about_product' => false]];
+        $this->assertSame('out_of_scope', $this->ask('מה דעתך על הדק?')->json('data.outcome'));
+
+        // and a store that turned its site's assistant off keeps this page's alone
+        Features::override('assistant.on_search', false, $this->shop->id);
+        $this->model->replies = [['about_product' => false]];
+        $this->ask('אפשר לשריין אותו?');
+        $this->assertCount(3, $site->asked);
+    }
+
+    public function test_which_questions_on_a_products_page_are_the_stores(): void
+    {
+        foreach (['האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?', 'אפשר לשריין?', 'האם אפשר לשריין את המוצר הזה?', 'יש משלוח חינם?', 'אפשר להחזיר אם לא מתאים?', 'is there a warranty?'] as $q) {
+            $this->assertTrue(AnswerSiteQuestion::asksOfTheStore($q), $q);
+        }
+        foreach (['מאיזה חומר זה עשוי?', 'מה המידות?', 'איזו אבן יש בטבעת?', 'is it real gold?'] as $q) {
+            $this->assertFalse(AnswerSiteQuestion::asksOfTheStore($q), $q);
+        }
     }
 
     private function ask(string $question, string $type = 'product', string $id = '31538', string $vid = self::VID): TestResponse
