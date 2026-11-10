@@ -47,7 +47,7 @@ class Demos extends Page
 
     public function getSubheading(): ?string
     {
-        return __('demo::operator.subheading', ['days' => Settings::get('demo.keep_days'), 'per_day' => Settings::get('demo.per_day'), 'budget' => Settings::get('demo.budget_usd')]);
+        return __(((int) Settings::get('demo.keep_days')) > 0 ? 'demo::operator.subheading' : 'demo::operator.subheading_kept', ['days' => Settings::get('demo.keep_days'), 'per_day' => Settings::get('demo.per_day'), 'budget' => Settings::get('demo.budget_usd')]);
     }
 
     /**
@@ -86,10 +86,13 @@ class Demos extends Page
     public function extend(string $id): void
     {
         $site = DemoSite::query()->find($id);
-        if ($site === null || ! $site->live()) {
+        // a demo whose day passed but is not ended yet (the sweep runs every few minutes) is still the team's to keep
+        if ($site === null || ! in_array($site->status, [DemoSite::READY, DemoSite::SCANNING], true)) {
             return;
         }
-        $site->forceFill(['expires_at' => ($site->expires_at ?? now())->addDays((int) Settings::get('demo.keep_days'))])->save();
+        // from today when its day has passed; with no days set (the default), it stays until ended
+        $from = $site->expires_at !== null && $site->expires_at->isFuture() ? $site->expires_at : now();
+        $site->forceFill(['expires_at' => DemoSite::keptUntil($from)])->save();
         DemoSite::query()->where('shop_id', $site->shop_id)->whereKeyNot($site->id)->update(['expires_at' => $site->expires_at]);
         Notification::make()->title(__('demo::operator.extended'))->success()->send();
     }

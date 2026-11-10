@@ -3,7 +3,7 @@
 return [
     'max_products' => ['label' => 'Products in a demo', 'description' => 'At most this many products are read for each demo.'],
     'max_content' => ['label' => 'Pages and posts in a demo', 'description' => 'At most this many pages and posts are read for each demo (the terms and policies are always read).'],
-    'keep_days' => ['label' => 'Days a demo lasts', 'description' => 'After this, the demo is deleted with everything read from the site.'],
+    'keep_days' => ['label' => 'Days a demo lasts', 'description' => '0: a demo stays until it is ended or deleted. A number of days: after them, the demo is deleted with everything read from the site.'],
     'per_day' => ['label' => 'Demos a day', 'description' => 'How many demo requests are taken a day, all sites together.'],
     'per_email_per_day' => ['label' => 'Demos a day from one email', 'description' => 'How many demo requests are taken from one email in 24 hours.'],
     'budget_usd' => ['label' => 'Cost cap per demo', 'description' => 'The most spent on model calls for each demo, the scan and the questions together. Once reached, the demo keeps searching without the AI.'],

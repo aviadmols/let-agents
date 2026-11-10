@@ -3,6 +3,7 @@
 return [
     'title' => 'Demos',
     'subheading' => 'Everyone who asked to see Lets on their site. Each demo lasts :days days, then is deleted with all its data; up to :per_day requests a day, and a cap of $:budget a demo.',
+    'subheading_kept' => 'Everyone who asked to see Lets on their site. A demo stays until it is ended or deleted; up to :per_day requests a day, and a cap of $:budget a demo.',
     'page' => 'The demo page',
     'none' => 'No demos asked for yet.',
     'consent' => 'Agreed to updates',

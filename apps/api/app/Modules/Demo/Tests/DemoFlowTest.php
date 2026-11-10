@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -157,6 +158,35 @@ final class DemoFlowTest extends TestCase
         $this->assertSame(DemoSite::EXPIRED, $site->fresh()->status);
         $this->assertSame(0, Shop::query()->count(), 'the demo store and all it holds are gone');
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-ended', false);
+    }
+
+    /**
+     * A demo stays until the team ends or deletes it (demo.keep_days is 0 by default, 10.11): no end date, never swept,
+     * no "available until" on it or in its email. Days set again bring the end back, and "Extend" counts from today for
+     * a demo whose day passed before the sweep came.
+     */
+    public function test_a_demo_stays_until_it_is_ended_unless_days_are_set(): void
+    {
+        $this->assertNull(DemoSite::keptUntil());
+        $this->start();
+        $site = DemoSite::query()->sole();
+        $this->post('/demo/'.$site->token.'/verify', ['code' => Mail::sent(DemoMail::class)->first()->data['code']]);
+        $site->refresh()->forceFill(['status' => DemoSite::READY, 'expires_at' => DemoSite::keptUntil(), 'products' => 12])->save();
+
+        $this->travel(90)->days();
+        app(SweepDemos::class)->handle();
+        $this->assertSame(DemoSite::READY, $site->fresh()->status);
+        $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-bar', false)->assertDontSee('Available until');
+        $this->assertStringContainsString('come back to the demo whenever you like', (new DemoMail('ready', $site->fresh()))->locale('en')->render());
+
+        // days set again: an end date, and a demo past it is extended from today, not from its old date
+        Settings::set('demo.keep_days', 7);
+        $this->assertTrue(DemoSite::keptUntil()->isSameDay(now()->addDays(7)));
+        $site->forceFill(['expires_at' => now()->subHour()])->save();
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        Livewire::test(Demos::class)->call('extend', $site->id);
+        $this->assertTrue($site->fresh()->expires_at->isSameDay(now()->addDays(7)));
     }
 
     public function test_a_store_that_connects_for_real_takes_its_domain_from_its_demo(): void

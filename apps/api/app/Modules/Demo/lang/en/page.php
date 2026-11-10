@@ -30,6 +30,7 @@ return [
         'consent' => 'I\'d like updates and ideas from Lets for my site\'s search. Unsubscribe any time.',
         'go' => 'Build my demo',
         'privacy' => 'We read only what your site publishes to everyone. The demo and its data are deleted after :days days.',
+        'privacy_kept' => 'We read only what your site publishes to everyone. You can ask for the demo and its data to be deleted at any time.',
     ],
     'errors' => [
         'closed' => 'Demos are closed right now. Please try again later.',

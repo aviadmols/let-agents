@@ -13,6 +13,7 @@ return [
         'lead' => 'The search, photo search and AI answers already work on the products and pages of :site. Try searching as a shopper would.',
         'button' => 'Open the demo',
         'note' => 'The demo is available until :date, then deleted with everything read from the site.',
+        'note_kept' => 'The link stays yours: come back to the demo whenever you like.',
     ],
     'alert' => [
         'subject' => 'Lets demo: :site needs a look',

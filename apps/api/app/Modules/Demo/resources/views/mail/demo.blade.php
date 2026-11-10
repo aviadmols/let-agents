@@ -17,7 +17,7 @@
                 <p style="margin:0;font-size:13px;color:#5f5f67;line-height:1.6">{{ $t('note') }}</p>
             @else
                 <p style="margin:0 0 20px"><a href="{{ $link }}" style="display:inline-block;padding:13px 24px;border-radius:999px;background:#0b0b0c;color:#e2ff78;text-decoration:none;font-weight:600">{{ $t('button') }}</a></p>
-                <p style="margin:0;font-size:13px;color:#5f5f67;line-height:1.6">{{ $t('note', ['date' => $site->expires_at?->locale(app()->getLocale())->translatedFormat('j.n.Y') ?? '']) }}</p>
+                <p style="margin:0;font-size:13px;color:#5f5f67;line-height:1.6">{{ $site->expires_at === null ? $t('note_kept') : $t('note', ['date' => $site->expires_at->locale(app()->getLocale())->translatedFormat('j.n.Y')]) }}</p>
             @endif
         </div>
     </div>

@@ -2,7 +2,6 @@
 
 namespace App\Modules\Demo\Actions;
 
-use App\Core\Facades\Settings;
 use App\Modules\Demo\Mail\DemoMail;
 use App\Modules\Demo\Models\DemoSite;
 use App\Modules\Demo\Support\DemoProgress;
@@ -48,7 +47,7 @@ final class FinishDemo
             'pages' => $pages,
             'pictures' => (int) ($progress['facts']['pictures_read'] ?? 0),
             'ready_at' => now(),
-            'expires_at' => now()->addDays((int) Settings::get('demo.keep_days')),
+            'expires_at' => DemoSite::keptUntil(),
         ])->save();
 
         // everyone who asked for this store's demo meanwhile gets it too

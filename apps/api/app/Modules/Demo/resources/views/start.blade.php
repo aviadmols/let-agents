@@ -56,7 +56,7 @@
         <label class="check"><input type="checkbox" name="consent" value="1" @checked($old['consent'] ?? false)><span>{{ $t('start.consent') }}</span></label>
 
         <button class="btn btn--block" type="submit">{{ $t('start.go') }}</button>
-        <p class="note">{{ $t('start.privacy', ['days' => \App\Core\Facades\Settings::get('demo.keep_days')]) }}</p>
+        <p class="note">{{ ((int) \App\Core\Facades\Settings::get('demo.keep_days')) > 0 ? $t('start.privacy', ['days' => \App\Core\Facades\Settings::get('demo.keep_days')]) : $t('start.privacy_kept') }}</p>
     </form>
     <p class="foot">© Lets · <a href="https://lets.co.il{{ $locale === 'he' ? '/he/' : '/' }}">lets.co.il</a></p>
 @endsection

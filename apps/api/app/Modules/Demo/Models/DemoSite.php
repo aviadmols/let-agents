@@ -3,6 +3,7 @@
 namespace App\Modules\Demo\Models;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -94,6 +95,17 @@ class DemoSite extends Model
     public function shop(): BelongsTo
     {
         return $this->belongsTo(Shop::class);
+    }
+
+    /**
+     * Until when a demo made ready now (or extended from $from) stays: demo.keep_days after it, or never (null) while
+     * that is 0, the default since 10.11: a demo stays until the team ends or deletes it.
+     */
+    public static function keptUntil(?Carbon $from = null): ?Carbon
+    {
+        $days = (int) Settings::get('demo.keep_days');
+
+        return $days > 0 ? ($from ?? now())->copy()->addDays($days) : null;
     }
 
     public function live(): bool
