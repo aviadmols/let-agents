@@ -104,6 +104,75 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['4'], array_column($this->search('נעליים לבנות')['groups']['product'], 'external_id'), 'the plural names the kind "נעלי" opens');
     }
 
+    public function test_a_kind_holds_what_says_it_with_every_other_word_wherever_its_title_opens(): void
+    {
+        // Gueta, 10.11: "פוליש מכונה" found the polishing machine for hire and the polisher's discs, and left them out as
+        // no machine (their titles open with "השכרת" and "רשת"); "מכונת פוליש", so finding none, was loosened to "מכונת"
+        // and showed the pressure washers as if asked for
+        $this->catalog([
+            '1' => ['מכונת שטיפה Lavor 160 בר', 'ניקוי'],
+            '2' => ['מכונת שטיפה Krauss 215 בר', 'ניקוי'],
+            '3' => ['רשת ליטוש למכונת פוליש 16', 'אביזרים'],
+            '4' => ['השכרת מכונת פוליש מקצועית', 'השכרה'],
+            '5' => ['משחזת זווית 900W', 'כלים'],
+            '6' => ['מקדחה רוטטת 850W', 'כלים'],
+            '7' => ['מברגה נטענת 18V', 'כלים'],
+            '8' => ['דבק לעץ 1 ליטר', 'דבקים'],
+            '9' => ['פלס לייזר קרן ירוקה', 'מדידה'],
+            '10' => ['כפפות עבודה', 'בטיחות'],
+        ]);
+
+        foreach (['פוליש מכונה', 'מכונת פוליש', 'מכונות פוליש'] as $query) {
+            $result = $this->search($query);
+            $this->assertSame(['4', '3'], array_column($result['groups']['product'], 'external_id'), "\"{$query}\": the machine, then what is made for it; never a pressure washer");
+            $this->assertArrayNotHasKey('loosened', $result, "\"{$query}\": found as asked");
+        }
+        $washers = array_column($this->search('מכונת שטיפה')['groups']['product'], 'external_id');
+        sort($washers);
+        $this->assertSame(['1', '2'], $washers, 'a kind its titles open with is that kind, as before');
+    }
+
+    public function test_a_title_that_says_it_comes_without_the_kind_is_not_of_it(): void
+    {
+        // Rocks: "שרשרת כסף" would have shown a pendant "זהב וכסף, תליון ללא שרשרת" as the silver chain
+        $this->catalog([
+            '1' => ['שרשרת גורמט זהב 14K', 'זהב'],
+            '2' => ['שרשרת חבל זהב 14K', 'זהב'],
+            '3' => ['תליון לב זהב וכסף ללא שרשרת', 'תליונים'],
+            '4' => ['טבעת סוליטר זהב', 'טבעות'],
+            '5' => ['עגילי חישוק זהב', 'עגילים'],
+            '6' => ['צמיד טניס זהב', 'צמידים'],
+            '7' => ['צמיד חוליות זהב', 'צמידים'],
+            '8' => ['עגילים צמודים משובצים יהלומים', 'עגילים'],
+            '9' => ['טבעת יהלומים זהב', 'טבעות'],
+        ]);
+
+        $this->assertNotContains('3', array_column($this->search('שרשרת כסף')['groups']['product'], 'external_id'), 'a pendant without a chain is no chain');
+        // and a word is said as it is written: "צמודים" (studs) only looks like "צמיד" once its ו and י are dropped (Rocks)
+        $this->assertNotContains('8', array_column($this->search('צמיד יהלומים')['groups']['product'], 'external_id'), 'stud earrings are no bracelet');
+    }
+
+    public function test_the_colour_a_title_is_in_names_no_paint(): void
+    {
+        // Gueta: "צבע לעץ" would have shown wood brackets "זוית לעץ בצבע צהוב" as wood paint
+        $this->catalog([
+            '1' => ['צבע לעץ על בסיס מים', 'גימור'],
+            '2' => ['צבע אטום לעץ Durastain', 'גימור'],
+            '3' => ['זוית לעץ 40 מ"מ בצבע צהוב', 'פרזול'],
+            '4' => ['מקדחה רוטטת 850W', 'כלים'],
+            '5' => ['מברגה נטענת 18V', 'כלים'],
+            '6' => ['פלס לייזר קרן ירוקה', 'מדידה'],
+            '7' => ['כפפות עבודה', 'בטיחות'],
+            '8' => ['דבק מגע 1 ליטר', 'דבקים'],
+            '9' => ['מסור עגול 1400W', 'כלים'],
+            '10' => ['סולם אלומיניום 5 שלבים', 'סולמות'],
+        ]);
+
+        $found = array_column($this->search('צבע לעץ')['groups']['product'], 'external_id');
+        $this->assertContains('1', $found);
+        $this->assertNotContains('3', $found, 'a yellow bracket is no paint');
+    }
+
     public function test_a_kind_holds_what_the_store_files_under_it_whatever_its_title_opens_with(): void
     {
         // Story: "נעלים לבנים" kept only the titles opening with "נעלי", none white; the white sneakers the store tags

@@ -254,7 +254,9 @@
           score = Math.max(score, 0.9 - 0.02 * (candidate.length - length));
         } else if (length >= 3 && stem(candidate) === base) {
           score = Math.max(score, 0.85);
-        } else if (candidate.length > 3 && PREFIX_LETTER.test(candidate) && candidate.slice(1) === variant) {
+        // after a prefix letter, the word or a form of it, its letters as typed: "למכונת" is "מכונה"; "בסיס" is never "סוס",
+        // and a letter is taken off one side only: "באורך" is never "מאורכות" (the server's closeWords)
+        } else if (candidate.length > 3 && PREFIX_LETTER.test(candidate) && (candidate.slice(1) === variant || (position === 0 && length > 3 && core(candidate.slice(1)) === core(variant)))) {
           score = Math.max(score, 0.85);
         }
         // the letters of its sounds the same, its vowel letters typed otherwise: "ראישי" is "ריישי", "צגה" is "צאגה"; never a

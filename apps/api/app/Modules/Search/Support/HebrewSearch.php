@@ -1412,7 +1412,10 @@ final class HebrewSearch
                     $score = max($score, 0.9 - 0.02 * (mb_strlen($candidate) - $length));
                 } elseif ($length >= 3 && self::stem($candidate) === $base) {
                     $score = max($score, 0.85);
-                } elseif (mb_strlen($candidate) > 3 && preg_match('/^[והבלמשכ]/u', $candidate) && mb_substr($candidate, 1) === $variant) {
+                    // after a prefix letter, the word or a form of it, its letters as typed: "למכונת" is "מכונה" (Gueta, 10.11:
+                    // "פוליש מכונה" missed the discs "למכונת פוליש"); "בסיס" is never "סוס", and a letter is taken off one side
+                    // only: "באורך" is never "מאורכות" (Rocks)
+                } elseif (mb_strlen($candidate) > 3 && preg_match('/^[והבלמשכ]/u', $candidate) && (mb_substr($candidate, 1) === $variant || ($position === 0 && $length > 3 && self::core(mb_substr($candidate, 1)) === self::core($variant)))) {
                     $score = max($score, 0.85);
                 }
                 // the letters of its sounds the same, its vowel letters typed otherwise: "ראישי" is "ריישי", "צגה" is "צאגה"; never

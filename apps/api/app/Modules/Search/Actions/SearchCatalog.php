@@ -289,8 +289,22 @@ final class SearchCatalog
         $facets = (array) ($index['facets'] ?? []);
         $whomSaid = array_map(fn (array $n): string => HebrewSearch::normalize((string) $n['said']), array_filter(HebrewSearch::facets($raw, $facets, $index),
             fn (array $n): bool => in_array((string) ($facets[intdiv((int) $n['code'], 1000)]['k'] ?? ''), self::WHOM_FACETS, true)));
+        // the nouns of the store's own kinds of product (its type filter's names, each by its first word: "פוליש", "מכונת שטיפה",
+        // never the "עץ" of "דבק לעץ"): what it is, wherever typed. "מכונת פוליש" left without "פוליש" is every machine
+        // (Gueta, 10.11: the pressure washers, as if asked for)
+        $kindWords = [];
+        foreach ($facets as $facet) {
+            if (($facet['k'] ?? null) === 'type') {
+                foreach ((array) ($facet['v'] ?? []) as $value) {
+                    $noun = explode(' ', HebrewSearch::normalize((string) ($value['l'] ?? '')), 2)[0];
+                    if (mb_strlen($noun) >= 3 && preg_match('/^\p{L}+$/u', $noun) === 1) {
+                        $kindWords[self::wordForm($noun)] = true;
+                    }
+                }
+            }
+        }
 
-        // the words that say how it is: not the first (what it is), not whom it is for, not one that only joins
+        // the words that say how it is: not the first (what it is), not a kind of product, not whom it is for, not one that only joins
         $first = null;
         $describing = [];
         foreach ($words as $at => $word) {
@@ -304,6 +318,9 @@ final class SearchCatalog
                 continue;
             }
             if (array_filter($whomSaid, fn (string $s): bool => $s !== '' && str_contains($plain, $s)) !== []) {
+                continue;
+            }
+            if (isset($kindWords[self::wordForm($plain)])) {
                 continue;
             }
             $describing[] = ['at' => $at, 'word' => $word, 'colour' => Colours::mentions($word) !== []];
@@ -805,7 +822,9 @@ final class SearchCatalog
             }
             if ($kinds !== []) {
                 $before = array_column($groups['product'], 'id');
-                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => self::ofKinds($r, $kinds)));
+                // ...or whose own title says the kind with every other word typed ("השכרת מכונת פוליש" for "מכונת פוליש"),
+                // after those of the kind, and what is only made for it ("רשת ליטוש למכונת פוליש") last
+                $groups['product'] = self::kindsFirst(array_values(array_filter($groups['product'], fn (array $r): bool => self::ofKinds($r, $kinds, $worded))), $kinds);
                 $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'kind');
             }
             $before = array_column($groups['product'], 'id');
@@ -822,7 +841,7 @@ final class SearchCatalog
 
             // The one product first, wherever the merge put it, and also when only its code found it; not one of another
             // kind than the search names (a keychain holding "תיק" and white is no white bag).
-            if ($single !== null && $kinds !== [] && ! self::ofKinds($index['records'][$single['id']] ?? [], $kinds)) {
+            if ($single !== null && $kinds !== [] && ! self::ofKinds($index['records'][$single['id']] ?? [], $kinds, $worded)) {
                 $single = null;
             }
             if ($single !== null) {
@@ -1029,9 +1048,96 @@ final class SearchCatalog
      * @param  array<string, mixed>  $record
      * @param  array<string, int>  $kinds
      */
-    private static function ofKinds(array $record, array $kinds): bool
+    private static function ofKinds(array $record, array $kinds, string $asked = ''): bool
     {
-        return isset($kinds[self::headOf((string) ($record['title'] ?? ''))]) || array_intersect_key($kinds, array_flip((array) ($record['kd'] ?? []))) !== [];
+        return isset($kinds[self::headOf((string) ($record['title'] ?? ''))]) || array_intersect_key($kinds, array_flip((array) ($record['kd'] ?? []))) !== []
+            || ($asked !== '' && self::titleSaysAll($record, $asked));
+    }
+
+    /**
+     * Whether a product's own title says every word searched, each as any of its forms, with or without a letter before it
+     * ("למכונת" says "מכונה"), wherever in the title. A kind word of the search then names this product though its title
+     * opens with another ("השכרת מכונת פוליש", "רשת ליטוש למכונת פוליש"): Gueta, 10.11, "פוליש מכונה" left both out as no
+     * machine, and "מכונת פוליש", finding none, was loosened to "מכונת" and showed the pressure washers.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function titleSaysAll(array $record, string $asked): bool
+    {
+        // what it says it is without is not said: "תליון ללא שרשרת" is no chain (Rocks, "שרשרת כסף"); nor is the "בצבע" before
+        // its colour: "בריח בצבע שחור" is no black paint (Gueta, "צבע שחור")
+        $title = (string) preg_replace('/(?:^| )(?:ללא|בלי|לא כולל|without|no)(?: [^ ]+)/u', ' ', HebrewSearch::normalize((string) ($record['title'] ?? '')));
+        $said = self::wordForms((string) preg_replace('/(?:^| )ו?ב(?:צבע|גוונ)(?= |$)/u', ' ', $title));
+        $words = array_values(array_filter(explode(' ', HebrewSearch::normalize($asked)), fn (string $w): bool => mb_strlen($w) >= 2 && ! HebrewSearch::isFiller($w)));
+
+        // each word as typed, a letter before it taken off the title's side only ("באורך" is no "מאורכות")
+        return $words !== [] && array_all($words, fn (string $w): bool => isset($said[self::wordForm($w)]));
+    }
+
+    /**
+     * The words of a text as the forms they may be met as (wordForm), a Hebrew word's also without the letter before it
+     * ("למכונת": "מכונת").
+     *
+     * @return array<string, true>
+     */
+    private static function wordForms(string $text): array
+    {
+        $forms = [];
+        foreach (explode(' ', HebrewSearch::normalize($text)) as $w) {
+            if ($w === '') {
+                continue;
+            }
+            $forms[self::wordForm($w)] = true;
+            if (mb_strlen($w) > 3 && preg_match('/^[והבלמשכ][א-ת]+$/u', $w) === 1) {
+                $forms[self::wordForm(mb_substr($w, 1))] = true;
+            }
+        }
+
+        return $forms;
+    }
+
+    /**
+     * A word without its endings, its letters otherwise as written: "מכונה", "מכונת" and "מכונות" are "מכונ", "נעליים" and
+     * "נעלי" "נעל"; never "צמיד" for "צמודים" (a stem drops the ו and י that tell them apart). An English word without its
+     * plural ending.
+     */
+    private static function wordForm(string $word): string
+    {
+        if (preg_match('/^[א-ת]+$/u', $word) !== 1) {
+            return self::singular($word);
+        }
+        foreach ([1, 2] as $pass) {
+            $word = mb_strlen($word) > 3 ? (string) preg_replace('/(?:ימ|ות|ה|ת|י)$/u', '', $word) : $word;
+        }
+
+        return $word;
+    }
+
+    /**
+     * Products kept to a kind, those of it first (their title opens with it, or the store files them under it), then those
+     * whose title only says it with the rest of the search, and what is only made for it ("רשת ליטוש למכונת פוליש", the kind
+     * after a "ל") last; otherwise in the order they came.
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @param  array<string, int>  $kinds
+     * @return list<array<string, mixed>>
+     */
+    private static function kindsFirst(array $records, array $kinds): array
+    {
+        $tier = function (array $r) use ($kinds): int {
+            if (self::ofKinds($r, $kinds)) {
+                return 0;
+            }
+            $title = array_values(array_filter(explode(' ', HebrewSearch::normalize((string) ($r['title'] ?? ''))), fn (string $w): bool => preg_match('/^[א-ת]{2,}$/u', $w) === 1));
+            $plain = array_filter($title, fn (string $w): bool => array_intersect_key(array_flip(self::headsOf($w)), $kinds) !== []);
+
+            return $plain === [] ? 2 : 1;
+        };
+        $tiers = array_map($tier, $records);
+        $order = array_keys($records);
+        usort($order, fn (int $a, int $b): int => [$tiers[$a], $a] <=> [$tiers[$b], $b]);
+
+        return array_map(fn (int $at): array => $records[$at], $order);
     }
 
     /**
