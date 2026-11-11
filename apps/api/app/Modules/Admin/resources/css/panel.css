@@ -251,6 +251,32 @@ html.dark {
     font-weight: 600;
 }
 
+/* The number sits in the middle of its circle, always: Filament pins the label to the text's baseline and pads the badge
+   top and bottom, which in a pill of fixed height pushes the number down. Centred on both axes, no vertical padding. */
+.fi-sidebar-item-badge-ctn {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+}
+
+.fi-sidebar-item-badge-ctn .fi-badge,
+.fi-sidebar-item .fi-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-block: 0;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.fi-sidebar-item .fi-badge .fi-badge-label-ctn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    line-height: 1;
+}
+
 .fi-sidebar-item-badge-ctn .fi-badge {
     min-width: 20px;
     justify-content: center;
