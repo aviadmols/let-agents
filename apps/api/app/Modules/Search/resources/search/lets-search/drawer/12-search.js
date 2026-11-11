@@ -281,14 +281,18 @@
   function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '" data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">' + count + '</span>' : '') + '</button>'; }
   function sortLabel(s) { return s === 'asc' ? t('sortAsc') : s === 'desc' ? t('sortDesc') : s === 'new' ? t('sortNew') : t('sortRel'); }
 
-  function card(r) {
+  // first: the product the search showed in this card, kept while a colour dot turns the card to another (its dots
+  // stay in their order)
+  function card(r, first) {
     var id = pid(r.id), saved = S.saved.indexOf(id) >= 0;
     var badge = r.s === 0 ? t('outBadge') : r.sl === 1 ? t('onSaleBadge') : '';
-    return '<article class="ls-card' + (r.s === 0 ? ' is-out' : '') + '" data-card="' + esc(id) + '">' +
+    // .map(card) hands it the index: only a product is a first
+    first = first && typeof first === 'object' ? first : r;
+    return '<article class="ls-card' + (r.s === 0 ? ' is-out' : '') + '" data-card="' + esc(id) + '"' + (first !== r ? ' data-first="' + esc(pid(first.id)) + '"' : '') + '>' +
       // the picture opens the product, as its name does
       '<div class="ls-card__media"><a class="ls-card__link" href="' + esc(r.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || '') + '" alt="">' + pic2(r) + '</a>' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
       '<span class="ls-card__heart">' + heartBtn(id, saved, true) + '</span></div>' +
-      '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' + colourDots(r) +
+      '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' + colourDots(r, first) +
       '<div class="ls-card__row">' + priceHtml(r) + (r.ns === 1 ? '' : '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button>') + '</div>' +
       buyBtn(r, 'ls-btn--sm ls-btn--block') + '<div data-after="' + esc(id) + '"></div></article>';
   }
@@ -311,11 +315,13 @@
     return '<' + (attrs ? 'button' : 'span') + ' class="ls-dot' + (sw === 'clear' ? ' ls-dot--clear' : '') + '"' + (sw === 'clear' ? '' : ' style="--sw:' + esc(sw) + '"') +
       ' title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></' + (attrs ? 'button' : 'span') + '>';
   }
-  function colourDots(r) {
+  function colourDots(r, first) {
     var out = [], seen = {}, fam = familyOf(r);
     if (fam && fam.length > 1) {
-      // its own colour first, then the others in stock, then those sold out
-      [r].concat(fam.filter(function (x) { return x !== r && x.s !== 0; }), fam.filter(function (x) { return x !== r && x.s === 0; })).forEach(function (x) {
+      // the colour the search showed first, then the others in stock, then those sold out; a dot pressed turns the
+      // card and is marked where it is, never moved to the front (as Aviad asked, 11.11)
+      var lead = first && familyOf(first) === fam ? first : r;
+      [lead].concat(fam.filter(function (x) { return x !== lead && x.s !== 0; }), fam.filter(function (x) { return x !== lead && x.s === 0; })).forEach(function (x) {
         var c = x.mc && x.mc[0];
         if (c && MC_HEX[c] && !seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], withFinals(c), ' data-sib="' + esc(pid(x.id)) + '" aria-pressed="' + (x === r) + '"')); }
       });
