@@ -36,6 +36,7 @@ use App\Modules\Assistant\Support\QuestionGuard;
 use App\Modules\Assistant\Support\QuestionLinks;
 use App\Modules\Assistant\Support\RelatedGroups;
 use App\Modules\Assistant\Support\RepeatedText;
+use App\Modules\Assistant\Support\StoreCodes;
 use App\Modules\Assistant\Support\StoreSpelling;
 use App\Modules\Assistant\Support\StoreVoice;
 use App\Modules\Catalog\Models\CatalogCategory;
@@ -599,6 +600,15 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         if ($saved !== null && $this->stale($saved, $shopId)) {
             $saved->delete();
+            $saved = null;
+        }
+
+        // "not about the store" kept for a question that names a code the store writes ("GH", "VS"): never so (StoreCodes),
+        // asked again
+        if ($saved !== null && $saved->outcome === AssistantAnswer::OUT_OF_SCOPE && StoreCodes::in($shopId, $question) !== []) {
+            if (! $this->trial) {
+                $saved->delete();
+            }
             $saved = null;
         }
 
@@ -1736,7 +1746,8 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                     $replies[] = [$scope, 'scope'];
                     $scoped = [
-                        'about_store' => ($scope->data['about_store'] ?? null) === true,
+                        // a code the store writes on its products or pages ("GH", "VS", "14K") makes it the store's, by code (StoreCodes)
+                        'about_store' => ($scope->data['about_store'] ?? null) === true || StoreCodes::in($shopId, $question) !== [],
                         'harmful' => ($scope->data['harmful'] ?? false) === true,
                         'injection' => ($scope->data['injection'] ?? false) === true,
                     ];
