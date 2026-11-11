@@ -1937,11 +1937,14 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $answer = StoreVoice::plural(self::endsWhole($answer));
                 $notFound = isset($notFound) ? StoreVoice::plural($notFound) : null;
                 $picks = array_map(fn (array $pick): array => ['why' => StoreVoice::plural((string) ($pick['why'] ?? ''))] + $pick, $picks);
-                $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited)) : [];
+                $quotes = [];
+                $sources = $refusal === null ? $this->sources(array_map(fn (string $ref): array => $byRef[$ref], $cited), $quotes) : [];
                 // what it recommends by name that is none of its products ("שיטאקה"): only names the answer, as checked, still says
                 $names = $refusal === null ? self::names($reply->data['names'] ?? null, $answer) : [];
                 $flags = $names === [] ? $flags : (array) $flags + ['names' => $names];
                 $flags = (array) $flags + ['own' => self::ownWord(), 'tone' => self::toneKey(app(TenantContext::class)->id())];
+                // the words of the pages it was written from, as they were: the team sees where each detail came from
+                $flags = $quotes === [] ? $flags : (array) $flags + ['quotes' => $quotes];
                 $stored = array_map(fn (array $pick): array => ['external_id' => $pick['external_id'], 'title' => $pick['title'], 'why' => $pick['why']], $picks);
                 $unfit ??= false;
                 $notFound ??= null;
@@ -3402,10 +3405,18 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $out;
     }
 
-    private function sources(array $cited): array
+    private function sources(array $cited, ?array &$quotes = null): array
     {
         $out = [];
         $seen = [];
+        $quotes = [];
+        // the words of each page the answer was written from, every passage of it it cited, for the team's "why"
+        $said = [];
+        foreach ($cited as $passage) {
+            if ($passage['source'] !== 'store') {
+                $said[$passage['source'].'|'.$passage['source_id']][] = trim((string) ($passage['text'] ?? ''));
+            }
+        }
 
         foreach ($cited as $passage) {
             // what code wrote of the store (what it sells) is no page of it
@@ -3431,6 +3442,10 @@ final class AnswerSiteQuestion implements TriesQuestions
             // what the store says about itself (shipping, returns, its policies): the drawer shows no products beside such an answer
             $out[] = ['title' => $title, 'url' => $page?->url, 'type' => $passage['source'] === 'product' ? 'product' : 'content']
                 + (($passage['kind'] ?? null) === 'knowledge' || $policy !== null ? ['store' => true] : []);
+            $text = self::quoteOf(implode("\n", array_unique(array_filter($said[$key] ?? []))));
+            if ($text !== '') {
+                $quotes[] = ['title' => $title, 'url' => $page?->url, 'text' => $text];
+            }
 
             if (count($out) >= self::MAX_SOURCES) {
                 break;
@@ -3438,6 +3453,24 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $out;
+    }
+
+    /** How much of a page's words an answer was written from is kept with it, at most, for the team's "why". */
+    public const KEPT_QUOTE_CHARS = 700;
+
+    /** A page's words as kept with an answer: whole sentences, up to KEPT_QUOTE_CHARS. */
+    public static function quoteOf(string $text): string
+    {
+        $text = trim((string) preg_replace('/[ \t]+/u', ' ', $text));
+
+        if (mb_strlen($text) <= self::KEPT_QUOTE_CHARS) {
+            return $text;
+        }
+
+        $cut = mb_substr($text, 0, self::KEPT_QUOTE_CHARS);
+        $end = max((int) mb_strrpos($cut, '. '), (int) mb_strrpos($cut, "\n"));
+
+        return rtrim($end > self::KEPT_QUOTE_CHARS / 2 ? mb_substr($cut, 0, $end + 1) : $cut).'…';
     }
 
     /** @param array{provider: AiProviderName, name: string, model: string} $role */

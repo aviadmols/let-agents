@@ -15,6 +15,7 @@ use App\Modules\Assistant\Actions\CheckAnswerChange;
 use App\Modules\Assistant\Filament\Merchant\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswerRule;
 use App\Modules\Assistant\Support\AnswerRules;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
@@ -201,6 +202,8 @@ final class AnswerChangesTest extends TestCase
             ->assertSee('החזרות והחלפות')
             ->assertSeeHtml('href="https://store.test/returns"')
             ->assertSeeHtml('data-why-source="page"')
+            ->assertSeeHtml('data-why-quote="kept"')
+            ->assertSee('אפשר להחזיר מוצר תוך 14 יום מקבלתו, באריזה המקורית.')
             ->assertSee('עוד אין חוקים')
             ->assertSee('ויתחילו לפעול בתשובות לגולשים בקרוב')
             ->call('startRule')
@@ -219,6 +222,28 @@ final class AnswerChangesTest extends TestCase
 
         $page->call('removeRule', $rule->id);
         $this->assertSame([], AnswerRules::texts($this->shop->id));
+    }
+
+    public function test_an_answer_kept_before_its_words_were_shows_the_nearest_lines_of_its_page_now(): void
+    {
+        $this->asked();
+        $this->inShop(function (): void {
+            $saved = AnswerSiteQuestion::siteAnswers()->sole();
+            $saved->forceFill(['flags' => array_diff_key((array) $saved->flags, ['quotes' => true])])->save();
+            CatalogContent::query()->where('external_id', '700')->update(['body' => "משלוחים לכל הארץ תוך 3 ימי עסקים.\nאפשר להחזיר מוצר תוך 14 יום מקבלתו, באריזה המקורית.\nהחנות פתוחה בימים א-ה."]);
+        });
+        $merchant = User::factory()->create();
+        $merchant->attachShop($this->shop, ShopRole::Owner);
+        $this->actingAs($merchant);
+        app()->setLocale('he');
+        Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
+        Filament::setTenant($this->shop);
+
+        Livewire::withQueryParams(['find' => 'להחזיר', 'explain' => '1'])->test(ShopQuestions::class)
+            ->assertSeeHtml('data-why-quote="now"')
+            ->assertSee('מה שכתוב שם היום, הכי קרוב לתשובה')
+            ->assertSee('אפשר להחזיר מוצר תוך 14 יום מקבלתו')
+            ->assertDontSee('משלוחים לכל הארץ תוך 3 ימי עסקים');
     }
 
     /** The question asked once by a shopper and answered from the policy page. */

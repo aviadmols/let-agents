@@ -17,6 +17,7 @@ use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerRules;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogCategory;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Notifications\Notification;
@@ -614,6 +615,9 @@ final class ShopQuestions extends OperatorShopQuestions
                 $sources = array_values(array_filter((array) ($saved?->sources ?? []), 'is_array'));
                 $out['sources'] = array_slice(array_map(fn (array $s): array => ['title' => trim((string) ($s['title'] ?? '')), 'url' => isset($s['url']) && is_string($s['url']) && $s['url'] !== '' ? $s['url'] : null], $sources), 0, 6);
                 $out['sources'] = array_values(array_filter($out['sources'], fn (array $s): bool => $s['title'] !== ''));
+                $answerText = trim((string) ($saved?->answer ?? ($ask === null ? '' : ($ask->getAttributes()['answer'] ?? ''))));
+                $kept = array_values(array_filter((array) (((array) ($saved?->flags ?? []))['quotes'] ?? []), 'is_array'));
+                $out['sources'] = array_map(fn (array $s): array => $s + self::quoteFor($s, $kept, $answerText), $out['sources']);
                 $answered = ($ask?->outcome ?? $saved?->outcome) === AssistantAnswer::ANSWERED;
                 $out['from'] = ! $answered ? 'none' : ($out['sources'] !== [] ? 'pages' : ($saved !== null && $saved->product_id !== null ? 'product' : 'store'));
             }
@@ -630,6 +634,69 @@ final class ShopQuestions extends OperatorShopQuestions
 
             return $out;
         });
+    }
+
+    /**
+     * What a source says that the answer came from: the words the answer was written from, as kept with it ("kept"); for
+     * an answer kept before those were, the lines of that page as it reads now that share the most with the answer
+     * ("now"), its numbers counted twice (a sum, an hour, a share are the details a shopper checks). Code only.
+     *
+     * @param  array{title: string, url: string|null}  $source
+     * @param  list<array<string, mixed>>  $kept
+     * @return array{quote: string, quote_kind: string}|array{}
+     */
+    private static function quoteFor(array $source, array $kept, string $answer): array
+    {
+        foreach ($kept as $quote) {
+            if ((string) ($quote['title'] ?? '') === $source['title'] || ($source['url'] !== null && (string) ($quote['url'] ?? '') === $source['url'])) {
+                $text = trim((string) ($quote['text'] ?? ''));
+
+                return $text === '' ? [] : ['quote' => $text, 'quote_kind' => 'kept'];
+            }
+        }
+
+        if ($answer === '') {
+            return [];
+        }
+
+        $page = CatalogContent::query()->active()
+            ->where(fn ($q) => $source['url'] !== null ? $q->where('url', $source['url']) : $q->where('title', $source['title']))
+            ->first(['body', 'excerpt']);
+        $text = trim((string) ($page?->body ?: $page?->excerpt ?? ''));
+
+        if ($text === '') {
+            return [];
+        }
+
+        $words = array_values(array_unique(array_filter(preg_split('/[^\p{L}\p{N}%.:]+/u', mb_strtolower($answer)) ?: [], fn (string $w): bool => mb_strlen(trim($w, '.:')) >= 3 || preg_match('/\d/', $w) === 1)));
+        $lines = preg_split('/(?<=[.!?])\s+|\n+/u', $text) ?: [];
+        $scored = [];
+
+        foreach ($lines as $i => $line) {
+            $line = trim($line);
+            $low = mb_strtolower($line);
+            $score = 0;
+            foreach ($words as $word) {
+                $word = trim($word, '.:');
+                if ($word !== '' && str_contains($low, $word)) {
+                    $score += preg_match('/\d/', $word) === 1 ? 2 : 1;
+                }
+            }
+            if ($line !== '' && $score >= 2) {
+                $scored[$i] = $score;
+            }
+        }
+
+        if ($scored === []) {
+            return [];
+        }
+
+        // the three lines that share the most, in the order the page has them
+        arsort($scored);
+        $best = array_slice(array_keys($scored), 0, 3);
+        sort($best);
+
+        return ['quote' => AnswerSiteQuestion::quoteOf(implode(' ', array_map(fn (int $i): string => trim($lines[$i]), $best))), 'quote_kind' => 'now'];
     }
 
     /** When it was asked, to the minute, as the shop reads the time: "28.10.2026 11:39". */

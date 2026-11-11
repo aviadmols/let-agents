@@ -431,6 +431,8 @@ Answer: :answer',
                 'store' => 'From your store pages and the knowledge centre.',
                 'none' => 'Nothing on the site answers this question, so no answer was written. You can write one yourself, or add the information to your store information.',
             ],
+            'quote_kept' => 'What it says, that the answer was written from:',
+            'quote_now' => 'What it says today, closest to the answer:',
             'checked_title' => 'How it was checked',
             'checked' => [
                 'kept' => 'After it was written, every sentence was checked against your site and found there.',
