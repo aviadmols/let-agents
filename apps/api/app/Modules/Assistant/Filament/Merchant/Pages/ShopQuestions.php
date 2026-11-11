@@ -147,6 +147,31 @@ final class ShopQuestions extends OperatorShopQuestions
             return [];
         }
 
+        // Once a request: the list, its counts, the side panel and each action read the same rows, and each reading was
+        // the last weeks' questions again (up to 2,000), so the "i" took seconds to open.
+        $memo = $this->order.'|'.$this->shop;
+        if ($this->rowsRead !== null && $this->rowsRead[0] === $memo) {
+            return $this->rowsRead[1];
+        }
+
+        $rows = $this->readRows();
+        $this->rowsRead = [$memo, $rows];
+
+        return $rows;
+    }
+
+    /** @var array{0: string, 1: list<array<string, mixed>>}|null the rows read in this request, by the order they were read in */
+    private ?array $rowsRead = null;
+
+    /** Read again once for the screen itself: an action of this request (an answer, a question set aside) changed them. */
+    public function rendering(): void
+    {
+        $this->rowsRead = null;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function readRows(): array
+    {
         return app(TenantContext::class)->run($this->shop, function (): array {
             $since = $this->since();
             $handled = AssistantAnswer::query()->whereNull('product_id')->whereNull('content_id')
@@ -175,6 +200,8 @@ final class ShopQuestions extends OperatorShopQuestions
                 $score = $group->map(fn (AssistantSearchAsk $a) => $scores[(string) $a->id] ?? null)->filter()->first();
                 $rows[] = [
                     'id' => 's:'.$key,
+                    // the latest ask, for the side panel to read it at once
+                    'ask_id' => (string) $latest->id,
                     'question' => (string) $latest->question,
                     'where' => __('assistant::ui.inbox.in_search'),
                     'asked' => $group->count(),
@@ -623,9 +650,9 @@ final class ShopQuestions extends OperatorShopQuestions
             if (str_starts_with($row, 'a:')) {
                 $saved = AssistantAnswer::query()->find(substr($row, 2));
             } else {
-                $key = substr($row, 2);
-                $ask = AssistantSearchAsk::query()->with('answer')->where('created_at', '>=', $this->since())->latest('created_at')->orderByDesc('id')->limit(2000)->get()
-                    ->first(fn (AssistantSearchAsk $a): bool => Question::key((string) $a->question) === $key);
+                // the row's latest ask, by its id (the list read it already), never the weeks' questions read again
+                $askId = collect($this->rows())->firstWhere('id', $row)['ask_id'] ?? null;
+                $ask = $askId === null ? null : AssistantSearchAsk::query()->with('answer')->find($askId);
                 $saved = $ask?->getRelation('answer');
             }
 

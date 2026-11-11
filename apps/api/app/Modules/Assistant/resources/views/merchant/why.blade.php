@@ -28,7 +28,7 @@
                         </a>
                         {{-- what it says that the answer came from: as kept with the answer, or the nearest lines of it now --}}
                         @if (($source['quote'] ?? '') !== '')
-                            <figure style="margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--la-ink); background: var(--la-paper); border-radius: 0 10px 10px 0; display: grid; gap: 4px" data-why-quote="{{ $source['quote_kind'] }}">
+                            <figure style="margin: 0; padding: 10px 12px; background: var(--la-paper); border-radius: 10px; display: grid; gap: 4px" data-why-quote="{{ $source['quote_kind'] }}">
                                 <figcaption class="lp-note">{{ $w('quote_'.$source['quote_kind']) }}</figcaption>
                                 <blockquote dir="auto" style="margin: 0; white-space: pre-line; font-size: 13.5px; line-height: 1.5">{{ $source['quote'] }}</blockquote>
                             </figure>

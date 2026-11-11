@@ -170,6 +170,17 @@
     {{-- "i": a side panel over the page, from its far edge, with everything about the answer: what it was written from
          (each source and the line it is written in, fixed or removed there), how it was checked, the tone and the
          rules (as Aviad asked, 11.11). Escape or the shade around it closes it. --}}
+    {{-- the panel at once, the moment the "i" is pressed, while its content is read --}}
+    <div wire:loading.block wire:target="explainRow" style="display: none; position: fixed; inset: 0; z-index: 62" data-why-loading>
+        <div style="position: absolute; inset: 0; background: rgb(0 0 0 / 35%)"></div>
+        <aside style="position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: min(580px, 100vw); background: var(--la-paper); box-shadow: 0 0 40px rgb(0 0 0 / 25%); padding: 22px; display: grid; gap: 14px; align-content: start">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 600">{{ __('assistant::ui.inbox.why.open') }}</h2>
+            @foreach ([60, 100, 85, 100, 70] as $w)
+                <span style="display: block; height: 14px; width: {{ $w }}%; border-radius: 7px; background: var(--la-sunk)"></span>
+            @endforeach
+        </aside>
+    </div>
+
     @php($whyRow = $this->why === null ? null : collect($all)->firstWhere('id', $this->why))
     @if ($whyRow)
         <div wire:click="closeWhy" data-why-shade style="position: fixed; inset: 0; background: rgb(0 0 0 / 35%); z-index: 60"></div>

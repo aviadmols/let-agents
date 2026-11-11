@@ -28,14 +28,30 @@ final class ScheduleOutput
         $task->appendOutputTo($target);
     }
 
+    /**
+     * Its end, with its exit code: written to the same output, as one JSON line the platform reads with its level.
+     * Not through the log: Laravel runs schedule:finish with its own output in /dev/null, where a log line to stderr
+     * went (11.11).
+     */
     public function finished(ScheduledBackgroundTaskFinished $event): void
     {
         $task = $event->task;
-        $context = ['task' => $task->description ?: $task->command, 'exit_code' => $task->exitCode];
+        $failed = $task->exitCode !== 0;
+        $line = [
+            'level' => $failed ? 'error' : 'info',
+            'message' => $failed ? 'Scheduled task failed in the background' : 'Scheduled task finished in the background',
+            'task' => $task->description ?: $task->command,
+            'exit_code' => $task->exitCode,
+        ];
+        $target = (string) config('logging.schedule_output');
 
-        $task->exitCode === 0
-            ? Log::info('Scheduled task finished in the background', $context)
-            : Log::error('Scheduled task failed in the background', $context);
+        if ($target !== '' && self::writable($target)) {
+            @file_put_contents($target, json_encode($line, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+
+            return;
+        }
+
+        $failed ? Log::error($line['message'], $line) : Log::info($line['message'], $line);
     }
 
     private static function writable(string $target): bool

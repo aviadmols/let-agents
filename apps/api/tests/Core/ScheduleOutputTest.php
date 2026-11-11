@@ -34,10 +34,17 @@ final class ScheduleOutputTest extends TestCase
         $this->assertSame($foreground->getDefaultOutput(), $foreground->output, 'the foreground is the scheduler\'s own output already');
         $this->assertNotSame($target, $own->output, 'a command that chose its output keeps it');
 
-        Log::spy();
+        // its end, as one JSON line with its level, in the same output (schedule:finish's own goes to /dev/null)
         $background->exitCode = 1;
         app(ScheduleOutput::class)->finished(new ScheduledBackgroundTaskFinished($background));
-        Log::shouldHaveReceived('error')->once()->withArgs(fn (string $message, array $context): bool => $context['exit_code'] === 1);
+        $line = json_decode(trim((string) file_get_contents($target)), true);
+        $this->assertSame(['error', 1], [$line['level'], $line['exit_code']]);
+
+        // with no target, the log
+        config(['logging.schedule_output' => '']);
+        Log::spy();
+        app(ScheduleOutput::class)->finished(new ScheduledBackgroundTaskFinished($background));
+        Log::shouldHaveReceived('error')->once();
 
         @unlink($target);
     }
