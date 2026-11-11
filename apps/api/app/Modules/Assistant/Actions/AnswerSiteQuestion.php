@@ -1934,7 +1934,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                 // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
                 // and in the store's own plural, never "אני יכול" (StoreVoice, Rocks 9.11): the answer, its not-found line, each pick's why
-                $answer = StoreVoice::plural(self::endsWhole($answer));
+                $answer = self::withoutOfferedAgain(StoreVoice::plural(self::endsWhole($answer)), $this->conversation);
                 $notFound = isset($notFound) ? StoreVoice::plural($notFound) : null;
                 $picks = array_map(fn (array $pick): array => ['why' => StoreVoice::plural((string) ($pick['why'] ?? ''))] + $pick, $picks);
                 $quotes = [];
@@ -2177,6 +2177,68 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $out;
+    }
+
+    /** The closing offer of an answer: its last sentence, when it offers ("אם תרצו, נוכל…", "תרצו ש…", "רוצים ש…"). */
+    private const OFFER = '/^(?:אם\s+(?:תרצו|תרצי|תרצה|תרצה)|תרצו|תרצי|רוצים|רוצה|נשמח|נוכל|if\s+you\s+(?:like|want|wish)|would\s+you\s+like|shall\s+we|want\s+us)/iu';
+
+    /** Words an offer is made of whatever it offers: left out when it is compared with what was asked. */
+    private const OFFER_WORDS = '/^(?:אם|תרצו|תרצי|תרצה|רוצים|רוצה|נשמח|נוכל|לעזור|לכם|לך|גם|עוד|לפרט|להסביר|לבדוק|להראות|לספר|בפועל|איך|מה|את|על|של|עם|זה|הזו|הזה|זאת|יותר|you|like|want|would|shall|help|more|also|explain|tell|show|how|what|the|about)$/iu';
+
+    /**
+     * A reply's answer without a closing offer of what the conversation already holds: one whose words are those of a
+     * question the shopper asked before and was answered ("איך מתבצע השריון?" answered, then "נוכל לפרט גם איך מתבצע
+     * השריון בפועל", Rocks 11.11), or the offer an earlier answer already made. Code only; anything else stays.
+     *
+     * @param  list<array{question: string, answer: string}>  $conversation
+     */
+    public static function withoutOfferedAgain(string $answer, array $conversation): string
+    {
+        if ($conversation === [] || trim($answer) === '') {
+            return $answer;
+        }
+
+        $trimmed = rtrim($answer);
+        // the last sentence, after the last sentence end or line break before it
+        $cut = max((int) mb_strrpos(mb_substr($trimmed, 0, -1), "\n"), ...array_map(fn (string $end): int => (int) mb_strrpos(mb_substr($trimmed, 0, -1), $end), ['. ', '! ', '? ']));
+        $last = trim(mb_substr($trimmed, $cut === 0 ? 0 : $cut + 1));
+
+        if ($cut === 0 || preg_match(self::OFFER, $last) !== 1) {
+            return $answer;
+        }
+
+        $words = function (string $text): array {
+            $out = [];
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(strtr($text, ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']))) ?: [] as $w) {
+                if (preg_match(self::OFFER_WORDS, $w) === 1) {
+                    continue;
+                }
+                $w = mb_strlen($w) > 3 ? (string) preg_replace('/^[והבלמשכ]/u', '', $w) : $w;
+                if (mb_strlen($w) >= 3) {
+                    $out[$w] = true;
+                }
+            }
+
+            return $out;
+        };
+        $offered = $words($last);
+
+        if (count($offered) < 1) {
+            return $answer;
+        }
+
+        foreach ($conversation as $turn) {
+            $asked = $words((string) $turn['question']);
+            $before = $words((string) mb_substr((string) $turn['answer'], -200));
+            $share = count(array_intersect_key($offered, $asked)) / count($offered);
+            $again = count(array_intersect_key($offered, $before)) / count($offered);
+
+            if ($share >= 0.6 || $again >= 0.8) {
+                return rtrim(mb_substr($trimmed, 0, $cut + 1));
+            }
+        }
+
+        return $answer;
     }
 
     public static function promptVersion(string $name): ?int
