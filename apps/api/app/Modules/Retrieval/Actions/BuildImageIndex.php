@@ -23,6 +23,7 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -177,9 +178,18 @@ final class BuildImageIndex
                 $stats['stopped'] = 'spend_cap';
                 break;
             } catch (ModelCallFailed $e) {
+                // The provider's moment (its quota, a timeout, its own error): the scan stops here and the pictures
+                // wait for the next one, never asked one by one, sixteen calls into a quota already spent, and never
+                // marked unreadable for it (9.11: 12 quota errors and 27 timeouts in six hours). One line, no trace.
+                if ($e->transient()) {
+                    Log::warning('Picture index stopped: the provider is not answering now', ['shop' => $shopId, 'reason' => $e->reason, 'batch' => count($images), 'error' => mb_substr($e->getMessage(), 0, 200)]);
+                    $stats['stopped'] = $e->reason;
+                    break;
+                }
+
                 // One picture the provider will not read fails the whole batch. Each is asked
                 // alone: what fails alone is marked unreadable and the rest go on; only when every
-                // one fails (a key, a quota, an outage) does the scan stop.
+                // one fails (a key, an outage) does the scan stop.
                 report($e);
                 $refused = $e->reason;
                 [$vectors, $kept] = $this->oneByOne($choice, $images, $rows, $dimensions);

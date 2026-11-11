@@ -39,12 +39,14 @@ case "$role" in
     # First operator on a server with no shell. The password is read from the environment
     # by name, so it never appears in a command line or a log. Existing users are only
     # promoted, so this is safe to leave on for every boot.
+    # Quiet: on every boot it said "<the operator's email> is already an operator" in the log (11.11); a failure
+    # still says so below.
     if [ -n "${BOOTSTRAP_OPERATOR_EMAIL:-}" ]; then
       php artisan admin:operator "$BOOTSTRAP_OPERATOR_EMAIL" \
         --password-env=BOOTSTRAP_OPERATOR_PASSWORD \
         --locale="${BOOTSTRAP_OPERATOR_LOCALE:-he}" \
-        --no-interaction \
-        || echo "Operator bootstrap failed; see the message above." >&2
+        --no-interaction --quiet \
+        || echo "Operator bootstrap failed (run it without --quiet to see why)." >&2
     fi
 
     # A lost password, set again at boot from the same variables: BOOTSTRAP_OPERATOR_RESET=true
@@ -57,10 +59,14 @@ case "$role" in
     # Report wiring problems in the first lines of the log without blocking the boot.
     php artisan system:check || echo "system:check reported problems; see above." >&2
 
+    # --log-level: the server's lines pass as they are, JSON with their own level, instead of each one wrapped as an
+    # "info" line by Octane (an error and its trace reached the log as dozens of info lines, 9-11.11). WARN is the level
+    # Octane already gave the server outside local.
     exec php artisan octane:frankenphp \
       --host=0.0.0.0 \
       --port="${PORT:-8080}" \
-      --max-requests="${OCTANE_MAX_REQUESTS:-500}"
+      --max-requests="${OCTANE_MAX_REQUESTS:-500}" \
+      --log-level="${OCTANE_LOG_LEVEL:-WARN}"
     ;;
   worker)
     # Several workers in one service, each started again when it ends (every hour, --max-time).

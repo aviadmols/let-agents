@@ -85,7 +85,9 @@ final class GeminiEmbeddings implements EmbeddingDriver, ImageEmbeddingDriver
 
         if (! $response->successful()) {
             // Gemini's own reason, for the log: the scan reports it and goes on without it.
-            throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, new \RuntimeException('Gemini '.$response->status().': '.mb_substr((string) $response->body(), 0, 500)));
+            // 429 is the quota, worth asking again later (ModelCallFailed::transient()), never the pictures sent
+            throw new ModelCallFailed($response->status() === 429 ? ModelCallFailed::RATE_LIMITED : ModelCallFailed::PROVIDER_ERROR,
+                new \RuntimeException('Gemini '.$response->status().': '.mb_substr((string) $response->body(), 0, 500)));
         }
 
         $vectors = [];

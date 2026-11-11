@@ -21,6 +21,12 @@ return [
     'default' => env('LOG_CHANNEL', 'stack'),
 
     /*
+    | Where a scheduled command run in the background writes what it says (App\Core\Console\ScheduleOutput): the
+    | scheduler process's own output in the container, which the platform reads. Empty: Laravel's /dev/null.
+    */
+    'schedule_output' => env('SCHEDULE_OUTPUT', PHP_OS_FAMILY === 'Linux' ? '/proc/1/fd/1' : ''),
+
+    /*
     |--------------------------------------------------------------------------
     | Deprecations Log Channel
     |--------------------------------------------------------------------------

@@ -5,6 +5,7 @@ namespace App\Core;
 use App\Core\Console\CheckTranslationsCommand;
 use App\Core\Console\MakeModuleCommand;
 use App\Core\Console\ModuleListCommand;
+use App\Core\Console\ScheduleOutput;
 use App\Core\Console\SystemCheckCommand;
 use App\Core\Features\FeatureManager;
 use App\Core\Features\FeatureRegistry;
@@ -16,6 +17,9 @@ use App\Core\Plans\PlanCeilings;
 use App\Core\Settings\SettingManager;
 use App\Core\Settings\SettingRegistry;
 use App\Core\Tenancy\TenantContext;
+use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskStarting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Translation\Translator;
 use LogicException;
@@ -62,6 +66,10 @@ final class CoreServiceProvider extends ServiceProvider
                 ModuleListCommand::class,
                 SystemCheckCommand::class,
             ]);
+
+            // a scheduled command in the background speaks to the log, and its end is logged (ScheduleOutput)
+            Event::listen(ScheduledTaskStarting::class, [ScheduleOutput::class, 'starting']);
+            Event::listen(ScheduledBackgroundTaskFinished::class, [ScheduleOutput::class, 'finished']);
         }
     }
 

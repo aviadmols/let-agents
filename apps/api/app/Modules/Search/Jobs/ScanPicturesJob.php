@@ -23,8 +23,15 @@ final class ScanPicturesJob implements ShouldBeUniqueUntilProcessing, ShouldQueu
     /** Seconds. Above the scan's own time budget, below the queue's retry_after. */
     public int $timeout = 1500;
 
-    /** A failed part is a failed run on the screen; the next press or the night goes on. */
-    public int $tries = 1;
+    /**
+     * A part that failed is a failed run on the screen; the next press or the night goes on. A part a deploy cut off
+     * (its worker stopped mid-part, no error) runs once more, its pictures done kept: with one try it was failed half
+     * an hour later, without a run (9.11, two scans).
+     */
+    public int $tries = 2;
+
+    /** An error of its own fails it at once: only a part cut off runs again. */
+    public int $maxExceptions = 1;
 
     private const MAX_PARTS = 1000;
 

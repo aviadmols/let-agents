@@ -70,4 +70,42 @@ final class RefusedPictureTest extends TestCase
             ->assertSee('data-problem="not_described"', false)
             ->assertSee(__('retrieval::ui.scans.reasons.refused'));
     }
+
+    public function test_the_providers_quota_stops_the_scan_and_marks_no_picture(): void
+    {
+        $shop = Shop::factory()->create();
+        Features::override('retrieval.image_index', true, $shop->id);
+        Http::fake(fn () => Http::response('GOOD', 200, ['Content-Type' => 'image/jpeg']));
+
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach (['1', '2', '3'] as $id) {
+                CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => 'p'.$id, 'image_url' => "https://s.test/{$id}.jpg", 'hash' => 'h'.$id, 'payload' => []]);
+            }
+        });
+
+        $embedder = new class implements ImageEmbedder
+        {
+            public int $calls = 0;
+
+            public function embedImages(AiProviderName $provider, string $model, array $images, ?int $dimensions = null): Embeddings
+            {
+                $this->calls++;
+
+                throw new ModelCallFailed(ModelCallFailed::RATE_LIMITED, new \RuntimeException('Gemini 429: RESOURCE_EXHAUSTED'));
+            }
+
+            public function embedTextsForImages(AiProviderName $provider, string $model, array $texts, ?int $dimensions = null, bool $query = true): Embeddings
+            {
+                return new Embeddings([], 0);
+            }
+        };
+        $this->app->instance(ImageEmbedder::class, $embedder);
+
+        app(BuildImageIndex::class)->handle($shop->id);
+
+        $this->assertSame(1, $embedder->calls, 'never asked one by one into a spent quota');
+        $rows = app(TenantContext::class)->run($shop->id, fn () => RetrievalImage::query()->get());
+        $this->assertSame([], $rows->whereNotNull('error')->pluck('error')->all(), 'no picture is marked for the provider\'s quota');
+        $this->assertSame(0, $rows->whereNotNull('embedded_at')->count(), 'they wait for the next scan');
+    }
 }

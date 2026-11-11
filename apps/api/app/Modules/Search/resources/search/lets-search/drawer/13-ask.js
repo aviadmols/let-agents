@@ -223,6 +223,8 @@
     }
     if (turn.general) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('general')) + '</span></div>'; }
     if (turn.follow && turn.follow.length) { html += '<div class="ls-follow">' + turn.follow.map(function (f) { return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(f) + '">' + esc(f) + '</button>'; }).join('') + '</div>'; }
+    // the team offered under a partial answer, right under it and above the reply box (as Aviad asked, 11.11)
+    html += partialHtml(turn);
     // the newest answer can be replied to ("לאיזו מטרה?" "לחיזוק חיסון"): the reply is asked with this conversation
     if (newestAnswer() === turn && turn.answer) {
       html += '<form class="ls-askabout__form ls-reply" data-reply="' + esc(turn.id) + '"><label class="ls-field ls-field--sm">' +
@@ -230,7 +232,6 @@
         '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form>';
     }
     html += rateHtml(turn);
-    html += partialHtml(turn);
     html += leadFlowHtml(turn);
     // the line to make sure with the team, unless the partial answer's offer already holds it
     var h = hours(), link = !partialHtml(turn) && S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
@@ -366,7 +367,10 @@
     if (!turn.answer || turn.leadFlow || !PARTIAL.test(String(turn.answer)) || noAnswerOf(turn) === 'none') { return ''; }
     if (turn.partialOpen || turn.lead) { return '<div class="ls-partial" style="margin-top:14px">' + noInfoHtml(turn, true) + '</div>'; }
     var h = hours(), link = noAnswerOf(turn) === 'team' && h.open ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null;
-    return '<div class="ls-partial" style="margin-top:14px"><p class="ls-noanswer__text" style="margin:0 0 10px">' + esc(t('partialAsk')) + '</p><div class="ls-form__actions">' +
+    // an answer that already hands over to the team ("צוות החנות ישמח לעזור לכם") gets the buttons alone, never the
+    // same said twice
+    var handed = /צוות\s+החנות\s+ישמח|הצוות\s+שלנו\s+ישמח|team\s+will\s+be\s+glad/i.test(String(turn.answer));
+    return '<div class="ls-partial" style="margin-top:14px">' + (handed ? '' : '<p class="ls-noanswer__text" style="margin:0 0 10px">' + esc(t('partialAsk')) + '</p>') + '<div class="ls-form__actions">' +
       (link ? '<a class="ls-btn ls-btn--primary ls-btn--sm" href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('teamWa')) + '</a>' : '') +
       (S.config.callbacks !== false || noAnswerOf(turn) === 'details' ? '<button type="button" class="ls-btn ' + (link ? 'ls-btn--secondary' : 'ls-btn--primary') + ' ls-btn--sm" data-partial-open="' + esc(turn.id) + '">' + esc(t('partialLeave')) + '</button>' : '') +
       '</div></div>';

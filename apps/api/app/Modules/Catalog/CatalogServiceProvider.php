@@ -73,13 +73,16 @@ final class CatalogServiceProvider extends ModuleServiceProvider
                 ->withoutOverlapping(50)
                 ->onOneServer();
 
-            // Prices and stock three times a day (catalog.refresh): the products alone.
+            // Prices and stock three times a day (catalog.refresh): the products alone. In the background: it takes
+            // eight to eleven minutes, and in the foreground every schedule of those minutes waited for it and then ran
+            // twice in a row (9-11.11). Nothing of the day waits on it, unlike the night's read above.
             foreach (['08:30', '14:30', '20:30'] as $at) {
                 $schedule->command('catalog:sync --refresh')
                     ->dailyAt($at)
                     ->timezone('Asia/Jerusalem')
                     ->name('catalog:refresh-'.$at)
                     ->withoutOverlapping(60)
+                    ->runInBackground()
                     ->onOneServer();
             }
 

@@ -33,7 +33,10 @@ final class ReadPageChoicesJob implements ShouldBeUnique, ShouldQueue
     /** Seconds. The queue's retry_after (30 minutes) must stay above it. */
     public int $timeout = 1500;
 
-    public int $tries = 1;
+    /** A part a deploy cut off (no error) reads once more from where pages are still due (9.11); an error fails it at once. */
+    public int $tries = 2;
+
+    public int $maxExceptions = 1;
 
     public int $uniqueFor = 1800;
 

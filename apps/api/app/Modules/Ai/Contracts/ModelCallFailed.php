@@ -2,6 +2,7 @@
 
 namespace App\Modules\Ai\Contracts;
 
+use Illuminate\Http\Client\ConnectionException;
 use RuntimeException;
 use Throwable;
 
@@ -22,5 +23,16 @@ final class ModelCallFailed extends RuntimeException
     public function __construct(public readonly string $reason, ?Throwable $previous = null)
     {
         parent::__construct($previous?->getMessage() ?? $reason, 0, $previous);
+    }
+
+    /**
+     * Whether it is the provider's moment, not what was asked: too many requests, the connection or its time running
+     * out, or the provider's own error (5xx). Asked again later, the same input goes through; it says nothing of it.
+     */
+    public function transient(): bool
+    {
+        return $this->reason === self::RATE_LIMITED
+            || $this->getPrevious() instanceof ConnectionException
+            || preg_match('/\b(?:429|408|50[0-4])\b|timed out|cURL error 28/i', $this->getMessage()) === 1;
     }
 }
