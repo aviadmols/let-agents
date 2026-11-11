@@ -28,12 +28,14 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -634,6 +636,12 @@ final class ShopifyAppTest extends TestCase
         // Billing "View": the plans, each choice carrying the frame on
         $plans = $this->get($framed(ShopifyAppController::plansLink(self::SHOP, 'en')), ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
         $this->assertStringContainsString('host=YWRtaW4', self::choice($plans, 'pro'));
+
+        // made in the panel, on the shop's own address: the links still lead to the app's address, where App Bridge reaches the admin
+        URL::setRequest(Request::create('https://gueta.panel.test/merchant/settings/plan'));
+        $this->assertStringStartsWith(rtrim((string) config('app.url'), '/').'/shopify/billing/start?', ShopifyAppController::planLink(self::SHOP, 'growth'));
+        $this->assertStringStartsWith(rtrim((string) config('app.url'), '/').'/shopify/plans?', ShopifyAppController::plansLink(self::SHOP));
+        $this->assertSame('https://gueta.panel.test/merchant', url('/merchant'), 'and the panel\'s own links stay where they are');
 
         // the store itself stays signed: another store's address in the same link is refused
         $this->get(str_replace('shop='.urlencode(self::SHOP), 'shop=another-store.myshopify.com', $framed(ShopifyAppController::plansLink(self::SHOP, 'en'))))

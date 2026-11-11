@@ -230,7 +230,7 @@ final class ShopifyAppController
     /** A link to the plans, signed for this store, for an hour: the panel offers it as "change plan", in its language. */
     public static function plansLink(string $shopDomain, ?string $locale = null): string
     {
-        return URL::temporarySignedRoute('shopify.plans', now()->addHour(), ['shop' => $shopDomain] + self::speaking($locale));
+        return self::onAppAddress(fn (): string => URL::temporarySignedRoute('shopify.plans', now()->addHour(), ['shop' => $shopDomain] + self::speaking($locale)));
     }
 
     /**
@@ -242,7 +242,31 @@ final class ShopifyAppController
      */
     public static function planLink(string $shopDomain, string $plan, ?string $locale = null, array $frame = []): string
     {
-        return URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $shopDomain, 'plan' => $plan] + self::speaking($locale) + $frame);
+        return self::onAppAddress(fn (): string => URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $shopDomain, 'plan' => $plan] + self::speaking($locale) + $frame));
+    }
+
+    /**
+     * A link on the app's own address (app.url, the address Shopify knows the app by), wherever it is made. The panel
+     * lives on the shop's address (gueta.agents.lets.co.il), and App Bridge on a page there never reaches the admin:
+     * the step to Shopify's approval waited forever, its button too (App Store review, 11.2026).
+     *
+     * @param  callable(): string  $link
+     */
+    private static function onAppAddress(callable $link): string
+    {
+        $root = rtrim((string) config('app.url'), '/');
+
+        if ($root === '') {
+            return $link();
+        }
+
+        URL::forceRootUrl($root);
+
+        try {
+            return $link();
+        } finally {
+            URL::forceRootUrl(null);
+        }
     }
 
     /** @return array{locale?: string} the language a signed link carries on to the page it opens */

@@ -27,7 +27,10 @@ window.__letAgentsFetch = window.fetch ? window.fetch.bind(window) : null;
         if (!link || link.target === '_blank' || link.hasAttribute('download')) { return; }
         var url;
         try { url = new URL(link.href, location.href); } catch (e) { return; }
-        if (url.origin !== location.origin || (url.searchParams.has('host') && url.searchParams.has('shop'))) { return; }
+        // this page's address, or the app's own (the step to Shopify's approval lives there, where App Bridge reaches the admin)
+        var app = null;
+        try { app = new URL(@js((string) config('app.url'))).origin; } catch (e) {}
+        if ((url.origin !== location.origin && url.origin !== app) || (url.searchParams.has('host') && url.searchParams.has('shop'))) { return; }
         url.searchParams.set('host', keep.host);
         url.searchParams.set('shop', keep.shop);
         url.searchParams.set('embedded', '1');
