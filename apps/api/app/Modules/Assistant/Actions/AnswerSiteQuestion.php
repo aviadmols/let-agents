@@ -1934,7 +1934,14 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                 // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
                 // and in the store's own plural, never "אני יכול" (StoreVoice, Rocks 9.11): the answer, its not-found line, each pick's why
-                $answer = self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain(StoreVoice::plural(self::endsWhole($answer)), $this->conversation, $locale), $this->conversation), $locale);
+                $answer = StoreVoice::plural(self::endsWhole($answer));
+                // a "yes" to our own offer goes forward with a question, never to the team (forwardOnYes)
+                $forward = self::forwardOnYes($this->asked, $answer, $this->conversation, $locale);
+                $answer = $forward
+                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain($answer, $this->conversation, $locale), $this->conversation), $locale);
+                // a question back rests on no page and offers nothing: no sources or products under it
+                $cited = $forward === null ? $cited : [];
+                $picks = $forward === null ? $picks : [];
                 $notFound = isset($notFound) ? StoreVoice::plural($notFound) : null;
                 $picks = array_map(fn (array $pick): array => ['why' => StoreVoice::plural((string) ($pick['why'] ?? ''))] + $pick, $picks);
                 $quotes = [];
@@ -2239,6 +2246,44 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $answer;
+    }
+
+    /** A reply that only agrees ("כן", "בטח", "אשמח", "yes please"). */
+    private const AGREED = '/^\s*(?:כן|כן\s+בבקשה|כן\s+אשמח|כן\s+תודה|בטח|בהחלט|אשמח|אוקיי?|יאללה|סבבה|בבקשה|yes|yes\s+please|yeah|yep|sure|ok(?:ay)?|please)\s*[.!,]*\s*$/iu';
+
+    /** An offer about one product of the shopper's ("…אם הפריט שמעניין אתכם מתאים לשריון?"). */
+    private const ABOUT_ITEM = '/(?<![\p{L}])(?:ה|ב|ל|ש)?(?:פריט|מוצר|דגם)|\b(?:item|product|model)\b/iu';
+
+    /**
+     * A "yes" to the offer the answer before closed with ("תרצו שנעזור להבין אם הפריט שמעניין אתכם מתאים לשריון?" "כן"),
+     * that the writer did not carry forward (the same answer again, or "it needs checking": Rocks 11.11, told the team
+     * would check), goes forward with a question: which product, by its name or SKU, when the offer was about one;
+     * what they need otherwise. Never the team for a yes to our own offer. Null when it is no such yes, or the writer
+     * did carry it forward. Code only.
+     *
+     * @param  list<array{question: string, answer: string}>  $conversation
+     */
+    public static function forwardOnYes(string $question, string $answer, array $conversation, string $locale): ?string
+    {
+        if ($conversation === [] || preg_match(self::AGREED, $question) !== 1) {
+            return null;
+        }
+
+        $before = rtrim((string) end($conversation)['answer']);
+        $cut = max((int) mb_strrpos(mb_substr($before, 0, -1), "\n"), ...array_map(fn (string $end): int => (int) mb_strrpos(mb_substr($before, 0, -1), $end), ['. ', '! ', '? ']));
+        $offer = trim(mb_substr($before, $cut === 0 ? 0 : $cut + 1));
+
+        if ($offer === '' || (! str_ends_with($offer, '?') && preg_match(self::OFFER, $offer) !== 1)) {
+            return null;
+        }
+
+        $stalled = trim($answer) === '' || self::notSaidAgain($answer, $conversation, $locale) !== $answer || preg_match(self::UNSETTLED, $answer) === 1;
+
+        if (! $stalled) {
+            return null;
+        }
+
+        return (string) __('assistant::answers.site.'.(preg_match(self::ABOUT_ITEM, $offer) === 1 ? 'which_item' : 'tell_more'), [], $locale === 'en' ? 'en' : 'he');
     }
 
     /**

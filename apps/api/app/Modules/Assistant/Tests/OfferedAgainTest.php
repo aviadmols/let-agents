@@ -55,6 +55,27 @@ final class OfferedAgainTest extends TestCase
         $this->assertSame($new, AnswerSiteQuestion::notSaidAgain($new, $conversation, 'he'), 'a reply that says something new stays');
     }
 
+    public function test_a_yes_to_our_own_offer_goes_forward_with_a_question_never_to_the_team(): void
+    {
+        // Rocks 11.11: "כן" to the offer, the layaway said again, and the shopper told the team would check
+        $layaway = "כן, אפשר לשריין פריט דרך תוכנית Layaway לפריטים שמחירם 2,000 ש\"ח ומעלה, בלחיצה על \"תשלום חלקי\" בדף המוצר.\n\nמשאירים מקדמה של לפחות 10% מסכום ההזמנה, ואת היתרה אפשר לשלם בתשלומים חודשיים עד 10 חודשים, ללא ריבית או דמי טיפול.\n\nלפריטים שמחירם נמוך מ־2,000 ש\"ח אפשר לרכוש ישירות באתר.\n\nתרצו שנעזור להבין אם הפריט שמעניין אתכם מתאים לשריון?";
+        $conversation = [['question' => 'האם יש לי דרך לשריין אצלכם מוצר עד שאני אבוא לראות אותו?', 'answer' => $layaway]];
+        $again = 'אפשר לשריין פריט דרך תוכנית Layaway לפריטים שמחירם 2,000 ש"ח ומעלה, בלחיצה על "תשלום חלקי" בדף המוצר. משאירים מקדמה של לפחות 10% מסכום ההזמנה, ואת היתרה בתשלומים חודשיים עד 10 חודשים.';
+        $which = 'בשמחה. על איזה מוצר מדובר? כתבו את שם המוצר או את המק"ט.';
+
+        $this->assertSame($which, AnswerSiteQuestion::forwardOnYes('כן', $again, $conversation, 'he'), 'the same answer again');
+        $this->assertSame($which, AnswerSiteQuestion::forwardOnYes('כן בבקשה!', 'כדי לדעת אם הפריט מתאים צריך לבדוק אותו.', $conversation, 'he'), '"it needs checking"');
+        $this->assertNull(AnswerSiteQuestion::forwardOnYes('כן', 'הנה שלוש טבעות מעל 2,000 ש"ח שאפשר לשריין: טבעת אוניקס, טבעת ספיר וטבעת יהלום.', $conversation, 'he'), 'a yes the writer carried forward stays');
+        $this->assertNull(AnswerSiteQuestion::forwardOnYes('יש לכם טבעות זהב?', $again, $conversation, 'he'), 'only a yes');
+
+        // an offer about no one product: what they need
+        $returns = [['question' => 'מה מדיניות ההחזרות?', 'answer' => 'אפשר להחזיר תוך 14 יום באריזה המקורית. תרצו שנסביר איך שולחים את ההחזרה?']];
+        $this->assertSame('בשמחה. ספרו לנו קצת יותר במה תרצו עזרה.', AnswerSiteQuestion::forwardOnYes('בטח', 'אפשר להחזיר תוך 14 יום באריזה המקורית, ואת ההחזרה שולחים אלינו.', $returns, 'he'));
+
+        // an answer before that closed with no offer: nothing changes
+        $this->assertNull(AnswerSiteQuestion::forwardOnYes('כן', $again, [['question' => 'שריון?', 'answer' => 'אפשר לשריין פריטים מעל 2,000 ש"ח.']], 'he'));
+    }
+
     public function test_without_a_conversation_or_an_offer_nothing_changes(): void
     {
         $offer = 'אפשר לשריין. אם תרצו, נוכל לפרט גם איך מתבצע השריון בפועל.';
