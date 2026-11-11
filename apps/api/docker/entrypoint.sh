@@ -89,6 +89,11 @@ case "$role" in
     wait
     ;;
   scheduler)
+    # A deploy stops the old container with the commands it ran in the background, before they free their overlap
+    # lock (withoutOverlapping, kept 24 hours): each was then skipped, silently, until the next day (11.11: demo:sweep
+    # and enrichment collect, started at 16:20:14, a deploy at 16:20). A new scheduler means the old one and its
+    # commands are gone, so their locks are freed first.
+    php artisan schedule:clear-cache || echo "Could not free the schedule's locks; see above." >&2
     exec php artisan schedule:work
     ;;
   *)
