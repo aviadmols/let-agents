@@ -14,6 +14,7 @@ use App\Modules\Retrieval\Models\RetrievalQueryVector;
 use App\Modules\Runs\Enums\RunStatus;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -87,15 +88,21 @@ final class QueryVectors
             return null;
         }
 
-        RetrievalQueryVector::query()->create([
-            'shop_id' => $shopId,
-            'embedding_model' => $stored,
-            'text_hash' => $hash,
-            'text' => $text,
-            'dimensions' => count($vector),
-            'embedding' => VectorSearch::column($vector),
-            'last_used_at' => now(),
-        ]);
+        // The same words asked twice at once both embed them, and the second to save finds the first's row: its own
+        // vector is the same and is used as it is, never a failed search (7 times, 9-11.11, a 500 to the shopper).
+        try {
+            RetrievalQueryVector::query()->create([
+                'shop_id' => $shopId,
+                'embedding_model' => $stored,
+                'text_hash' => $hash,
+                'text' => $text,
+                'dimensions' => count($vector),
+                'embedding' => VectorSearch::column($vector),
+                'last_used_at' => now(),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // kept by the other request already
+        }
 
         $this->record($shopId, $choice->providerName, $choice->model, $embeddings->inputTokens, $embeddings->costUsd($price));
 

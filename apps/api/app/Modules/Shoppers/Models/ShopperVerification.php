@@ -40,9 +40,15 @@ class ShopperVerification extends Model
         ];
     }
 
-    /** @return Builder<$this> */
+    /**
+     * Codes a day past their time, every shop's: model:prune runs with no shop in the tenant context, so the scope that
+     * keeps one shop's rows from another's is left off here (as AnalyticsEvent prunes). With it on, the nightly prune
+     * failed every night and no expired code was ever removed (9-11.11).
+     *
+     * @return Builder<$this>
+     */
     public function prunable(): Builder
     {
-        return static::query()->where('expires_at', '<', now()->subDay());
+        return static::query()->withoutGlobalScopes()->where('expires_at', '<', now()->subDay());
     }
 }

@@ -11,15 +11,18 @@ use App\Modules\Shopify\Models\ShopperDataReport;
  * A shopper's privacy request, passed on by Shopify: asked what the store keeps, the report is made for the owners
  * (ReportShopperData); asked to be erased, the reports made for them earlier go too, by their Shopify customer id
  * or their email.
+ *
+ * What it works with is taken when it runs, never in its constructor: under Octane the event dispatcher builds a
+ * listener from the app as it booted, whose TenantContext is not the request's one the tenant scope reads, so the shop
+ * it ran with was never seen (11.11: a customers/redact failed eight times and was dropped, and the listeners after
+ * it, which forget the shopper's leads, contact and saved list, never ran).
  */
 final class AnswerShopperData
 {
-    public function __construct(private readonly ReportShopperData $report, private readonly TenantContext $tenant) {}
-
     public function handle(ShopperDataRequested $event): void
     {
         if ($event->kind === 'report') {
-            $this->report->handle($event);
+            app(ReportShopperData::class)->handle($event);
 
             return;
         }
@@ -35,7 +38,7 @@ final class AnswerShopperData
             return;
         }
 
-        $this->tenant->run($event->shopId, fn () => ShopperDataReport::query()
+        app(TenantContext::class)->run($event->shopId, fn () => ShopperDataReport::query()
             ->where(fn ($q) => $q->when($customer !== null, fn ($q) => $q->orWhere('customer_ref', $customer))->when($email !== null, fn ($q) => $q->orWhere('email_hash', $email)))
             ->delete());
     }

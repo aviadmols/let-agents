@@ -24,8 +24,6 @@ use Throwable;
  */
 final class ReportShopperData
 {
-    public function __construct(private readonly TenantContext $tenant) {}
-
     public function handle(ShopperDataRequested $request): ?ShopperDataReport
     {
         $shop = Shop::query()->find($request->shopId);
@@ -34,7 +32,8 @@ final class ReportShopperData
             return null;
         }
 
-        [$report, $created] = $this->tenant->run($shop->id, function () use ($shop, $request): array {
+        // the request's own TenantContext, taken when it runs (see AnswerShopperData): the one the tenant scope reads
+        [$report, $created] = app(TenantContext::class)->run($shop->id, function () use ($shop, $request): array {
             $sections = [];
 
             foreach (app()->tagged(KeepsShopperData::TAG) as $source) {
