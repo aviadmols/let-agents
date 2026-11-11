@@ -181,9 +181,55 @@
     all.forEach(function (r) {
       if (out.length >= ASK_SHOWN) { return; }
       if (r.ak === 'product') { if (products >= ASK_PRODUCT || !(r.src && r.src[0] && r.src[0].title)) { return; } products++; }
+      // one question once: "אפשר להחזיר או להחליף?" and "האם אפשר להחזיר מוצר?" are one, the most asked of them shown
+      // (as Aviad asked, 11.11)
+      if (out.some(function (o) { return sameAsk(o, r); })) { if (r.ak === 'product') { products--; } return; }
       out.push(r);
     });
     return out;
+  }
+  // The words a question asks about: without its question words, its joining words, what every shop question says
+  // ("מוצר", "הזמנה", "מדיניות") and the store's subject, what most of its products say ("זהב" and "תכשיטים" in a
+  // jewellery store: "תכשיטים בזהב 22 קראט" and "קונים תכשיטי זהב" ask different things). Each as the search engine
+  // reads it (its endings away). Read once per question while the index is the same.
+  var ASK_FILLER = /^(יש|לכם|אצלכם|אליכם|שלכם|שלך|שלי|שלנו|לך|לי|של|את|הם|הן|הוא|היא|על|עם|איך|מה|האם|כמה|אפשר|ניתן|איזה|איזו|אילו|למה|מתי|איפה|היכן|זה|זו|הזה|הזו|הזאת|גם|או|אני|אתם|אתה|יכול|יכולה|יכולים|לעשות|בבקשה|היי|שלום|תודה|הכי|מוצר|מוצרים|המוצר|המוצרים|פריט|פריטים|הזמנה|ההזמנה|הזמנות|מדיניות|the|a|an|is|are|do|does|i|you|your|we|have|for|of|with|how|what|where|when|can|could|there|any|please|it|this|to|my|me|product|products|item|items|order|orders|policy|policies)$/i;
+  var askRead = {}, askReadOf = null;
+  function askWords(q) {
+    if (askReadOf !== S.records) { askRead = {}; askReadOf = S.records; }
+    q = String(q || '');
+    if (askRead[q]) { return askRead[q]; }
+    var E = S.engine, seen = {};
+    var norm = function (w) { try { return E && E.normalize ? E.normalize(w) : w; } catch (e) { return w; } };
+    var stemmed = function (w) { try { return E && E.stem ? E.stem(w) : w; } catch (e) { return w; } };
+    var out = { w: [], subject: [] };
+    q.toLowerCase().replace(/[׳״'"`]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/)
+      .filter(function (w) { return w.length >= 2 && !ASK_FILLER.test(w); }).map(norm).forEach(function (w) {
+        var s = stemmed(w);
+        if (!w || !s || seen[s]) { return; }
+        seen[s] = 1;
+        (w.length >= 3 && storeShare(wordForms(w)) > SUBJECT_SHARE ? out.subject : out.w).push(s);
+      });
+    askRead[q] = out;
+    return out;
+  }
+  // Two questions are one when they ask about the same words: two thirds of the shorter's are the other's, and those are
+  // two thirds of the longer's (half of two) ("לשריין מוצר" is "לשריין את המוצר"; "תיקון תכשיטים" is no "תכשיטים בזהב
+  // 22 קראט", "אפשר לאסוף בעצמי?" is no question about the final price with pickup, and "אפשר להחזיר מוצר?" is no
+  // question about returning a ring through the shipping company). The store's subject words make no match, and two that
+  // differ in them ask different things ("מזהב אמיתי", "יהלומים אמיתיים"). A word is the same with a prefix letter
+  // ("בזהב", "זהב") or as the start of its longer form ("cancel", "cancellation"). A question about a product is one
+  // with another about the same product only.
+  function sameAsk(a, b) {
+    if ((a.ak === 'product' || b.ak === 'product') && !(a.ak === b.ak && a.src && b.src && a.src[0] && b.src[0] && a.src[0].url === b.src[0].url)) { return false; }
+    var qa = askWords(a.title), qb = askWords(b.title), x = qa.w, y = qb.w;
+    if (!x.length || !y.length) { return String(a.title).trim() === String(b.title).trim(); }
+    var prefixed = function (u, v) { return u.length === v.length + 1 && v.length >= 3 && /^[והבלמשכ]/.test(u) && u.slice(1) === v; };
+    var like = function (u, v) { return u === v || prefixed(u, v) || prefixed(v, u) || (Math.min(u.length, v.length) >= 4 && (u.indexOf(v) === 0 || v.indexOf(u) === 0)); };
+    var within = function (p, r) { return p.every(function (u) { return r.some(function (v) { return like(u, v); }); }); };
+    if (!within(qa.subject, qb.subject) && !within(qb.subject, qa.subject)) { return false; }
+    var short = x.length <= y.length ? x : y, long = short === x ? y : x;
+    var shared = short.filter(function (u) { return long.some(function (v) { return like(u, v); }); }).length;
+    return shared > 0 && shared * 3 >= short.length * 2 && (shared * 3 >= long.length * 2 || (long.length <= 2 && shared * 2 >= long.length));
   }
   // the shop's most added to the cart lately, first of all (the index config's wanted); none, no section
   function wantedHtml() {
