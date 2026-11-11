@@ -619,6 +619,27 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame('pending', $install->fresh()->subscription_status);
     }
 
+    public function test_the_panels_plan_buttons_work_inside_the_frame_where_the_panel_adds_host_to_every_link(): void
+    {
+        $this->installed();
+        // what the panel's frame script does to every link it follows (shopify::embed): Shopify's host and embedded added
+        $framed = fn (string $link): string => $link.'&host=YWRtaW4&embedded=1';
+
+        // "Upgrade" / "Switch" on Plan and billing: App Bridge in the frame, off to Shopify's approval (11.2026: refused, 404)
+        $this->get($framed(ShopifyAppController::planLink(self::SHOP, 'growth', 'en')), ['Sec-Fetch-Dest' => 'iframe'])
+            ->assertOk()
+            ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/charges\/confirm', false)
+            ->assertSee("window.open(url, '_top')", false);
+
+        // Billing "View": the plans, each choice carrying the frame on
+        $plans = $this->get($framed(ShopifyAppController::plansLink(self::SHOP, 'en')), ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
+        $this->assertStringContainsString('host=YWRtaW4', self::choice($plans, 'pro'));
+
+        // the store itself stays signed: another store's address in the same link is refused
+        $this->get(str_replace('shop='.urlencode(self::SHOP), 'shop=another-store.myshopify.com', $framed(ShopifyAppController::plansLink(self::SHOP, 'en'))))
+            ->assertNotFound();
+    }
+
     public function test_a_cancelled_plan_stops_billing_now_and_keeps_the_search_until_the_paid_period_ends(): void
     {
         Mail::fake();

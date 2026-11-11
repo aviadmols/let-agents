@@ -56,6 +56,9 @@ final class ShopifyAppController
 
     private const MERCHANT_OVERVIEW_ROUTE = 'filament.merchant.pages.overview';
 
+    /** What Shopify opens the frame with, kept on every link inside it: never part of a signed link. */
+    private const FRAME_QUERY = ['host', 'embedded'];
+
     /**
      * A screen of a shop's panel, as the Shopify admin asks for it after a refresh, at the app's own
      * address. Never the panel's login or logout, which live at that address too.
@@ -311,7 +314,12 @@ final class ShopifyAppController
 
     private function signedInstall(Request $request): ?ShopifyInstall
     {
-        $shop = $request->hasValidSignature() ? ShopifySignatures::shopDomain($request->query('shop')) : null;
+        // Inside the admin's frame the panel adds what Shopify opened the frame with (host, embedded) to every link it
+        // follows, this one too. They were never signed, and a signature that counted them refused every plan button
+        // in the panel (App Store review, 11.2026). A link the plans page signed with them (choosePlan) is whole as it is.
+        // The store itself stays signed either way.
+        $signed = $request->hasValidSignature() || $request->hasValidSignatureWhileIgnoring(self::FRAME_QUERY);
+        $shop = $signed ? ShopifySignatures::shopDomain($request->query('shop')) : null;
         $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
 
         return $install !== null && $install->installed() ? $install : null;

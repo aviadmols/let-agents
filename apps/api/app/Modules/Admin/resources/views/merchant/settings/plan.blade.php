@@ -46,7 +46,8 @@
                         @elseif ($plan['move'] !== null && $this->canConnect())
                             @php($label = $plan['move'] === 'upgrade' ? $c('upgrade') : ($plan['move'] === 'downgrade' ? $t('switch') : $c('choose')))
                             @if ($plan['url'] !== null)
-                                <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $plan['url'] }}" target="_top" data-plan-move="{{ $plan['move'] }}">{{ $label }}</a>
+                                {{-- in the same window: inside the Shopify admin the next step has App Bridge, which takes the window to Shopify's approval --}}
+                                <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $plan['url'] }}" data-plan-move="{{ $plan['move'] }}">{{ $label }}</a>
                             @else
                                 <button type="button" class="lp-d-btn lp-d-btn-line lp-d-btn-sm" wire:click="askPlan(@js($plan['code']))" wire:loading.attr="disabled" data-plan-move="{{ $plan['move'] }}">{{ $label }}</button>
                             @endif
@@ -61,7 +62,9 @@
             @if ($d['woo'])
             <div class="lp-d-set"><div><b>{{ $t('compare') }}</b><span>{{ $t('compare_text') }}</span></div><a class="lp-d-more" href="{{ \App\Modules\Admin\Filament\Merchant\Pages\PlanSettings::PRICING_URL }}" target="_blank" rel="noopener">{{ $t('pricing') }}</a></div>
             @endif
-            <div class="lp-d-set"><div><b>{{ $t('billing') }}</b><span>{{ $d['woo'] ? $t('billing_team') : $t('billing_shopify') }}</span></div>@if ($d['plans_url'])<a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $d['plans_url'] }}" target="_top">{{ $t('view') }}</a>@endif</div>
+            <div class="lp-d-set"><div><b>{{ $t('billing') }}</b><span>{{ $d['woo'] ? $t('billing_team') : $t('billing_shopify') }}</span></div>@if ($d['plans_url'])<a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $d['plans_url'] }}" data-plans-view>{{ $t('view') }}</a>@endif</div>
+            {{-- stopping the payments: Privacy and account cancels the plan with the platform that bills it, in one press --}}
+            <div class="lp-d-set" data-plan-cancel><div><b>{{ $t('cancel') }}</b><span>{{ $t('cancel_text') }}</span></div><a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ \App\Modules\Admin\Filament\Merchant\Pages\PrivacySettings::getUrl() }}">{{ $t('cancel_go') }}</a></div>
         </section>
     </div>
 </x-filament-panels::page>
