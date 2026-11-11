@@ -222,6 +222,16 @@
     if (d.q) { e.preventDefault(); if (d.loose) { signalEvent('loose_pick', d.loose, d.q); } submit(d.q, 'search'); return; }
     if (d.notSure) { e.preventDefault(); notSure(turnById(d.notSure)); return; }
     if (d.askAbout) { e.preventDefault(); askAbout(turnById(d.askAbout), d.question); return; }
+    // a tap answer to the question an answer about trouble ends with: the shopper's reply, asked with the conversation
+    if (d.choice) {
+      e.preventDefault();
+      var ct0 = turnById(d.choice);
+      if (ct0 && d.v) {
+        var cthread = (ct0.thread || []).concat([{ q: String(ct0.q || ''), a: String(ct0.answer || '') }]).slice(-3);
+        askTurn(String(d.v), { thread: cthread, previous: [] }, !!ct0.ctx, { thread: cthread });
+      }
+      return;
+    }
     if (d.ask) { e.preventDefault(); if (d.askcard !== undefined && d.from) { signalEvent('ask_after', d.from, ''); } submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
     if (d.savedAnswer) {
       e.preventDefault();

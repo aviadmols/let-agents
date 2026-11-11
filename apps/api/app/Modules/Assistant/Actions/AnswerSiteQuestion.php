@@ -142,9 +142,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * checked (CheckAnswerChange answers with v23) but given to no shopper's answer. Released by PROMPT_VERSION = 23
      * after the quality baseline on Rocks (as-is twice, --prompt=23 twice); a store with no rules is given v22's input.
      *
+     * answer_site v24 (v23 and, as Aviad asked 11.11 after reading another assistant's answers on Rocks: a shopper who tells
+     * of trouble is given the likely reason, the simple steps and one question with tap answers, `choices`; a term of the
+     * store's trade is explained from what anyone in it knows, each such sentence in `general`, which code keeps only when
+     * it says nothing of the store) is written and not released either: released with v23, after the same baseline.
+     *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23]];
+    public const CANDIDATES = ['answer_site' => [23, 24]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -268,6 +273,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** True in the second look: the question was already found to be the store's. */
     private bool $scoped = false;
+
+    /** The writer was told the shopper reports something that does not work (reportsTrouble, answer_site v24): it may ask back with choices. */
+    private bool $trouble = false;
 
     /** Whether the question being handled is within the day's questions, once asked (withinDailyLimits). */
     private ?bool $allowed = null;
@@ -1170,7 +1178,13 @@ final class AnswerSiteQuestion implements TriesQuestions
             $more = [];
 
             if ($entry->external_id === BuildShopKnowledge::TEAM) {
-                $text = implode("\n\n", array_slice(array_filter(preg_split('/\n{2,}/u', $text) ?: [], $speaks), 0, self::TEAM_PAIRS));
+                // the team's answers to questions like this one: those the meaning search found (the same question in other
+                // words: "לא מגיע לי הקוד" for "לא קיבלתי קוד הנחה"), first, then those that share a word with it
+                $near = implode("\n", array_map(fn (array $p): string => (string) $p['text'], array_filter($found, fn (array $p): bool => $p['source'] === 'content' && (string) $p['source_id'] === (string) $entry->id)));
+                $pairs = preg_split('/\n{2,}/u', $text) ?: [];
+                $meant = array_values(array_filter($pairs, fn (string $pair): bool => $near !== '' && ($head = trim((string) strtok(trim($pair), "\n"))) !== '' && mb_strpos($near, $head) !== false));
+                $worded = array_values(array_filter($pairs, fn (string $pair): bool => ! in_array($pair, $meant, true) && $speaks($pair)));
+                $text = implode("\n\n", array_slice([...$meant, ...$worded], 0, self::TEAM_PAIRS));
             }
 
             if ($entry->external_id === BuildShopKnowledge::POSTS) {
@@ -1482,9 +1496,13 @@ final class AnswerSiteQuestion implements TriesQuestions
         // "החנות פתוחה עכשיו": the store's own day and hour, only for a question that depends on when it is asked
         $now = AssistantAnswer::asksTheClock($question) ? self::clock($shopId) : null;
 
+        // something that does not work for the shopper ("לא קיבלתי קוד במייל"): the writer may ask back with choices (v24)
+        $this->trouble = ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= self::TROUBLE_FROM && self::reportsTrouble($this->asked !== '' ? $this->asked : $question);
+
         $input = (string) json_encode([
             'question' => $question,
         ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation])
+            + ($this->trouble ? ['trouble' => true] : [])
             + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
             + ($now === null ? [] : ['now' => $now])
             + (($tone = $this->voice !== null ? $this->voice['tone'] : self::tone($shopId)) === null ? [] : ['tone' => $tone])
@@ -1856,6 +1874,8 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                     $screened = $this->screen($reply->data, $prepared, $question, $mode);
                     ['answer' => $answer, 'cited' => $cited, 'picks' => $picks, 'refusal' => $answerRefusal] = $screened;
+                    // the answers the shopper may tap to the question a reply about trouble ends with (v24)
+                    $choices = (array) ($screened['choices'] ?? []);
                     // Every product the answer names is shown under it, as Aviad asked (2026-10-21): "דרקולה" in a sentence
                     // is a card too. Only of the products the writer was given, and before the checker, which judges them
                     // like any pick: nothing reaches the shopper unchecked.
@@ -1948,10 +1968,13 @@ final class AnswerSiteQuestion implements TriesQuestions
                 // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
                 // and in the store's own plural, never "אני יכול" (StoreVoice, Rocks 9.11): the answer, its not-found line, each pick's why
                 $answer = StoreVoice::plural(self::endsWhole($answer));
-                // a "yes" to our own offer goes forward with a question, never to the team (forwardOnYes)
-                $forward = self::forwardOnYes($this->asked, $answer, $this->conversation, $locale);
-                $answer = $forward
-                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain($answer, $this->conversation, $locale), $this->conversation), $locale);
+                // the tap answers stand only while the answer, as checked, still ends with their question
+                $choices = isset($choices) && $refusal === null ? self::choices($answer, $choices) : [];
+                // a "yes" to our own offer goes forward with a question, never to the team (forwardOnYes); a question back
+                // about trouble, with its choices, is that question: nothing of it is taken for an offer
+                $forward = $choices === [] ? self::forwardOnYes($this->asked, $answer, $this->conversation, $locale) : null;
+                $answer = $choices !== [] ? $answer : ($forward
+                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain($answer, $this->conversation, $locale), $this->conversation), $locale));
                 // a question back rests on no page and offers nothing: no sources or products under it
                 $cited = $forward === null ? $cited : [];
                 $picks = $forward === null ? $picks : [];
@@ -1971,7 +1994,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $outcome = $refusal === null ? AssistantAnswer::ANSWERED : ($unfit ? AssistantAnswer::OUT_OF_SCOPE : AssistantAnswer::NO_INFO);
                 // A "not found" is kept with its line: the next shopper who asks the same is told it without a model.
                 // the question as the first model read it, its slips mended ("יש מוצרים בכסף??"): how it is shown to others
-                $saved = $remember && $keep ? $this->save($question, $outcome, $refusal === null ? $answer : $notFound, $sources, $stored, $writer['model'], $replies, $run, $corrected === null ? $flags : (array) $flags + ['corrected' => $corrected]) : null;
+                // a question back with choices belongs to this shopper's trouble: never kept for the next one
+                $saved = $remember && $keep && $choices === [] ? $this->save($question, $outcome, $refusal === null ? $answer : $notFound, $sources, $stored, $writer['model'], $replies, $run, $corrected === null ? $flags : (array) $flags + ['corrected' => $corrected]) : null;
 
                 // This visitor got it clean: checked, safe, no attempt to instruct, nothing personal,
                 // nothing harmful. Counted once; enough different visitors share it with everyone.
@@ -1981,6 +2005,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                 $result = $refusal === null
                     ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored)
+                        + ($choices === [] ? [] : ['choices' => $choices])
                     : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
                         : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
                 $trace += ['writer' => $wrote, 'check' => $checked, 'refused' => $refusal, 'picks' => array_column($stored, 'external_id')];
@@ -2261,6 +2286,88 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $answer;
     }
 
+    /** From this version of answer_site the writer is told of trouble and may answer from general knowledge (general, choices). */
+    public const TROUBLE_FROM = 24;
+
+    /**
+     * A shopper telling of something that does not work for them with the store: a code that does not apply, an email
+     * that did not come, a payment or a page that fails ("לא מצליחה לרכוש עגילים ולקבל הנחה", "לא קיבלתי קוד במייל").
+     */
+    private const TROUBLE = '/(?<![\p{L}])(?:לא\s+(?:מצליח|מצליחה|מצליחים|הצלחתי|הצלחנו|עובד|עובדת|עובדים|מתקבל|מתקבלת|קיבלתי|קיבלנו|הגיע|הגיעה|הגיעו|נכנס|נכנסת|נפתח|נפתחת|נטען|נטענת|מאפשר|מאפשרת|מופיע|מופיעה|עבר|עברה)|נתקע|נתקעת|נתקעתי|תקוע|תקועה|שגיאה|תקלה|באג)(?![\p{L}])|\b(?:can(?:not|\'t)\s+(?:buy|pay|order|log\s*in|apply|use|check\s*out|complete)|(?:doesn\'t|does\s+not|didn\'t|did\s+not|won\'t|isn\'t)\s+(?:work|apply|arrive|come|load|open|working)|not\s+working|never\s+(?:arrived|came)|error)\b/iu';
+
+    /** "לא מצליחה למצוא טבעת": a search, no trouble. */
+    private const ONLY_FINDING = '/^(?:(?!(?:עובד|מתקבל|קיבלתי|הגיע|נכנס|נפתח|נטען|שגיאה|תקלה|באג|קוד|הנחה|קופון|תשלום|לשלם|לרכוש|לקנות|להזמין|להתחבר|מייל)).)*לא\s+(?:מצליח|מצליחה|מצליחים|הצלחתי|הצלחנו)\s+(?:ל)?(?:מצוא|למצוא)/u';
+
+    public static function reportsTrouble(string $question): bool
+    {
+        return preg_match(self::TROUBLE, $question) === 1 && preg_match(self::ONLY_FINDING, $question) !== 1;
+    }
+
+    /** What general knowledge never says: the store's own word (a price, stock, shipping, returns, payment, hours, "we"). */
+    private const STORE_FACT = '/[₪$€%]|ש["״׳\']ח|(?<![\p{L}])[ובהלמש]?(?:מחיר|מחירים|מלאי|משלוח|משלוחים|החזר|החזרה|החזרות|החזרים|החלפה|החלפות|אחריות|תשלום|תשלומים|זיכוי|שעות|פתוחים|פתוחה|סגורים|סגורה|אצלנו|שלנו|אנחנו|נשמח)(?![\p{L}])|\b(?:prices?|stock|shipping|delivery|returns?|refunds?|exchanges?|warranty|payments?|hours|open|closed|we|our|us)\b/iu';
+
+    /**
+     * The sentences of the answer the writer marked as general knowledge (answer_site v24), kept only where they stand
+     * in the answer and say nothing of the store (STORE_FACT); one that does is taken out of the answer, whatever else it
+     * says. Code only.
+     *
+     * @param  array<int, mixed>  $marked
+     * @return array{answer: string, general: list<string>}
+     */
+    public static function general(string $answer, array $marked): array
+    {
+        $kept = [];
+        $squash = fn (string $text): string => trim((string) preg_replace('/\s+/u', ' ', $text));
+
+        foreach ($marked as $sentence) {
+            $sentence = is_string($sentence) ? trim($sentence) : '';
+            if ($sentence === '' || mb_strpos($squash($answer), $squash($sentence)) === false) {
+                continue;
+            }
+
+            if (preg_match(self::STORE_FACT, $sentence) === 1) {
+                $answer = trim((string) preg_replace('/[ \t]*'.preg_quote($sentence, '/').'[ \t]*/u', ' ', $answer, 1));
+                $answer = trim((string) preg_replace('/ {2,}/u', ' ', $answer));
+
+                continue;
+            }
+
+            $kept[] = $sentence;
+        }
+
+        return ['answer' => $answer, 'general' => array_values(array_unique($kept))];
+    }
+
+    /**
+     * The short answers a shopper may tap to the one question an answer about trouble ends with (answer_site v24): two to
+     * four, each a few words, no price, no link, the answer ending with its question. None otherwise. Code only.
+     *
+     * @param  array<int, mixed>  $given
+     * @return list<string>
+     */
+    public static function choices(string $answer, array $given): array
+    {
+        if (! str_ends_with(rtrim($answer), '?')) {
+            return [];
+        }
+
+        $choices = [];
+        foreach ($given as $choice) {
+            $choice = is_string($choice) ? trim((string) preg_replace('/\s+/u', ' ', $choice)) : '';
+            if ($choice === '' || mb_strlen($choice) > self::CHOICE_CHARS || preg_match('/[₪$€%]|https?:|www\./iu', $choice) === 1) {
+                continue;
+            }
+            $choices[mb_strtolower($choice)] = $choice;
+        }
+
+        $choices = array_slice(array_values($choices), 0, 4);
+
+        return count($choices) >= 2 ? $choices : [];
+    }
+
+    /** How long one tap answer may be. */
+    private const CHOICE_CHARS = 40;
+
     /** A reply that only agrees ("כן", "בטח", "אשמח", "yes please"). */
     private const AGREED = '/^\s*(?:כן|כן\s+בבקשה|כן\s+אשמח|כן\s+תודה|בטח|בהחלט|אשמח|אוקיי?|יאללה|סבבה|בבקשה|yes|yes\s+please|yeah|yep|sure|ok(?:ay)?|please)\s*[.!,]*\s*$/iu';
 
@@ -2459,18 +2566,26 @@ final class AnswerSiteQuestion implements TriesQuestions
         $own = array_keys(array_filter($byRef, fn (array $passage): bool => in_array($passage['from'] ?? null, self::OWN_WORD, true)));
         $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], array_values(array_unique([...$cited, ...$own]))))."\n".$prices;
 
+        // What the writer said from general knowledge (answer_site v24: a term of the trade, the steps any website takes):
+        // only sentences that say nothing of the store; one that does is taken out of the answer (general()). What stays
+        // is known, so its numbers pass ("פי 10"), and an answer of it alone rests on it, citing no page.
+        ['answer' => $answer, 'general' => $general] = self::general($answer, (array) ($data['general'] ?? []));
+        $known .= $general === [] ? '' : "\n".implode("\n", $general);
+        $choices = $this->trouble ? self::choices($answer, (array) ($data['choices'] ?? [])) : [];
+
         // Code's checks on the answer, sentence by sentence (gate()); the picks stand or fall on their own.
         $trimmed = 0;
         $refusal = match (true) {
             $answer === '' => 'no_answer',
-            $cited === [] && $picks === [] => 'cites_nothing',
+            $cited === [] && $picks === [] && $general === [] => 'cites_nothing',
             default => null,
         };
         if ($refusal === null) {
             [$answer, $refusal, $trimmed] = self::gate($answer, $known, $pages);
         }
 
-        return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed];
+        return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed,
+            'general' => $general, 'choices' => $refusal === null ? $choices : []];
     }
 
     /** Who wrote a passage, when it is the store's own word (WRITTEN_BY): above any page. */

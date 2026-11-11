@@ -85,7 +85,7 @@
       var namedIds = named ? named.ids.map(function (id) { return pid(id); }) : [];
       return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds)).then(function () {
         if (d.outcome === 'answered') {
-          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [],
+          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
             ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [],
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null });
           announce(t('announceReady') + ': ' + d.answer);
@@ -223,6 +223,10 @@
     }
     if (turn.general) { html += '<div class="ls-note">' + icon('info') + '<span>' + esc(t('general')) + '</span></div>'; }
     if (turn.follow && turn.follow.length) { html += '<div class="ls-follow">' + turn.follow.map(function (f) { return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(f) + '">' + esc(f) + '</button>'; }).join('') + '</div>'; }
+    // the answers the shopper may tap to the question this answer ends with (something that does not work for them): a tap is their reply
+    if (newestAnswer() === turn && turn.choices && turn.choices.length) {
+      html += '<div class="ls-follow ls-choices" role="group">' + turn.choices.map(function (c) { return '<button class="ls-chip" data-choice="' + esc(turn.id) + '" data-v="' + esc(c) + '" dir="auto">' + esc(c) + '</button>'; }).join('') + '</div>';
+    }
     // the team offered under a partial answer, right under it and above the reply box (as Aviad asked, 11.11)
     html += partialHtml(turn);
     // the newest answer can be replied to ("לאיזו מטרה?" "לחיזוק חיסון"): the reply is asked with this conversation
