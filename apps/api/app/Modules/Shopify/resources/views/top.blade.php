@@ -16,8 +16,18 @@
 <body>
 <main>
     <p>{{ __('shopify::app.continue_text') }}</p>
-    <a href="{{ $url }}" target="_top">{{ __('shopify::app.continue') }}</a>
+    {{-- a press takes the window there too, through App Bridge, whatever stopped the step on its own --}}
+    <a href="{{ $url }}" target="_top" data-continue onclick="event.preventDefault(); window.open(this.href, '_top');">{{ __('shopify::app.continue') }}</a>
 </main>
-<script>setTimeout(function () { window.open(@json($url), '_top'); }, 50);</script>
+{{-- App Bridge (in the head, opened with host) takes the admin's window to Shopify's screen: window.open with _top is its
+     way out of the frame; at once, and again once it is ready --}}
+<script>
+    (function () {
+        var url = @json($url), gone = false;
+        function go() { if (!gone) { gone = true; window.open(url, '_top'); } }
+        if (window.shopify && window.shopify.ready) { window.shopify.ready.then(go, go); } else { go(); }
+        setTimeout(function () { gone = false; go(); }, 1500);
+    })();
+</script>
 </body>
 </html>

@@ -81,7 +81,9 @@
                 @if ($row['current'])
                     <span class="here">{{ __('shopify::app.plans_current') }}</span>
                 @else
-                    <a class="go" href="{{ $row['url'] }}" target="_top" onclick="event.preventDefault(); window.open(this.href, '_top');">{{ __('shopify::app.plans_choose', ['plan' => $plan->name]) }}</a>
+                    {{-- in the same window: inside the admin's frame the next step has App Bridge (the link carries host),
+                         and App Bridge takes the window to Shopify's approval --}}
+                    <a class="go" href="{{ $row['url'] }}" data-plan="{{ $plan->code }}">{{ __('shopify::app.plans_choose', ['plan' => $plan->name]) }}</a>
                 @endif
             </section>
         @endforeach

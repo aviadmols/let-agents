@@ -595,12 +595,27 @@ final class ShopifyAppTest extends TestCase
     {
         $install = $this->installed();
 
-        // The plan is not approved: inside the frame the plans show, and each opens its approval on top, not in it.
+        // The plan is not approved: inside the frame the plans show; a choice stays in the frame with what Shopify opened
+        // it with (App Store review, 11.11: a jump out of the frame from the plans did nothing).
         $plans = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4'])))
             ->assertOk()
-            ->assertSee('target="_top"', false)
-            ->assertSee('shopify/billing/start', false);
-        $this->get(self::choice($plans, 'pro'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
+            ->assertSee('shopify/billing/start', false)
+            ->assertDontSee('window.open(this.href', false);
+        $choice = self::choice($plans, 'pro');
+        $this->assertStringContainsString('host=YWRtaW4', $choice);
+        $this->assertStringContainsString('embedded=1', $choice);
+
+        // In the frame, the step has App Bridge (the admin's key, opened with host) and takes the window to the approval.
+        $this->get($choice, ['Sec-Fetch-Dest' => 'iframe'])
+            ->assertOk()
+            ->assertSee('cdn.shopify.com/shopifycloud/app-bridge.js', false)
+            ->assertSee('name="shopify-api-key"', false)
+            ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/charges\/confirm', false)
+            ->assertSee("window.open(url, '_top')", false);
+
+        // A link made outside the frame (the panel's change of plan, opened in the full window): straight to the approval.
+        $this->get(ShopifyAppController::planLink(self::SHOP, 'growth'))
+            ->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
         $this->assertSame('pending', $install->fresh()->subscription_status);
     }
 

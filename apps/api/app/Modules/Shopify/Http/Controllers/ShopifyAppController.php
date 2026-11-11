@@ -230,10 +230,16 @@ final class ShopifyAppController
         return URL::temporarySignedRoute('shopify.plans', now()->addHour(), ['shop' => $shopDomain] + self::speaking($locale));
     }
 
-    /** One plan, signed for this store, for an hour: off to Shopify to approve it (the panel's upgrade or downgrade). */
-    public static function planLink(string $shopDomain, string $plan, ?string $locale = null): string
+    /**
+     * One plan, signed for this store, for an hour: off to Shopify to approve it (the panel's upgrade or downgrade).
+     * Inside the admin's frame it carries what Shopify opened the frame with ($frame: host, embedded), so the next
+     * page in the frame has App Bridge too, which alone may take the frame's window to Shopify's approval.
+     *
+     * @param  array{host?: string, embedded?: string}  $frame
+     */
+    public static function planLink(string $shopDomain, string $plan, ?string $locale = null, array $frame = []): string
     {
-        return URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $shopDomain, 'plan' => $plan] + self::speaking($locale));
+        return URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $shopDomain, 'plan' => $plan] + self::speaking($locale) + $frame);
     }
 
     /** @return array{locale?: string} the language a signed link carries on to the page it opens */
@@ -254,13 +260,19 @@ final class ShopifyAppController
         $offered = Plan::query()->offered()->get();
         $store = app(PlanFit::class)->store($install);
         $fit = PlanFit::choose($offered, $store);
+        // Inside the admin's frame, a choice stays in the frame with what Shopify opened it with: the step it opens
+        // has App Bridge, which takes the window to Shopify's approval. A plain jump out of the frame did nothing in
+        // App Store review (11.11: "buttons are not working"): App Bridge kept our own address in the frame, and the
+        // page there, opened without host, had no App Bridge to leave it.
+        $frame = EmbeddedApp::framed($request) && filled($request->query('host'))
+            ? ['embedded' => '1', 'host' => (string) $request->query('host')] : [];
         $plans = $offered->map(fn (Plan $plan): array => [
             'plan' => $plan,
             'current' => $plan->code === $current,
             'fits' => $plan->code === $fit['fits'],
             'short' => $fit['short'][$plan->code] ?? [],
             'lines' => $plan->lines(),
-            'url' => self::planLink($install->shop_domain, $plan->code, $locale),
+            'url' => self::planLink($install->shop_domain, $plan->code, $locale, $frame),
         ])->all();
 
         $trial = null;
