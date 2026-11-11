@@ -44,11 +44,19 @@ final class ScheduleOutput
             'exit_code' => $task->exitCode,
         ];
         $target = (string) config('logging.schedule_output');
+        $json = json_encode($line, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
 
-        if ($target !== '' && self::writable($target)) {
-            @file_put_contents($target, json_encode($line, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-
-            return;
+        // opened as the shell opens it for the command's own output, no check first: the scheduler's output, or its
+        // error stream beside it (/proc/1/fd/2) when that one will not open
+        foreach ($target === '' ? [] : array_unique([$target, preg_replace('~/fd/1$~', '/fd/2', $target)]) as $to) {
+            $handle = @fopen((string) $to, 'a');
+            if ($handle !== false) {
+                $written = @fwrite($handle, $json);
+                @fclose($handle);
+                if ($written) {
+                    return;
+                }
+            }
         }
 
         $failed ? Log::error($line['message'], $line) : Log::info($line['message'], $line);
