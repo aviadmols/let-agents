@@ -56,6 +56,9 @@ final class ShopifyAppController
 
     private const MERCHANT_OVERVIEW_ROUTE = 'filament.merchant.pages.overview';
 
+    /** Plan and billing in the shop's panel, where a plan link that ran out returns. */
+    private const PLAN_SETTINGS_ROUTE = 'filament.merchant.pages.settings.plan';
+
     /** What Shopify opens the frame with, kept on every link inside it: never part of a signed link. */
     private const FRAME_QUERY = ['host', 'embedded'];
 
@@ -205,7 +208,7 @@ final class ShopifyAppController
         $this->speak($request, $install);
 
         if ($install === null) {
-            return response(__('shopify::app.bad_request'), 404);
+            return $this->expired($request) ?? response(__('shopify::app.bad_request'), 404);
         }
 
         return $this->choosePlan($request, $install);
@@ -219,7 +222,7 @@ final class ShopifyAppController
         $this->speak($request, $install);
 
         if ($install === null || $plan === null) {
-            return response(__('shopify::app.bad_request'), 404);
+            return ($install === null ? $this->expired($request) : null) ?? response(__('shopify::app.bad_request'), 404);
         }
 
         $approve = $billing->start($install, url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain])), $plan);
@@ -334,6 +337,29 @@ final class ShopifyAppController
         Carbon::setLocale($locale);
 
         return $locale;
+    }
+
+    /**
+     * A link of ours whose hour ran out (Plan and billing left open, a press later): back to Plan and billing, whose
+     * links are fresh, in the frame as it was; never an error page. A link that was never ours gets nothing here.
+     */
+    private function expired(Request $request): ?RedirectResponse
+    {
+        $ours = URL::hasCorrectSignature($request) || URL::hasCorrectSignature($request, true, self::FRAME_QUERY);
+        $shop = $ours && ! URL::signatureHasNotExpired($request) ? ShopifySignatures::shopDomain($request->query('shop')) : null;
+        $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
+
+        if ($install === null || ! $install->installed() || $install->shop === null) {
+            return null;
+        }
+
+        $url = route(self::PLAN_SETTINGS_ROUTE, ['tenant' => $install->shop->slug]);
+
+        if (EmbeddedApp::framed($request)) {
+            $url .= '?'.http_build_query(['embedded' => '1', 'host' => (string) $request->query('host'), 'shop' => $install->shop_domain]);
+        }
+
+        return redirect()->to($url);
     }
 
     private function signedInstall(Request $request): ?ShopifyInstall

@@ -643,6 +643,15 @@ final class ShopifyAppTest extends TestCase
         $this->assertStringStartsWith(rtrim((string) config('app.url'), '/').'/shopify/plans?', ShopifyAppController::plansLink(self::SHOP));
         $this->assertSame('https://gueta.panel.test/merchant', url('/merchant'), 'and the panel\'s own links stay where they are');
 
+        // Plan and billing left open past the link's hour: a press goes back there, in the frame, never to an error page
+        $late = $framed(ShopifyAppController::planLink(self::SHOP, 'growth', 'en'));
+        $this->travel(2)->hours();
+        $back = $this->get($late, ['Sec-Fetch-Dest' => 'iframe'])->assertRedirect();
+        $this->assertStringContainsString('/settings/plan?', (string) $back->headers->get('Location'));
+        $this->assertStringContainsString('host=YWRtaW4', (string) $back->headers->get('Location'));
+        $this->get(str_replace('plan=growth', 'plan=pro', $late))->assertNotFound();
+        $this->travelBack();
+
         // the store itself stays signed: another store's address in the same link is refused
         $this->get(str_replace('shop='.urlencode(self::SHOP), 'shop=another-store.myshopify.com', $framed(ShopifyAppController::plansLink(self::SHOP, 'en'))))
             ->assertNotFound();
