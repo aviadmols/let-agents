@@ -72,6 +72,29 @@ return [
         'remove_confirm' => 'Remove this line? The assistant stops using it.',
     ],
 
+    // a long text the team pastes: found by what it says, the piece that answers brought to the answer
+    'text' => [
+        'open' => 'Have a longer text? Paste a paragraph or a document',
+        'title_label' => 'Title (optional)',
+        'title_placeholder' => 'For example: Diamond grades guide',
+        'body_label' => 'The text',
+        'body_placeholder' => 'Paste a paragraph, a guide, a policy or anything about your store here. Several paragraphs are fine.',
+        'help' => 'The assistant doesn’t read the whole text for every answer: it searches it and brings only the part that answers the question.',
+        'save' => 'Save the text',
+        'cancel' => 'Cancel',
+        'saved' => 'Text saved',
+        'saved_body' => 'In a few minutes the assistant starts using it in answers.',
+        'removed' => 'Text removed',
+        'list' => 'Longer texts',
+        'words' => '{1} One word|[2,*] :n words',
+        'ready' => 'Used in answers',
+        'preparing' => 'Getting ready, a few more minutes',
+        'more' => 'Show all',
+        'less' => 'Show less',
+        'remove_confirm' => 'Remove this text? The assistant stops using it.',
+        'too_long' => 'The text is too long. Up to :n characters, or split it into a few texts.',
+    ],
+
     'rules' => [
         'sub' => 'Rules that apply to a whole group of products, without editing each one.',
         'zero' => 'No rules yet',

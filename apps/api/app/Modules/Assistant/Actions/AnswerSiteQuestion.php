@@ -1148,7 +1148,9 @@ final class AnswerSiteQuestion implements TriesQuestions
         // The team's own words first, then its answers, then what every product page repeats, then
         // what the posts say.
         $order = array_flip(array_keys(self::WRITTEN_BY));
-        $entries = CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->orderBy('external_id')->get(['id', 'external_id', 'title', 'body'])
+        // the team's long texts are not read whole: their pieces near the question came with the pages (addText)
+        $entries = CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', 'not like', BuildShopKnowledge::TEXT_PREFIX.'%')
+            ->orderBy('external_id')->get(['id', 'external_id', 'title', 'body'])
             ->sortBy(fn (CatalogContent $entry): int => $order[(string) $entry->external_id] ?? count($order));
         // About a named product: what names it, not every line sharing a word with the question ("מדינה" in
         // "המדינה הזאת" when "המדינה שבדרך" is asked about).

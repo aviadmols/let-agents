@@ -4,12 +4,14 @@ namespace App\Modules\Assistant\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Http\OutboundUrl;
+use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Contracts\StorefrontLock;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Retrieval\Contracts\RefreshesVectors;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
@@ -58,6 +60,14 @@ final class BuildShopKnowledge
 
     /** One line the team adds. */
     public const MAX_OWN = 600;
+
+    /** A long text the team adds, each an entry of its own, found by meaning only (addText). */
+    public const TEXT_PREFIX = CatalogContent::OWN_PREFIX.'knowledge-text-';
+
+    /** How much of one long text is kept, and of its title. */
+    public const MAX_TEXT = 30000;
+
+    public const MAX_TEXT_TITLE = 120;
 
     /** The lock the last page answered with (StorefrontLock), or null. */
     private ?string $lock = null;
@@ -271,6 +281,93 @@ final class BuildShopKnowledge
     public function removeOwn(string $id): void
     {
         $this->putOwn(array_values(array_filter($this->ownRows(), fn (array $r): bool => $r['id'] !== $id)));
+    }
+
+    /**
+     * A long text the team wrote (a guide, a policy, the story of the store): an entry of its own, never read whole
+     * before an answer as the team's lines are, but cut into passages, given vectors and found by meaning like a page
+     * of the site, its pieces that speak of a question brought to the writer (as Aviad asked, 11.11). The vectors are
+     * made a few minutes later (RefreshesVectors). Null when there is no text.
+     */
+    public function addText(string $title, string $body): ?string
+    {
+        $id = self::TEXT_PREFIX.Str::lower((string) Str::ulid());
+
+        return $this->putText($id, $title, $body) ? $id : null;
+    }
+
+    /** A long text the team changed: cut and given vectors again. Empty removes it. */
+    public function editText(string $id, string $title, string $body): void
+    {
+        if (! str_starts_with($id, self::TEXT_PREFIX) || $this->row($id) === null) {
+            return;
+        }
+
+        if (trim($body) === '') {
+            $this->removeText($id);
+
+            return;
+        }
+
+        $this->putText($id, $title, $body);
+    }
+
+    /** A long text taken away: its passages leave with it at the next refresh. */
+    public function removeText(string $id): void
+    {
+        $row = str_starts_with($id, self::TEXT_PREFIX) ? $this->row($id) : null;
+
+        if ($row !== null && $row->removed_at === null) {
+            $row->forceFill(['removed_at' => now(), 'body' => '', 'hash' => hash('sha256', '')])->save();
+            app(RefreshesVectors::class)->soon((string) app(TenantContext::class)->id());
+        }
+    }
+
+    /**
+     * The team's long texts, newest first.
+     *
+     * @return list<array{id: string, content_id: string, title: string, body: string, at: string|null, changed: string|null}>
+     */
+    public function texts(): array
+    {
+        return CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', 'like', self::TEXT_PREFIX.'%')
+            ->orderByDesc('created_at')->orderByDesc('external_id')->get(['id', 'external_id', 'title', 'body', 'created_at', 'updated_at'])
+            ->map(fn (CatalogContent $row): array => [
+                'id' => (string) $row->external_id,
+                'content_id' => (string) $row->id,
+                'title' => (string) $row->title,
+                'body' => (string) $row->body,
+                'at' => $row->created_at?->toIso8601String(),
+                'changed' => $row->updated_at?->toIso8601String(),
+            ])->values()->all();
+    }
+
+    private function putText(string $id, string $title, string $body): bool
+    {
+        // the text as written, its paragraphs kept; a title of its own, or its first words
+        $body = trim(mb_substr(str_replace(["\r\n", "\r"], "\n", $body), 0, self::MAX_TEXT));
+        $body = (string) preg_replace("/\n{3,}/u", "\n\n", $body);
+
+        if ($body === '') {
+            return false;
+        }
+
+        $title = trim(mb_substr(trim($title), 0, self::MAX_TEXT_TITLE));
+        $title = $title !== '' ? $title : Str::limit((string) preg_replace('/\s+/u', ' ', $body), self::MAX_TEXT_TITLE - 10, '…');
+        $hash = hash('sha256', $title."\n".$body);
+        $row = $this->row($id);
+
+        if ($row === null) {
+            CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => $id, 'title' => $title, 'body' => $body, 'terms' => [], 'hash' => $hash, 'synced_at' => now()]);
+        } elseif ($row->hash !== $hash || $row->removed_at !== null) {
+            $row->forceFill(['title' => $title, 'body' => $body, 'hash' => $hash, 'removed_at' => null, 'synced_at' => now()])->save();
+        } else {
+            return true;
+        }
+
+        app(RefreshesVectors::class)->soon((string) app(TenantContext::class)->id());
+
+        return true;
     }
 
     /**

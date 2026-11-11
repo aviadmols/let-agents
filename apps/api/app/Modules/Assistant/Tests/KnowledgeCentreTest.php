@@ -18,6 +18,8 @@ use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Enrichment\Contracts\ShopRules;
 use App\Modules\Retrieval\Contracts\Passages;
+use App\Modules\Retrieval\Contracts\RefreshesVectors;
+use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -174,6 +176,53 @@ final class KnowledgeCentreTest extends TestCase
             ->assertDontSee('10 ש"ח לחיתוך');
 
         $this->assertSame([], $this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()));
+    }
+
+    public function test_a_long_text_is_an_entry_of_its_own_found_by_meaning_and_can_be_edited_and_removed(): void
+    {
+        $refreshed = new \ArrayObject;
+        $this->app->instance(RefreshesVectors::class, new class($refreshed) implements RefreshesVectors
+        {
+            public function __construct(private readonly \ArrayObject $refreshed) {}
+
+            public function soon(string $shopId): void
+            {
+                $this->refreshed->append($shopId);
+            }
+        });
+        $body = "מדריך דרגות יהלומים.\n\nצבע: D עד F חסר צבע, G עד H כמעט חסר צבע.\n\nניקיון: VS פירושו פגמים זעירים שקשה לראות בהגדלה של פי 10.";
+
+        $page = Livewire::test(AboutStore::class)
+            ->assertSee('יש לכם טקסט ארוך?')
+            ->set('textTitle', 'דרגות יהלומים')
+            ->set('textBody', $body)
+            ->call('addText')
+            ->assertSet('textBody', '')
+            ->assertSee('טקסטים ארוכים')
+            ->assertSee('דרגות יהלומים')
+            ->assertSee('בהכנה, עוד כמה דקות');
+
+        $row = $this->inShop(fn (): CatalogContent => CatalogContent::query()->where('external_id', 'like', BuildShopKnowledge::TEXT_PREFIX.'%')->sole());
+        $this->assertSame([CatalogContent::KNOWLEDGE, 'דרגות יהלומים', $body], [$row->type, $row->title, $row->body], 'its paragraphs as written');
+        $this->assertSame([$this->shop->id], $refreshed->getArrayCopy(), 'cut and given vectors a few minutes later');
+        $this->assertArrayNotHasKey((string) $row->external_id, $this->inShop(fn (): array => app(BuildShopKnowledge::class)->entries()), 'never among the entries read whole');
+
+        // every piece given its vector since it was saved: in use
+        $this->inShop(function () use ($row): void {
+            foreach ([0, 1] as $position) {
+                (new RetrievalChunk)->forceFill(['shop_id' => $this->shop->id, 'source' => 'content', 'source_id' => $row->id, 'external_id' => $row->external_id, 'title' => $row->title, 'position' => $position,
+                    'text' => 'piece '.$position, 'text_hash' => 'h'.$position, 'embedding_model' => 'test', 'embedded_at' => now()->addSecond()])->save();
+            }
+        });
+        $page->call('show', 'notes')->assertSee('בשימוש בתשובות');
+
+        $page->call('startText', $row->external_id)->set('editTextBody', $body."\n\nאת היהלומים שלנו בודק גמולוג מוסמך.")->call('saveText')
+            ->assertSee('גמולוג מוסמך');
+        $this->assertCount(2, $refreshed, 'a change is cut again');
+
+        $page->call('removeText', $row->external_id)->assertDontSee('data-texts', false)->assertDontSee('גמולוג מוסמך');
+        $this->assertNotNull($row->fresh()->removed_at);
+        $this->assertCount(3, $refreshed, 'and its pieces leave');
     }
 
     public function test_the_check_names_only_passages_it_sent_and_asks_once_for_the_same_input(): void

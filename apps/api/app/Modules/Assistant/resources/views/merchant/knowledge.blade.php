@@ -8,6 +8,7 @@
     @php($pageIcon = '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6"/></svg>')
     @php($penIcon = '<svg viewBox="0 0 24 24"><path d="M5 19.5h4l10-10-4-4-10 10z"/></svg>')
     @php($own = $this->ownRows())
+    @php($texts = $this->texts())
     @php($pages = $this->pages())
     @php($rules = $this->rules())
     @php($knows = $this->knows())
@@ -28,13 +29,30 @@
                             <button type="button" @click="$refs.teach.value = @js($example); $refs.teach.dispatchEvent(new Event('input')); $refs.teach.focus()">{{ $example }}</button>
                         @endforeach
                     </div>
+                    @if ($this->mayFixLines())
+                        {{-- a long text: a paragraph, a guide, a policy; searched, and only what answers is brought (addText) --}}
+                        <div x-data="{ open: false }" x-on:lets-text-saved.window="open = false" data-text-new>
+                            <button type="button" class="lp-d-teach-open" x-show="!open" @click="open = true; $nextTick(() => $refs.longBody.focus())" data-text-open>{{ $t('text.open') }}</button>
+                            <form class="lp-d-text-form" x-show="open" x-cloak wire:submit="addText">
+                                <label for="text-title">{{ $t('text.title_label') }}</label>
+                                <input id="text-title" wire:model="textTitle" maxlength="{{ \App\Modules\Assistant\Actions\BuildShopKnowledge::MAX_TEXT_TITLE }}" placeholder="{{ $t('text.title_placeholder') }}" dir="auto" autocomplete="off">
+                                <label for="text-body">{{ $t('text.body_label') }}</label>
+                                <textarea id="text-body" x-ref="longBody" wire:model="textBody" rows="8" maxlength="{{ \App\Modules\Assistant\Actions\BuildShopKnowledge::MAX_TEXT }}" placeholder="{{ $t('text.body_placeholder') }}" dir="auto"></textarea>
+                                <p>{{ $t('text.help') }}</p>
+                                <div class="lp-d-text-go">
+                                    <button class="lp-d-btn lp-d-btn-lime lp-d-btn-sm" type="submit" wire:loading.attr="disabled" wire:target="addText">{{ $t('text.save') }}</button>
+                                    <button type="button" class="lp-d-ghost" @click="open = false">{{ $t('text.cancel') }}</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
                 </div>
             </section>
 
             <div class="lp-d-know">
                 <div>
                     <div class="lp-d-ktabs" role="tablist" aria-label="{{ $t('tabs.label') }}">
-                        @foreach (['pages' => count($pages), 'products' => $knows['products'], 'notes' => count($own), 'rules' => count($rules)] as $key => $count)
+                        @foreach (['pages' => count($pages), 'products' => $knows['products'], 'notes' => count($own) + count($texts), 'rules' => count($rules)] as $key => $count)
                             <button type="button" role="tab" wire:click="show(@js($key))" aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}"><span>{{ $t('tabs.'.$key) }}</span><span class="lp-d-ktabs-n lp-d-num">{{ number_format($count) }}</span></button>
                         @endforeach
                     </div>
@@ -153,7 +171,43 @@
                     @elseif ($this->tab === 'notes')
                         {{-- what the team added, each checked against the site --}}
                         @php($checking = collect($own)->contains(fn (array $r): bool => $r['check'] === null && $r['at'] !== null && \Illuminate\Support\Carbon::parse($r['at'])->gt(now()->subMinutes(10))))
-                        <section class="lp-d-card" data-pane="notes" @if ($checking) wire:poll.5s @endif>
+                        @php($preparing = collect($texts)->contains(fn (array $x): bool => ! $x['ready']))
+                        <section class="lp-d-card" data-pane="notes" @if ($checking) wire:poll.5s @elseif ($preparing) wire:poll.15s @endif>
+                            @if ($texts !== [])
+                                {{-- the long texts the team pasted: searched, the piece that answers brought to the answer --}}
+                                <div class="lp-d-texts" data-texts>
+                                    <h3>{{ $t('text.list') }}</h3>
+                                    @foreach ($texts as $text)
+                                        <div class="lp-d-srow" data-text="{{ $text['id'] }}" wire:key="text-{{ $text['id'] }}" x-data="{ all: false }">
+                                            <span class="lp-d-srow-ic">{!! $pageIcon !!}</span>
+                                            <span class="lp-d-srow-main">
+                                                @if ($this->editingText === $text['id'])
+                                                    <form class="lp-d-text-edit" wire:submit="saveText">
+                                                        <input wire:model="editTextTitle" maxlength="{{ \App\Modules\Assistant\Actions\BuildShopKnowledge::MAX_TEXT_TITLE }}" dir="auto" aria-label="{{ $t('text.title_label') }}">
+                                                        <textarea wire:model="editTextBody" rows="10" maxlength="{{ \App\Modules\Assistant\Actions\BuildShopKnowledge::MAX_TEXT }}" dir="auto" aria-label="{{ $t('text.body_label') }}"></textarea>
+                                                        <span><button type="submit" class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" wire:loading.attr="disabled" wire:target="saveText">{{ $t('notes.save') }}</button>
+                                                        <button type="button" class="lp-d-ghost" wire:click="cancelText">{{ $t('notes.cancel') }}</button></span>
+                                                    </form>
+                                                @else
+                                                    <b dir="auto">{{ $text['title'] }}</b>
+                                                    <span class="lp-d-srow-l lp-d-srow-wrap">
+                                                        @if ($text['at']){{ $t('notes.added', ['when' => $ago($text['at'])]) }} · @endif{{ trans_choice('assistant::store_knowledge.text.words', $text['words'], ['n' => number_format($text['words'])]) }} · {{ $text['ready'] ? $t('text.ready') : $t('text.preparing') }}
+                                                    </span>
+                                                    <p class="lp-d-text-body" dir="auto" x-show="!all">{{ \Illuminate\Support\Str::limit($text['body'], 220) }}</p>
+                                                    <p class="lp-d-text-body" dir="auto" x-show="all" x-cloak>{{ $text['body'] }}</p>
+                                                    @if (mb_strlen($text['body']) > 220)
+                                                        <button type="button" class="lp-d-ghost" style="padding: 0; height: auto" @click="all = !all" x-text="all ? @js($t('text.less')) : @js($t('text.more'))"></button>
+                                                    @endif
+                                                @endif
+                                            </span>
+                                            @if ($this->editingText !== $text['id'] && $this->mayFixLines())
+                                                <button type="button" class="lp-d-ghost" wire:click="startText(@js($text['id']))">{{ $t('notes.edit') }}</button>
+                                                <button type="button" class="lp-d-ghost" wire:click="removeText(@js($text['id']))" wire:confirm="{{ $t('text.remove_confirm') }}">{{ $t('notes.remove') }}</button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                             @forelse (array_slice($own, 0, $this->limits['notes']) as $row)
                                 @php($check = $row['check'])
                                 <div class="lp-d-srow" data-own="{{ $row['id'] }}">
@@ -201,7 +255,9 @@
                                     @endif
                                 </div>
                             @empty
-                                <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('notes.zero') }}</b><span>{{ $t('notes.zero_text') }}</span></div>
+                                @if ($texts === [])
+                                    <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('notes.zero') }}</b><span>{{ $t('notes.zero_text') }}</span></div>
+                                @endif
                             @endforelse
                         </section>
                     @else

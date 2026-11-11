@@ -6,13 +6,17 @@ use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\KnowledgeProducts;
 use App\Modules\Admin\Models\User;
+use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Filament\Merchant\Concerns\EditsSourceLines;
 use App\Modules\Assistant\Filament\Operator\Pages\AboutStore as OperatorAboutStore;
+use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 use UnitEnum;
@@ -140,6 +144,121 @@ final class AboutStore extends OperatorAboutStore
         $id = $this->product ?? ($this->strip()[0]['id'] ?? null);
 
         return $id === null ? null : $this->products(fn (KnowledgeProducts $k): ?array => $k->product($this->tenant(), $id));
+    }
+
+    /** A long text being written (the teach box opened for it), and one being changed in the list. */
+    public string $textTitle = '';
+
+    public string $textBody = '';
+
+    public ?string $editingText = null;
+
+    public string $editTextTitle = '';
+
+    public string $editTextBody = '';
+
+    /** A long text pasted: kept as an entry of its own, found by meaning a few minutes later (BuildShopKnowledge::addText). */
+    public function addText(): void
+    {
+        abort_unless($this->mayFixLines(), 403);
+
+        if (! $this->textFits($this->textBody)) {
+            return;
+        }
+
+        $id = $this->inThisShop(fn (): ?string => app(BuildShopKnowledge::class)->addText($this->textTitle, $this->textBody));
+
+        if ($id === null) {
+            return;
+        }
+
+        $this->textTitle = '';
+        $this->textBody = '';
+        $this->tab = 'notes';
+        $this->dispatch('lets-text-saved');
+        Notification::make()->success()->title(__('assistant::store_knowledge.text.saved'))->body(__('assistant::store_knowledge.text.saved_body'))->send();
+    }
+
+    public function startText(string $id): void
+    {
+        $row = collect($this->texts())->firstWhere('id', $id);
+        $this->editingText = $row === null ? null : $id;
+        $this->editTextTitle = (string) ($row['title'] ?? '');
+        $this->editTextBody = (string) ($row['body'] ?? '');
+    }
+
+    public function saveText(): void
+    {
+        abort_unless($this->mayFixLines(), 403);
+
+        if ($this->editingText === null || ! $this->textFits($this->editTextBody)) {
+            return;
+        }
+
+        $id = $this->editingText;
+        $this->inThisShop(fn () => app(BuildShopKnowledge::class)->editText($id, $this->editTextTitle, $this->editTextBody));
+        $this->cancelText();
+        Notification::make()->success()->title(__('assistant::store_knowledge.text.saved'))->body(__('assistant::store_knowledge.text.saved_body'))->send();
+    }
+
+    public function cancelText(): void
+    {
+        $this->editingText = null;
+        $this->editTextTitle = '';
+        $this->editTextBody = '';
+    }
+
+    public function removeText(string $id): void
+    {
+        abort_unless($this->mayFixLines(), 403);
+        $this->inThisShop(fn () => app(BuildShopKnowledge::class)->removeText($id));
+        Notification::make()->success()->title(__('assistant::store_knowledge.text.removed'))->send();
+    }
+
+    /**
+     * The team's long texts, newest first, each with how many words it has and whether the assistant finds it yet: every
+     * piece of it given its vector since it was last saved.
+     *
+     * @return list<array{id: string, title: string, body: string, at: string|null, words: int, ready: bool}>
+     */
+    public function texts(): array
+    {
+        return $this->inThisShop(function (): array {
+            $texts = app(BuildShopKnowledge::class)->texts();
+            $pieces = RetrievalChunk::query()->where('source', 'content')->whereIn('source_id', array_column($texts, 'content_id'))
+                ->selectRaw('source_id, count(*) as pieces, count(embedded_at) as found, max(embedded_at) as since')->groupBy('source_id')->get()->keyBy('source_id');
+
+            return array_map(function (array $text) use ($pieces): array {
+                $piece = $pieces->get($text['content_id']);
+                $since = $piece?->since === null ? null : Carbon::parse((string) $piece->since);
+
+                return [
+                    'id' => $text['id'],
+                    'title' => $text['title'],
+                    'body' => $text['body'],
+                    'at' => $text['at'],
+                    'words' => count(preg_split('/\s+/u', trim($text['body']), -1, PREG_SPLIT_NO_EMPTY) ?: []),
+                    'ready' => $piece !== null && (int) $piece->pieces > 0 && (int) $piece->found === (int) $piece->pieces
+                        && $since !== null && ($text['changed'] === null || $since->gte(Carbon::parse($text['changed'])->subSecond()) || Carbon::parse($text['changed'])->lt(now()->subMinutes(30))),
+                ];
+            }, $texts);
+        });
+    }
+
+    private function textFits(string $body): bool
+    {
+        if (mb_strlen(trim($body)) <= BuildShopKnowledge::MAX_TEXT) {
+            return true;
+        }
+
+        Notification::make()->warning()->title(__('assistant::store_knowledge.text.too_long', ['n' => number_format(BuildShopKnowledge::MAX_TEXT)]))->send();
+
+        return false;
+    }
+
+    private function inThisShop(callable $callback): mixed
+    {
+        return app(TenantContext::class)->run((string) $this->tenant()->id, $callback);
     }
 
     /**
