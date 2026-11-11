@@ -60,10 +60,6 @@
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('shown_instead') }}</span><p>{{ $row['answer'] }}</p></div>
                     @endif
 
-                    @if ($this->why === $row['id'])
-                        @include('assistant::merchant.why', ['row' => $row])
-                    @endif
-
                     {{-- what the team linked the question to: its answer is chosen among these products first --}}
                     @if ($row['link'] ?? null)
                         <p class="lp-note" style="margin: 8px 0 0" data-linked>
@@ -170,4 +166,30 @@
             <div x-data x-intersect="$wire.more()" class="lp-more"><button type="button" class="lp-link" wire:click="more">{{ $t('more') }}</button></div>
         @endif
     </div>
+
+    {{-- "i": a side panel over the page, from its far edge, with everything about the answer: what it was written from
+         (each source and the line it is written in, fixed or removed there), how it was checked, the tone and the
+         rules (as Aviad asked, 11.11). Escape or the shade around it closes it. --}}
+    @php($whyRow = $this->why === null ? null : collect($all)->firstWhere('id', $this->why))
+    @if ($whyRow)
+        <div wire:click="closeWhy" data-why-shade style="position: fixed; inset: 0; background: rgb(0 0 0 / 35%); z-index: 60"></div>
+        <aside role="dialog" aria-modal="true" aria-label="{{ __('assistant::ui.inbox.why.open') }}" data-why-drawer wire:key="why-{{ $whyRow['id'] }}"
+            x-data x-on:keydown.escape.window="$wire.closeWhy()"
+            style="position: fixed; top: 0; bottom: 0; inset-inline-end: 0; width: min(580px, 100vw); z-index: 61; overflow-y: auto; background: var(--la-paper); box-shadow: 0 0 40px rgb(0 0 0 / 25%); padding: 22px 22px 40px; display: grid; gap: 14px; align-content: start">
+            <div style="display: flex; align-items: center; gap: 12px">
+                <h2 style="margin: 0; flex: 1; font-size: 18px; font-weight: 600">{{ __('assistant::ui.inbox.why.open') }}</h2>
+                <button type="button" wire:click="closeWhy" aria-label="{{ $t('cancel') }}" data-why-close style="all: unset; cursor: pointer; width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; background: var(--la-sunk)">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div style="display: grid; gap: 6px">
+                <b dir="auto" style="font-size: 15px; font-weight: 600">{{ $whyRow['question'] }}</b>
+                <span class="lp-note">{{ trans_choice('assistant::ui.inbox.asked', $whyRow['asked'], ['n' => number_format($whyRow['asked'])]) }} · {{ $whyRow['where'] }}</span>
+            </div>
+            @if ($whyRow['answer'] !== '')
+                <div class="lp-ask-answer" style="margin: 0"><span class="lp-note">{{ $whyRow['state'] !== 'open' ? $t('answer_given') : $t('shown_instead') }}</span><p dir="auto">{{ $whyRow['answer'] }}</p></div>
+            @endif
+            @include('assistant::merchant.why', ['row' => $whyRow])
+        </aside>
+    @endif
 </x-filament-panels::page>

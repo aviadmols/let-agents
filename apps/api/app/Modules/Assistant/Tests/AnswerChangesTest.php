@@ -15,6 +15,7 @@ use App\Modules\Assistant\Actions\CheckAnswerChange;
 use App\Modules\Assistant\Filament\Merchant\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswerRule;
 use App\Modules\Assistant\Support\AnswerRules;
+use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -198,6 +199,7 @@ final class AnswerChangesTest extends TestCase
         ];
 
         $page = Livewire::withQueryParams(['find' => 'להחזיר', 'explain' => '1'])->test(ShopQuestions::class)
+            ->assertSeeHtml('data-why-drawer')
             ->assertSee('ממה היא נכתבה')
             ->assertSee('החזרות והחלפות')
             ->assertSeeHtml('href="https://store.test/returns"')
@@ -224,6 +226,10 @@ final class AnswerChangesTest extends TestCase
 
         $page->call('removeRule', $rule->id);
         $this->assertSame([], AnswerRules::texts($this->shop->id));
+
+        // the side panel closes, and opens again from the question's "i"
+        $page->call('closeWhy')->assertDontSeeHtml('data-why-drawer')
+            ->call('explainRow', 's:'.Question::key(self::QUESTION))->assertSeeHtml('data-why-drawer');
     }
 
     public function test_an_answer_kept_before_its_words_were_shows_the_nearest_lines_of_its_page_now(): void

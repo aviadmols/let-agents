@@ -481,6 +481,21 @@ final class ShopQuestions extends OperatorShopQuestions
         $this->cancelChange();
     }
 
+    /** The side panel closed. */
+    public function closeWhy(): void
+    {
+        $this->why = null;
+        $this->cancelChange();
+        $this->cancelLine();
+    }
+
+    /** "Fix the answer" from the side panel: closed, and the answer's own box opened in its row. */
+    public function fixFromWhy(string $row): void
+    {
+        $this->closeWhy();
+        $this->writeOwn($row);
+    }
+
     /** A new rule, or one of the store's rules to write again (by its id). */
     public function startRule(?string $ruleId = null): void
     {

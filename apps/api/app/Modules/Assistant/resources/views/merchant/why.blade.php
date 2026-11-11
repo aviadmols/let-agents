@@ -88,7 +88,7 @@
     @if ($may && $this->changing === null)
         <div class="lp-actions">
             @if ($row['state'] !== 'off')
-                <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="writeOwn(@js($row['id']))">{{ $w('fix_answer') }}</button>
+                <button type="button" class="lp-btn lp-btn-sm lp-btn-primary" wire:click="fixFromWhy(@js($row['id']))">{{ $w('fix_answer') }}</button>
             @endif
             @if ($why['search'])
                 <button type="button" class="lp-btn lp-btn-sm" wire:click="startRule" data-add-rule>{{ $w('rule_add') }}</button>
