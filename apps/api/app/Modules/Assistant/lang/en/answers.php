@@ -23,6 +23,8 @@ return [
         'legal-notice' => 'Legal notice',
     ],
     'site' => [
+        'team_glad' => 'The store\'s team will be glad to help you.',
+        'team_check' => 'This is one for our team to check. The store\'s team will be glad to help you.',
         'personal_data' => 'To keep your details private, please do not write a phone number, email, address or payment details here. Ask without them, or contact the store team directly.',
         'blocked' => 'Questions are not available here right now. The store team will be glad to help.',
         'no_match' => 'We found no product that exactly fits the question. The store team will be glad to help.',

@@ -1934,7 +1934,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                 // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
                 // and in the store's own plural, never "אני יכול" (StoreVoice, Rocks 9.11): the answer, its not-found line, each pick's why
-                $answer = self::withoutOfferedAgain(StoreVoice::plural(self::endsWhole($answer)), $this->conversation);
+                $answer = self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain(StoreVoice::plural(self::endsWhole($answer)), $this->conversation, $locale), $this->conversation), $locale);
                 $notFound = isset($notFound) ? StoreVoice::plural($notFound) : null;
                 $picks = array_map(fn (array $pick): array => ['why' => StoreVoice::plural((string) ($pick['why'] ?? ''))] + $pick, $picks);
                 $quotes = [];
@@ -2239,6 +2239,90 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $answer;
+    }
+
+    /**
+     * A reply that says again what the answer before it said ("כן, אשמח שתעזרו לי לבדוק" after "צריך לבדוק אותה", and
+     * the same answer once more, Rocks 11.11) is no answer: the shopper is told it is the team's to check, and the
+     * drawer offers that team under it. Most of its words in the answer before it, its words read as the search reads
+     * them. Code only.
+     *
+     * @param  list<array{question: string, answer: string}>  $conversation
+     */
+    public static function notSaidAgain(string $answer, array $conversation, string $locale): string
+    {
+        $before = $conversation === [] ? '' : (string) end($conversation)['answer'];
+
+        if (trim($answer) === '' || trim($before) === '') {
+            return $answer;
+        }
+
+        // each word with its forms, one or two prefix letters left off ("במבנה" is "מבנה"); a word of the reply is the
+        // answer's when any of its forms is (Rocks 11.11: the same answer reworded held 83% of its words, a new one 8%)
+        $forms = function (string $text): array {
+            $out = [];
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(strtr($text, ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']))) ?: [] as $w) {
+                if (mb_strlen($w) < 3) {
+                    continue;
+                }
+                $set = [$w];
+                if (mb_strlen($w) > 3 && preg_match('/^[והבלמשכ]/u', $w) === 1) {
+                    $set[] = mb_substr($w, 1);
+                }
+                if (mb_strlen($w) > 4 && preg_match('/^[והבלמשכ]{2}/u', $w) === 1) {
+                    $set[] = mb_substr($w, 2);
+                }
+                $out[] = $set;
+            }
+
+            return $out;
+        };
+        $said = [];
+        foreach ($forms($before) as $set) {
+            foreach ($set as $form) {
+                $said[$form] = true;
+            }
+        }
+        $now = $forms($answer);
+        $held = count(array_filter($now, fn (array $set): bool => array_filter($set, fn (string $f): bool => isset($said[$f])) !== []));
+
+        if (count($now) < 8 || $held / count($now) < 0.7) {
+            return $answer;
+        }
+
+        return (string) __('assistant::answers.site.team_check', [], $locale === 'en' ? 'en' : 'he');
+    }
+
+    /**
+     * An answer that says the pages do not settle it: what was asked is written nowhere, or has to be checked by a
+     * person ("כדי לדעת אם קיצור מתאים לשרשרת הזו, צריך לבדוק אותה").
+     */
+    private const UNSETTLED = '/(?:צריך|יש|כדאי|נדרש|נצטרך)\s+(?:ל)?בדוק|לבדוק\s+(?:אותה|אותו|אותם|מול)|(?:לא\s+ניתן|אי\s+אפשר)\s+לדעת|לא\s+(?:מצוין|מצוינת|מצוינים|כתוב|כתובה|כתובים|מופיע|מופיעה|ידוע|ידועה|מפורט|מפורטת)(?![\p{L}])|אין\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים)(?![\p{L}])|\bneeds?\s+to\s+be\s+checked\b|\bcan(?:not|\'t)\s+(?:know|tell)\b|\bnot\s+(?:stated|mentioned|listed|specified)\b/iu';
+
+    /**
+     * An answer that says the pages do not settle it closes with the store's team, never with an offer to do what only
+     * a person can ("תרצו שנעזור לבדוק את האורך המתאים לכם?" after "צריך לבדוק אותה", Rocks 11.11): its closing offer
+     * becomes "the store's team will be glad to help", and the drawer offers that team under it. Code only.
+     */
+    public static function teamWhenUnsettled(string $answer, string $locale): string
+    {
+        if (trim($answer) === '' || preg_match(self::UNSETTLED, $answer) !== 1) {
+            return $answer;
+        }
+
+        $trimmed = rtrim($answer);
+        $cut = max((int) mb_strrpos(mb_substr($trimmed, 0, -1), "\n"), ...array_map(fn (string $end): int => (int) mb_strrpos(mb_substr($trimmed, 0, -1), $end), ['. ', '! ', '? ']));
+        $last = trim(mb_substr($trimmed, $cut === 0 ? 0 : $cut + 1));
+
+        // only the closing offer, and only when there is an answer before it
+        if ($cut === 0 || (preg_match(self::OFFER, $last) !== 1 && ! str_ends_with($last, '?'))) {
+            return $answer;
+        }
+
+        $glad = (string) __('assistant::answers.site.team_glad', [], $locale === 'en' ? 'en' : 'he');
+        $kept = rtrim(mb_substr($trimmed, 0, $cut + 1));
+
+        return str_contains($kept, $glad) ? $kept : $kept.(str_contains(mb_substr($trimmed, $cut, 1), "\n") ? "\n\n" : ' ').$glad;
     }
 
     public static function promptVersion(string $name): ?int

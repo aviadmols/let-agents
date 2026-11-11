@@ -361,7 +361,7 @@
   // it, what the shop offers when there is no answer (its team on WhatsApp in the opening hours, the form), one press
   // away, so the shopper still gets the rest from a person (as Aviad asked, 11.11). Not where the shop offers nothing,
   // and not beside the shop's own lead flow after an answer.
-  var PARTIAL = /(?:^|[^\p{L}])(?:אין|לא)\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים|פירוט)(?![\p{L}])|(?:^|[^\p{L}])לא\s+(?:מצוין|מצוינת|מצוינים|מצוינות|כתוב|כתובה|כתובים|מופיע|מופיעה|מופיעים|ידוע|ידועה|מפורט|מפורטת|מפורטים)(?![\p{L}])|(?:^|[^\p{L}])אין\s+(?:לנו\s+)?(?:כאן|באתר|בעמוד|בתיאור)\s+(?![בל]?מלאי)\S+|\bnot\s+(?:stated|mentioned|listed|specified|given)\b|\bno\s+(?:information|details)\s+(?:on|about)\b/iu;
+  var PARTIAL = /(?:^|[^\p{L}])(?:אין|לא)\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים|פירוט)(?![\p{L}])|(?:^|[^\p{L}])לא\s+(?:מצוין|מצוינת|מצוינים|מצוינות|כתוב|כתובה|כתובים|מופיע|מופיעה|מופיעים|ידוע|ידועה|מפורט|מפורטת|מפורטים)(?![\p{L}])|(?:^|[^\p{L}])אין\s+(?:לנו\s+)?(?:כאן|באתר|בעמוד|בתיאור)\s+(?![בל]?מלאי)\S+|(?:צריך|יש|כדאי|נדרש|נצטרך)\s+(?:ל)?בדוק|לבדוק\s+(?:אותה|אותו|אותם|מול)|(?:לא\s+ניתן|אי\s+אפשר)\s+לדעת|צוות\s+החנות\s+ישמח|הצוות\s+שלנו\s+ישמח|\bnot\s+(?:stated|mentioned|listed|specified|given)\b|\bno\s+(?:information|details)\s+(?:on|about)\b|\bneeds?\s+to\s+be\s+checked\b|\bteam\s+will\s+be\s+glad\b/iu;
   function partialHtml(turn) {
     if (!turn.answer || turn.leadFlow || !PARTIAL.test(String(turn.answer)) || noAnswerOf(turn) === 'none') { return ''; }
     if (turn.partialOpen || turn.lead) { return '<div class="ls-partial" style="margin-top:14px">' + noInfoHtml(turn, true) + '</div>'; }
