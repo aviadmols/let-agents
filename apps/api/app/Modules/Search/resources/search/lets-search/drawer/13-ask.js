@@ -230,8 +230,10 @@
         '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form>';
     }
     html += rateHtml(turn);
+    html += partialHtml(turn);
     html += leadFlowHtml(turn);
-    var h = hours(), link = S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
+    // the line to make sure with the team, unless the partial answer's offer already holds it
+    var h = hours(), link = !partialHtml(turn) && S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html + myAi(turn);
   }
@@ -355,28 +357,45 @@
       throw new Error('lead');
     }).catch(function () { turn.leadBusy = false; update(turn, { leadErr: true }); });
   }
-  function noInfoHtml(turn) {
+  // An answer that says a detail asked about is written nowhere ("אין לנו כאן משקל של הספיר", "לא מצוין בתיאור"): under
+  // it, what the shop offers when there is no answer (its team on WhatsApp in the opening hours, the form), one press
+  // away, so the shopper still gets the rest from a person (as Aviad asked, 11.11). Not where the shop offers nothing,
+  // and not beside the shop's own lead flow after an answer.
+  var PARTIAL = /(?:^|[^\p{L}])(?:אין|לא)\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים|פירוט)(?![\p{L}])|(?:^|[^\p{L}])לא\s+(?:מצוין|מצוינת|מצוינים|מצוינות|כתוב|כתובה|כתובים|מופיע|מופיעה|מופיעים|ידוע|ידועה|מפורט|מפורטת|מפורטים)(?![\p{L}])|(?:^|[^\p{L}])אין\s+(?:לנו\s+)?(?:כאן|באתר|בעמוד|בתיאור)\s+(?![בל]?מלאי)\S+|\bnot\s+(?:stated|mentioned|listed|specified|given)\b|\bno\s+(?:information|details)\s+(?:on|about)\b/iu;
+  function partialHtml(turn) {
+    if (!turn.answer || turn.leadFlow || !PARTIAL.test(String(turn.answer)) || noAnswerOf(turn) === 'none') { return ''; }
+    if (turn.partialOpen || turn.lead) { return '<div class="ls-partial" style="margin-top:14px">' + noInfoHtml(turn, true) + '</div>'; }
+    var h = hours(), link = noAnswerOf(turn) === 'team' && h.open ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null;
+    return '<div class="ls-partial" style="margin-top:14px"><p class="ls-noanswer__text" style="margin:0 0 10px">' + esc(t('partialAsk')) + '</p><div class="ls-form__actions">' +
+      (link ? '<a class="ls-btn ls-btn--primary ls-btn--sm" href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('teamWa')) + '</a>' : '') +
+      (S.config.callbacks !== false || noAnswerOf(turn) === 'details' ? '<button type="button" class="ls-btn ' + (link ? 'ls-btn--secondary' : 'ls-btn--primary') + ' ls-btn--sm" data-partial-open="' + esc(turn.id) + '">' + esc(t('partialLeave')) + '</button>' : '') +
+      '</div></div>';
+  }
+  function noInfoHtml(turn, partial) {
     // what the shop offers when there is no answer (assistant.no_answer, sent with the reply): team (WhatsApp in
     // the opening hours, details outside them), details (always the form, never WhatsApp), none ("not found" only)
     var offer = noAnswerOf(turn), h = hours(), link = offer === 'team' ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null, html = '';
-    var form = leadFormOf(turn), own = turn.notFound ? String(turn.notFound) : '';
+    var form = leadFormOf(turn), own = partial ? t('partialAsk') : turn.notFound ? String(turn.notFound) : '';
     if (turn.lead === 'done' || turn.lead === 'code') {
       html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(turn.leadVerified ? t('codeDone') : t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>' + (turn.lead === 'code' ? codeForm(turn) : '');
     } else if (turn.lead === 'no') {
       html = '<p class="ls-noanswer__text">' + esc(t('leadDeclined')) + '</p>';
     } else if (offer === 'none') {
       html = '<p class="ls-noanswer__text">' + esc(own || t('noInfo')) + '</p>';
-    } else if (offer === 'team' && h.open && link) {
+    // "leave details" pressed under a partial answer: the form, even while the team is on WhatsApp
+    } else if (offer === 'team' && h.open && link && !(partial && turn.partialOpen)) {
       html = '<div class="ls-hours"><span class="ls-dot"></span>' + esc(t('teamNow', { t: h.until || '' })) + '</div><p class="ls-noanswer__text">' + esc(own || t('waText')) + '</p>' +
         '<a class="ls-btn ls-btn--primary" href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp') + esc(t('teamWa')) + '</a>';
     } else if (offer === 'details' || S.config.callbacks !== false) {
       // in the opening hours "the team is back" says nothing: only the question and the form
-      html = (offer === 'team' || !h.open ? '<div class="ls-hours"><span class="ls-dot ls-dot--off"></span>' + esc(t('teamBack', { when: h.when || '' })) + '</div>' : '') +
-        '<p class="ls-noanswer__text">' + esc(own ? own + ' ' + t('leadAsk') : t('leadText')) + '</p>' + (form ? shopLeadForm(turn, form, turn.q) : leadForm(turn, turn.q));
+      // under a partial answer, the form the shopper asked for: no "the team is back" while it is open, one line asking
+      html = ((offer === 'team' && !(partial && h.open)) || !h.open ? '<div class="ls-hours"><span class="ls-dot ls-dot--off"></span>' + esc(t('teamBack', { when: h.when || '' })) + '</div>' : '') +
+        '<p class="ls-noanswer__text">' + esc(partial ? t('leadAsk') : own ? own + ' ' + t('leadAsk') : t('leadText')) + '</p>' + (form ? shopLeadForm(turn, form, turn.q) : leadForm(turn, turn.q));
     } else {
       html = '<p class="ls-noanswer__text">' + esc(own || t('noInfo')) + '</p>';
     }
     // the search box's own question said why it was not answered ("אין באתר המלצה אחת…"): what to ask instead
+    if (partial) { return html; }
     if (own && !turn.ctx && turn.lead !== 'done') { html += '<p class="ls-noanswer__hint">' + esc(t('askSpecific')) + '</p>'; }
     if (turn.rel && turn.rel.length) {
       html += '<div class="ls-block"><div class="ls-block__title" style="color:var(--ls-fg-muted);font-weight:500">' + esc(t('meanwhile')) + '</div><div class="ls-panel" style="box-shadow:0 0 0 1px var(--ls-line);padding:4px">' + turn.rel.map(function (id) { return prow(rec(id)); }).join('') + '</div></div>';

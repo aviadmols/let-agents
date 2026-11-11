@@ -134,9 +134,18 @@
     while ((m = re.exec(t))) { last = m.index + 1; }
     return last >= t.length * 0.5 ? t.slice(0, last) : s;
   }
+  // an address the answer gives ("https://rocksandgold.co.il/certificate/?id="): a link that opens, its closing
+  // punctuation left out of it (as Aviad asked, 11.11)
+  var ADDRESS = /https?:\/\/[^\s<>"'״׳”«»]+/i;
   function answerText(text, anim, pages) {
     var n = 0, said = '', plain = function (s) { var h = anim ? words(s, n) : ltrWords(s); n += String(s).split(' ').length; return h; };
     var out = function (s) {
+      var a = ADDRESS.exec(s);
+      if (a) {
+        var url = a[0].replace(/[.,;:!?)\]}]+$/, ''), head = out(s.slice(0, a.index));
+        said += url + ' ';
+        return head + '<a class="ls-answer__page-link" href="' + esc(url) + '" target="_blank" rel="noopener" dir="ltr">' + esc(url) + '</a>' + out(s.slice(a.index + url.length));
+      }
       var m = pages && pages.length ? PAGE_SAID.exec(s) : null, before = m ? s.slice(0, m.index) : s;
       if (!m) { said += s + ' '; return plain(s); }
       var near = (said + before).slice(-160).toLowerCase(), page = pages.filter(function (p) { return near.indexOf(String(p.title).toLowerCase()) >= 0; })[0] || pages[0];

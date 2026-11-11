@@ -280,6 +280,7 @@
     }
     if (d.leadFlowNo) { var ln = turnById(d.leadFlowNo); if (ln && ln.leadFlow && !ln.leadFlow.busy) { leadStep(ln, { declined: true }); } return; }
     if (d.leadCodeSkip) { var cs = turnById(d.leadCodeSkip); if (cs) { update(cs, { lead: 'done', codeErr: '' }); } return; }
+    if (d.partialOpen) { var po = turnById(d.partialOpen); if (po) { update(po, { partialOpen: true }); } return; }
     if (d.leadNo) { var lt2 = S.turns.filter(function (x) { return x.id === d.leadNo; })[0]; update(lt2, { lead: 'no' }); return; }
     if (d.tagOff) { var pr = d.tagOff.split(':'), pt = S.turns.filter(function (x) { return x.id === pr[0]; })[0]; pt.off[pr[1]] = !pt.off[pr[1]]; persist(); render(); return; }
     if (d.photoItem) {
