@@ -191,6 +191,14 @@ final class DraftTeamAnswer
             $passages[] = ['id' => 'p'.($i + 1), 'title' => (string) $piece['title'], 'text' => mb_substr(trim((string) $piece['text']), 0, self::MAX_PASSAGE)];
         }
 
+        // The team's own lines that speak of the question or of what was found, as the answerer reads them first: a
+        // condition the team wrote ("for items of ₪2,000 and up, Layaway") belongs with the page it qualifies, never
+        // left out because six nearer pieces filled the places (Rocks, 11.11: a draft on paying other than by card said
+        // Layaway without its least price).
+        if (($own = $this->ownLines((string) $row->question, $passages)) !== null) {
+            $passages[] = ['id' => 'p'.(count($passages) + 1)] + $own;
+        }
+
         return [
             'shop' => (string) (Shop::query()->find($shopId)?->name ?? ''),
             'question' => (string) $row->question,
@@ -198,6 +206,44 @@ final class DraftTeamAnswer
             'page' => $subject?->context ?? [],
             'passages' => $passages,
         ];
+    }
+
+    /**
+     * The lines the team added that share a word (three letters or more, its prefix letter aside) with the question or
+     * the passages found, as one passage under the team's own title; null when none does or one is among them already.
+     *
+     * @param  list<array{id: string, title: string, text: string}>  $passages
+     * @return array{title: string, text: string}|null
+     */
+    private function ownLines(string $question, array $passages): ?array
+    {
+        $knowledge = app(BuildShopKnowledge::class);
+        $entry = $knowledge->entries()[BuildShopKnowledge::OWN] ?? null;
+        $title = trim((string) ($entry?->title ?? ''));
+
+        if ($entry === null || $entry->removed_at !== null || in_array($title, array_column($passages, 'title'), true)) {
+            return null;
+        }
+
+        $words = function (string $text): array {
+            $out = [];
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(strtr($text, ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']))) ?: [] as $w) {
+                $w = mb_strlen($w) > 3 ? (string) preg_replace('/^[והבלמשכ]/u', '', $w) : $w;
+                if (mb_strlen($w) >= 3) {
+                    $out[$w] = true;
+                }
+            }
+
+            return $out;
+        };
+        $found = $words($question.' '.implode(' ', array_column($passages, 'text')));
+        $lines = array_values(array_filter($knowledge->ownRows(), fn (array $r): bool => array_intersect_key($words($r['text']), $found) !== []));
+
+        if ($lines === []) {
+            return null;
+        }
+
+        return ['title' => $title, 'text' => mb_substr(implode("\n", array_map(fn (array $r): string => '- '.$r['text'], $lines)), 0, self::MAX_PASSAGE * 2)];
     }
 
     private function usedToday(string $shopId): int

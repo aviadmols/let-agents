@@ -8,6 +8,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\DraftTeamAnswer;
 use App\Modules\Assistant\Filament\Operator\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
@@ -118,5 +119,21 @@ final class TeamDraftTest extends TestCase
         $this->assertSame(['refused' => 'off'], app(DraftTeamAnswer::class)->handle($this->shop->id, $this->question->id, 'x'));
         Livewire::test(ShopQuestions::class, ['shop' => $this->shop->id])->assertDontSee('ניסוח עם AI');
         $this->assertSame([], $this->calls);
+    }
+
+    public function test_the_teams_own_line_on_what_was_found_reaches_the_draft(): void
+    {
+        $this->inShop(function (): void {
+            app(BuildShopKnowledge::class)->addOwn('לכל המכשירים אחריות של שנתיים, בהצגת חשבונית.');
+            app(BuildShopKnowledge::class)->addOwn('החנות סגורה בשבת.');
+        });
+        $this->replies = [['answer' => 'למקדחה אחריות של שנתיים, בהצגת חשבונית.', 'sources' => ['p1', 'p2']], ['ok' => true, 'problems' => []]];
+
+        app(DraftTeamAnswer::class)->handle($this->shop->id, $this->question->id, '');
+
+        $passages = $this->calls[0]['input']['passages'];
+        $this->assertSame('אחריות ושירות', $passages[0]['title'], 'the nearest piece first');
+        $this->assertStringContainsString('אחריות של שנתיים, בהצגת חשבונית', (string) end($passages)['text'], 'the team\'s line on warranty');
+        $this->assertStringNotContainsString('סגורה בשבת', (string) end($passages)['text'], 'never a line that speaks of nothing found');
     }
 }
