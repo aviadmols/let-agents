@@ -456,7 +456,12 @@
     return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') + askCard(q, false, askFind(q));
   }
   // the AI asked to find the words across the whole catalogue ("תראה לי …": the set finder), from the ask card or the row
-  function askFind(q) { return 'data-askcard data-from="' + esc(q) + '" data-ask="' + esc(t('askFindQ', { q: String(q || '').replace(/[?؟.!\s]+$/, '') })) + '"'; }
+  // "חפשו לי באתר": a few words of what is sought are asked to see ("תראה לי עגילי זהב"); a sentence, or a question, is
+  // asked as the shopper wrote it, never "תראה לי" before it (as Aviad asked, 11.11)
+  function askFind(q) {
+    var s = String(q || '').replace(/[?؟.!\s]+$/, ''), asked = isQuestion(s) || s.trim().split(/\s+/).length >= 4;
+    return 'data-askcard data-from="' + esc(q) + '" data-ask="' + esc(asked ? String(q || '').trim() : t('askFindQ', { q: s })) + '"';
+  }
   // nothing found by the words nor by their meaning: never "not found" (Tomer's ask card, 8.11), the store's popular
   // searches to start from, then the card that asks the AI
   function popularHtml() {

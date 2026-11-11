@@ -136,8 +136,13 @@
     // "תן לי את כל ספרי החטופים", "תציג לי את ספריית שיבולת": a set asked to see, which the assistant shows whole
     return /\?\s*$/.test(q) || /^(איזה|איזו|אילו|איך|כמה|האם|מה|למה|מתי|אפשר|יש לכם|יש לך|which|what|how|can|does|is|do|why)\b/i.test(q.trim())
       || /^(תן|תני|תנו|תציג|תציגי|תציגו|הצג|תראה|תראי|תראו|הראה|הראו)\s+(לי|לנו)\s+\S|^(show|list)\s+(me\s+)?(all\s+)?\S/i.test(q.trim())
-      || (q.trim().split(/\s+/).length >= 5 && ASKS_FOR.test(q));
+      || (q.trim().split(/\s+/).length >= 5 && ASKS_FOR.test(q))
+      // "אהבתי מאוד את התכשיט הזה, האם אפשר להגדיל את הטבעת למידה 54": what it asks starts after what it tells, and one
+      // Enter asks it (Rocks, 11.11: it was searched, and asked only on a second Enter)
+      || (q.trim().split(/\s+/).length >= 4 && ASKS_INSIDE.test(q));
   }
+  // a question word starting a clause inside the text, as a word of its own ("שאפשר", "כמה" of a product's name aside)
+  var ASKS_INSIDE = /(^|[\s,.;:!])(?:(?:האם|איך|למה|מתי|יש\s+לכם|יש\s+לך|can\s+i|can\s+you|is\s+it\s+possible|do\s+you)(?=[\s,]|$)|(?:אפשר|ניתן)\s+ל[א-ת]{2,})/i;
   var ASKS_FOR = /(תמליצ|תמליץ|המליצ|ממליצ|המלצה|תסביר|תסבירו|הסבר|ספר(ו)? לי|תגיד(ו)? לי|השוו|ההבדל|הבדל בין|כדאי לי|מה עדיף|עדיף|צריך לדעת|אני מתלבט|מתלבטת|recommend|explain|compare|difference|should i|which is better)/i;
 
   // store products (regular price, variations) for the cards on screen
