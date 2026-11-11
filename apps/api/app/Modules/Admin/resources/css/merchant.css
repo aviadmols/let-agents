@@ -1933,7 +1933,9 @@ html.dark .fi-panel-merchant .lp-d-task:hover { background: var(--lp-d-card); }
 .fi-panel-merchant .lp-d-price { font-size: 30px; font-weight: 500; letter-spacing: -.03em; }
 .fi-panel-merchant .lp-d-price small { font-size: 13px; color: var(--lp-d-muted); font-weight: 400; letter-spacing: 0; }
 .fi-panel-merchant .lp-d-planc ul { margin: 4px 0 0; padding-inline-start: 16px; display: grid; gap: 3px; font-size: 12.5px; color: var(--lp-d-muted); }
-.fi-panel-merchant .lp-d-planc .lp-d-btn { margin-top: 10px; justify-content: center; }
+/* a narrow card (four side by side in the Shopify admin's frame): the price's "/ a month" and the button's label wrap inside it */
+.fi-panel-merchant .lp-d-planc .lp-d-price { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; min-width: 0; }
+.fi-panel-merchant .lp-d-planc .lp-d-btn { margin-top: 10px; justify-content: center; max-width: 100%; min-width: 0; height: auto; min-height: 36px; padding-block: 8px; white-space: normal; text-align: center; line-height: 1.25; overflow-wrap: anywhere; }
 .fi-panel-merchant .lp-d-planc .lp-d-btn.is-static { cursor: default; }
 .fi-panel-merchant .lp-d-planc.is-mine { box-shadow: inset 0 0 0 2px var(--lp-d-ink), var(--lp-d-shadow); }
 .fi-panel-merchant .lp-d-panel { background: var(--lp-d-paper); border-radius: var(--lp-d-r); box-shadow: var(--lp-d-shadow); padding: 8px 22px; margin-top: 14px; }
