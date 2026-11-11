@@ -10,4 +10,5 @@ return [
     'answer_preparer' => 'Prepares answers to questions about the store',
     'question_mender' => 'Mends the spelling of questions shown to shoppers',
     'page_reader' => 'Reads what every product page says',
+    'change_checker' => 'Checks changes to the tone and rules of answers before they are kept',
 ];

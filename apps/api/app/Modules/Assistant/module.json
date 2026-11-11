@@ -712,6 +712,42 @@
             "max": 500,
             "scope": "shop",
             "unit": "requests"
+        },
+        {
+            "name": "answer_rules_max",
+            "type": "int",
+            "default": 12,
+            "min": 1,
+            "max": 30,
+            "scope": "shop",
+            "unit": "rules"
+        },
+        {
+            "name": "answer_rule_chars",
+            "type": "int",
+            "default": 300,
+            "min": 40,
+            "max": 500,
+            "scope": "global",
+            "unit": "characters"
+        },
+        {
+            "name": "answer_changes_per_day",
+            "type": "int",
+            "default": 10,
+            "min": 0,
+            "max": 100,
+            "scope": "shop",
+            "unit": "requests"
+        },
+        {
+            "name": "answer_change_questions",
+            "type": "int",
+            "default": 5,
+            "min": 0,
+            "max": 10,
+            "scope": "shop",
+            "unit": "questions"
         }
     ],
     "agents": [
@@ -904,6 +940,26 @@
                     ],
                     "prompts": [
                         "own_fact_check"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "change_checker",
+            "action": "check_answer_change",
+            "when": "on_request",
+            "features": [],
+            "roles": [
+                {
+                    "role": "checker",
+                    "provider": "post_check_provider",
+                    "model": "post_check_model",
+                    "prices": [
+                        "post_check_input_usd_per_million",
+                        "post_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "answer_change_check"
                     ]
                 }
             ]

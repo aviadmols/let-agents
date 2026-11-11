@@ -316,4 +316,20 @@ return [
         'label' => 'Ready questions per sync',
         'description' => 'At most this many questions about the store are answered ahead on each sync. One already answered whose pages did not change is not asked again.',
     ],
+    'answer_rules_max' => [
+        'label' => 'Rules for answers',
+        'description' => 'The most rules a store can write for its answers.',
+    ],
+    'answer_rule_chars' => [
+        'label' => 'Rule length',
+        'description' => 'The most characters in one rule.',
+    ],
+    'answer_changes_per_day' => [
+        'label' => 'Checks of answer changes per day',
+        'description' => 'How many times a day a store team can check a change to the tone or rules. Each check answers a few questions again.',
+    ],
+    'answer_change_questions' => [
+        'label' => 'Questions a change is tried on',
+        'description' => 'Besides the question the team is on: how many of the most asked answered questions of the last weeks are answered again with the change before it can be kept.',
+    ],
 ];

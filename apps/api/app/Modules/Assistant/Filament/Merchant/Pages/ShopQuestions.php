@@ -7,11 +7,14 @@ use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\WritesPosts;
 use App\Modules\Admin\Models\User;
+use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Actions\CheckAnswerChange;
 use App\Modules\Assistant\Filament\Operator\Pages\ShopQuestions as OperatorShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
 use App\Modules\Assistant\Models\AssistantQuestionLink;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\AnswerRules;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -30,7 +33,21 @@ use UnitEnum;
  */
 final class ShopQuestions extends OperatorShopQuestions
 {
-    use LocksShopToPanelTenant;
+    use LocksShopToPanelTenant {
+        mount as lockShop;
+    }
+
+    /** Opened from another screen with a question's "why" (?find=…&explain=1): its panel open on the first that matches. */
+    public function mount(): void
+    {
+        $this->lockShop();
+
+        if ($this->explain === '1' && trim($this->find) !== '') {
+            $this->why = $this->visible($this->rows())[0]['id'] ?? null;
+        }
+
+        $this->explain = '';
+    }
 
     private const DAYS = 30;
 
@@ -428,6 +445,191 @@ final class ShopQuestions extends OperatorShopQuestions
         $categories = CatalogCategory::query()->whereIn('external_id', (array) $link->categories)->pluck('name')->map(fn ($n): string => (string) $n)->all();
 
         return ['names' => [...$categories, ...array_map('strval', (array) $link->tags)], 'products' => count((array) $link->products)];
+    }
+
+    // ------------------------------------------------------------------ why this answer, and changing how the store answers
+
+    #[Url(as: 'explain')]
+    public string $explain = '';
+
+    /** The row whose "why" is open. */
+    public ?string $why = null;
+
+    /** What is being changed in the open panel: a rule (new, or one by its id) or the tone; null when nothing. */
+    public ?string $changing = null;
+
+    /** @var array{text: string, replaces: string|null, style: string, note: string} the change as the team writes it */
+    public array $change = ['text' => '', 'replaces' => null, 'style' => '', 'note' => ''];
+
+    /** The check of the change, by its id (CheckAnswerChange), while it runs and after. */
+    public ?string $checkId = null;
+
+    /** @var array<string, string> the answer as it comes out after a change was kept, by row */
+    public array $updated = [];
+
+    public function explainRow(string $row): void
+    {
+        $this->why = $this->why === $row ? null : $row;
+        $this->cancelChange();
+    }
+
+    /** A new rule, or one of the store's rules to write again (by its id). */
+    public function startRule(?string $ruleId = null): void
+    {
+        if (! $this->mayLink() || $this->shop === null) {
+            return;
+        }
+
+        $rule = $ruleId === null ? null : collect(AnswerRules::rows($this->shop))->firstWhere('id', $ruleId);
+        $this->change = ['text' => (string) ($rule['text'] ?? ''), 'replaces' => $rule === null ? null : (string) $rule['id'], 'style' => '', 'note' => ''];
+        $this->changing = CheckAnswerChange::RULE;
+        $this->checkId = null;
+    }
+
+    public function startTone(): void
+    {
+        if (! $this->mayLink() || $this->shop === null) {
+            return;
+        }
+
+        $this->change = [
+            'text' => '', 'replaces' => null,
+            'style' => (string) (Settings::get('assistant.answer_tone', $this->shop) ?: AnswerSiteQuestion::TONE_DEFAULT),
+            'note' => (string) Settings::get('assistant.answer_tone_note', $this->shop),
+        ];
+        $this->changing = CheckAnswerChange::TONE;
+        $this->checkId = null;
+    }
+
+    public function cancelChange(): void
+    {
+        $this->changing = null;
+        $this->checkId = null;
+        $this->change = ['text' => '', 'replaces' => null, 'style' => '', 'note' => ''];
+    }
+
+    /** The change checked before it can be kept: code at once, then a reading and a few questions answered with it. */
+    public function checkChange(): void
+    {
+        if ($this->changing === null || $this->shop === null || ! $this->mayLink()) {
+            return;
+        }
+
+        $question = $this->why === null ? null : (collect($this->rows())->firstWhere('id', $this->why)['question'] ?? null);
+        $change = $this->changing === CheckAnswerChange::TONE
+            ? ['kind' => CheckAnswerChange::TONE, 'style' => $this->change['style'], 'note' => $this->change['note']]
+            : ['kind' => CheckAnswerChange::RULE, 'text' => $this->change['text'], 'replaces' => $this->change['replaces']];
+        $started = app(CheckAnswerChange::class)->start($this->shop, $change, str_starts_with((string) $this->why, 's:') ? $question : null, auth()->id());
+
+        if (isset($started['refused'])) {
+            $this->checkId = null;
+            Notification::make()->warning()->title(__('assistant::ui.inbox.why.refused.'.$started['refused'], ['n' => (int) Settings::get('assistant.answer_rules_max', $this->shop)]))->send();
+
+            return;
+        }
+
+        $this->checkId = $started['id'];
+    }
+
+    /**
+     * The check of the change as it stands, for this shop.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function checkState(): ?array
+    {
+        return $this->checkId === null || $this->shop === null ? null : app(CheckAnswerChange::class)->state($this->checkId, $this->shop);
+    }
+
+    /** Keeps a change that passed its check, and shows the answer to the open question as it comes out with it. */
+    public function saveChange(): void
+    {
+        if ($this->checkId === null || $this->shop === null || ! $this->mayLink()) {
+            return;
+        }
+
+        $state = $this->checkState();
+
+        if (! app(CheckAnswerChange::class)->apply($this->checkId, $this->shop, auth()->id())) {
+            Notification::make()->warning()->title(__('assistant::ui.inbox.why.not_passed'))->send();
+
+            return;
+        }
+
+        $mine = collect((array) ($state['items'] ?? []))->firstWhere('mine', true);
+        if ($this->why !== null && is_array($mine) && trim((string) $mine['after']) !== '') {
+            $this->updated[$this->why] = (string) $mine['after'];
+        }
+
+        $this->changing = null;
+        $this->checkId = null;
+        Notification::make()->success()->title(__('assistant::ui.inbox.why.saved'))->send();
+    }
+
+    /** A rule taken away: fewer rules make no answer wrong, so it is not checked. */
+    public function removeRule(string $ruleId): void
+    {
+        if ($this->shop !== null && $this->mayLink()) {
+            app(CheckAnswerChange::class)->remove($this->shop, $ruleId);
+            Notification::make()->success()->title(__('assistant::ui.inbox.why.removed'))->send();
+        }
+    }
+
+    /**
+     * Why a row's answer is what it is, in the team's words: what it was written from, how it was checked, and how the
+     * store's assistant speaks (its tone and its rules). Never a model, a cost or a mechanism.
+     *
+     * @return array{from: string, sources: list<array{title: string, url: string|null}>, checked: string|null, tone: string, note: string, rules: list<array{id: string, text: string}>, search: bool, rules_live: bool}
+     */
+    public function whyFor(string $row): array
+    {
+        $out = ['from' => 'none', 'sources' => [], 'checked' => null, 'tone' => '', 'note' => '', 'rules' => [], 'search' => str_starts_with($row, 's:'), 'rules_live' => AnswerSiteQuestion::releasedVersion('answer_site') >= AnswerSiteQuestion::RULES_FROM];
+
+        if ($this->shop === null) {
+            return $out;
+        }
+
+        $out['tone'] = (string) __('assistant::shop_settings.tone_options.'.((string) (Settings::get('assistant.answer_tone', $this->shop) ?: AnswerSiteQuestion::TONE_DEFAULT)));
+        $out['note'] = trim((string) Settings::get('assistant.answer_tone_note', $this->shop));
+        $out['rules'] = array_map(fn (array $r): array => ['id' => $r['id'], 'text' => $r['text']], AnswerRules::rows($this->shop));
+
+        return app(TenantContext::class)->run($this->shop, function () use ($row, $out): array {
+            $saved = null;
+            $ask = null;
+
+            if (str_starts_with($row, 'a:')) {
+                $saved = AssistantAnswer::query()->find(substr($row, 2));
+            } else {
+                $key = substr($row, 2);
+                $ask = AssistantSearchAsk::query()->with('answer')->where('created_at', '>=', $this->since())->latest('created_at')->orderByDesc('id')->limit(2000)->get()
+                    ->first(fn (AssistantSearchAsk $a): bool => Question::key((string) $a->question) === $key);
+                $saved = $ask?->getRelation('answer');
+            }
+
+            if ($saved instanceof AssistantAnswer && $saved->source === self::TEAM) {
+                $out['from'] = 'team';
+            } elseif ($ask !== null && $ask->from === 'none' && $ask->outcome !== AssistantAnswer::ANSWERED) {
+                $out['from'] = 'none';
+            } else {
+                $sources = array_values(array_filter((array) ($saved?->sources ?? []), 'is_array'));
+                $out['sources'] = array_slice(array_map(fn (array $s): array => ['title' => trim((string) ($s['title'] ?? '')), 'url' => isset($s['url']) && is_string($s['url']) && $s['url'] !== '' ? $s['url'] : null], $sources), 0, 6);
+                $out['sources'] = array_values(array_filter($out['sources'], fn (array $s): bool => $s['title'] !== ''));
+                $answered = ($ask?->outcome ?? $saved?->outcome) === AssistantAnswer::ANSWERED;
+                $out['from'] = ! $answered ? 'none' : ($out['sources'] !== [] ? 'pages' : ($saved !== null && $saved->product_id !== null ? 'product' : 'store'));
+            }
+
+            // how it was checked, in plain words: the check of that answer, or a saved answer shown again
+            $verdict = $ask?->verdict;
+            $out['checked'] = match (true) {
+                $out['from'] === 'team' => 'team',
+                $ask !== null && $ask->from === 'bank' => 'saved',
+                is_string($verdict) && str_starts_with($verdict, 'skipped') => null,
+                in_array($verdict, ['kept', 'answer_removed', 'picks_removed', 'rejected'], true) => $verdict,
+                default => null,
+            };
+
+            return $out;
+        });
     }
 
     /** When it was asked, to the minute, as the shop reads the time: "28.10.2026 11:39". */

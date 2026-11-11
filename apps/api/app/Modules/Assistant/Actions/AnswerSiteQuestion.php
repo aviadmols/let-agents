@@ -24,6 +24,7 @@ use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\AnswerFailure;
+use App\Modules\Assistant\Support\AnswerRules;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Dated;
@@ -135,9 +136,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * scope_site v9 (a reply that narrows the request keeps the conditions it does not change) was released after two runs
      * on Rocks, 28.10: 7/7 and 6/7 of the conversation cases, supported 68→84, p90 12.7→9.8 s.
      *
+     * answer_site v23 (the store's rules, `rules`, written on the questions screen and checked before they are kept) is
+     * written and not released: PROMPT_VERSION stays 22, so shoppers are answered with v22 and the rules are kept and
+     * checked (CheckAnswerChange answers with v23) but given to no shopper's answer. Released by PROMPT_VERSION = 23
+     * after the quality baseline on Rocks (as-is twice, --prompt=23 twice); a store with no rules is given v22's input.
+     *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = [];
+    public const CANDIDATES = ['answer_site' => [23]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -270,6 +276,15 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** The words the shopper typed, a reply's own (handle()): whether it says anything of price. */
     private string $asked = '';
+
+    /**
+     * @var array{tone: array{style: string, note?: string}|null, rules: list<string>}|null the tone and the rules a change
+     *                                                                                      the team is checking would give, in place of the store's own (withVoice())
+     */
+    private ?array $voice = null;
+
+    /** The writer's prompt version that is given the store's rules (answer_site v23). */
+    public const RULES_FROM = 23;
 
     /**
      * Whether the question is about the products already shown ("מה הכי זול?" after a search, "מה ההבדל ביניהם?"): then
@@ -465,12 +480,64 @@ final class AnswerSiteQuestion implements TriesQuestions
         return ['style' => $style === '' ? self::TONE_DEFAULT : $style] + ($note === '' ? [] : ['note' => $note]);
     }
 
-    /** The tone as one short key, kept with a saved answer: an answer kept in another tone is written again. */
+    /**
+     * The tone, and the store's rules once the released writer is given them, as one short key kept with a saved answer:
+     * an answer kept in another tone or under other rules is written again. While the released writer is given no rules,
+     * rules change nothing it writes, and the key is the tone's alone, as it was.
+     */
     public static function toneKey(?string $shopId): ?string
     {
         $tone = self::tone($shopId);
+        $rules = $shopId !== null && $shopId !== '' && self::releasedVersion('answer_site') >= self::RULES_FROM ? AnswerRules::texts($shopId) : [];
 
-        return $tone === null ? null : substr(hash('sha256', (string) json_encode($tone, JSON_UNESCAPED_UNICODE)), 0, 16);
+        if ($tone === null && $rules === []) {
+            return null;
+        }
+
+        return substr(hash('sha256', (string) json_encode($rules === [] ? $tone : ['tone' => $tone, 'rules' => $rules], JSON_UNESCAPED_UNICODE)), 0, 16);
+    }
+
+    /** The version of a prompt shoppers are answered with (promptFile()), 0 when it has none. */
+    public static function releasedVersion(string $name): int
+    {
+        return preg_match('/\.v(\d+)\.md$/', (string) self::promptFile($name), $m) === 1 ? (int) $m[1] : 0;
+    }
+
+    /**
+     * The store's rules as the writer is given them: only by a prompt that reads them (answer_site v23 and on), and in a
+     * change being checked, that change's in place of the store's own (withVoice()).
+     *
+     * @return list<string>
+     */
+    private function rulesFor(string $shopId): array
+    {
+        if (($this->promptVersions['answer_site'] ?? self::releasedVersion('answer_site')) < self::RULES_FROM) {
+            return [];
+        }
+
+        return $this->voice !== null ? $this->voice['rules'] : AnswerRules::texts($shopId);
+    }
+
+    /**
+     * Something done as if the store's tone and rules were these: a change the team is checking, answered with before it
+     * is kept (CheckAnswerChange). Put back after, whatever happens.
+     *
+     * @template T
+     *
+     * @param  array{style: string, note?: string}|null  $tone
+     * @param  list<string>  $rules
+     * @param  callable(): T  $work
+     * @return T
+     */
+    public function withVoice(?array $tone, array $rules, callable $work): mixed
+    {
+        $this->voice = ['tone' => $tone, 'rules' => array_values($rules)];
+
+        try {
+            return $work();
+        } finally {
+            $this->voice = null;
+        }
     }
 
     /** What the team wrote in the knowledge centre, as its hash; null when it wrote nothing. */
@@ -1408,7 +1475,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation])
             + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
             + ($now === null ? [] : ['now' => $now])
-            + (($tone = self::tone($shopId)) === null ? [] : ['tone' => $tone]) + [
+            + (($tone = $this->voice !== null ? $this->voice['tone'] : self::tone($shopId)) === null ? [] : ['tone' => $tone])
+            + (($rules = $this->rulesFor($shopId)) === [] ? [] : ['rules' => $rules]) + [
                 'products' => $forModel,
                 'analysis' => $analysis,
                 'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),

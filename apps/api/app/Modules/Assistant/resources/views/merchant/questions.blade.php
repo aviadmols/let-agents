@@ -49,12 +49,19 @@
                         @if ($row['last'])<span>· {{ $t('last_at', ['at' => $page::at($row['last']), 'when' => $page::ago($row['last'])]) }}</span>@endif
                         <span>· {{ $row['where'] }}</span>
                         @if ($row['score'] !== null)<span class="lp-pill" data-tone="{{ $row['score'] >= 80 ? 'good' : ($row['score'] >= 50 ? 'warn' : 'bad') }}">{{ $t('score', ['n' => $row['score']]) }}</span>@endif
+                        {{-- "i": why this answer, and how to change how the store answers --}}
+                        <button type="button" wire:click="explainRow(@js($row['id']))" aria-expanded="{{ $this->why === $row['id'] ? 'true' : 'false' }}" aria-label="{{ __('assistant::ui.inbox.why.open') }}" title="{{ __('assistant::ui.inbox.why.open') }}" data-why="{{ $row['id'] }}"
+                            style="all: unset; cursor: pointer; width: 22px; height: 22px; flex: none; border-radius: 999px; display: inline-grid; place-items: center; font: italic 600 13px/1 Georgia, serif; {{ $this->why === $row['id'] ? 'background: var(--la-ink); color: var(--la-paper);' : 'box-shadow: inset 0 0 0 1.5px currentColor;' }}">i</button>
                     </div>
 
                     @if ($row['answer'] !== '' && $row['state'] !== 'open')
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('answer_given') }}</span><p>{{ $row['answer'] }}</p></div>
                     @elseif ($row['answer'] !== '')
                         <div class="lp-ask-answer"><span class="lp-note">{{ $t('shown_instead') }}</span><p>{{ $row['answer'] }}</p></div>
+                    @endif
+
+                    @if ($this->why === $row['id'])
+                        @include('assistant::merchant.why', ['row' => $row])
                     @endif
 
                     {{-- what the team linked the question to: its answer is chosen among these products first --}}

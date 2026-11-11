@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["verdict", "why", "suggestion", "conflicts"],
+    "properties": {
+        "verdict": {"type": "string", "enum": ["ok", "unsafe", "fact", "contradicts_site", "conflict", "unclear"]},
+        "why": {"type": "string"},
+        "suggestion": {"type": "string"},
+        "conflicts": {"type": "array", "items": {"type": "string"}}
+    }
+}

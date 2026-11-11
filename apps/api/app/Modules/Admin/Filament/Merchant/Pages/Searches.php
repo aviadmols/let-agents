@@ -209,6 +209,14 @@ final class Searches extends Page
         return Route::has($route) ? route($route, ['tenant' => $this->shop()]) : ShopNotices::getUrl();
     }
 
+    /** One question on the questions screen, its "why" open: what the answer came from, and how to change it. */
+    public function whyUrl(string $question): ?string
+    {
+        $url = $this->questionsUrl();
+
+        return $url === null ? null : $url.(str_contains($url, '?') ? '&' : '?').http_build_query(['find' => $question, 'explain' => '1']);
+    }
+
     /** Every question, with the answer it got (the questions list), behind "All questions". */
     public function questionsUrl(): ?string
     {

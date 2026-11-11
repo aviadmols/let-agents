@@ -211,6 +211,12 @@
                                                 <p class="lp-d-q-text lp-d-q-none">{{ $t('questions.no_answer') }}</p>
                                             @endif
                                             @unless ($q['answered'])<a class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" href="{{ $this->improvementsUrl() }}">{{ $t('questions.answer_it') }}</a>@endunless
+                                            {{-- "i": why this answer, its sources, and how to change how the store answers, on the questions screen --}}
+                                            @if ($why = $this->whyUrl($q['question']))
+                                                <a class="lp-d-btn lp-d-btn-sm" href="{{ $why }}" data-why-link style="display: inline-flex; align-items: center; gap: 8px">
+                                                    <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 999px; box-shadow: inset 0 0 0 1.5px currentColor; display: inline-grid; place-items: center; font: italic 600 11px/1 Georgia, serif">i</span>{{ $t('questions.why') }}
+                                                </a>
+                                            @endif
                                         </div>
                                     </details>
                                 </li>

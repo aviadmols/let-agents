@@ -61,6 +61,7 @@ return [
         'opened' => 'Opened',
         'no_answer' => 'The assistant had no answer for this yet.',
         'answer_it' => 'Answer it',
+        'why' => 'Why this answer',
         'times' => '{1} once|{2} twice|[0,*] :n times',
         'from' => [
             'page' => 'from the “:page” page',
