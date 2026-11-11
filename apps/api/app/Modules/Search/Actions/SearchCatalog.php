@@ -2534,11 +2534,39 @@ final class SearchCatalog
      * @param  array<int, string>  $values  code => label
      * @param  list<array<string, mixed>>  $facets
      */
+    /**
+     * Whether one value of a filter is a kind of another: "זהב" holds "זהב צהוב", "זהב לבן", "זהב 14 קראט" (Rocks 11.11: "טבעת
+     * זהב" showed 4 rings of the store's 66 in yellow gold). In Hebrew the kind follows the word it is of, so its words begin
+     * with all of the other's ("ציפוי זהב" is no gold); in English it comes before, so they end with them ("yellow gold" is
+     * gold, "gold plated" is not). As the drawer reads it (under).
+     */
+    public static function under(string $narrow, string $broad): bool
+    {
+        $read = fn (string $label): array => array_values(array_filter(preg_split('/\s+/u', trim((string) preg_replace('/[^\p{L}\p{N}\s]/u', ' ', (string) preg_replace('/[׳״\'"`]/u', '', mb_strtolower($label))))) ?: [], fn (string $w): bool => $w !== ''));
+        $n = $read($narrow);
+        $b = $read($broad);
+
+        if ($b === [] || count($n) <= count($b)) {
+            return false;
+        }
+
+        $part = preg_match('/[\x{0590}-\x{05FF}]/u', $broad) === 1 ? array_slice($n, 0, count($b)) : array_slice($n, -count($b));
+
+        return $part === $b;
+    }
+
     private static function holdsRead(array $r, int $at, array $values, array $facets): bool
     {
         $carried = array_map('intval', (array) ($r['f'] ?? []));
 
         if (array_intersect(array_keys($values), $carried) !== []) {
+            return true;
+        }
+
+        // a kind of the value is the value: "זהב" holds a ring in "זהב צהוב" (under)
+        $mine = array_filter($carried, fn (int $code): bool => intdiv($code, 1000) === $at);
+
+        if (array_any($values, fn (string $label): bool => array_any($mine, fn (int $code): bool => self::under((string) ($facets[$at]['v'][$code % 1000]['l'] ?? ''), $label)))) {
             return true;
         }
 

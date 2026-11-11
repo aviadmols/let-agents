@@ -141,6 +141,9 @@
       var holds = function (r, code) {
         var f = r.f || [], g = Math.floor(code / 1000);
         if (f.indexOf(code) >= 0) { return true; }
+        // a kind of the value is the value, chosen or read: "זהב" holds a ring in "זהב צהוב" (under)
+        var me = valueOf(code);
+        if (me && me.value && f.some(function (o) { var v = o !== code && Math.floor(o / 1000) === g && valueOf(o); return !!(v && v.value && under(v.value.l, me.value.l)); })) { return true; }
         var x = c.auto[code] && !c.f[code] && valueOf(code);
         if (!x || !x.value) { return false; }
         var asked = wordsOf(x.value.l);

@@ -22,6 +22,19 @@ final class FieldFiltersTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_a_value_holds_its_kinds_gold_holds_yellow_white_and_14k_gold_never_gold_plating(): void
+    {
+        // Rocks 11.11: "טבעת זהב" showed 4 rings; "זהב צהוב" alone held 66
+        $this->assertTrue(SearchCatalog::under('זהב צהוב', 'זהב'));
+        $this->assertTrue(SearchCatalog::under('זהב לבן', 'זהב'));
+        $this->assertTrue(SearchCatalog::under('זהב 14 קראט', 'זהב'));
+        $this->assertFalse(SearchCatalog::under('ציפוי זהב', 'זהב'), 'in Hebrew the kind follows the word it is of');
+        $this->assertFalse(SearchCatalog::under('זהב', 'זהב'));
+        $this->assertFalse(SearchCatalog::under('זהב צהוב', 'זהב לבן'));
+        $this->assertTrue(SearchCatalog::under('Yellow Gold', 'gold'), 'in English it comes before');
+        $this->assertFalse(SearchCatalog::under('gold plated', 'gold'));
+    }
+
     public function test_a_field_most_products_have_is_a_filter_named_as_the_store_names_it(): void
     {
         $shop = Shop::factory()->create(['content_locale' => 'he']);

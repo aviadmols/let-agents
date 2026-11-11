@@ -61,6 +61,16 @@
     })(0, []);
     return { n: best.length, of: lw.length, at: best };
   }
+  // Whether one value of a filter is a kind of another: "זהב" holds "זהב צהוב", "זהב לבן", "זהב 14 קראט" (Rocks 11.11: "טבעת
+  // זהב" showed 4 rings of the store's 66 in yellow gold). In Hebrew the kind follows the word it is of, so its words
+  // begin with all of the other's ("ציפוי זהב" is no gold); in English it comes before, so they end with them
+  // ("yellow gold" is gold, "gold plated" is not). As the server reads it (SearchCatalog::under).
+  function under(narrow, broad) {
+    var n = wordsOf(narrow), b = wordsOf(broad);
+    if (!b.length || n.length <= b.length) { return false; }
+    var part = /[֐-׿]/.test(String(broad)) ? n.slice(0, b.length) : n.slice(n.length - b.length);
+    return part.join(' ') === b.join(' ');
+  }
   // Whether a typed word is a form of a word in the name of one of the store's categories or kinds ("עגילי" of "עגילים").
   function namesKind(x) {
     if (x.length < 3) { return false; }
