@@ -5,6 +5,8 @@ namespace App\Modules\Assistant\Filament\Merchant\Pages;
 use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\KnowledgeProducts;
+use App\Modules\Admin\Models\User;
+use App\Modules\Assistant\Filament\Merchant\Concerns\EditsSourceLines;
 use App\Modules\Assistant\Filament\Operator\Pages\AboutStore as OperatorAboutStore;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -25,7 +27,17 @@ use UnitEnum;
  */
 final class AboutStore extends OperatorAboutStore
 {
+    use EditsSourceLines;
     use LocksShopToPanelTenant;
+
+    /** Who may fix a line where it is written: who edits the shop (a viewer only looks), or an operator. */
+    public function mayFixLines(): bool
+    {
+        $user = auth()->user();
+        $shop = $this->shop === null ? null : Shop::query()->find($this->shop);
+
+        return $user instanceof User && $shop !== null && ($user->is_operator || $user->canEditShop($shop));
+    }
 
     public const TABS = ['pages', 'products', 'notes', 'rules'];
 

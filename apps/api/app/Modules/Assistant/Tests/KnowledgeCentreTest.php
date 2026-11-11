@@ -185,7 +185,7 @@ final class KnowledgeCentreTest extends TestCase
         $check = $this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()[0]['check']);
 
         $this->assertSame('conflict', $check['status']);
-        $this->assertSame([['title' => 'תקנון', 'why' => 'באתר: 10 ש"ח לחיתוך.']], $check['notes'], 'the title comes from code; p9 was never sent');
+        $this->assertSame([['title' => 'תקנון', 'why' => 'באתר: 10 ש"ח לחיתוך.', 'text' => 'חיתוך: 10 ש"ח לחתך.']], $check['notes'], 'the title and the words come from code; p9 was never sent');
         $this->assertCount(1, $this->calls);
 
         // The same line against the same passages: no second call.
@@ -194,6 +194,41 @@ final class KnowledgeCentreTest extends TestCase
         $this->assertCount(1, $this->calls, 'never asked twice');
 
         Livewire::test(AboutStore::class)->call('show', 'notes')->assertSee('באתר כתוב אחרת')->assertSee('באתר: 10 ש"ח לחיתוך.');
+    }
+
+    public function test_a_line_another_line_contradicts_shows_that_line_once_and_it_is_fixed_where_it_is_written(): void
+    {
+        $older = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->addOwn('יש הנחת shopping IL של 20% עד יום ראשון בשעה 12.00'));
+        $title = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->entries()[BuildShopKnowledge::OWN]->title);
+        $newer = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->addOwn('אין לנו הנחה SHOPPING IL עד יום ראשון'));
+        $passage = "- אין לנו הנחה SHOPPING IL עד יום ראשון\n- יש הנחת shopping IL של 20% עד יום ראשון בשעה 12.00";
+        // two pieces of the team's own text, each found saying otherwise: one note
+        $this->near = [
+            ['source' => 'content', 'source_id' => '1', 'external_id' => BuildShopKnowledge::OWN, 'title' => $title, 'text' => $passage, 'similarity' => 0.9],
+            ['source' => 'content', 'source_id' => '1', 'external_id' => BuildShopKnowledge::OWN, 'title' => $title, 'text' => $passage, 'similarity' => 0.8],
+        ];
+        $this->app->instance(ChatModel::class, new class implements ChatModel
+        {
+            public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
+            {
+                return new ModelReply(['conflicts' => [['id' => 'p1', 'why' => 'כתוב שיש הנחת shopping IL עד יום ראשון.'], ['id' => 'p2', 'why' => 'כתוב שיש הנחת shopping IL עד יום ראשון.']]], 600, 30);
+            }
+        });
+
+        app(CheckOwnKnowledge::class)->handle($this->shop->id, $newer);
+        $check = collect($this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()))->firstWhere('id', $newer)['check'];
+        $this->assertCount(1, $check['notes'], 'the same note once');
+
+        $page = Livewire::test(AboutStore::class)->call('show', 'notes')
+            ->assertSeeHtml('data-own-conflicts')
+            ->assertSeeHtml('data-source-line="own"')
+            ->assertSee('שורה שהוספתם במידע על החנות');
+        $html = $page->html();
+        $conflicts = substr($html, (int) strpos($html, 'data-own-conflicts'));
+        $this->assertStringContainsString('בשעה 12.00', $conflicts, 'the line that says otherwise');
+
+        $page->call('removeLine', 'own', $older);
+        $this->assertSame([$newer], array_column($this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()), 'id'), 'deleted where it is written');
     }
 
     public function test_nothing_on_the_site_near_the_line_means_no_model_is_asked(): void

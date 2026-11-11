@@ -11,6 +11,7 @@ use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Shopify\Console\ConnectPixelCommand;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Feed\ShopifyBlog;
+use App\Modules\Shopify\Feed\ShopifyEditLinks;
 use App\Modules\Shopify\Feed\ShopifyStoreFeed;
 use App\Modules\Shopify\Http\Middleware\CheckShopifySessionToken;
 use App\Modules\Shopify\Http\Middleware\FrameInsideShopify;
@@ -36,6 +37,7 @@ final class ShopifyServiceProvider extends ModuleServiceProvider
     {
         $this->app->tag([ShopifyStoreFeed::class], 'connections.store_feeds');
         $this->app->tag([ShopifyBlog::class], 'connections.store_blogs');
+        $this->app->tag([ShopifyEditLinks::class], 'connections.edit_links');
         // The app and its plan on the shop's "Connection and plan".
         $this->app->tag([ShopifyConnectionFacts::class], ConnectionFacts::TAG);
         // The plan, ended in Shopify when the owner ends it or deletes the shop.

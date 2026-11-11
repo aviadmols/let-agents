@@ -33,6 +33,8 @@
                                 <blockquote dir="auto" style="margin: 0; white-space: pre-line; font-size: 13.5px; line-height: 1.5">{{ $source['quote'] }}</blockquote>
                             </figure>
                         @endif
+                        {{-- the line it is written in, fixed there --}}
+                        @include('assistant::merchant.source-lines', ['lines' => $this->linesOf($source, ($source['quote'] ?? '') !== '' ? $source['quote'] : $why['answer']), 'may' => $may])
                     </div>
                 @endforeach
             </div>

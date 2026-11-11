@@ -179,7 +179,19 @@
                                                 @endswitch
                                             </span>
                                             @if (($check['status'] ?? null) === 'conflict')
-                                                <ul class="lp-d-kfacts">@foreach ($check['notes'] as $note)<li><span dir="auto"><b>{{ $note['title'] }}:</b> {{ $note['why'] }}</span></li>@endforeach</ul>
+                                                {{-- each place that says otherwise once, with the line it is written in, fixed there --}}
+                                                @php($notes = collect($check['notes'])->unique(fn (array $n): string => $n['title'].'|'.($n['text'] ?? $n['why']))->values()->all())
+                                                <div style="display: grid; gap: 10px; margin-top: 6px" data-own-conflicts>
+                                                    @foreach ($notes as $note)
+                                                        <div style="display: grid; gap: 6px">
+                                                            <span dir="auto"><b>{{ $note['title'] }}:</b> {{ $note['why'] }}</span>
+                                                            @include('assistant::merchant.source-lines', [
+                                                                'lines' => $this->linesOf(['title' => $note['title'], 'url' => $note['url'] ?? null], trim(($note['text'] ?? '').' '.$note['why']), [$row['id']]),
+                                                                'may' => $this->mayFixLines(),
+                                                            ])
+                                                        </div>
+                                                    @endforeach
+                                                </div>
                                             @endif
                                         @endif
                                     </span>

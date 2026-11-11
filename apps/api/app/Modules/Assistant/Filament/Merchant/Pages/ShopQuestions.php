@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\WritesPosts;
 use App\Modules\Admin\Models\User;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\CheckAnswerChange;
+use App\Modules\Assistant\Filament\Merchant\Concerns\EditsSourceLines;
 use App\Modules\Assistant\Filament\Operator\Pages\ShopQuestions as OperatorShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantAskReview;
@@ -34,8 +35,14 @@ use UnitEnum;
  */
 final class ShopQuestions extends OperatorShopQuestions
 {
+    use EditsSourceLines;
     use LocksShopToPanelTenant {
         mount as lockShop;
+    }
+
+    public function mayFixLines(): bool
+    {
+        return $this->mayLink();
     }
 
     /** Opened from another screen with a question's "why" (?find=…&explain=1): its panel open on the first that matches. */
@@ -584,7 +591,7 @@ final class ShopQuestions extends OperatorShopQuestions
      */
     public function whyFor(string $row): array
     {
-        $out = ['from' => 'none', 'sources' => [], 'checked' => null, 'tone' => '', 'note' => '', 'rules' => [], 'search' => str_starts_with($row, 's:'), 'rules_live' => AnswerSiteQuestion::releasedVersion('answer_site') >= AnswerSiteQuestion::RULES_FROM];
+        $out = ['answer' => '', 'from' => 'none', 'sources' => [], 'checked' => null, 'tone' => '', 'note' => '', 'rules' => [], 'search' => str_starts_with($row, 's:'), 'rules_live' => AnswerSiteQuestion::releasedVersion('answer_site') >= AnswerSiteQuestion::RULES_FROM];
 
         if ($this->shop === null) {
             return $out;
@@ -616,6 +623,7 @@ final class ShopQuestions extends OperatorShopQuestions
                 $out['sources'] = array_slice(array_map(fn (array $s): array => ['title' => trim((string) ($s['title'] ?? '')), 'url' => isset($s['url']) && is_string($s['url']) && $s['url'] !== '' ? $s['url'] : null], $sources), 0, 6);
                 $out['sources'] = array_values(array_filter($out['sources'], fn (array $s): bool => $s['title'] !== ''));
                 $answerText = trim((string) ($saved?->answer ?? ($ask === null ? '' : ($ask->getAttributes()['answer'] ?? ''))));
+                $out['answer'] = $answerText;
                 $kept = array_values(array_filter((array) (((array) ($saved?->flags ?? []))['quotes'] ?? []), 'is_array'));
                 $out['sources'] = array_map(fn (array $s): array => $s + self::quoteFor($s, $kept, $answerText), $out['sources']);
                 $answered = ($ask?->outcome ?? $saved?->outcome) === AssistantAnswer::ANSWERED;

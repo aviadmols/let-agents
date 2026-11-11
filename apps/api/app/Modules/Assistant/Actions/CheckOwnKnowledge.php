@@ -72,11 +72,14 @@ final class CheckOwnKnowledge
     {
         $passages = [];
         $titles = [];
+        $texts = [];
 
         foreach ($this->passages->near($shopId, $line, ['content'], self::PASSAGES) as $i => $piece) {
             $id = 'p'.($i + 1);
             $passages[] = ['id' => $id, 'title' => (string) $piece['title'], 'text' => mb_substr(trim((string) $piece['text']), 0, self::MAX_PASSAGE)];
             $titles[$id] = (string) $piece['title'];
+            // what it says, kept with the note: the team sees the line it is written in, and fixes it there (SourceLines)
+            $texts[$id] = mb_substr(trim((string) $piece['text']), 0, self::MAX_PASSAGE);
         }
 
         // Nothing on the site near it: nothing to contradict, and no model is asked.
@@ -103,7 +106,7 @@ final class CheckOwnKnowledge
             shopId: $shopId,
             trigger: RunTrigger::Manual,
             input: ['line' => $line, 'passages' => count($passages)],
-            work: function (RunContext $run) use ($input, $titles, &$result): void {
+            work: function (RunContext $run) use ($input, $titles, $texts, &$result): void {
                 $provider = AiProviderName::tryFrom(strtolower(trim((string) Settings::get('assistant.post_check_provider'))));
                 $model = trim((string) Settings::get('assistant.post_check_model'));
 
@@ -134,13 +137,15 @@ final class CheckOwnKnowledge
                 $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($in, $out));
                 $notes = [];
 
-                // Only a passage that was sent, once, with its title from code.
+                // Only a passage that was sent, once, with its title and its words from code; two pieces of one page
+                // found saying the same are one note.
                 foreach ((array) ($reply->data['conflicts'] ?? []) as $conflict) {
                     $id = is_array($conflict) ? (string) ($conflict['id'] ?? '') : '';
                     $why = is_array($conflict) ? trim((string) ($conflict['why'] ?? '')) : '';
+                    $same = isset($titles[$id]) ? $titles[$id].'|'.$why : '';
 
-                    if (isset($titles[$id]) && $why !== '' && ! isset($notes[$id])) {
-                        $notes[$id] = ['title' => $titles[$id], 'why' => mb_substr($why, 0, self::MAX_WHY)];
+                    if (isset($titles[$id]) && $why !== '' && ! isset($notes[$same])) {
+                        $notes[$same] = ['title' => $titles[$id], 'why' => mb_substr($why, 0, self::MAX_WHY), 'text' => $texts[$id] ?? ''];
                     }
                 }
 

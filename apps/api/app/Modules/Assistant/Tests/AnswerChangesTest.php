@@ -203,6 +203,8 @@ final class AnswerChangesTest extends TestCase
             ->assertSeeHtml('href="https://store.test/returns"')
             ->assertSeeHtml('data-why-source="page"')
             ->assertSeeHtml('data-why-quote="kept"')
+            ->assertSeeHtml('data-source-line="page"')
+            ->assertSeeHtml('https://store.test/wp-admin/post.php?post=700&amp;action=edit')
             ->assertSee('אפשר להחזיר מוצר תוך 14 יום מקבלתו, באריזה המקורית.')
             ->assertSee('עוד אין חוקים')
             ->assertSee('ויתחילו לפעול בתשובות לגולשים בקרוב')
