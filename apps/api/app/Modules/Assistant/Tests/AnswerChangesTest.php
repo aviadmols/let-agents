@@ -199,6 +199,8 @@ final class AnswerChangesTest extends TestCase
         $page = Livewire::withQueryParams(['find' => 'להחזיר', 'explain' => '1'])->test(ShopQuestions::class)
             ->assertSee('ממה היא נכתבה')
             ->assertSee('החזרות והחלפות')
+            ->assertSeeHtml('href="https://store.test/returns"')
+            ->assertSeeHtml('data-why-source="page"')
             ->assertSee('עוד אין חוקים')
             ->assertSee('ויתחילו לפעול בתשובות לגולשים בקרוב')
             ->call('startRule')

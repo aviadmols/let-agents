@@ -11,11 +11,22 @@
         <b style="font-size: 13px; font-weight: 600">{{ $w('from_title') }}</b>
         <p style="margin: 0" dir="auto">{{ $w('from.'.$why['from']) }}</p>
         @if ($why['sources'] !== [])
-            <ul style="margin: 0; padding-inline-start: 18px; display: grid; gap: 2px">
+            {{-- each source a link: a page of the site opens in a new tab; what the store knows without a page of its
+                 own (what the posts say, the team's information) opens the store's knowledge, where it is kept --}}
+            <div style="display: flex; flex-wrap: wrap; gap: 8px" data-why-sources>
                 @foreach ($why['sources'] as $source)
-                    <li dir="auto">@if ($source['url'])<a href="{{ $source['url'] }}" target="_blank" rel="noopener" style="color: inherit">{{ $source['title'] }}</a>@else{{ $source['title'] }}@endif</li>
+                    @php($href = $source['url'] ?: \App\Modules\Assistant\Filament\Merchant\Pages\AboutStore::getUrl())
+                    <a href="{{ $href }}" @if ($source['url']) target="_blank" rel="noopener" @endif dir="auto" data-why-source="{{ $source['url'] ? 'page' : 'knowledge' }}"
+                        style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--la-paper); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%); color: var(--la-ink); font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px">
+                        @if ($source['url'])
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                        @else
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7"/></svg>
+                        @endif
+                        <span>{{ $source['title'] }}</span>
+                    </a>
                 @endforeach
-            </ul>
+            </div>
         @endif
     </div>
 
