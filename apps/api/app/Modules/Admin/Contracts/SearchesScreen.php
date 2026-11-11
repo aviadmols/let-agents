@@ -44,8 +44,9 @@ interface SearchesScreen
      * The questions asked most, and where the answer came from. from: page (its title in where), product, team, general, or none.
      * answer: what the shopper was told (null when nothing); first and last: when it was first and last asked (timestamps).
      * asked_on: the product (with its picture) or article page it was asked on; null when asked in the search box.
+     * shown: the products the answer showed the last time it was given (its picks first), opened when the shopper opened or added it.
      *
-     * @return list<array{question: string, times: int, answered: bool, from: string, where: string|null, answer: string|null, first: int, last: int, asked_on?: array{kind: string, title: string, url: string|null, image: string|null}|null}>
+     * @return list<array{question: string, times: int, answered: bool, from: string, where: string|null, answer: string|null, first: int, last: int, asked_on?: array{kind: string, title: string, url: string|null, image: string|null}|null, shown?: list<array{title: string, url: string|null, picture: string|null, price: string|null, opened: bool}>}>
      */
     public function questions(Shop $shop, CarbonInterface $since, CarbonInterface $until, int $limit): array;
 

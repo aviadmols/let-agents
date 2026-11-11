@@ -163,8 +163,11 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** A fix by code keeps at least this share of the answer, or the answer is refused whole. */
     private const KEPT_SHARE = 0.4;
 
-    /** An answer saying what was asked about is not among what it was given ("לא מופיע", "נמצא כאן רק"); not "not in stock". */
-    private const SAYS_MISSING = '/(?<![\p{L}])(?:לא|אינו|אינה|אינם|אינן)\s+(?:מופיע|מופיעה|מופיעים|נמצא|נמצאת|נמצאים)(?!\s+(?:ב|כרגע\s+ב)מלאי)|(?:נמצא|נמצאת|מופיע|מופיעה|יש)\s+כאן\s+רק|אין\s+(?:לי\s+)?מידע\s+על|\bnot\s+(?:listed|found|among|in\s+(?:the|these)\s+results)\b|\bonly\s+(?:found|see|have)\b/iu';
+    /**
+     * An answer saying what was asked about is not among what it was given ("לא מופיע", "נמצא כאן רק", "אין כאן עגיל
+     * מטפס": Rocks, 11.11, kept and shown to every shopper who searched "מטפס"); not "not in stock" ("אין כרגע במלאי").
+     */
+    private const SAYS_MISSING = '/(?<![\p{L}])(?:לא|אינו|אינה|אינם|אינן)\s+(?:מופיע|מופיעה|מופיעים|נמצא|נמצאת|נמצאים)(?!\s+(?:ב|כרגע\s+ב)מלאי)|(?:נמצא|נמצאת|מופיע|מופיעה|יש)\s+כאן\s+רק|אין\s+(?:לי\s+)?מידע\s+על|(?<![\p{L}])אין\s+(?:כאן|כרגע|באתר|בחנות|בקטלוג|לנו\s+כרגע)(?!\s+ב?מלאי)|\bnot\s+(?:listed|found|among|in\s+(?:the|these)\s+results)\b|\bonly\s+(?:found|see|have)\b/iu';
 
     /** How much longer than the answer the checker's fix may be: it may correct, not add. */
     private const REVISED_GROWTH = 2;
@@ -768,6 +771,51 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $picks;
+    }
+
+    /**
+     * An answer the checker kept that says the exact thing asked for is not here, and offers products instead ("אין כאן
+     * עגיל מטפס בודד, אבל… העגיל פתית שלג…"), shows those products: each the answer still names, or whose own page it
+     * cites, comes back if the checker took its card away. Kept, the text sent the shopper looking for products it gave no
+     * card to (Rocks, 11.11). An honest alternative is what the checker is told fits; one presented as what was asked is
+     * no "not here" answer and stays as the checker left it. In the order they were offered, up to the picks' limit.
+     *
+     * @param  list<string>  $cited
+     * @param  array<string, array<string, mixed>>  $byRef
+     * @param  list<array<string, mixed>>  $offered  the picks before the check
+     * @param  list<array<string, mixed>>  $kept  the picks after it
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @return list<array<string, mixed>>
+     */
+    public static function offeredInstead(string $answer, array $cited, array $byRef, array $offered, array $kept, array $productsByRef): array
+    {
+        if ($answer === '' || ! self::saysMissing($answer) || count($kept) >= count($offered)) {
+            return $kept;
+        }
+        $still = array_flip([
+            ...array_column(self::namedInAnswer($answer, [], $productsByRef), 'external_id'),
+            ...array_map(fn (string $ref): string => ($byRef[$ref]['source'] ?? null) === 'product' ? (string) ($byRef[$ref]['external_id'] ?? '') : '', $cited),
+        ]);
+        $have = array_flip(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $kept));
+        $back = array_values(array_filter($offered, fn (array $p): bool => ($id = (string) ($p['external_id'] ?? '')) !== '' && isset($still[$id]) && ! isset($have[$id])));
+        if ($back === []) {
+            return $kept;
+        }
+        // the order they were offered in, the checker's corrected reasons kept
+        $byId = [];
+        foreach ([...$kept, ...$back] as $p) {
+            $byId[(string) $p['external_id']] = $p;
+        }
+        $out = [];
+        foreach ($offered as $p) {
+            $id = (string) ($p['external_id'] ?? '');
+            if (isset($byId[$id])) {
+                $out[] = $byId[$id];
+                unset($byId[$id]);
+            }
+        }
+
+        return array_slice([...$out, ...array_values($byId)], 0, self::MAX_PICKS);
     }
 
     /**
@@ -1784,8 +1832,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                         ];
                         $checked['ran'] = true;
 
+                        $offered = $picks;
                         $applied = self::applyCheck($check->data, $answer, $picks);
                         ['answer' => $answer, 'picks' => $picks, 'refusal' => $refusal] = $applied;
+                        // the products a kept answer offers instead of what is not here keep their cards (Rocks, 11.11)
+                        $picks = self::offeredInstead($answer, $cited, $byRef, $offered, $picks, $prepared['productsByRef']);
                         $checked['verdict'] = $applied['verdict'];
                         // Why, for the record: the decision and each issue's kind and severity (never the shopper's words).
                         $checked['decision'] = $applied['decision'] ?? null;

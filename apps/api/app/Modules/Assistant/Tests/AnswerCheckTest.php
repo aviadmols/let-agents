@@ -148,9 +148,14 @@ final class AnswerCheckTest extends TestCase
         $this->assertTrue(AnswerSiteQuestion::saysMissing('נמצא כאן רק הספר **"חטוף" מאת אלי שרעבי**. לפי תיאור המוצר, זהו סיפור בגוף ראשון.'));
         $this->assertTrue(AnswerSiteQuestion::saysMissing('אם התכוונת לספר של שם טוב, הוא לא מופיע בתוצאות האלה ולכן אי אפשר להשוות.'));
         $this->assertTrue(AnswerSiteQuestion::saysMissing('That book is not listed here.'));
+        // Rocks, 11.11: kept, and shown to every shopper who searched the word
+        $this->assertTrue(AnswerSiteQuestion::saysMissing('אין כאן עגיל מטפס בודד, אבל יש לנו עגילים בודדים גדולים בזהב צהוב.'));
+        $this->assertTrue(AnswerSiteQuestion::saysMissing('כרגע אין באתר שרשרת וינטג׳ באורך 70 ס״מ.'));
 
         $this->assertFalse(AnswerSiteQuestion::saysMissing('הספר עוסק בחזון לעתידה של ישראל.'));
         $this->assertFalse(AnswerSiteQuestion::saysMissing('הספר לא נמצא במלאי כרגע, ואפשר להזמין אותו מראש.'), 'not in stock is an answer');
+        $this->assertFalse(AnswerSiteQuestion::saysMissing('הטבעת הזאת אין כרגע במלאי, ואפשר להזמין אותה.'), 'not in stock, said the other way, is an answer');
+        $this->assertFalse(AnswerSiteQuestion::saysMissing('אין צורך במידה מדויקת: הצמיד מתכוונן.'));
     }
 
     public function test_a_not_found_line_says_what_was_not_found_and_nothing_more(): void

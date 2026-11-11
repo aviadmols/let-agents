@@ -105,6 +105,34 @@ final class SearchesScreenTest extends TestCase
             ->assertSee('https://shop.test/dress.jpg', false);
     }
 
+    public function test_a_question_shows_the_products_its_answer_showed(): void
+    {
+        // Aviad, 11.11: "add here in the answer that I also see the products that were shown"
+        $this->inShop(function (): void {
+            $id = $this->shop->id;
+            CatalogProduct::query()->create(['shop_id' => $id, 'external_id' => '21', 'hash' => 'h21', 'payload' => [], 'type' => 'simple', 'status' => 'publish', 'title' => 'עגיל חישוק זהב', 'url' => 'https://shop.test/hoop', 'image_url' => 'https://shop.test/hoop.jpg', 'price' => 1250, 'in_stock' => true, 'purchasable' => true]);
+            CatalogProduct::query()->create(['shop_id' => $id, 'external_id' => '22', 'hash' => 'h22', 'payload' => [], 'type' => 'simple', 'status' => 'publish', 'title' => 'עגיל טיפה', 'image_url' => 'https://shop.test/drop.jpg', 'in_stock' => true, 'purchasable' => true]);
+            $answer = AssistantAnswer::query()->create(['shop_id' => $id, 'question' => 'תראה לי עגיל חישוק', 'question_key' => 'hoop', 'answer' => 'הנה שניים.', 'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN,
+                'source' => 'store', 'prompt_version' => 1, 'asked_count' => 20, 'last_asked_at' => now()->subHour()]);
+            // an older ask showed something else; the screen shows the latest; the results on screen before the question are not the answer's
+            AssistantSearchAsk::query()->create(['shop_id' => $id, 'day' => now()->subDays(2)->toDateString(), 'question' => 'תראה לי עגיל חישוק', 'products' => ['11'], 'outcome' => 'answered', 'from' => 'model', 'answer_id' => $answer->id,
+                'picks' => [['external_id' => '11', 'title' => 'שמלת פשתן לבנה', 'why' => '']]])->forceFill(['created_at' => now()->subDays(2)])->save();
+            AssistantSearchAsk::query()->create(['shop_id' => $id, 'day' => now()->toDateString(), 'question' => 'תראה לי עגיל חישוק', 'products' => ['11'], 'outcome' => 'answered', 'from' => 'bank', 'answer_id' => $answer->id,
+                'picks' => [['external_id' => '21', 'title' => 'עגיל חישוק זהב', 'why' => 'חישוק']], 'shown' => ['22', '21'], 'picked' => ['22']])->forceFill(['created_at' => now()->subHour()])->save();
+        });
+
+        $q = collect($this->inShop(fn () => app(SearchScreen::class)->questions($this->shop, now()->subDays(7), now(), 8)))->firstWhere('question', 'תראה לי עגיל חישוק');
+        $this->assertSame(['עגיל חישוק זהב', 'עגיל טיפה'], array_column($q['shown'], 'title'), 'its picks first, each once, never what was on screen before');
+        $this->assertSame([false, true], array_column($q['shown'], 'opened'));
+        $this->assertSame([], collect($this->inShop(fn () => app(SearchScreen::class)->questions($this->shop, now()->subDays(7), now(), 8)))->firstWhere('question', 'יש משלוח לאילת?')['shown']);
+
+        $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/searches")
+            ->assertOk()
+            ->assertSeeInOrder(['הנה שניים.', 'המוצרים שהוצגו להם', 'עגיל חישוק זהב', 'עגיל טיפה', 'נפתח'])
+            ->assertSee('https://shop.test/hoop.jpg', false)
+            ->assertSee('https://shop.test/hoop', false);
+    }
+
     public function test_the_numbers_count_what_search_recorded(): void
     {
         $screen = app(SearchScreen::class);

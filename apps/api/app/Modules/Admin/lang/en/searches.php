@@ -57,6 +57,8 @@ return [
         'asked_last' => 'Last asked',
         'asked_first' => 'first',
         'they_got' => 'The answer they got',
+        'shown' => 'The products they were shown',
+        'opened' => 'Opened',
         'no_answer' => 'The assistant had no answer for this yet.',
         'answer_it' => 'Answer it',
         'times' => '{1} once|{2} twice|[0,*] :n times',

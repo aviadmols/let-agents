@@ -36,6 +36,9 @@ final class SearchScreen implements SearchesScreen
     /** How many of a photo search's results show beside the shopper's photo. */
     private const PHOTO_FOUND = 4;
 
+    /** The most products listed under one question's answer. */
+    private const ANSWER_SHOWN = 8;
+
     /** A word with fewer searches than this is not "rising" on its growth alone. */
     private const RISING_MIN = 3;
 
@@ -139,13 +142,14 @@ final class SearchScreen implements SearchesScreen
     {
         $rows = AssistantAnswer::query()->where('status', AssistantAnswer::SHOWN)->whereIn('outcome', [AssistantAnswer::ANSWERED, AssistantAnswer::NO_INFO])
             ->where('last_asked_at', '>=', $since)->where('last_asked_at', '<', $until)
-            ->orderByDesc('asked_count')->orderByDesc('last_asked_at')->limit($limit)->get(['question', 'answer', 'asked_count', 'outcome', 'source', 'sources', 'product_id', 'content_id', 'created_at', 'last_asked_at']);
+            ->orderByDesc('asked_count')->orderByDesc('last_asked_at')->limit($limit)->get(['id', 'question', 'answer', 'asked_count', 'outcome', 'source', 'sources', 'picks', 'product_id', 'content_id', 'created_at', 'last_asked_at']);
         // the page each was asked on (Aviad, 9.11: "from which page or product it was asked"): a product with its picture, an article
         $products = CatalogProduct::query()->whereIn('id', $rows->pluck('product_id')->filter()->unique()->values())->get(['id', 'title', 'url', 'image_url'])->keyBy('id');
         $contents = CatalogContent::query()->whereIn('id', $rows->pluck('content_id')->filter()->unique()->values())->get(['id', 'title', 'url'])->keyBy('id');
+        $shown = $this->shownWithAnswers($shop, $rows->all(), $until);
 
         return $rows
-            ->map(function (AssistantAnswer $a) use ($products, $contents): array {
+            ->map(function (AssistantAnswer $a) use ($products, $contents, $shown): array {
                 $product = $a->product_id !== null ? $products->get($a->product_id) : null;
                 $content = $a->content_id !== null ? $contents->get($a->content_id) : null;
                 $askedOn = match (true) {
@@ -172,8 +176,67 @@ final class SearchScreen implements SearchesScreen
                     'answer' => $answer === '' ? null : mb_substr($answer, 0, 1200),
                     'first' => min($a->created_at?->getTimestamp() ?? $last, $last), 'last' => $last,
                     'asked_on' => $askedOn,
+                    'shown' => $shown[(string) $a->id] ?? [],
                 ];
             })->all();
+    }
+
+    /**
+     * The products each answer showed the shopper the last time it was given (Aviad, 11.11: "show the products that were
+     * shown"): its picks first, then the others it showed (named in its words, or a set it listed), as the store has them
+     * now; the ones the shopper opened or added marked. A saved answer never asked from the search box keeps its own picks.
+     * Never the results that were on screen before the question: those were not the answer's.
+     *
+     * @param  list<AssistantAnswer>  $answers
+     * @return array<string, list<array{title: string, url: string|null, picture: string|null, price: string|null, opened: bool}>>
+     */
+    private function shownWithAnswers(Shop $shop, array $answers, CarbonInterface $until): array
+    {
+        $ids = array_map(fn (AssistantAnswer $a): string => (string) $a->id, $answers);
+        if ($ids === []) {
+            return [];
+        }
+        // the latest ask of each answer (asks come newest first, so the first per answer wins)
+        $latest = [];
+        foreach (AssistantSearchAsk::query()->whereIn('answer_id', $ids)->where('created_at', '<', $until)->latest('created_at')->orderByDesc('id')->limit(500)->get(['answer_id', 'picks', 'shown', 'picked']) as $ask) {
+            $latest[(string) $ask->answer_id] ??= $ask;
+        }
+
+        $wanted = [];
+        foreach ($answers as $a) {
+            $ask = $latest[(string) $a->id] ?? null;
+            $picks = array_values(array_filter((array) ($ask !== null ? $ask->picks : $a->picks), 'is_array'));
+            $order = [...array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $picks), ...array_map('strval', (array) ($ask?->shown ?? []))];
+            $wanted[(string) $a->id] = [
+                'ids' => array_slice(array_values(array_unique(array_filter($order, fn (string $id): bool => $id !== ''))), 0, self::ANSWER_SHOWN),
+                'titles' => array_column($picks, 'title', 'external_id'),
+                'opened' => array_flip(array_map('strval', (array) ($ask?->picked ?? []))),
+            ];
+        }
+
+        $all = array_values(array_unique(array_merge(...array_values(array_map(fn (array $w): array => $w['ids'], $wanted)))));
+        if ($all === []) {
+            return [];
+        }
+        $products = CatalogProduct::query()->whereIn('external_id', $all)->get(['external_id', 'title', 'url', 'image_url', 'price'])->keyBy('external_id');
+        $currency = (string) ($shop->currency ?: 'ILS');
+
+        $out = [];
+        foreach ($wanted as $answerId => $w) {
+            $out[$answerId] = array_values(array_filter(array_map(function (string $id) use ($products, $w, $currency): array {
+                $p = $products[$id] ?? null;
+
+                return [
+                    'title' => trim((string) ($p->title ?? $w['titles'][$id] ?? '')),
+                    'url' => $p?->url,
+                    'picture' => $p?->image_url,
+                    'price' => $p?->price === null ? null : Money::total((float) $p->price, $currency),
+                    'opened' => isset($w['opened'][$id]),
+                ];
+            }, $w['ids']), fn (array $p): bool => $p['title'] !== ''));
+        }
+
+        return $out;
     }
 
     public function photos(Shop $shop, CarbonInterface $since, CarbonInterface $until, int $limit): array

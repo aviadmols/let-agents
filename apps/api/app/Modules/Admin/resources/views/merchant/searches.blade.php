@@ -194,6 +194,19 @@
                                             @if (($q['answer'] ?? null) !== null)
                                                 <span class="lp-d-q-label">{{ $t('questions.they_got') }}</span>
                                                 <p class="lp-d-q-text" dir="auto">{!! nl2br(e($q['answer'])) !!}</p>
+                                                {{-- the products the answer showed, those the shopper opened or added marked --}}
+                                                @if (($q['shown'] ?? []) !== [])
+                                                    <span class="lp-d-q-label">{{ $t('questions.shown') }}</span>
+                                                    <div class="lp-d-q-shown" data-answer-products>
+                                                        @foreach ($q['shown'] as $p)
+                                                            <a class="lp-d-q-prod{{ $p['opened'] ? ' is-opened' : '' }}" href="{{ $p['url'] ?: '#' }}" target="_blank" rel="noopener" data-answer-product>
+                                                                <span class="lp-d-q-prod-pic">@if ($p['picture'])<img src="{{ $p['picture'] }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
+                                                                <span class="lp-d-q-prod-title" dir="auto">{{ $p['title'] }}</span>
+                                                                @if ($p['price'] || $p['opened'])<span class="lp-d-q-prod-meta"><bdi>{{ $p['price'] }}</bdi>@if ($p['price'] && $p['opened']) · @endif @if ($p['opened'])<b>{{ $t('questions.opened') }}</b>@endif</span>@endif
+                                                            </a>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                             @else
                                                 <p class="lp-d-q-text lp-d-q-none">{{ $t('questions.no_answer') }}</p>
                                             @endif
