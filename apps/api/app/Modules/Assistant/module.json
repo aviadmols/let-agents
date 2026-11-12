@@ -365,6 +365,15 @@
             "scope": "shop"
         },
         {
+            "name": "offer_max_age_days",
+            "type": "int",
+            "default": 90,
+            "min": 0,
+            "max": 730,
+            "scope": "shop",
+            "unit": "days"
+        },
+        {
             "name": "site_code_rules",
             "type": "int",
             "default": 0,

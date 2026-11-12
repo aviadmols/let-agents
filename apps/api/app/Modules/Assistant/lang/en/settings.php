@@ -135,6 +135,10 @@ return [
         'label' => 'Minimum nearness of a piece to the question',
         'description' => 'Below this a piece is not sent, and with no piece no writing model is asked.',
     ],
+    'offer_max_age_days' => [
+        'label' => 'Days after which a post\'s offer no longer counts',
+        'description' => 'A post published longer ago than this: what it says of sales, discounts and coupons is left out of answers. The store\'s pages are not. 0 turns it off.',
+    ],
     'site_code_rules' => [
         'label' => 'Answer code rules: the conversation\'s kind, a least price, "nothing written"',
         'description' => '1 turns them on: a reply keeps the conversation\'s kind of product, an offer from a least price says the amount, and "nothing written" counts as unanswered. Measured on the quality baseline before it is turned on.',

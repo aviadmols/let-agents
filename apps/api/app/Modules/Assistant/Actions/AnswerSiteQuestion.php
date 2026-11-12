@@ -37,6 +37,7 @@ use App\Modules\Assistant\Support\QuestionGuard;
 use App\Modules\Assistant\Support\QuestionLinks;
 use App\Modules\Assistant\Support\RelatedGroups;
 use App\Modules\Assistant\Support\RepeatedText;
+use App\Modules\Assistant\Support\StaleOffers;
 use App\Modules\Assistant\Support\StoreCodes;
 use App\Modules\Assistant\Support\StoreSpelling;
 use App\Modules\Assistant\Support\StoreVoice;
@@ -1454,6 +1455,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         if (($ignored = AssistantIgnoredSource::contentIds()) !== []) {
             $found = array_values(array_filter($found, fn (array $p): bool => ($p['source'] ?? '') !== 'content' || ! in_array((string) ($p['source_id'] ?? ''), $ignored, true)));
         }
+        // and an offer told in a post older than the store's limit is no offer today (StaleOffers)
+        $found = $this->withoutStaleOffers($shopId, $found);
         // A product whose own page the question found by meaning ("מיקו דרים" for "לישון ממש טוב?") is one the answer may
         // show, before what the search showed: named in the answer without its card, it sent the shopper looking for it.
         if ($viewing === null && ! $followUp && $named === []) {
@@ -3287,6 +3290,51 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return array_slice(array_values($out), 0, self::MINIMUMS);
+    }
+
+    /**
+     * The passages without what an old post says of an offer (StaleOffers; Sella, 12.11): a post published longer ago than
+     * assistant.offer_max_age_days loses its lines of sales, discounts and coupons, and so do the facts read from such a
+     * post in what the posts say ("- … (its title)"). A passage left with nothing is dropped. Pages stay as they are.
+     *
+     * @param  list<array<string, mixed>>  $found
+     * @return list<array<string, mixed>>
+     */
+    public function withoutStaleOffers(string $shopId, array $found): array
+    {
+        $days = (int) Settings::get('assistant.offer_max_age_days', $shopId);
+        $offering = array_filter($found, fn (array $p): bool => ($p['source'] ?? '') === 'content' && StaleOffers::talks((string) ($p['text'] ?? '')));
+        if ($days <= 0 || $offering === []) {
+            return $found;
+        }
+        $cut = now()->subDays($days);
+        $old = fn (CatalogContent $c): bool => ($at = StaleOffers::publishedAt($c->url, $c->source_updated_at)) !== null && $at->lessThan($cut);
+
+        $ids = array_values(array_unique(array_map(fn (array $p): string => (string) ($p['source_id'] ?? ''), $offering)));
+        $rows = CatalogContent::query()->whereIn('id', $ids)->get(['id', 'type', 'external_id', 'url', 'source_updated_at'])->keyBy('id');
+        $postsRow = $rows->first(fn (CatalogContent $c): bool => $c->external_id === BuildShopKnowledge::POSTS);
+        // the titles of the old posts the facts in what the posts say end with
+        $oldTitles = $postsRow === null ? [] : CatalogContent::query()->where('type', CatalogContent::POST)->get(['title', 'url', 'source_updated_at'])
+            ->filter($old)->map(fn (CatalogContent $c): string => trim((string) $c->title))->filter()->flip()->all();
+
+        $out = [];
+        foreach ($found as $passage) {
+            $row = ($passage['source'] ?? '') === 'content' ? $rows->get((string) ($passage['source_id'] ?? '')) : null;
+            if ($row !== null && $row->type === CatalogContent::POST && $old($row)) {
+                $passage['text'] = StaleOffers::withoutOffers((string) $passage['text']);
+            } elseif ($row !== null && $postsRow !== null && (string) $row->id === (string) $postsRow->id && $oldTitles !== []) {
+                $passage['text'] = implode("\n", array_filter(explode("\n", (string) $passage['text']), function (string $line) use ($oldTitles): bool {
+                    $title = preg_match('/\(([^()]+)\)\s*$/u', $line, $m) === 1 ? trim($m[1]) : null;
+
+                    return $title === null || ! isset($oldTitles[$title]) || ! StaleOffers::talks($line);
+                }));
+            }
+            if (trim((string) ($passage['text'] ?? '')) !== '') {
+                $out[] = $passage;
+            }
+        }
+
+        return $out;
     }
 
     /** A word held by this many titles or fewer tells products apart ("כסף" in a gold store); held by more, it names the range ("טבעת"). */
