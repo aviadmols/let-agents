@@ -135,6 +135,10 @@ return [
         'label' => 'Minimum nearness of a piece to the question',
         'description' => 'Below this a piece is not sent, and with no piece no writing model is asked.',
     ],
+    'site_code_rules' => [
+        'label' => 'Answer code rules: the conversation\'s kind, a least price, "nothing written"',
+        'description' => '1 turns them on: a reply keeps the conversation\'s kind of product, an offer from a least price says the amount, and "nothing written" counts as unanswered. Measured on the quality baseline before it is turned on.',
+    ],
     'site_similarity_drop' => [
         'label' => 'How far below the nearest piece a piece is still sent',
         'description' => 'A piece further below the nearest than this is not sent. 0 turns it off. Measured on the quality baseline before it is turned on.',

@@ -365,6 +365,14 @@
             "scope": "shop"
         },
         {
+            "name": "site_code_rules",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 1,
+            "scope": "shop"
+        },
+        {
             "name": "site_similarity_drop",
             "type": "float",
             "default": 0,

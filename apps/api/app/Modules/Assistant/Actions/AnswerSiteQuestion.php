@@ -150,9 +150,10 @@ final class AnswerSiteQuestion implements TriesQuestions
      * and 9, and supported fell 74.1→69 in one run. A reply naming no kind ("יש משהו עם זהב צהב?" after solitaire rings)
      * was given pendants, "nothing written" was marked answered, and a least price was left out.
      *
-     * answer_site v25 (v24, and: a reply keeps the conversation's kind of product, in code as well, heldKind(); "nothing
-     * written about it" is never an answer, in code as well, saysNothingWritten(); an offer that applies from a least price
-     * says that amount) is the one to release, after the same baseline.
+     * answer_site v25 (v24, and the same in its words: a reply keeps the conversation's kind, "nothing written" is no
+     * answer, an offer from a least price says the amount) is not released either: half a run on 12.11 showed no gain over
+     * v22 beyond what code does. Code does it for every version and every store: heldKind(), saysNothingWritten(),
+     * withLeastPrice().
      *
      * @var array<string, list<int>>
      */
@@ -1443,8 +1444,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         $this->linked = $linked;
         $shown = array_values(array_unique([...$linked, ...$shown]));
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
-        // a reply naming no kind keeps the conversation's (v25 on; an older prompt is given what it was)
-        if (($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= self::KIND_FROM) {
+        // a reply naming no kind keeps the conversation's, whatever the prompt (code, every store; site_code_rules)
+        if ($this->codeRules()) {
             $candidates = self::heldKind($this->asked !== '' ? $this->asked : $question, $this->conversation, $candidates);
         }
         $type = AnswerContext::type($question);
@@ -1986,6 +1987,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $forward = $choices === [] ? self::forwardOnYes($this->asked, $answer, $this->conversation, $locale) : null;
                 $answer = $choices !== [] ? $answer : ($forward
                     ?? self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain($answer, $this->conversation, $locale), $this->conversation), $locale));
+                // an offer that applies to this product from a least price says that amount, in the store's own sentence
+                if ($forward === null && $choices === [] && $this->codeRules()) {
+                    $answer = self::withLeastPrice($answer, (array) ($analysis['price_minimums'] ?? []), self::viewingOf($prepared), $cited, $byRef);
+                }
                 // a question back rests on no page and offers nothing: no sources or products under it
                 $cited = $forward === null ? $cited : [];
                 $picks = $forward === null ? $picks : [];
@@ -2299,9 +2304,6 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** From this version of answer_site the writer is told of trouble and may answer from general knowledge (general, choices). */
     public const TROUBLE_FROM = 24;
-
-    /** From this version of answer_site a reply keeps the conversation's kind (heldKind) and "nothing written" is no answer. */
-    public const KIND_FROM = 25;
 
     /**
      * An answer that says the store has nothing written about what was asked ("אין לנו כאן מידע כתוב על…", "בחומר שבידינו
@@ -2713,8 +2715,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         $trimmed = 0;
         // "Nothing written about it" with no product and no general knowledge answers nothing, whatever `found` says (v25):
         // it is the shopper's not-found line (missing), told as one, with the team's help.
-        $nothing = ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= self::KIND_FROM
-            && $answer !== '' && $picks === [] && $general === [] && self::saysNothingWritten($answer);
+        $nothing = $answer !== '' && $picks === [] && $general === [] && $this->codeRules() && self::saysNothingWritten($answer);
         $refusal = match (true) {
             $answer === '' => 'no_answer',
             $nothing => 'not_found',
@@ -3171,6 +3172,73 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return array_slice(array_values($out), 0, self::MINIMUMS);
+    }
+
+    /**
+     * Whether code's answer rules of 12.11 are on for this shop (heldKind, saysNothingWritten, withLeastPrice): off until
+     * the quality baseline with them (--set=assistant.site_code_rules=1) is no worse than without.
+     */
+    private function codeRules(): bool
+    {
+        // the writer bench screens replies outside any shop: the rules as they are by default
+        $shopId = $this->tenant->id();
+
+        return (int) Settings::get('assistant.site_code_rules', $shopId) === 1;
+    }
+
+    /** The ref of the product the question was asked about (`viewing` in the writer's input), live or frozen; null when none. */
+    private static function viewingOf(array $prepared): ?string
+    {
+        $input = json_decode((string) ($prepared['input'] ?? ''), true);
+        $ref = is_array($input) ? ($input['viewing'] ?? null) : null;
+
+        return is_string($ref) && $ref !== '' ? $ref : null;
+    }
+
+    /**
+     * An answer about an offer that applies to the product asked about from a least price, which leaves out that amount
+     * ("כן, אפשר לשריין את הטבעת הזו בתוכנית Layaway…", Rocks, 12.11, one run in two whatever the prompt): the store's own
+     * sentence that sets it, from the cited passage, after the answer's first sentence. Code, for any store and any such
+     * offer (a plan, free shipping, a gift); an answer that already says the amount, or cites no passage that sets one
+     * about what it speaks of, stays as it is.
+     *
+     * @param  list<array{amount: string, ref: string, below: list<string>, at_or_above: list<string>}>  $minimums
+     * @param  list<string>  $cited
+     * @param  array<string, array<string, mixed>>  $byRef
+     */
+    public static function withLeastPrice(string $answer, array $minimums, ?string $viewing, array $cited, array $byRef): string
+    {
+        if (trim($answer) === '' || $viewing === null || $minimums === []) {
+            return $answer;
+        }
+
+        $digits = fn (string $text): string => (string) preg_replace('/(?<=\d)[,.](?=\d{3})/u', '', $text);
+        $words = fn (string $text): array => array_unique(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($text)) ?: [], fn (string $w): bool => mb_strlen($w) >= 4));
+        $said = $digits($answer);
+
+        foreach ($minimums as $minimum) {
+            if (! in_array($viewing, $minimum['at_or_above'], true) || ! in_array($minimum['ref'], $cited, true)) {
+                continue;
+            }
+            $sum = (string) preg_replace('/\D/u', '', $digits($minimum['amount']));
+            if ($sum === '' || preg_match('/(?<!\d)'.$sum.'(?!\d)/u', $said) === 1) {
+                return $answer;
+            }
+            // the passage's sentence that holds the amount, when it speaks of what the answer speaks of
+            $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) ($byRef[$minimum['ref']]['text'] ?? ''))));
+            foreach (preg_split('/(?<=[.!?])\s+|\s*[•·|]\s*/u', $text) ?: [] as $sentence) {
+                $sentence = trim($sentence);
+                if (! str_contains($sentence, $minimum['amount']) || mb_strlen($sentence) > 220 || array_intersect($words($sentence), $words($answer)) === []) {
+                    continue;
+                }
+                $sentence = preg_match('/[.!?]$/u', $sentence) === 1 ? $sentence : $sentence.'.';
+                $cut = preg_match('/^.+?[.!?](?=\s|$)/u', $answer, $m) === 1 ? mb_strlen($m[0]) : mb_strlen($answer);
+
+                return trim(mb_substr($answer, 0, $cut).' '.$sentence.' '.ltrim(mb_substr($answer, $cut)));
+            }
+        }
+
+        return $answer;
     }
 
     /** "מה הספר הכי מומלץ", "הכי נמכר", "רב מכר", "best seller": what the store's customers choose most. */

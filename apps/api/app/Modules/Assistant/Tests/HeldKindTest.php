@@ -67,6 +67,30 @@ final class HeldKindTest extends TestCase
         $this->assertSame(['x'], $this->ids(AnswerSiteQuestion::heldKind('anything in blue?', [['question' => 'do you have shirts?', 'answer' => 'Yes.']], $shirts)));
     }
 
+    public function test_an_offer_from_a_least_price_says_the_amount_in_the_store_s_own_sentence(): void
+    {
+        $byRef = [
+            's1' => ['title' => 'Layaway', 'text' => 'תשלום חלקי ללא תפיסת מסגרת. תוכנית Layaway זמינה לפריטים שמחירם 2,000 ש״ח ומעלה. מקדמה של 10%.'],
+            's2' => ['title' => 'משלוחים', 'text' => 'משלוח חינם בהזמנה מעל 300 ש״ח.'],
+        ];
+        $products = ['p1' => ['price' => 2600.0], 'p2' => ['price' => 650.0]];
+        $minimums = AnswerSiteQuestion::priceMinimums($byRef, $products);
+        $answer = 'כן, אפשר לשריין את הטבעת הזו בתוכנית Layaway דרך לחיצה על ״תשלום חלקי״. נדרשת מקדמה של לפחות 10%.';
+
+        $this->assertSame(
+            'כן, אפשר לשריין את הטבעת הזו בתוכנית Layaway דרך לחיצה על ״תשלום חלקי״. תוכנית Layaway זמינה לפריטים שמחירם 2,000 ש״ח ומעלה. נדרשת מקדמה של לפחות 10%.',
+            AnswerSiteQuestion::withLeastPrice($answer, $minimums, 'p1', ['s1'], $byRef),
+        );
+
+        // already said, in any writing of it
+        $said = 'התוכנית מיועדת לפריטים מ־2000 ש״ח ומעלה, והטבעת הזו נכללת בה.';
+        $this->assertSame($said, AnswerSiteQuestion::withLeastPrice($said, $minimums, 'p1', ['s1'], $byRef));
+        // a product under the amount, no product asked about, the passage not cited: as it was
+        $this->assertSame($answer, AnswerSiteQuestion::withLeastPrice($answer, $minimums, 'p2', ['s1'], $byRef));
+        $this->assertSame($answer, AnswerSiteQuestion::withLeastPrice($answer, $minimums, null, ['s1'], $byRef));
+        $this->assertSame($answer, AnswerSiteQuestion::withLeastPrice($answer, $minimums, 'p1', ['s2'], $byRef));
+    }
+
     public function test_nothing_written_is_no_answer(): void
     {
         foreach ([
