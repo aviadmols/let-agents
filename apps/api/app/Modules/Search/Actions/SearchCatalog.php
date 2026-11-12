@@ -1481,7 +1481,7 @@ final class SearchCatalog
             }
             $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
-            $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
+            $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own), own: true);
             // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before
             // long (Vans, 12.11); none of 40 of Rocks's products had one among its alike
             $records = $own === null ? $records : self::sameSideFirst($records, (string) ($own['title'] ?? ''));

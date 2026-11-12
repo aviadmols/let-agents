@@ -86,18 +86,23 @@ final class Patterns
      * of it, most, a part, then those whose picture has not said, then a detail only, then the plain and the
      * ones in another print. Unchanged when no print is asked for.
      *
+     * $own: the print is a product's own, for its alike: a print of no family of its own (a graphic on a tee) is then
+     * that print alone, never any print. Asked for in a search ("חולצה עם הדפס") every print counts; a graphic tee's
+     * alike are graphic tees, not tees covered in stripes (Vans, 12.11: the stripes, all over, came first).
+     *
      * @param  list<array<string, mixed>>  $records
      * @return list<array<string, mixed>>
      */
-    public static function tiered(array $records, ?int $family): array
+    public static function tiered(array $records, ?int $family, bool $own = false): array
     {
         if ($family === null || count($records) < 2) {
             return $records;
         }
+        $any = $family === self::ANY && ! $own;
         $tier = [];
         foreach ($records as $at => $record) {
             $said = self::of($record);
-            $tier[$at] = $said === null ? self::UNKNOWN : ($said['family'] !== null && ($family === self::ANY || $said['family'] === $family) ? (float) $said['level'] : 0.0);
+            $tier[$at] = $said === null ? self::UNKNOWN : ($said['family'] !== null && ($any || $said['family'] === $family) ? (float) $said['level'] : 0.0);
         }
         $order = array_keys($records);
         usort($order, fn (int $a, int $b): int => [$tier[$b], $a] <=> [$tier[$a], $b]);
