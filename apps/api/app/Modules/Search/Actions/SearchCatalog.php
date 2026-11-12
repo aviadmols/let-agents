@@ -1489,19 +1489,27 @@ final class SearchCatalog
 
                         return $filed ? 0 : 2;
                     };
-                    $tiers = [[], [], []];
                     foreach ($records as $r) {
-                        $tiers[$tier($r)][] = $r;
+                        $colourTier[(string) $r['id']] = $tier($r);
                     }
-                    $records = [...$tiers[0], ...$tiers[1], ...$tiers[2]];
                 }
             }
             $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own), own: true);
-            // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before
-            // long (Vans, 12.11); none of 40 of Rocks's products had one among its alike
-            $records = $own === null ? $records : self::sameSideFirst($records, (string) ($own['title'] ?? ''));
+            if (isset($colourTier)) {
+                // clothes (titles that name no colour): its colour first, then its print, then its side, each kept in the
+                // order before: a white long tee's alike are white tees before a yellow shirt of its length (Vans, 12.11)
+                $ownTitle = (string) ($own['title'] ?? '');
+                $order = array_keys($records);
+                usort($order, fn (int $a, int $b): int => [$colourTier[(string) $records[$a]['id']] ?? 2, (int) BuildSearchIndex::contradicts($ownTitle, (string) ($records[$a]['title'] ?? '')), $a]
+                    <=> [$colourTier[(string) $records[$b]['id']] ?? 2, (int) BuildSearchIndex::contradicts($ownTitle, (string) ($records[$b]['title'] ?? '')), $b]);
+                $records = array_map(fn (int $at): array => $records[$at], $order);
+            } else {
+                // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before
+                // long (Vans, 12.11); none of 40 of Rocks's products had one among its alike
+                $records = $own === null ? $records : self::sameSideFirst($records, (string) ($own['title'] ?? ''));
+            }
             // In the order the code and their nearness gave, with no model: one that ordered them by their pictures (Rocks,
             // 28.10) kept the shopper waiting seconds on every first look (Aviad, 30.10). A photo's own search still asks it.
             $products = array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
