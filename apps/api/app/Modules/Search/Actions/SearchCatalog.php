@@ -1473,15 +1473,13 @@ final class SearchCatalog
             // words in their data, where one sold in many colours (Pismo Knit) said every colour and led every list.
             // Whom it is for, as the store says it (its title, type, categories, tags): a kids' shoe is never an adult's
             // alike, nor the other way (Vans, 12.11: a glittery kids' sneaker beside an adult slip-on). Any store.
+            // A product the store says nothing of is for grown-ups where the store says "kids" of others: its adult shoes are
+            // "נעלי סניקרס Old Skool", its kids' ones say "לילדים". A kids' product's alike are kids' alone; an adult's, none.
             $audiences = $this->audiencesOf(array_values(array_unique([$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])));
             $young = fn (array $a): bool => array_intersect($a, ['kids', 'babies']) !== [];
             $ownFor = $audiences[$externalId] ?? [];
-            if ($ownFor !== []) {
-                $records = array_values(array_filter($records, function (array $r) use ($audiences, $ownFor, $young): bool {
-                    $for = $audiences[substr((string) $r['id'], 2)] ?? [];
-
-                    return $for === [] || $young($for) === $young($ownFor);
-                }));
+            if (array_filter($audiences, $young) !== []) {
+                $records = array_values(array_filter($records, fn (array $r): bool => $young($audiences[substr((string) $r['id'], 2)] ?? []) === $young($ownFor)));
             }
 
             $filedLead = $parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index);
@@ -1498,6 +1496,7 @@ final class SearchCatalog
                 $ownFiled = self::filedColours($own, $facets);
                 $ownPrint = Patterns::of($own);
                 $ownTitle = (string) ($own['title'] ?? '');
+                // its picture's nearness as the steps before ordered it (the pictures, its drawing, its words), in stock first
                 $count = max(1, count($records));
                 $score = [];
                 foreach ($records as $at => $r) {
@@ -1511,7 +1510,7 @@ final class SearchCatalog
                     ]);
                 }
                 $order = array_keys($records);
-                usort($order, fn (int $a, int $b): int => [$score[$b], $a] <=> [$score[$a], $b]);
+                usort($order, fn (int $a, int $b): int => [(int) ($records[$b]['s'] ?? 0), $score[$b], $a] <=> [(int) ($records[$a]['s'] ?? 0), $score[$a], $b]);
                 $records = array_map(fn (int $at): array => $records[$at], $order);
             } else {
                 // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before

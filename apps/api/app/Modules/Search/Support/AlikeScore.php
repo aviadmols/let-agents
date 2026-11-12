@@ -12,7 +12,7 @@ namespace App\Modules\Search\Support;
 final class AlikeScore
 {
     /** How much each signal weighs. Whom it is for weighs most: a kids' shoe is no adult's alike, however it looks. */
-    public const WEIGHTS = ['look' => 1.0, 'colour' => 1.0, 'print' => 1.2, 'side' => 0.8, 'audience' => 2.0];
+    public const WEIGHTS = ['look' => 1.0, 'colour' => 1.0, 'print' => 2.0, 'side' => 0.8, 'audience' => 2.0];
 
     /** A print that covers at least this much (Patterns' levels: 3 most, 4 all) is all over; less is a print on a part. */
     private const ALL_OVER = 3;
