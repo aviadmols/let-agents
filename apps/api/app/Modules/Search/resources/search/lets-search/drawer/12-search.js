@@ -402,7 +402,9 @@
     });
     // "נעלים לגברים מנומרות": a word none of the products shown says, though the store has it elsewhere (a leopard bag):
     // said, never shown as if they were it (as Aviad asked, 2026-10-25)
-    var shownList = filtered(turn), missing = typed.length ? [] : unsaid(turn.q, shownList, read);
+    // and a value the words named that none of the results has, let go (readTags): said first
+    var letGo = (turn.letGo || []).filter(function (w) { return !ASKS_ONLY.test(w) && !STOP.test(w); });
+    var shownList = filtered(turn), missing = typed.length ? [] : letGo.concat(unsaid(turn.q, shownList, read).filter(function (w) { return letGo.indexOf(w) < 0; }));
     var rest = missing.length ? kept.filter(function (w) { return missing.indexOf(w) < 0; }) : [];
     // "מה זה ספרי פנטזיה?": the books are shown, and it says so; "פנטזיה" is not on the site
     // nothing as asked: the server searched looser, and says what it left out; the other way it found is a press away

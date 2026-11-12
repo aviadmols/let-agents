@@ -193,11 +193,19 @@
     // "In stock" by default is weighed apart: what the shopper named, all sold out, is shown sold out, not swapped for
     // something else in stock.
     // a value the words name that none of these results has is let go first: the others read stay as they are
-    if (all.length) { Object.keys(precise).map(Number).forEach(function (code) { if (c.auto[code] && !holdsAlone(turn, code)) { delete c.auto[code]; } }); }
+    // and what is let go is said above the results, never dropped quietly: "ג'קט כחול" with no blue jacket shows the
+    // jackets under "אין כרגע 'כחול' ב'ג'קט'" (as Aviad asked, Vans 12.11), never as if they were blue (noteHtml)
+    var qWords = wordsOf(q);
+    turn.letGo = [];
+    var letGo = function (code) {
+      (c.at[code] || []).forEach(function (i) { if (qWords[i] && turn.letGo.indexOf(qWords[i]) < 0) { turn.letGo.push(qWords[i]); } });
+      delete c.auto[code];
+    };
+    if (all.length) { Object.keys(precise).map(Number).forEach(function (code) { if (c.auto[code] && !holdsAlone(turn, code)) { letGo(code); } }); }
     var loose = Object.keys(c.auto).map(Number).sort(function (a, b) { return (precise[a] || 0) - (precise[b] || 0) || a - b; });
     var stocked = c.autoStock;
     c.autoStock = false;
-    while (loose.length && all.length && !filtered(turn).length) { delete c.auto[loose.shift()]; }
+    while (loose.length && all.length && !filtered(turn).length) { letGo(loose.shift()); }
     c.autoStock = stocked;
     if (c.autoStock && !c.saidStock && all.length && !filtered(turn).length) { c.autoStock = false; }
     // ✦ the words no filter here took that the results say ("גרב" of "כובע גרב"): chips too (as Aviad asked, 2026-10-25)

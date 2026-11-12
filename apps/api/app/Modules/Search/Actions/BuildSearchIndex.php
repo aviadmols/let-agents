@@ -1323,6 +1323,35 @@ final class BuildSearchIndex
         return $words;
     }
 
+    /**
+     * Opposites a product's title and the names it is filed under may say of it: its length, height, width, thickness,
+     * weight. Stems as HebrewSearch reads them (finals as letters), and in English.
+     */
+    private const OPPOSITES = [['קצר', 'ארוכ'], ['גבוה', 'נמוכ'], ['רחב', 'צר'], ['דק', 'עבה'], ['short', 'long'], ['high', 'low'], ['wide', 'narrow'], ['thin', 'thick']];
+
+    /**
+     * Whether a name the store files a product under says the opposite of what its own title says ("חולצות טי קצרות"
+     * for "חולצה ארוכה Core Thermal"): the title holds one side of a pair and the name the other, neither holding both.
+     */
+    public static function contradicts(string $title, string $name): bool
+    {
+        $words = fn (string $text): array => array_values(array_filter(explode(' ', HebrewSearch::normalize($text))));
+        // a word says a side when it is it, or, for a side of three letters or more, opens with it ("קצרות", "ארוכה")
+        $says = fn (array $in, string $side): bool => array_any($in, fn (string $w): bool => $w === $side || (mb_strlen($side) >= 3 && str_starts_with($w, $side)));
+        $t = $words($title);
+        $n = $words($name);
+
+        foreach (self::OPPOSITES as [$a, $b]) {
+            $titleA = $says($t, $a) && ! $says($t, $b);
+            $titleB = $says($t, $b) && ! $says($t, $a);
+            if (($titleA && $says($n, $b) && ! $says($n, $a)) || ($titleB && $says($n, $a) && ! $says($n, $b))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @param  list<string>  $learned  what the scan learned it is and is for, right after its categories */
     private function productWords(CatalogProduct $product, array $learned = []): array
     {
@@ -1330,13 +1359,19 @@ final class BuildSearchIndex
         // its Latin name as a shopper types it in Hebrew ("תיק ליגו" for "Herschel LEGO"), first, before the long lists
         array_push($words, ...Transliterate::hebrew($product->title.' '.$product->brand));
 
+        // a category or a tag that says the opposite of the product's own title is none of its words: "חולצה ארוכה Core
+        // Thermal" tagged "חולצות טי קצרות" was found for "חולצה קצרה" (Vans, 12.11). Its title is what it is.
+        $fits = fn (string $name): bool => ! self::contradicts((string) $product->title, $name);
+
         foreach ($product->categories as $category) {
-            $words[] = (string) $category->name;
+            if ($fits((string) $category->name)) {
+                $words[] = (string) $category->name;
+            }
         }
 
         array_push($words, ...$learned);
 
-        array_push($words, ...array_map('strval', (array) ($product->payload['tags'] ?? [])));
+        array_push($words, ...array_values(array_filter(array_map('strval', (array) ($product->payload['tags'] ?? [])), $fits)));
         array_push($words, ...array_map('strval', (array) ($product->payload['brands'] ?? [])));
 
         foreach ($product->storeAttributes() as $attribute) {
