@@ -9,6 +9,7 @@ use App\Modules\Assistant\Actions\RunQualityCases;
 use App\Modules\Assistant\Models\AssistantQualityCase;
 use App\Modules\Assistant\Models\AssistantQualityResult;
 use App\Modules\Assistant\Models\AssistantQualityRun;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Console\Command;
 use Throwable;
@@ -33,7 +34,8 @@ final class QualityBaselineCommand extends Command
         {--live : run: on today\'s catalogue and pages instead of each case\'s frozen data}
         {--label= : run: a name for the run, to find it again}
         {--kind=all : run: baseline (real questions), regression (cases with expectations), or all}
-        {--runs= : compare: two runs, by ID or label, as a,b}';
+        {--runs= : compare: two runs, by ID or label, as a,b}
+        {--answers : compare: every case with both answers, before and after, and the products each showed}';
 
     protected $description = 'Build the quality baseline from real questions, run it and print its numbers against the run before, or compare two runs case by case.';
 
@@ -199,15 +201,27 @@ final class QualityBaselineCommand extends Command
             $moved = $x->outcome !== $y->outcome || $x->verdict !== $y->verdict || $x->passed !== $y->passed
                 || ($x->duration_ms && $y->duration_ms && abs($y->duration_ms - $x->duration_ms) > 0.5 * $x->duration_ms);
 
-            if (! $moved) {
+            if (! $moved && ! $this->option('answers')) {
                 continue;
             }
 
-            $changed++;
+            $changed += $moved ? 1 : 0;
             $pass = fn (?bool $p): string => $p === null ? '·' : ($p ? 'pass' : 'FAIL');
             $this->line(mb_substr((string) ($questions[$caseId] ?? $caseId), 0, 90));
             $this->line(sprintf('  %s/%s/%s %s ms → %s/%s/%s %s ms%s', $x->outcome, $x->verdict ?? '-', $pass($x->passed), $x->duration_ms ?? '?',
                 $y->outcome, $y->verdict ?? '-', $pass($y->passed), $y->duration_ms ?? '?', $y->problems ? '  '.implode(' ', (array) $y->problems) : ''));
+            if ($this->option('answers')) {
+                foreach (['before' => $x, 'after' => $y] as $side => $r) {
+                    $this->line(sprintf('  %-6s %s', $side, trim((string) $r->answer) === '' ? '(no answer)' : trim((string) preg_replace('/\s+/u', ' ', (string) $r->answer))));
+                    if ((array) $r->picks !== []) {
+                        $titles = $tenant->runUnscoped(fn () => CatalogProduct::query()->whereIn('external_id', (array) $r->picks)->pluck('title', 'external_id'));
+                        foreach ((array) $r->picks as $id) {
+                            $this->line('           · '.mb_substr((string) ($titles[$id] ?? $id), 0, 80));
+                        }
+                    }
+                }
+                $this->newLine();
+            }
         }
 
         $this->line(sprintf('%d of %d cases changed.', $changed, $ra->count()));

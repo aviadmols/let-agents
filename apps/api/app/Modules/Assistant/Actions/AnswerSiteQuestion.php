@@ -146,10 +146,17 @@ final class AnswerSiteQuestion implements TriesQuestions
      * of trouble is given the likely reason, the simple steps and one question with tap answers, `choices`; a term of the
      * store's trade is explained from what anyone in it knows, each such sentence in `general`, which code keeps only when
      * it says nothing of the store) is written and not released either: released with v23, after the same baseline.
+     * Not released: on Rocks, 12.11 (asis-1111a/b against v24-1111a/b) it passed 8 and 7 cases of 10 where v22 passed 9
+     * and 9, and supported fell 74.1→69 in one run. A reply naming no kind ("יש משהו עם זהב צהב?" after solitaire rings)
+     * was given pendants, "nothing written" was marked answered, and a least price was left out.
+     *
+     * answer_site v25 (v24, and: a reply keeps the conversation's kind of product, in code as well, heldKind(); "nothing
+     * written about it" is never an answer, in code as well, saysNothingWritten(); an offer that applies from a least price
+     * says that amount) is the one to release, after the same baseline.
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -1436,6 +1443,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         $this->linked = $linked;
         $shown = array_values(array_unique([...$linked, ...$shown]));
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
+        // a reply naming no kind keeps the conversation's (v25 on; an older prompt is given what it was)
+        if (($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= self::KIND_FROM) {
+            $candidates = self::heldKind($this->asked !== '' ? $this->asked : $question, $this->conversation, $candidates);
+        }
         $type = AnswerContext::type($question);
         $counts = ['found' => count($found), 'shown' => count($candidates)];
         $debug = null;
@@ -1903,7 +1914,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         // a writer that found nothing writes no answer, which code reads as "no answer" or "cites
                         // nothing": its line is the shopper's all the same ("אין באתר המלצה אחת…")
                         $notFound = in_array($refusal, ['not_found', 'no_answer', 'cites_nothing'], true) && ! $unfit
-                            ? self::notFoundLine((string) ($reply->data['not_found'] ?? ''), $question) : null;
+                            ? self::notFoundLine(trim((string) ($reply->data['not_found'] ?? '')) !== '' ? (string) $reply->data['not_found'] : (string) ($screened['missing'] ?? ''), $question) : null;
                     } else {
                         $started = hrtime(true);
 
@@ -2289,6 +2300,131 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** From this version of answer_site the writer is told of trouble and may answer from general knowledge (general, choices). */
     public const TROUBLE_FROM = 24;
 
+    /** From this version of answer_site a reply keeps the conversation's kind (heldKind) and "nothing written" is no answer. */
+    public const KIND_FROM = 25;
+
+    /**
+     * An answer that says the store has nothing written about what was asked ("אין לנו כאן מידע כתוב על…", "בחומר שבידינו
+     * אין מענה", "we have nothing written about…"): whatever else it says, it answers nothing (Rocks, 12.11: such a line
+     * on watch batteries was marked answered). Any store, any language the widget speaks.
+     */
+    private const NOTHING_WRITTEN = '/(?<![\p{L}])אין\s+(?:לנו\s+)?(?:כאן\s+|באתר\s+|כרגע\s+)?(?:מידע|מענה|פירוט|התייחסות)(?:\s+כתוב(?:ה)?)?\s+(?:על|לגבי|בנוגע|ל)|בחומר\s+(?:שבידינו|שלנו|שיש\s+לנו)\s+אין|(?<![\p{L}])לא\s+(?:כתוב|מצאנו|מצאתי)\s+(?:אצלנו|באתר|כאן|מידע)|\b(?:we\s+have\s+)?(?:nothing|no\s+information)\s+(?:written\s+)?(?:about|on|regarding)\b|\bwe\s+(?:could\s+not|couldn\'t|did\s+not|didn\'t)\s+find\s+(?:any\s+)?information\b/iu';
+
+    /**
+     * Whether an answer's only word on what was asked is that the store has nothing written about it (NOTHING_WRITTEN):
+     * one that goes on to answer a part ("…אבל המשלוח בארץ חינם") answers that part, and stays.
+     */
+    public static function saysNothingWritten(string $answer): bool
+    {
+        return preg_match(self::NOTHING_WRITTEN, $answer) === 1
+            && preg_match('/(?<![\p{L}])(?:אבל|אך|לעומת\s+זאת|עם\s+זאת|מנגד)(?![\p{L}])|\b(?:but|however|though)\b/iu', $answer) !== 1;
+    }
+
+    /**
+     * The products a reply is answered from, when it names no kind of product and the conversation did: those of that
+     * kind ("יש משהו עם זהב צהב?" after "יש לכם טבעות סוליטר?": rings, never the pendants the words also find; Rocks,
+     * 12.11). A product's kind is read from the store's own words, the head of its title and of each category it is in,
+     * never a list of kinds: any store, any trade. A reply that names a kind ("ועגילים?"), a conversation that named
+     * none, or none of the products of the kind asked before: all of them, as they were.
+     *
+     * @param  list<array{question: string, answer: string}>  $conversation
+     * @param  list<array<string, mixed>>  $candidates  each with its `title` and `category` ("תכשיטים > טבעות > סוליטר")
+     * @return list<array<string, mixed>>
+     */
+    public static function heldKind(string $asked, array $conversation, array $candidates): array
+    {
+        if ($conversation === [] || count($candidates) < 2) {
+            return $candidates;
+        }
+
+        $kindsOf = [];
+        $all = [];
+        foreach ($candidates as $i => $product) {
+            $heads = [self::headWord((string) ($product['title'] ?? ''))];
+            foreach (preg_split('/\s*>\s*/u', (string) ($product['category'] ?? '')) ?: [] as $segment) {
+                $heads[] = self::headWord($segment);
+            }
+            $kindsOf[$i] = array_values(array_unique(array_filter($heads)));
+            $all = [...$all, ...$kindsOf[$i]];
+        }
+        $all = array_values(array_unique($all));
+
+        if ($all === [] || self::kindsNamed($asked, $all) !== []) {
+            return $candidates;
+        }
+
+        foreach (array_reverse($conversation) as $turn) {
+            $held = self::kindsNamed($turn['question'], $all);
+            if ($held === []) {
+                continue;
+            }
+            $kept = array_values(array_filter($candidates, fn (array $p, int $i): bool => array_intersect($kindsOf[$i], $held) !== [], ARRAY_FILTER_USE_BOTH));
+
+            return $kept === [] ? $candidates : $kept;
+        }
+
+        return $candidates;
+    }
+
+    /** The stem of a title's or a category's first word of letters ("טבעות סוליטר" → "טבע"); null when it has none fit to be a kind. */
+    private static function headWord(string $text): ?string
+    {
+        if (preg_match('/\p{L}{3,}/u', $text, $m) !== 1) {
+            return null;
+        }
+
+        return self::kindStem($m[0]);
+    }
+
+    /**
+     * A noun's stem for telling kinds apart, by code: finals as letters, then one plural or construct ending off
+     * ("טבעות", "טבעת" → "טבע"; "עגילים", "עגילי" → "עגיל"; "rings" → "ring").
+     */
+    private static function kindStem(string $word): string
+    {
+        $word = mb_strtolower(strtr($word, ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']));
+        foreach (['ות', 'ימ', 'es', 's', 'י', 'ה', 'ת'] as $ending) {
+            if (mb_strlen($word) - mb_strlen($ending) >= 3 && str_ends_with($word, $ending)) {
+                return mb_substr($word, 0, -mb_strlen($ending));
+            }
+        }
+
+        return $word;
+    }
+
+    /**
+     * The kinds among these a text names, word by word, a Hebrew prefix letter or two allowed ("לטבעות", "והעגילים").
+     *
+     * @param  list<string>  $kinds  stems (kindStem)
+     * @return list<string>
+     */
+    private static function kindsNamed(string $text, array $kinds): array
+    {
+        $named = [];
+        foreach (preg_split('/[^\p{L}]+/u', $text) ?: [] as $word) {
+            if (mb_strlen($word) < 3) {
+                continue;
+            }
+            $forms = [self::kindStem($word)];
+            if (preg_match('/^[והבלמשכ]{1,2}(\p{L}{3,})$/u', $word, $m) === 1) {
+                $forms[] = self::kindStem($m[1]);
+                if (preg_match('/^ה(\p{L}{3,})$/u', $m[1], $h) === 1) {
+                    $forms[] = self::kindStem($h[1]);
+                }
+            }
+            foreach ($kinds as $kind) {
+                foreach ($forms as $form) {
+                    if ($form === $kind || (mb_strlen($form) >= 3 && mb_strlen($kind) >= 3 && abs(mb_strlen($form) - mb_strlen($kind)) <= 1
+                        && (str_starts_with($form, $kind) || str_starts_with($kind, $form)))) {
+                        $named[] = $kind;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($named));
+    }
+
     /**
      * A shopper telling of something that does not work for them with the store: a code that does not apply, an email
      * that did not come, a payment or a page that fails ("לא מצליחה לרכוש עגילים ולקבל הנחה", "לא קיבלתי קוד במייל").
@@ -2575,8 +2711,13 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         // Code's checks on the answer, sentence by sentence (gate()); the picks stand or fall on their own.
         $trimmed = 0;
+        // "Nothing written about it" with no product and no general knowledge answers nothing, whatever `found` says (v25):
+        // it is the shopper's not-found line (missing), told as one, with the team's help.
+        $nothing = ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= self::KIND_FROM
+            && $answer !== '' && $picks === [] && $general === [] && self::saysNothingWritten($answer);
         $refusal = match (true) {
             $answer === '' => 'no_answer',
+            $nothing => 'not_found',
             $cited === [] && $picks === [] && $general === [] => 'cites_nothing',
             default => null,
         };
@@ -2585,7 +2726,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed,
-            'general' => $general, 'choices' => $refusal === null ? $choices : []];
+            'general' => $general, 'choices' => $refusal === null ? $choices : [], 'missing' => $nothing ? $answer : null];
     }
 
     /** Who wrote a passage, when it is the store's own word (WRITTEN_BY): above any page. */
