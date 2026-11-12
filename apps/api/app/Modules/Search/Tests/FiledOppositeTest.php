@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Tests;
 
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\SearchCatalog;
 use Tests\TestCase;
 
 /**
@@ -18,6 +19,21 @@ final class FiledOppositeTest extends TestCase
         $this->assertTrue(BuildSearchIndex::contradicts('מכנס ג\'ינס קצר', 'מכנסיים ארוכים'));
         $this->assertTrue(BuildSearchIndex::contradicts('Long Sleeve Tee', 'Short sleeve'));
         $this->assertTrue(BuildSearchIndex::contradicts('נעל גבוהה Sk8-Hi', 'נעליים נמוכות'));
+    }
+
+    public function test_similar_items_put_the_opposite_last_and_read_the_colour_the_store_files(): void
+    {
+        $records = [
+            ['id' => 'p:1', 'title' => 'חולצת טי ארוכה Left Chest'],
+            ['id' => 'p:2', 'title' => 'חולצת טי קצרה Left Chest'],
+            ['id' => 'p:3', 'title' => 'חולצת טי Pismo'],
+        ];
+        $this->assertSame(['p:2', 'p:3', 'p:1'], array_column(SearchCatalog::sameSideFirst($records, 'חולצת טי קצרה All\'s Well'), 'id'));
+        $this->assertSame(['p:1', 'p:2', 'p:3'], array_column(SearchCatalog::sameSideFirst($records, 'חולצת טי All\'s Well'), 'id'), 'a title of neither side keeps the order');
+
+        $facets = [['k' => 'variant_size', 'l' => 'מידה', 'v' => [['l' => 'M']]], ['k' => 'pa_color', 'l' => 'צבע', 'v' => [['l' => 'כחול'], ['l' => 'שחור']]]];
+        $this->assertSame(['כחול'], SearchCatalog::filedColours(['f' => [0, 1000]], $facets));
+        $this->assertSame([], SearchCatalog::filedColours(['f' => [0]], $facets));
     }
 
     public function test_a_tag_that_agrees_or_says_nothing_of_it_stays(): void

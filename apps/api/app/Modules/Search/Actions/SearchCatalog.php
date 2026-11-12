@@ -1465,7 +1465,15 @@ final class SearchCatalog
             // further on ("טבעת וינטג' בריטית משובצת ספיר") is no less the ring's. Read as near that word, a blue ring
             // whose picture's words open with its gold was "another colour" and went last (Rocks, 28.10).
             $parts = $looksLead ? array_map(fn (array $p): array => ['part' => null] + $p, array_map(fn (array $p): array => array_diff_key($p, ['part' => true]), $parts)) : $parts;
+            // a title that names no colour ("חולצת טי קצרה All's Well"): its colour as the store files it, when it is one
+            // or two (Vans, 12.11: a blue tee's alike were black and brown tees, by shape alone)
+            if ($parts === [] && $looksLead && $own !== null) {
+                $filed = self::filedColours($own, (array) ($index['facets'] ?? []));
+                $parts = $filed === [] || count($filed) > 2 ? [] : array_map(fn (array $p): array => ['part' => null] + array_diff_key($p, ['part' => true]), Colours::parts([implode(' ', $filed)]));
+            }
             $records = $own === null || ! $colours ? $records : self::byColour($records, $parts);
+            // and never what its title says the opposite of first: a short tee's alike are short before long (Vans, 12.11)
+            $records = $own === null ? $records : self::sameSideFirst($records, (string) ($own['title'] ?? ''));
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
             // In the order the code and their nearness gave, with no model: one that ordered them by their pictures (Rocks,
@@ -1712,6 +1720,47 @@ final class SearchCatalog
         }
 
         return [...$bands[0], ...$bands[1], ...$bands[2], ...array_slice($records, self::PICTURE_COLOUR_READ)];
+    }
+
+    /**
+     * A product's colours as the store files it: the values of its colour filters (COLOUR_FILTER) its record holds.
+     *
+     * @param  array<string, mixed>  $record
+     * @param  list<array<string, mixed>>  $facets
+     * @return list<string>
+     */
+    public static function filedColours(array $record, array $facets): array
+    {
+        $out = [];
+        foreach ((array) ($record['f'] ?? []) as $code) {
+            $facet = $facets[intdiv((int) $code, 1000)] ?? null;
+            $value = is_array($facet) ? (((array) ($facet['v'] ?? []))[(int) $code % 1000] ?? null) : null;
+            if ($value !== null && preg_match(self::COLOUR_FILTER, (string) ($facet['k'] ?? '').' '.(string) ($facet['l'] ?? '')) === 1) {
+                $label = trim((string) (is_array($value) ? ($value['l'] ?? '') : $value));
+                if ($label !== '' && ! in_array($label, $out, true)) {
+                    $out[] = $label;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Those whose title says the opposite of the product's own (BuildSearchIndex::contradicts, "ארוכה" beside "קצרה")
+     * after the rest, each side in the order it came.
+     *
+     * @param  list<array<string, mixed>>  $records
+     * @return list<array<string, mixed>>
+     */
+    public static function sameSideFirst(array $records, string $title): array
+    {
+        if (trim($title) === '') {
+            return $records;
+        }
+        $opposite = fn (array $r): bool => BuildSearchIndex::contradicts($title, (string) ($r['title'] ?? ''));
+
+        return [...array_values(array_filter($records, fn (array $r): bool => ! $opposite($r))), ...array_values(array_filter($records, $opposite))];
     }
 
     private static function byColour(array $records, array $colours): array
