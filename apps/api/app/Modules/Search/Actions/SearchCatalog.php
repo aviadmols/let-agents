@@ -1466,8 +1466,9 @@ final class SearchCatalog
             // whose picture's words open with its gold was "another colour" and went last (Rocks, 28.10).
             $parts = $looksLead ? array_map(fn (array $p): array => ['part' => null] + $p, array_map(fn (array $p): array => array_diff_key($p, ['part' => true]), $parts)) : $parts;
             // a title that names no colour ("חולצת טי קצרה All's Well"): its colour as the store files it, when it is one
-            // or two (Vans, 12.11: a blue tee's alike were black and brown tees, by shape alone)
-            if ($parts === [] && $looksLead && $own !== null) {
+            // or two (Vans, 12.11: a blue tee's alike were black and brown tees, by shape alone). Only in a store whose
+            // titles hardly ever name a colour: where most do (Rocks: "זהב צהוב"), the order its alike have stays as it is.
+            if ($parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index)) {
                 $filed = self::filedColours($own, (array) ($index['facets'] ?? []));
                 $parts = $filed === [] || count($filed) > 2 ? [] : array_map(fn (array $p): array => ['part' => null] + array_diff_key($p, ['part' => true]), Colours::parts([implode(' ', $filed)]));
             }
@@ -1720,6 +1721,36 @@ final class SearchCatalog
         }
 
         return [...$bands[0], ...$bands[1], ...$bands[2], ...array_slice($records, self::PICTURE_COLOUR_READ)];
+    }
+
+    /** A store whose product titles name a colour this rarely or less tells colours by its filters, not its titles. */
+    private const TITLES_COLOUR_SHARE = 0.2;
+
+    /**
+     * Whether the store's product titles hardly ever name a colour (TITLES_COLOUR_SHARE of a sample at most): Vans's
+     * "חולצת טי קצרה All's Well", never Rocks's "טבעת זהב צהוב". Read once a day a shop, from its index.
+     *
+     * @param  array<string, mixed>  $index
+     */
+    private static function titlesNameNoColour(string $shopId, array $index): bool
+    {
+        return (bool) Cache::remember('search.titles_name_no_colour.'.$shopId, now()->addDay(), function () use ($index): bool {
+            $titles = [];
+            foreach ((array) ($index['records'] ?? []) as $record) {
+                if (str_starts_with((string) ($record['id'] ?? ''), 'p:')) {
+                    $titles[] = (string) ($record['title'] ?? '');
+                }
+                if (count($titles) >= 300) {
+                    break;
+                }
+            }
+            if ($titles === []) {
+                return false;
+            }
+            $named = count(array_filter($titles, fn (string $t): bool => Colours::parts([$t]) !== []));
+
+            return $named / count($titles) <= self::TITLES_COLOUR_SHARE;
+        });
     }
 
     /**
