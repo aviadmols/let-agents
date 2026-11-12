@@ -91,6 +91,8 @@ final class StoreReportTest extends TestCase
             ['query' => 'linen', 'searches' => 140, 'before' => 120], ['query' => 'velvet', 'searches' => 50, 'before' => 10], ['query' => 'rare', 'searches' => 6, 'before' => 0],
         ]));
         $this->assertNull(StoreReport::rising([['query' => 'linen', 'searches' => 140, 'before' => 120]]));
+        $this->assertNull(StoreReport::rising([['query' => '35059', 'searches' => 19, 'before' => 0]]), 'a SKU is no word');
+        $this->assertSame(['query' => 'אמרלד', 'times' => null, 'searches' => 103], StoreReport::rising([['query' => 'אמרלד', 'searches' => 103, 'before' => 1]]), 'one search before: new');
         $this->assertSame('call me …', StoreReport::clean('call me 052-1234567'));
         $this->assertSame('write to …', StoreReport::clean('write to dana@mail.com'));
     }

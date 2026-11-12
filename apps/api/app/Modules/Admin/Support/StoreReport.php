@@ -43,6 +43,9 @@ class StoreReport
     /** A word rises when searched at least this many times. */
     public const RISING_FROM = 10;
 
+    /** Fewer searches than this the period before: the word is new, not "N times more". */
+    public const FEW_BEFORE = 3;
+
     public function __construct(private readonly Home $home, private readonly Today $today) {}
 
     /** How often this shop's report goes out, as its owner chose. */
@@ -175,8 +178,10 @@ class StoreReport
         $best = null;
         foreach ($top as $t) {
             $now = (int) $t['searches'];
-            $before = (int) $t['before'];
-            if ($now < self::RISING_FROM || ($before > 0 && $now < 2 * $before)) {
+            // a few searches before say nothing of how much it rose ("פי 103" over one search): it is new
+            $before = (int) $t['before'] < self::FEW_BEFORE ? 0 : (int) $t['before'];
+            // a code or a number alone ("35059", a product's SKU) is no word that rises
+            if ($now < self::RISING_FROM || ($before > 0 && $now < 2 * $before) || preg_match('/\p{L}{2}/u', (string) $t['query']) !== 1) {
                 continue;
             }
             $score = $before === 0 ? $now : $now / $before;

@@ -46,14 +46,14 @@ final class SearchFixesToday implements TodayImprovements
                 text: trans_choice('search::today.fix.family.text', count($words), ['n' => count($words)]),
                 action: __('search::today.fix.family.action'),
                 oneTap: true,
-                url: WordFamilies::getUrl(),
+                url: WordFamilies::getUrl(panel: 'merchant', tenant: $shop),
                 pictures: $this->pictures($plain, now()->subDays(self::DAYS)),
                 impact: $searches,
                 kind: 'nothing',
                 // the words, each as searched, read as one from now on
                 suggestion: ['type' => 'words', 'words' => array_map(fn (string $w): string => HebrewSearch::withFinals($w), $words)],
                 typed: $this->typed($plain),
-                secondary: ['label' => __('search::today.fix.family.edit'), 'url' => WordFamilies::getUrl()],
+                secondary: ['label' => __('search::today.fix.family.edit'), 'url' => WordFamilies::getUrl(panel: 'merchant', tenant: $shop)],
             );
         }
 
