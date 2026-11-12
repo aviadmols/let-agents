@@ -24,6 +24,7 @@ use App\Modules\Catalog\Events\CatalogUpdated;
 use App\Modules\Enrichment\Events\FactsDecided;
 use App\Modules\Search\Console\CompareEmbeddersCommand;
 use App\Modules\Search\Console\ForgetVisitsCommand;
+use App\Modules\Search\Console\RecountSearchesCommand;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Contracts\PageTags;
@@ -167,6 +168,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
             ForgetVisitsCommand::class,
             SearchCommand::class,
             CompareEmbeddersCommand::class,
+            RecountSearchesCommand::class,
         ];
     }
 }

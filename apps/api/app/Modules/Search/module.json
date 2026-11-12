@@ -139,6 +139,14 @@
     ],
     "settings": [
         {
+            "name": "recounted_until",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 10,
+            "scope": "shop"
+        },
+        {
             "name": "input_selector",
             "type": "string",
             "default": "input[name=\"s\"], input[type=\"search\"]",

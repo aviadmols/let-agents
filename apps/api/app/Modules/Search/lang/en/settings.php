@@ -22,6 +22,10 @@ return [
         'label' => 'Floating button height',
         'description' => 'Its distance from the bottom of the screen, so it does not cover the site\'s own floating buttons (accessibility, chat, cookies).',
     ],
+    'recounted_until' => [
+        'label' => 'Searches counted again until',
+        'description' => 'Up to which day the count was corrected so the same words from the same address on one day count once. Written by the system.',
+    ],
     'input_selector' => [
         'label' => 'Search boxes on the site',
         'description' => 'CSS selector of the search fields Lets search attaches to. Several, separated by commas.',

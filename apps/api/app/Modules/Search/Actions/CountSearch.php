@@ -49,8 +49,15 @@ final class CountSearch
 
         $this->ensure($shopId, $query);
 
+        // The same words from the same address on the same day are one search, however many times they were sent (Aviad,
+        // 12.11: "גדרות", 20 searches, were a few people searching again): every count of a word's searches reads this.
+        // Still logged each time, for the feed; only the count is once.
+        $ip = (string) ($visit['ip'] ?? '');
+        $again = $ip !== '' && SearchLog::query()->where('query', $query)->where('ip', $ip)
+            ->where('created_at', '>=', now()->startOfDay())->exists();
+
         SearchTerm::query()->whereDate('day', now()->toDateString())->where('query', $query)->incrementEach(
-            ['searches' => 1, 'empty' => $results === 0 ? 1 : 0],
+            $again ? ['searches' => 0] : ['searches' => 1, 'empty' => $results === 0 ? 1 : 0],
             ['last_results' => max(0, $results), 'updated_at' => now()],
         );
 
