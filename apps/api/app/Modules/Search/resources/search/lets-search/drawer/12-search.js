@@ -412,6 +412,13 @@
       return '<div data-unknown><p class="ls-note__text">' + esc(t('loosened', { q: turn.q, w: turn.loosened.left.join(' ') })) + '</p>' +
         ((turn.loosened.also || []).length ? '<div class="ls-chips" style="margin:6px 0 10px">' + turn.loosened.also.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '" data-loose="' + esc(turn.q) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' : '') + '</div>';
     }
+    // no product holds every word, and the server offers the parts that do (focus): said, with each part a press away
+    // ("חולצה קצרה כחולה עם כיס": a long blue shirt was shown as if it were it, Vans 12.11)
+    if (!missing.length && !typed.length && held === 0 && total && turn.focus && (turn.focus.options || []).length) {
+      return '<div data-unknown><p class="ls-note__text">' + esc(t('noneAll', { q: turn.q })) + '</p><div class="ls-chips" style="margin:6px 0 10px">' +
+        turn.focus.options.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' +
+        askCardHtml(turn.q, '', turn.askShown) + '</div>';
+    }
     var text = missing.length && shownList.length && rest.length ? t('noneSaid', { gone: missing.join(' '), kept: rest.join(' ') })
       : typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
       : typed.length ? t('notHere', { w: typed.join(' ') })
