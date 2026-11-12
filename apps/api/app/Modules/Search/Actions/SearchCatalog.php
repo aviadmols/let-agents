@@ -1475,8 +1475,25 @@ final class SearchCatalog
                 $facets = (array) ($index['facets'] ?? []);
                 $mine = self::filedColours($own, $facets);
                 if ($mine !== [] && count($mine) <= 2) {
-                    $ofMine = fn (array $r): bool => array_intersect(self::filedColours($r, $facets), $mine) !== [];
-                    $records = [...array_values(array_filter($records, $ofMine)), ...array_values(array_filter($records, fn (array $r): bool => ! $ofMine($r)))];
+                    // the colour its picture shows most, and each one's: shown in its colour first (a white tee sold in
+                    // black too is not a black tee to see), then filed in it among its colours, then the rest
+                    $seen = RetrievalImage::query()->whereIn('external_id', [$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])
+                        ->get(['external_id', 'caption_words'])->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => Colours::dominant(array_values((array) ($i->caption_words ?? [])), colourFirst: true)])->all();
+                    $ownSeen = $seen[$externalId] ?? null;
+                    $tier = function (array $r) use ($facets, $mine, $seen, $ownSeen): int {
+                        $shows = $seen[substr((string) $r['id'], 2)] ?? null;
+                        $filed = array_intersect(self::filedColours($r, $facets), $mine) !== [];
+                        if ($ownSeen !== null && $shows !== null) {
+                            return Colours::near($ownSeen, $shows) >= 0.8 ? 0 : ($filed ? 1 : 2);
+                        }
+
+                        return $filed ? 0 : 2;
+                    };
+                    $tiers = [[], [], []];
+                    foreach ($records as $r) {
+                        $tiers[$tier($r)][] = $r;
+                    }
+                    $records = [...$tiers[0], ...$tiers[1], ...$tiers[2]];
                 }
             }
             $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
