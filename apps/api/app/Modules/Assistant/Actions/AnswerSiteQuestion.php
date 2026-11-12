@@ -1466,6 +1466,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
         $this->linked = $linked;
         $shown = array_values(array_unique([...$linked, ...$shown]));
+        // The products whose own titles say a word of the question that tells products apart ("יש לכם תכשיטים בכסף?":
+        // the silver earrings and the brooch "מכסף, זהב ויהלומים", Rocks 12.11), before what meaning found: a question
+        // typed in the box runs no product search, and meaning brought white gold and platinum, so "we have no silver".
+        if ($this->codeRules() && $viewing === null && ! $followUp && $named === [] && self::aboutProducts($question)) {
+            $shown = array_values(array_unique([...$this->ownWordProducts($question), ...$shown]));
+        }
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         // a reply naming no kind keeps the conversation's, whatever the prompt (code, every store; site_code_rules)
         if ($this->codeRules()) {
@@ -3262,6 +3268,64 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return array_slice(array_values($out), 0, self::MINIMUMS);
+    }
+
+    /** A word held by this many titles or fewer tells products apart ("כסף" in a gold store); held by more, it names the range ("טבעת"). */
+    private const OWN_WORD_MOST = 40;
+
+    /** At most this many products are brought by the words of their titles. */
+    private const OWN_WORD_SHOWN = 6;
+
+    /**
+     * The products a question names by a word their titles hold as it is, a prefix letter or two and a plural ending
+     * allowed ("בכסף" for "עגילי כסף", "סיכה עתיקה מכסף"): those holding every such word, else those holding the rarest.
+     * Only words that tell products apart count: one in no title says nothing of them, one in more than OWN_WORD_MOST
+     * names the store's range. Code, for any store; in the order given (in stock first).
+     *
+     * @param  array<string, string>  $titles  external id => title, of the products whose titles may hold the words
+     * @return list<string>
+     */
+    public static function ownWordHolders(string $question, array $titles): array
+    {
+        $holds = fn (string $title, string $word): bool => preg_match('/(?<![\p{L}\p{N}])[והבלמשכ]{0,2}'.preg_quote($word, '/').'(?:ים|ות|י|ה|ת)?(?![\p{L}\p{N}])/u', mb_strtolower($title)) === 1;
+
+        $by = [];
+        foreach (Question::words($question) as $word) {
+            $ids = array_keys(array_filter($titles, fn (string $title): bool => $holds($title, $word)));
+            if ($ids !== [] && count($ids) <= self::OWN_WORD_MOST) {
+                $by[$word] = array_map('strval', $ids);
+            }
+        }
+        if ($by === []) {
+            return [];
+        }
+
+        $every = array_values(array_intersect(...array_values($by)));
+        if ($every === []) {
+            uasort($by, fn (array $a, array $b): int => count($a) <=> count($b));
+            $every = array_values((array) reset($by));
+        }
+
+        return array_slice($every, 0, self::OWN_WORD_SHOWN);
+    }
+
+    /** ownWordHolders() over this shop's products: those whose titles may hold a word of the question, in stock first. */
+    private function ownWordProducts(string $question): array
+    {
+        $words = Question::words($question);
+        if ($words === []) {
+            return [];
+        }
+
+        $titles = CatalogProduct::query()->whereNull('removed_at')
+            ->where(function ($q) use ($words): void {
+                foreach ($words as $word) {
+                    $q->orWhere('title', 'like', '%'.addcslashes($word, '%_\\').'%');
+                }
+            })
+            ->orderByDesc('in_stock')->orderBy('id')->limit(400)->pluck('title', 'external_id')->all();
+
+        return self::ownWordHolders($question, array_map('strval', $titles));
     }
 
     /**

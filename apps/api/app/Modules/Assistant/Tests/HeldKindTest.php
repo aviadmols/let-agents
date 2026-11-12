@@ -91,6 +91,32 @@ final class HeldKindTest extends TestCase
         $this->assertSame($answer, AnswerSiteQuestion::withLeastPrice($answer, $minimums, 'p1', ['s2'], $byRef));
     }
 
+    public function test_products_whose_own_titles_say_a_word_of_the_question_are_brought(): void
+    {
+        $titles = [
+            '1' => 'עגילי כסף משובצים יהלומים טבעיים',
+            '2' => 'סיכה עתיקה מכסף, זהב ויהלומים',
+            '3' => 'טבעת זהב לבן משובצת יהלום',
+            '4' => 'טבעת פלטינה וינטג\'',
+            '5' => 'טבעת זהב צהוב 14K',
+        ];
+        // "בכסף" is "כסף", in "מכסף" too; white gold and platinum are not silver
+        $this->assertSame(['1', '2'], AnswerSiteQuestion::ownWordHolders('יש לכם תכשיטים בכסף?', $titles));
+        // every word that tells them apart, else the rarest
+        $this->assertSame(['1'], AnswerSiteQuestion::ownWordHolders('יש עגילי כסף?', $titles));
+        $this->assertSame(['4'], AnswerSiteQuestion::ownWordHolders('יש לכם פלטינה?', $titles));
+        // a word in no title, or a question of none: nothing brought
+        $this->assertSame([], AnswerSiteQuestion::ownWordHolders('יש לכם תכשיטי טיטניום?', $titles));
+        $this->assertSame([], AnswerSiteQuestion::ownWordHolders('מה שעות הפתיחה?', $titles));
+
+        // a word most titles hold names the range, not some products
+        $range = [];
+        for ($i = 0; $i < 50; $i++) {
+            $range[(string) $i] = 'טבעת זהב דגם '.$i;
+        }
+        $this->assertSame([], AnswerSiteQuestion::ownWordHolders('יש טבעות?', $range));
+    }
+
     public function test_nothing_written_is_no_answer(): void
     {
         foreach ([
