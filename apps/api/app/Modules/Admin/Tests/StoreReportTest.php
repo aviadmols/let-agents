@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Modules\Admin\Actions\SendStoreReports;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Filament\Merchant\Pages\ReportSettings;
+use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Mail\StoreReportMail;
 use App\Modules\Admin\Models\User;
 use App\Modules\Admin\Support\Home;
@@ -112,6 +113,28 @@ final class StoreReportTest extends TestCase
         $this->assertStringContainsString('Your month in search', $en);
         $this->assertStringContainsString('You get this report on the 1st of every month.', $en);
         $this->assertSame('Your month in search: 1,284 searches, 312 questions', (new StoreReportMail(self::sample('monthly', 'en')))->envelope()->subject);
+    }
+
+    public function test_today_sends_the_report_now_to_the_address_typed(): void
+    {
+        $this->app->instance(StoreReport::class, new class(app(Home::class), app(Today::class)) extends StoreReport
+        {
+            public function of(Shop $shop, string $frequency, ?CarbonInterface $now = null): ?array
+            {
+                return ['frequency' => $frequency] + (new \ReflectionMethod(StoreReportTest::class, 'sample'))->invoke(null);
+            }
+        });
+        $this->actingAs($this->owner);
+        app()->setLocale('he');
+        Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
+        Filament::setTenant($this->shop);
+
+        Livewire::test(ShopOverview::class)
+            ->assertSee('לשלוח עכשיו')->assertSee('בכל יום שני בבוקר')
+            ->set('reportEmail', 'not-an-email')->call('sendReport')->assertNotified('הכתובת לא נראית כמו כתובת מייל.')
+            ->set('reportEmail', 'aviad@example.com')->call('sendReport')->assertNotified('נשלח אל aviad@example.com');
+
+        Mail::assertSent(StoreReportMail::class, fn (StoreReportMail $m): bool => $m->hasTo('aviad@example.com'));
     }
 
     public function test_the_owner_chooses_how_often_and_only_an_owner_does(): void

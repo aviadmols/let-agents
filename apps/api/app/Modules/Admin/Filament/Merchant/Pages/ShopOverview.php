@@ -11,9 +11,11 @@ use App\Modules\Admin\Contracts\ReportSeries;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Contracts\TodayWin;
+use App\Modules\Admin\Mail\StoreReportMail;
 use App\Modules\Admin\Support\Home;
 use App\Modules\Admin\Support\Onboarding as FirstRun;
 use App\Modules\Admin\Support\Sparkline;
+use App\Modules\Admin\Support\StoreReport;
 use App\Modules\Admin\Support\Today;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -26,6 +28,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use UnitEnum;
 
@@ -281,6 +285,48 @@ final class ShopOverview extends Page
         $said === null
             ? Notification::make()->warning()->title(__('admin::today.todo.gone'))->send()
             : Notification::make()->success()->title($said)->send();
+    }
+
+    /** Where the store report is sent from here ("send it to"), the signed-in person's address by default. */
+    public string $reportEmail = '';
+
+    /**
+     * The store report sent now to the address typed (Aviad, 12.11: in place of only seeing an example), of the period the
+     * store's report covers (a week when it is off). A few an hour a person.
+     */
+    public function sendReport(): void
+    {
+        $email = trim($this->reportEmail !== '' ? $this->reportEmail : (string) Auth::user()?->email);
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            Notification::make()->danger()->title(__('admin::today.mail.bad_email'))->send();
+
+            return;
+        }
+        $key = 'report-send:'.Auth::id();
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            Notification::make()->warning()->title(__('admin::today.mail.too_many'))->send();
+
+            return;
+        }
+        RateLimiter::hit($key, 3600);
+
+        $shop = $this->shop();
+        $frequency = StoreReport::frequency($shop) === StoreReport::OFF ? StoreReport::WEEKLY : StoreReport::frequency($shop);
+        $report = app(StoreReport::class)->of($shop, $frequency);
+        if ($report === null) {
+            Notification::make()->warning()->title(__('admin::report.settings.nothing'))->send();
+
+            return;
+        }
+
+        Mail::to($email)->locale($report['locale'])->send(new StoreReportMail($report));
+        Notification::make()->success()->title(__('admin::report.settings.sent', ['email' => $email]))->send();
+    }
+
+    /** How often the store report goes out, for the line that says when. */
+    public function reportFrequency(): string
+    {
+        return StoreReport::frequency($this->shop());
     }
 
     /** "Not now": the fix leaves Today until next week. */

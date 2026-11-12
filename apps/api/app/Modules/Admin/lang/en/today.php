@@ -139,8 +139,18 @@ return [
     ],
 
     'mail' => [
-        'when' => 'Every Monday morning',
-        'text' => ':when we’ll email you the week on one page: what they searched, what sold, and what’s waiting for you.',
+        'when' => [
+            'daily' => 'Every morning',
+            'weekly' => 'Every Monday morning',
+            'monthly' => 'On the 1st of every month',
+        ],
+        'text' => ':when we’ll email you a report on one page: what they searched, what sold, and what’s waiting for you.',
+        'off' => 'The store report is off.',
+        'settings' => 'Report settings',
+        'to' => 'Email address to send to',
+        'send' => 'Send now',
+        'bad_email' => 'That doesn’t look like an email address.',
+        'too_many' => 'A few reports were sent in the last hour. Try again a little later.',
         'see' => 'See an example',
     ],
 ];

@@ -303,10 +303,19 @@
             @endif
 
             {{-- the weekly email --}}
+            @php($reportEvery = $this->reportFrequency())
             <section class="lp-d-mail" data-weekly-mail>
                 <span class="lp-d-mail-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg></span>
-                <p>{!! $t('mail.text', ['when' => '<b>'.e($t('mail.when')).'</b>']) !!}</p>
-                <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ \App\Modules\Admin\Filament\Merchant\Pages\WeeklyEmailPreview::getUrl() }}" target="_blank" rel="noopener">{{ $t('mail.see') }}</a>
+                <p>
+                    @if ($reportEvery === 'off'){{ $t('mail.off') }}@else{!! $t('mail.text', ['when' => '<b>'.e($t('mail.when.'.$reportEvery)).'</b>']) !!}@endif
+                    <a href="{{ \App\Modules\Admin\Filament\Merchant\Pages\ReportSettings::getUrl() }}" style="text-decoration: underline; text-underline-offset: 3px">{{ $t('mail.settings') }}</a>
+                </p>
+                {{-- the report now, to any address (the signed-in person's by default), and the example beside it --}}
+                <form class="lp-d-mail-send" wire:submit="sendReport" data-report-send>
+                    <input type="email" wire:model="reportEmail" dir="ltr" placeholder="{{ auth()->user()?->email }}" aria-label="{{ $t('mail.to') }}" autocomplete="email">
+                    <button type="submit" class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" wire:loading.attr="disabled" wire:target="sendReport">{{ $t('mail.send') }}</button>
+                    <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ \App\Modules\Admin\Filament\Merchant\Pages\WeeklyEmailPreview::getUrl() }}" target="_blank" rel="noopener">{{ $t('mail.see') }}</a>
+                </form>
             </section>
         </div>
     </div>
