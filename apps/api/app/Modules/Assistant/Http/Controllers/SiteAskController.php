@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /api/v1/search/{site}/ask   {"question": "...", "vid": "anon-...", "locale": "he", "products": ["<shown ids>"], "previous": ["<ids>"], "page": 1}
+ * POST /api/v1/search/{site}/ask   {"question": "...", "vid": "anon-...", "locale": "he", "products": ["<shown ids>"], "previous": ["<ids>"], "page": 1, "said": [{"q": "...", "a": "..."}]}
  *
  * A question typed in the store's search box, about the whole site. Sent as text/plain from the
  * storefront so the browser sends no preflight; the body is JSON. Called only when the shopper
@@ -51,6 +51,13 @@ final class SiteAskController
 
         // The visitor only counts toward a daily limit, as a hash salted per shop, like analytics.
         $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products, $previous, $page, $thread);
+
+        // What this visit already told the shopper is not told again (Rocks, 12.11): the conversation of a reply, or, for a
+        // question of its own in the same drawer, the answers before it (`said`), read for this alone and kept nowhere.
+        $told = AnswerSiteQuestion::thread($thread !== [] ? $thread : (is_array($body) && is_array($body['said'] ?? null) ? $body['said'] : []));
+        if ($told !== [] && is_string($result['answer'] ?? null) && ($result['outcome'] ?? null) === 'answered') {
+            $result['answer'] = AnswerSiteQuestion::withoutSaidBefore($result['answer'], $told);
+        }
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }

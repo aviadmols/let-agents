@@ -2302,6 +2302,73 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $answer;
     }
 
+    /** A sentence holding this share of the words of one sentence the shopper was already told is told again. */
+    private const SAID_SHARE = 0.75;
+
+    /**
+     * An answer without what this visit already told the shopper: each sentence that says again one sentence of an earlier
+     * answer (most of its words, as the search reads them), and a closing offer of what was asked or offered before (Rocks,
+     * 12.11: "דרכו אפשר לקבל גם מבצעים, הנחות והטבה לכבוד יום הולדת" in one answer, then "אפשר גם להירשם כדי לקבל מבצעים,
+     * הנחות והטבה לכבוד יום ההולדת" in the next). Code, at serving, for any store: what is saved for other shoppers stays
+     * whole. When nothing new would be left, the answer is as it was: asked again, it is answered again.
+     *
+     * @param  list<array{question: string, answer: string}>  $conversation  the visit's questions and answers before, oldest first
+     */
+    public static function withoutSaidBefore(string $answer, array $conversation): string
+    {
+        if ($conversation === [] || trim($answer) === '') {
+            return $answer;
+        }
+
+        $forms = function (string $text): array {
+            $out = [];
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(strtr($text, ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']))) ?: [] as $w) {
+                if (mb_strlen($w) < 3) {
+                    continue;
+                }
+                $set = [$w];
+                if (mb_strlen($w) > 3 && preg_match('/^[והבלמשכ]/u', $w) === 1) {
+                    $set[] = mb_substr($w, 1);
+                }
+                if (mb_strlen($w) > 4 && preg_match('/^[והבלמשכ]{2}/u', $w) === 1) {
+                    $set[] = mb_substr($w, 2);
+                }
+                $out[] = $set;
+            }
+
+            return $out;
+        };
+        $sentences = fn (string $text): array => array_values(array_filter(array_map('trim', preg_split('/(?<=[.!?])\s+|\n+/u', $text) ?: []), fn (string $s): bool => $s !== ''));
+
+        $told = [];
+        foreach ($conversation as $turn) {
+            foreach ($sentences((string) $turn['answer']) as $sentence) {
+                $said = [];
+                foreach ($forms($sentence) as $set) {
+                    foreach ($set as $form) {
+                        $said[$form] = true;
+                    }
+                }
+                $told[] = $said;
+            }
+        }
+
+        $kept = [];
+        foreach ($sentences($answer) as $sentence) {
+            $now = $forms($sentence);
+            $again = count($now) >= 5 && array_any($told, fn (array $said): bool => count(array_filter($now, fn (array $set): bool => array_filter($set, fn (string $f): bool => isset($said[$f])) !== [])) / count($now) >= self::SAID_SHARE);
+            if (! $again) {
+                $kept[] = $sentence;
+            }
+        }
+
+        $left = self::withoutOfferedAgain(implode(' ', $kept), $conversation);
+        // something new is left only when a sentence of its own words is: never "כן," alone or an offer alone
+        $body = preg_match(self::OFFER, (string) end($kept) ?: '') === 1 ? array_slice($kept, 0, -1) : $kept;
+
+        return count($forms(implode(' ', $body))) >= 5 && trim($left) !== '' ? $left : $answer;
+    }
+
     /** From this version of answer_site the writer is told of trouble and may answer from general knowledge (general, choices). */
     public const TROUBLE_FROM = 24;
 

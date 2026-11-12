@@ -10,6 +10,16 @@
   function askTurn(q, extra, about, mark) {
     if (about && S.ctx && (LIKE_THIS.test(q) || OTHER_COLOUR.test(q))) { similarTurn(S.ctx, null, null, OTHER_COLOUR.test(q), q); return; }
     var prev = S.turns.slice().reverse().filter(function (x) { return x.kind === 'results' && x.ids; })[0];
+    // a question asked right after an answer, in the box or by a chip, goes on the same conversation, as a reply does
+    // ("האם אפשר להחליף או לשדרג?" after "יש לי תכשיט שנרכש לפני 4 שנים", Rocks 12.11): the server reads it with what
+    // was asked and answered before. A search in between starts a new one.
+    var last = S.turns[S.turns.length - 1];
+    var lastSaid = last && last.kind === 'answer' && !last.loading ? String(last.answer || last.said || last.notFound || '') : '';
+    if (!(extra && extra.thread) && lastSaid) {
+      var goesOn = (last.thread || []).concat([{ q: String(last.q || '').slice(0, 300), a: lastSaid.slice(0, 1200) }]).slice(-3);
+      extra = Object.assign({}, extra || {}, { thread: goesOn, previous: [] });
+      mark = Object.assign({}, mark || {}, { thread: goesOn });
+    }
     var turn = addTurn(Object.assign({ kind: 'answer', q: q, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
     announce(t('announceSearching'));
     var slow = setTimeout(function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (el) { el.textContent = t('slow'); } }, 8000);
@@ -52,6 +62,13 @@
     // the turn before's products, from a product page or after a search still on screen: "מה הכי זול?" or "איזה מהם?"
     // is about them (the server decides by the question's words whether it is); never a search behind the dashed line
     if (shown.length && ((S.ctx && turn.ctx) || !prev.prev)) { body.previous = shown; }
+    // what this visit's answers already told the shopper, for a question of its own: the server leaves it out of the
+    // answer (never told twice in one visit, Rocks 12.11); one on the same conversation carries the conversation instead
+    if (!(extra && extra.thread)) {
+      var said = S.turns.filter(function (x) { return x.kind === 'answer' && x.id !== turn.id && x.answer; }).slice(-3)
+        .map(function (x) { return { q: String(x.q || '').slice(0, 300), a: String(x.answer || '').slice(0, 1200) }; });
+      if (said.length) { body.said = said; }
+    }
     visitStep('ask', { label: String(q).slice(0, 200) });
     // The same question again in this visit is answered from what this browser kept (Tomer's ask card, 8.11): no second
     // call to the AI. Only answers that answered are kept, by the question, the product it is about and the products it
