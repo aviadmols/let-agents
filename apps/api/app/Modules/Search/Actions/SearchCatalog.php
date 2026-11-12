@@ -1468,11 +1468,18 @@ final class SearchCatalog
             // a title that names no colour ("חולצת טי קצרה All's Well"): its colour as the store files it, when it is one
             // or two (Vans, 12.11: a blue tee's alike were black and brown tees, by shape alone). Only in a store whose
             // titles hardly ever name a colour: where most do (Rocks: "זהב צהוב"), the order its alike have stays as it is.
-            if ($parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index)) {
-                $filed = self::filedColours($own, (array) ($index['facets'] ?? []));
-                $parts = $filed === [] || count($filed) > 2 ? [] : array_map(fn (array $p): array => ['part' => null] + array_diff_key($p, ['part' => true]), Colours::parts([implode(' ', $filed)]));
+            // Those filed in its colour come first, each side in the order its pictures and words gave: never by the colour
+            // words in their data, where one sold in many colours (Pismo Knit) said every colour and led every list.
+            $filedLead = $parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index);
+            if ($filedLead) {
+                $facets = (array) ($index['facets'] ?? []);
+                $mine = self::filedColours($own, $facets);
+                if ($mine !== [] && count($mine) <= 2) {
+                    $ofMine = fn (array $r): bool => array_intersect(self::filedColours($r, $facets), $mine) !== [];
+                    $records = [...array_values(array_filter($records, $ofMine)), ...array_values(array_filter($records, fn (array $r): bool => ! $ofMine($r)))];
+                }
             }
-            $records = $own === null || ! $colours ? $records : self::byColour($records, $parts);
+            $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
             // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before
