@@ -104,8 +104,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * condition with what it applies to, every detail cited; never "two versions" (Take Me Home's returns, 9.11).
      * Released after two paired runs on Rocks, 9.11: answered 75.7% as v21, supported 82.1% (v21 78.6%), expected 9 of 10
      * (v21 8); Take Me Home's returns brought together in 3 of 6 (v21 none).
+     *
+     * answer_site v26 (v22 and a term of the store's trade explained from what anyone in it knows, in `general`) released
+     * 12.11, as Aviad decided, on these runs: Rocks frozen, 55 cases (asis-rocks-a2/b2 against v26-rocks-a2/b2): expected
+     * 12 and 13 of 15 as v22, 15 and 12 as v26, answered 74.6% against 76.4%, the one change both runs agree on "מה
+     * ההבדל בין GH ל-VS?" answered (v22 never); Rocks live, 86 cases with 31 off the store's topic (asis-live2 twice
+     * against v26-live): 45 of 46 in each, none of the 31 answered, supported 71.7 and 76.4 against 82.4.
      */
-    public const PROMPT_VERSION = 22;
+    public const PROMPT_VERSION = 26;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -161,7 +167,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 26]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
