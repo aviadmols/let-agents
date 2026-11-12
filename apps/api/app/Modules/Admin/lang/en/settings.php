@@ -25,4 +25,22 @@ return [
         'label' => 'Days until a shop is deleted',
         'description' => 'When a shop\'s owner asks for it to be deleted, it turns off at once and is deleted with all its data after this many days. Until then they can keep it.',
     ],
+    'report_frequency' => [
+        'label' => 'How often the store report is sent',
+        'description' => 'An email to the store\'s owners: what shoppers searched, asked and could not find. Owners choose it in Settings, Store report.',
+        'options' => [
+            'daily' => 'Daily',
+            'weekly' => 'Weekly',
+            'monthly' => 'Monthly',
+            'off' => 'Off',
+        ],
+    ],
+    'report_sent' => [
+        'label' => 'The last report sent',
+        'description' => 'The period of the last report sent, so none is sent twice. Written by the system.',
+    ],
+    'reports_sending' => [
+        'label' => 'Sending store reports',
+        'description' => '1 sends the store reports to the stores\' owners, as each chose. 0: no report is sent.',
+    ],
 ];

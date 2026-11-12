@@ -7,6 +7,7 @@ use App\Modules\Admin\Console\CreateOperatorCommand;
 use App\Modules\Admin\Console\DeleteDueShopsCommand;
 use App\Modules\Admin\Console\DesignKitCommand;
 use App\Modules\Admin\Console\EndDuePlansCommand;
+use App\Modules\Admin\Console\SendStoreReportsCommand;
 use App\Modules\Admin\Console\SetPasswordCommand;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Contracts\TimelineSource;
@@ -67,6 +68,8 @@ final class AdminServiceProvider extends ModuleServiceProvider
             $schedule->command('shops:delete-due')->dailyAt('04:10')->name('shops:delete-due')->withoutOverlapping();
             // A cancelled plan that reached the end of the period already paid: the shop pauses within the hour.
             $schedule->command('shops:end-due-plans')->hourlyAt(5)->name('shops:end-due-plans')->withoutOverlapping();
+            // The store reports, at 08:00 on each store's clock: every hour reads whose 08:00 it is (SendStoreReports).
+            $schedule->command('reports:send')->hourlyAt(2)->name('reports:send')->withoutOverlapping();
         });
     }
 
@@ -77,6 +80,7 @@ final class AdminServiceProvider extends ModuleServiceProvider
             DesignKitCommand::class,
             DeleteDueShopsCommand::class,
             EndDuePlansCommand::class,
+            SendStoreReportsCommand::class,
             SetPasswordCommand::class,
         ];
     }

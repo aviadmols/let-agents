@@ -2,7 +2,9 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Modules\Admin\Mail\StoreReportMail;
 use App\Modules\Admin\Mail\WeeklySummaryMail;
+use App\Modules\Admin\Support\StoreReport;
 use App\Modules\Admin\Support\WeeklySummary;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -31,11 +33,19 @@ final class WeeklyEmailPreview extends Page
         return __('admin::weekly.preview.sub');
     }
 
+    /**
+     * The store report as its owners get it (StoreReport, Tomer's design of 12.11), of the period their report covers (a
+     * week when it is off); the first sketch only while nothing happened yet.
+     */
     public function html(): string
     {
         /** @var Shop $shop */
         $shop = Filament::getTenant();
+        $frequency = StoreReport::frequency($shop) === StoreReport::OFF ? StoreReport::WEEKLY : StoreReport::frequency($shop);
+        $report = app(StoreReport::class)->of($shop, $frequency);
 
-        return (new WeeklySummaryMail(app(WeeklySummary::class)->of($shop)))->render();
+        return $report === null
+            ? (new WeeklySummaryMail(app(WeeklySummary::class)->of($shop)))->render()
+            : (new StoreReportMail($report))->locale($report['locale'])->render();
     }
 }
