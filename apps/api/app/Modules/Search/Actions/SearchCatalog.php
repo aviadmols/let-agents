@@ -1473,10 +1473,11 @@ final class SearchCatalog
                 $parts = $filed === [] || count($filed) > 2 ? [] : array_map(fn (array $p): array => ['part' => null] + array_diff_key($p, ['part' => true]), Colours::parts([implode(' ', $filed)]));
             }
             $records = $own === null || ! $colours ? $records : self::byColour($records, $parts);
-            // and never what its title says the opposite of first: a short tee's alike are short before long (Vans, 12.11)
-            $records = $own === null ? $records : self::sameSideFirst($records, (string) ($own['title'] ?? ''));
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own));
+            // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before
+            // long (Vans, 12.11); none of 40 of Rocks's products had one among its alike
+            $records = $own === null ? $records : self::sameSideFirst($records, (string) ($own['title'] ?? ''));
             // In the order the code and their nearness gave, with no model: one that ordered them by their pictures (Rocks,
             // 28.10) kept the shopper waiting seconds on every first look (Aviad, 30.10). A photo's own search still asks it.
             $products = array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
