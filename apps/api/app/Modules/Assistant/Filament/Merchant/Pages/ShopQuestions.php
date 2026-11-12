@@ -633,7 +633,7 @@ final class ShopQuestions extends OperatorShopQuestions
      */
     public function whyFor(string $row): array
     {
-        $out = ['answer' => '', 'from' => 'none', 'sources' => [], 'checked' => null, 'tone' => '', 'note' => '', 'rules' => [], 'search' => str_starts_with($row, 's:'), 'rules_live' => AnswerSiteQuestion::releasedVersion('answer_site') >= AnswerSiteQuestion::RULES_FROM];
+        $out = ['answer' => '', 'from' => 'none', 'sources' => [], 'checked' => null, 'tone' => '', 'note' => '', 'rules' => [], 'search' => str_starts_with($row, 's:'), 'rules_live' => AnswerSiteQuestion::promptReads('answer_site', AnswerSiteQuestion::releasedVersion('answer_site'), 'rules')];
 
         if ($this->shop === null) {
             return $out;

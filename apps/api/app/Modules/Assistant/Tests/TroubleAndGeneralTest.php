@@ -41,6 +41,18 @@ final class TroubleAndGeneralTest extends TestCase
         $this->assertSame([], AnswerSiteQuestion::general('אצלנו המשלוח חינם. כדאי לבדוק בתיקיית הספאם.', ['אצלנו המשלוח חינם.'])['general']);
     }
 
+    public function test_the_writer_is_given_what_its_prompt_reads_not_what_its_number_says(): void
+    {
+        $this->assertFalse(AnswerSiteQuestion::promptReads('answer_site', 22, 'rules'));
+        $this->assertTrue(AnswerSiteQuestion::promptReads('answer_site', 23, 'rules'));
+        $this->assertTrue(AnswerSiteQuestion::promptReads('answer_site', 24, 'trouble'));
+        // v26 is v22 with the trade's general knowledge: neither the store's rules nor trouble
+        $this->assertFalse(AnswerSiteQuestion::promptReads('answer_site', 26, 'rules'));
+        $this->assertFalse(AnswerSiteQuestion::promptReads('answer_site', 26, 'trouble'));
+        $this->assertTrue(AnswerSiteQuestion::promptReads('answer_site', 26, 'general'));
+        $this->assertFalse(AnswerSiteQuestion::promptReads('answer_site', 99, 'rules'), 'no such version');
+    }
+
     public function test_tap_answers_stand_only_with_the_question_they_answer(): void
     {
         $asks = 'אצלנו אין כפל הנחות, כך שאם העגילים כבר במחיר מבצע, הקוד לא יחול עליהם. מה בדיוק קורה כשאתם מזינים את הקוד?';

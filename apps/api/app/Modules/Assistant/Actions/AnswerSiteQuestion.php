@@ -155,9 +155,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * v22 beyond what code does. Code does it for every version and every store: heldKind(), saysNothingWritten(),
      * withLeastPrice().
      *
+     * answer_site v26 (v22, and only what did better in v25: a term of the store's trade explained from what anyone in it
+     * knows, each such sentence in `general`; "GH ל-VS" was answered where v22 had nothing) reads v22's input: no rules,
+     * no trouble (promptReads()). Released after the quality baseline, as above.
+     *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 26]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -505,7 +509,7 @@ final class AnswerSiteQuestion implements TriesQuestions
     public static function toneKey(?string $shopId): ?string
     {
         $tone = self::tone($shopId);
-        $rules = $shopId !== null && $shopId !== '' && self::releasedVersion('answer_site') >= self::RULES_FROM ? AnswerRules::texts($shopId) : [];
+        $rules = $shopId !== null && $shopId !== '' && self::promptReads('answer_site', self::releasedVersion('answer_site'), 'rules') ? AnswerRules::texts($shopId) : [];
 
         if ($tone === null && $rules === []) {
             return null;
@@ -520,6 +524,25 @@ final class AnswerSiteQuestion implements TriesQuestions
         return preg_match('/\.v(\d+)\.md$/', (string) self::promptFile($name), $m) === 1 ? (int) $m[1] : 0;
     }
 
+    /** @var array<string, bool> */
+    private static array $reads = [];
+
+    /**
+     * Whether a version of a prompt reads an input field (its text names it, as "`rules`"): what the writer is given
+     * follows the prompt, not its number. answer_site v26 is v22 with the trade's general knowledge, and reads neither
+     * the store's rules (v23) nor trouble (v24).
+     */
+    public static function promptReads(string $name, int $version, string $field): bool
+    {
+        $key = $name.'.'.$version.'.'.$field;
+        if (! isset(self::$reads[$key])) {
+            $file = __DIR__.'/../Prompts/'.$name.'.v'.$version.'.md';
+            self::$reads[$key] = is_file($file) && str_contains((string) file_get_contents($file), '`'.$field.'`');
+        }
+
+        return self::$reads[$key];
+    }
+
     /**
      * The store's rules as the writer is given them: only by a prompt that reads them (answer_site v23 and on), and in a
      * change being checked, that change's in place of the store's own (withVoice()).
@@ -528,7 +551,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     private function rulesFor(string $shopId): array
     {
-        if (($this->promptVersions['answer_site'] ?? self::releasedVersion('answer_site')) < self::RULES_FROM) {
+        if (! self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::releasedVersion('answer_site'), 'rules')) {
             return [];
         }
 
@@ -1509,7 +1532,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         $now = AssistantAnswer::asksTheClock($question) ? self::clock($shopId) : null;
 
         // something that does not work for the shopper ("לא קיבלתי קוד במייל"): the writer may ask back with choices (v24)
-        $this->trouble = ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= self::TROUBLE_FROM && self::reportsTrouble($this->asked !== '' ? $this->asked : $question);
+        $this->trouble = self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'trouble') && self::reportsTrouble($this->asked !== '' ? $this->asked : $question);
 
         $input = (string) json_encode([
             'question' => $question,
