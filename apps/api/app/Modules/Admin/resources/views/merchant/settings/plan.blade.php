@@ -31,10 +31,13 @@
                     <div class="lp-d-usage"><div><span>{{ $c('usage') }}</span><b class="lp-d-num">{{ min(100, $d['usage']['percent']) }}%</b></div><i><u style="width: {{ max(2, min(100, $d['usage']['percent'])) }}%"></u></i></div>
                 @endif
             </div>
-            @if ($d['plans'] !== [])<a class="lp-d-btn lp-d-btn-lime" href="#plans">{{ $t('choose') }}</a>@endif
+            {{-- a store no platform bills (WordPress) does not change its plan itself, for now: the team does (Aviad, 12.11) --}}
+            @php($selfServe = collect($d['plans'])->contains(fn (array $p): bool => $p['url'] !== null))
+            @if ($d['plans'] !== [] && $selfServe)<a class="lp-d-btn lp-d-btn-lime" href="#plans">{{ $t('choose') }}</a>@endif
         </section>
 
         @if ($d['plans'] !== [])
+            @unless ($selfServe)<p class="lp-note" style="margin: 0" data-plan-by-team>{{ $t('by_team') }} <a href="mailto:hey@lets.co.il" dir="ltr">hey@lets.co.il</a></p>@endunless
             <div class="lp-d-plans" id="plans" data-plans>
                 @foreach ($d['plans'] as $plan)
                     <div @class(['lp-d-planc', 'is-mine' => $plan['current']]) data-plan="{{ $plan['code'] }}">
@@ -43,14 +46,10 @@
                         @if ($plan['lines'] !== [])<ul>@foreach (array_slice($plan['lines'], 0, 4) as $line)<li>{{ $line }}</li>@endforeach</ul>@endif
                         @if ($plan['current'])
                             <span class="lp-d-btn lp-d-btn-ink lp-d-btn-sm is-static">{{ $t('keep', ['plan' => $plan['name']]) }}</span>
-                        @elseif ($plan['move'] !== null && $this->canConnect())
+                        @elseif ($plan['move'] !== null && $plan['url'] !== null && $this->canConnect())
                             @php($label = $plan['move'] === 'upgrade' ? $c('upgrade') : ($plan['move'] === 'downgrade' ? $t('switch') : $c('choose')))
-                            @if ($plan['url'] !== null)
-                                {{-- in the same window: inside the Shopify admin the next step has App Bridge, which takes the window to Shopify's approval --}}
-                                <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $plan['url'] }}" data-plan-move="{{ $plan['move'] }}">{{ $label }}</a>
-                            @else
-                                <button type="button" class="lp-d-btn lp-d-btn-line lp-d-btn-sm" wire:click="askPlan(@js($plan['code']))" wire:loading.attr="disabled" data-plan-move="{{ $plan['move'] }}">{{ $label }}</button>
-                            @endif
+                            {{-- in the same window: inside the Shopify admin the next step has App Bridge, which takes the window to Shopify's approval --}}
+                            <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $plan['url'] }}" data-plan-move="{{ $plan['move'] }}">{{ $label }}</a>
                         @endif
                     </div>
                 @endforeach

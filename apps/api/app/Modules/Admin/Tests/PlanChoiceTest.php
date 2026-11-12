@@ -41,7 +41,10 @@ final class PlanChoiceTest extends TestCase
     public function test_the_plans_show_side_by_side_with_the_shops_own_marked(): void
     {
         // Plan and billing (the redesign, 11.2026)
-        $plans = collect(Livewire::test(PlanSettings::class)->assertSee('לבחור חבילה')->assertSee('התוכנית שלכם')->assertSee('הפסקת תשלומים')->assertSee('settings/privacy', false)->instance()->details()['plans'])->keyBy('code');
+        // a store no platform bills (WordPress) sees the plans and changes none itself: the team does (Aviad, 12.11)
+        $plans = collect(Livewire::test(PlanSettings::class)->assertSee('התוכנית שלכם')->assertSee('הפסקת תשלומים')->assertSee('settings/privacy', false)
+            ->assertSee('את החבילה של החנות משנה צוות Lets')->assertDontSee('data-plan-move', false)->assertDontSee('לבחור חבילה')
+            ->instance()->details()['plans'])->keyBy('code');
 
         $this->assertTrue($plans['starter']['current']);
         $this->assertSame('upgrade', $plans['growth']['move']);
@@ -51,6 +54,7 @@ final class PlanChoiceTest extends TestCase
 
     public function test_a_store_the_team_bills_asks_the_team_for_another_plan(): void
     {
+        // not offered on the page for now; the call itself still only tells the team
         Livewire::test(ConnectionSettings::class)->call('askPlan', 'growth')->assertNotified('קיבלנו. נעביר את החנות לתוכנית Growth עוד היום.');
 
         Mail::assertSent(TeamNoticeMail::class, fn (TeamNoticeMail $mail): bool => $mail->kind === TeamNoticeMail::PLAN_ASKED && $mail->plan === 'Growth' && $mail->hasTo('team@lets.test'));

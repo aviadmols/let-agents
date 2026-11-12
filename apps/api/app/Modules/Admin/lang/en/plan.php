@@ -12,6 +12,7 @@ return [
     'choose' => 'Choose a plan',
     'keep' => 'Keep :plan',
     'switch' => 'Switch',
+    'by_team' => 'The Lets team changes your store’s plan. Want another one? Write to us:',
     'compare' => 'What’s in each plan',
     'compare_text' => 'The full comparison is on the pricing page',
     'pricing' => 'Pricing page',
