@@ -72,6 +72,15 @@ return [
         'remove_confirm' => 'למחוק את השורה? העוזר יפסיק להשתמש בה.',
     ],
 
+    // pages and posts of the site the team stopped from the "why" of an answer, each brought back from here
+    'ignored' => [
+        'list' => 'עמודים שהעוזר לא משתמש בהם',
+        'note' => 'עצרתם אותם מתוך "למה זו התשובה". העוזר לא עונה מהם ולא ממה שנקרא מהם.',
+        'stopped' => 'נעצר :when',
+        'back' => 'להחזיר',
+        'brought_back' => 'העמוד חזר. העוזר ישתמש בו שוב.',
+    ],
+
     // a long text the team pastes: found by what it says, the piece that answers brought to the answer
     'text' => [
         'open' => 'יש לכם טקסט ארוך? להדביק פסקה או מסמך',

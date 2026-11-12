@@ -173,6 +173,26 @@
                         @php($checking = collect($own)->contains(fn (array $r): bool => $r['check'] === null && $r['at'] !== null && \Illuminate\Support\Carbon::parse($r['at'])->gt(now()->subMinutes(10))))
                         @php($preparing = collect($texts)->contains(fn (array $x): bool => ! $x['ready']))
                         <section class="lp-d-card" data-pane="notes" @if ($checking) wire:poll.5s @elseif ($preparing) wire:poll.15s @endif>
+                            @php($ignored = $this->ignoredSources())
+                            @if ($ignored !== [])
+                                {{-- pages and posts stopped from the "why" of an answer: brought back from here --}}
+                                <div class="lp-d-texts" data-ignored-sources>
+                                    <h3>{{ $t('ignored.list') }}</h3>
+                                    <p class="lp-d-srow-l" style="margin: 0">{{ $t('ignored.note') }}</p>
+                                    @foreach ($ignored as $source)
+                                        <div class="lp-d-srow" data-ignored="{{ $source['content_id'] }}" wire:key="ignored-{{ $source['content_id'] }}">
+                                            <span class="lp-d-srow-ic">{!! $pageIcon !!}</span>
+                                            <span class="lp-d-srow-main">
+                                                @if ($source['url'])<a href="{{ $source['url'] }}" target="_blank" rel="noopener" dir="auto"><b>{{ $source['title'] }}</b></a>@else<b dir="auto">{{ $source['title'] }}</b>@endif
+                                                @if ($source['at'])<span class="lp-d-srow-l">{{ $t('ignored.stopped', ['when' => $ago($source['at'])]) }}</span>@endif
+                                            </span>
+                                            @if ($this->mayFixLines())
+                                                <button type="button" class="lp-d-ghost" wire:click="bringBack(@js($source['content_id']))">{{ $t('ignored.back') }}</button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                             @if ($texts !== [])
                                 {{-- the long texts the team pasted: searched, the piece that answers brought to the answer --}}
                                 <div class="lp-d-texts" data-texts>

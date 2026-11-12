@@ -661,12 +661,14 @@ final class ShopQuestions extends OperatorShopQuestions
             } elseif ($ask !== null && $ask->from === 'none' && $ask->outcome !== AssistantAnswer::ANSWERED) {
                 $out['from'] = 'none';
             } else {
-                $sources = array_values(array_filter((array) ($saved?->sources ?? []), 'is_array'));
+                // an answer kept nowhere else (a reply in a conversation) keeps what it was written from with its ask
+                $askTrace = (array) ($ask?->trace ?? []);
+                $sources = array_values(array_filter((array) ($saved?->sources ?? ($askTrace['sources'] ?? [])), 'is_array'));
                 $out['sources'] = array_slice(array_map(fn (array $s): array => ['title' => trim((string) ($s['title'] ?? '')), 'url' => isset($s['url']) && is_string($s['url']) && $s['url'] !== '' ? $s['url'] : null], $sources), 0, 6);
                 $out['sources'] = array_values(array_filter($out['sources'], fn (array $s): bool => $s['title'] !== ''));
                 $answerText = trim((string) ($saved?->answer ?? ($ask === null ? '' : ($ask->getAttributes()['answer'] ?? ''))));
                 $out['answer'] = $answerText;
-                $kept = array_values(array_filter((array) (((array) ($saved?->flags ?? []))['quotes'] ?? []), 'is_array'));
+                $kept = array_values(array_filter((array) (((array) ($saved?->flags ?? []))['quotes'] ?? ($askTrace['quotes'] ?? [])), 'is_array'));
                 $out['sources'] = array_map(fn (array $s): array => $s + self::quoteFor($s, $kept, $answerText), $out['sources']);
                 $answered = ($ask?->outcome ?? $saved?->outcome) === AssistantAnswer::ANSWERED;
                 $out['from'] = ! $answered ? 'none' : ($out['sources'] !== [] ? 'pages' : ($saved !== null && $saved->product_id !== null ? 'product' : 'store'));

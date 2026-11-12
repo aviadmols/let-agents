@@ -14,6 +14,7 @@ use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Actions\ReadPostKnowledge;
 use App\Modules\Assistant\Filament\Merchant\Pages\AboutStore;
 use App\Modules\Assistant\Jobs\ReadPostKnowledgeJob;
+use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -107,6 +108,23 @@ final class PostKnowledgeTest extends TestCase
         $this->assertCount(2, $this->calls, 'only the changed post is read');
         $this->assertStringNotContainsString('מוצאים מתחת לכפתור', (string) $this->entry()->body);
         $this->assertStringContainsString('מחשבון חיתוך שמחשב', (string) $this->entry()->body);
+
+        // The team stops the whole post from an answer's "why" (Sella, 12.11): nothing read from it is said, nor is it a
+        // passage; brought back, it is both again. No model either way.
+        $this->calls = [];
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->ignore((string) $cutting->id));
+        $this->assertStringNotContainsString('(מחשבון חיתוך', (string) $this->entry()->body);
+        $this->assertSame([], $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), 'יש לכם מחשבון חיתוך?', $this->shop->id, [])), 'nothing of the stopped post');
+        $this->assertSame(['title' => 'מחשבון חיתוך: איך מזמינים פלטות חתוכות'], array_intersect_key(
+            $this->inShop(fn () => AssistantIgnoredSource::query()->firstOrFail()->toArray()), ['title' => 1]));
+
+        app(ReadPostKnowledge::class)->handle($this->shop->id);
+        $this->assertStringNotContainsString('(מחשבון חיתוך', (string) $this->entry()->body, 'still stopped after the next reading');
+
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->unignore((string) $cutting->id));
+        $this->assertStringContainsString('מחשבון חיתוך שמחשב', (string) $this->entry()->body, 'brought back');
+        $this->assertSame([], $this->calls);
     }
 
     public function test_a_checker_of_the_same_family_fails_the_run_and_no_model_is_asked(): void

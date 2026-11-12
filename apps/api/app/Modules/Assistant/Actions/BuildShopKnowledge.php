@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Core\Http\OutboundUrl;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\RepeatedText;
 use App\Modules\Catalog\Contracts\StorefrontLock;
@@ -396,9 +397,14 @@ final class BuildShopKnowledge
     public function posts(array $read): void
     {
         $hidden = (array) ($this->row(self::POSTS)?->terms['hidden'] ?? []);
+        $ignored = AssistantIgnoredSource::contentIds();
         $lines = [];
 
-        foreach ($read as $post) {
+        foreach ($read as $contentId => $post) {
+            // a page or post the team stopped: none of what was read from it
+            if (in_array((string) $contentId, $ignored, true)) {
+                continue;
+            }
             foreach ($post['facts'] as $fact) {
                 if (! in_array(RepeatedText::key($fact), $hidden, true) && RepeatedText::useful($fact)) {
                     $lines[] = '- '.$fact.' ('.$post['title'].')';
@@ -411,6 +417,38 @@ final class BuildShopKnowledge
 
         // each fact once, whichever pages said it (the terms and the payment page both tell the 30 days to exchange)
         $this->put(self::POSTS, 'posts', implode("\n", RepeatedText::distinct(array_values(array_unique($lines)))), ['read' => $read, 'hidden' => $hidden, 'wanted' => $wanted, 'read_at' => now()->toIso8601String()]);
+    }
+
+    /**
+     * A page or post of the store's site the team stopped (the "why" of an answer, Sella 12.11: a 2024 post on the book
+     * week's offers): never a passage again, and the facts read from it leave what the posts say. Kept until brought back.
+     */
+    public function ignore(string $contentId, ?int $by = null): void
+    {
+        $content = CatalogContent::query()->whereKey($contentId)->whereIn('type', [CatalogContent::PAGE, CatalogContent::POST])->first();
+        if ($content === null) {
+            return;
+        }
+
+        AssistantIgnoredSource::query()->updateOrCreate(['content_id' => (string) $content->id],
+            ['title' => mb_substr(trim((string) $content->title), 0, 300), 'url' => $content->url === null ? null : mb_substr((string) $content->url, 0, 1000), 'created_by' => $by]);
+        $this->rereadPosts();
+    }
+
+    /** A page or post the team stopped, brought back: a passage again, and what was read from it with the posts. */
+    public function unignore(string $contentId): void
+    {
+        AssistantIgnoredSource::query()->where('content_id', $contentId)->delete();
+        $this->rereadPosts();
+    }
+
+    /** What the posts say, made again from what was read, as it stands now. */
+    private function rereadPosts(): void
+    {
+        $row = $this->row(self::POSTS);
+        if ($row !== null) {
+            $this->posts((array) ($row->terms['read'] ?? []));
+        }
     }
 
     /** A page or post read again even though it did not change: what it taught stays until the new reading replaces it. */

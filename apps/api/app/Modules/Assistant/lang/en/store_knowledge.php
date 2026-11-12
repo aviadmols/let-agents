@@ -72,6 +72,15 @@ return [
         'remove_confirm' => 'Remove this line? The assistant stops using it.',
     ],
 
+    // pages and posts of the site the team stopped from the "why" of an answer, each brought back from here
+    'ignored' => [
+        'list' => 'Pages the assistant does not use',
+        'note' => 'You stopped them from "Why this answer". The assistant does not answer from them or from what was read from them.',
+        'stopped' => 'Stopped :when',
+        'back' => 'Bring back',
+        'brought_back' => 'The page is back. The assistant will use it again.',
+    ],
+
     // a long text the team pastes: found by what it says, the piece that answers brought to the answer
     'text' => [
         'open' => 'Have a longer text? Paste a paragraph or a document',

@@ -28,6 +28,9 @@
                         @if ($line['url'])
                             <a class="lp-link" href="{{ $line['url'] }}" target="_blank" rel="noopener">{{ $line['kind'] === 'post_fact' ? $w('line_open_post') : $w('line_open_page') }} ↗</a>
                         @endif
+                        @if ($may && $line['kind'] === 'page')
+                            <button type="button" class="lp-link" wire:click="removeLine(@js($line['kind']), @js($line['key']))" wire:confirm="{{ $w('line_stop_page_confirm') }}" data-stop-page>{{ $w('line_stop_page') }}</button>
+                        @endif
                         @if ($line['edit_url'])
                             <a class="lp-link" href="{{ $line['edit_url'] }}" target="_blank" rel="noopener" data-edit-on-store>{{ $w('line_edit_on_store') }} ↗</a>
                         @endif

@@ -83,6 +83,8 @@ trait EditsSourceLines
                 SourceLines::OWN => $knowledge->removeOwn($key),
                 SourceLines::REPEATED => $knowledge->hide($key),
                 SourceLines::POST_FACT => $knowledge->hidePostFact($key),
+                // a page or post of the store's site, stopped whole (brought back on the store's knowledge screen)
+                SourceLines::PAGE => $knowledge->ignore($key, auth()->id() === null ? null : (int) auth()->id()),
                 SourceLines::TEAM => (function () use ($key, $knowledge): void {
                     AssistantAnswer::query()->whereKey($key)->where('source', TeamAnswers::TEAM)->update(['status' => AssistantAnswer::HIDDEN]);
                     $knowledge->team();

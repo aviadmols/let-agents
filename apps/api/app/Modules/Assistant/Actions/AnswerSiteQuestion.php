@@ -21,6 +21,7 @@ use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\AnswerFailure;
@@ -1449,6 +1450,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         // Before all: what the store says about itself on every product page, in its team's words,
         // and the team's answers to questions like this one.
         $found = $this->knowledge($question, $shopId, $found);
+        // a page or post of the site the team stopped (AssistantIgnoredSource) is never a passage
+        if (($ignored = AssistantIgnoredSource::contentIds()) !== []) {
+            $found = array_values(array_filter($found, fn (array $p): bool => ($p['source'] ?? '') !== 'content' || ! in_array((string) ($p['source_id'] ?? ''), $ignored, true)));
+        }
         // A product whose own page the question found by meaning ("מיקו דרים" for "לישון ממש טוב?") is one the answer may
         // show, before what the search showed: named in the answer without its card, it sent the shopper looking for it.
         if ($viewing === null && ! $followUp && $named === []) {
@@ -2060,6 +2065,12 @@ final class AnswerSiteQuestion implements TriesQuestions
                     : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
                         : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
                 $trace += ['writer' => $wrote, 'check' => $checked, 'refused' => $refusal, 'picks' => array_column($stored, 'external_id')];
+                // an answer kept nowhere else (a reply in a conversation, one about the page's product): what it was
+                // written from goes with its ask, so the team still sees each source and can stop it (Sella, 12.11)
+                if ($saved === null && $refusal === null && $sources !== []) {
+                    $trace += ['sources' => array_slice($sources, 0, 6),
+                        'quotes' => array_slice(array_map(fn (array $q): array => ['text' => mb_substr((string) ($q['text'] ?? ''), 0, 800)] + $q, $quotes), 0, 6)];
+                }
                 $run->output(['outcome' => $outcome, 'refused' => $refusal, 'cited' => count($cited), 'picks' => count($picks), 'answer' => $answer, 'checker' => $checker['name'].' · '.$checker['model'],
                     'check' => $checked, 'context' => $trace['context'], 'writer' => $wrote])
                     ->summary('assistant::runs.site_'.$outcome);
@@ -2086,6 +2097,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'check_tokens' => isset($trace['check']['in']) ? [(int) $trace['check']['in'], (int) ($trace['check']['out'] ?? 0)] : null,
                 'picks' => $trace['picks'] ?? null,
                 'corrected' => $corrected,
+                'sources' => $trace['sources'] ?? null,
+                'quotes' => $trace['quotes'] ?? null,
             ], fn ($v): bool => $v !== null && $v !== []),
             'cost_usd' => $run->cost_usd === null ? null : (float) $run->cost_usd,
             'duration_ms' => $run->duration_ms,

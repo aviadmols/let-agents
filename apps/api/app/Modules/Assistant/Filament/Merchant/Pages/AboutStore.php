@@ -9,6 +9,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
 use App\Modules\Assistant\Filament\Merchant\Concerns\EditsSourceLines;
 use App\Modules\Assistant\Filament\Operator\Pages\AboutStore as OperatorAboutStore;
+use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Retrieval\Models\RetrievalChunk;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
@@ -213,6 +214,25 @@ final class AboutStore extends OperatorAboutStore
         abort_unless($this->mayFixLines(), 403);
         $this->inThisShop(fn () => app(BuildShopKnowledge::class)->removeText($id));
         Notification::make()->success()->title(__('assistant::store_knowledge.text.removed'))->send();
+    }
+
+    /**
+     * The pages and posts of the site the team stopped from the "why" of an answer, newest first.
+     *
+     * @return list<array{content_id: string, title: string, url: string|null, at: string|null}>
+     */
+    public function ignoredSources(): array
+    {
+        return $this->inThisShop(fn (): array => AssistantIgnoredSource::query()->latest()->get()
+            ->map(fn (AssistantIgnoredSource $s): array => ['content_id' => $s->content_id, 'title' => $s->title, 'url' => $s->url, 'at' => $s->created_at?->toIso8601String()])->all());
+    }
+
+    /** A page the team stopped, brought back: the assistant answers from it again. */
+    public function bringBack(string $contentId): void
+    {
+        abort_unless($this->mayFixLines(), 403);
+        $this->inThisShop(fn () => app(BuildShopKnowledge::class)->unignore($contentId));
+        Notification::make()->success()->title(__('assistant::store_knowledge.ignored.brought_back'))->send();
     }
 
     /**
