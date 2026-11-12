@@ -20,6 +20,7 @@ use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Search\Contracts\RelatedByTags;
 use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchResolution;
+use App\Modules\Search\Support\AlikeScore;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\DescribedProducts;
 use App\Modules\Search\Support\HebrewSearch;
@@ -1470,40 +1471,47 @@ final class SearchCatalog
             // titles hardly ever name a colour: where most do (Rocks: "זהב צהוב"), the order its alike have stays as it is.
             // Those filed in its colour come first, each side in the order its pictures and words gave: never by the colour
             // words in their data, where one sold in many colours (Pismo Knit) said every colour and led every list.
-            $filedLead = $parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index);
-            if ($filedLead) {
-                $facets = (array) ($index['facets'] ?? []);
-                $mine = self::filedColours($own, $facets);
-                if ($mine !== [] && count($mine) <= 2) {
-                    // the colour its picture shows most, and each one's: shown in its colour first (a white tee sold in
-                    // black too is not a black tee to see), then filed in it among its colours, then the rest
-                    $seen = RetrievalImage::query()->whereIn('external_id', [$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])
-                        ->get(['external_id', 'caption_words'])->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => Colours::dominant(array_values((array) ($i->caption_words ?? [])), colourFirst: true)])->all();
-                    $ownSeen = $seen[$externalId] ?? null;
-                    $tier = function (array $r) use ($facets, $mine, $seen, $ownSeen): int {
-                        $shows = $seen[substr((string) $r['id'], 2)] ?? null;
-                        $filed = array_intersect(self::filedColours($r, $facets), $mine) !== [];
-                        if ($ownSeen !== null && $shows !== null) {
-                            return Colours::near($ownSeen, $shows) >= 0.8 ? 0 : ($filed ? 1 : 2);
-                        }
+            // Whom it is for, as the store says it (its title, type, categories, tags): a kids' shoe is never an adult's
+            // alike, nor the other way (Vans, 12.11: a glittery kids' sneaker beside an adult slip-on). Any store.
+            $audiences = $this->audiencesOf(array_values(array_unique([$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])));
+            $young = fn (array $a): bool => array_intersect($a, ['kids', 'babies']) !== [];
+            $ownFor = $audiences[$externalId] ?? [];
+            if ($ownFor !== []) {
+                $records = array_values(array_filter($records, function (array $r) use ($audiences, $ownFor, $young): bool {
+                    $for = $audiences[substr((string) $r['id'], 2)] ?? [];
 
-                        return $filed ? 0 : 2;
-                    };
-                    foreach ($records as $r) {
-                        $colourTier[(string) $r['id']] = $tier($r);
-                    }
-                }
+                    return $for === [] || $young($for) === $young($ownFor);
+                }));
             }
+
+            $filedLead = $parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index);
             $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own), own: true);
-            if (isset($colourTier)) {
-                // clothes (titles that name no colour): its colour first, then its print, then its side, each kept in the
-                // order before: a white long tee's alike are white tees before a yellow shirt of its length (Vans, 12.11)
+            if ($filedLead) {
+                // Clothes and shoes (titles that name no colour): one score of what a shopper sees (AlikeScore), its picture's
+                // nearness, colour, print (which, and how much it covers), side and whom it is for, each weighed: no one of
+                // them decides alone (Vans, 12.11: a black striped tee 26th by picture came first by its colour alone)
+                $facets = (array) ($index['facets'] ?? []);
+                $seen = RetrievalImage::query()->whereIn('external_id', [$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])
+                    ->get(['external_id', 'caption_words'])->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => Colours::dominant(array_values((array) ($i->caption_words ?? [])), colourFirst: true)])->all();
+                $ownFiled = self::filedColours($own, $facets);
+                $ownPrint = Patterns::of($own);
                 $ownTitle = (string) ($own['title'] ?? '');
+                $count = max(1, count($records));
+                $score = [];
+                foreach ($records as $at => $r) {
+                    $id = substr((string) $r['id'], 2);
+                    $score[$at] = AlikeScore::of([
+                        'look' => 1 - $at / $count,
+                        'colour' => AlikeScore::colour($ownFiled, $seen[$externalId] ?? null, self::filedColours($r, $facets), $seen[$id] ?? null),
+                        'print' => AlikeScore::print($ownPrint, Patterns::of($r)),
+                        'side' => BuildSearchIndex::contradicts($ownTitle, (string) ($r['title'] ?? '')) ? 0.0 : 1.0,
+                        'audience' => AlikeScore::audience($ownFor, $audiences[$id] ?? []),
+                    ]);
+                }
                 $order = array_keys($records);
-                usort($order, fn (int $a, int $b): int => [$colourTier[(string) $records[$a]['id']] ?? 2, (int) BuildSearchIndex::contradicts($ownTitle, (string) ($records[$a]['title'] ?? '')), $a]
-                    <=> [$colourTier[(string) $records[$b]['id']] ?? 2, (int) BuildSearchIndex::contradicts($ownTitle, (string) ($records[$b]['title'] ?? '')), $b]);
+                usort($order, fn (int $a, int $b): int => [$score[$b], $a] <=> [$score[$a], $b]);
                 $records = array_map(fn (int $at): array => $records[$at], $order);
             } else {
                 // and, last, never what its title says the opposite of before the rest: a short tee's alike are short before
@@ -1754,6 +1762,24 @@ final class SearchCatalog
         }
 
         return [...$bands[0], ...$bands[1], ...$bands[2], ...array_slice($records, self::PICTURE_COLOUR_READ)];
+    }
+
+    /**
+     * Whom each product is for (ProductKinds::audiences: women, men, kids, babies), by external id; empty when the store
+     * says none. Call inside the shop's tenant.
+     *
+     * @param  list<string>  $externalIds
+     * @return array<string, list<string>>
+     */
+    private function audiencesOf(array $externalIds): array
+    {
+        if ($externalIds === []) {
+            return [];
+        }
+        $kinds = app(ProductKinds::class);
+
+        return CatalogProduct::query()->whereIn('external_id', $externalIds)->with('categories:id,name')->get(['id', 'shop_id', 'external_id', 'title', 'brand', 'payload'])
+            ->mapWithKeys(fn (CatalogProduct $p): array => [(string) $p->external_id => $kinds->audiences($p)])->all();
     }
 
     /** A store whose product titles name a colour this rarely or less tells colours by its filters, not its titles. */
