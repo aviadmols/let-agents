@@ -2406,7 +2406,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * אין מענה", "we have nothing written about…"): whatever else it says, it answers nothing (Rocks, 12.11: such a line
      * on watch batteries was marked answered). Any store, any language the widget speaks.
      */
-    private const NOTHING_WRITTEN = '/(?<![\p{L}])אין\s+(?:לנו\s+)?(?:כאן\s+|באתר\s+|כרגע\s+)?(?:מידע|מענה|פירוט|התייחסות)(?:\s+כתוב(?:ה)?)?\s+(?:על|לגבי|בנוגע|ל)|בחומר\s+(?:שבידינו|שלנו|שיש\s+לנו)\s+אין|(?<![\p{L}])לא\s+(?:כתוב|מצאנו|מצאתי)\s+(?:אצלנו|באתר|כאן|מידע)|\b(?:we\s+have\s+)?(?:nothing|no\s+information)\s+(?:written\s+)?(?:about|on|regarding)\b|\bwe\s+(?:could\s+not|couldn\'t|did\s+not|didn\'t)\s+find\s+(?:any\s+)?information\b/iu';
+    private const NOTHING_WRITTEN = '/(?<![\p{L}])אין\s+(?:לנו\s+)?(?:כאן\s+|באתר\s+|כרגע\s+)?(?:מידע|מענה|פירוט|התייחסות|משהו|דבר)(?:\s+כתוב(?:ה)?)?\s+(?:על|לגבי|בנוגע|ל)|בחומר\s+(?:שבידינו|שלנו|שיש\s+לנו)\s+אין|(?<![\p{L}])לא\s+(?:כתוב|מצאנו|מצאתי)\s+(?:אצלנו|באתר|כאן|מידע)|\b(?:we\s+have\s+)?(?:nothing|no\s+information)\s+(?:written\s+)?(?:about|on|regarding)\b|\bwe\s+(?:could\s+not|couldn\'t|did\s+not|didn\'t)\s+find\s+(?:any\s+)?information\b/iu';
 
     /**
      * Whether an answer's only word on what was asked is that the store has nothing written about it (NOTHING_WRITTEN):

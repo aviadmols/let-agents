@@ -123,6 +123,7 @@ final class HeldKindTest extends TestCase
             'אנחנו עוסקים בתכשיטי זהב ויהלומים, ובחומר שבידינו אין לנו מענה כתוב על החלפת סוללות לשעונים. צוות החנות ישמח לעזור לכם.',
             'אין לנו כאן מידע כתוב על החלפת סוללות לשעונים.',
             'אין מידע לגבי משלוח לחו"ל.',
+            'אין לנו משהו כתוב על החלפת סוללות לשעונים. אם תרצו, אנחנו יכולים לבדוק איתכם מה כן אפשר לעשות אצלנו.',
             'We have nothing written about gift wrapping.',
         ] as $answer) {
             $this->assertTrue(AnswerSiteQuestion::saysNothingWritten($answer), $answer);
