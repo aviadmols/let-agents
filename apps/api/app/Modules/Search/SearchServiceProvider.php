@@ -8,6 +8,7 @@ use App\Core\Modules\ModuleServiceProvider;
 use App\Modules\Admin\Contracts\AutoFixes;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Admin\Contracts\HomeSource;
+use App\Modules\Admin\Contracts\PoorAnswers;
 use App\Modules\Admin\Contracts\ScanDetails;
 use App\Modules\Admin\Contracts\ScanProgress;
 use App\Modules\Admin\Contracts\SearchesScreen;
@@ -37,6 +38,7 @@ use App\Modules\Search\Support\SearchAutoFixes;
 use App\Modules\Search\Support\SearchFirstSteps;
 use App\Modules\Search\Support\SearchFixesToday;
 use App\Modules\Search\Support\SearchHome;
+use App\Modules\Search\Support\SearchPoorAnswers;
 use App\Modules\Search\Support\SearchReport;
 use App\Modules\Search\Support\SearchScanDetails;
 use App\Modules\Search\Support\SearchScanProgress;
@@ -68,6 +70,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
         // Today's searches: found, top words, what sold, the live feed.
         $this->app->tag([SearchToday::class], TodaySearches::TAG);
         $this->app->tag([SearchFixesToday::class], TodayImprovements::TAG);
+        // the answers shoppers said did not help, for the store report
+        $this->app->tag([SearchPoorAnswers::class], PoorAnswers::TAG);
         // the Searches screen: what shoppers look for, in their own words, and what they find
         $this->app->tag([SearchScreen::class], SearchesScreen::TAG);
         // "Fixed by Lets": what the search fixed on its own, with its undo

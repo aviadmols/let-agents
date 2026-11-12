@@ -4,6 +4,8 @@ namespace App\Modules\Admin\Support;
 
 use App\Core\Facades\Settings;
 use App\Core\Localization\Money;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Contracts\PoorAnswers;
 use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Filament\Merchant\Pages\Improvements;
 use App\Modules\Admin\Filament\Merchant\Pages\ReportSettings;
@@ -11,6 +13,8 @@ use App\Modules\Admin\Filament\Merchant\Pages\Searches;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Route;
+use Throwable;
 
 /**
  * The store report the owner gets by email (Tomer's design, emails/weekly-report.html and its spec, 12.11): how many
@@ -142,12 +146,34 @@ class StoreReport
             'money' => $quiet || $revenue <= 0 ? null : Money::total($revenue, $currency),
             'adds' => (int) ($numbers['adds']['now'] ?? 0),
             'orders' => (int) ($numbers['orders']['now'] ?? 0),
+            // the answers shoppers said did not help, with the two ways to fix them (Aviad, 12.11)
+            'poor' => array_map(fn (array $p): array => ['question' => self::clean($p['question']), 'answer' => self::clean($p['answer']), 'downs' => (int) $p['downs']], $this->poor($shop, $sinceUtc, $untilUtc)),
             'urls' => [
                 'panel' => Searches::getUrl(panel: 'merchant', tenant: $shop),
                 'fixes' => Improvements::getUrl(panel: 'merchant', tenant: $shop),
                 'settings' => ReportSettings::getUrl(panel: 'merchant', tenant: $shop),
+                // the questions screen (each answer edited there) and the store's knowledge (what it knows about itself)
+                'answers' => Route::has('filament.merchant.pages.assistant.questions') ? route('filament.merchant.pages.assistant.questions', ['tenant' => $shop->slug]) : null,
+                'knowledge' => Route::has('filament.merchant.pages.about-store') ? route('filament.merchant.pages.about-store', ['tenant' => $shop->slug]) : null,
             ],
         ];
+    }
+
+    /** At most this many answers shoppers said did not help. */
+    public const POOR_SHOWN = 3;
+
+    /** @return list<array{question: string, answer: string, downs: int}> */
+    private function poor(Shop $shop, CarbonInterface $since, CarbonInterface $until): array
+    {
+        foreach (app()->tagged(PoorAnswers::TAG) as $source) {
+            try {
+                return app(TenantContext::class)->run((string) $shop->id, fn (): array => $source->poor($shop, $since, $until, self::POOR_SHOWN));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return [];
     }
 
     /**

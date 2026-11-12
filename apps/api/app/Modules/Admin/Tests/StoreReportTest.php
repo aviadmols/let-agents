@@ -54,7 +54,8 @@ final class StoreReportTest extends TestCase
             'missing' => [['title' => '"מגפיים" · 41 חיפושים בלי תוצאות', 'text' => '', 'action' => 'לקשר למוצר', 'url' => 'https://agents.test/fix']],
             'sold' => [['title' => 'טבעת סוליטר', 'adds' => 31]],
             'money' => '₪2,340', 'adds' => 96, 'orders' => 12,
-            'urls' => ['panel' => 'https://agents.test/searches', 'fixes' => 'https://agents.test/fixes', 'settings' => 'https://agents.test/settings/report'],
+            'poor' => [['question' => 'איזה מבצעים יש?', 'answer' => 'מבצע חודש הספר: 6 ספרים ב-200₪.', 'downs' => 3]],
+            'urls' => ['panel' => 'https://agents.test/searches', 'fixes' => 'https://agents.test/fixes', 'settings' => 'https://agents.test/settings/report', 'answers' => 'https://agents.test/questions', 'knowledge' => 'https://agents.test/about-store'],
         ];
     }
 
@@ -104,6 +105,11 @@ final class StoreReportTest extends TestCase
         $this->assertStringContainsString('dir="rtl"', $he);
         $this->assertStringContainsString('גולשים חיפשו בחנות שלכם.', $he);
         $this->assertStringContainsString('הדוח הזה מגיע אליכם כל יום שני.', $he);
+        // the answers shoppers said did not help, with the two ways to fix them
+        $this->assertStringContainsString('תשובות שלא עזרו', $he);
+        $this->assertStringContainsString('3 גולשים סימנו שזה לא עזר', $he);
+        $this->assertStringContainsString('https://agents.test/questions', $he);
+        $this->assertStringContainsString('https://agents.test/about-store', $he);
         $this->assertStringContainsString('https://agents.test/settings/report', $he);
         $this->assertStringContainsString('&#9660; 4%', $he, 'a drop in grey, never red');
         $this->assertStringNotContainsString('#ff', strtolower(str_replace('#ffffff', '', $he)));

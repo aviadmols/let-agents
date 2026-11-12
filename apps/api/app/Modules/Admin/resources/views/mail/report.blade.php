@@ -69,6 +69,20 @@
 </td></tr>
 @endif
 
+@if (($r['poor'] ?? []) !== [])
+<!-- answers that did not help -->
+<tr><td style="background:#ffffff;padding:26px 32px 6px;">
+<p style="{{ $label }}">{{ $m('poor') }}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+@foreach ($r['poor'] as $i => $p)
+@php($line = $i < count($r['poor']) - 1 ? 'border-bottom:1px solid #e2e2e6;' : '')
+<tr><td align="{{ $start }}" style="padding:12px 0;{{ $line }}font-size:15px;line-height:1.45;" dir="auto"><b style="font-weight:500;">“{{ $p['question'] }}”</b> <span style="color:#5f5f67;">· {{ trans_choice('admin::report.mail.poor_downs', $p['downs'], ['n' => $p['downs']], $l) }}</span>@if ($p['answer'] !== '')<br><span style="font-size:13px;color:#5f5f67;">{{ $m('poor_said') }} “{{ \Illuminate\Support\Str::limit($p['answer'], 160) }}”</span>@endif</td></tr>
+@endforeach
+</table>
+<p style="margin:10px 0 0;font-size:13.5px;line-height:1.6;color:#3a3a40;">{{ $m('poor_advice') }}@if ($r['urls']['answers'])<br><a href="{{ $r['urls']['answers'] }}" style="color:#0b0b0c;font-weight:500;text-decoration:underline;">{{ $m('poor_edit') }} {!! $rtl ? '&larr;' : '&rarr;' !!}</a>@endif @if ($r['urls']['knowledge'])&nbsp;&nbsp;<a href="{{ $r['urls']['knowledge'] }}" style="color:#0b0b0c;font-weight:500;text-decoration:underline;">{{ $m('poor_add') }} {!! $rtl ? '&larr;' : '&rarr;' !!}</a>@endif</p>
+</td></tr>
+@endif
+
 @if ($r['sold'] !== [])
 <!-- products -->
 <tr><td style="background:#ffffff;padding:26px 32px 6px;">
