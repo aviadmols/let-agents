@@ -153,7 +153,8 @@ final class BuildShopKnowledge
     {
         StorefrontLock::seen($shopId, $kind);
         $cleared = $this->clearLockReading();
-        $shopify = Shop::query()->whereKey($shopId)->value('platform') === ShopPlatform::Shopify->value;
+        // The model casts the platform to its enum: compared to the plain string, every Shopify store read as WooCommerce.
+        $platform = Shop::query()->whereKey($shopId)->first(['id', 'platform'])?->platform ?? ShopPlatform::WooCommerce;
 
         $this->runs->track(
             agent: self::AGENT,
@@ -161,7 +162,7 @@ final class BuildShopKnowledge
             shopId: $shopId,
             trigger: RunTrigger::System,
             work: fn (RunContext $run) => $run->output(['tried' => $tried, 'locked' => $kind, 'cleared' => $cleared])
-                ->summary('assistant::runs.knowledge_locked', ['platform' => $shopify ? 'Shopify' : 'WooCommerce', 'cleared' => (string) $cleared]),
+                ->summary('assistant::runs.knowledge_locked', ['platform' => $platform->label(), 'cleared' => (string) $cleared]),
         );
 
         return ['tried' => $tried, 'pages' => 0, 'sentences' => 0, 'locked' => $kind];

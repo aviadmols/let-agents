@@ -62,7 +62,7 @@ return [
         'change_plan' => 'Change plan',
         'change_plan_woo' => 'To change plans, write to us and we\'ll move your store the same day.',
         'plans_title' => 'Plans',
-        'plans_help' => 'What each plan gives. You can switch at any time: an upgrade applies at once, a downgrade from the next month.',
+        'plans_help' => 'What each plan gives. You can switch at any time, and the new plan applies as soon as you approve it.',
         'plans_help_team' => 'What each plan gives. Choose one, and we\'ll move your store the same day.',
         'current_plan' => 'Your plan',
         'per_month' => 'a month',

@@ -19,7 +19,8 @@ use Throwable;
  * shopify.trial_days: the plan the merchant chose (Plan: its name on the bill and its price), or
  * shopify.plan_name at shopify.plan_price_usd when none is offered. A development store is billed
  * in test mode, so a test install never charges anyone. The active subscription's name says the
- * shop's plan again: an upgrade holds from its approval, a downgrade from the next period (Shopify).
+ * shop's plan again. Any change, up or down, holds from its approval: Shopify's standard replacement swaps a
+ * monthly plan for another at once (it defers only annual ones), and the plans page says so.
  * The trial is one per store: a plan changed, or the app installed again, carries the days left of it, and none once
  * it ended or a plan was paid without one (trialDaysLeft).
  *
@@ -159,16 +160,18 @@ final class ManageSubscription
 
     /**
      * The trial days a new subscription for this store gets: shopify.trial_days for a store that never had a plan;
-     * the whole days left until trial_ends_at for one in its trial (a plan changed, the app installed again: the
-     * install is kept by the store's address); none once the trial ended, or after a plan without one. Whole days,
-     * rounded down, so changing plans never lengthens the trial.
+     * the days left until trial_ends_at for one in its trial (a plan changed, the app installed again: the
+     * install is kept by the store's address); none once the trial ended, or after a plan without one. Shopify takes
+     * whole days, so the part of a day left counts as a day: a plan change never takes a day off the trial. It never
+     * lengthens it either: trial_ends_at is the trial's first end, which refresh() never moves later, so Shopify's
+     * end stays within a day of it however many times the plan changes.
      */
     public static function trialDaysLeft(ShopifyInstall $install): int
     {
         $full = max(0, (int) Settings::get('shopify.trial_days'));
 
         if ($install->trial_ends_at !== null) {
-            return min($full, max(0, (int) floor(now()->diffInSeconds($install->trial_ends_at, false) / 86400)));
+            return min($full, max(0, (int) ceil(now()->diffInSeconds($install->trial_ends_at, false) / 86400)));
         }
 
         return $install->subscribed_at === null ? $full : 0;
@@ -185,7 +188,12 @@ final class ManageSubscription
             && ShopifyApps::key($install->client_id) === ShopifyApps::key();
     }
 
-    /** Reads the store's subscription from Shopify and sets the install and the shop by it. */
+    /**
+     * Reads the store's subscription from Shopify and sets the install and the shop by it. The trial's end is the
+     * earlier of the one kept and the subscription's: a plan changed mid-trial is created with whole days, rounded
+     * up (trialDaysLeft), so its own end may fall hours after the first one, and taking it would let the trial
+     * creep forward one change at a time.
+     */
     public function refresh(ShopifyInstall $install): string
     {
         $active = collect((array) ($this->api->query($install, self::ACTIVE)['currentAppInstallation']['activeSubscriptions'] ?? []))
@@ -193,11 +201,18 @@ final class ManageSubscription
 
         if ($active !== null) {
             $trialDays = (int) ($active['trialDays'] ?? 0);
+            $ends = $trialDays > 0 ? self::moment($active['createdAt'] ?? null)?->addDays($trialDays) : null;
+            $kept = $install->trial_ends_at;
+
+            if ($ends !== null && $kept !== null && $kept->isFuture() && $kept->lessThan($ends)) {
+                $ends = $kept;
+            }
+
             $install->forceFill([
                 'subscription_id' => (string) $active['id'],
                 'subscription_status' => ShopifyInstall::ACTIVE,
                 'subscribed_at' => $install->subscribed_at ?? now(),
-                'trial_ends_at' => $trialDays > 0 ? now()->parse((string) $active['createdAt'])->addDays($trialDays) : null,
+                'trial_ends_at' => $ends,
             ])->save();
             $this->planFrom($install, (string) ($active['name'] ?? ''));
         } elseif (! self::charges($install)) {

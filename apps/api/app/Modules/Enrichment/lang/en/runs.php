@@ -11,7 +11,7 @@ return [
     'vocabulary_saved' => 'Vocabulary ":name" version :version saved: :types product types, :attributes specs and choices, :tags tags.',
     'article_products_matched' => ':links {links:product/products} chosen for :articles {articles:article/articles}. :skipped {skipped:article/articles} got none: store pages, no value to shoppers, or not checked yet.',
     'vocabulary_invalid' => 'The vocabulary was not saved: :count problems.',
-    'structure_built' => 'Divided the catalog into :branches branches: :approved went on, :held wait for a decision; :rest products belong to no branch.',
+    'structure_built' => 'The catalog was divided. Branches: :branches (went on: :approved, waiting for a decision: :held). Products in no branch: :rest.',
     'structure_whole' => 'A vocabulary already covers the whole catalog, so it was not divided into branches.',
     'web_lookup' => 'Checked on the web: :product (:certainty).',
     'schema_scored' => 'Scored the vocabulary of :branch: :score of 100 (:hard hard failures).',

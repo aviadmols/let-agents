@@ -98,6 +98,9 @@ final class LockedStorefrontTest extends TestCase
         $this->assertStringContainsString('come from Shopify', (string) $site->summary());
         $this->assertSame(1, $site->output['cleared']);
         $this->assertSame(StorefrontLock::PASSWORD, Run::query()->where('action', BuildShopKnowledge::ACTION)->sole()->output['locked']);
+        $line = (string) Run::query()->where('action', BuildShopKnowledge::ACTION)->sole()->summary();
+        $this->assertStringContainsString('comes from Shopify', $line, 'a Shopify store is told its own platform');
+        $this->assertStringNotContainsString('WooCommerce', $line);
 
         $this->inShop(function (): void {
             $this->assertNotNull(CatalogContent::query()->where('external_id', ReadSitePages::PREFIX.'old-lock')->value('removed_at'), 'the page kept from the password page is gone');

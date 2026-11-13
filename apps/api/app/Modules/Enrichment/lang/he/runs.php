@@ -11,7 +11,7 @@ return [
     'vocabulary_saved' => 'נשמר אוצר המילים ״:name״ גרסה :version: :types סוגי מוצרים, :attributes מפרטים ובחירות, :tags תגיות.',
     'article_products_matched' => 'נבחרו :links {links:מוצר/מוצרים} ל־:articles {articles:מאמר/מאמרים}. :skipped {skipped:מאמר לא קיבל/מאמרים לא קיבלו} מוצרים: דפי חנות, בלי ערך לקונה, או שעוד לא נבדקו.',
     'vocabulary_invalid' => 'אוצר המילים לא נשמר: :count בעיות.',
-    'structure_built' => 'הקטלוג חולק ל־:branches ענפים: :approved המשיכו הלאה, :held מחכים להחלטה; :rest מוצרים לא שייכים לאף ענף.',
+    'structure_built' => 'הקטלוג חולק. ענפים: :branches (המשיכו הלאה: :approved, מחכים להחלטה: :held). מוצרים שלא שייכים לאף ענף: :rest.',
     'structure_whole' => 'אוצר מילים כבר מכסה את כל הקטלוג, ולכן הוא לא חולק לענפים.',
     'web_lookup' => 'נבדק ברשת: :product (:certainty).',
     'schema_scored' => 'ניקוד אוצר המילים של :branch: :score מתוך 100 (:hard כשלים קשים).',

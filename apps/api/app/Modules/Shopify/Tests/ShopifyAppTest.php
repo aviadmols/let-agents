@@ -452,13 +452,36 @@ final class ShopifyAppTest extends TestCase
 
         $this->assertSame(14, $trialAsked(), 'a store that never had a plan: the whole trial');
 
-        // Approved with its trial, then the plan changed four days in: ten days left, never fourteen again.
+        // Approved with its trial.
         $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/1', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 14, 'createdAt' => now()->toIso8601String()]];
         app(ManageSubscription::class)->refresh($install->fresh());
+        $end = $install->fresh()->trial_ends_at;
+        $this->assertTrue($end->equalTo(now()->addDays(14)));
+
+        // The plan changed twice within minutes (up, then down again): no day is lost, and the end does not move.
+        foreach ([2 => 'Lets Essentials', 3 => 'Lets Growth'] as $id => $name) {
+            $this->travel(5)->minutes();
+            $days = $trialAsked();
+            $this->assertSame(14, $days, 'a part of a day left counts as a day: a plan change takes no day off the trial');
+            $this->subscriptions = [['id' => "gid://shopify/AppSubscription/{$id}", 'name' => $name, 'status' => 'ACTIVE', 'trialDays' => $days, 'createdAt' => now()->toIso8601String()]];
+            app(ManageSubscription::class)->refresh($install->fresh());
+            $this->assertTrue($install->fresh()->trial_ends_at->equalTo($end), 'the trial ends on the day it always did');
+        }
+
+        // Four days in: ten days left, never fourteen again; three hours later still ten, and the end kept is the first one.
         $this->travel(4)->days();
         $this->assertSame(10, $trialAsked());
         $this->travel(3)->hours();
-        $this->assertSame(9, $trialAsked(), 'whole days, rounded down: changing plans never lengthens it');
+        $this->assertSame(10, $trialAsked(), 'whole days, rounded up against the first end');
+        $this->subscriptions = [['id' => 'gid://shopify/AppSubscription/4', 'name' => 'Lets Growth', 'status' => 'ACTIVE', 'trialDays' => 10, 'createdAt' => now()->toIso8601String()]];
+        app(ManageSubscription::class)->refresh($install->fresh());
+        $this->assertTrue($install->fresh()->trial_ends_at->equalTo($end), 'Shopify\'s end, hours later, never moves the trial: it cannot creep one change at a time');
+
+        // A day later, changed again: still bounded by the first end, not by the last subscription's.
+        $this->travel(20)->hours();
+        $this->assertSame(10, $trialAsked());
+        $this->travel(5)->hours();
+        $this->assertSame(9, $trialAsked());
 
         // Removed and installed again within the trial: what is left of it.
         $this->webhook('app/uninstalled', ['id' => 7])->assertOk();

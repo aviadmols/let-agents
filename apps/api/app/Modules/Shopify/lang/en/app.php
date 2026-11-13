@@ -24,7 +24,7 @@ return [
     'plans_short_answers' => 'Too small: :limit AI answers a month, and there were already :has this month.',
     'plans_short_photos' => 'Too small: :limit photo searches a month, and there were already :has this month.',
     'plans_short_no_photos' => 'No photo search, and shoppers already searched by photo :has times this month.',
-    'plans_note' => 'An upgrade applies as soon as you approve it in Shopify; a smaller plan applies from the next billing period. Typed search is unlimited on every plan. When you reach a limit, search keeps working, and AI answers and photo searches wait for next month or an upgrade.',
+    'plans_note' => 'A change of plan, up or down, applies as soon as you approve it in Shopify. Typed search is unlimited on every plan. When you reach a limit, search keeps working, and AI answers and photo searches wait for next month or an upgrade.',
     'continue_title' => 'Continuing in Shopify',
     'continue_text' => 'The next step opens in the full Shopify window.',
     'continue' => 'Continue',
