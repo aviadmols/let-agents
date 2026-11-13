@@ -1355,6 +1355,9 @@ html.dark .fi-panel-merchant .lp-d-task:hover { background: var(--lp-d-card); }
 .fi-panel-merchant .lp-d-mail .lp-d-btn { margin-inline-start: auto; }
 .fi-panel-merchant .lp-d-mail-send { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-inline-start: auto; }
 .fi-panel-merchant .lp-d-mail-send .lp-d-btn { margin-inline-start: 0; }
+.fi-panel-merchant .lp-d-back { align-items: flex-start; box-shadow: inset 0 0 0 1px var(--lp-d-line, #e2e2e6); }
+.fi-panel-merchant .lp-d-back p { line-height: 1.55; }
+@media (max-width: 720px) { .fi-panel-merchant .lp-d-back { flex-wrap: wrap; } .fi-panel-merchant .lp-d-back .lp-d-mail-send { margin-inline-start: 0; } }
 .fi-panel-merchant .lp-d-mail-send input { height: 36px; min-width: 0; width: 230px; max-width: 100%; padding: 0 14px; border-radius: 999px; border: 1px solid var(--lp-d-line, #e2e2e6); background: var(--lp-d-paper, #fff); color: var(--lp-d-ink); font: inherit; font-size: 14px; }
 .fi-panel-merchant .lp-d-mail-send input:focus-visible { outline: 2px solid var(--lp-d-ink); outline-offset: 2px; }
 .fi-panel-merchant .lp-d-mail-frame { width: 100%; min-height: 1900px; border: 0; border-radius: var(--lp-d-r); background: #f6f6f7; }

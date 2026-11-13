@@ -5,7 +5,7 @@ return [
     'nav' => 'Plan and billing',
     'settings' => 'Settings',
     'lede' => 'Your plan, the store connection, your team and your account.',
-    'trial_text' => 'Your card is charged only when the trial ends. Cancel anytime.',
+    'trial_text' => 'Nothing is billed until the trial ends. Cancel anytime.',
     'free_text' => 'Your store isn’t charged for Lets.',
     'renews' => 'Renews on :date. Cancel anytime.',
     'cancel_any' => 'Cancel anytime.',

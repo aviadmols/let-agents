@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
+use App\Core\Facades\Settings;
 use App\Core\Filament\HasPeriod;
 use App\Core\Localization\Money;
 use App\Modules\Admin\Contracts\FirstStep;
@@ -327,6 +328,32 @@ final class ShopOverview extends Page
     public function reportFrequency(): string
     {
         return StoreReport::frequency($this->shop());
+    }
+
+    /**
+     * The day the store installed the app again while its deletion waited, in the reader's words; null when it did not.
+     * The data came back then, and the owner is told so until they close it (Shopify review, 13.11).
+     */
+    public function calledOff(): ?string
+    {
+        $day = (string) Settings::get('admin.deletion_called_off', (string) $this->shop()->id);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) !== 1) {
+            return null;
+        }
+
+        return Carbon::parse($day)->locale(app()->getLocale())->isoFormat(app()->getLocale() === 'he' ? 'D.M.YYYY' : 'MMMM D, YYYY');
+    }
+
+    /** "Got it": the welcome back leaves Today. */
+    public function closeCalledOff(): void
+    {
+        Settings::clear('admin.deletion_called_off', (string) $this->shop()->id);
+    }
+
+    /** The privacy page, where the store can be deleted again. */
+    public function privacyUrl(): string
+    {
+        return PrivacySettings::getUrl();
     }
 
     /** "Not now": the fix leaves Today until next week. */

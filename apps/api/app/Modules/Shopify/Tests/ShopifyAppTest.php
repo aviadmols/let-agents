@@ -249,6 +249,7 @@ final class ShopifyAppTest extends TestCase
         $this->assertFalse($shop->leaving(), 'coming back calls off the deletion');
         $this->assertNull($shop->deletion_asked_by);
         $this->assertSame(ShopStatus::Active, $shop->status, 'and the search is back on the site');
+        $this->assertSame(now()->toDateString(), (string) Settings::get('admin.deletion_called_off', (string) $shop->id), 'Today tells the owner the data came back');
     }
 
     public function test_a_new_store_starts_its_first_scan_at_install_once_and_a_store_installing_again_only_syncs(): void

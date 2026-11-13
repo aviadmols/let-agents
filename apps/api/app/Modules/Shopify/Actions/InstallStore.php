@@ -3,6 +3,7 @@
 namespace App\Modules\Shopify\Actions;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\ShopScan;
 use App\Modules\Admin\Enums\ShopRole;
@@ -100,9 +101,11 @@ final class InstallStore
                 'content_locale' => $language,
             ]);
 
-            // Installed again after asking for the shop to be deleted: it is kept, and the plan can start again.
+            // Installed again after asking for the shop to be deleted: it is kept, and the plan can start again. The
+            // owner is told so on Today (Shopify review, 13.11: the data came back with no word of it).
             if ($shop->leaving()) {
                 $shop->forceFill(['deletion_due_at' => null, 'deletion_asked_by' => null])->save();
+                Settings::set('admin.deletion_called_off', now()->toDateString(), (string) $shop->id);
             }
 
             // Paused until the merchant approves the subscription: the storefront stays quiet.

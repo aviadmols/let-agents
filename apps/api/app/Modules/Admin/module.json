@@ -14,6 +14,7 @@
         { "name": "shop_deletion_days", "type": "int", "default": 30, "min": 1, "max": 90, "scope": "global", "unit": "days" },
         { "name": "report_frequency", "type": "enum", "options": ["daily", "weekly", "monthly", "off"], "default": "weekly", "scope": "shop" },
         { "name": "report_sent", "type": "string", "default": "", "min": 0, "max": 40, "scope": "shop" },
+        { "name": "deletion_called_off", "type": "string", "default": "", "min": 0, "max": 10, "scope": "shop" },
         { "name": "reports_sending", "type": "int", "default": 0, "min": 0, "max": 1, "scope": "global" }
     ]
 }

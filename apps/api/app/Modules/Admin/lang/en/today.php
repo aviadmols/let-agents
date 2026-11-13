@@ -153,4 +153,12 @@ return [
         'too_many' => 'A few reports were sent in the last hour. Try again a little later.',
         'see' => 'See an example',
     ],
+
+    'back' => [
+        'title' => 'Welcome back: your data is here',
+        'text' => 'On :date you asked for this store to be deleted, and installed the app again before the deletion. So nothing was deleted: the catalogue, the questions, the searches and the settings are as you left them.',
+        'fresh' => 'Want to start from scratch? Delete the store again on the privacy page, and install the app after the deletion.',
+        'ok' => 'Got it',
+        'privacy' => 'To the privacy page',
+    ],
 ];

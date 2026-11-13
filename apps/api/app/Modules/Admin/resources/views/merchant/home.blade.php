@@ -11,6 +11,22 @@
 
     <div class="lp-page lp-d" data-home @if ($first) data-first-day @endif>
         <div class="lp-d-grid">
+            {{-- installed again while the deletion waited: nothing was deleted, and the owner hears it (Shopify review, 13.11) --}}
+            @php($calledOff = $this->calledOff())
+            @if ($calledOff)
+                <section class="lp-d-mail lp-d-back" role="status" data-called-off>
+                    <span class="lp-d-mail-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></span>
+                    <p>
+                        <b>{{ $t('back.title') }}</b><br>
+                        {{ $t('back.text', ['date' => $calledOff]) }} {{ $t('back.fresh') }}
+                    </p>
+                    <div class="lp-d-mail-send">
+                        <button type="button" class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" wire:click="closeCalledOff">{{ $t('back.ok') }}</button>
+                        <a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $this->privacyUrl() }}">{{ $t('back.privacy') }}</a>
+                    </div>
+                </section>
+            @endif
+
             @if (! $first)
                 {{-- the money through search, on ink --}}
                 @php($hero = $this->hero())

@@ -35,7 +35,7 @@ return [
 
     'delete' => [
         'title' => 'Delete the shop and all its data',
-        'help' => 'The shop, its catalogue, questions, leads, statistics and settings will be deleted for good. The search leaves the site at once and the plan is cancelled. The deletion itself happens after :days days, and until then you can change your mind.',
+        'help' => 'The shop, its catalogue, questions, leads, statistics and settings will be deleted for good. The search leaves the site at once and the plan is cancelled. The deletion itself happens after :days days. Until then you can change your mind: keeping the shop here, or installing the app again, calls off the deletion and brings all the data back.',
         'tip_export' => 'Download the shop\'s data first.',
         'type_name' => 'To confirm, type the shop\'s name: :name',
         'button' => 'Delete the shop',

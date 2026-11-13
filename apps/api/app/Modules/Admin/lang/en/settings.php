@@ -39,6 +39,10 @@ return [
         'label' => 'The last report sent',
         'description' => 'The period of the last report sent, so none is sent twice. Written by the system.',
     ],
+    'deletion_called_off' => [
+        'label' => 'Deletion called off by installing again',
+        'description' => 'The day the store installed the app again while its deletion was pending: Today tells the owner the data is back. Written by the system.',
+    ],
     'reports_sending' => [
         'label' => 'Sending store reports',
         'description' => '1 sends the store reports to the stores\' owners, as each chose. 0: no report is sent.',
