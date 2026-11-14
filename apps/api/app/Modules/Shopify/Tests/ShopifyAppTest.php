@@ -67,6 +67,9 @@ final class ShopifyAppTest extends TestCase
     /** A token Shopify has withdrawn: its calls answer 401. */
     private ?string $withdrawn = null;
 
+    /** What the fake Shopify refuses a new subscription with. */
+    private array $subscriptionErrors = [];
+
     /** What the fake store answers when the app writes its metafields. */
     private array $metafieldErrors = [];
 
@@ -107,7 +110,9 @@ final class ShopifyAppTest extends TestCase
                 str_contains($query, 'webPixelUpdate') => ['webPixelUpdate' => ['webPixel' => ['id' => 'gid://shopify/WebPixel/1'], 'userErrors' => []]],
                 str_contains($query, 'webPixel {') => ['webPixel' => ['id' => 'gid://shopify/WebPixel/1']],
                 str_contains($query, 'appSubscriptionCancel') => ['appSubscriptionCancel' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'CANCELLED'], 'userErrors' => []]],
-                str_contains($query, 'appSubscriptionCreate') => ['appSubscriptionCreate' => ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'PENDING'], 'confirmationUrl' => 'https://gueta-test.myshopify.com/admin/charges/confirm', 'userErrors' => []]],
+                str_contains($query, 'appSubscriptionCreate') => ['appSubscriptionCreate' => $this->subscriptionErrors !== []
+                    ? ['appSubscription' => null, 'confirmationUrl' => null, 'userErrors' => $this->subscriptionErrors]
+                    : ['appSubscription' => ['id' => 'gid://shopify/AppSubscription/1', 'status' => 'PENDING'], 'confirmationUrl' => 'https://gueta-test.myshopify.com/admin/charges/confirm', 'userErrors' => []]],
                 str_contains($query, 'activeSubscriptions') => ['currentAppInstallation' => ['activeSubscriptions' => $this->subscriptions], 'shop' => ['plan' => ['partnerDevelopment' => true]]],
                 str_contains($query, 'metafieldsSet') => ['metafieldsSet' => ['userErrors' => $this->metafieldErrors]],
                 str_contains($query, 'shopOwnerName') => ['shop' => ['shopOwnerName' => 'Dana Gueta']],
@@ -157,8 +162,11 @@ final class ShopifyAppTest extends TestCase
             $plan['test'],
         ], 'the chosen plan at its price every 30 days, in test mode on a development store');
 
-        // A link to a plan only works as we signed it.
-        $this->get(str_replace('plan=growth', 'plan=pro', self::choice($plans, 'growth')))->assertNotFound();
+        // A link to a plan only works as we signed it: one changed by hand asks Shopify for nothing, and goes back into
+        // the app through the store's admin.
+        $asked = collect($this->graphql)->filter(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate'))->count();
+        $this->get(str_replace('plan=growth', 'plan=pro', self::choice($plans, 'growth')))->assertRedirect('https://gueta-test.myshopify.com/admin/apps/test-key');
+        $this->assertSame($asked, collect($this->graphql)->filter(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate'))->count());
 
         Queue::assertPushed(FirstScanStep::class, fn (FirstScanStep $job): bool => $job->step === 'catalog' && $job->shopId === $shop->id);
 
@@ -667,18 +675,108 @@ final class ShopifyAppTest extends TestCase
         $this->assertStringStartsWith(rtrim((string) config('app.url'), '/').'/shopify/plans?', ShopifyAppController::plansLink(self::SHOP));
         $this->assertSame('https://gueta.panel.test/merchant', url('/merchant'), 'and the panel\'s own links stay where they are');
 
-        // Plan and billing left open past the link's hour: a press goes back there, in the frame, never to an error page
+        // Plan and billing left open for hours: a press still goes to Shopify's approval (11.2026: it went to the panel,
+        // which a store without a plan cannot open, and the reviewer saw nothing happen)
         $late = $framed(ShopifyAppController::planLink(self::SHOP, 'growth', 'en'));
         $this->travel(2)->hours();
-        $back = $this->get($late, ['Sec-Fetch-Dest' => 'iframe'])->assertRedirect();
-        $this->assertStringContainsString('/settings/plan?', (string) $back->headers->get('Location'));
-        $this->assertStringContainsString('host=YWRtaW4', (string) $back->headers->get('Location'));
-        $this->get(str_replace('plan=growth', 'plan=pro', $late))->assertNotFound();
+        $this->get($late, ['Sec-Fetch-Dest' => 'iframe'])
+            ->assertOk()
+            ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/charges\/confirm', false);
         $this->travelBack();
+
+        // a link changed by hand (another plan in a signed link): back into the app through the store's admin, never 404
+        $this->get(str_replace('plan=growth', 'plan=pro', $late), ['Sec-Fetch-Dest' => 'iframe'])
+            ->assertOk()
+            ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/apps\/test-key', false)
+            ->assertDontSee('admin\/charges\/confirm', false);
 
         // the store itself stays signed: another store's address in the same link is refused
         $this->get(str_replace('shop='.urlencode(self::SHOP), 'shop=another-store.myshopify.com', $framed(ShopifyAppController::plansLink(self::SHOP, 'en'))))
             ->assertNotFound();
+    }
+
+    public function test_a_plan_pressed_hours_after_the_plans_page_opened_still_reaches_shopifys_approval(): void
+    {
+        $install = $this->installed();
+        Log::spy();
+
+        // A new store, its plans page opened inside the admin, and left open (App Store review, 11 and 13.11.2026).
+        $plans = $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4', 'locale' => 'en'])))->assertOk();
+        $choice = self::choice($plans, 'growth');
+        $this->assertStringNotContainsString('expires=', $choice, 'the plan links do not run out');
+
+        $this->travel(2)->hours();
+        $this->get($choice, ['Sec-Fetch-Dest' => 'iframe'])
+            ->assertOk()
+            ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/charges\/confirm', false)
+            ->assertSee("window.open(url, '_top')", false);
+        $this->assertSame('pending', $install->fresh()->subscription_status, 'Shopify was asked for the subscription');
+
+        // A link made before links stopped running out, left open in a tab: still ours, still to the approval.
+        $old = URL::temporarySignedRoute('shopify.billing.start', now()->subHour(), ['shop' => self::SHOP, 'plan' => 'pro', 'locale' => 'en']);
+        $this->get($old)->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
+
+        // The plans themselves, from the panel's "change plan", a day later.
+        $link = ShopifyAppController::plansLink(self::SHOP, 'en');
+        $this->travel(1)->days();
+        $this->get($link)->assertOk()->assertSee('Choose a plan');
+
+        // Removed and installed again: the links of the page left open still work for the store.
+        $this->webhook('app/uninstalled', ['id' => 7])->assertOk();
+        $this->installed();
+        $this->get($choice, ['Sec-Fetch-Dest' => 'iframe'])->assertOk()->assertSee('admin\/charges\/confirm', false);
+
+        // A made-up link for the store: back into the app through its admin, which opens it with a fresh token; logged.
+        $forged = '/shopify/billing/start?'.http_build_query(['shop' => self::SHOP, 'plan' => 'growth', 'signature' => 'nope']);
+        $this->get($forged)->assertRedirect('https://gueta-test.myshopify.com/admin/apps/test-key');
+        $this->get('/shopify/plans?'.http_build_query(['shop' => self::SHOP, 'signature' => 'nope']), ['Sec-Fetch-Dest' => 'iframe'])
+            ->assertOk()
+            ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/apps\/test-key', false)
+            ->assertDontSee('3,412', false);
+        Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'signature') && $context['shop'] === self::SHOP);
+
+        // A store that does not have the app: nothing to open.
+        $this->get('/shopify/plans?'.http_build_query(['shop' => 'nobody.myshopify.com', 'signature' => 'nope']))->assertNotFound();
+    }
+
+    public function test_inside_the_admin_a_plan_is_chosen_with_the_session_token_and_a_refusal_is_logged(): void
+    {
+        $install = $this->installed();
+        Log::spy();
+
+        // The plans page presses through the session token inside the frame, and keeps each plan's signed link.
+        $this->get('/shopify/app?'.http_build_query(self::signed(['embedded' => '1', 'host' => 'YWRtaW4'])))
+            ->assertOk()
+            ->assertSee('\/shopify\/billing\/choose', false)
+            ->assertSee('bridge.idToken()', false)
+            ->assertSee('shopify/billing/start', false);
+
+        $choose = fn (array $body, ?string $token): TestResponse => $this->postJson('/shopify/billing/choose', $body, $token === null ? [] : ['Authorization' => 'Bearer '.$token]);
+
+        $choose(['plan' => 'growth'], self::idToken())
+            ->assertOk()
+            ->assertExactJson(['url' => 'https://gueta-test.myshopify.com/admin/charges/confirm']);
+        $this->assertSame('pending', $install->fresh()->subscription_status);
+
+        $choose(['plan' => 'growth'], null)->assertUnauthorized();
+        $choose(['plan' => 'growth'], self::idToken([], 'shpss_wrong'))->assertUnauthorized();
+        $choose(['plan' => 'growth'], self::idToken(['exp' => time() - 120]))->assertUnauthorized();
+        $choose(['plan' => 'gold'], self::idToken())->assertNotFound();
+        $choose(['plan' => 'growth'], self::idToken(['dest' => 'https://nobody.myshopify.com', 'iss' => 'https://nobody.myshopify.com/admin']))->assertNotFound();
+        Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'plan not offered') && $context['shop'] === self::SHOP);
+
+        // Shopify refusing the subscription is logged with the store, not lost.
+        $this->subscriptionErrors = [['field' => ['price'], 'message' => 'Price is too low']];
+        $this->withoutExceptionHandling();
+
+        try {
+            $choose(['plan' => 'growth'], self::idToken());
+            $this->fail('a refusal is not a success');
+        } catch (\RuntimeException $refused) {
+            $this->assertStringContainsString('Price is too low', $refused->getMessage());
+        }
+
+        Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context): bool => $message === 'Shopify refused the subscription' && $context['shop'] === self::SHOP && $context['plan'] === 'growth');
     }
 
     public function test_a_cancelled_plan_stops_billing_now_and_keeps_the_search_until_the_paid_period_ends(): void

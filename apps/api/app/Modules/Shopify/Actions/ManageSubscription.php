@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -129,24 +130,36 @@ final class ManageSubscription
     /** Where the merchant approves the plan in Shopify. */
     public function start(ShopifyInstall $install, string $returnUrl, ?Plan $plan = null): string
     {
-        $dev = (bool) ($this->api->query($install, 'query { shop { plan { partnerDevelopment } } }')['shop']['plan']['partnerDevelopment'] ?? false);
+        // Every failure on the way to Shopify's approval is logged with the store: a reviewer's "the button does
+        // nothing" must leave a trace (App Store review, 11.2026).
+        $context = ['shop' => $install->shop_domain, 'plan' => $plan?->code];
 
-        $answer = (array) ($this->api->query($install, self::CREATE, [
-            'name' => $plan?->billingName() ?? (string) Settings::get('shopify.plan_name'),
-            'returnUrl' => $returnUrl,
-            'trialDays' => self::trialDaysLeft($install),
-            'test' => $dev || (bool) Settings::get('shopify.billing_test'),
-            'lineItems' => [[
-                'plan' => ['appRecurringPricingDetails' => [
-                    'price' => ['amount' => $plan?->price() ?? (float) Settings::get('shopify.plan_price_usd'), 'currencyCode' => 'USD'],
-                    'interval' => 'EVERY_30_DAYS',
+        try {
+            $dev = (bool) ($this->api->query($install, 'query { shop { plan { partnerDevelopment } } }')['shop']['plan']['partnerDevelopment'] ?? false);
+
+            $answer = (array) ($this->api->query($install, self::CREATE, [
+                'name' => $plan?->billingName() ?? (string) Settings::get('shopify.plan_name'),
+                'returnUrl' => $returnUrl,
+                'trialDays' => self::trialDaysLeft($install),
+                'test' => $dev || (bool) Settings::get('shopify.billing_test'),
+                'lineItems' => [[
+                    'plan' => ['appRecurringPricingDetails' => [
+                        'price' => ['amount' => $plan?->price() ?? (float) Settings::get('shopify.plan_price_usd'), 'currencyCode' => 'USD'],
+                        'interval' => 'EVERY_30_DAYS',
+                    ]],
                 ]],
-            ]],
-        ])['appSubscriptionCreate'] ?? []);
+            ])['appSubscriptionCreate'] ?? []);
+        } catch (Throwable $failed) {
+            Log::error('Shopify subscription could not be asked for: '.$failed->getMessage(), $context + ['exception' => $failed::class]);
+
+            throw $failed;
+        }
 
         $url = $answer['confirmationUrl'] ?? null;
 
         if (! is_string($url) || ($answer['userErrors'] ?? []) !== []) {
+            Log::error('Shopify refused the subscription', $context + ['answer' => $answer['userErrors'] ?? $answer]);
+
             throw new RuntimeException('Shopify refused the subscription: '.json_encode($answer['userErrors'] ?? $answer));
         }
 

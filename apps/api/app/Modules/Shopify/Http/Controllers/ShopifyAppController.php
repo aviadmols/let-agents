@@ -18,6 +18,7 @@ use App\Modules\Shopify\Support\ShopifySessionToken;
 use App\Modules\Shopify\Support\ShopifySignatures;
 use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -25,6 +26,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Throwable;
@@ -38,7 +40,10 @@ use Throwable;
  *                                 in the admin's frame; a store without our token gets it on the
  *                                 spot, in exchange for the session token Shopify opened with
  *   GET /shopify/plans            the plans to choose from (a link we signed), before approving one
- *   GET /shopify/billing/start    the chosen plan, off to Shopify to approve it (a link we signed)
+ *   POST /shopify/billing/choose  the plan pressed inside the admin, with the session token App Bridge gives
+ *                                 the page: Shopify's approval address back, which the page opens in the window
+ *   GET /shopify/billing/start    the chosen plan, off to Shopify to approve it (a link we signed): the same
+ *                                 step where the page has no session token
  *   GET /shopify/billing/return   after the merchant approved (or not) the monthly plan
  *
  * Every request Shopify sends is signed, or carries its session token; a link older than a few
@@ -55,9 +60,6 @@ final class ShopifyAppController
     private const STATE_SECONDS = 600;
 
     private const MERCHANT_OVERVIEW_ROUTE = 'filament.merchant.pages.overview';
-
-    /** Plan and billing in the shop's panel, where a plan link that ran out returns. */
-    private const PLAN_SETTINGS_ROUTE = 'filament.merchant.pages.settings.plan';
 
     /** What Shopify opens the frame with, kept on every link inside it: never part of a signed link. */
     private const FRAME_QUERY = ['host', 'embedded'];
@@ -198,7 +200,7 @@ final class ShopifyAppController
         // approved, the plans again when it was declined. The app stays embedded throughout.
         $billing->refresh($install);
 
-        return redirect()->away('https://'.$install->shop_domain.'/admin/apps/'.ShopifyApps::key($install->client_id));
+        return redirect()->away(self::appInAdmin($install));
     }
 
     /** The plans a store chooses from: a signed link, from onward() or from the panel's "Connection and plan". */
@@ -208,7 +210,7 @@ final class ShopifyAppController
         $this->speak($request, $install);
 
         if ($install === null) {
-            return $this->expired($request) ?? response(__('shopify::app.bad_request'), 404);
+            return $this->reopen($request) ?? response(__('shopify::app.bad_request'), 404);
         }
 
         return $this->choosePlan($request, $install);
@@ -221,23 +223,68 @@ final class ShopifyAppController
         $plan = Plan::query()->offered()->where('code', (string) $request->query('plan'))->first();
         $this->speak($request, $install);
 
-        if ($install === null || $plan === null) {
-            return ($install === null ? $this->expired($request) : null) ?? response(__('shopify::app.bad_request'), 404);
+        if ($install === null) {
+            return $this->reopen($request) ?? response(__('shopify::app.bad_request'), 404);
         }
 
-        $approve = $billing->start($install, url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain])), $plan);
+        if ($plan === null) {
+            // a plan no longer offered (the page was opened before it changed): the plans as they are now
+            Log::warning('Shopify plan link names a plan not offered', ['shop' => $install->shop_domain, 'plan' => (string) $request->query('plan')]);
+
+            return $this->choosePlan($request, $install);
+        }
+
+        $approve = $billing->start($install, self::billingReturnUrl($install), $plan);
 
         return $this->outward($request, $approve, ShopifyApps::key($install->client_id), $install);
     }
 
-    /** A link to the plans, signed for this store, for an hour: the panel offers it as "change plan", in its language. */
-    public static function plansLink(string $shopDomain, ?string $locale = null): string
+    /**
+     * A plan pressed on the plans page inside the admin: the page sends the session token App Bridge gives it, which
+     * proves the store and never grows old with the page (App Store review, 11.2026: a plan pressed on a page left
+     * open past its links' hour did nothing). Shopify's approval address comes back, and the page opens it in the
+     * admin's window. Anything refused is answered as JSON, and the page falls back to the plan's signed link.
+     */
+    public function choosePlanByToken(Request $request, ManageSubscription $billing): JsonResponse
     {
-        return self::onAppAddress(fn (): string => URL::temporarySignedRoute('shopify.plans', now()->addHour(), ['shop' => $shopDomain] + self::speaking($locale)));
+        $claims = ShopifySessionToken::claims((string) $request->bearerToken());
+        $install = $claims === null ? null : ShopifyInstall::query()->where('shop_domain', $claims['shop'])->first();
+        $plan = Plan::query()->offered()->where('code', (string) $request->input('plan'))->first();
+        $refused = match (true) {
+            $claims === null => 'session token',
+            $install === null || ! $install->installed() => 'store not installed',
+            $install->client_id !== null && $install->client_id !== $claims['app'] => 'token of another app',
+            $plan === null => 'plan not offered',
+            default => null,
+        };
+
+        if ($refused !== null) {
+            Log::warning('Shopify plan choice refused: '.$refused, ['shop' => $claims['shop'] ?? null, 'plan' => (string) $request->input('plan')]);
+
+            return response()->json(['message' => __('shopify::app.bad_request')], $claims === null ? 401 : 404);
+        }
+
+        return response()->json(['url' => $billing->start($install, self::billingReturnUrl($install), $plan)]);
+    }
+
+    private static function billingReturnUrl(ShopifyInstall $install): string
+    {
+        return url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain]));
     }
 
     /**
-     * One plan, signed for this store, for an hour: off to Shopify to approve it (the panel's upgrade or downgrade).
+     * A link to the plans, signed for this store: the panel offers it as "change plan", in its language. It does not
+     * run out: a page left open for hours still works (App Store review, 11.2026), and it opens only this store's
+     * plans, whose approval Shopify asks of the store's own staff.
+     */
+    public static function plansLink(string $shopDomain, ?string $locale = null): string
+    {
+        return self::onAppAddress(fn (): string => URL::signedRoute('shopify.plans', ['shop' => $shopDomain] + self::speaking($locale)));
+    }
+
+    /**
+     * One plan, signed for this store, with no end: off to Shopify to approve it (the panel's upgrade or downgrade).
+     * Approving is Shopify's, by the store's staff signed in to its admin, so an old link can do no more than ask.
      * Inside the admin's frame it carries what Shopify opened the frame with ($frame: host, embedded), so the next
      * page in the frame has App Bridge too, which alone may take the frame's window to Shopify's approval.
      *
@@ -245,7 +292,7 @@ final class ShopifyAppController
      */
     public static function planLink(string $shopDomain, string $plan, ?string $locale = null, array $frame = []): string
     {
-        return self::onAppAddress(fn (): string => URL::temporarySignedRoute('shopify.billing.start', now()->addHour(), ['shop' => $shopDomain, 'plan' => $plan] + self::speaking($locale) + $frame));
+        return self::onAppAddress(fn (): string => URL::signedRoute('shopify.billing.start', ['shop' => $shopDomain, 'plan' => $plan] + self::speaking($locale) + $frame));
     }
 
     /**
@@ -340,26 +387,28 @@ final class ShopifyAppController
     }
 
     /**
-     * A link of ours whose hour ran out (Plan and billing left open, a press later): back to Plan and billing, whose
-     * links are fresh, in the frame as it was; never an error page. A link that was never ours gets nothing here.
+     * A plans link that is not good (changed by hand, or never ours): never an error page and never the panel, which
+     * needs a signed-in owner this store may not have yet (App Store review, 11.2026). Back into the app through the
+     * store's Shopify admin, which opens it with a fresh session token: the plans again for a store without a plan,
+     * its panel otherwise. Nothing of the store is shown here, so a made-up link learns nothing. Null for a store
+     * that does not have the app.
      */
-    private function expired(Request $request): ?RedirectResponse
+    private function reopen(Request $request): RedirectResponse|Response|null
     {
-        $ours = URL::hasCorrectSignature($request) || URL::hasCorrectSignature($request, true, self::FRAME_QUERY);
-        $shop = $ours && ! URL::signatureHasNotExpired($request) ? ShopifySignatures::shopDomain($request->query('shop')) : null;
+        $shop = ShopifySignatures::shopDomain($request->query('shop'));
         $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
 
-        if ($install === null || ! $install->installed() || $install->shop === null) {
+        if ($install === null || ! $install->installed()) {
             return null;
         }
 
-        $url = route(self::PLAN_SETTINGS_ROUTE, ['tenant' => $install->shop->slug]);
+        return $this->outward($request, self::appInAdmin($install), ShopifyApps::key($install->client_id), $install);
+    }
 
-        if (EmbeddedApp::framed($request)) {
-            $url .= '?'.http_build_query(['embedded' => '1', 'host' => (string) $request->query('host'), 'shop' => $install->shop_domain]);
-        }
-
-        return redirect()->to($url);
+    /** The app inside the store's Shopify admin, which opens it with a fresh session token. */
+    private static function appInAdmin(ShopifyInstall $install): string
+    {
+        return 'https://'.$install->shop_domain.'/admin/apps/'.ShopifyApps::key($install->client_id);
     }
 
     private function signedInstall(Request $request): ?ShopifyInstall
@@ -367,12 +416,23 @@ final class ShopifyAppController
         // Inside the admin's frame the panel adds what Shopify opened the frame with (host, embedded) to every link it
         // follows, this one too. They were never signed, and a signature that counted them refused every plan button
         // in the panel (App Store review, 11.2026). A link the plans page signed with them (choosePlan) is whole as it is.
-        // The store itself stays signed either way.
-        $signed = $request->hasValidSignature() || $request->hasValidSignatureWhileIgnoring(self::FRAME_QUERY);
+        // The store itself stays signed either way. Its age does not count: a link made while links still ran out
+        // (expires in it, left open in a tab) is still ours, and still asks no more than Shopify's approval.
+        $signed = URL::hasCorrectSignature($request) || URL::hasCorrectSignature($request, true, self::FRAME_QUERY);
         $shop = $signed ? ShopifySignatures::shopDomain($request->query('shop')) : null;
         $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
 
-        return $install !== null && $install->installed() ? $install : null;
+        if ($install === null || ! $install->installed()) {
+            Log::warning('Shopify plan link refused: '.($signed ? 'store not installed' : 'signature'), [
+                'shop' => (string) $request->query('shop'),
+                'path' => $request->path(),
+                'framed' => EmbeddedApp::framed($request),
+            ]);
+
+            return null;
+        }
+
+        return $install;
     }
 
     /**
@@ -390,7 +450,7 @@ final class ShopifyAppController
                 return $this->choosePlan($request, $install);
             }
 
-            $approve = $billing->start($install, url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain])));
+            $approve = $billing->start($install, self::billingReturnUrl($install));
 
             return $this->outward($request, $approve, ShopifyApps::key($install->client_id), $install);
         }

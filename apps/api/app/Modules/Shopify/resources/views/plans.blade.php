@@ -90,5 +90,53 @@
     </div>
     <p class="note">{{ __('shopify::app.plans_note') }}</p>
 </main>
+<script>
+    // Inside the admin's frame a press asks for the plan with the session token App Bridge gives the page, which never
+    // grows old with it (App Store review, 11.2026: a press on a page open for hours did nothing), and App Bridge
+    // takes the admin's window to Shopify's approval. Outside the frame, or whenever that does not answer, the plan's
+    // own signed link, as it is.
+    (function () {
+        var framed = false;
+        try { framed = window.top !== window.self; } catch (e) { framed = true; }
+        var chooseUrl = @json(route('shopify.billing.choose', [], false));
+
+        document.querySelectorAll('a.go[data-plan]').forEach(function (link) {
+            var busy = false;
+
+            link.addEventListener('click', function (event) {
+                var bridge = window.shopify;
+                if (!framed || !bridge || typeof bridge.idToken !== 'function' || !window.fetch) { return; }
+                event.preventDefault();
+                if (busy) { return; }
+                busy = true;
+                link.setAttribute('aria-busy', 'true');
+
+                var settled = false;
+                function viaLink() { if (!settled) { settled = true; window.location.href = link.href; } }
+                var timer = setTimeout(viaLink, 6000);
+
+                Promise.resolve(bridge.idToken())
+                    .then(function (token) {
+                        return fetch(chooseUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + token },
+                            body: JSON.stringify({ plan: link.getAttribute('data-plan') })
+                        });
+                    })
+                    .then(function (response) { if (!response.ok) { throw new Error('HTTP ' + response.status); } return response.json(); })
+                    .then(function (data) {
+                        if (settled) { return; }
+                        if (!data || typeof data.url !== 'string') { throw new Error('no url'); }
+                        settled = true;
+                        clearTimeout(timer);
+                        window.open(data.url, '_top');
+                        // still here a while later: the next press may try again
+                        setTimeout(function () { busy = false; link.removeAttribute('aria-busy'); }, 4000);
+                    })
+                    .catch(function () { clearTimeout(timer); viaLink(); });
+            });
+        });
+    })();
+</script>
 </body>
 </html>
