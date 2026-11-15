@@ -445,7 +445,14 @@ final class SimilarItemsTest extends TestCase
         $this->travel(10)->minutes();
         LoadedIndex::forget();
 
-        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
+        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'one not read, filed as it is ("Fashion"), stays');
+
+        // Naot QA, 15.11: a shoe cleaner no picture word was read of, filed "Miscellaneous", beside a derby shoe
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogProduct::query()->where('external_id', '303')->update(['payload' => ['product_type' => 'Miscellaneous']]));
+        $this->travel(10)->minutes();
+        LoadedIndex::forget();
+
+        $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'one not read, filed as another kind, goes');
 
         // Jean Rachel, 15.11: a set and a stack of bracelets are bracelets, both of them
         app(TenantContext::class)->run($this->shop->id, function (): void {

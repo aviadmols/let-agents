@@ -955,12 +955,23 @@ final class SearchCatalog
         }
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy(fn (RetrievalImage $r): string => (string) $r->external_id);
 
-        return array_values(array_filter($externalIds, function (string $id) use ($theirs, $ownKind, $known): bool {
+        $unread = [];
+        $kept = array_flip(array_filter($externalIds, function (string $id) use ($theirs, $ownKind, &$unread): bool {
             $words = array_values(array_filter((array) ($theirs->get($id)?->caption_words ?? []), 'is_string'));
             $kind = self::kindNouns((string) ($words[0] ?? ''));
+            if ($kind === []) {
+                $unread[] = $id;
 
-            return $kind === [] ? ! $known : array_intersect($kind, $ownKind) !== [];
+                return false;
+            }
+
+            return array_intersect($kind, $ownKind) !== [];
         }));
+        // one whose picture says nothing is what the store files it as: a shoe cleaner no picture word was read of was a
+        // shoe's alike (Naot QA, 15.11: "Innersole Refresher", filed "Miscellaneous", beside a derby shoe)
+        $filed = $known || $unread === [] ? [] : array_flip(app(ProductKinds::class)->sameKind($product, $unread));
+
+        return array_values(array_filter($externalIds, fn (string $id): bool => isset($kept[$id]) || isset($filed[$id])));
     }
 
     /** What its main picture says it is ("derby shoe": "shoe"), or [] when its picture was not read or says nothing. */
