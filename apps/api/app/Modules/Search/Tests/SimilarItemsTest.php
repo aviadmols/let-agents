@@ -8,6 +8,7 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Actions\BuildProductVariants;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -378,6 +379,42 @@ final class SimilarItemsTest extends TestCase
 
         $this->assertSame(['304', '303', '302'], array_column($this->similar('301', 3)->json('products'), 'external_id'),
             'its model in another colour; then a two-strap sandal, brown, before a black sandal on a toe post; the store\'s filing decides nothing');
+    }
+
+    public function test_by_its_picture_only_its_kind_and_its_people_and_the_rest_of_them_when_its_pictures_found_few(): void
+    {
+        // Naot QA, 15.11: footbeds beside a clog (its picture says "cork footbed"), women's models beside a man's sandal
+        // (the store saying nothing of whom), and a shoe with two alike in a store of thirty like it
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            $sizes = fn (int $from, int $to): array => array_map(fn (int $s): array => [
+                'external_id' => 'v'.$s.uniqid(), 'status' => 'publish', 'attributes' => [['key' => 'size', 'name' => 'Size', 'value' => (string) $s]],
+                'price' => ['price' => '200'], 'stock' => ['in_stock' => true], 'purchasable' => true,
+            ], range($from, $to));
+            foreach ([
+                '301' => ['Martin', ['sandals', 'two straps', 'cork footbed'], 40, 47],
+                '302' => ['Julius', ['fisherman sandal', 'closed toe'], 40, 47],
+                '303' => ['Rio', ['clogs', 'cork footbed'], 40, 47],
+                '304' => ['Footbed Classic', ['footbed', 'cork footbed', 'insole'], 40, 47],
+                '305' => ['Kayla', ['sandals', 'back strap'], 35, 41],
+                '306' => ['Arthur', ['sandal', 'two straps'], 40, 48],
+            ] as $id => [$title, $words, $from, $to]) {
+                $product = CatalogProduct::query()->where('external_id', $id)->first() ?? CatalogProduct::query()->create([
+                    'shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/{$id}",
+                    'price' => '200', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => [],
+                ]);
+                $product->update(['title' => $title, 'type' => 'variable', 'in_stock' => true, 'variations_count' => $to - $from + 1, 'payload' => ['variations' => $sizes($from, $to)]]);
+                app(BuildProductVariants::class)->product($product->refresh());
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words, 'caption_pattern' => ['covers' => 'none']]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        // its pictures found 302 and 303 alone (the stub): a clog is no sandal; the rest of the store fills in its kind
+        // and its people, never a footbed, never a woman's sandal by its sizes; two straps like its own before a fisherman's
+        $this->assertSame(['306', '302'], array_column($this->similar('301', 6)->json('products'), 'external_id'));
     }
 
     public function test_where_the_title_is_a_models_name_its_picture_says_what_its_alike_are(): void

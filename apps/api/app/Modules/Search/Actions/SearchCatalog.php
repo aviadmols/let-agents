@@ -939,30 +939,27 @@ final class SearchCatalog
     /**
      * Of these, those whose main picture shows the same kind of thing as its own. Its picture's words name the kind first
      * ("derby shoe", "sandals", "נעלי ספורט"); two kinds are one when they are named by the same noun ("slip-on shoe",
-     * "derby shoes"), or when either's noun is among the other's picture words. One whose picture was not read stays:
-     * nothing says it is another kind. A product whose own picture says nothing keeps them all.
+     * "derby shoes"), and only by what each picture says it is first: a clog's "cork footbed" made footbeds its alike
+     * (Naot QA, 15.11). One whose picture was not read stays: nothing says it is another kind. A product whose own
+     * picture says nothing keeps them all.
      *
      * @param  list<string>  $externalIds
      * @return list<string>
      */
-    private static function seenKind(CatalogProduct $product, array $externalIds): array
+    private static function seenKind(CatalogProduct $product, array $externalIds, bool $known = false): array
     {
         $ownWords = array_values(array_filter((array) (RetrievalImage::query()->where('product_id', $product->id)->value('caption_words') ?? []), 'is_string'));
         $ownKind = self::kindNouns((string) ($ownWords[0] ?? ''));
         if ($ownKind === [] || $externalIds === []) {
             return $externalIds;
         }
-        $ownAll = self::pictureWords($ownWords);
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy(fn (RetrievalImage $r): string => (string) $r->external_id);
 
-        return array_values(array_filter($externalIds, function (string $id) use ($theirs, $ownKind, $ownAll): bool {
+        return array_values(array_filter($externalIds, function (string $id) use ($theirs, $ownKind, $known): bool {
             $words = array_values(array_filter((array) ($theirs->get($id)?->caption_words ?? []), 'is_string'));
             $kind = self::kindNouns((string) ($words[0] ?? ''));
-            if ($kind === []) {
-                return true;
-            }
 
-            return array_intersect($kind, $ownKind) !== [] || array_intersect($ownKind, self::pictureWords($words)) !== [] || array_intersect($kind, $ownAll) !== [];
+            return $kind === [] ? ! $known : array_intersect($kind, $ownKind) !== [];
         }));
     }
 
@@ -975,19 +972,76 @@ final class SearchCatalog
     }
 
     /**
-     * Of these, those for its people: none that is for others only (a woman's sandal beside a man's). Where it says
-     * nothing of whom, or they say nothing, they stay.
+     * Of these, those for its people: none that is for others only (a woman's sandal beside a man's). Whom each is for
+     * as the store says it, else as its shoe sizes do (Naot QA, 15.11: a man's sandal had women's models beside it, the
+     * store saying nothing of whom on most of its products). Where nothing says, they stay.
      *
      * @param  list<string>  $externalIds
+     * @param  array<string, mixed>  $index
      * @return list<string>
      */
-    private function sameWhom(string $externalId, array $externalIds): array
+    private function sameWhom(string $externalId, array $externalIds, array $index): array
     {
-        $audiences = $this->audiencesOf([$externalId, ...$externalIds]);
-        $own = $audiences[$externalId] ?? [];
+        $said = $this->audiencesOf([$externalId, ...$externalIds]);
+        $sizes = self::sizeFacet($index);
+        $whom = fn (string $id): array => ($said[$id] ?? []) !== [] ? $said[$id] : self::sizedFor($index['records']['p:'.$id] ?? null, $sizes);
+        $own = $whom($externalId);
 
-        return $own === [] ? $externalIds : array_values(array_filter($externalIds, fn (string $id): bool => ($theirs = $audiences[$id] ?? []) === [] || array_intersect($theirs, $own) !== []));
+        return $own === [] ? $externalIds : array_values(array_filter($externalIds, fn (string $id): bool => ($theirs = $whom($id)) === [] || array_intersect($theirs, $own) !== []));
     }
+
+    /** The index's size filter, by its place among the filters: [at, values], or null. */
+    private static function sizeFacet(array $index): ?array
+    {
+        foreach ((array) ($index['facets'] ?? []) as $at => $facet) {
+            if (in_array((string) ($facet['k'] ?? ''), ['variant_size', 'size'], true)) {
+                return [(int) $at, (array) ($facet['v'] ?? [])];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whom a shoe is for by the sizes it is sold in (European sizes, 30 to 50): up to 43 and from 37 down a woman's,
+     * from 39 up and to 45 or more a man's, up to 34 a child's; none for anything else, or sizes that say both.
+     *
+     * @param  array<string, mixed>|null  $record
+     * @return list<string>
+     */
+    private static function sizedFor(?array $record, ?array $sizes): array
+    {
+        if ($record === null || $sizes === null) {
+            return [];
+        }
+        [$at, $values] = $sizes;
+        $numbers = [];
+        foreach ((array) ($record['v'] ?? []) as $variant) {
+            foreach ((array) ($variant[0] ?? []) as $code) {
+                if (intdiv((int) $code, 1000) === $at && is_numeric($label = $values[(int) $code % 1000]['l'] ?? null) && (float) $label >= 20 && (float) $label <= 50) {
+                    $numbers[] = (float) $label;
+                }
+            }
+        }
+        if (count($numbers) < 2) {
+            return [];
+        }
+        $low = min($numbers);
+        $high = max($numbers);
+
+        return match (true) {
+            $high <= 34 => ['kids'],
+            $high <= 43 && $low <= 37 => ['women'],
+            $low >= 39 && $high >= 45 => ['men'],
+            default => [],
+        };
+    }
+
+    /** By its picture, fewer alike than this are filled from the rest of its kind and its people... */
+    private const FILL_TO = 6;
+
+    /** ...read among at most this many of the store's products. */
+    private const FILL_FROM = 1500;
 
     /** A model of more products than this is a word of the store's, not a model ("Footbed"). */
     private const MODEL_MOST = 20;
@@ -1545,9 +1599,18 @@ final class SearchCatalog
             // its collections and offers ("Orthotic Friendly", "Classic Collection"), and a store typing all alike ("Fashion"):
             // they made a man's derby shoe's alike sandals, and left 61 of 300 sandals and shoes none at all (Naot, 15.11)
             $byPicture = $looksLead && preg_match('/^\p{Hebrew}/u', trim((string) $product->title)) !== 1 && self::pictureKind($product) !== [];
+            $filled = [];
             if ($byPicture) {
-                $ids = $this->sameWhom($externalId, self::seenKind($product, array_map('strval', $ids)));
+                $ids = $this->sameWhom($externalId, self::seenKind($product, array_map('strval', $ids)), $index);
                 $near = [];
+                // Few its pictures found: the rest of its kind and its people, from the whole store, after them (Naot QA,
+                // 15.11: a shoe had two alike in a store of thirty like it). Ordered later by shape, colour and stock.
+                $found = array_intersect($ids, [...$looks, ...$alike]);
+                if (count($found) < self::FILL_TO) {
+                    $rest = array_slice(array_values(array_diff(array_map(fn (string $key): string => substr($key, 2), array_filter(array_keys($index['records']), fn (string $key): bool => str_starts_with($key, 'p:'))), [...$ids, $externalId])), 0, self::FILL_FROM);
+                    $filled = $this->sameWhom($externalId, self::seenKind($product, array_map('strval', $rest), known: true), $index);
+                    $ids = [...$ids, ...$filled];
+                }
             } else {
                 // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
                 $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
@@ -1583,7 +1646,7 @@ final class SearchCatalog
             // and only what its pictures found near: one its words alone found is at most "maybe these". A kid's sneaker
             // was a man's boot's alike by "נעליים" and "נעלי" in their titles, and no picture near it (Chozen, 30.10)
             if ($looksLead && ! $otherColour && ($wants['words'] ?? []) === []) {
-                $seen = array_flip([...$looks, ...$alike]);
+                $seen = array_flip([...$looks, ...$alike, ...$filled]);
                 $ids = self::seenAlike($product, array_values(array_filter($ids, fn (string $id): bool => isset($seen[$id]))));
             }
             // what its look left out, as the store sells them now: never the product itself, and still all the question asked
