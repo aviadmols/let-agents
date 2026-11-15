@@ -306,6 +306,45 @@ final class AnswerQuestionTest extends TestCase
         $this->assertCount(3, $site->asked);
     }
 
+    /**
+     * Rocks, 15.11: "אפשר להגדיל למידה 59?" on the page of a ring made 46 to 50 went to the site's assistant as the
+     * store's question, without the ring, and its general answer was saved for every ring. Resizing goes about this
+     * product (where the sizes its page offers are read); when it arrives stays every page's one answer.
+     */
+    public function test_on_a_products_page_resizing_goes_to_the_sites_assistant_about_this_product_and_delivery_does_not(): void
+    {
+        Features::clearOverride('assistant.on_search', $this->shop->id);
+        $site = new class
+        {
+            /** @var list<array<string, mixed>> */
+            public array $asked = [];
+
+            public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false, array $thread = []): array
+            {
+                $this->asked[] = compact('question', 'products', 'fromPage');
+
+                return ['outcome' => 'answered', 'answer' => 'תשובה.', 'from' => 'model', 'sources' => [], 'picks' => []];
+            }
+        };
+        $this->app->instance(AnswerSiteQuestion::class, $site);
+
+        foreach (['אפשר להגדיל למידה 59?', 'אפשר להקטין את הטבעת?', 'כמה עולה הגדלה?', 'can it be resized?'] as $q) {
+            $this->assertTrue(AnswerQuestion::asksToResize($q), $q);
+        }
+        foreach (['כמה עולה משלוח?', 'אפשר להחזיר?', 'מה המידה שלה?'] as $q) {
+            $this->assertFalse(AnswerQuestion::asksToResize($q), $q);
+        }
+
+        $this->ask('אפשר להגדיל למידה 59?');
+        $this->ask('מתי זה יגיע?');
+
+        $this->assertSame([
+            ['question' => 'אפשר להגדיל למידה 59?', 'products' => ['31538'], 'fromPage' => true],
+            ['question' => 'מתי זה יגיע?', 'products' => [], 'fromPage' => false],
+        ], $site->asked);
+        $this->assertSame([], $this->model->calls, 'this page\'s own writer is never asked either');
+    }
+
     public function test_which_questions_on_a_products_page_are_the_stores(): void
     {
         foreach (['האם אפשר לשמור את המוצר ולבוא לראות אותו אצלכם?', 'אפשר לשריין?', 'האם אפשר לשריין את המוצר הזה?', 'יש משלוח חינם?', 'אפשר להחזיר אם לא מתאים?', 'is there a warranty?'] as $q) {

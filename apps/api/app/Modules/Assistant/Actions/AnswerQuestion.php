@@ -76,6 +76,9 @@ final class AnswerQuestion
         'shipping', 'deliver', 'arriv', 'return', 'refund', 'exchange', 'warranty', 'payment', 'installment', 'resiz',
     ];
 
+    /** Of STORE_WORDS, the ones that ask to resize this product: answered about it (asksToResize). */
+    private const RESIZE_WORDS = ['להגד(?:י)?ל', 'להקט(?:י)?נ', 'הגדלה', 'הגדלת', 'הקטנה', 'הקטנת', 'התאמת מידה', 'שינוי מידה', 'resiz'];
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -101,8 +104,11 @@ final class AnswerQuestion
             // A question about the store asked on a product's page ("תוך כמה זמן זה מגיע?", "אפשר להחזיר?")
             // goes to the site's answerer, which reads the store's pages; its barrier, saved answers and
             // limits apply there. One this product already has an answer to (the team's) stays here.
+            // Resizing is a service of the store, but how far depends on this product (a ring of 48 made 46 to 50): asked
+            // about this product, with the sizes its page offers, and kept for no other (Rocks, 15.11: "אפשר להגדיל למידה
+            // 59?" was answered from the store's general pages, and that answer was saved for every ring).
             if (! $onArticle && self::aboutTheStore($question) && Features::enabled('assistant.on_search', $shopId) && ! $this->answeredHere($externalId, $question)) {
-                return $this->bySite($shopId, $question, $visitorHash, $locale);
+                return $this->bySite($shopId, $question, $visitorHash, $locale, self::asksToResize($question) ? $externalId : null);
             }
 
             if (($stop = $this->guarded($shopId, $question, $visitorHash, $locale)) !== null) {
@@ -427,6 +433,14 @@ final class AnswerQuestion
         return preg_match('/(?<![\p{L}])[והבלש]?(?:'.implode('|', self::STORE_WORDS).')/u', $text) === 1;
     }
 
+    /** Whether a question on a product's page asks to make it bigger or smaller (RESIZE_WORDS): this product's, not every one's. */
+    public static function asksToResize(string $question): bool
+    {
+        $text = strtr(mb_strtolower($question), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
+
+        return preg_match('/(?<![\p{L}])[והבלש]?(?:'.implode('|', self::RESIZE_WORDS).')/u', $text) === 1;
+    }
+
     /** Whether this product already has a shown answer to the question (the team's, or one written before). */
     private function answeredHere(string $externalId, string $question): bool
     {
@@ -440,13 +454,16 @@ final class AnswerQuestion
      * The site's answer to a store question asked on a product's page, in this answerer's shape. Asked as
      * the store's question, not bound to the product: delivery and returns are the same on every page, so
      * the answer is saved and shared like one from the search box. Quotes from the store's pages come with
-     * it when the answer could not be checked.
+     * it when the answer could not be checked. With $about, a question about this product (resizing it): asked
+     * from its page, about it, and kept for no other.
      *
      * @return array{outcome: string, answer: string, from: string, source?: string, sources?: list<array<string, mixed>>, quotes?: list<array<string, mixed>>}
      */
-    private function bySite(string $shopId, string $question, string $visitorHash, string $locale): array
+    private function bySite(string $shopId, string $question, string $visitorHash, string $locale, ?string $about = null): array
     {
-        $site = app(AnswerSiteQuestion::class)->handle($shopId, $question, $visitorHash, $locale);
+        $site = $about === null
+            ? app(AnswerSiteQuestion::class)->handle($shopId, $question, $visitorHash, $locale)
+            : app(AnswerSiteQuestion::class)->handle($shopId, $question, $visitorHash, $locale, [$about], [], true);
 
         return array_filter([
             'outcome' => (string) ($site['outcome'] ?? 'unavailable'),
