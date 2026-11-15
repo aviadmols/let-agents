@@ -74,6 +74,18 @@
 
   // a word's consonants: its first letter, then the rest without the letters that stand for vowels (א ו י, and a last ה; a ה within is a sound: "צהוב"), as Hebrew
   // typed fast drops, adds or swaps them. The same on the server (HebrewSearch::skeleton).
+  var LATIN_WORD = /^[a-z]+$/;
+  /** Whether two words are one letter apart: one changed, one more or one less (as PHP's levenshtein() of 1). */
+  function oneEditApart(a, b) {
+    if (a === b || Math.abs(a.length - b.length) > 1) { return false; }
+    var i = 0, j = 0, edits = 0;
+    while (i < a.length && j < b.length) {
+      if (a.charAt(i) === b.charAt(j)) { i++; j++; continue; }
+      if (++edits > 1) { return false; }
+      if (a.length > b.length) { i++; } else if (a.length < b.length) { j++; } else { i++; j++; }
+    }
+    return edits + (a.length - i) + (b.length - j) === 1;
+  }
   function skeleton(word) {
     if (!HEBREW_WORD.test(word)) {
       return word;
@@ -263,6 +275,11 @@
         // word the store has as typed ("ראש" is a head), the nearer in length first ("ריישי" before "ראש" for "ראישי")
         if (length >= 3 && candidate !== variant && Math.abs(candidate.length - length) <= 2 && !Object.prototype.hasOwnProperty.call(index.holders, variant) && skeleton(variant).length >= 2 && skeleton(candidate) === skeleton(variant)) {
           score = Math.max(score, 0.87 - 0.02 * Math.abs(candidate.length - length));
+        }
+        // an English word a letter off one the store writes ("blak" for "black", "brwn" for "brown"): that word; never a word the
+        // store writes as typed (the server's closeWords). Naot QA, 16.11: "blak sandels" left "blak" not on the site
+        if (length >= 4 && LATIN_WORD.test(variant) && LATIN_WORD.test(candidate) && candidate !== variant && Math.abs(candidate.length - length) <= 1 && !Object.prototype.hasOwnProperty.call(index.holders, variant) && oneEditApart(variant, candidate)) {
+          score = Math.max(score, 0.86);
         }
         if (colour !== null && colorOf(candidate) === colour) {
           score = Math.max(score, 0.95);
@@ -980,6 +997,10 @@
     }
     if (hebrew && word.length >= 4 && sound(typed) === sound(word)) {
       return 4;
+    }
+    // an English word of four letters a slip off a value's ("blak" for "Black": Naot QA, 16.11), as the server reads it
+    if (READ_LATIN.test(typed) && READ_LATIN.test(word) && typed.length >= 4 && word.length >= 4 && slips(typed, word, 1) <= 1) {
+      return 5;
     }
     if (typed.length >= 5 && word.length >= 5) {
       var max = Math.min(typed.length, word.length) >= 8 ? 2 : 1;

@@ -132,6 +132,19 @@
     if (aligned) {
       reads.forEach(function (r) { r.at = r.at.map(function (i) { return pieces[i]; }).filter(function (j, k, all) { return all.indexOf(j) === k; }); });
     }
+    // whom it is for in any of its forms ("man", "men's", "ladies"), where the store filters by whom: that filter's value
+    // ("man sandals" left the Men filter off: Naot QA, 16.11)
+    var g = (S.facets || []).map(function (f) { return f.k; }).indexOf('audience');
+    if (g >= 0) {
+      var taken = {};
+      reads.forEach(function (r) { (r.at || []).forEach(function (j) { taken[j] = 1; }); });
+      words.forEach(function (w, j) {
+        var whom = taken[j] ? null : whomOf(E.normalize ? E.normalize(w) : w), at = whom ? (S.facets[g].v || []).map(function (v) { return v.k; }).indexOf(whom) : -1;
+        if (at < 0 || c.no[g * 1000 + at] || reads.some(function (r) { return r.code === g * 1000 + at; })) { return; }
+        var v = S.facets[g].v[at];
+        reads.push({ code: g * 1000 + at, g: g, at: [j], tiers: [0], part: false, label: v.l, title: String(S.facets[g].l || ''), k: v.k });
+      });
+    }
     return reads;
   }
   // whether a value read holds any of the results on its own: one no result carries is let go before anything else

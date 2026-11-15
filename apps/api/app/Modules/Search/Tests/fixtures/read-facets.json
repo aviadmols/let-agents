@@ -1,5 +1,5 @@
 {
-  "about": "Three stores in small: jewellery (Rocks), hardware (Gueta) and tours (Gil Travel). Their filters, their word families and a few products whose words are the catalogue's, as the live indexes had them on 1.11.2026.",
+  "about": "Four stores in small: jewellery (Rocks), hardware (Gueta), tours (Gil Travel) and English shoes (Naot's demo, 16.11: a slip in a four-letter English word). Their filters, their word families and a few products whose words are the catalogue's, as the live indexes had them on 1.11.2026.",
   "stores": {
     "jewellery": {
       "facets": [
@@ -45,6 +45,19 @@
         {"id": "p:2", "title": "A 10-Day Jewish Odyssey", "keywords": "israel"}
       ],
       "counts": {}
+    },
+    "shoes": {
+      "facets": [
+        {"k": "variant_color", "l": "Colour", "v": [{"k": "black", "l": "Black"}, {"k": "brown", "l": "Brown"}, {"k": "beige", "l": "Beige"}]},
+        {"k": "type", "l": "Type", "v": [{"k": "sandals", "l": "Sandals"}, {"k": "shoes", "l": "Shoes"}]}
+      ],
+      "families": [],
+      "counts": {},
+      "items": [
+        {"id": "p:1", "title": "Kayla - 034 Black Matte", "keywords": "sandals black leather"},
+        {"id": "p:2", "title": "Chief - SY7 Brown Combo", "keywords": "derby shoe brown leather"},
+        {"id": "p:3", "title": "Tahoe", "keywords": "sandal beige"}
+      ]
     }
   },
   "expected": {
@@ -74,6 +87,12 @@
       "jewish heritag tours": [[0, "exact"]],
       "kosher cruise": [],
       "6 nights spain": [[1001, "exact"]]
+    },
+    "shoes": {
+      "blak sandels": [[0, "slip"], [1000, "slip"]],
+      "brwn shoes": [[1, "slip"], [1001, "exact"]],
+      "black sandals": [[0, "exact"], [1000, "exact"]],
+      "beige": [[2, "exact"]]
     }
   }
 }

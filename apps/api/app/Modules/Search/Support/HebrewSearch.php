@@ -776,6 +776,10 @@ final class HebrewSearch
         if ($hebrew && mb_strlen($word) >= 4 && self::sound($typed) === self::sound($word)) {
             return 4;
         }
+        // an English word of four letters a slip off a value's ("blak" for "Black": Naot QA, 16.11), as the browser reads it
+        if (preg_match('/^[a-z]+$/', $typed) === 1 && preg_match('/^[a-z]+$/', $word) === 1 && strlen($typed) >= 4 && strlen($word) >= 4 && self::slips($typed, $word, 1) <= 1) {
+            return 5;
+        }
         if (mb_strlen($typed) >= 5 && mb_strlen($word) >= 5) {
             $max = min(mb_strlen($typed), mb_strlen($word)) >= 8 ? 2 : 1;
             if (self::slips($typed, $word, $max) <= $max) {
@@ -1426,6 +1430,13 @@ final class HebrewSearch
                 if ($length >= 3 && $candidate !== $variant && abs(mb_strlen($candidate) - $length) <= 2 && ! isset($index['holders'][$variant])
                     && mb_strlen(self::skeleton($variant)) >= 2 && self::skeleton($candidate) === self::skeleton($variant)) {
                     $score = max($score, 0.87 - 0.02 * abs(mb_strlen($candidate) - $length));
+                }
+
+                // an English word a letter off one the store writes ("blak" for "black", "brwn" for "brown"): that word; never a word
+                // the store writes as typed (the browser's closeWords). Naot QA, 16.11: "blak sandels" left "blak" not on the site
+                if ($length >= 4 && preg_match('/^[a-z]+$/', $variant) === 1 && preg_match('/^[a-z]+$/', $candidate) === 1 && $candidate !== $variant
+                    && abs(strlen($candidate) - $length) <= 1 && ! isset($index['holders'][$variant]) && levenshtein($variant, $candidate) === 1) {
+                    $score = max($score, 0.86);
                 }
 
                 if ($colour !== null && self::colorOf($candidate) === $colour) {
