@@ -2039,6 +2039,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $forward = $choices === [] ? self::forwardOnYes($this->asked, $answer, $this->conversation, $locale) : null;
                 $answer = $choices !== [] ? $answer : ($forward
                     ?? self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain($answer, $this->conversation, $locale), $this->conversation), $locale));
+                // a size asked on a product's page: the sizes it comes in, said by code when the writer left them out
+                $viewed = self::viewingOf($prepared);
+                if ($forward === null && $choices === [] && $refusal === null && is_string($viewed) && isset($productsByRef[$viewed])) {
+                    $answer = self::withSizes($answer, $this->asked !== '' ? $this->asked : $question, (array) ($productsByRef[$viewed]['sizes'] ?? []), $locale);
+                }
                 // an offer that applies to this product from a least price says that amount, in the store's own sentence
                 if ($forward === null && $choices === [] && $this->codeRules()) {
                     $answer = self::withLeastPrice($answer, (array) ($analysis['price_minimums'] ?? []), self::viewingOf($prepared), $cited, $byRef);
@@ -2728,6 +2733,52 @@ final class AnswerSiteQuestion implements TriesQuestions
      * person ("כדי לדעת אם קיצור מתאים לשרשרת הזו, צריך לבדוק אותה").
      */
     private const UNSETTLED = '/(?:צריך|יש|כדאי|נדרש|נצטרך)\s+(?:ל)?בדוק|אפשר\s+לבדוק\s+(?:את\s+האפשרות|אם|מול)|לבדוק\s+(?:אותה|אותו|אותם|מול)|מול\s+הצוות|(?:ו?נבדוק|הצוות\s+(?:בודק|יבדוק))(?![\p{L}])|(?:לא\s+ניתן|אי\s+אפשר)\s+לדעת|לא\s+(?:מצוין|מצוינת|מצוינים|כתוב|כתובה|כתובים|מופיע|מופיעה|ידוע|ידועה|מפורט|מפורטת)(?![\p{L}])|אין\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים)(?![\p{L}])|\bneeds?\s+to\s+be\s+checked\b|\bcan(?:not|\'t)\s+(?:know|tell)\b|\bnot\s+(?:stated|mentioned|listed|specified)\b/iu';
+
+    /** A question about a size: its word, or making it bigger or smaller. */
+    private const ASKS_SIZE = '/מיד(?:ה|ות|ת|תי|תה|תו)(?![\p{L}])|(?<![\p{L}])sizes?(?![\p{L}])|resiz|להגד(?:י)?ל|להקט(?:י)?נ|הגדלה|הגדלת|הקטנה|הקטנת/iu';
+
+    /**
+     * A size asked on a product's page is answered with the sizes the product comes in, by code when the writer left
+     * them out: given the ring's sizes, half the answers to "אפשר להגדיל למידה 59?" said "outside the range shown" with
+     * no range (Rocks, 15.11). One sentence first, in the store's voice; an answer that names any of them stays as it is.
+     *
+     * @param  list<string>  $sizes  as candidates() read them
+     */
+    public static function withSizes(string $answer, string $question, array $sizes, string $locale): string
+    {
+        $sizes = array_values(array_filter(array_map(fn ($size): string => trim((string) $size), $sizes), fn (string $size): bool => $size !== ''));
+
+        if (trim($answer) === '' || $sizes === [] || preg_match(self::ASKS_SIZE, $question) !== 1) {
+            return $answer;
+        }
+
+        foreach ($sizes as $size) {
+            if (preg_match('/(?<![\p{L}\d.])'.preg_quote($size, '/').'(?![\p{L}\d]|\.\d)/u', $answer) === 1) {
+                return $answer;
+            }
+        }
+
+        return (string) __('assistant::answers.site.sizes_offered', ['sizes' => self::sizeList($sizes)], $locale === 'en' ? 'en' : 'he').' '.ltrim($answer);
+    }
+
+    /**
+     * Sizes as a shopper reads them: whole numbers one after another as a range ("46–50"), anything else listed.
+     *
+     * @param  list<string>  $sizes
+     */
+    private static function sizeList(array $sizes): string
+    {
+        $whole = array_map(fn (string $size): ?int => preg_match('/^\d{1,3}$/', $size) === 1 ? (int) $size : null, $sizes);
+
+        if (count($sizes) >= 3 && ! in_array(null, $whole, true)) {
+            sort($whole);
+            if ($whole === range($whole[0], $whole[count($whole) - 1])) {
+                return $whole[0].'–'.$whole[count($whole) - 1];
+            }
+        }
+
+        return implode(', ', array_slice($sizes, 0, 20));
+    }
 
     /** A closing offer to reach the store's team for the shopper: to word a request, to contact or write to them. */
     private const TEAM_OFFER = '/צוות|לנסח|ניסוח|(?<![\p{L}])ה?פני(?:י)?ה(?![\p{L}])|לפנות|ליצור\s+קשר|ו?וו?א?טסאפ|whatsapp|\bteam\b|\bcontact\b|reach\s+out|\bword\s+(?:a|the|your)\s+(?:request|message)\b/iu';

@@ -64,6 +64,23 @@ final class OfferedAgainTest extends TestCase
         $this->assertSame($chart, AnswerSiteQuestion::teamWhenUnsettled($chart, 'he'), 'checking a size in the chart is no question left to a person');
     }
 
+    /** Rocks, 15.11: half the answers to "can it be made 59?" said "outside the range shown" and named no range. */
+    public function test_a_size_asked_on_a_products_page_is_answered_with_the_sizes_it_comes_in(): void
+    {
+        $ring = ['46', '47', '48', '49', '50'];
+        $vague = 'מידה 59 היא מעבר לטווח המידות שמופיע לטבעת הזו. צוות החנות ישמח לעזור לכם.';
+
+        $this->assertSame('המוצר הזה מוצע במידות 46–50. '.$vague, AnswerSiteQuestion::withSizes($vague, 'אפשר להגדיל למידה 59?', $ring, 'he'));
+        $this->assertSame('This product comes in sizes 46–50. '.$vague, AnswerSiteQuestion::withSizes($vague, 'can it be resized to 59?', $ring, 'en'));
+
+        $named = 'הטבעת הזו מוצעת במידות 46–50, ולכן מידה 59 לא מופיעה בטווח שלה.';
+        $this->assertSame($named, AnswerSiteQuestion::withSizes($named, 'אפשר להגדיל למידה 59?', $ring, 'he'), 'an answer that names them stays');
+        $this->assertSame($vague, AnswerSiteQuestion::withSizes($vague, 'מאיזה זהב הטבעת?', $ring, 'he'), 'a question of no size');
+        $this->assertSame($vague, AnswerSiteQuestion::withSizes($vague, 'אפשר להגדיל למידה 59?', [], 'he'), 'a product of no sizes');
+        $this->assertSame('המוצר הזה מוצע במידות S, M, L. '.$vague, AnswerSiteQuestion::withSizes($vague, 'יש במידה XL?', ['S', 'M', 'L'], 'he'), 'sizes that are no numbers, listed');
+        $this->assertSame('המוצר הזה מוצע במידות 6.5, 7, 8. '.$vague, AnswerSiteQuestion::withSizes($vague, 'יש במידה 9?', ['6.5', '7', '8'], 'he'));
+    }
+
     public function test_a_reply_that_says_the_answer_before_again_hands_over_to_the_team(): void
     {
         $again = "השרשרת הזו אפשר לקצר קבוע רק אם מבנה החוליות והסוגר מאפשרים את זה, ובשרשרת עם חוליות גדולות האורך הסופי יכול להשתנות בקפיצות לפי גודל כל חוליה.\n\nכדי לדעת אם זה מתאים בדיוק לשרשרת הזו, צריך לבדוק אותה.";

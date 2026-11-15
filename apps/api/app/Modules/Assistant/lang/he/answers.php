@@ -24,6 +24,7 @@ return [
     ],
     'site' => [
         'team_glad' => 'צוות החנות ישמח לעזור לכם.',
+        'sizes_offered' => 'המוצר הזה מוצע במידות :sizes.',
         'team_check' => 'את זה צריך לבדוק מול הצוות שלנו. צוות החנות ישמח לעזור לכם.',
         // a "yes" to the offer the answer closed with, that the writer did not carry forward
         'which_item' => 'בשמחה. על איזה מוצר מדובר? כתבו את שם המוצר או את המק"ט.',

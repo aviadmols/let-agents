@@ -24,6 +24,7 @@ return [
     ],
     'site' => [
         'team_glad' => 'The store\'s team will be glad to help you.',
+        'sizes_offered' => 'This product comes in sizes :sizes.',
         'team_check' => 'This is one for our team to check. The store\'s team will be glad to help you.',
         // a "yes" to the offer the answer closed with, that the writer did not carry forward
         'which_item' => 'Gladly. Which product is it? Write its name or SKU.',
