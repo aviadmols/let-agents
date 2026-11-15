@@ -4,7 +4,10 @@ namespace App\Modules\Ai\Filament\Operator\Pages;
 
 use App\Core\Facades\Settings;
 use App\Core\Settings\InvalidSettingValue;
+use App\Core\Tenancy\TenantContext;
+use App\Modules\Ai\Contracts\CreditBook;
 use App\Modules\Ai\Contracts\SpendGuard;
+use App\Modules\Ai\Models\AiCredit;
 use App\Modules\Ai\Support\MonthlySpendGuard;
 use App\Modules\Ai\Support\UsageStrip;
 use App\Modules\Runs\Models\Run;
@@ -100,7 +103,8 @@ final class ShopBudgets extends Page
     public function edit(string $shopId): void
     {
         $this->editing = $shopId;
-        $this->cap = (string) app(SpendGuard::class)->capFor($shopId);
+        // the shop's own allowance, never with the credits it bought: saved back, they would become its allowance for good
+        $this->cap = (string) Settings::get('ai.shop_monthly_cap_usd', $shopId);
         $this->stops = (bool) Settings::get('ai.shop_cap_stops_shoppers', $shopId);
         $this->resetErrorBag();
     }
@@ -145,6 +149,34 @@ final class ShopBudgets extends Page
         }
 
         $this->editing = null;
+    }
+
+    /** @return list<array{code: string, usd: float, price: float}> */
+    public function packs(): array
+    {
+        return app(CreditBook::class)->packs();
+    }
+
+    public function creditsLeft(string $shopId): float
+    {
+        return app(CreditBook::class)->balance($shopId);
+    }
+
+    /** A pack the shop asked the team for (it is billed by hand, or Shopify purchases are off): active at once. */
+    public function grant(string $shopId, string $code): void
+    {
+        $shop = Shop::query()->find($shopId);
+        $pack = app(CreditBook::class)->pack($code);
+
+        if ($shop === null || $pack === null) {
+            return;
+        }
+
+        app(TenantContext::class)->run((string) $shop->id, fn () => AiCredit::query()->create([
+            'shop_id' => $shop->id, 'pack' => $pack['code'], 'usd' => $pack['usd'], 'price_usd' => $pack['price'],
+            'source' => 'team', 'status' => AiCredit::ACTIVE, 'activated_at' => now(),
+        ]));
+        Notification::make()->success()->title(__('ai::budget.screen.form.granted', ['shop' => $shop->name, 'usd' => self::money($pack['usd'])]))->send();
     }
 
     public static function defaultCap(): float

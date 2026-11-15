@@ -95,7 +95,11 @@
   // backwards, and the full stop after "info@store.co.il." still ends the Hebrew sentence (Rocks, 28.10). A short
   // one is never broken across two lines.
   var LTR_WORD = /^([("'״]*)([^\s֐-׿؀-ۿ]*?)([.,;:!?)"'״]*)$/;
+  // an email address in an answer, with whatever is joined to it ("ל־info@store.co.il."): to press, as Aviad asked (15.11)
+  var EMAIL_WORD = /^(.*?)([A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})([.,;:!?)"'״]*)$/;
   function ltrWord(w) {
+    var e = EMAIL_WORD.exec(w);
+    if (e) { return esc(e[1]) + '<bdi dir="ltr"><a class="ls-answer__page-link" href="mailto:' + esc(e[2]) + '">' + esc(e[2]) + '</a></bdi>' + esc(e[3]); }
     var m = LTR_WORD.exec(w);
     // a link a store's own word gave ("https://maps.app.goo.gl/…"): to press, by the name of its site
     if (m && /^https?:\/\/[^/]/i.test(m[2])) { return esc(m[1]) + '<bdi dir="ltr"><a class="ls-answer__page-link" href="' + esc(m[2]) + '" target="_blank" rel="noopener">' + esc(m[2].replace(/^https?:\/\/(?:www\.)?/i, '').split(/[/?#]/)[0]) + '</a></bdi>' + esc(m[3]); }

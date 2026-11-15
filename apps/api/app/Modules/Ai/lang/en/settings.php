@@ -17,4 +17,24 @@ return [
         'label' => 'Warning before the allowance ends',
         'description' => 'From what share used the top bar is marked as near the end, for the operator and the shop manager.',
     ],
+    'credit_pack_small_usd' => [
+        'label' => 'Small credit pack',
+        'description' => 'How many dollars of model work the small pack adds to a shop allowance. The shop pays this amount times the markup.',
+    ],
+    'credit_pack_medium_usd' => [
+        'label' => 'Medium credit pack',
+        'description' => 'How many dollars of model work the medium pack adds to a shop allowance.',
+    ],
+    'credit_pack_large_usd' => [
+        'label' => 'Large credit pack',
+        'description' => 'How many dollars of model work the large pack adds to a shop allowance.',
+    ],
+    'credit_markup' => [
+        'label' => 'Credit price markup',
+        'description' => 'A shop pays for a pack what it costs us times this number (10: a pack of $10 of work costs $100).',
+    ],
+    'credit_requests_to' => [
+        'label' => 'Where credit requests go',
+        'description' => 'A shop that does not buy by itself (WooCommerce, a private Shopify app, or while Shopify purchases are off) sends its request to this address, and the team adds the pack.',
+    ],
 ];

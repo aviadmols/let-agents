@@ -66,6 +66,13 @@
                                                 @enderror
                                                 <label class="la-switch"><input type="checkbox" wire:model="stops"> {{ __('ai::budget.screen.form.stops') }}</label>
                                                 <p class="la-note">{{ __('ai::budget.screen.form.note') }}</p>
+                                                {{-- a pack the shop asked for (it pays the team, or Shopify purchases are off): added here, active at once --}}
+                                                <p class="la-note" data-credits-left>{{ __('ai::budget.screen.form.credits', ['left' => \App\Modules\Ai\Filament\Operator\Pages\ShopBudgets::money($this->creditsLeft($row['id']))]) }}</p>
+                                                <div class="la-toolbar">
+                                                    @foreach ($this->packs() as $pack)
+                                                        <button type="button" class="la-btn la-btn-sm" wire:click="grant(@js($row['id']), @js($pack['code']))" wire:confirm="{{ __('ai::budget.screen.form.grant', ['name' => __('ai::credits.packs.'.$pack['code']), 'usd' => \App\Modules\Ai\Filament\Operator\Pages\ShopBudgets::money($pack['usd'])]) }}?" data-grant="{{ $pack['code'] }}">{{ __('ai::budget.screen.form.grant', ['name' => __('ai::credits.packs.'.$pack['code']), 'usd' => \App\Modules\Ai\Filament\Operator\Pages\ShopBudgets::money($pack['usd'])]) }}</button>
+                                                    @endforeach
+                                                </div>
                                                 <div class="la-actions">
                                                     <button type="submit" class="la-btn la-btn-primary">{{ __('ai::budget.screen.form.save') }}</button>
                                                     <button type="button" class="la-btn la-btn-quiet" wire:click="cancel">{{ __('ai::budget.screen.form.cancel') }}</button>
