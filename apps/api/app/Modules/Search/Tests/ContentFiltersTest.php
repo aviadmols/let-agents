@@ -106,6 +106,11 @@ final class ContentFiltersTest extends TestCase
         $this->assertSame(['israel', 1000.0], [HebrewSearch::priceRange('israel max price 1000$')[0], HebrewSearch::priceRange('israel max price 1000$')[2]]);
         $this->assertSame(1500.0, HebrewSearch::priceRange('tour up to 1,500 dollars')[2]);
         $this->assertSame([null, null], array_slice(HebrewSearch::priceRange('מידה 52'), 1), 'a size is no price');
+        // Rocks, 16.11: "מעל ל 4500 ש״ח" was read as a budget of 4500 (its "ל" broke "מעל"), and rings under it were shown
+        $this->assertSame(['טבעת זהב צהוב עם אבן אדומה', 4500.0, null], HebrewSearch::priceRange('טבעת זהב צהוב עם אבן אדומה מחיר מעל ל 4500 ש"ח'));
+        $this->assertSame(['טבעת', 4500.0, null], HebrewSearch::priceRange('טבעת מעל ל-4500'));
+        $this->assertSame(['טבעת', null, 2000.0], HebrewSearch::priceRange('טבעת עד ל-2000'));
+        $this->assertSame(['טבעת', 3000.0, null], HebrewSearch::priceRange('טבעת החל מ-3000'));
     }
 
     private function content(): void

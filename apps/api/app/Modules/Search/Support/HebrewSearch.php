@@ -248,10 +248,13 @@ final class HebrewSearch
     private const PRICE_CURRENCY = '(?:\s*(?:'.self::CURRENCY.'))?';
 
     /** A top: "עד", "under", "max price", "price up to" (the word "price" between the top and the amount, or before both). */
-    private const PRICE_TOP = 'עד|מתחת\s*ל-?|מתחת|פחות\s*מ-?|לא\s+יותר\s+מ-?|under|below|up\s+to|less\s+than|no\s+more\s+than|cheaper\s+than|max(?:imum)?(?:\s+(?:price|budget))?(?:\s+of)?|(?:price|budget)\s+(?:up\s+to|under|below|max(?:imum)?|of\s+up\s+to)';
+    private const PRICE_TOP = 'עד\s*ל[-־]?|עד|מתחת\s*ל[-־]?|מתחת|פחות\s*מ[-־]?|לא\s+יותר\s+מ-?|under|below|up\s+to|less\s+than|no\s+more\s+than|cheaper\s+than|max(?:imum)?(?:\s+(?:price|budget))?(?:\s+of)?|(?:price|budget)\s+(?:up\s+to|under|below|max(?:imum)?|of\s+up\s+to)';
 
-    /** A bottom: "מעל", "over", "more than", "min price". */
-    private const PRICE_BOTTOM = 'מעל|יותר\s*מ-?|לפחות|over|above|more\s+than|at\s+least|min(?:imum)?(?:\s+price)?(?:\s+of)?|(?:price|budget)\s+(?:over|above|from)';
+    /**
+     * A bottom: "מעל", "מעל ל-", "over", "more than", "min price". "מעל ל 4500 ש״ח" read without its "ל" was "4500 ש״ח", a
+     * budget: rings under 4500 for "above 4500" (Rocks, 16.11).
+     */
+    private const PRICE_BOTTOM = 'מעל\s*ל[-־]?|מעל|יותר\s*מ[-־]?|לפחות|החל\s*מ[-־]?|over|above|more\s+than|at\s+least|min(?:imum)?(?:\s+price)?(?:\s+of)?|(?:price|budget)\s+(?:over|above|from)';
 
     /** "4 days" in a search, "A 10-Day Odyssey" in a title: a tour's length in days ("6 nights" is a day more). */
     private const DAYS = '(\d{1,2})\s*[-–]?\s*(?:[\p{L}\']+\s+)?(?:days?|ימים)';
