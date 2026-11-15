@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {{-- Inside the Shopify admin's frame, the next step (Shopify's own screens) must open in the full window. --}}
     <meta name="shopify-api-key" content="{{ $key }}">
-    {{-- the browser's own window.open, before App Bridge takes it over: App Bridge holds every _top open until it has
-         reached the admin, and silently forever when it never does --}}
-    <script>window.__letAgentsOpen = window.open ? window.open.bind(window) : null;</script>
+    {{-- App Bridge first, before any other script (App Store 2.2.3). The fallback below needs nothing before it: a plain
+         link the browser opens itself when App Bridge never reached the admin. --}}
     <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     <title>{{ __('shopify::app.continue_title') }}</title>
     <style>
@@ -16,7 +15,7 @@
         .spin { width: 28px; height: 28px; border: 3px solid #e4e4e7; border-top-color: #111; border-radius: 50%; animation: spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         p { margin: 0; }
-        button { padding: 10px 18px; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+        .continue { display: inline-block; padding: 10px 18px; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
         [hidden] { display: none !important; }
     </style>
 </head>
@@ -25,7 +24,9 @@
 <main>
     <div class="spin" aria-hidden="true"></div>
     <p>{{ __('shopify::app.continue_text') }}</p>
-    <button type="button" data-continue hidden>{{ __('shopify::app.continue') }}</button>
+    {{-- a link of its own: when App Bridge did not reach the admin, the browser opens Shopify's approval in a tab of its
+         own (the admin's frame lets a press open one), and once approved it comes back into the app there --}}
+    <a class="continue" href="{{ $url }}" target="_blank" rel="noopener" data-continue hidden>{{ __('shopify::app.continue') }}</a>
 </main>
 <script>
     (function () {
@@ -40,13 +41,9 @@
             }
         } catch (e) {}
         setTimeout(function () { button.hidden = false; }, 3000);
-        // A press: through App Bridge when it reached the admin; otherwise Shopify's approval in a tab of its own, by the
-        // browser itself (the admin's frame lets a press open one), and once approved it comes back into the app there.
-        button.addEventListener('click', function () {
-            if (reached) { gone = false; go(); return; }
-            var open = window.__letAgentsOpen;
-            var tab = open ? open(url, '_blank') : null;
-            if (!tab) { try { window.top.location.href = url; } catch (e) { location.href = url; } }
+        // A press: through App Bridge when it reached the admin; otherwise the link does it, the browser's own.
+        button.addEventListener('click', function (event) {
+            if (reached) { event.preventDefault(); gone = false; go(); }
         });
     })();
 </script>

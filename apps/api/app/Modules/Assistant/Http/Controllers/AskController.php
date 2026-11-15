@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Modules\Assistant\Actions\AnswerQuestion;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\AnswerLanguage;
 use App\Modules\Assistant\Support\NoAnswer;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Http\JsonResponse;
@@ -40,7 +41,9 @@ final class AskController
         $id = is_array($body) ? (string) ($body['id'] ?? '') : '';
         $question = is_array($body) ? (string) ($body['question'] ?? '') : '';
         $visitor = is_array($body) ? (string) ($body['vid'] ?? '') : '';
-        $locale = is_array($body) && ($body['locale'] ?? 'he') === 'en' ? 'en' : 'he';
+        // The shopper's language: the question's own, else what the storefront sent, else the shop's; never Hebrew by default
+        // (lets-review-test-4, 15.11: an English store's questions were answered in Hebrew).
+        $locale = AnswerLanguage::of($question, is_array($body) && is_string($body['locale'] ?? null) ? $body['locale'] : null, (string) ($connection->shop?->content_locale ?? ''));
         // A widget still cached from before guides could be asked about sends no type.
         $pageType = is_array($body) && ($body['type'] ?? 'product') === 'content' ? 'content' : 'product';
 

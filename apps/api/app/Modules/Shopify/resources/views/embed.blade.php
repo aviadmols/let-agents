@@ -1,12 +1,33 @@
-{{-- App Bridge: the Shopify admin's bridge to this page inside its frame. The key names which of our apps this is. --}}
+{{-- App Bridge: the Shopify admin's bridge to this page inside its frame. The key names which of our apps this is.
+     App Bridge is the first script of the page, before any other (App Store 2.2.3). A page reached without Shopify's
+     "host" in its address is sent back with it by the server before it loads (FrameInsideShopify), so nothing has to
+     run before App Bridge to put it there. --}}
 <meta name="shopify-api-key" content="{{ $key }}">
+<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 <script>
-// The browser's own fetch, before App Bridge takes it over (below).
-window.__letAgentsFetch = window.fetch ? window.fetch.bind(window) : null;
-// Shopify hands the app its "host" and "shop" on the first page only. App Bridge reads both from the
-// address and stops without them, and with it every request the page makes (saving, buttons) waits
-// forever. So both are kept, put back into this page's address before App Bridge loads, and carried
-// on by every link inside the frame.
+// The browser's own fetch, which App Bridge has taken over by now: from an empty frame of this same address, whose
+// fetch is the browser's (same origin, same cookies). Made when first needed, once the page has a body.
+window.__letAgentsFetch = (function () {
+    var own = null, bridgedAtLoad = window.fetch;
+    return function (input, init) {
+        if (!own) {
+            try {
+                var frame = document.createElement('iframe');
+                frame.style.display = 'none';
+                frame.setAttribute('aria-hidden', 'true');
+                frame.setAttribute('tabindex', '-1');
+                (document.body || document.documentElement).appendChild(frame);
+                own = frame.contentWindow.fetch.bind(frame.contentWindow);
+            } catch (e) {
+                own = null;
+            }
+        }
+        // the frame could not be made: App Bridge's fetch as it was at load (never the wrapper below, which calls this)
+        return own ? own(input, init) : bridgedAtLoad.call(window, input, init);
+    };
+})();
+// Shopify hands the app its "host" and "shop" on the first page only. The server keeps them and puts them back on a
+// page reached without them; here they are kept as well, and carried on by every link inside the frame.
 (function () {
     var params = new URLSearchParams(location.search);
     var keep = { host: params.get('host'), shop: params.get('shop') || @js($shop) };
@@ -38,7 +59,6 @@ window.__letAgentsFetch = window.fetch ? window.fetch.bind(window) : null;
     }, true);
 })();
 </script>
-<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 <script>
 // App Bridge makes every request of this page wait for a Shopify token, and when the token does not
 // come (the panel lives on the shop's own address), every button and every save waits forever,

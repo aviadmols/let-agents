@@ -6,10 +6,9 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Enums\ConnectionStatus;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Shopify\Actions\ManageSubscription;
-use App\Modules\Shopify\Events\ShopperDataRequested;
+use App\Modules\Shopify\Jobs\HandleComplianceWebhook;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifySignatures;
-use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,17 +59,18 @@ final class ShopifyWebhooksController
                 (string) ($payload['app_subscription']['admin_graphql_api_id'] ?? ''),
                 (string) ($payload['app_subscription']['status'] ?? ''),
             ),
-            'customers/data_request', 'customers/redact' => event(new ShopperDataRequested(
+            // the privacy topics: answered 200 at once, the work in the background (HandleComplianceWebhook): a shop/redact
+            // deleting a whole shop took 6,009 ms and timed out on Shopify's first try (14.11)
+            'customers/data_request', 'customers/redact', 'shop/redact' => HandleComplianceWebhook::dispatch(
+                $topic,
                 (string) $install->shop_id,
-                $topic === 'customers/redact' ? 'redact' : 'report',
-                mb_strtolower((string) ($payload['customer']['email'] ?? '')),
-                (string) ($payload['customer']['id'] ?? ''),
-                (string) ($payload['customer']['phone'] ?? ''),
+                [
+                    'email' => (string) ($payload['customer']['email'] ?? ''),
+                    'id' => (string) ($payload['customer']['id'] ?? ''),
+                    'phone' => (string) ($payload['customer']['phone'] ?? ''),
+                ],
                 (string) ($payload['data_request']['id'] ?? ''),
-            )),
-            // 48 hours after the app was removed: the shop and all it holds go, the kernel's tables and its files too
-            // (deleted as a model, so Shop::deleted cleans what has no foreign key).
-            'shop/redact' => Shop::query()->whereKey($install->shop_id)->first()?->delete(),
+            ),
             default => null,
         };
 

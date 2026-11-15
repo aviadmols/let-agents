@@ -198,6 +198,8 @@ final class ShopifyAppController
         // link carries no proof of who follows it (anyone who knows a store's address could). Back into the
         // app inside the Shopify admin, which opens it with a session token: the panel when the plan was
         // approved, the plans again when it was declined. The app stays embedded throughout.
+        // Approved or declined, the approval made for the plan is not offered again (ManageSubscription::start).
+        ManageSubscription::forgetPending($install);
         $billing->refresh($install);
 
         return redirect()->away(self::appInAdmin($install));

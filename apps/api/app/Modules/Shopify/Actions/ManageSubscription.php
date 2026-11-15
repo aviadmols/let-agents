@@ -10,7 +10,9 @@ use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Plan;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -127,8 +129,61 @@ final class ManageSubscription
         }
     }
 
-    /** Where the merchant approves the plan in Shopify. */
+    /** A plan asked for again within this many minutes gets the approval already made for it, not a second one. */
+    private const PENDING_MINUTES = 10;
+
+    /**
+     * Where the merchant approves the plan in Shopify, once per store and plan within PENDING_MINUTES: the plans page
+     * asks with the session token and, when that has not answered in six seconds, through the plan's signed link, and a
+     * slow first answer could make two subscriptions (lets-review-test-3, 14.11, two 38 seconds apart). The second ask,
+     * or the same plan pressed again, gets the approval made for the first while it is still pending; one at a time per
+     * store and plan (a lock), so two asks at once make one.
+     */
     public function start(ShopifyInstall $install, string $returnUrl, ?Plan $plan = null): string
+    {
+        $key = self::pendingKey($install->shop_domain, $plan?->code);
+
+        try {
+            return Cache::lock($key.':lock', 30)->block(20, fn (): string => $this->startOnce($install, $returnUrl, $plan, $key));
+        } catch (LockTimeoutException) {
+            Log::warning('Shopify subscription asked without its lock', ['shop' => $install->shop_domain, 'plan' => $plan?->code]);
+
+            return $this->startOnce($install, $returnUrl, $plan, $key);
+        }
+    }
+
+    private function startOnce(ShopifyInstall $install, string $returnUrl, ?Plan $plan, string $key): string
+    {
+        $kept = Cache::get($key);
+        $install->refresh();
+
+        if (is_array($kept) && is_string($kept['url'] ?? null) && $install->subscription_status === 'pending' && (string) $install->subscription_id === (string) ($kept['id'] ?? '')) {
+            Log::info('Shopify subscription asked again: the pending approval is reused', ['shop' => $install->shop_domain, 'plan' => $plan?->code]);
+
+            return $kept['url'];
+        }
+
+        $url = $this->create($install, $returnUrl, $plan);
+        Cache::put($key, ['url' => $url, 'id' => (string) $install->subscription_id], now()->addMinutes(self::PENDING_MINUTES));
+
+        return $url;
+    }
+
+    private static function pendingKey(string $shop, ?string $plan): string
+    {
+        return 'shopify:pending-subscription:'.$shop.':'.($plan ?? 'default');
+    }
+
+    /** Back from Shopify's approval, approved or declined: no pending approval is reused after it. */
+    public static function forgetPending(ShopifyInstall $install): void
+    {
+        foreach ([null, ...Plan::query()->pluck('code')->all()] as $code) {
+            Cache::forget(self::pendingKey($install->shop_domain, $code === null ? null : (string) $code));
+        }
+    }
+
+    /** A new subscription in Shopify, and where the merchant approves it. */
+    private function create(ShopifyInstall $install, string $returnUrl, ?Plan $plan = null): string
     {
         // Every failure on the way to Shopify's approval is logged with the store: a reviewer's "the button does
         // nothing" must leave a trace (App Store review, 11.2026).

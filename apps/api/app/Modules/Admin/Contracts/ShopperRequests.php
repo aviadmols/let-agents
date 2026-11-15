@@ -21,7 +21,7 @@ interface ShopperRequests
      * the page they asked on (a product, with its picture, or an article), so the store knows what the question is about;
      * null when asked from the search box or the page is gone.
      *
-     * @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface, visitor: string|null, page?: array{kind: string, title: string, url: string|null, image: string|null}|null}>
+     * @return list<array{key: string, name: string|null, channel: string, contact?: string, question: string, at: CarbonInterface, visitor: string|null, page?: array{kind: string, title: string, url: string|null, image: string|null}|null}>
      */
     public function waiting(Shop $shop, int $limit): array;
 

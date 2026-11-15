@@ -29,6 +29,8 @@ final class LeadRequests implements ShopperRequests
                 'key' => self::PREFIX.$lead->id,
                 'name' => self::name($lead),
                 'channel' => $lead->channel === 'email' ? 'email' : 'phone',
+                // the phone or the email itself, on the store's own screen (App Store 5.1.5)
+                'contact' => (string) $lead->contact,
                 'question' => self::said($lead),
                 'at' => $lead->created_at,
                 'visitor' => is_string($lead->visitor_hash) && $lead->visitor_hash !== '' ? $lead->visitor_hash : null,

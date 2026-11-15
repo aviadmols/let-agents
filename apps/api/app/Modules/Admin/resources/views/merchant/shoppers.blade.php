@@ -75,7 +75,7 @@
                             <div class="lp-d-lead-body">
                                 {{-- the name opens the visit they asked from: what they searched and saw before asking --}}
                                 @if ($lead['visit'])<a class="lp-d-lead-name" href="{{ $lead['visit'] }}" title="{{ $t('waiting.see_visit') }}" dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</a>@else<b dir="auto">{{ $lead['name'] ?? $t('waiting.someone') }}</b>@endif
-                                <span class="lp-d-lead-meta">· {{ $t('waiting.'.($lead['channel'] === 'email' ? 'email' : 'whatsapp')) }} · <time datetime="{{ $lead['at']?->toIso8601String() }}" title="{{ $ago($lead['at']) }}"><bdi>{{ $when($lead['at']) }}</bdi></time> · {{ $ago($lead['at']) }}</span>
+                                <span class="lp-d-lead-meta">· {{ $t('waiting.'.($lead['channel'] === 'email' ? 'email' : 'whatsapp')) }}@if (! empty($lead['contact'])) <a href="{{ ($lead['channel'] === 'email' ? 'mailto:' : 'tel:').$lead['contact'] }}" dir="ltr" data-lead-contact>{{ $lead['contact'] }}</a>@endif · <time datetime="{{ $lead['at']?->toIso8601String() }}" title="{{ $ago($lead['at']) }}"><bdi>{{ $when($lead['at']) }}</bdi></time> · {{ $ago($lead['at']) }}</span>
                                 <p class="lp-d-lead-q" dir="auto">{{ $lead['question'] }}</p>
                                 {{-- the page they asked on: what the question is about --}}
                                 @if (! empty($lead['page']['title']))

@@ -38,13 +38,15 @@ final class EmbeddedPanelTest extends TestCase
         $this->get($profile)->assertOk()->assertSee('data-logout', false)->assertSee('data-change-password', false);
 
         // the first page Shopify opens (embedded, host) and every frame load after it (Sec-Fetch-Dest)
+        // (a frame load without Shopify's "host" is sent back with the one kept first: App Bridge, the page's first script,
+        // reads it from the address, App Store 2.2.3)
         foreach ([[$profile.'?embedded=1&host=YWRtaW4&shop='.self::SHOP, []], [$profile, ['Sec-Fetch-Dest' => 'iframe']]] as [$url, $headers]) {
-            $this->get($url, $headers)->assertOk()
+            $this->followingRedirects()->get($url, $headers)->assertOk()
                 ->assertSee('shopify-api-key', false)
                 ->assertDontSee('data-logout', false)
                 ->assertDontSee('data-change-password', false);
         }
-        $this->get("/merchant/{$shop->slug}/overview", ['Sec-Fetch-Dest' => 'iframe'])->assertOk()->assertDontSee('data-logout', false);
+        $this->followingRedirects()->get("/merchant/{$shop->slug}/overview", ['Sec-Fetch-Dest' => 'iframe'])->assertOk()->assertDontSee('data-logout', false);
 
         // a request from the frame with a good session token is inside too; a forged one is not
         $host = app(ShopifyPanelHost::class);

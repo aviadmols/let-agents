@@ -512,6 +512,80 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(['assistant.site_answerer'], Run::query()->pluck('agent')->unique()->values()->all(), 'the product\'s writer is never asked');
     }
 
+    /**
+     * lets-review-test-4, 15.11: an English store's "Which snowboard is good for a beginner?" was answered in Hebrew, its
+     * products' notes too. The writer is told the shopper's language (the question's own), an answer in another is asked
+     * once more, and a second one is no answer: the team's line, in English. Never Hebrew by default.
+     */
+    public function test_an_english_question_is_answered_in_english_and_a_hebrew_one_in_hebrew(): void
+    {
+        // the storefront sent English, the question is English: written in Hebrew once, asked again, answered in English
+        $this->replies = [
+            ['found' => true, 'answer' => 'בערך 30 ברגים למטר.', 'refs' => ['s1']],
+            ['found' => true, 'answer' => 'About 30 screws per square metre, two where each board meets a joist.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+        $data = $this->askIn('How many screws do I need for a metre of decking?', 'en')->assertOk()->json('data');
+
+        $this->assertSame('English', json_decode($this->calls[0]['user'], true)['language'] ?? null, 'the writer is told the language');
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertStringStartsWith('About 30 screws', $data['answer']);
+        $this->assertCount(3, $this->calls, 'written twice, checked once');
+
+        // twice in Hebrew: no answer, and what the shopper is told is English
+        $this->calls = [];
+        $this->replies = [
+            ['found' => true, 'answer' => 'בערך 30 ברגים למטר.', 'refs' => ['s1']],
+            ['found' => true, 'answer' => 'שוב בעברית.', 'refs' => ['s1']],
+        ];
+        $data = $this->askIn('How many screws per metre of decking, roughly?', 'en')->assertOk()->json('data');
+        $this->assertNotSame('answered', $data['outcome']);
+        $this->assertDoesNotMatchRegularExpression('/\p{Hebrew}/u', (string) ($data['answer'] ?? ''), 'never Hebrew to an English question');
+
+        // no locale sent at all: the question's own language still decides
+        $this->calls = [];
+        $this->replies = [
+            ['found' => true, 'answer' => 'About 30 screws per square metre.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+        $this->askIn('How many decking screws per metre?', null)->assertOk();
+        $this->assertSame('English', json_decode($this->calls[0]['user'], true)['language'] ?? null);
+
+        // a Hebrew question on a Hebrew store: Hebrew
+        $this->calls = [];
+        $this->replies = [
+            ['found' => true, 'answer' => 'בערך 30 ברגים למטר מרובע, שניים בכל מפגש של קרש עם קורה.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+        $data = $this->ask('כמה ברגים צריך למטר דק?')->assertOk()->json('data');
+        $this->assertSame('Hebrew', json_decode($this->calls[0]['user'], true)['language'] ?? null);
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertCount(2, $this->calls, 'in its language at once: no second writing');
+    }
+
+    public function test_an_answer_kept_in_another_language_than_the_question_is_not_served(): void
+    {
+        $this->inShop(fn () => AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'question' => 'What is your return policy?', 'question_key' => Question::key('What is your return policy?'),
+            'answer' => 'אפשר להחזיר תוך 14 יום.', 'outcome' => AssistantAnswer::ANSWERED, 'status' => AssistantAnswer::SHOWN, 'prompt_version' => AnswerSiteQuestion::PROMPT_VERSION,
+            'asked_count' => 9, 'shared_at' => now(), 'last_asked_at' => now()]));
+        $this->replies = [
+            ['found' => true, 'answer' => 'You can return it in its original packaging.', 'refs' => ['s1']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true],
+        ];
+
+        $data = $this->askIn('What is your return policy?', 'en')->assertOk()->json('data');
+
+        $this->assertNotSame('bank', $data['from'] ?? null, 'the Hebrew answer kept for it is not the answer');
+        $this->assertStringStartsWith('You can return it', (string) $data['answer']);
+    }
+
+    private function askIn(string $question, ?string $locale): TestResponse
+    {
+        return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['question' => $question, 'vid' => self::VID] + ($locale === null ? [] : ['locale' => $locale]), JSON_UNESCAPED_UNICODE));
+    }
+
     private function ask(string $question): TestResponse
     {
         return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [

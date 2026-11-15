@@ -25,6 +25,7 @@ use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\AnswerFailure;
+use App\Modules\Assistant\Support\AnswerLanguage;
 use App\Modules\Assistant\Support\AnswerRules;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
@@ -328,6 +329,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** @var list<array<string, mixed>> in a trial, what each look gave the writer: the pages and the products */
     private array $looked = [];
+
+    /** The language the question being asked is answered in (AnswerLanguage), he or en. */
+    private string $language = 'en';
 
     public function __construct(
         private readonly RecordsRuns $runs,
@@ -648,6 +652,16 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         if ($saved !== null && $this->stale($saved, $shopId)) {
             $saved->delete();
+            $saved = null;
+        }
+
+        // an answer kept in another language than the question's is no answer to it (English questions on an English
+        // store were answered and kept in Hebrew, lets-review-test-4, 15.11): asked again; the team's own words stay
+        if ($saved !== null && $saved->source !== 'team' && trim((string) $saved->answer) !== ''
+            && ! AnswerLanguage::writtenIn((string) $saved->answer, AnswerLanguage::of($question, $locale))) {
+            if (! $this->trial) {
+                $saved->delete();
+            }
             $saved = null;
         }
 
@@ -1565,6 +1579,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         $input = (string) json_encode([
             'question' => $question,
+            // the language to answer in, as code read it from the question (AnswerLanguage): on an English store the
+            // writer, reading Hebrew examples and passages, answered English questions in Hebrew (lets-review-test-4, 15.11)
+            'language' => AnswerLanguage::name($this->language),
         ] + ($this->conversation === [] ? [] : ['conversation' => $this->conversation])
             + ($this->trouble ? ['trouble' => true] : [])
             + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
@@ -1886,6 +1903,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $corrected = $this->conversation[count($this->conversation) - 1]['question'].' '.$question;
                 }
                 // A replay on frozen data gives the writer what it was given then; everything else, today's.
+                // the shopper's language: the question's own letters, else what the storefront sent (AnswerLanguage)
+                $this->language = AnswerLanguage::of($this->asked !== '' ? $this->asked : ($corrected ?? $question), $locale);
                 $prepared = $this->frozen ?? $this->prepare($shopId, $corrected ?? $question, $shown, $mode, $viewing, $this->onShown);
                 ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis, 'forModel' => $forModel, 'input' => $input] = $prepared;
                 $context = ['mode' => $mode, 'type' => $prepared['type'], 'constraints' => AnswerContext::constraints($question), 'products_shown' => $prepared['shown'], 'products_sent' => count($productsByRef),
@@ -1932,6 +1951,18 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $started = hrtime(true);
                     $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
+                    // In the shopper's language, or not at all: written in another, it is asked once more, and a second
+                    // in another language is no answer (the team's line, in theirs). Never Hebrew to an English question
+                    // (lets-review-test-4, 15.11).
+                    if (! self::inLanguage($reply->data, $this->language)) {
+                        $checked['language'] = 'asked_again';
+                        $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
+                        $replies[] = [$reply, 'answer'];
+                        if (! self::inLanguage($reply->data, $this->language)) {
+                            $checked['language'] = 'none';
+                            $reply = new ModelReply(['found' => false, 'answer' => '', 'not_found' => '', 'refs' => [], 'picks' => []], $reply->inputTokens, $reply->outputTokens);
+                        }
+                    }
                     // Token counts as "in" and "out": a key holding "token" is redacted on a run.
                     $wrote = ['model' => $writer['model'], 'ms' => (int) round((hrtime(true) - $started) / 1e6), 'in' => $reply->inputTokens, 'out' => $reply->outputTokens,
                         'cost_usd' => round($reply->costUsd($this->price('answer_input'), $this->price('answer_output')), 6)];
@@ -3972,6 +4003,19 @@ final class AnswerSiteQuestion implements TriesQuestions
             'sizes' => array_values((array) ($product['sizes'] ?? [])),
             'current_size' => $product['current_size'] ?? null,
         ], fn ($v): bool => $v !== null && $v !== '' && $v !== []);
+    }
+
+    /**
+     * Whether a writer's reply is in the shopper's language: its answer, its "not found" line and each pick's reason,
+     * together (a product's name in another script is fine: the letters around it decide).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function inLanguage(array $data, string $language): bool
+    {
+        $whys = array_map(fn ($pick): string => is_array($pick) ? (string) ($pick['why'] ?? '') : '', (array) ($data['picks'] ?? []));
+
+        return AnswerLanguage::writtenIn(implode(' ', [(string) ($data['answer'] ?? ''), (string) ($data['not_found'] ?? ''), ...$whys]), $language);
     }
 
     /** A size as a shopper reads it: 48, 52.5. */

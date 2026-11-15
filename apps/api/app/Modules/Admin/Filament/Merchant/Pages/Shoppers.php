@@ -164,7 +164,7 @@ final class Shoppers extends Page
         }, array_slice(self::waitingOf($this->shop(), self::WAITING), 0, self::WAITING_SHOWN));
     }
 
-    /** "Reply on WhatsApp" / "Reply by email": the module that keeps the request opens the reply; the contact never sits on the page. */
+    /** "Reply on WhatsApp" / "Reply by email": the module that keeps the request opens the reply (the contact is shown beside it, 5.1.5). */
     public function replyTo(string $key): void
     {
         foreach (app()->tagged(ShopperRequests::TAG) as $source) {

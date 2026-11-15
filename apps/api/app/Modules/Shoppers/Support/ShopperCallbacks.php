@@ -22,7 +22,7 @@ final class ShopperCallbacks implements ShopperRequests
 
     public function waiting(Shop $shop, int $limit): array
     {
-        $rows = ShopperCallback::query()->with('identity:id,channel')->whereNull('answered_at')
+        $rows = ShopperCallback::query()->with('identity:id,channel,contact')->whereNull('answered_at')
             ->latest('created_at')->orderByDesc('id')->limit($limit)->get();
         // the browser each identity was last linked from (the later link wins), for "see their visit"
         $visitors = $rows->isEmpty() ? collect() : ShopperVisitor::query()->whereIn('identity_id', $rows->pluck('identity_id')->unique()->values())
@@ -33,6 +33,9 @@ final class ShopperCallbacks implements ShopperRequests
             'key' => self::PREFIX.$row->id,
             'name' => is_string($row->name) && trim($row->name) !== '' ? trim($row->name) : null,
             'channel' => $row->identity?->channel === Contact::EMAIL ? 'email' : 'phone',
+            // the phone or the email itself, on the store's own screen (App Store 5.1.5: what the storefront collects is
+            // the merchant's to see in the admin), never only behind the reply button
+            'contact' => (string) ($row->identity?->contact ?? ''),
             'question' => trim((string) $row->question),
             'at' => $row->created_at,
             'visitor' => $visitors->get($row->identity_id),

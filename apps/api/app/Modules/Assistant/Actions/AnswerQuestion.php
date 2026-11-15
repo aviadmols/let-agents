@@ -13,6 +13,7 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Support\AnswerLanguage;
 use App\Modules\Assistant\Support\Barrier;
 use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Offenders;
@@ -129,7 +130,9 @@ final class AnswerQuestion
             // An answer from an older prompt is asked again: the rules for what shoppers see changed.
             // The team's own answers stay.
             // And one written before the team last changed its own lines: they may answer it now ("all our diamonds are natural").
-            if ($saved !== null && $saved->source !== 'team' && ($saved->prompt_version < self::PROMPT_VERSION || $this->storeLinesChangedSince($saved))) {
+            // And one kept in another language than the question's (lets-review-test-4, 15.11): no answer to it.
+            if ($saved !== null && $saved->source !== 'team' && ($saved->prompt_version < self::PROMPT_VERSION || $this->storeLinesChangedSince($saved)
+                || (trim((string) $saved->answer) !== '' && ! AnswerLanguage::writtenIn((string) $saved->answer, AnswerLanguage::of($question, $locale))))) {
                 $saved->delete();
                 $saved = null;
             }
@@ -235,13 +238,17 @@ final class AnswerQuestion
                         return;
                     }
 
-                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, 'question' => $question], $maxOutput, $effort, 'answer');
+                    // the language to answer in, as code read it from the question; an answer in another is no answer (the
+                    // site's assistant is asked next, AskController), never Hebrew to an English question (lets-review-test-4, 15.11)
+                    $language = AnswerLanguage::of($question, $locale);
+                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, 'question' => $question, 'language' => AnswerLanguage::name($language)], $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
 
                     $answer = mb_substr(trim((string) ($reply->data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
                     $source = in_array($reply->data['source'] ?? null, ['store', 'general'], true) ? $reply->data['source'] : null;
                     $refusal = match (true) {
                         $source === null || $answer === '' => 'no_answer',
+                        ! AnswerLanguage::writtenIn($answer, $language) => 'wrong_language',
                         Question::hasContactDetails($answer) => 'contact_details',
                         self::mentionsPrice($answer) => 'price',
                         self::hasNumberNotIn($answer, $contextJson.' '.$question) => 'number_not_in_product_information',

@@ -107,13 +107,14 @@ final class ShoppersWaitingTest extends TestCase
             ->assertSee('https://store.test/linen.jpg', false);
     }
 
-    public function test_both_kinds_wait_in_one_list_the_newest_first_and_no_contact_on_the_page(): void
+    public function test_both_kinds_wait_in_one_list_the_newest_first_with_their_contact(): void
     {
         $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/shoppers")
             ->assertOk()
             ->assertSeeInOrder(['Jonah K.', 'Do you gift wrap?', 'Reply by email', 'Dana R.', 'Can I order the linen dress in olive green?', 'Reply on WhatsApp'])
-            ->assertDontSee('972501234567')
-            ->assertDontSee('jonah@example.com');
+            // what the storefront collected is the merchant's to see in the admin (App Store 5.1.5), not only behind the reply
+            ->assertSee('501234567')
+            ->assertSee('mailto:jonah@example.com', false);
     }
 
     public function test_reply_opens_the_chat_with_the_question_and_records_who_looked(): void

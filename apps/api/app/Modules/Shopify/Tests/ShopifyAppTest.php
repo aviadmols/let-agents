@@ -16,6 +16,7 @@ use App\Modules\Runs\Jobs\FirstScanStep;
 use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
+use App\Modules\Shopify\Jobs\HandleComplianceWebhook;
 use App\Modules\Shopify\Models\ShopifyInstall;
 use App\Modules\Shopify\Support\ShopifyApi;
 use App\Modules\Shopify\Support\ShopifyApps;
@@ -443,7 +444,11 @@ final class ShopifyAppTest extends TestCase
         $this->webhook('shop/redact', ['shop_domain' => 'another-store.myshopify.com'])->assertUnauthorized();
         $this->assertSame(1, Shop::query()->count());
 
+        // answered at once, the shop erased in the background (14.11: a shop/redact took 6,009 ms and timed out)
         $this->webhook('shop/redact', ['shop_domain' => self::SHOP])->assertOk();
+        $this->assertSame(1, Shop::query()->count(), 'nothing is erased while Shopify waits for its answer');
+        Queue::assertPushed(HandleComplianceWebhook::class, fn (HandleComplianceWebhook $job): bool => $job->topic === 'shop/redact' && $job->shopId === (string) $install->shop_id);
+        (new HandleComplianceWebhook('shop/redact', (string) $install->shop_id))->handle();
         $this->assertSame(0, Shop::query()->count(), 'the shop and all it holds are erased');
         $this->assertSame(0, DB::table('setting_overrides')->where('scope', $install->shop_id)->count(), 'its own settings too, which have no foreign key');
     }
@@ -584,6 +589,14 @@ final class ShopifyAppTest extends TestCase
         $this->assertSame('frame-ancestors https://'.self::SHOP.' https://admin.shopify.com;', $page->headers->get('Content-Security-Policy'));
         $page->assertSee('<meta name="shopify-api-key" content="test-key">', false)->assertSee('cdn.shopify.com/shopifycloud/app-bridge.js', false)
             ->assertSee('window.__letAgentsFetch', false)->assertSee('failed.status === 419', false);
+        // App Bridge is the first script of the page, before any other (App Store 2.2.3), and is loaded once
+        $this->assertFirstScriptIsAppBridge((string) $page->getContent());
+        $this->assertSame(1, substr_count((string) $page->getContent(), 'shopifycloud/app-bridge.js'));
+        // a page of the panel loaded in the frame without Shopify's "host": sent back with the one kept, before it loads
+        $again = (string) $this->get('/merchant/gueta-test/welcome', ['Sec-Fetch-Dest' => 'iframe'])->assertRedirect()->headers->get('Location');
+        $this->assertStringContainsString('host=YWRtaW4', $again);
+        $this->assertStringContainsString('embedded=1', $again);
+        $this->get($again, ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
 
         // Opened on its own, outside the admin, the same page carries no bridge.
         $this->get(strtok($welcome, '?'))->assertOk()->assertDontSee('shopify-api-key', false);
@@ -661,14 +674,19 @@ final class ShopifyAppTest extends TestCase
         $framed = fn (string $link): string => $link.'&host=YWRtaW4&embedded=1';
 
         // "Upgrade" / "Switch" on Plan and billing: App Bridge in the frame, off to Shopify's approval (11.2026: refused, 404)
-        $this->get($framed(ShopifyAppController::planLink(self::SHOP, 'growth', 'en')), ['Sec-Fetch-Dest' => 'iframe'])
+        $top = $this->get($framed(ShopifyAppController::planLink(self::SHOP, 'growth', 'en')), ['Sec-Fetch-Dest' => 'iframe'])
             ->assertOk()
             ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/charges\/confirm', false)
-            ->assertSee("window.open(url, '_top')", false);
+            ->assertSee("window.open(url, '_top')", false)
+            // when App Bridge never reached the admin, a plain link the browser opens itself: nothing runs before App Bridge
+            ->assertSee('href="https://gueta-test.myshopify.com/admin/charges/confirm" target="_blank"', false)
+            ->assertDontSee('__letAgentsOpen', false);
+        $this->assertFirstScriptIsAppBridge((string) $top->getContent());
 
         // Billing "View": the plans, each choice carrying the frame on
         $plans = $this->get($framed(ShopifyAppController::plansLink(self::SHOP, 'en')), ['Sec-Fetch-Dest' => 'iframe'])->assertOk();
         $this->assertStringContainsString('host=YWRtaW4', self::choice($plans, 'pro'));
+        $this->assertFirstScriptIsAppBridge((string) $plans->getContent());
 
         // made in the panel, on the shop's own address: the links still lead to the app's address, where App Bridge reaches the admin
         URL::setRequest(Request::create('https://gueta.panel.test/merchant/settings/plan'));
@@ -784,6 +802,34 @@ final class ShopifyAppTest extends TestCase
         $this->assertNull(collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate')), 'Shopify is never asked');
     }
 
+    /**
+     * lets-review-test-3, 14.11: two appSubscriptionCreate 38 seconds apart. The plans page asks with the session token
+     * and, when that has not answered in six seconds, through the plan's signed link: a slow first answer made two.
+     * The same plan asked again while its approval is pending gets that approval; back from Shopify, a new one.
+     */
+    public function test_a_plan_asked_twice_makes_one_subscription_until_the_merchant_is_back_from_shopify(): void
+    {
+        $install = $this->installed();
+        $creates = fn (): int => collect($this->graphql)->filter(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate'))->count();
+        $before = $creates();
+
+        // the session token's press, then the six-second fallback through the signed link: one subscription
+        $this->postJson('/shopify/billing/choose', ['plan' => 'growth'], ['Authorization' => 'Bearer '.self::idToken()])->assertOk()
+            ->assertExactJson(['url' => 'https://gueta-test.myshopify.com/admin/charges/confirm']);
+        $this->get(ShopifyAppController::planLink(self::SHOP, 'growth', 'en'))->assertRedirect('https://gueta-test.myshopify.com/admin/charges/confirm');
+        $this->assertSame($before + 1, $creates(), 'the second ask reuses the approval made for the first');
+
+        // another plan is its own approval
+        $this->postJson('/shopify/billing/choose', ['plan' => 'pro'], ['Authorization' => 'Bearer '.self::idToken()])->assertOk();
+        $this->assertSame($before + 2, $creates());
+
+        // back from Shopify (approved or declined): the next press asks Shopify again
+        $this->get('/shopify/billing/return?shop='.self::SHOP);
+        $install->forceFill(['subscription_status' => 'pending'])->save();
+        $this->postJson('/shopify/billing/choose', ['plan' => 'growth'], ['Authorization' => 'Bearer '.self::idToken()])->assertOk();
+        $this->assertSame($before + 3, $creates());
+    }
+
     public function test_inside_the_admin_a_plan_is_chosen_with_the_session_token_and_a_refusal_is_logged(): void
     {
         $install = $this->installed();
@@ -810,7 +856,9 @@ final class ShopifyAppTest extends TestCase
         $choose(['plan' => 'growth'], self::idToken(['dest' => 'https://nobody.myshopify.com', 'iss' => 'https://nobody.myshopify.com/admin']))->assertNotFound();
         Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'plan not offered') && $context['shop'] === self::SHOP);
 
-        // Shopify refusing the subscription is logged with the store, not lost.
+        // Shopify refusing the subscription is logged with the store, not lost (back from the approval first: no
+        // pending one to reuse).
+        $this->get('/shopify/billing/return?shop='.self::SHOP);
         $this->subscriptionErrors = [['field' => ['price'], 'message' => 'Price is too low']];
         $this->withoutExceptionHandling();
 
@@ -1046,6 +1094,14 @@ final class ShopifyAppTest extends TestCase
             'HTTP_X_SHOPIFY_HMAC_SHA256' => $hmac ?? base64_encode(hash_hmac('sha256', $body, self::SECRET, true)),
             'CONTENT_TYPE' => 'application/json',
         ], content: $body);
+    }
+
+    /** App Store 2.2.3: app-bridge.js is the first script in the page's head, before any other. */
+    private function assertFirstScriptIsAppBridge(string $html): void
+    {
+        $this->assertSame(1, preg_match('~<head\b[^>]*>(.*?)</head>~is', $html, $head), 'the page has a head');
+        $this->assertSame(1, preg_match('~<script\b[^>]*>~i', $head[1], $first), 'the head has a script');
+        $this->assertStringContainsString('src="https://cdn.shopify.com/shopifycloud/app-bridge.js"', $first[0], 'and its first one is App Bridge');
     }
 
     /**

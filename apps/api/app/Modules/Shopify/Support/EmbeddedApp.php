@@ -17,6 +17,12 @@ use Illuminate\Http\Request;
  */
 final class EmbeddedApp
 {
+    /** Shopify's "host": the admin's address, base64 (letters, digits, -, _, =). */
+    public const HOST = '/^[A-Za-z0-9_\-=]{4,300}$/';
+
+    /** Where the session keeps a shop's "host" (head(), FrameInsideShopify). */
+    public const HOST_KEY = 'shopify_host.';
+
     /** Whether this request is a page inside the Shopify admin. */
     public static function framed(Request $request): bool
     {
@@ -44,6 +50,14 @@ final class EmbeddedApp
 
         if ($install === null) {
             return '';
+        }
+
+        // Shopify's "host" for this shop, kept with the session from the page that has it: a page of the panel reached
+        // without it is sent back with it before it loads (FrameInsideShopify), so App Bridge, the page's first script,
+        // finds it in the address (App Store 2.2.3)
+        $host = $request->query('host');
+        if (is_string($host) && preg_match(self::HOST, $host) === 1 && $request->hasSession()) {
+            $request->session()->put(self::HOST_KEY.$install->shop_domain, $host);
         }
 
         return view('shopify::embed', ['key' => ShopifyApps::key($install->client_id), 'shop' => (string) $install->shop_domain])->render();

@@ -3,6 +3,7 @@
 namespace App\Modules\Assistant\Http\Controllers;
 
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Support\AnswerLanguage;
 use App\Modules\Connections\Models\StoreConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,9 @@ final class SiteAskController
         $body = json_decode((string) $request->getContent(), true);
         $question = is_array($body) ? (string) ($body['question'] ?? '') : '';
         $visitor = is_array($body) ? (string) ($body['vid'] ?? '') : '';
-        $locale = is_array($body) && ($body['locale'] ?? 'he') === 'en' ? 'en' : 'he';
+        // The shopper's language: the question's own, else what the storefront sent, else the shop's; never Hebrew by default
+        // (lets-review-test-4, 15.11: an English store's questions were answered in Hebrew).
+        $locale = AnswerLanguage::of($question, is_array($body) && is_string($body['locale'] ?? null) ? $body['locale'] : null, (string) ($connection->shop?->content_locale ?? ''));
         // The products the search showed with the question: the assistant picks only from them.
         $products = self::ids(is_array($body) ? ($body['products'] ?? null) : null);
         // In the drawer's conversation, the products the turn before showed: "מה הכי זול?" is about them.
