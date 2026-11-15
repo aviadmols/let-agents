@@ -2727,25 +2727,32 @@ final class AnswerSiteQuestion implements TriesQuestions
      * An answer that says the pages do not settle it: what was asked is written nowhere, or has to be checked by a
      * person ("כדי לדעת אם קיצור מתאים לשרשרת הזו, צריך לבדוק אותה").
      */
-    private const UNSETTLED = '/(?:צריך|יש|כדאי|נדרש|נצטרך)\s+(?:ל)?בדוק|לבדוק\s+(?:אותה|אותו|אותם|מול)|(?:לא\s+ניתן|אי\s+אפשר)\s+לדעת|לא\s+(?:מצוין|מצוינת|מצוינים|כתוב|כתובה|כתובים|מופיע|מופיעה|ידוע|ידועה|מפורט|מפורטת)(?![\p{L}])|אין\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים)(?![\p{L}])|\bneeds?\s+to\s+be\s+checked\b|\bcan(?:not|\'t)\s+(?:know|tell)\b|\bnot\s+(?:stated|mentioned|listed|specified)\b/iu';
+    private const UNSETTLED = '/(?:צריך|יש|כדאי|נדרש|נצטרך)\s+(?:ל)?בדוק|אפשר\s+לבדוק\s+(?:את\s+האפשרות|אם|מול)|לבדוק\s+(?:אותה|אותו|אותם|מול)|מול\s+הצוות|(?:ו?נבדוק|הצוות\s+(?:בודק|יבדוק))(?![\p{L}])|(?:לא\s+ניתן|אי\s+אפשר)\s+לדעת|לא\s+(?:מצוין|מצוינת|מצוינים|כתוב|כתובה|כתובים|מופיע|מופיעה|ידוע|ידועה|מפורט|מפורטת)(?![\p{L}])|אין\s+(?:לנו\s+)?(?:כאן\s+)?(?:מידע|פרטים)(?![\p{L}])|\bneeds?\s+to\s+be\s+checked\b|\bcan(?:not|\'t)\s+(?:know|tell)\b|\bnot\s+(?:stated|mentioned|listed|specified)\b/iu';
+
+    /** A closing offer to reach the store's team for the shopper: to word a request, to contact or write to them. */
+    private const TEAM_OFFER = '/צוות|לנסח|ניסוח|(?<![\p{L}])ה?פני(?:י)?ה(?![\p{L}])|לפנות|ליצור\s+קשר|ו?וו?א?טסאפ|whatsapp|\bteam\b|\bcontact\b|reach\s+out|\bword\s+(?:a|the|your)\s+(?:request|message)\b/iu';
 
     /**
      * An answer that says the pages do not settle it closes with the store's team, never with an offer to do what only
      * a person can ("תרצו שנעזור לבדוק את האורך המתאים לכם?" after "צריך לבדוק אותה", Rocks 11.11): its closing offer
      * becomes "the store's team will be glad to help", and the drawer offers that team under it. Code only.
+     *
+     * And any answer whose closing offer is to reach the team for the shopper ("תרצו שנעזור לנסח את הפנייה לצוות?",
+     * Rocks 15.11): no step we can take here, and its "yes" left the next answer nothing to do.
      */
     public static function teamWhenUnsettled(string $answer, string $locale): string
     {
-        if (trim($answer) === '' || preg_match(self::UNSETTLED, $answer) !== 1) {
+        if (trim($answer) === '') {
             return $answer;
         }
 
         $trimmed = rtrim($answer);
         $cut = max((int) mb_strrpos(mb_substr($trimmed, 0, -1), "\n"), ...array_map(fn (string $end): int => (int) mb_strrpos(mb_substr($trimmed, 0, -1), $end), ['. ', '! ', '? ']));
         $last = trim(mb_substr($trimmed, $cut === 0 ? 0 : $cut + 1));
+        $offers = preg_match(self::OFFER, $last) === 1 || str_ends_with($last, '?');
 
-        // only the closing offer, and only when there is an answer before it
-        if ($cut === 0 || (preg_match(self::OFFER, $last) !== 1 && ! str_ends_with($last, '?'))) {
+        // only the closing offer, and only when there is an answer before it; an unsettled answer, or one to the team
+        if ($cut === 0 || ! $offers || (preg_match(self::UNSETTLED, $answer) !== 1 && preg_match(self::TEAM_OFFER, $last) !== 1)) {
             return $answer;
         }
 
@@ -3038,6 +3045,14 @@ final class AnswerSiteQuestion implements TriesQuestions
     public function checkInput(string $question, string $answer, array $cited, array $picks, array $prepared): string
     {
         ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis] = $prepared;
+        // An answer about the product whose page it is, picking none, rests on that product as much as on the pages it
+        // cites: the checker reads it as a pick, with what code measured. Without it "46–50" for the ring of the page was
+        // taken out as unsupported and "the range is on the product page" was left (Rocks, 15.11). Only for the checker:
+        // with no picks of the writer's, what it judges of this one leaves no pick of the answer's.
+        $viewing = self::viewingOf($prepared);
+        $judged = $picks === [] && is_string($viewing) && isset($productsByRef[$viewing])
+            ? [['ref' => $viewing, 'title' => (string) $productsByRef[$viewing]['title'], 'why' => '']]
+            : $picks;
 
         return (string) json_encode([
             'question' => $question,
@@ -3046,7 +3061,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']] + (in_array($byRef[$ref]['from'] ?? null, self::OWN_WORD, true) ? ['from' => $byRef[$ref]['from']] : []), $cited),
             'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank']))
                 // the sizes it is made in and the one it is, as the writer had them: code's measures, not a claim to refuse
-                + self::sizesOf($productsByRef[$pick['ref']]), $picks),
+                + self::sizesOf($productsByRef[$pick['ref']]), $judged),
             'analysis' => $analysis,
         ], JSON_UNESCAPED_UNICODE);
     }

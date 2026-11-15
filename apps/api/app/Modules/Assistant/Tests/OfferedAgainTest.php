@@ -44,6 +44,26 @@ final class OfferedAgainTest extends TestCase
         $this->assertSame($settled, AnswerSiteQuestion::teamWhenUnsettled($settled, 'he'), 'an answer that answers keeps its offer');
     }
 
+    /**
+     * Rocks, 15.11: "can it be made 59?" closed with "תרצו שנעזור לנסח את הפנייה לצוות?", which nothing here can do,
+     * and the shopper's "כן" left the next answer nothing to do. An offer to reach the team becomes the team's line.
+     */
+    public function test_an_offer_to_reach_the_team_for_the_shopper_becomes_the_teams_line(): void
+    {
+        $range = 'מעבר לטווח שולחים את המק״ט ואת המידה המבוקשת לווטסאפ, והצוות בודק לפי מבנה הטבעת.';
+
+        $this->assertSame($range.' צוות החנות ישמח לעזור לכם.', AnswerSiteQuestion::teamWhenUnsettled($range.' תרצו שנעזור לנסח את הפנייה לצוות?', 'he'));
+        $this->assertSame('הטבעת הזו מוצעת במידות 46–50. צוות החנות ישמח לעזור לכם.',
+            AnswerSiteQuestion::teamWhenUnsettled('הטבעת הזו מוצעת במידות 46–50. תרצו שנעזור לנסח את הפנייה?', 'he'), 'to the team, whatever came before');
+        $this->assertSame('אפשר לבדוק את האפשרות מול הצוות. צוות החנות ישמח לעזור לכם.',
+            AnswerSiteQuestion::teamWhenUnsettled('אפשר לבדוק את האפשרות מול הצוות. תרצו שנעזור למצוא טבעת אחרת?', 'he'), 'and an answer that leaves it to the team checking');
+
+        $doable = 'הטבעת הזו מוצעת במידות 46–50. תרצו שנעזור למצוא טבעת דומה במידה 59?';
+        $this->assertSame($doable, AnswerSiteQuestion::teamWhenUnsettled($doable, 'he'), 'a step we can take stays');
+        $chart = 'אפשר לבדוק את המידה שלכם בטבלת המידות. תרצו שנעזור למצוא טבעת?';
+        $this->assertSame($chart, AnswerSiteQuestion::teamWhenUnsettled($chart, 'he'), 'checking a size in the chart is no question left to a person');
+    }
+
     public function test_a_reply_that_says_the_answer_before_again_hands_over_to_the_team(): void
     {
         $again = "השרשרת הזו אפשר לקצר קבוע רק אם מבנה החוליות והסוגר מאפשרים את זה, ובשרשרת עם חוליות גדולות האורך הסופי יכול להשתנות בקפיצות לפי גודל כל חוליה.\n\nכדי לדעת אם זה מתאים בדיוק לשרשרת הזו, צריך לבדוק אותה.";

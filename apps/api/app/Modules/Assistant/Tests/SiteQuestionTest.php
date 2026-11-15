@@ -916,6 +916,22 @@ final class SiteQuestionTest extends TestCase
             $checker = json_decode($this->calls[1]['user'], true);
             $this->assertSame(['46', '47', '48', '49', '50'], $checker['picks'][0]['sizes'] ?? null, $mode.': the checker reads them as code measured them');
         }
+
+        // The writer cites a page and picks nothing: the checker still reads the ring of the page and its sizes (15.11:
+        // without it, "46–50" was taken out as unsupported), and the answer shows no product it did not pick.
+        $this->calls = [];
+        $this->replies = [
+            ['found' => true, 'answer' => 'הטבעת הזו במידה 48, ואפשר להזמין אותה במידות 46 עד 50.', 'refs' => ['s1'], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('אפשר להגדיל למידה 59?', ['901', '902'], page: true)->assertOk()->json('data');
+
+        $checker = json_decode($this->calls[1]['user'], true);
+        $this->assertSame('p1', $checker['picks'][0]['ref'] ?? null, 'the ring of the page goes to the checker');
+        $this->assertSame(['46', '47', '48', '49', '50'], $checker['picks'][0]['sizes'] ?? null, 'with its sizes');
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertSame([], $data['picks'] ?? [], 'and the shopper is shown no product the writer did not pick');
     }
 
     public function test_a_product_page_question_is_the_stores_whatever_its_words_alone_seem_to_be_about(): void
