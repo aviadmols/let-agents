@@ -28,6 +28,7 @@ use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\HebrewSearch;
+use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Search\Support\StoreFamilies;
 use App\Modules\Search\Support\Transliterate;
@@ -291,6 +292,8 @@ final class BuildSearchIndex
         // what each product's picture shows (CaptionImages): its words, less what is only drawn or printed on it, and the print on it
         $pictures = RetrievalImage::query()->whereNotNull('caption_words')->get(['product_id', 'caption_words', 'caption_depicted', 'caption_pattern'])->keyBy('product_id');
         $seen = $pictures->map(fn (RetrievalImage $i): array => self::shown($i));
+        // where looks matter (a store of things, not of tours or books): what a product's picture says it is counts as a tag
+        $looksMatter = Looks::matter((string) $this->tenant->id());
 
         // What each product is, from the shop's approved facts: the filters beside the results. Then the
         // colours and sizes its variants come in, two filters of their own.
@@ -365,7 +368,7 @@ final class BuildSearchIndex
                 // its tags by meaning, apart from its words: weighed by how central each is ([[words, weight], …])
                 // and, where its title is a model's name, what its picture says it is first ("wedge sandal"): found by it before
                 // a product whose picture only has "a low wedge" among its details (Naot QA, 16.11: "wedge" led with flat sandals)
-                'tg' => self::withPictureKind($tagged[$product->id] ?? null, $pictures->get($product->id), (string) $product->title),
+                'tg' => self::withPictureKind($tagged[$product->id] ?? null, $looksMatter ? $pictures->get($product->id) : null, (string) $product->title),
                 'i2' => $this->secondPicture($product),
                 's' => $product->in_stock ? 1 : 0,
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.

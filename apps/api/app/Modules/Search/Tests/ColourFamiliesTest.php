@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Tests;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\BuildProductVariants;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -46,6 +47,12 @@ final class ColourFamiliesTest extends TestCase
 
         $this->assertSame('p:3', HebrewSearch::search($index['engine'], 'wedge')[0]['id'] ?? null, 'the wedge sandal before the sandals with a low wedge');
         $this->assertArrayNotHasKey('tg', $items['p:4'], 'a title that says what it is gets no tag from its picture');
+
+        // a store whose search goes by meaning (tours, books): a picture says nothing of what is sold
+        Settings::set('search.similar_by', 'meaning', $shop->id);
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $items = array_column((array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['items'], null, 'id');
+        $this->assertArrayNotHasKey('tg', $items['p:3']);
     }
 
     public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void
