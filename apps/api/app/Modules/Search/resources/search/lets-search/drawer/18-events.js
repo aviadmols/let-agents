@@ -197,7 +197,16 @@
     // the press that ends a drag of a row of chips is not a press on a chip
     if (el.closest('.ls-chips--drag') && dragged) { e.preventDefault(); dragged = false; return; }
     if (d.popAll !== undefined) { S.popAll = !S.popAll; render(); return; }
-    if (d.sib) { var sibCard = el.closest('.ls-card'), sib = rec(d.sib); if (sibCard && sib) { sibCard.outerHTML = card(sib, rec(sibCard.dataset.first || sibCard.dataset.card) || sib); } return; }
+    if (d.sib) {
+      var sibCard = el.closest('.ls-card'), sib = rec(d.sib);
+      if (sibCard && sib) {
+        // the colour chosen already shown as a card of its own in the same list: that card goes, never two alike (Naot QA, 16.11)
+        var grid = sibCard.parentNode, sid = pid(sib.id);
+        if (grid) { [].slice.call(grid.querySelectorAll('.ls-card')).forEach(function (other) { if (other !== sibCard && other.dataset.card === sid) { other.remove(); } }); }
+        sibCard.outerHTML = card(sib, rec(sibCard.dataset.first || sibCard.dataset.card) || sib);
+      }
+      return;
+    }
     if (d.close !== undefined) { e.preventDefault(); close(); return; }
     if (d.layerClose !== undefined) { hideLayer(); return; }
     if (d.tab) { S.tab = d.tab; S.wide = null; if (S.tab !== 'chat') { hideLive(); } render(); if (S.tab === 'chat') { INPUT.focus({ preventScroll: true }); } return; }
