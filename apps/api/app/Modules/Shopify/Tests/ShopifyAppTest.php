@@ -26,6 +26,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Console\QueuedCommand;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\Request;
@@ -737,6 +738,24 @@ final class ShopifyAppTest extends TestCase
 
         // A store that does not have the app: nothing to open.
         $this->get('/shopify/plans?'.http_build_query(['shop' => 'nobody.myshopify.com', 'signature' => 'nope']))->assertNotFound();
+    }
+
+    /**
+     * The plan pressed inside the admin carries a session token, no cookie form token: whatever guard the web group
+     * holds against forged requests, this route leaves it out. Tests never run that guard, so it is read off the
+     * route (15.11: the old guard's name was left out, the new one stayed on, and every press got 419 live).
+     */
+    public function test_the_plan_pressed_inside_the_admin_is_not_held_to_a_cookie_form_token(): void
+    {
+        $router = app('router');
+        $route = $router->getRoutes()->getByName('shopify.billing.choose');
+        $guards = array_values(array_filter($router->getMiddlewareGroups()['web'] ?? [], fn ($m): bool => is_string($m) && is_a($m, PreventRequestForgery::class, true)));
+
+        $this->assertNotEmpty($guards, 'the web group guards against forged requests');
+        $this->assertContains('web', $route->middleware(), 'it runs in the web group');
+        foreach ($guards as $guard) {
+            $this->assertContains($guard, $route->excludedMiddleware(), $guard.' is left out of the plan pressed with a session token');
+        }
     }
 
     public function test_inside_the_admin_a_plan_is_chosen_with_the_session_token_and_a_refusal_is_logged(): void

@@ -2,7 +2,7 @@
 
 use App\Modules\Shopify\Http\Controllers\ShopifyAppController;
 use App\Modules\Shopify\Http\Controllers\ShopperDataReportController;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
 // The Shopify app, as a merchant meets it. Signed by Shopify; see the controller.
@@ -17,8 +17,10 @@ Route::middleware('throttle:shopify')->group(function (): void {
     Route::get('shopify/plans', [ShopifyAppController::class, 'plans'])->name('shopify.plans');
     Route::get('shopify/billing/start', [ShopifyAppController::class, 'startPlan'])->name('shopify.billing.start');
     // The plan pressed inside the admin, proven by the session token App Bridge gives the page (no cookie, so no CSRF).
+    // The web group's guard is PreventRequestForgery since Laravel 13: leaving out ValidateCsrfToken, its old name,
+    // left the guard on, and every press was refused with 419 before the token was read (15.11).
     Route::post('shopify/billing/choose', [ShopifyAppController::class, 'choosePlanByToken'])
-        ->withoutMiddleware(ValidateCsrfToken::class)
+        ->withoutMiddleware(PreventRequestForgery::class)
         ->name('shopify.billing.choose');
 });
 
