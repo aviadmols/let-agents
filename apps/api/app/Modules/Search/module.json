@@ -858,6 +858,12 @@
             "scope": "shop"
         },
         {
+            "name": "content_first",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "guides_after",
             "type": "int",
             "default": 0,

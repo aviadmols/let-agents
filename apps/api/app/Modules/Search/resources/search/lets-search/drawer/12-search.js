@@ -120,7 +120,7 @@
       var d = got.d, ids = got.ids;
       var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       return products(ids.slice(0, 8)).then(function () {
-        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, near: d.near || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, 3), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
+        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, near: d.near || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, contentShown()), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
         announce(t('announceResults', { n: ids.length }));
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -442,7 +442,9 @@
     var E = S.engine;
     if (!E || !E.normalize || !list.length) { return []; }
     var typed = wordsOf(q).filter(function (w, i) { return (read || []).indexOf(i) < 0 && w.length >= 3 && !STOP.test(w) && !ASKS_ONLY.test(w) && !/\d/.test(w); });
-    if (typed.length < 2) { return []; }
+    // one word left over is said too when the rest of the search was read ("neckles men green": the necklaces and green
+    // shown, and "men" said, not dropped in silence; 15.11); a search of one word is its own matter
+    if (!typed.length || (typed.length < 2 && wordsOf(q).length < 2)) { return []; }
     var said = {};
     list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; }); }); });
     return typed.filter(function (w) { return !wordForms(E.normalize(w)).some(function (f) { return said[f]; }); });
@@ -504,7 +506,8 @@
     // names it almost word for word (90% or more) and better than any product does; "טבעת זהב" keeps the products first
     var guides = guidesFor(turn);
     var g0 = guides[0], gm = g0 && meantWords(turn.q).length >= GUIDE_FIRST_WORDS ? matchOf(turn.q, g0.title, (S.records[g0.id] || {}).kw, 0) : 0;
-    var guideFirst = gm >= GUIDE_FIRST && (!list.length || gm > matchOf(turn.q, decode(list[0].title), list[0].kw, 0));
+    // a content site (search.content_first): the articles and pages it found first, its products after them
+    var guideFirst = (!!(S.config && S.config.contentFirst) && guides.length > 0) || (gm >= GUIDE_FIRST && (!list.length || gm > matchOf(turn.q, decode(list[0].title), list[0].kw, 0)));
     if (guideFirst) { html += guidesHtml(guides, turn.q); }
     html += noteHtml(turn);
     html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +

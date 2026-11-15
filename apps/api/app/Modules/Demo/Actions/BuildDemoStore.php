@@ -58,6 +58,10 @@ final class BuildDemoStore
             ]);
             // what matters, as they said: a content site's demo keeps it (ContentSite reads it before choosing the content)
             $shop->forceFill(['profile' => ['kind' => (string) ($site->choices['kind'] ?? 'store'), 'matters' => (string) ($site->choices['matters'] ?? 'both')]])->save();
+            // a content site's demo searches its articles and pages first (search.content_first)
+            if (($site->choices['kind'] ?? 'store') === 'content') {
+                Settings::set('search.content_first', true, (string) $shop->id);
+            }
 
             $this->tenant->runUnscoped(function () use ($shop, $site): void {
                 $connection = new StoreConnection;

@@ -2069,7 +2069,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                 // about trouble, with its choices, is that question: nothing of it is taken for an offer
                 $forward = $choices === [] ? self::forwardOnYes($this->asked, $answer, $this->conversation, $locale) : null;
                 $answer = $choices !== [] ? $answer : ($forward
-                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain(self::notSaidAgain($answer, $this->conversation, $locale), $this->conversation), $locale));
+                    // an answer that shows products is never taken for one said again: "white sneakers" after another
+                    // search for shoes found three, and was told "this is one for our team to check" (15.11)
+                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain($picks === [] ? self::notSaidAgain($answer, $this->conversation, $locale) : $answer, $this->conversation), $locale));
                 // a size asked on a product's page: the sizes it comes in, said by code when the writer left them out
                 $viewed = self::viewingOf($prepared);
                 if ($forward === null && $choices === [] && $refusal === null && is_string($viewed) && isset($productsByRef[$viewed])) {

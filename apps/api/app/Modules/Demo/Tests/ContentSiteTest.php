@@ -5,6 +5,7 @@ namespace App\Modules\Demo\Tests;
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Actions\SaveShopProfile;
 use App\Modules\Connections\Actions\TestStoreConnection;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
 use App\Modules\Connections\Models\StoreConnection;
@@ -65,6 +66,24 @@ final class ContentSiteTest extends TestCase
         $content = $config();
         $this->assertSame([false, 'read_more', 0, 'USD'], [$content['cart'], $content['cardAction'], $content['guidesAfter'], $content['currency']]);
         $this->assertTrue(Features::enabled('search.content_by_meaning', $shop->id), 'its articles found by what they say');
+        // what it offers (tours, Gil Travel) still comes first: articles before products only where the site chose it
+        $this->assertFalse($store['contentFirst']);
+        $this->assertFalse($content['contentFirst'], 'a site read as offering things keeps its order');
+
+        // settled as a content site (as Gil Travel is), it is not told to put articles first; a site whose manager chooses
+        // "content site": its articles and pages first (Aviad, 15.11); chosen back, as before
+        $save = app(SaveShopProfile::class);
+        $this->assertSame('content', $shop->fresh()->profile['kind'] ?? null);
+        $save->handle($shop->fresh(), ['kind' => 'both'] + $save->load($shop->fresh()));
+        $save->handle($shop->fresh(), ['kind' => 'content'] + $save->load($shop->fresh()));
+        Cache::flush();
+        $this->assertTrue($config()['contentFirst']);
+        $save->handle($shop->fresh(), ['name' => 'Tours'] + $save->load($shop->fresh()));
+        Cache::flush();
+        $this->assertTrue($config()['contentFirst'], 'saving the rest of the profile leaves it');
+        $save->handle($shop->fresh(), ['kind' => 'both'] + $save->load($shop->fresh()));
+        Cache::flush();
+        $this->assertFalse($config()['contentFirst']);
     }
 
     public function test_a_site_connected_with_the_plugin_and_no_woocommerce_is_read_as_its_demo_is_and_set_once(): void

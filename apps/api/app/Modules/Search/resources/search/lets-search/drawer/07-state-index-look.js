@@ -139,8 +139,15 @@
       || (q.trim().split(/\s+/).length >= 5 && ASKS_FOR.test(q))
       // "אהבתי מאוד את התכשיט הזה, האם אפשר להגדיל את הטבעת למידה 54": what it asks starts after what it tells, and one
       // Enter asks it (Rocks, 11.11: it was searched, and asked only on a second Enter)
-      || (q.trim().split(/\s+/).length >= 4 && ASKS_INSIDE.test(q));
+      || (q.trim().split(/\s+/).length >= 4 && ASKS_INSIDE.test(q))
+      // a need in the shopper's own words, which no product is named by ("something elegant for a wedding", "comfortable
+      // shoes for standing all day", "משהו אלגנטי לחתונה"): asked, as the AI search is for; it was searched by its words
+      // and found nothing, or one product (15.11). Opened by "something" or "looking for", or a longer one with what it is for.
+      || (q.trim().split(/\s+/).length >= 3 && NEED_OPENS.test(q.trim()))
+      || (q.trim().split(/\s+/).length >= 5 && NEED_FOR.test(q));
   }
+  var NEED_OPENS = /^(?:something|anything|looking\s+for|i(?:'m|\s+am)?\s+looking\s+for|im\s+looking\s+for|i\s+need|i\s+want|need\s+something|משהו|מחפש|מחפשת|מחפשים|אני\s+מחפש|אני\s+מחפשת|אני\s+צריך|אני\s+צריכה)(?=\s)/i;
+  var NEED_FOR = /(?:\b(?:gift|present)\s+for\b|\b(?:suitable|good|perfect|ideal|great)\s+for\b|\bfor\s+(?:a|an|my|the|her|him|our)\s+[a-z]{3,}|\bto\s+wear\s+(?:to|at|for)\b|\ball\s+day\b|\bfor\s+(?:standing|walking|running|work|travel|everyday|daily)\b|מתנה\s+ל|מתאים\s+ל|מתאימה\s+ל|מושלם\s+ל|מושלמת\s+ל|לאירוע|לחתונה|לכל\s+היום)/i;
   // a question word starting a clause inside the text, as a word of its own ("שאפשר", "כמה" of a product's name aside)
   var ASKS_INSIDE = /(^|[\s,.;:!])(?:(?:האם|איך|למה|מתי|יש\s+לכם|יש\s+לך|can\s+i|can\s+you|is\s+it\s+possible|do\s+you)(?=[\s,]|$)|(?:אפשר|ניתן)\s+ל[א-ת]{2,})/i;
   var ASKS_FOR = /(תמליצ|תמליץ|המליצ|ממליצ|המלצה|תסביר|תסבירו|הסבר|ספר(ו)? לי|תגיד(ו)? לי|השוו|ההבדל|הבדל בין|כדאי לי|מה עדיף|עדיף|צריך לדעת|אני מתלבט|מתלבטת|recommend|explain|compare|difference|should i|which is better)/i;

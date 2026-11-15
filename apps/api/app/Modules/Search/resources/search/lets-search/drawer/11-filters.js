@@ -439,6 +439,8 @@
     });
     return Math.max(41, Math.min(98, 52 + Math.round(44 * hit / qw.length) - rank * 3));
   }
+  // how many articles and pages a search shows: three beside the products, six on a content site, where they come first
+  function contentShown() { return S.config && S.config.contentFirst ? 6 : 3; }
   function guidesHtml(list, q) {
     if (!list || !list.length) { return ''; }
     return '<div class="ls-block"><div class="ls-block__title">' + esc(t('guides')) + '</div><div class="ls-guides">' + list.map(function (c, i) {

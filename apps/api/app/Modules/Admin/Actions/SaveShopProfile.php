@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Actions;
 
+use App\Core\Facades\Settings;
 use App\Modules\Tenancy\Enums\SearchMatters;
 use App\Modules\Tenancy\Models\Shop;
 
@@ -53,6 +54,8 @@ final class SaveShopProfile
         // what matters changes the shop's pictures only when the manager changed it
         $before = SearchMatters::of($shop);
         $matters = SearchMatters::tryFrom((string) ($data['matters'] ?? '')) ?? $before;
+        $kindBefore = (string) (((array) ($shop->profile ?? []))['kind'] ?? 'store');
+        $kind = in_array($data['kind'] ?? null, self::KINDS, true) ? (string) $data['kind'] : 'store';
 
         $shop->forceFill([
             'name' => mb_substr(trim((string) $data['name']), 0, 120),
@@ -69,6 +72,13 @@ final class SaveShopProfile
 
         if ($matters !== $before) {
             $matters->apply($shop);
+        }
+
+        // A content site's search shows its articles and pages before its products (search.content_first), as Aviad asked
+        // (15.11): set when the manager changes the site's kind, never for a store that only saved its profile again, so
+        // no store's search changes by itself (Gil Travel's among them).
+        if ($kind !== $kindBefore) {
+            Settings::set('search.content_first', $kind === 'content', (string) $shop->id);
         }
     }
 }

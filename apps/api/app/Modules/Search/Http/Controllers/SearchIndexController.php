@@ -97,6 +97,8 @@ final class SearchIndexController
             'cardAction' => (string) Settings::get('search.card_action', $shopId),
             // how many cards come before the guides and articles a search found (0: after all of them)
             'guidesAfter' => (int) Settings::get('search.guides_after', $shopId),
+            // a content site: the articles, posts and pages a search found come before its products (search.content_first)
+            'contentFirst' => (bool) Settings::get('search.content_first', $shopId),
             // the store's own currency, for a site whose prices come with none (no Store API, no Shopify format)
             'currency' => Settings::get('search.store_currency', $shopId) ? (string) (Shop::query()->whereKey($shopId)->value('currency') ?? '') : null,
             // Product pictures fill their square ("cover"), or show whole in a light frame ("frame").

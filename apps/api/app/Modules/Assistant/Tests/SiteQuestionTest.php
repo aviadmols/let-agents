@@ -870,6 +870,26 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(2, $sent['products']);
     }
 
+    /**
+     * 15.11: "white sneakers" after another search for shoes found three, and was told "this is one for our team to check":
+     * the answer's words were most of the answer before. An answer that shows products is never taken for one said again.
+     */
+    public function test_a_reply_that_shows_products_is_never_taken_for_the_answer_said_again(): void
+    {
+        $this->drills();
+        $before = 'We have cordless drivers from Makita and Einhell, both light, strong and easy to hold for long work.';
+        $this->replies = [
+            ['found' => true, 'answer' => 'We have cordless drivers from Makita and Einhell, light, strong and easy to hold for long work.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'cordless']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->reply('and the cordless ones?', [['q' => 'which drivers do you have?', 'a' => $before]], ['701', '702'])->assertOk()->json('data');
+
+        $this->assertSame('answered', $data['outcome']);
+        $this->assertStringStartsWith('We have cordless drivers', $data['answer'], 'the answer with its products stays');
+        $this->assertNotEmpty($data['picks']);
+    }
+
     /** @param  list<array{q: string, a: string}>  $thread */
     private function reply(string $question, array $thread, array $products = []): TestResponse
     {

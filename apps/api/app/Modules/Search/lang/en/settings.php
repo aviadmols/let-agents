@@ -349,6 +349,10 @@ return [
         'label' => 'Prices in the store\'s currency',
         'description' => 'For a site whose prices come with no currency of their own (a content site): the store\'s currency beside every price. Off, a store\'s own (its Store API, Shopify\'s format) as it always was.',
     ],
+    'content_first' => [
+        'label' => 'Content site: articles and pages before products',
+        'description' => 'In the search results, the articles, posts and pages a search found come first, then the products (if any). Turned on by itself for a store that chooses content site and for a content site demo; existing stores do not change.',
+    ],
     'guides_after' => [
         'label' => 'Guides and articles after this many products',
         'description' => 'Where the guides and articles a search found are shown among the products. 0: after all of them. On a site with many articles, 4 shows them after the second row.',
