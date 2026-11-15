@@ -1608,6 +1608,11 @@ final class BuildSearchIndex
         if (count($byBrand) < 2 || max(array_map('count', $byBrand)) / max(1, $total) >= self::CATEGORY_MAX_SHARE) {
             return [];
         }
+        // one brand under its names ("Naot Footwear Australia", "Naot Footwear Industries"): every name opens with the
+        // same word, and choosing between them narrows nothing a shopper means (Naot QA, 16.11)
+        if (count(array_unique(array_map(fn (string $key): string => (string) (preg_split('/\s+/u', $key)[0] ?? ''), array_keys($byBrand)))) === 1) {
+            return [];
+        }
 
         $offered = [];
         foreach ($facets as $facet) {

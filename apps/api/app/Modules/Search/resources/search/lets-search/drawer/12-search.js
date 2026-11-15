@@ -362,7 +362,8 @@
       [lead].concat(fam.filter(function (x) { return x !== lead && x.s !== 0; }), fam.filter(function (x) { return x !== lead && x.s === 0; })).forEach(function (x) {
         var c = x.mc && x.mc[0], sib = ' data-sib="' + esc(pid(x.id)) + '" aria-pressed="' + (x === r) + '"';
         if (c && MC_HEX[c]) {
-          if (!seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], withFinals(c), sib)); }
+          // named in the store's language: its swatch's name, else, in a store not in Hebrew, its colour filter's ("כסוף" on an English store's dot: Naot QA, 16.11)
+          if (!seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], x.cl || (LANG === 'he' ? withFinals(c) : ((filedSwatch(x) || {}).label || decode(x.title || ''))), sib)); }
           return;
         }
         // a colour no Hebrew word names ("Black", a store abroad): as the store's colour filter files it, with its swatch

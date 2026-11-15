@@ -23,6 +23,25 @@ final class ColourFamiliesTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void
+    {
+        // Naot QA, 16.11: "Naot Footwear Australia" and "Naot Footwear Industries", one brand, a filter that narrows nothing
+        foreach ([[['Naot Footwear Australia', 'Naot Footwear Industries'], false], [['Stanley', 'Makita'], true]] as [$brands, $filter]) {
+            LoadedIndex::forget();
+            $shop = Shop::factory()->create(['content_locale' => 'en']);
+            app(TenantContext::class)->run($shop->id, function () use ($shop, $brands): void {
+                foreach (range(1, 6) as $i) {
+                    CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $i, 'type' => 'simple', 'status' => 'publish', 'title' => 'Model '.$i,
+                        'brand' => $brands[$i % 2], 'url' => "https://store.test/p/{$i}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$i}", 'payload' => []]);
+                }
+            });
+            app(BuildSearchIndex::class)->handle($shop->id);
+            $facets = (array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['facets'];
+
+            $this->assertSame($filter, collect($facets)->contains('k', 'brand'), implode(' / ', $brands));
+        }
+    }
+
     public function test_a_word_that_only_starts_like_a_colour_is_no_colour(): void
     {
         // Rocks, 2.11: a spiral halo read as a sapphire's blue, a rectangular stone as white.
