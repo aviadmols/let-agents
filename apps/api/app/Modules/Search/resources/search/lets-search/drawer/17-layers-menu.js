@@ -4,7 +4,7 @@
       var fc = facetChips(turn, 0), c = C(turn), groups = {}, so = sortOf(c);
       fc.codes.forEach(function (code) { var g = Math.floor(code / 1000); (groups[g] = groups[g] || []).push(code); });
       // sizes in the order sizes go (35 to 48, S to L), as the filter holds them, never by how many carry each (Naot QA, 16.11)
-      Object.keys(groups).forEach(function (g) { if (sizeFacet(S.facets[g])) { groups[g].sort(function (a, b) { return a - b; }); } });
+      Object.keys(groups).forEach(function (g) { if (sizeFacet(S.facets[g])) { groups[g].sort(bySize); } });
       var html = activeRow(turn) ? '<div class="ls-fgroup ls-fgroup--active"><div class="ls-fgroup__t">' + esc(t('activeFilters')) + '</div>' + activeRow(turn) + '</div>' : '';
       html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(t('sort')) + '</div><div class="ls-chips">' + ['', 'asc', 'desc', 'new'].map(function (s) { return '<button class="ls-chip" aria-pressed="' + (so === s) + '" data-fsort="' + s + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(sortLabel(s)) + '</button>'; }).join('') + '</div></div>';
       if (fc.stock || fc.sale || onStock(c) || onSale(c)) {
@@ -26,7 +26,7 @@
       var s = e.target.closest('[data-fsort]');
       // handled here, so the drawer's own click handler doesn't toggle it a second time
       if (s) { e.stopPropagation(); setSort(turn, s.dataset.fsort); draw(); refresh(turn); return; }
-      if (e.target.closest('[data-fclear]')) { e.stopPropagation(); clearC(turn, true); draw(); refresh(turn); return; }
+      if (e.target.closest('[data-fclear]')) { e.stopPropagation(); clearC(turn, false); draw(); refresh(turn); return; }
       var cl = e.target.closest('[data-clear-filters]');
       if (cl) { e.stopPropagation(); clearC(turn, false); draw(); refresh(turn); return; }
       var ch = e.target.closest('[data-chip]');
@@ -43,7 +43,9 @@
     Object.keys(c.auto).forEach(function (k) { n.no[k] = true; });
     Object.keys(c.words || {}).forEach(function (k) { n.no['w:' + k] = true; });
     n.suggest = c.suggest || {};
-    if (c.autoStock) { n.no.stock = true; }
+    // "In stock" as every search starts stays: clearing is of the filters chosen, not of the default, nor of the order
+    // chosen (Vans QA, 16.11); said in the words, it goes with them
+    if (c.autoStock) { if (c.saidStock) { n.no.stock = true; } else { n.autoStock = true; } }
     if (c.autoSale) { n.no.sale = true; }
     if (withSort) { n.no.sort = true; } else { n.sort = c.sort; n.autoSort = c.autoSort; }
     turn.c = n;

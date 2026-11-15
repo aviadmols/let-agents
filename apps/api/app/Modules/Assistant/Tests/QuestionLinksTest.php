@@ -56,6 +56,18 @@ final class QuestionLinksTest extends TestCase
         $this->assertSame(['Sandals', 'Heels/Wedges', 'טבעות זהב'], array_column($kept, 'name'));
     }
 
+    public function test_a_price_in_the_question_names_no_group(): void
+    {
+        // Naot QA, 16.11: "under" of "sandals under $150" found the sandals filed "Under $100" and offered their "Heels/Wedges"
+        $this->rings();
+        $this->product('u1', 'טבעת נישואין קלאסית', 'טבעת נישואין עד 2000 לכל תקציב', [$this->groups['טבעות אירוסין']], ['price' => '900.00', 'in_stock' => true]);
+
+        $this->assertSame(
+            $this->inShop(fn (): array => RelatedGroups::for($this->shop->id, 'תראה לי טבעות נישואין')),
+            $this->inShop(fn (): array => RelatedGroups::for($this->shop->id, 'תראה לי טבעות נישואין עד 2000 ש"ח')),
+        );
+    }
+
     public function test_a_linked_question_takes_in_what_its_categories_and_tags_hold_today(): void
     {
         $this->rings();

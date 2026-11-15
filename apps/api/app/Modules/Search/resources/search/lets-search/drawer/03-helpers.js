@@ -131,7 +131,9 @@
     lines.forEach(function (line) {
       var parts = line.split(/;\s+/);
       if (item.test(line)) { var last = blocks[blocks.length - 1]; if (last && last.list) { last.list.push(line.replace(item, '')); } else { blocks.push({ list: [line.replace(item, '')] }); } return; }
-      if (parts.length >= 2 && line.length > 120) { blocks.push({ text: parts[0] }); blocks.push({ list: parts.slice(1) }); return; }
+      // a list of two or more after its lead; one ";" is a sentence, never a lead cut short and a lone bullet ("…for full
+      // credit" and "• exchanges are accepted within 60 days": Jean Rachel QA, 16.11)
+      if (parts.length >= 3 && line.length > 120) { blocks.push({ text: parts[0] }); blocks.push({ list: parts.slice(1) }); return; }
       blocks.push({ text: line });
     });
     return blocks;

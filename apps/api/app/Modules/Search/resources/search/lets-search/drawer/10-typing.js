@@ -59,7 +59,7 @@
       // book there is. Asked once more, before anything shows; when the rest finds nothing, the whole words stand.
       if (words && !ids.length && lv.whole) { ids = lv.whole; words = null; }
       if (!words && !byMeaning) {
-        lv.ids = ids; lv.actions = d.actions || [];
+        lv.ids = ids; lv.actions = d.actions || []; lv.kept = typeof d.query === 'string' ? d.query + ' ' + ((d.loosened && d.loosened.left) || []).join(' ') : null;
         readTags(lv);
         var rest = restWords(lv);
         if (rest) { lv.whole = ids; lv.words = rest; liveServer(q, false, rest); return; }

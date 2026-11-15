@@ -8,8 +8,8 @@ final class HebrewPriceRange implements PriceRange
 {
     public function read(string $text): array
     {
-        [, $min, $max] = HebrewSearch::priceRange(mb_substr($text, 0, 120));
+        [$words, $min, $max] = HebrewSearch::priceRange(mb_substr($text, 0, 120));
 
-        return ['min' => $min, 'max' => $max];
+        return ['min' => $min, 'max' => $max] + ($min === null && $max === null ? [] : ['words' => $words]);
     }
 }

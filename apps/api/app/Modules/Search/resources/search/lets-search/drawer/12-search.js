@@ -106,7 +106,7 @@
     }).then(function (r) {
       var d = r.body || {}, ids = idsOf(d);
       // the words' own asks ("הכי זול", "במבצע") are read with the tags: chosen, marked, and can be taken off
-      Object.assign(turn, { ids: ids, actions: d.actions || [] });
+      Object.assign(turn, { ids: ids, actions: d.actions || [], kept: typeof d.query === 'string' ? d.query + ' ' + ((d.loosened && d.loosened.left) || []).join(' ') : null });
       readTags(turn);
       // "ספרים על חטופים": "ספרים" is the filter "ספר", so the search is for "על חטופים", filtered to books, not every
       // book there is (as Aviad asked, 2026-10-21). Asked once more, counted once; when the rest finds nothing, the
@@ -128,6 +128,15 @@
         announce(t('announceResults', { n: ids.length }));
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
+  }
+  // 1 for a product whose name says a word of the search, in any of its forms ("נעלי" of "נעליים", "sandal" of "sandals"),
+  // else 0; all 0 when nothing was typed that means something
+  function namesSearch(turn) {
+    var E = S.engine, st = function (w) { try { return E && E.stem && E.normalize ? E.stem(E.normalize(w)) : w; } catch (e) { return w; } };
+    var asked = [];
+    meantWords(turn.words || turn.q || '').forEach(function (w) { wordForms(w).forEach(function (f) { asked.push(st(f)); }); });
+    if (!asked.length) { return function () { return 0; }; }
+    return function (r) { return wordsOf(decode(r.title || '')).some(function (w) { return wordForms(w).some(function (f) { return asked.indexOf(st(f)) >= 0; }); }) ? 1 : 0; };
   }
   function filtered(turn) {
     var c = C(turn), out = (turn.ids || []).map(rec).filter(Boolean);
@@ -186,7 +195,12 @@
     if (onStock(c)) { out = out.filter(function (r) { return r.s === 1; }); }
     if (onSale(c)) { out = out.filter(function (r) { return r.sl === 1; }); }
     var so = sortOf(c);
-    if (so === 'asc' || so === 'desc') { out = out.slice().sort(function (a, b) { return ((a.pr || 0) - (b.pr || 0)) * (so === 'asc' ? 1 : -1); }); }
+    // by price, the products whose names say the search first: "נעליים" cheapest first is the cheapest shoes, not a pair of
+    // socks whose picture's words say "גרבי נעל" (Vans QA, 16.11); then the rest, by price too
+    if (so === 'asc' || so === 'desc') {
+      var said = namesSearch(turn);
+      out = out.map(function (r) { return { r: r, n: said(r) }; }).sort(function (a, b) { return (b.n - a.n) || ((a.r.pr || 0) - (b.r.pr || 0)) * (so === 'asc' ? 1 : -1); }).map(function (x) { return x.r; });
+    }
     else if (so === 'new') { out = out.slice().sort(function (a, b) { return (b.d || 0) - (a.d || 0); }); }
     else { out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1); }); }
     // two colours of one model under one name ("Kayla" and "Kayla"): one card, its colours its dots; nothing told them
@@ -297,7 +311,8 @@
     Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(c.suggest[k].label, false, 'g:' + k, turn.id, false); } });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }
-  function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '" data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">' + count + '</span>' : '') + '</button>'; }
+  // its count in brackets, smaller: "38 (41)", never "38 41" read as a range of sizes (Vans QA, 16.11)
+  function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '" data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">(' + count + ')</span>' : '') + '</button>'; }
   function sortLabel(s) { return s === 'asc' ? t('sortAsc') : s === 'desc' ? t('sortDesc') : s === 'new' ? t('sortNew') : t('sortRel'); }
 
   // first: the product the search showed in this card, kept while a colour dot turns the card to another (its dots
@@ -352,12 +367,32 @@
   }
   // a size filter: by its values' own order (35, 36, 37), never by count
   function sizeFacet(f) { return !!f && /size|מידה|מידות/i.test(String(f.k || '') + ' ' + String(f.l || '')); }
+  // Two sizes in order: by the number they are (21, 21.5, 22), never by the order the store added them (21.5 after 47:
+  // Vans QA, 16.11); a size that is no number ("M (38.5-42)", socks) after every number, in the store's own order.
+  function sizeNumber(code) {
+    var f = S.facets[Math.floor(code / 1000)], v = f && f.v[code % 1000], m = v && /^\s*(\d+(?:[.,]\d+)?)\s*$/.exec(String(v.l));
+    return m ? parseFloat(m[1].replace(',', '.')) : null;
+  }
+  function bySize(a, b) {
+    var x = sizeNumber(a), y = sizeNumber(b);
+    if (x !== null && y !== null) { return x - y || a - b; }
+    return x !== null ? -1 : y !== null ? 1 : a - b;
+  }
   // the chips of a size filter in its own order, in the places they hold among the others
   function sizesInOrder(codes) {
     var places = {}, out = codes.slice();
     codes.forEach(function (code, i) { var g = Math.floor(code / 1000); if (sizeFacet(S.facets[g])) { (places[g] = places[g] || []).push(i); } });
-    Object.keys(places).forEach(function (g) { var sorted = places[g].map(function (i) { return codes[i]; }).sort(function (a, b) { return a - b; }); places[g].forEach(function (i, k) { out[i] = sorted[k]; }); });
+    Object.keys(places).forEach(function (g) { var sorted = places[g].map(function (i) { return codes[i]; }).sort(bySize); places[g].forEach(function (i, k) { out[i] = sorted[k]; }); });
     return out;
+  }
+  // A version named by what tells it from its siblings, never the whole product name: "Buzz - WEK White Floral Rose Gold"
+  // beside "Buzz - SLB Chestnut Copper Combo" is "WEK White Floral Rose Gold", "Julius - 739 Buffallo" is "739 Buffallo"
+  // (Naot QA, 16.11). The words every sibling shares are the model's name; with nothing left, the name as it is.
+  function versionLabel(x, fam) {
+    var title = decode(x.title || ''), others = (fam || []).filter(function (o) { return o !== x; }).map(function (o) { return ' ' + decode(o.title || '').toLowerCase() + ' '; });
+    if (!others.length) { return title; }
+    var own = title.split(/\s+/).filter(function (w) { return w && !/^[-–|·,/]+$/.test(w) && others.some(function (o) { return o.indexOf(' ' + w.toLowerCase() + ' ') < 0; }); });
+    return own.join(' ').replace(/^[-–|·,\s]+|[-–|·,\s]+$/g, '') || title;
   }
   function colourDots(r, first) {
     var out = [], seen = {}, fam = familyOf(r);
@@ -368,8 +403,12 @@
       [lead].concat(fam.filter(function (x) { return x !== lead && x.s !== 0; }), fam.filter(function (x) { return x !== lead && x.s === 0; })).forEach(function (x) {
         var c = x.mc && x.mc[0], sib = ' data-sib="' + esc(pid(x.id)) + '" aria-pressed="' + (x === r) + '"';
         if (c && MC_HEX[c]) {
+          // read as two colours ("Port Royale/Black": burgundy canvas, black laces): both, the dot split between them, never
+          // the first alone, a black dot on a burgundy shoe (Vans QA, 16.11); and two versions apart from a plain black one
+          var c2 = x.mc[1] && x.mc[1] !== c && /^#/.test(MC_HEX[x.mc[1]] || '') && /^#/.test(MC_HEX[c]) ? x.mc[1] : null, key = c + (c2 ? '+' + c2 : '');
+          var sw = c2 ? 'linear-gradient(135deg,' + MC_HEX[c] + ' 50%,' + MC_HEX[c2] + ' 50%)' : MC_HEX[c];
           // named in the store's language: its swatch's name, else, in a store not in Hebrew, its colour filter's ("כסוף" on an English store's dot: Naot QA, 16.11)
-          if (!seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], x.cl || (LANG === 'he' ? withFinals(c) : ((filedSwatch(x) || {}).label || decode(x.title || ''))), sib)); }
+          if (!seen[key]) { seen[key] = 1; out.push(dot(sw, x.cl || (LANG === 'he' ? withFinals(c) + (c2 ? ' / ' + withFinals(c2) : '') : ((filedSwatch(x) || {}).label || versionLabel(x, fam))), sib)); }
           return;
         }
         // a colour no Hebrew word names ("Black", a store abroad): as the store's colour filter files it, with its swatch
@@ -377,7 +416,7 @@
         if (filed && !seen['f' + filed.code]) { seen['f' + filed.code] = 1; out.push(dot(filed.sw, x.cl || filed.label, sib)); return; }
         // no colour to tell it by (a ring in amethyst, in citrine), or one its sibling already showed: its own picture,
         // named as the store's swatch names it ("Citrine"), so every version is a press away (Jean Rachel, 16.11)
-        if (x.img && !seen['i' + x.id]) { seen['i' + x.id] = 1; out.push(imgDot(x.img, x.cl || decode(x.title), sib)); }
+        if (x.img && !seen['i' + x.id]) { seen['i' + x.id] = 1; out.push(imgDot(x.img, x.cl || versionLabel(x, fam), sib)); }
       });
     } else if (r && r.v) {
       var at = S.facets.map(function (f) { return f.k; }).indexOf('variant_color');
@@ -575,9 +614,10 @@
   }
   // the AI asked to find the words across the whole catalogue ("תראה לי …": the set finder), from the ask card or the row
   // "חפשו לי באתר": a few words of what is sought are asked to see ("תראה לי עגילי זהב"); a sentence, or a question, is
-  // asked as the shopper wrote it, never "תראה לי" before it (as Aviad asked, 11.11)
+  // asked as the shopper wrote it, never "הראו לי" before it (as Aviad asked, 11.11); so is anything with markup in it
+  // ("<img onerror>": Vans QA, 16.11). "הראו", in the plural: never as a man or as a woman.
   function askFind(q) {
-    var s = String(q || '').replace(/[?؟.!\s]+$/, ''), asked = isQuestion(s) || s.trim().split(/\s+/).length >= 4;
+    var s = String(q || '').replace(/[?؟.!\s]+$/, ''), asked = isQuestion(s) || s.trim().split(/\s+/).length >= 4 || /[<>{}=\\]/.test(s);
     return 'data-askcard data-from="' + esc(q) + '" data-ask="' + esc(asked ? String(q || '').trim() : t('askFindQ', { q: s })) + '"';
   }
   // nothing found by the words nor by their meaning: never "not found" (Tomer's ask card, 8.11), the store's popular

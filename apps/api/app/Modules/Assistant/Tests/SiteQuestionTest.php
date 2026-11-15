@@ -455,7 +455,10 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('no_info', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'days passing say nothing new: still from memory, no model');
         $this->travel(1)->minutes();
         $this->inShop(fn () => CatalogContent::query()->update(['updated_at' => now()]));
-        $this->assertSame('answered', $this->ask('יש משלוח לאילת?')->json('data.outcome'), 'the store wrote the page: asked again');
+        $data = $this->ask('יש משלוח לאילת?')->json('data');
+        $this->assertSame('answered', $data['outcome'], 'the store wrote the page: asked again');
+        // a question of the store's: the storefront offers no products "related" to its words (Vans QA, 16.11)
+        $this->assertTrue($data['store_question'] ?? false);
     }
 
     public function test_a_writer_never_checks_its_own_family_and_a_page_answer_is_not_a_site_answer(): void
@@ -636,6 +639,41 @@ final class SiteQuestionTest extends TestCase
         // Nothing it names in the range: a model reads it, as before.
         $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => []]];
         $this->assertSame('model', $this->askWith('צמיד עד 500', ['803', '801'])->json('data.from'));
+
+        // More in the range than three: every one, cheapest first, as a set the drawer shows whole (Naot QA, 16.11).
+        $this->product('806', 'עגילי טיפה זהב', 'עגילים.', [], ['price' => '420.00', 'in_stock' => true]);
+        $this->product('807', 'עגילי פרח זהב', 'עגילים.', [], ['price' => '390.00', 'in_stock' => true]);
+        $this->product('808', 'עגילי לב שאזלו', 'עגילים.', [], ['price' => '200.00', 'in_stock' => false]);
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return ['801', '802', '804', '805', '806', '807', '808'];
+            }
+        });
+        $data = $this->askWith('עגילים עד 500 ש"ח?', ['801'])->json('data');
+        $this->assertSame(['answered', 'code', []], [$data['outcome'], $data['from'], $data['picks']]);
+        $this->assertSame(['805', '807', '806', '801', '802'], $data['set']['ids'], 'every earring up to 500 in stock, cheapest first');
+        $this->assertStringStartsWith('5 ', $data['answer']);
+    }
+
+    public function test_a_pick_whose_reason_is_marks_alone_shows_no_reason(): void
+    {
+        // Naot QA, 16.11: a card under "What size should I get if I am a US 8?" said only '""' under its name.
+        $this->drills();
+        $this->replies = [
+            ['found' => true, 'answer' => 'הראשונה חזקה יותר.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => '""'], ['ref' => 'p2', 'why' => 'קלה יותר']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $picks = $this->askWith('מה ההבדל ביניהם?', ['701', '702'])->json('data.picks');
+
+        $this->assertSame([['701', ''], ['702', 'קלה יותר']], array_map(fn (array $p): array => [$p['external_id'], $p['why']], $picks), 'the card stays, without the marks');
     }
 
     public function test_a_question_about_the_products_in_front_of_the_shopper_is_never_kept_for_the_next_one(): void

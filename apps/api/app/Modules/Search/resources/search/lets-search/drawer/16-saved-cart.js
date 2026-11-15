@@ -215,7 +215,9 @@
     return (holder && holder.querySelector('[data-after="' + id + '"]')) || BODY.querySelector('[data-after="' + id + '"]');
   }
   function afterAdd(id, btn) {
+    // a card in a grid of cards: said in a toast, never a box that makes this card taller than its row (Vans QA, 16.11)
     var box = afterBox(id, btn);
+    if (box && box.closest('.ls-grid .ls-card')) { toast(CFG.demo ? t('demoAdded') : (LANG === 'he' ? 'נוסף לעגלה שלכם' : 'Added to your cart')); return; }
     if (!box) { return; }
     // a demo says it is one: added, as a store would show it, with no cart to go to
     box.innerHTML = CFG.demo ? '<div class="ls-added ls-focus-in">' + icon('cart', 'ls-icon--sm') + '<span style="flex:1">' + esc(t('demoAdded')) + '</span></div>'
@@ -280,7 +282,7 @@
               return '<button class="ls-chip" aria-pressed="' + !!on + '"' + (ok ? '' : ' disabled style="opacity:.4;text-decoration:line-through"') + ' data-var="' + esc(a.name) + '|' + esc(term.slug) + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(term.name) + '</button>';
             }).join('') + '</div></div>';
         }).join('');
-        var foot = '<button class="ls-btn ls-btn--primary ls-btn--lg ls-add" data-var-add' + (missing.length ? ' disabled' : '') + '><span class="ls-add__label">' + esc(missing.length ? t('choose', { a: missing[0].name }) : t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
+        var foot = '<button class="ls-btn ls-btn--primary ls-btn--lg ls-add" data-var-add' + (missing.length ? ' disabled' : '') + '><span class="ls-add__label">' + esc(missing.length ? chooseOf('choose', 'a', missing[0].name) : t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
         LAYER.querySelector('.ls-layer__body').innerHTML = head + groups;
         LAYER.querySelector('.ls-layer__foot').innerHTML = foot;
       }

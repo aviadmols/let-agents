@@ -106,7 +106,7 @@
       return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds)).then(function () {
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
-            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [],
+            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question,
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null });
           announce(t('announceReady') + ': ' + d.answer);
           if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
@@ -172,6 +172,8 @@
     if (!turn || turn.alsoIds) { return; }
     // an answer about one product (asked on its page, or a kept answer about it): nothing beside it (1.11)
     if (turn.ctx || turn.oneProduct) { turn.alsoIds = []; return; }
+    // a question of the store's (shipping, returns): no products are related to its words (Vans QA, 16.11)
+    if (turn.storeQ) { turn.alsoIds = []; return; }
     turn.alsoIds = [];
     if ((turn.sources || []).some(function (s) { return s && s.store; })) { return; }
     json(API + '/search/' + SITE + '?counted=1&q=' + encodeURIComponent(turn.q)).then(function (r) {
@@ -232,7 +234,7 @@
       html += '<ol class="ls-picks"' + (anim ? ' style="--lsp-stagger:110ms"' : '') + '>' + turn.picks.map(function (p, i) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, buy: 0, s: 1 };
         return '<li class="ls-pick' + (anim ? ' ls-focus-in' : '') + '" style="--i:' + (anim ? Math.round(n * 28 / 110) + i : 0) + '"><a class="ls-pick__media" href="' + esc(r.url || p.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || p.image || '') + '" alt=""></a><div>' +
-          '<a class="ls-pick__title" dir="auto" href="' + esc(r.url || p.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(r.title || p.title)) + '</a><div class="ls-pick__why">' + esc(p.why || '') + '</div>' +
+          '<a class="ls-pick__title" dir="auto" href="' + esc(r.url || p.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(r.title || p.title)) + '</a>' + (/[\p{L}\p{N}]/u.test(String(p.why || '')) ? '<div class="ls-pick__why">' + esc(p.why) + '</div>' : '') +
           '<div class="ls-pick__row">' + priceHtml(r) + '<span style="display:flex;gap:4px;align-items:center">' + heartBtn(pid(r.id), S.saved.indexOf(pid(r.id)) >= 0) + buyBtn(r, 'ls-btn--sm') + '</span></div><div data-after="' + esc(pid(r.id)) + '"></div></div></li>';
       }).join('') + '</ol>';
     }

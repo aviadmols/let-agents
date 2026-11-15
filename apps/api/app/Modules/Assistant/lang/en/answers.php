@@ -44,6 +44,8 @@ return [
             'most_expensive' => 'The most expensive in stock of what we found: :title.',
             'on_sale' => 'On sale now, of what we found: :title.',
             'in_range' => 'In your price range, the cheapest in stock of what we found: :title.',
+            'in_range_all' => ':count in your price range and in stock, from the cheapest:',
+            'on_sale_all' => ':count on sale now and in stock, from the cheapest:',
             'why_cheapest' => 'The cheapest in stock',
             'why_cheapest_next' => 'Another low-priced option in stock',
             'why_most_expensive' => 'The most expensive in stock',

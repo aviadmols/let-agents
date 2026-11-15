@@ -9,7 +9,7 @@
       showAll: 'הצגת כל :n התוצאות', showMoreLeft: 'הצגת עוד תוצאות · נותרו :n', askSpecific: 'אפשר לחפש מוצר, או לשאול שאלה מדויקת יותר, למשל לפי נושא, קהל או תקציב, ואעזור למצוא.', understood: 'הבנתי: ‏":q"', searchFor: 'לכל התוצאות בחיפוש "‎:q‎"', showAllOne: 'הצגת התוצאה', notSure: 'יש שאלה על התוצאות? שאלו את :name', askOneBrief: 'ספרו לי בקצרה על :t', askOneWho: 'למי מתאים :t?', askOneKnow: 'מה כדאי לדעת על :t לפני שקונים?', askManyDiff: 'מה ההבדל ביניהם?', askManyBest: 'מה הכי מתאים לי מביניהם?', askManyWorth: 'איזה מהם הכי משתלם?', askOwn: 'או כתבו שאלה משלכם', adviceQ: 'מה הכי כדאי ומתאים לי מבין התוצאות לחיפוש "‎:q‎"?', goPage: 'לדף :t', adviceNone: 'לא מצאתי המלצה ברורה מבין התוצאות. אפשר להתייעץ עליהן עם AI אחר:',
       noMatch: 'לא מצאנו את "‎:q‎"', noMatchSub: 'אולי זה מתואר אחרת אצלנו. אפשר לשאול, או להתחיל מקטגוריה.',
       askKicker: 'יש לכם שאלה?', askBtn: 'חפשו לי באתר', askSub: ':name בודק בדפי החנות ומציג את המקור', askOther: 'לא מה שחיפשתם? שאלו את :name', thinkingAsk: 'בודקים בדפי החנות…',
-      productsCount: ':n מוצרים', askedAbout: 'נשאל על: :t', askedAboutProduct: 'נשאל על מוצר: :t', alsoRelated: 'מוצרים שקשורים לשאלה', colours: 'צבעים', relatedGroups: 'אפשר לחפש גם לפי', alsoAll: 'לכל התוצאות', wanted: 'מוצרים פופולריים', notHere: 'לא מצאנו ":w" באתר. אלה הקרובים ביותר לפי משמעות:', showingFor: 'מציג תוצאות ל":kept" · ":gone" לא נמצא באתר', noneSaid: 'אין כרגע ":gone" ב":kept". אלה הקרובים ביותר:', loosened: 'לא מצאנו בדיוק ":q". מציגים בלי ":w":', meaningOnly: 'אף מוצר לא מכיל את המילים ":q". אלה הקרובים ביותר לפי משמעות:', noneAll: 'אין מוצר שמתאים לכל המילים ":q". אלה מתאימים לחלק מהן, ואפשר לבחור:', meaningMostly: 'רק :n מוצרים מכילים את המילים; השאר קרובים לפי משמעות.', askFind: 'לבקש מ־:name למצוא את זה', askFindQ: 'תראה לי :q', oneProduct: 'מוצר אחד', oneItem: 'פריט אחד', itemsCount: ':n פריטים', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
+      productsCount: ':n מוצרים', askedAbout: 'נשאל על: :t', askedAboutProduct: 'נשאל על מוצר: :t', alsoRelated: 'מוצרים שקשורים לשאלה', colours: 'צבעים', relatedGroups: 'אפשר לחפש גם לפי', alsoAll: 'לכל התוצאות', wanted: 'מוצרים פופולריים', notHere: 'לא מצאנו ":w" באתר. אלה הקרובים ביותר לפי משמעות:', showingFor: 'מציג תוצאות ל":kept" · ":gone" לא נמצא באתר', noneSaid: 'אין כרגע ":gone" ב":kept". אלה הקרובים ביותר:', loosened: 'לא מצאנו בדיוק ":q". מציגים בלי ":w":', meaningOnly: 'אף מוצר לא מכיל את המילים ":q". אלה הקרובים ביותר לפי משמעות:', noneAll: 'אין מוצר שמתאים לכל המילים ":q". אלה מתאימים לחלק מהן, ואפשר לבחור:', meaningMostly: 'רק :n מוצרים מכילים את המילים; השאר קרובים לפי משמעות.', askFind: 'לבקש מ־:name למצוא את זה', askFindQ: 'הראו לי :q', oneProduct: 'מוצר אחד', oneItem: 'פריט אחד', itemsCount: ':n פריטים', in: 'ב:name', filter: 'סינון', sort: 'מיון', sortRel: 'רלוונטי', sortAsc: 'מחיר: מהזול', sortDesc: 'מחיר: מהיקר', sortNew: 'הכי חדש',
       inStock: 'במלאי', onSale: 'במבצע', clearAll: 'ניקוי', showN: 'הצגת :n מוצרים', noFilterMatch: 'אין מוצרים שמתאימים לכל הסינונים. נסו להסיר אחד.',
       didYouMean: 'לא מצאנו בדיוק את "‎:q‎". למה התכוונתם?', category: 'קטגוריה: :t', exactSku: 'נמצא לפי מק״ט :sku', exact: 'התאמה מדויקת',
       noResults: 'לא מצאנו את "‎:q‎"', noResultsSub: 'נסו מילה אחרת, או התחילו מקטגוריה.',
@@ -129,5 +129,12 @@
     if (typeof S !== 'undefined' && S.config && S.config.cardAction === 'read_more') { s = itemized(s); }
     if (vars) { Object.keys(vars).forEach(function (k) { var v = vars[k]; if (k === 'name' || k === 'shop') { v = '\u2068' + v + '\u2069'; } s = s.split(':' + k).join(v); }); }
     return s;
+  }
+  // "Choose :a" with an option the store already named as a request ("Choose your ring size"): the store's words alone,
+  // never "Choose Choose your ring size" (Jean Rachel QA, 16.11)
+  function chooseOf(key, k, name) {
+    var lead = String(T[key] || '').split(':' + k)[0].trim().toLowerCase(), v = {};
+    v[k] = name;
+    return lead && String(name).trim().toLowerCase().indexOf(lead) === 0 ? String(name).trim() : t(key, v);
   }
 

@@ -241,7 +241,7 @@ a.ls-btn:not(.ls-btn--link) { text-decoration: none; }
 .ls-recent__x { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 100%; padding-inline-end: 4px; color: var(--ls-fg-muted); }
 .ls-recent__x .ls-icon { width: 14px; height: 14px; }
 @media (hover: hover) and (pointer: fine) { .ls-recent__x:hover { color: var(--ls-fg); } }
-.ls-chip__count { color: var(--ls-fg-muted); font-weight: 400; }
+.ls-chip__count { color: var(--ls-fg-muted); font-weight: 400; font-size: .85em; }
 .ls-chip[aria-pressed="true"] .ls-chip__count { color: inherit; opacity: .7; }
 @media (hover: hover) and (pointer: fine) {
   .ls-chip:not([aria-pressed="true"]):hover { background: var(--ls-bg-sunken); box-shadow: inset 0 0 0 1px var(--ls-fg-faint); }

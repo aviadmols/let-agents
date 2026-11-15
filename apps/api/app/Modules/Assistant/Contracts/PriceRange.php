@@ -11,6 +11,6 @@ namespace App\Modules\Assistant\Contracts;
  */
 interface PriceRange
 {
-    /** @return array{min: float|null, max: float|null} both null when the text names no price */
+    /** @return array{min: float|null, max: float|null, words?: string} both null when the text names no price; words: the text without it */
     public function read(string $text): array;
 }

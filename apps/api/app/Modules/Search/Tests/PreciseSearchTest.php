@@ -94,6 +94,9 @@ final class PreciseSearchTest extends TestCase
         $this->assertEqualsCanonicalizing(['2', '4'], $this->found('טבעת יהלום זהב'), 'without the price, both');
         $this->assertEqualsCanonicalizing(['4'], $this->found('טבעת מעל 3 אלף ש״ח'));
         $this->assertEqualsCanonicalizing(['1', '5'], $this->found('יהלום בין 800 ל-1500'));
+        // a price alone is every product within it, never its word searched ("under 150" found the "Under $100" tag: Naot, 16.11)
+        $this->assertEqualsCanonicalizing(['1', '3', '5'], $this->found('עד 1500'));
+        $this->assertEqualsCanonicalizing(['1', '3', '5'], $this->found('under 1500'));
 
         $this->assertSame(['טבעת יהלום בזהב', null, 2500.0], HebrewSearch::priceRange('טבעת יהלום בזהב עד 2500 שח'));
         $this->assertSame(['טבעת', 1000.0, 2000.0], HebrewSearch::priceRange('טבעת מ-1000 עד 2,000 ש"ח'));

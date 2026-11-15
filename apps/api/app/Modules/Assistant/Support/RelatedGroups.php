@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Support;
 
+use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Catalog\Models\CatalogProduct;
 use Illuminate\Support\Facades\Cache;
 
@@ -49,6 +50,10 @@ final class RelatedGroups
      */
     public static function for(string $shopId, string $question): array
     {
+        // a price is no name of a group: "under" of "sandals under $150" found the sandals filed "Under $100", and offered
+        // their "Heels/Wedges" (Naot QA, 16.11)
+        $priced = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : [];
+        $question = trim((string) ($priced['words'] ?? $question)) ?: $question;
         $key = $shopId.'.'.Question::key($question);
 
         return self::$found[$key] ??= Cache::remember('assistant.related.'.$key, 3600, fn (): array => self::find($question));

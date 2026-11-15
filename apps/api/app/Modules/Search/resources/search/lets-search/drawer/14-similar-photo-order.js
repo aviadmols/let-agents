@@ -241,7 +241,7 @@
         : line.status === 'unknown_product' ? '<div class="ls-order__state is-bad">' + esc(t('orderUnknown')) + '</div>' : '';
       var choose = line.status === 'requires_manual_option_selection' && line.choose && !r.done ? '<div class="ls-chips ls-order__choose">' + line.choose.map(function (c, at) {
         return '<button class="ls-chip" aria-pressed="' + (turn.pickedAt[r.i] === at) + '" data-order-pick="' + turn.id + ':' + r.i + ':' + at + '"' + (c.in_stock ? '' : ' disabled') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(c.label || '') + (c.price != null ? ' <span class="ls-chip__count ls-num">' + money(c.price) + '</span>' : '') + '</button>';
-      }).join('') + '</div><div class="ls-order__hint">' + esc(t('orderChoose', { field: line.field || t('orderOption') })) + '</div>' : '';
+      }).join('') + '</div><div class="ls-order__hint">' + esc(chooseOf('orderChoose', 'field', line.field || t('orderOption'))) + '</div>' : '';
       return '<div class="ls-order__line' + (r.done ? ' is-done' : '') + '">' + (line.image ? '<img class="ls-order__img" src="' + esc(line.image) + '" alt="" decoding="async">' : '<span class="ls-order__img"></span>') +
         '<div class="ls-order__main"><div class="ls-order__name" dir="auto">' + esc(decode(line.title || line.product || '')) + '</div>' + (sub.length ? '<div class="ls-order__sub">' + esc(sub.join(' · ')) + '</div>' : '') + choose + state +
         (line.page_url && line.status !== 'unknown_product' ? '<a class="ls-order__page" href="' + esc(line.page_url) + '">' + esc(t('orderPage')) + '</a>' : '') + '</div>' +

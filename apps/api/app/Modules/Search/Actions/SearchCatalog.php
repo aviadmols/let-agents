@@ -469,7 +469,10 @@ final class SearchCatalog
             [$query, $without] = HebrewSearch::without($priced);
             // one letter is not a search: "ס" found the one book whose author is "תומס ס. טיילור" and called it the
             // exact match. Under two letters or digits it is as nothing typed.
-            $index = mb_strlen((string) preg_replace('/[^\p{L}\p{N}]/u', '', $query)) < 2 ? null : LoadedIndex::for($shopId);
+            // A price alone ("under 150") is no word to search: every product within it (Naot QA, 16.11: "under" was searched
+            // and found the "Under $100" gift tag).
+            $priceOnly = ($minPrice !== null || $maxPrice !== null) && trim($query) === '' && $without === [];
+            $index = ! $priceOnly && mb_strlen((string) preg_replace('/[^\p{L}\p{N}]/u', '', $query)) < 2 ? null : LoadedIndex::for($shopId);
             // "הכי זול", "במבצע", "גדול מ-2": actions, not words. The same phrases in every shop, less
             // those its index leaves out (no size: "גדול" stays a word).
             [$query, $actions] = HebrewSearch::actions($query, $index['actions'] ?? []);
@@ -484,7 +487,7 @@ final class SearchCatalog
                 }
             }
             // "מבצעים", "הכי זול": nothing but what to do asked, every product as asked (Take Me Home, 9.11: "מבצעים" found none)
-            if ($index !== null && trim($query) === '' && $actions['ids'] !== []) {
+            if ($index !== null && trim($query) === '' && ($actions['ids'] !== [] || $priceOnly)) {
                 return $this->ofLength($shopId, $index, null, $minPrice, $maxPrice, $actions, $only, $count, $perGroup, $visit);
             }
             // "אני רוצה לקנות מתנה לאשתי טבעת יהלום": a sentence no product holds is searched by what it asks for ("טבעת

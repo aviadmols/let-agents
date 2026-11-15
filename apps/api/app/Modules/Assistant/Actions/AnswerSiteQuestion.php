@@ -399,6 +399,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             // The store's categories and tags the question is about, as chips under the answer to search by.
             $related = $result['outcome'] === AssistantAnswer::ANSWERED && ! $bound && ! isset($result['set']) ? $this->relatedChips($shopId, $question) : [];
             $result += $related === [] ? [] : ['related' => $related];
+            // A question of the store's (shipping, returns, hours): the storefront offers no products "related" to its words
+            // (Vans QA, 16.11: socks under "how much is shipping to Eilat?").
+            $result += self::aboutProducts($question) ? [] : ['store_question' => true];
 
             return $this->logged($shopId, $question, $products, $result);
         });
@@ -2242,7 +2245,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     private function priceRange(string $question): array
     {
-        $read = fn (string $q): array => app()->bound(PriceRange::class) ? app(PriceRange::class)->read($q) : ['min' => null, 'max' => null];
+        $read = fn (string $q): array => app()->bound(PriceRange::class) ? array_intersect_key(app(PriceRange::class)->read($q), ['min' => 0, 'max' => 0]) : ['min' => null, 'max' => null];
         $range = $read($question);
 
         if ($range['min'] !== null || $range['max'] !== null || $this->conversation === [] || preg_match(self::PRICE_WORDS, $this->asked) === 1) {
@@ -3667,6 +3670,20 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         uasort($fit, fn (array $a, array $b): int => $asks === 'most_expensive' ? $b['price'] <=> $a['price'] : $a['price'] <=> $b['price']);
+
+        // "sandals under $150", "what is on sale": every one that fits, cheapest first, as the drawer shows a whole set (a
+        // grid and "show all"), never the first three (Naot QA, 16.11: three sandals of a dozen in the range).
+        if (in_array($asks, ['in_range', 'on_sale'], true) && count($fit) > self::MAX_COMPUTED) {
+            return [
+                'outcome' => AssistantAnswer::ANSWERED,
+                'answer' => (string) __('assistant::answers.site.computed.'.$asks.'_all', ['count' => count($fit)], $locale),
+                'from' => 'code',
+                'sources' => [],
+                'picks' => [],
+                'set' => ['ids' => array_map('strval', array_column(array_values($fit), 'external_id')), 'title' => null, 'near' => null, 'ask' => null, 'search' => null],
+            ];
+        }
+
         $picks = [];
 
         foreach (array_slice(array_values($fit), 0, self::MAX_COMPUTED) as $at => $product) {
@@ -4041,8 +4058,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         foreach ($raw as $pick) {
             $ref = is_array($pick) ? (string) ($pick['ref'] ?? '') : '';
             $why = is_array($pick) ? self::withoutRefs(mb_substr(trim((string) ($pick['why'] ?? '')), 0, 160)) : '';
+            // a reason of marks alone ('""', "-"): the card without a line under its name, never the marks (Naot QA, 16.11)
+            $marksOnly = $why !== '' && preg_match('/[\p{L}\p{N}]/u', $why) !== 1;
+            $why = $marksOnly ? '' : $why;
 
-            if (! isset($productsByRef[$ref]) || isset($seen[$ref]) || $why === '' || Question::hasContactDetails($why) || self::hasRef($why)) {
+            if (! isset($productsByRef[$ref]) || isset($seen[$ref]) || ($why === '' && ! $marksOnly) || Question::hasContactDetails($why) || self::hasRef($why)) {
                 continue;
             }
 
@@ -4169,6 +4189,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($link !== null) {
             $categories = (array) $link->categories === [] ? [] : CatalogCategory::query()->whereIn('external_id', array_map('strval', (array) $link->categories))->whereNull('removed_at')->pluck('name')->all();
             $names = array_values(array_unique(array_filter(array_map('strval', [...$categories, ...(array) $link->tags]))));
+            // a name a shopper reads, here too: never a collection's address or a menu's path
+            $names = array_column(RelatedGroups::chips(array_map(fn (string $name): array => ['kind' => 'tag', 'id' => $name, 'name' => $name, 'count' => 0], $names)), 'name');
 
             return array_map(fn (string $name): array => ['name' => $name], array_slice($names, 0, RelatedGroups::MAX));
         }

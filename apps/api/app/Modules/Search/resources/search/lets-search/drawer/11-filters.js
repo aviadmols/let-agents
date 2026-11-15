@@ -387,8 +387,16 @@
     if (!taken.length) { return null; }
     // only the words that mean something: a joining word left alone ("עם" of "טבעות עם רובי") would narrow the search to
     // the products whose names happen to hold it
-    var rest = meantWords(wordsOf(turn.q).filter(function (w, i) { return taken.indexOf(i) < 0; }).join(' ')).join(' ');
-    return rest || null;
+    var rest = meantWords(wordsOf(turn.q).filter(function (w, i) { return taken.indexOf(i) < 0; }).join(' '));
+    // and only when one of them is a word the server searched for: what is left of "sandals under $150" once "sandals" is a
+    // filter is the price alone, already read, and "under 150" searched on its own found the "Under $100" gift tag
+    // (footbeds: Naot QA, 16.11). The words left are still sent whole, so the server reads their price again.
+    var E = S.engine, norm1 = function (w) { return E && E.normalize ? E.normalize(w) : String(w).toLowerCase(); };
+    if (typeof turn.kept === 'string') {
+      var kept = wordsOf(turn.kept).map(norm1);
+      if (!rest.some(function (w) { return kept.indexOf(norm1(w)) >= 0; })) { return null; }
+    }
+    return rest.join(' ') || null;
   }
   var SIZE_BAND = { top: /(^|\s)(ב?מיד(ה|ות)\s+(גדול|רחב)|large\s+sizes?|big\s+sizes?|plus\s+sizes?)/i, bottom: /(^|\s)(ב?מיד(ה|ות)\s+(קטנ|צר)|small\s+sizes?|petite)/i };
   function onCode(c, code) { return !!(c.f[code] || (c.auto && c.auto[code])); }
