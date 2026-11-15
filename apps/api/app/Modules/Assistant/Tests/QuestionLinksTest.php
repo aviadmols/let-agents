@@ -47,6 +47,15 @@ final class QuestionLinksTest extends TestCase
         $this->assertSame(['groups' => [], 'ids' => []], $this->inShop(fn (): array => RelatedGroups::for($this->shop->id, 'יש לכם שעוני קיר?')), 'words no product says: nothing');
     }
 
+    public function test_a_chip_under_an_answer_is_a_name_a_shopper_reads(): void
+    {
+        // Naot QA, 16.11: "tiramisu-collection" and "Women > Heels" among the chips under "sandals under $150"
+        $group = fn (string $name): array => ['kind' => 'category', 'id' => $name, 'name' => $name, 'count' => 3];
+        $kept = RelatedGroups::chips([$group('Sandals'), $group('tiramisu-collection'), $group('Women > Heels'), $group('#Naotic Favorites'), $group('Heels/Wedges'), $group('טבעות זהב')]);
+
+        $this->assertSame(['Sandals', 'Heels/Wedges', 'טבעות זהב'], array_column($kept, 'name'));
+    }
+
     public function test_a_linked_question_takes_in_what_its_categories_and_tags_hold_today(): void
     {
         $this->rings();

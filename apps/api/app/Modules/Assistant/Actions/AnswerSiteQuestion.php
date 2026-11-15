@@ -4174,7 +4174,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return self::aboutProducts($question)
-            ? array_map(fn (array $g): array => ['name' => $g['name']], RelatedGroups::for($shopId, $question)['groups'])
+            ? array_map(fn (array $g): array => ['name' => $g['name']], RelatedGroups::chips(RelatedGroups::for($shopId, $question)['groups']))
             : [];
     }
 

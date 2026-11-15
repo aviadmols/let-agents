@@ -156,6 +156,24 @@ final class RelatedGroups
     }
 
     /**
+     * The groups worth a chip under an answer: a name a shopper reads, never a collection's address ("tiramisu-collection"),
+     * a menu's path ("Women > Heels") or a hashtag (Naot QA, 16.11). The groups' products still go to the answer as
+     * before; only the chips are fewer.
+     *
+     * @param  list<array{kind: string, id: string, name: string, count: int}>  $groups
+     * @return list<array{kind: string, id: string, name: string, count: int}>
+     */
+    public static function chips(array $groups): array
+    {
+        return array_values(array_filter($groups, function (array $g): bool {
+            $name = trim((string) $g['name']);
+            $address = preg_match('/^[a-z0-9&,\s_-]+$/u', $name) === 1 && (str_contains($name, '-') || str_contains($name, '_') || preg_match('/^[a-z0-9]+$/u', $name) === 1);
+
+            return $name !== '' && ! $address && ! str_contains($name, '>') && ! str_starts_with($name, '#');
+        }));
+    }
+
+    /**
      * The words of a question that may name something, each with the forms a product's text may hold it in: as
      * written, without a plural ending, without a leading ו ה ב ל מ ש כ, final letters as any other, and dry (ו and
      * י dropped after the first letter, so "טבעות" meets "טבעת").
