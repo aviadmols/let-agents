@@ -734,6 +734,9 @@ final class ShopifyAppTest extends TestCase
             ->assertOk()
             ->assertSee('https:\/\/gueta-test.myshopify.com\/admin\/apps\/test-key', false)
             ->assertDontSee('3,412', false);
+        // and opened outside the frame (a tab, a link pasted): the same way back, never an error (500 live, 15.11)
+        $this->get('/shopify/plans?'.http_build_query(['shop' => self::SHOP, 'signature' => 'nope']))
+            ->assertRedirect('https://gueta-test.myshopify.com/admin/apps/test-key');
         Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'signature') && $context['shop'] === self::SHOP);
 
         // A store that does not have the app: nothing to open.

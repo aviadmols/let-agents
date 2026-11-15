@@ -203,8 +203,11 @@ final class ShopifyAppController
         return redirect()->away(self::appInAdmin($install));
     }
 
-    /** The plans a store chooses from: a signed link, from onward() or from the panel's "Connection and plan". */
-    public function plans(Request $request): Response
+    /**
+     * The plans a store chooses from: a signed link, from onward() or from the panel's "Connection and plan". A link
+     * that is not ours goes back into the app (reopen()): a page inside the admin's frame, a redirect outside it.
+     */
+    public function plans(Request $request): RedirectResponse|Response
     {
         $install = $this->signedInstall($request);
         $this->speak($request, $install);
