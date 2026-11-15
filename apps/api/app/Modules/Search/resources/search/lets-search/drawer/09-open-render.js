@@ -123,7 +123,7 @@
     requestAnimationFrame(function () { sliders(); watchExposure(); fitCols(); });
     clearTimeout(fitTimer); fitTimer = setTimeout(fitCols, 450);
     D.querySelector('[data-name]').textContent = CFG.assistant || 'Lets AI';
-    D.querySelector('[data-count]').textContent = S.saved.length;
+    D.querySelector('[data-count]').textContent = savedCount();
     TABS.querySelectorAll('[role="tab"]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === S.tab)); });
     placePill();
     renderCtx();

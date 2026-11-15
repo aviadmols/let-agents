@@ -1,9 +1,15 @@
   // ---------------------------------------------------------------- saved + compare
+  // How many saved products are shown: once the store's products are read, only those it still sells (one removed, or
+  // saved elsewhere, is no "3" over an empty list: Naot QA, 15.11); before, as many as were saved.
+  function savedCount() {
+    return S.records && Object.keys(S.records).length ? S.saved.filter(function (id) { return !!rec(id); }).length : S.saved.length;
+  }
   function savedView() {
-    if (!S.saved.length) {
+    var list = S.saved.map(rec).filter(Boolean);
+    // nothing to show: no list, and nothing to share or copy
+    if (!list.length) {
       return '<div class="ls-saved-empty"><span class="ls-ibtn">' + icon('heart') + '</span><b>' + esc(t('savedEmptyT')) + '</b>' + esc(t('savedEmpty')) + '</div>';
     }
-    var list = S.saved.map(rec).filter(Boolean);
     var html = '<div class="ls-saved-tools" style="padding-top:8px">' +
       (SHORT && SHORT.wishlistWhatsapp === false ? '' : '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-share-wa>' + icon('whatsapp', 'ls-icon--sm') + esc(t('shareWa')) + '</button>') +
       '<button class="ls-btn ls-btn--secondary ls-btn--sm" data-copy>' + icon('link', 'ls-icon--sm') + esc(t('copyLink')) + '</button></div>';
@@ -69,7 +75,7 @@
     wishSend(on ? { add: [id] } : { remove: [id] }).then(wishTake).catch(function () { /* kept here; sent with the next change */ });
     root.querySelectorAll('[data-heart="' + id + '"]').forEach(function (b) { b.setAttribute('aria-pressed', String(on)); });
     paintSave(id, on); refreshLauncher();
-    var c = D.querySelector('[data-count]'); c.textContent = S.saved.length; c.classList.remove('is-bump'); void c.offsetWidth; c.classList.add('is-bump');
+    var c = D.querySelector('[data-count]'); c.textContent = savedCount(); c.classList.remove('is-bump'); void c.offsetWidth; c.classList.add('is-bump');
     toast(on ? t('savedToast') : t('removedToast'), function () { toggleSaved(id); if (S.tab === 'saved') { render(); } });
     if (S.tab === 'saved') { render(); }
   }

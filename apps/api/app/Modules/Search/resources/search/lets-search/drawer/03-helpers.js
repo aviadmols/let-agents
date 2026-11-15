@@ -55,11 +55,20 @@
     } catch (x) { CUR_AFFIX[code] = { prefix: code + ' ', suffix: '' }; }
     return CUR_AFFIX[code];
   }
+  // Each site's own: every demo is on one address (agents.lets.co.il), and one's saved list, searches and conversation
+  // were another's (Naot QA, 15.11: "Saved 3" over an empty list). A key already a site's (its look) stays as it is.
+  function siteKey(key) { return key.indexOf('ls_look_') === 0 ? key : key + '@' + String(CFG.site || ''); }
   function store(kind, key, val) {
     try {
-      var s = kind === 'local' ? win.localStorage : win.sessionStorage;
-      if (val === undefined) { var v = s.getItem(key); return v ? JSON.parse(v) : null; }
-      if (val === null) { s.removeItem(key); } else { s.setItem(key, JSON.stringify(val)); }
+      var s = kind === 'local' ? win.localStorage : win.sessionStorage, k = siteKey(key);
+      if (val === undefined) {
+        var v = s.getItem(k);
+        // what a store's shoppers kept before it was kept apart, carried over once: never on our demo address, where it
+        // was another demo's
+        if (v === null && !CFG.demo) { v = s.getItem(key); if (v !== null) { s.setItem(k, v); } }
+        return v ? JSON.parse(v) : null;
+      }
+      if (val === null) { s.removeItem(k); } else { s.setItem(k, JSON.stringify(val)); }
     } catch (e) { return null; }
     return null;
   }

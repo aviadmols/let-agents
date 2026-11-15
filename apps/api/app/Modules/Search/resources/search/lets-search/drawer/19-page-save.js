@@ -40,7 +40,7 @@
   function launcherEl() { return LAUNCHERS.filter(function (b) { return b.isConnected; })[0] || null; }
   // the dot on every launcher while something is saved, and the launcher's label with the count
   function refreshLauncher() {
-    var n = S.saved.length, label = n ? t('launcherSaved', { n: n }) : t('open');
+    var n = savedCount(), label = n ? t('launcherSaved', { n: n }) : t('open');
     LAUNCHERS.forEach(function (b) { var badge = b.querySelector('.ls-launch__badge'); if (badge) { badge.hidden = n === 0; } b.classList.toggle('has-saved', n > 0); b.setAttribute('aria-label', label); b.setAttribute('title', label); });
   }
   function receiveOnLauncher(b) {
@@ -219,7 +219,7 @@
     }).observe(doc.body, { childList: true, subtree: true });
     // another tab saved or removed: the same list here
     win.addEventListener('storage', function (e) {
-      if (e.key !== 'ls_saved') { return; }
+      if (e.key !== siteKey('ls_saved')) { return; }
       S.saved = [].concat(store('local', 'ls_saved') || []);
       refreshLauncher();
       doc.querySelectorAll('[data-lets-save]').forEach(function (b) { b.setAttribute('aria-pressed', String(S.saved.indexOf(String(b.dataset.letsSave)) >= 0)); });

@@ -3,6 +3,7 @@
 namespace App\Modules\Search\Tests;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Actions\BuildProductVariants;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchIndex;
@@ -61,5 +62,44 @@ final class ColourFamiliesTest extends TestCase
         $this->assertSame($items['p:1']['cf'], $items['p:3']['cf'], 'one model in three colours');
         $this->assertArrayNotHasKey('cf', $items['p:5'], 'another model of the brand');
         $this->assertArrayNotHasKey('cf', $items['p:4'], 'a model in one colour');
+    }
+
+    public function test_a_models_name_and_its_colour_after_a_dash_is_a_family_coloured_by_the_stores_colour_filter(): void
+    {
+        // Naot, 15.11: "Julius", "Julius - BA6 Soft Black", "Julius - 739 Buffallo" were three products and no family (no
+        // Hebrew colour word, two brand names), and "Kayla" twice was two cards no one could tell apart
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'en']);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach ([
+                ['1', 'Julius', 'Naot Footwear Australia', 'Black'],
+                ['2', 'Julius - BA6 Soft Black', 'Naot Footwear Industries', 'Black'],
+                ['3', 'Julius - 739 Buffallo', 'Naot Footwear Australia', 'Brown'],
+                ['4', 'Kayla', 'Naot Footwear Australia', 'Black'],
+                ['5', 'Kayla', 'Naot Footwear Australia', 'Beige'],
+                ['6', 'Martin', 'Naot Footwear Australia', 'Black'],
+            ] as [$id, $title, $brand, $colour]) {
+                $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'variable', 'status' => 'publish', 'title' => $title, 'brand' => $brand,
+                    'url' => "https://store.test/p/{$id}", 'price' => 200, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'variations_count' => 1,
+                    'payload' => ['tags' => [(int) $id <= 3 ? 'shsdchildproduct' : 'shsdparentproduct', (int) $id % 2 ? 'SHOP BY OCCASION' : '#Naotic Favorites', (int) $id <= 3 ? 'Sandals' : 'Shoes'], 'variations' => [[
+                        'external_id' => $id.'1', 'status' => 'publish', 'attributes' => [['key' => 'color', 'name' => 'Color', 'value' => $colour], ['key' => 'size', 'name' => 'Size', 'value' => '40']],
+                        'price' => ['price' => '200'], 'stock' => ['in_stock' => true], 'purchasable' => true,
+                    ]]]]);
+                app(BuildProductVariants::class)->product($product);
+            }
+        });
+
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $data = (array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true);
+        $items = array_column($data['items'], null, 'id');
+
+        $this->assertNotNull($items['p:1']['cf'] ?? null, 'a model in black and brown');
+        $this->assertSame([$items['p:1']['cf'], $items['p:1']['cf']], [$items['p:2']['cf'] ?? null, $items['p:3']['cf'] ?? null], 'its colours after a dash, whichever brand name');
+        $this->assertNotNull($items['p:4']['cf'] ?? null);
+        $this->assertSame($items['p:4']['cf'], $items['p:5']['cf'] ?? null, 'one name in two colours, one family: one card in the drawer');
+        $this->assertArrayNotHasKey('cf', $items['p:6'], 'a model in one colour');
+
+        $tags = collect($data['facets'])->firstWhere('k', 'store_tags');
+        $this->assertSame(['Sandals', 'Shoes'], array_column((array) ($tags['v'] ?? []), 'l'), 'never an app\'s tag, a menu\'s heading or a hashtag');
     }
 }

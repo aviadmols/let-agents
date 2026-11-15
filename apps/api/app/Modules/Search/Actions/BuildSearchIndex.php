@@ -107,8 +107,11 @@ final class BuildSearchIndex
         $address = (preg_match('/^[a-z0-9&,\s_-]+$/u', $name) === 1 && (str_contains($name, '-') || preg_match('/^[a-z0-9_]+$/u', $name) === 1))
             || preg_match('/^\S+[-_]\S+$/u', $name) === 1;
 
-        return ! $address && preg_match(self::CAMPAIGN_WORDS, $name) !== 1;
+        return ! $address && preg_match(self::CAMPAIGN_WORDS, $name) !== 1 && preg_match(self::NAVIGATION, $name) !== 1;
     }
+
+    /** A menu's heading or a hashtag, not a kind a shopper narrows by: "SHOP BY OCCASION", "#Naotic Favorites". */
+    private const NAVIGATION = '/^(?:#|shop\s+by\b|shop\s+all\b)/iu';
 
     /** The phrases that are actions, the same in every shop (HebrewSearch::actions). */
     public const ACTIONS = __DIR__.'/../resources/query-actions.json';
@@ -400,7 +403,10 @@ final class BuildSearchIndex
         // One model in several colours, each a product of its own (Chozen: "פלדיום מגפיים PAMPA HI לגברים" in beige, in brown):
         // a family, so its card shows the others' colours to switch to
         foreach ($families ?? [] as $key => $members) {
-            $colours = array_unique(array_filter(array_map(fn (int $i): ?string => $items[$i]['mc'][0] ?? null, $members)));
+            // its colour as its words say it, else, for a model's name (no colour word the code reads), as the store's colour
+            // filter files it ("Black", "Brown")
+            $colours = array_unique(array_filter(array_map(fn (int $i): ?string => $items[$i]['mc'][0]
+                ?? (str_starts_with((string) $key, 'model|') ? self::filedColour((array) ($items[$i]['f'] ?? []), $facets['facets']) : null), $members)));
             if (count($members) >= 2 && count($members) <= self::FAMILY_MAX && count($colours) >= 2) {
                 foreach ($members as $i) {
                     $items[$i]['cf'] = substr(md5((string) $key), 0, 8);
@@ -479,10 +485,45 @@ final class BuildSearchIndex
     /** The most products one model's colours are: more under one name are many products, not one in colours. */
     private const FAMILY_MAX = 12;
 
+    /** A title that is a model's name, not what the product is: it opens with no Hebrew word ("Chief", "Kayla - 034 Black Matte"). */
+    private static function modelTitled(string $title): bool
+    {
+        $title = trim($title);
+
+        return $title !== '' && preg_match('/^\p{Hebrew}/u', $title) !== 1 && preg_match('/\p{Hebrew}/u', $title) !== 1;
+    }
+
+    /**
+     * The first colour the store's colour filter files a product in ("black"), by its codes; null when it files none.
+     *
+     * @param  list<int>  $codes
+     * @param  list<array<string, mixed>>  $facets
+     */
+    private static function filedColour(array $codes, array $facets): ?string
+    {
+        foreach ($codes as $code) {
+            $facet = $facets[intdiv((int) $code, 1000)] ?? null;
+            if ($facet !== null && preg_match('/colou?r|צבע/iu', (string) ($facet['k'] ?? '').' '.(string) ($facet['l'] ?? '')) === 1) {
+                $key = $facet['v'][(int) $code % 1000]['k'] ?? null;
+                if (is_scalar($key) && (string) $key !== '') {
+                    return (string) $key;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /** One model of one brand, whatever colour it is: its title without colour words, its brand. */
     private static function familyKey(CatalogProduct $product): string
     {
+        // a model's name and its colour after a dash, as stores abroad write a product a colour ("Julius - BA6 Soft Black",
+        // "Julius - 739 Buffallo", "Julius"): the model, whichever of its brand's names the store gave it (Naot, 15.11:
+        // "Naot Footwear Australia" and "... Industries" on one model's colours)
         $words = array_filter(explode(' ', HebrewSearch::normalize($product->title)), fn (string $w): bool => HebrewSearch::colorOf($w) === null && ! in_array($w, ['בצבע', 'בגוונ'], true));
+        if (self::modelTitled((string) $product->title)) {
+            return 'model|'.(str_contains((string) $product->title, ' - ') ? HebrewSearch::normalize(trim(explode(' - ', (string) $product->title)[0])) : implode(' ', $words));
+        }
 
         return mb_strtolower(trim((string) $product->brand)).'|'.implode(' ', $words);
     }
@@ -1214,12 +1255,15 @@ final class BuildSearchIndex
     }
 
     /** A store's tags that file a page, not describe what it offers: never a filter value (Gil Travel's "blog"). */
-    private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
+    private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'all products', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
 
     /** A tag written for the store's systems, not for a shopper: "low-stock-flagged", "shilav_p", "NewIn" (Shilav, 2.11). */
     private static function machineTag(string $tag): bool
     {
-        return preg_match('/^[a-z0-9]+(?:[_-][a-z0-9]+)+$|^[A-Za-z0-9]+_[A-Za-z0-9_]+$|^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/', $tag) === 1;
+        // and an app's word run together ("shsdchildproduct"), a menu's heading ("SHOP BY OCCASION"), a hashtag
+        // ("#Naotic Favorites"): Naot QA, 15.11
+        return preg_match('/^[a-z0-9]+(?:[_-][a-z0-9]+)+$|^[A-Za-z0-9]+_[A-Za-z0-9_]+$|^[A-Z][a-z]+(?:[A-Z][a-z]+)+$|^[a-z]{14,}$/', $tag) === 1
+            || preg_match(self::NAVIGATION, $tag) === 1;
     }
 
     /** A tag of the store's is a filter value where it is on at least this many products. */

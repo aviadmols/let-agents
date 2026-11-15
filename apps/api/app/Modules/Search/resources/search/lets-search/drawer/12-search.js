@@ -185,6 +185,16 @@
     if (so === 'asc' || so === 'desc') { out = out.slice().sort(function (a, b) { return ((a.pr || 0) - (b.pr || 0)) * (so === 'asc' ? 1 : -1); }); }
     else if (so === 'new') { out = out.slice().sort(function (a, b) { return (b.d || 0) - (a.d || 0); }); }
     else { out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1); }); }
+    // two colours of one model under one name ("Kayla" and "Kayla"): one card, its colours its dots; nothing told them
+    // apart (Naot QA, 15.11). Under names of their own ("Julius - BA6 Soft Black") each keeps its card.
+    var named = {};
+    out = out.filter(function (r) {
+      if (!r.cf) { return true; }
+      var k = r.cf + '|' + String(r.title || '').trim().toLowerCase();
+      if (named[k]) { return false; }
+      named[k] = 1;
+      return true;
+    });
     return out;
   }
   // The articles beside the results, narrowed by the filters on that articles carry too (a tag a post was given, the
@@ -318,6 +328,18 @@
     return '<' + (attrs ? 'button' : 'span') + ' class="ls-dot' + (sw === 'clear' ? ' ls-dot--clear' : '') + '"' + (sw === 'clear' ? '' : ' style="--sw:' + esc(sw) + '"') +
       ' title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></' + (attrs ? 'button' : 'span') + '>';
   }
+  // the first colour the store's colour filter files a product in, with its swatch: {code, sw, label}, or null
+  function filedSwatch(x) {
+    var codes = x && x.f || [];
+    for (var i = 0; i < codes.length; i++) {
+      var f = S.facets[Math.floor(codes[i] / 1000)];
+      if (f && /colou?r|צבע/i.test(String(f.k || '') + ' ' + String(f.l || ''))) {
+        var v = f.v[codes[i] % 1000], sw = v && (v.h || SWATCH[v.l] || SWATCH[v.k]);
+        if (sw) { return { code: codes[i], sw: sw, label: v.l }; }
+      }
+    }
+    return null;
+  }
   function colourDots(r, first) {
     var out = [], seen = {}, fam = familyOf(r);
     if (fam && fam.length > 1) {
@@ -325,17 +347,24 @@
       // card and is marked where it is, never moved to the front (as Aviad asked, 11.11)
       var lead = first && familyOf(first) === fam ? first : r;
       [lead].concat(fam.filter(function (x) { return x !== lead && x.s !== 0; }), fam.filter(function (x) { return x !== lead && x.s === 0; })).forEach(function (x) {
-        var c = x.mc && x.mc[0];
-        if (c && MC_HEX[c] && !seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], withFinals(c), ' data-sib="' + esc(pid(x.id)) + '" aria-pressed="' + (x === r) + '"')); }
+        var c = x.mc && x.mc[0], sib = ' data-sib="' + esc(pid(x.id)) + '" aria-pressed="' + (x === r) + '"';
+        if (c && MC_HEX[c]) {
+          if (!seen[c]) { seen[c] = 1; out.push(dot(MC_HEX[c], withFinals(c), sib)); }
+          return;
+        }
+        // a colour no Hebrew word names ("Black", a store abroad): as the store's colour filter files it, with its swatch
+        var filed = filedSwatch(x);
+        if (filed && !seen['f' + filed.code]) { seen['f' + filed.code] = 1; out.push(dot(filed.sw, filed.label, sib)); }
       });
     } else if (r && r.v) {
       var at = S.facets.map(function (f) { return f.k; }).indexOf('variant_color');
       if (at < 0) { return ''; }
+      // a dot a colour it is sold in: one for each variant's colour, never two for one colour of two words ("Oily Coal
+      // Combo" is one colour, not black and grey to choose between: Naot, 15.11)
       r.v.forEach(function (x) {
-        (x[0] || []).forEach(function (code) {
-          var v = Math.floor(code / 1000) === at ? S.facets[at].v[code % 1000] : null, sw = v && (v.h || SWATCH[v.l] || SWATCH[v.k]);
-          if (sw && !seen[code]) { seen[code] = 1; out.push(dot(sw, v.l)); }
-        });
+        var codes = (x[0] || []).filter(function (code) { return Math.floor(code / 1000) === at; }), key = codes.slice().sort().join(',');
+        var v = codes.length ? S.facets[at].v[codes[0] % 1000] : null, sw = v && (v.h || SWATCH[v.l] || SWATCH[v.k]);
+        if (sw && !seen[key]) { seen[key] = 1; out.push(dot(sw, v.l)); }
       });
     }
     if (out.length < 2) { return ''; }
