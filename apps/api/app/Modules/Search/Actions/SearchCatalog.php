@@ -1012,6 +1012,112 @@ final class SearchCatalog
             + (isset($likeness[$hit['external_id']]) ? ['match' => (int) round(max(0, min(1, (float) $likeness[$hit['external_id']])) * 100)] : []), array_slice($kept, 0, $limit));
     }
 
+    /**
+     * The words of the store's colour filter, each in one form ("black", "silver", "beige"): the colours a store names in
+     * its own language, which the code's colour words may not know.
+     *
+     * @param  list<array<string, mixed>>  $facets
+     * @return array<string, true>
+     */
+    private static function filedColourWords(array $facets): array
+    {
+        $out = [];
+        foreach ($facets as $facet) {
+            if (preg_match(self::COLOUR_FILTER, (string) ($facet['k'] ?? '').' '.(string) ($facet['l'] ?? '')) !== 1) {
+                continue;
+            }
+            foreach ((array) ($facet['v'] ?? []) as $value) {
+                foreach ([...self::phraseWords((string) ($value['l'] ?? '')), ...self::phraseWords((string) ($value['k'] ?? ''))] as $w) {
+                    $out[self::oneForm($w)] = true;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * A picture's shape: its words but its colours, those the code reads and those the store's colour filter names.
+     *
+     * @param  list<array<string, mixed>>  $facets
+     * @return \Closure(list<string>): list<string>
+     */
+    private static function shapeOf(array $facets): \Closure
+    {
+        $colours = self::filedColourWords($facets);
+
+        return fn (array $words): array => array_values(array_filter(self::pictureWords($words), fn (string $w): bool => mb_strlen($w) >= 3 && ! isset($colours[$w]) && Colours::mentions($w) === []));
+    }
+
+    /** How many of a picture's first words name what it is ("sandal", "wedge sandal"). */
+    private const KIND_PHRASES = 2;
+
+    /**
+     * What a picture says it is besides the noun, in its first words ("sandal", "wedge sandal": "wedge"; "chukka boot",
+     * "ankle boot": "chukka", "ankle"), never a colour.
+     *
+     * @param  list<array<string, mixed>>  $facets
+     * @return \Closure(list<string>): list<string>
+     */
+    private static function kindModifiers(array $facets): \Closure
+    {
+        $colours = self::filedColourWords($facets);
+
+        return function (array $words) use ($colours): array {
+            $phrases = array_slice(array_values(array_filter($words, 'is_string')), 0, self::KIND_PHRASES);
+            $nouns = array_merge([], ...array_map(fn (string $p): array => self::kindNouns($p), $phrases));
+            $out = [];
+            foreach ($phrases as $phrase) {
+                foreach (self::phraseWords($phrase) as $w) {
+                    $w = self::oneForm($w);
+                    if (mb_strlen($w) >= 3 && ! in_array($w, $nouns, true) && ! isset($colours[$w]) && Colours::mentions($w) === [] && ! in_array($w, self::PICTURE_CONTAINERS, true)) {
+                        $out[] = $w;
+                    }
+                }
+            }
+
+            return array_values(array_unique($out));
+        };
+    }
+
+    /**
+     * Products of its kind (as each picture says it) and its people, from the whole store, not among those shown: nearest
+     * first in what its picture says it is besides the noun ("wedge"), then in its shape, in stock first.
+     *
+     * @param  array<string, mixed>  $index
+     * @param  list<string>  $shown  external ids already shown
+     * @return list<array<string, mixed>>
+     */
+    private function fillByKind(CatalogProduct $product, string $externalId, array $index, array $shown, int $need): array
+    {
+        if ($need < 1) {
+            return [];
+        }
+        $rest = array_slice(array_values(array_diff(array_map(fn (string $key): string => substr($key, 2), array_filter(array_keys($index['records']), fn (string $key): bool => str_starts_with($key, 'p:'))), [...array_map('strval', $shown), $externalId])), 0, self::FILL_FROM);
+        $rest = $this->sameWhom($externalId, self::seenKind($product, array_map('strval', $rest), known: true), $index);
+        if ($rest === []) {
+            return [];
+        }
+        $facets = (array) ($index['facets'] ?? []);
+        $shape = self::shapeOf($facets);
+        $mods = self::kindModifiers($facets);
+        $pictures = RetrievalImage::query()->whereIn('external_id', [$externalId, ...$rest])->get(['external_id', 'caption_words'])
+            ->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => array_values(array_filter((array) ($i->caption_words ?? []), 'is_string'))])->all();
+        $ownMods = $mods($pictures[$externalId] ?? []);
+        $ownShape = $shape($pictures[$externalId] ?? []);
+        $score = [];
+        foreach ($rest as $id) {
+            $score[$id] = [
+                (int) ($index['records']['p:'.$id]['s'] ?? 0),
+                count(array_intersect($ownMods, $mods($pictures[$id] ?? []))),
+                count(array_intersect($ownShape, $shape($pictures[$id] ?? []))),
+            ];
+        }
+        usort($rest, fn (string $a, string $b): int => [$score[$b], $a] <=> [$score[$a], $b]);
+
+        return array_map(fn (string $id): array => $this->present($index['records']['p:'.$id]), array_slice($rest, 0, $need));
+    }
+
     /** What its main picture says it is ("derby shoe": "shoe"), or [] when its picture was not read or says nothing. */
     private static function pictureKind(CatalogProduct $product): array
     {
@@ -1771,9 +1877,14 @@ final class SearchCatalog
                 $pictures = RetrievalImage::query()->whereIn('external_id', [$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])
                     ->get(['external_id', 'caption_words'])->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => array_values(array_filter((array) ($i->caption_words ?? []), 'is_string'))])->all();
                 $seen = array_map(fn (array $words): ?array => Colours::dominant($words, colourFirst: true), $pictures);
-                // its shape: its picture's words but its colours ("two-strap", "slide", "cork footbed", "buckle")
-                $shape = fn (array $words): array => array_values(array_filter(self::pictureWords($words), fn (string $w): bool => mb_strlen($w) >= 3 && Colours::mentions($w) === []));
+                // its shape: its picture's words but its colours ("two-strap", "slide", "cork footbed", "buckle"), the colours
+                // the code reads and those the store's own colour filter names ("Silver", "Beige": English ones it does not)
+                $shape = self::shapeOf($facets);
                 $ownShape = $byPicture ? $shape($pictures[$externalId] ?? []) : [];
+                // what its picture says it is, in its first words, besides the noun: "wedge" of "wedge sandal", "chukka" of
+                // "chukka boot": weighed most (Naot QA, 16.11: a wedge sandal's alike were flat sandals in its light shades)
+                $mods = self::kindModifiers($facets);
+                $ownMods = $byPicture ? $mods($pictures[$externalId] ?? []) : [];
                 // only what sets it apart among them: "cork footbed" and "leather" are every sandal's, "two-strap" is its own
                 if ($ownShape !== []) {
                     $held = array_count_values(array_merge(...array_map(fn (array $r): array => array_values(array_unique($shape($pictures[substr((string) $r['id'], 2)] ?? []))), $records)));
@@ -1795,6 +1906,7 @@ final class SearchCatalog
                         'side' => BuildSearchIndex::contradicts($ownTitle, (string) ($r['title'] ?? '')) ? 0.0 : 1.0,
                         'audience' => AlikeScore::audience($ownFor, $audiences[$id] ?? []),
                         'shape' => $ownShape === [] ? 0.0 : count(array_intersect($ownShape, $shape($pictures[$id] ?? []))) / count($ownShape),
+                        'subkind' => $ownMods === [] ? 0.0 : count(array_intersect($ownMods, $mods($pictures[$id] ?? []))) / count($ownMods),
                     ]);
                 }
                 $order = array_keys($records);
@@ -1817,6 +1929,12 @@ final class SearchCatalog
                 }
             }
             $products = array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
+            // Fewer than six after every step: the rest of its kind and its people from the whole store, nearest in what its
+            // picture says it is and its shape (Naot QA, 16.11: a clog had its own two colours, a boot one, filled before
+            // the steps that took the rest away)
+            if ($byPicture && $wants === null && ! $otherColour && count($products) < self::FILL_TO) {
+                $products = [...$products, ...$this->fillByKind($product, $externalId, $index, array_column($products, 'external_id'), min($limit, self::FILL_TO) - count($products))];
+            }
 
             // what the team put together with it stays first, whatever the pictures or the colours said
             if ($alike !== []) {

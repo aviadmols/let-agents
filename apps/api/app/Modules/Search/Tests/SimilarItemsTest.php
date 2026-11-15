@@ -381,6 +381,37 @@ final class SimilarItemsTest extends TestCase
             'its model in another colour; then a two-strap sandal, brown, before a black sandal on a toe post; the store\'s filing decides nothing');
     }
 
+    public function test_what_its_picture_says_it_is_weighs_most_and_few_alike_are_filled_after_every_step(): void
+    {
+        // Naot QA, 16.11: a wedge sandal's alike were flat sandals in its light shades; a clog had its own colours alone
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        $make = function (array $products): void {
+            app(TenantContext::class)->run($this->shop->id, function () use ($products): void {
+                RetrievalImage::query()->delete();
+                foreach ($products as $id => [$title, $words]) {
+                    $product = CatalogProduct::query()->where('external_id', $id)->first() ?? CatalogProduct::query()->create([
+                        'shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://www.store.test/p/{$id}",
+                        'price' => '200', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => [],
+                    ]);
+                    $product->update(['title' => $title, 'in_stock' => true]);
+                    RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                        'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id.$title), 'caption_words' => $words, 'caption_pattern' => ['covers' => 'none']]);
+                }
+            });
+            $this->travel(10)->minutes();
+            app(BuildSearchIndex::class)->handle($this->shop->id);
+            LoadedIndex::forget();
+        };
+
+        // its pictures find 302 (a flat sandal of its shades) before 303 (a wedge sandal in black)
+        $make(['301' => ['Dynasty', ['sandal', 'wedge sandal', 'taupe', 'metallic']], '302' => ['Sophia', ['sandals', 'flat sandal', 'taupe', 'metallic']], '303' => ['Pixie', ['sandal', 'wedge sandal', 'black']]]);
+        $this->assertSame(['303', '302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'a wedge sandal before a flat one in its shades');
+
+        // its pictures find its own other colour and a sandal; another clog no picture search found fills in
+        $make(['301' => ['Fiord', ['clogs', 'buckle strap']], '302' => ['Fiord - Black', ['clogs', 'buckle strap']], '303' => ['Rio', ['sandals']], '304' => ['Saloniki', ['clogs', 'mules']]]);
+        $this->assertSame(['302', '304'], array_column($this->similar('301', 6)->json('products'), 'external_id'));
+    }
+
     public function test_by_its_picture_only_its_kind_and_its_people_and_the_rest_of_them_when_its_pictures_found_few(): void
     {
         // Naot QA, 15.11: footbeds beside a clog (its picture says "cork footbed"), women's models beside a man's sandal
