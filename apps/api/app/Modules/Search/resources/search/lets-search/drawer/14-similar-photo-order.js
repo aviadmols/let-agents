@@ -78,11 +78,16 @@
     }
     var list = filtered(turn), n = gridN(turn);
     // like the results: how many, the order to show them in, and the filters (the large view has them in its head)
-    var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
+    var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length) + othersCount(turn)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn);
     if (!list.length) { return head + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
     return oosNote(turn) + (turn.wants ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarAsked', { w: turn.wants })) + '</p>' : '') + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
       (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '') + othersHtml(turn, null);
+  }
+  // what the title counts beside its alike: those shown apart below ("2 products" over a dozen: Naot QA, 16.11)
+  function othersCount(turn) {
+    var n = Math.min(8, (turn.others || []).map(rec).filter(Boolean).length);
+    return n ? ' · ' + t('similarPlus', { n: n }) : '';
   }
   // those of its kind that do not look like it, apart and said to be so: a line when none is alike, a title when few are
   function othersHtml(turn, line) {

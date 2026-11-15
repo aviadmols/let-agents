@@ -108,7 +108,8 @@ final class BuildSearchIndex
         $address = (preg_match('/^[a-z0-9&,\s_-]+$/u', $name) === 1 && (str_contains($name, '-') || preg_match('/^[a-z0-9_]+$/u', $name) === 1))
             || preg_match('/^\S+[-_]\S+$/u', $name) === 1;
 
-        return ! $address && preg_match(self::CAMPAIGN_WORDS, $name) !== 1 && preg_match(self::NAVIGATION, $name) !== 1;
+        // nor a menu's path ("Gift Guide > For Her")
+        return ! $address && preg_match(self::CAMPAIGN_WORDS, $name) !== 1 && preg_match(self::NAVIGATION, $name) !== 1 && ! str_contains($name, '>');
     }
 
     /** A menu's heading or a hashtag, not a kind a shopper narrows by: "SHOP BY OCCASION", "#Naotic Favorites". */
@@ -1279,6 +1280,37 @@ final class BuildSearchIndex
             || preg_match(self::NAVIGATION, $tag) === 1;
     }
 
+    /**
+     * The Latin words the store's products are named and seen by, lower case, each also without a final "s": their titles
+     * and their pictures' words.
+     *
+     * @return array<string, true>
+     */
+    private function saidWords(): array
+    {
+        $out = [];
+        $add = function (string $text) use (&$out): void {
+            foreach (preg_split('/[^a-z]+/', mb_strtolower($text), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $w) {
+                if (strlen($w) >= 3) {
+                    $out[$w] = true;
+                    $out[rtrim($w, 's')] = true;
+                }
+            }
+        };
+        CatalogProduct::query()->active()->select(['id', 'title'])->orderBy('id')->chunk(1000, function ($products) use ($add): void {
+            foreach ($products as $product) {
+                $add((string) $product->title);
+            }
+        });
+        RetrievalImage::query()->whereNotNull('caption_words')->select(['id', 'caption_words'])->orderBy('id')->chunk(1000, function ($images) use ($add): void {
+            foreach ($images as $image) {
+                $add(implode(' ', array_filter((array) $image->caption_words, 'is_string')));
+            }
+        });
+
+        return $out;
+    }
+
     /** A tag of the store's is a filter value where it is on at least this many products. */
     private const STORE_TAG_MIN_PRODUCTS = 2;
 
@@ -1310,11 +1342,16 @@ final class BuildSearchIndex
         $byTag = [];
         $names = [];
         $total = 0;
+        // the words the products are named and seen by (their titles, what their pictures show): an English tag of one word
+        // all in one case ("naotgivesback", "preorder", "FINALSALE") is a filter only where it is such a word ("sandals"),
+        // else it is the store's code for itself (Naot QA, 16.11); a menu's path ("Gift Guide > For Her") never is
+        $said = $this->saidWords();
         foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
             $total++;
             foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
                 $key = mb_strtolower($tag);
                 if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true) || self::machineTag($tag)
+                    || str_contains($tag, '>') || (preg_match('/^(?:[a-z]+|[A-Z]+)$/', $tag) === 1 && ! isset($said[rtrim($key, 's')]) && ! isset($said[$key]))
                     // a Hebrew store's shopper filters by Hebrew words: "SETHIT", "shilav_pc" are the store's own codes
                     || ($locale === 'he' && preg_match('/\p{Hebrew}/u', $tag) !== 1)
                     || (! $asked && ($kinds->campaign($tag) || $kinds->onlyWhom(str_replace(['/', '_', '-'], ' ', $tag))))) {

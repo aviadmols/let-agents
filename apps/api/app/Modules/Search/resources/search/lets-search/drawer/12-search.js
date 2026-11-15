@@ -286,7 +286,7 @@
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
     if (fc.stock && !onStock(c)) { chips += chip(t('inStock'), false, 'stock', turn.id, false); }
     if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
-    fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), false, 'f:' + code, turn.id, false, swatch(f, v)); });
+    sizesInOrder(fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED)).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), false, 'f:' + code, turn.id, false, swatch(f, v)); });
     // the store's words close to what was typed, offered to choose (a chosen one is in the row under it)
     Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(c.suggest[k].label, false, 'g:' + k, turn.id, false); } });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
@@ -343,6 +343,15 @@
       }
     }
     return null;
+  }
+  // a size filter: by its values' own order (35, 36, 37), never by count
+  function sizeFacet(f) { return !!f && /size|מידה|מידות/i.test(String(f.k || '') + ' ' + String(f.l || '')); }
+  // the chips of a size filter in its own order, in the places they hold among the others
+  function sizesInOrder(codes) {
+    var places = {}, out = codes.slice();
+    codes.forEach(function (code, i) { var g = Math.floor(code / 1000); if (sizeFacet(S.facets[g])) { (places[g] = places[g] || []).push(i); } });
+    Object.keys(places).forEach(function (g) { var sorted = places[g].map(function (i) { return codes[i]; }).sort(function (a, b) { return a - b; }); places[g].forEach(function (i, k) { out[i] = sorted[k]; }); });
+    return out;
   }
   function colourDots(r, first) {
     var out = [], seen = {}, fam = familyOf(r);
@@ -631,7 +640,7 @@
     if (turn.loading) { return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' : '') + '</div><div style="padding:12px 0">' + thinking() + '</div>'; }
     if (turn.error) { return '<div class="ls-wide-head">' + back + '</div>' + errorHtml(turn); }
     var list = filtered(turn), shown = list.slice(0, fill(turn.limit || 24));
-    var title = similar ? esc(countText(list.length)) + ' <span>' + esc(t('similar')) + '</span>' : esc(countText(list.length)) + ' <span>"' + esc(turn.q) + '"</span>';
+    var title = similar ? esc(countText(list.length) + othersCount(turn)) + ' <span>' + esc(t('similar')) + '</span>' : esc(countText(list.length)) + ' <span>"' + esc(turn.q) + '"</span>';
     return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' + oosNote(turn) : '') +
       '<div class="ls-summary" style="margin-top:' + (similar ? 18 : 8) + 'px"><div class="ls-summary__count ls-num" style="font-size:20px;font-weight:500">' + title + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn) + '</div>' +

@@ -107,10 +107,11 @@ final class ColourFamiliesTest extends TestCase
             ] as [$id, $title, $brand, $colour]) {
                 $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'variable', 'status' => 'publish', 'title' => $title, 'brand' => $brand,
                     'url' => "https://store.test/p/{$id}", 'price' => 200, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'variations_count' => 1,
-                    'payload' => ['tags' => [(int) $id <= 3 ? 'shsdchildproduct' : 'shsdparentproduct', (int) $id % 2 ? 'SHOP BY OCCASION' : '#Naotic Favorites', (int) $id <= 3 ? 'Sandals' : 'Shoes'], 'variations' => [[
-                        'external_id' => $id.'1', 'status' => 'publish', 'attributes' => [['key' => 'color', 'name' => 'Color', 'value' => $colour], ['key' => 'size', 'name' => 'Size', 'value' => '40']],
-                        'price' => ['price' => '200'], 'stock' => ['in_stock' => true], 'purchasable' => true,
-                    ]]]]);
+                    'payload' => ['tags' => [(int) $id <= 3 ? 'shsdchildproduct' : 'shsdparentproduct', (int) $id % 2 ? 'SHOP BY OCCASION' : '#Naotic Favorites', (int) $id <= 3 ? 'Sandals' : 'Shoes',
+                        (int) $id % 2 ? 'preorder' : 'naotgivesback', (int) $id % 2 ? 'FINALSALE' : 'Gift Guide > For Her'], 'variations' => [[
+                            'external_id' => $id.'1', 'status' => 'publish', 'attributes' => [['key' => 'color', 'name' => 'Color', 'value' => $colour], ['key' => 'size', 'name' => 'Size', 'value' => '40']],
+                            'price' => ['price' => '200'], 'stock' => ['in_stock' => true], 'purchasable' => true,
+                        ]]]]);
                 app(BuildProductVariants::class)->product($product);
             }
         });

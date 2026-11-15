@@ -3,6 +3,8 @@
     function draw() {
       var fc = facetChips(turn, 0), c = C(turn), groups = {}, so = sortOf(c);
       fc.codes.forEach(function (code) { var g = Math.floor(code / 1000); (groups[g] = groups[g] || []).push(code); });
+      // sizes in the order sizes go (35 to 48, S to L), as the filter holds them, never by how many carry each (Naot QA, 16.11)
+      Object.keys(groups).forEach(function (g) { if (sizeFacet(S.facets[g])) { groups[g].sort(function (a, b) { return a - b; }); } });
       var html = activeRow(turn) ? '<div class="ls-fgroup ls-fgroup--active"><div class="ls-fgroup__t">' + esc(t('activeFilters')) + '</div>' + activeRow(turn) + '</div>' : '';
       html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(t('sort')) + '</div><div class="ls-chips">' + ['', 'asc', 'desc', 'new'].map(function (s) { return '<button class="ls-chip" aria-pressed="' + (so === s) + '" data-fsort="' + s + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(sortLabel(s)) + '</button>'; }).join('') + '</div></div>';
       if (fc.stock || fc.sale || onStock(c) || onSale(c)) {
