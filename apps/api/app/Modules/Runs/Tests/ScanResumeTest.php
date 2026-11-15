@@ -4,6 +4,7 @@ namespace App\Modules\Runs\Tests;
 
 use App\Modules\Runs\Jobs\FirstScanStep;
 use App\Modules\Runs\Support\FirstScan;
+use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -50,5 +51,24 @@ final class ScanResumeTest extends TestCase
 
         $this->assertSame($steps[0], FirstScan::resume($shop), 'cut off by a deploy: run again');
         $this->assertSame(FirstScan::WAITING, FirstScan::state($shop)['steps'][$steps[0]]);
+    }
+
+    /** 15.11: a demo's scan cut off by a deploy stayed "running" for good: scan:resume carried on only active shops. */
+    public function test_a_demos_scan_cut_off_by_a_deploy_carries_on_too(): void
+    {
+        Bus::fake();
+        $demo = Shop::factory()->create(['status' => ShopStatus::Demo]);
+        $paused = Shop::factory()->create(['status' => ShopStatus::Paused]);
+        foreach ([$demo, $paused] as $shop) {
+            FirstScan::start($shop, full: true, skip: ['pictures']);
+            $this->travel(-(FirstScan::STALLED_MINUTES + 5))->minutes();
+            FirstScan::mark($shop->id, FirstScan::steps($shop)[0], FirstScan::RUNNING);
+            $this->travelBack();
+        }
+
+        $this->artisan('scan:resume')->assertSuccessful();
+
+        $this->assertSame(FirstScan::WAITING, FirstScan::state($demo)['steps'][FirstScan::steps($demo)[0]], 'the demo carries on');
+        $this->assertSame(FirstScan::RUNNING, FirstScan::state($paused)['steps'][FirstScan::steps($paused)[0]], 'a paused shop is left as it is');
     }
 }

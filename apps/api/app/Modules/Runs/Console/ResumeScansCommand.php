@@ -20,7 +20,8 @@ final class ResumeScansCommand extends Command
 
     public function handle(TenantContext $tenant): int
     {
-        foreach ($tenant->runUnscoped(fn () => Shop::query()->where('status', ShopStatus::Active)->get()) as $shop) {
+        // a demo's scan too: cut off by a deploy, it stayed "running" for good and its demo never finished (15.11)
+        foreach ($tenant->runUnscoped(fn () => Shop::query()->whereIn('status', [ShopStatus::Active, ShopStatus::Demo])->get()) as $shop) {
             if (($from = FirstScan::resume($shop)) !== null) {
                 $this->line("{$shop->slug}: carried on from {$from}");
             }
