@@ -12,6 +12,7 @@ use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
+use App\Modules\Catalog\Models\CatalogSibling;
 use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
@@ -339,6 +340,8 @@ final class BuildSearchIndex
         $tagged = app()->bound(ProductTags::class) ? app(ProductTags::class)->tagsByProduct($shopId) : [];
         $kinds = app(ProductKinds::class);
         $faceted = 0;
+        // one model's versions as the store's own collection pages link them (ReadCollectionSiblings), with how they name each
+        $siblings = CatalogSibling::query()->get(['product_id', 'group_key', 'label'])->keyBy('product_id');
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
@@ -395,7 +398,12 @@ final class BuildSearchIndex
                 // offer filed or called "Israel", not one whose text says it flies from Israel
                 'fn' => $lengths['days'] === [] ? null : (self::filedStems($product) ?: null),
             ]);
-            $families[self::familyKey($product)][] = count($items) - 1;
+            // the store's own word of which are one model comes first; its swatch's name ("Citrine") names its dot
+            $sibling = $siblings->get($product->id);
+            if ($sibling !== null && (string) $sibling->label !== '') {
+                $items[count($items) - 1]['cl'] = (string) $sibling->label;
+            }
+            $families[$sibling !== null ? 'store|'.$sibling->group_key : self::familyKey($product)][] = count($items) - 1;
             $counts['product']++;
             $sized = $sized || $z !== null;
         }
@@ -407,7 +415,9 @@ final class BuildSearchIndex
             // filter files it ("Black", "Brown")
             $colours = array_unique(array_filter(array_map(fn (int $i): ?string => $items[$i]['mc'][0]
                 ?? (str_starts_with((string) $key, 'model|') ? self::filedColour((array) ($items[$i]['f'] ?? []), $facets['facets']) : null), $members)));
-            if (count($members) >= 2 && count($members) <= self::FAMILY_MAX && count($colours) >= 2) {
+            // the store linking them is word enough, whatever colour the code reads of each (amethyst, citrine)
+            $linked = str_starts_with((string) $key, 'store|');
+            if (count($members) >= 2 && count($members) <= ($linked ? self::LINKED_MAX : self::FAMILY_MAX) && ($linked || count($colours) >= 2)) {
                 foreach ($members as $i) {
                     $items[$i]['cf'] = substr(md5((string) $key), 0, 8);
                 }
@@ -484,6 +494,9 @@ final class BuildSearchIndex
 
     /** The most products one model's colours are: more under one name are many products, not one in colours. */
     private const FAMILY_MAX = 12;
+
+    /** One model's versions as the store links them, at most (ReadCollectionSiblings keeps no larger group). */
+    private const LINKED_MAX = 20;
 
     /** A title that is a model's name, not what the product is: it opens with no Hebrew word ("Chief", "Kayla - 034 Black Matte"). */
     private static function modelTitled(string $title): bool

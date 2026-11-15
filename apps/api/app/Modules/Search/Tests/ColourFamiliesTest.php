@@ -5,6 +5,7 @@ namespace App\Modules\Search\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\BuildProductVariants;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogSibling;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\Colours;
@@ -62,6 +63,31 @@ final class ColourFamiliesTest extends TestCase
         $this->assertSame($items['p:1']['cf'], $items['p:3']['cf'], 'one model in three colours');
         $this->assertArrayNotHasKey('cf', $items['p:5'], 'another model of the brand');
         $this->assertArrayNotHasKey('cf', $items['p:4'], 'a model in one colour');
+    }
+
+    public function test_versions_the_stores_pages_link_are_one_family_whatever_colour_is_read_of_them(): void
+    {
+        // Jean Rachel, 16.11: a leaf ring in citrine, in amethyst, products of their own named apart, no colour filter;
+        // its collection pages link them (ReadCollectionSiblings)
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'en']);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach (['1' => '14K Gold Citrine Leaf Ring', '2' => '14K Gold Amethyst Leaf Ring', '3' => 'Sterling Silver Crosshatch Band'] as $id => $title) {
+                $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                    'url' => "https://store.test/products/p{$id}", 'price' => 900, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                if ((string) $id !== '3') {
+                    CatalogSibling::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'group_key' => 'leaf', 'label' => (string) $id === '1' ? 'Citrine' : 'Amethyst']);
+                }
+            }
+        });
+
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $items = array_column((array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['items'], null, 'id');
+
+        $this->assertNotNull($items['p:1']['cf'] ?? null);
+        $this->assertSame($items['p:1']['cf'], $items['p:2']['cf'] ?? null, 'the store linking them is word enough');
+        $this->assertSame(['Citrine', 'Amethyst'], [$items['p:1']['cl'] ?? null, $items['p:2']['cl'] ?? null], 'each named as its swatch is');
+        $this->assertArrayNotHasKey('cf', $items['p:3']);
     }
 
     public function test_a_models_name_and_its_colour_after_a_dash_is_a_family_coloured_by_the_stores_colour_filter(): void

@@ -11,6 +11,7 @@ return [
     'synced_capped' => 'הקריאה נעצרה במגבלה של :limit מוצרים: נקראו :products, :created חדשים, :updated השתנו. שום מוצר לא סומן כהוסר. כדי לקרוא את השאר מעלים את המגבלה בהגדרות.',
     'no_connection' => 'לחנות הזו אין חיבור. מוסיפים אותו ב״חיבור חנויות״.',
     'pages_sampled' => 'נבדקו :read דפי מוצר, לפחות אחד מכל סוג (:kinds סוגים): גרסאות של מוצר שמקושרות כמוצרים נפרדים ב־:siblings, מנוי ב־:subscriptions, בחירות שמופיעות רק בדף: :fields.',
+    'collection_siblings' => 'נקראו :pages דפי קטגוריה: :groups דגמים שנמכרים כמוצר נפרד לכל צבע, ובהם :products מוצרים.',
     // A storefront closed to visitors (StorefrontLock): what each reading of its pages did instead.
     'locked' => [
         'sample' => 'דפי המוצר: החנות סגורה למבקרים (בסיסמה, בתחזוקה או בדף ״בקרוב״), ולכן לא נקרא אף דף. המוצרים מגיעים מ־:platform, ודפיהם ייקראו כשהחנות תיפתח.',

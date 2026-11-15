@@ -6,4 +6,5 @@ return [
     'refresh' => 'Prices and stock refreshed',
     'sample_pages' => 'Product pages of every kind, sampled',
     'read_choices' => 'Choices from product pages (length, size)',
+    'collection_siblings' => "One model's colours, from the collection pages",
 ];

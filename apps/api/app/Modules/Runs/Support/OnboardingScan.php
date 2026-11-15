@@ -14,7 +14,7 @@ final class OnboardingScan implements ShopScan
 {
     /** part => the scan's steps that make it, in the scan's order */
     public const PART_STEPS = [
-        'products' => ['catalog', 'sample'],
+        'products' => ['catalog', 'sample', 'siblings'],
         'images' => ['pictures'],
         'pages' => ['site', 'posts', 'pages'],
         'tags' => ['structure', 'products', 'search', 'tags', 'check'],

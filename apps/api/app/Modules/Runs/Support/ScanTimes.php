@@ -22,6 +22,7 @@ final class ScanTimes
     private const FIRST = [
         'catalog' => [0.4, 120],
         'sample' => [null, 90],
+        'siblings' => [null, 60],
         'site' => [null, 180],
         'knowledge' => [null, 240],
         'posts' => [4.0, 300],

@@ -26,4 +26,8 @@ return [
         'label' => 'Pages sampled per scan',
         'description' => 'At most. Chosen so every kind of product is read at least once.',
     ],
+    'collection_pages_max' => [
+        'label' => 'Collection pages read per scan',
+        'description' => 'At most. Reading stops earlier at the last page that shows new products.',
+    ],
 ];

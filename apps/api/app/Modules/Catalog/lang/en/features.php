@@ -33,4 +33,8 @@ return [
         'label' => 'Sample product pages in a scan',
         'description' => 'At the start of a scan a few product pages of every kind (category, product type, the choices it is sold with) are read in code to find what the feed does not carry: versions linked as products of their own, subscriptions, choices only on the page. No model, a pause between pages.',
     ],
+    'collection_siblings' => [
+        'label' => "One model's colours from the collection pages",
+        'description' => "In a scan, the store's collection pages are read in code, page by page with a pause between them, for the versions of one model it sells as products of their own (a ring in another stone, a sandal in another colour), as its swatches link them. The search then shows them as one model's colours. No model.",
+    ],
 ];

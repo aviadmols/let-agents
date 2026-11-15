@@ -10,6 +10,7 @@ use App\Modules\Admin\Contracts\ScanProgress;
 use App\Modules\Admin\Contracts\ShopFacts;
 use App\Modules\Admin\Contracts\TimelineSource;
 use App\Modules\Catalog\Console\BuildVariantsCommand;
+use App\Modules\Catalog\Console\ReadCollectionSiblingsCommand;
 use App\Modules\Catalog\Console\ReadPageChoicesCommand;
 use App\Modules\Catalog\Console\ReadSitePagesCommand;
 use App\Modules\Catalog\Console\SamplePagesCommand;
@@ -127,6 +128,7 @@ final class CatalogServiceProvider extends ModuleServiceProvider
             SamplePagesCommand::class,
             BuildVariantsCommand::class,
             ReadSitePagesCommand::class,
+            ReadCollectionSiblingsCommand::class,
         ];
     }
 }

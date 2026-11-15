@@ -328,6 +328,10 @@
     return '<' + (attrs ? 'button' : 'span') + ' class="ls-dot' + (sw === 'clear' ? ' ls-dot--clear' : '') + '"' + (sw === 'clear' ? '' : ' style="--sw:' + esc(sw) + '"') +
       ' title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></' + (attrs ? 'button' : 'span') + '>';
   }
+  // a swatch of a version's own picture, where no colour tells it apart
+  function imgDot(img, label, attrs) {
+    return '<button class="ls-dot ls-dot--img" style="--sw:url(&quot;' + esc(img) + '&quot;)" title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></button>';
+  }
   // the first colour the store's colour filter files a product in, with its swatch: {code, sw, label}, or null
   function filedSwatch(x) {
     var codes = x && x.f || [];
@@ -354,7 +358,10 @@
         }
         // a colour no Hebrew word names ("Black", a store abroad): as the store's colour filter files it, with its swatch
         var filed = filedSwatch(x);
-        if (filed && !seen['f' + filed.code]) { seen['f' + filed.code] = 1; out.push(dot(filed.sw, filed.label, sib)); }
+        if (filed && !seen['f' + filed.code]) { seen['f' + filed.code] = 1; out.push(dot(filed.sw, x.cl || filed.label, sib)); return; }
+        // no colour to tell it by (a ring in amethyst, in citrine), or one its sibling already showed: its own picture,
+        // named as the store's swatch names it ("Citrine"), so every version is a press away (Jean Rachel, 16.11)
+        if (x.img && !seen['i' + x.id]) { seen['i' + x.id] = 1; out.push(imgDot(x.img, x.cl || decode(x.title), sib)); }
       });
     } else if (r && r.v) {
       var at = S.facets.map(function (f) { return f.k; }).indexOf('variant_color');

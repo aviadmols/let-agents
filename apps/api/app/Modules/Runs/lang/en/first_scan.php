@@ -19,6 +19,7 @@ return [
     'steps' => [
         'catalog' => 'Reading every product from the store',
         'sample' => 'Checking a product page of every kind',
+        'siblings' => "Finding each model's colours on the collection pages",
         'site' => "Reading the site's pages and policies",
         'structure' => 'Dividing the catalog and deciding what to know about each part',
         'products' => 'Understanding the product details',
@@ -43,6 +44,7 @@ return [
     'units' => [
         'catalog' => 'products',
         'sample' => 'product pages',
+        'siblings' => 'collection pages',
         'site' => 'pages',
         'knowledge' => 'pages',
         'posts' => 'posts',

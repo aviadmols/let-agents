@@ -11,6 +11,7 @@ return [
     'synced_capped' => 'Stopped at the limit of :limit products: :products read, :created new, :updated changed. Nothing was marked removed. Raise the limit in Settings to read the rest.',
     'no_connection' => 'This shop has no store connection. Add one in Store connections.',
     'pages_sampled' => ':read product pages read, at least one of every kind (:kinds kinds): versions linked as products of their own in :siblings, a subscription in :subscriptions, choices only on the page: :fields.',
+    'collection_siblings' => ':pages collection pages read: :groups models sold as a product a colour, :products products in them.',
     // A storefront closed to visitors (StorefrontLock): what each reading of its pages did instead.
     'locked' => [
         'sample' => 'Product pages: the store is closed to visitors (a password, maintenance or coming-soon page), so none were read. The products come from :platform; their pages are read once the store opens.',

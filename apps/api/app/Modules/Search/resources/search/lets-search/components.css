@@ -273,6 +273,8 @@ button.ls-dot { cursor: pointer; }
 .ls-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lsp-bg, #fff), 0 0 0 3.5px currentColor; }
 button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp-bg, #fff), 0 0 0 3px rgba(0,0,0,.25); }
 .ls-dot--clear { background: repeating-linear-gradient(45deg, #fff 0 3px, #e4e4e7 3px 6px); }
+/* a version no colour tells apart (a ring in another stone): its own picture, a little larger to be seen */
+.ls-dot--img { width: 24px; height: 24px; background: #fff var(--sw) center / cover no-repeat; }
 .ls-dots__more { font-size: var(--lsp-text-xs, 12px); opacity: .7; }
 .ls-card__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ls-card__similar { font-size: var(--lsp-text-sm); font-weight: 600; color: var(--ls-fg-strong-muted); }
