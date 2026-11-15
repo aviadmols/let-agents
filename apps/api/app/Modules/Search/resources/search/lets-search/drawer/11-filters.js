@@ -469,6 +469,9 @@
     if (c && c !== COLS) { COLS = c; render(); }
   }
   // "show all": on a phone the rest load right there, under the cards already seen; elsewhere the large view
+  // on a phone the button brings the next few, right under the ones seen: it says how many are left, counted again
+  // after each press (it said 'show all 1363' however many were already shown, 15.11); elsewhere it opens them all, wide
+  function allLabel(total, shown) { return isPhone() ? t('showMoreLeft', { n: Math.max(0, total - shown) }) : t('showAll', { n: total }); }
   function allBtn(turn, label, opt) { return '<button class="ls-btn ls-btn--secondary ls-btn--block" style="margin-top:20px"' + (opt ? ' data-opt' : '') + (isPhone() ? ' data-more="' : ' data-wide="') + turn.id + '">' + esc(label) + '</button>'; }
   function prow(r) {
     return '<a class="ls-prow" data-opt href="' + esc(r.url) + '" data-goto="' + esc(pid(r.id)) + '"><img class="ls-prow__img" src="' + esc(r.img || '') + '" alt="" decoding="async">' +

@@ -521,7 +521,7 @@
     var ga = !guideFirst && guides.length && S.config && S.config.guidesAfter > 0 && Math.min(n, list.length) > S.config.guidesAfter ? S.config.guidesAfter : 0;
     html += '<div class="ls-grid">' + list.slice(0, ga || n).map(card).join('') + '</div>';
     if (ga) { html += guidesHtml(guides, turn.q) + '<div class="ls-grid">' + list.slice(ga, n).map(card).join('') + '</div>'; }
-    if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
+    if (list.length > n) { html += allBtn(turn, allLabel(list.length, n), true); }
     if (!guideFirst && !ga) { html += guidesHtml(guides, turn.q); }
     // results that may not be it: a quiet way to ask the store's AI to search the site (Tomer's ask card, 8.11), never
     // for a question already asked above (its card is there), and only when the shopper presses it

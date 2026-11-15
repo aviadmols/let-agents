@@ -278,7 +278,7 @@
     }
     var list = filtered(turn), n = gridN(turn);
     if (list.length) { html += '<div class="ls-grid ls-set__grid">' + list.slice(0, n).map(card).join('') + '</div>'; }
-    if (list.length > n) { html += allBtn(turn, t('showAll', { n: list.length }), true); }
+    if (list.length > n) { html += allBtn(turn, allLabel(list.length, n), true); }
     if (turn.setSearch) { html += '<div class="ls-set__search"><button class="ls-btn ls-btn--link" data-q="' + esc(turn.setSearch) + '">' + icon('search', 'ls-icon--sm') + esc(t('searchFor', { q: turn.setSearch })) + '</button></div>'; }
     return html;
   }
