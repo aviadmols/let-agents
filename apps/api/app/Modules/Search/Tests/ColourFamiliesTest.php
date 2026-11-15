@@ -114,6 +114,7 @@ final class ColourFamiliesTest extends TestCase
         $this->assertSame($items['p:1']['cf'], $items['p:3']['cf'], 'one model in three colours');
         $this->assertArrayNotHasKey('cf', $items['p:5'], 'another model of the brand');
         $this->assertArrayNotHasKey('cf', $items['p:4'], 'a model in one colour');
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{8}$/', (string) $items['p:1']['cf'], 'a family read from colour words: a card each, as before');
     }
 
     public function test_versions_the_stores_pages_link_are_one_family_whatever_colour_is_read_of_them(): void
@@ -137,6 +138,7 @@ final class ColourFamiliesTest extends TestCase
 
         $this->assertNotNull($items['p:1']['cf'] ?? null);
         $this->assertSame($items['p:1']['cf'], $items['p:2']['cf'] ?? null, 'the store linking them is word enough');
+        $this->assertStringStartsWith('s', (string) $items['p:1']['cf'], 'linked by the store: one card in the drawer');
         $this->assertSame(['Citrine', 'Amethyst'], [$items['p:1']['cl'] ?? null, $items['p:2']['cl'] ?? null], 'each named as its swatch is');
         $this->assertArrayNotHasKey('cf', $items['p:3']);
     }
@@ -176,6 +178,7 @@ final class ColourFamiliesTest extends TestCase
         $this->assertNotNull($items['p:4']['cf'] ?? null);
         $this->assertSame($items['p:4']['cf'], $items['p:5']['cf'] ?? null, 'one name in two colours, one family: one card in the drawer');
         $this->assertArrayNotHasKey('cf', $items['p:6'], 'a model in one colour');
+        $this->assertStringStartsWith('m', (string) $items['p:1']['cf'], 'a model by its name: one card in the drawer');
 
         $tags = collect($data['facets'])->firstWhere('k', 'store_tags');
         $this->assertSame(['Sandals', 'Shoes'], array_column((array) ($tags['v'] ?? []), 'l'), 'never an app\'s tag, a menu\'s heading or a hashtag');

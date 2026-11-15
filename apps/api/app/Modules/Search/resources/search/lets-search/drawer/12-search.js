@@ -194,7 +194,9 @@
     var named = {};
     out = out.filter(function (r) {
       if (!r.cf) { return true; }
-      var k = r.cf + '|' + String(r.title || '').trim().toLowerCase();
+      // one model the store links or names (its family marked "s" or "m"): one card, the best of it for the search, the
+      // rest its dots (as Aviad asked, 16.11)
+      var k = /^[sm]/.test(r.cf) ? r.cf : r.cf + '|' + String(r.title || '').trim().toLowerCase();
       if (named[k]) { return false; }
       named[k] = 1;
       return true;

@@ -424,8 +424,11 @@ final class BuildSearchIndex
             // the store linking them is word enough, whatever colour the code reads of each (amethyst, citrine)
             $linked = str_starts_with((string) $key, 'store|');
             if (count($members) >= 2 && count($members) <= ($linked ? self::LINKED_MAX : self::FAMILY_MAX) && ($linked || count($colours) >= 2)) {
+                // one model as the store links it or names it ("s"/"m" before the hash, never a hex letter): one card in the
+                // drawer, its versions its dots (as Aviad asked, 16.11); a family read from colour words keeps a card each
+                $mark = str_starts_with((string) $key, 'store|') ? 's' : (str_starts_with((string) $key, 'model|') ? 'm' : '');
                 foreach ($members as $i) {
-                    $items[$i]['cf'] = substr(md5((string) $key), 0, 8);
+                    $items[$i]['cf'] = $mark.substr(md5((string) $key), 0, 8);
                 }
             }
         }
