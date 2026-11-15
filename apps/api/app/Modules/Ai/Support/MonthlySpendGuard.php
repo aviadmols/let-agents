@@ -4,7 +4,6 @@ namespace App\Modules\Ai\Support;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
-use App\Modules\Ai\Contracts\CreditBook;
 use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Events\SpendCapHit;
@@ -18,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class MonthlySpendGuard implements SpendGuard
 {
-    public function __construct(private readonly TenantContext $tenant, private readonly CreditBook $credits) {}
+    public function __construct(private readonly TenantContext $tenant) {}
 
     public function assertCanSpend(float $estimatedUsd, bool $forShopper = false): void
     {
@@ -63,10 +62,9 @@ final class MonthlySpendGuard implements SpendGuard
         return (float) $this->month()->where('shop_id', $shopId)->sum('cost_usd');
     }
 
-    /** The shop's own allowance, and what it bought on top of it and has not used yet (CreditBook). */
     public function capFor(string $shopId): float
     {
-        return (float) Settings::get('ai.shop_monthly_cap_usd', $shopId) + $this->credits->balance($shopId);
+        return (float) Settings::get('ai.shop_monthly_cap_usd', $shopId);
     }
 
     /**

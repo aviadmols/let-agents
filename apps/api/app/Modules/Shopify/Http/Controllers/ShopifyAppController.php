@@ -2,13 +2,10 @@
 
 namespace App\Modules\Shopify\Http\Controllers;
 
-use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Localization\Locales;
 use App\Modules\Admin\Models\User;
-use App\Modules\Ai\Contracts\CreditBook;
 use App\Modules\Connections\Contracts\StoreFeedUnavailable;
-use App\Modules\Shopify\Actions\BuyCredits;
 use App\Modules\Shopify\Actions\ConnectPixel;
 use App\Modules\Shopify\Actions\InstallStore;
 use App\Modules\Shopify\Actions\ManageSubscription;
@@ -289,50 +286,6 @@ final class ShopifyAppController
     private static function billingReturnUrl(ShopifyInstall $install): string
     {
         return url('/shopify/billing/return?'.http_build_query(['shop' => $install->shop_domain]));
-    }
-
-    /**
-     * A credit pack, off to Shopify to approve as a one-time charge (BuyCredits). Only while ai.credit_purchase is on and
-     * only for a store on the public app; anything else is told the team adds it. The store's plan is not touched.
-     */
-    public function startCredits(Request $request, BuyCredits $credits, CreditBook $book): RedirectResponse|Response
-    {
-        $install = $this->signedInstall($request);
-        $this->speak($request, $install);
-
-        if ($install === null) {
-            return $this->reopen($request) ?? response(__('shopify::app.bad_request'), 404);
-        }
-
-        $pack = $book->pack((string) $request->query('pack'));
-
-        if ($pack === null || ! Features::enabled('ai.credit_purchase', (string) $install->shop_id) || ! ShopifyApps::isPublic($install->client_id)) {
-            Log::warning('Shopify credit purchase refused', ['shop' => $install->shop_domain, 'pack' => (string) $request->query('pack')]);
-
-            return response(__('ai::credits.unavailable'), 409);
-        }
-
-        return $this->outward($request, $credits->start($install, $pack), ShopifyApps::key($install->client_id), $install);
-    }
-
-    /** Back from approving a credit pack: Shopify is asked whether it was bought, and the merchant goes back to the app. */
-    public function creditsReturn(Request $request, BuyCredits $credits): RedirectResponse|Response
-    {
-        // Shopify adds charge_id to the address it was given: never part of what we signed
-        $signed = URL::hasCorrectSignature($request, true, ['charge_id']);
-        $shop = $signed ? ShopifySignatures::shopDomain($request->query('shop')) : null;
-        $install = $shop === null ? null : ShopifyInstall::query()->where('shop_domain', $shop)->first();
-
-        if ($install === null || ! $install->installed()) {
-            Log::warning('Shopify credit return refused', ['shop' => (string) $request->query('shop'), 'signed' => $signed]);
-
-            return $this->reopen($request) ?? response(__('shopify::app.bad_request'), 404);
-        }
-
-        $status = $credits->confirm($install, (string) $request->query('credit'));
-        Log::info('Shopify credit purchase returned', ['shop' => $install->shop_domain, 'status' => $status]);
-
-        return redirect()->away(self::appInAdmin($install));
     }
 
     /**

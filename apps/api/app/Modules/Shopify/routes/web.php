@@ -22,9 +22,6 @@ Route::middleware('throttle:shopify')->group(function (): void {
     Route::post('shopify/billing/choose', [ShopifyAppController::class, 'choosePlanByToken'])
         ->withoutMiddleware(PreventRequestForgery::class)
         ->name('shopify.billing.choose');
-    // A credit pack bought in Shopify's billing (one-time), once ai.credit_purchase is on: signed by us, and back.
-    Route::get('shopify/credits/start', [ShopifyAppController::class, 'startCredits'])->name('shopify.credits.start');
-    Route::get('shopify/credits/return', [ShopifyAppController::class, 'creditsReturn'])->name('shopify.credits.return');
 });
 
 // Each shop's panel is on its own address ({slug}.shop_domain), so the Shopify admin keeps only the

@@ -93,7 +93,7 @@ final class ShopAllowanceTest extends TestCase
             ->assertSee('מתחדש ב־1 בנובמבר')
             ->getContent();
 
-        preg_match('/<div class="la-calm".*?data-add-credits.*?<\/a>/s', $html, $strip);
+        preg_match('/<div class="la-usage".*?<\/div>/s', $html, $strip);
         $this->assertStringNotContainsString('$', $strip[0], 'no dollars on a merchant screen');
         $this->assertStringNotContainsString('27.6', $strip[0]);
     }

@@ -6,7 +6,6 @@ use App\Core\Facades\Settings;
 use App\Modules\Admin\Contracts\ChosenShop;
 use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\SpendGuard;
-use App\Modules\Ai\Filament\Merchant\Pages\Credits;
 use App\Modules\Ai\Filament\Operator\Pages\ShopBudgets;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
@@ -63,8 +62,8 @@ final class UsageStrip
             return new HtmlString('');
         }
 
-        // A calm card of its own (the operator's strip stays as it is), with the way to add credits (Credits).
-        return new HtmlString(view('ai::usage-strip-merchant', [
+        return new HtmlString(view('ai::usage-strip', [
+            'title' => __('ai::budget.strip.title'),
             'percent' => $usage['percent'],
             'tone' => $usage['tone'],
             'main' => __('ai::budget.strip.share', ['percent' => min($usage['percent'], 100)]),
@@ -74,9 +73,8 @@ final class UsageStrip
                 'warn' => __('ai::budget.strip.near'),
                 default => __('ai::budget.strip.set_by'),
             },
-            // on the credits page itself, no way to where the shop already is
-            'link' => str_ends_with(request()->path(), '/'.Credits::getSlug()) ? null : Credits::getUrl(tenant: $shop),
-            'linkLabel' => __('ai::credits.cta'),
+            'link' => null,
+            'linkLabel' => null,
         ])->render());
     }
 

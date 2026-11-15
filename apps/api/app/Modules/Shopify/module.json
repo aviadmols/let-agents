@@ -6,8 +6,7 @@
         "Runs",
         "Connections",
         "Catalog",
-        "Admin",
-        "Ai"
+        "Admin"
     ],
     "provider": "ShopifyServiceProvider",
     "features": [],

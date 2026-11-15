@@ -8,7 +8,6 @@ use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Ai\Console\RecheckProvidersCommand;
 use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\ChatModel;
-use App\Modules\Ai\Contracts\CreditBook;
 use App\Modules\Ai\Contracts\Embedder;
 use App\Modules\Ai\Contracts\ImageEmbedder;
 use App\Modules\Ai\Contracts\ImageModel;
@@ -17,7 +16,6 @@ use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Contracts\VisionModel;
 use App\Modules\Ai\Contracts\WebSearchModel;
-use App\Modules\Ai\Support\AiCredits;
 use App\Modules\Ai\Support\AllowanceHome;
 use App\Modules\Ai\Support\Drivers\AnthropicBatches;
 use App\Modules\Ai\Support\Drivers\AnthropicChat;
@@ -66,7 +64,6 @@ final class AiServiceProvider extends ModuleServiceProvider
         $this->app->tag([AllowanceHome::class], HomeCards::CARDS_TAG);
         $this->app->bind(ListsProviderModels::class, SdkModelLister::class);
         $this->app->bind(SpendGuard::class, MonthlySpendGuard::class);
-        $this->app->bind(CreditBook::class, AiCredits::class);
 
         $this->app->tag(self::CHAT_DRIVERS, 'ai.chat_drivers');
         $this->app->tag(self::EMBEDDING_DRIVERS, 'ai.embedding_drivers');

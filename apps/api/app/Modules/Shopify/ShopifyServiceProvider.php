@@ -8,7 +8,6 @@ use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\HomeSource;
 use App\Modules\Admin\Contracts\PanelHost;
 use App\Modules\Admin\Contracts\TodayImprovements;
-use App\Modules\Ai\Contracts\CreditCheckout;
 use App\Modules\Shopify\Console\ConnectPixelCommand;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Shopify\Feed\ShopifyBlog;
@@ -19,7 +18,6 @@ use App\Modules\Shopify\Http\Middleware\FrameInsideShopify;
 use App\Modules\Shopify\Listeners\AnswerShopperData;
 use App\Modules\Shopify\Support\EmbeddedApp;
 use App\Modules\Shopify\Support\ShopifyConnectionFacts;
-use App\Modules\Shopify\Support\ShopifyCreditCheckout;
 use App\Modules\Shopify\Support\ShopifyPanelHost;
 use App\Modules\Shopify\Support\ShopifySubscription;
 use App\Modules\Shopify\Support\ShopperDataHome;
@@ -50,8 +48,6 @@ final class ShopifyServiceProvider extends ModuleServiceProvider
         $this->app->tag([ShopperDataToday::class], TodayImprovements::TAG);
         // Inside the Shopify admin, Shopify signed the merchant in: the panel offers no sign-out and no password.
         $this->app->tag([ShopifyPanelHost::class], PanelHost::TAG);
-        // A credit pack bought in Shopify's billing, once ai.credit_purchase is on (ShopifyCreditCheckout).
-        $this->app->bind(CreditCheckout::class, ShopifyCreditCheckout::class);
     }
 
     protected function bootModule(): void
