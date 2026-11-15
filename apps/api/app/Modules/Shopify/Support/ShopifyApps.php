@@ -31,6 +31,15 @@ final class ShopifyApps
         return $apps;
     }
 
+    /**
+     * Whether the store came through the public app: only it may bill through Shopify. A custom-distribution app is
+     * refused "Custom apps cannot use the Billing API" (Rocks, 15.11), so its store's plan is the team's to set.
+     */
+    public static function isPublic(?string $clientId): bool
+    {
+        return self::key($clientId) === self::key();
+    }
+
     /** The app's client id, or the public app's when none (or an unknown one) is given. */
     public static function key(?string $clientId = null): string
     {

@@ -35,8 +35,9 @@ final class ShopifyConnectionFacts implements ConnectionFacts
                 .rawurlencode(ShopifyApps::key($install->client_id)).'/'.self::EMBED;
         }
 
-        // the merchant changes plan themselves, in Shopify's billing; the pages on the way speak the panel's language
-        if ($install->installed() && Plan::query()->offered()->exists()) {
+        // the merchant changes plan themselves, in Shopify's billing; the pages on the way speak the panel's language.
+        // Only through the public app: a custom app may not bill (ShopifyApps::isPublic), so its store asks the team.
+        if ($install->installed() && ShopifyApps::isPublic($install->client_id) && Plan::query()->offered()->exists()) {
             $facts['plans_url'] = ShopifyAppController::plansLink($install->shop_domain, app()->getLocale());
             // each plan straight to Shopify's approval: the new plan holds from its approval, up or down
             $facts['plan_urls'] = Plan::query()->offered()->pluck('code')->mapWithKeys(fn (string $code): array => [$code => ShopifyAppController::planLink($install->shop_domain, $code, app()->getLocale())])->all();

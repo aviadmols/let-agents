@@ -237,6 +237,14 @@ final class ShopifyAppController
             return $this->choosePlan($request, $install);
         }
 
+        // a store of a custom app: Shopify bills through the public app alone ("Custom apps cannot use the Billing API",
+        // a 500 for Rocks, 15.11). Its plan is the team's to set: said plainly, Shopify never asked.
+        if (! ShopifyApps::isPublic($install->client_id)) {
+            Log::warning('Shopify plan chosen in a custom app', ['shop' => $install->shop_domain, 'plan' => $plan->code]);
+
+            return response(__('shopify::app.plan_by_team'), 409);
+        }
+
         $approve = $billing->start($install, self::billingReturnUrl($install), $plan);
 
         return $this->outward($request, $approve, ShopifyApps::key($install->client_id), $install);
@@ -258,13 +266,16 @@ final class ShopifyAppController
             $install === null || ! $install->installed() => 'store not installed',
             $install->client_id !== null && $install->client_id !== $claims['app'] => 'token of another app',
             $plan === null => 'plan not offered',
+            ! ShopifyApps::isPublic($install->client_id) => 'custom app',
             default => null,
         };
 
         if ($refused !== null) {
             Log::warning('Shopify plan choice refused: '.$refused, ['shop' => $claims['shop'] ?? null, 'plan' => (string) $request->input('plan')]);
 
-            return response()->json(['message' => __('shopify::app.bad_request')], $claims === null ? 401 : 404);
+            return $refused === 'custom app'
+                ? response()->json(['message' => __('shopify::app.plan_by_team')], 409)
+                : response()->json(['message' => __('shopify::app.bad_request')], $claims === null ? 401 : 404);
         }
 
         return response()->json(['url' => $billing->start($install, self::billingReturnUrl($install), $plan)]);

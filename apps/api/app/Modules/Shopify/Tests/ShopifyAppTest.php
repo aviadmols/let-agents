@@ -761,6 +761,29 @@ final class ShopifyAppTest extends TestCase
         }
     }
 
+    /**
+     * Rocks, 15.11: a plan pressed in the panel of a store on its own custom app reached Shopify, which refused it
+     * ("Custom apps cannot use the Billing API"), and the merchant got a 500. Such a store is offered no Shopify
+     * plan (the panel asks the team), and a plan link still pressed says so plainly, never asking Shopify.
+     */
+    public function test_a_store_on_a_custom_app_is_offered_no_shopify_plan_and_a_press_says_the_team_sets_it(): void
+    {
+        config(['services.shopify.more_apps' => 'custom-key:shpss_custom']);
+        $install = $this->installed();
+        $facts = app(ShopifyConnectionFacts::class);
+        $this->assertArrayHasKey('plan_urls', $facts->facts($install->shop), 'the public app\'s store approves its plan in Shopify');
+
+        $install->forceFill(['client_id' => 'custom-key'])->save();
+        $offered = $facts->facts($install->fresh()->shop);
+        $this->assertArrayNotHasKey('plans_url', $offered, 'a custom app\'s store is offered no Shopify billing');
+        $this->assertArrayNotHasKey('plan_urls', $offered);
+
+        $this->get(ShopifyAppController::planLink(self::SHOP, 'growth', 'he'))->assertStatus(409)->assertSee('הצוות שלנו');
+        $this->postJson('/shopify/billing/choose', ['plan' => 'growth'], ['Authorization' => 'Bearer '.self::idToken(['aud' => 'custom-key'], 'shpss_custom')])
+            ->assertStatus(409)->assertJsonPath('message', __('shopify::app.plan_by_team'));
+        $this->assertNull(collect($this->graphql)->first(fn (array $call): bool => str_contains((string) $call['query'], 'appSubscriptionCreate')), 'Shopify is never asked');
+    }
+
     public function test_inside_the_admin_a_plan_is_chosen_with_the_session_token_and_a_refusal_is_logged(): void
     {
         $install = $this->installed();
