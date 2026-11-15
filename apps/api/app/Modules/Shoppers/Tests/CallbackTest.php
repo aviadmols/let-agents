@@ -3,11 +3,15 @@
 namespace App\Modules\Shoppers\Tests;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Admin\Enums\ShopRole;
+use App\Modules\Admin\Models\User;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
+use App\Modules\Shoppers\Mail\CallbackReceivedMail;
 use App\Modules\Shoppers\Mail\VerificationCode;
 use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
@@ -86,6 +90,33 @@ final class CallbackTest extends TestCase
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
         ], content: json_encode(['vid' => self::VID, 'contact' => '0501234567', 'name' => '<b>x</b>', 'consent' => true, 'question' => 'שאלה', 'type' => 'search', 'id' => 'search']))->assertOk();
         $this->assertNull(app(TenantContext::class)->run($this->shop->id, fn () => ShopperCallback::query()->latest('id')->first()->name));
+    }
+
+    /**
+     * Aviad, 15.11: a shopper who asks for a person, or leaves details under an answer that sends them to the team, is
+     * mailed to the store's team at once with what the conversation was about; until now it waited only on the screen.
+     */
+    public function test_the_stores_team_is_mailed_who_to_get_back_to_and_about_what(): void
+    {
+        Mail::fake();
+        $owner = User::factory()->create(['email' => 'owner@store.test']);
+        $owner->attachShop($this->shop, ShopRole::Owner);
+        $viewer = User::factory()->create(['email' => 'viewer@store.test']);
+        $viewer->attachShop($this->shop, ShopRole::Viewer);
+
+        $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/signup', server: [
+            'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
+        ], content: json_encode(['vid' => self::VID, 'contact' => '0501234567', 'name' => 'דנה', 'consent' => true, 'locale' => 'he',
+            'question' => "אפשר להגדיל למידה 59?\nאני מעוניינת לדבר עם מישהו", 'type' => 'product', 'id' => '10'], JSON_UNESCAPED_UNICODE))->assertOk();
+
+        Mail::assertSent(CallbackReceivedMail::class, 1);
+        Mail::assertSent(CallbackReceivedMail::class, fn (CallbackReceivedMail $mail): bool => $mail->hasTo('owner@store.test')
+            && str_contains($mail->contact, '501234567') && $mail->name === 'דנה' && str_contains($mail->question, 'למידה 59') && $mail->channel === 'phone');
+
+        // a shop that turned it off keeps them on the screen only
+        Settings::set('shoppers.email_team_callbacks', false, $this->shop->id);
+        $this->leave('0507654321', 'עוד שאלה')->assertOk();
+        Mail::assertSent(CallbackReceivedMail::class, 1);
     }
 
     public function test_it_is_refused_when_the_shop_turned_it_off(): void

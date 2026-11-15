@@ -4,6 +4,7 @@ namespace App\Modules\Shoppers\Actions;
 
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Shoppers\Jobs\SendCallbackToTeam;
 use App\Modules\Shoppers\Mail\VerificationCode;
 use App\Modules\Shoppers\Models\ShopperCallback;
 use App\Modules\Shoppers\Models\ShopperIdentity;
@@ -75,7 +76,7 @@ final class SignUp
 
             // They are not signing up for offers; they are waiting for one answer.
             if ($waitingFor !== null) {
-                ShopperCallback::query()->create([
+                $callback = ShopperCallback::query()->create([
                     'shop_id' => $shopId,
                     'identity_id' => $identity->id,
                     'name' => $waitingFor['name'] ?? null,
@@ -83,6 +84,8 @@ final class SignUp
                     'page_type' => $waitingFor['type'],
                     'page_id' => $waitingFor['id'],
                 ]);
+                // and the store's team is told at once, with what they asked (SendCallbackToTeam)
+                SendCallbackToTeam::dispatch($shopId, (int) $callback->id);
             }
 
             // A code wherever one can arrive, the search chat's callbacks too (11.2026): the drawer asks for it, and a

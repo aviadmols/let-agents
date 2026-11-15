@@ -24,6 +24,12 @@
     ],
     "settings": [
         {
+            "name": "email_team_callbacks",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "recent_products_count",
             "type": "int",
             "default": 6,

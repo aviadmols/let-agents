@@ -45,4 +45,8 @@ return [
         'label' => 'The consent wording',
         'description' => 'What the shopper agrees to when leaving a contact. It must say the shop will see the contact and the products they viewed. Empty shows the built-in wording.',
     ],
+    'email_team_callbacks' => [
+        'label' => 'Email the team when a shopper leaves details',
+        'description' => 'A shopper who asked to be called back (left a phone or an email): the store team gets an email with the details, what they asked, and on which page.',
+    ],
 ];
