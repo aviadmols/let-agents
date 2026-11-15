@@ -164,9 +164,14 @@
   // A question the store already answered (checked, and kept as the store's): its answer is in the index,
   // so it starts right here as the shopper types, with no model; Enter or a tap opens it whole. Only the
   // store's own answers, never one about a product, and only one close enough (the engine's closeAnswer).
+  // On a product's page, a question about it (its size, making it bigger or smaller, "this one") is that product's: no
+  // store answer is offered for it (Rocks 15.11: "אפשר להגדיל למידה 59?" on a ring made 51-57 offered the answer kept
+  // from another ring's page)
+  var ASKS_SIZE_HERE = /(^|[^֐-׿a-z])[ובלהש]?מיד(ה|ות|ת|תה|תו)([^֐-׿a-z]|$)|(^|[^a-z])sizes?([^a-z]|$)/i;
   function savedAnswerFor(q) {
     var e = win.LA_ENGINE;
     if (off('ask') || !e || !e.closeAnswer) { return null; }
+    if (S.ctx && (ASKS_SIZE_HERE.test(q) || RESIZES_IT.test(q) || POINTS_AT_IT.test(q))) { return null; }
     var keys = Object.keys(S.records);
     for (var i = 0; i < keys.length; i++) {
       var r = S.records[keys[i]];
