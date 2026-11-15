@@ -379,6 +379,17 @@ final class SimilarItemsTest extends TestCase
         LoadedIndex::forget();
 
         $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
+
+        // Jean Rachel, 15.11: a set and a stack of bracelets are bracelets, both of them
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => ['bracelet set', 'stacked bracelets', 'silver']]);
+            RetrievalImage::query()->where('external_id', '302')->update(['caption_words' => ['bracelet stack', 'box chain', 'black beads']]);
+            RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => ['pendant necklace', 'silver']]);
+        });
+        $this->travel(10)->minutes();
+        LoadedIndex::forget();
+
+        $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
     }
 
     public function test_the_teams_word_keeps_two_products_apart_and_puts_two_together(): void

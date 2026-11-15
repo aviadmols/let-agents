@@ -952,7 +952,7 @@ final class SearchCatalog
         if ($ownKind === [] || $externalIds === []) {
             return $externalIds;
         }
-        $ownAll = array_merge(...array_map(fn (string $w): array => self::kindNouns($w), $ownWords));
+        $ownAll = self::pictureWords($ownWords);
         $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy(fn (RetrievalImage $r): string => (string) $r->external_id);
 
         return array_values(array_filter($externalIds, function (string $id) use ($theirs, $ownKind, $ownAll): bool {
@@ -961,37 +961,81 @@ final class SearchCatalog
             if ($kind === []) {
                 return true;
             }
-            $all = array_merge(...array_map(fn (string $w): array => self::kindNouns($w), $words));
 
-            return array_intersect($kind, $ownKind) !== [] || array_intersect($ownKind, $all) !== [] || array_intersect($kind, $ownAll) !== [];
+            return array_intersect($kind, $ownKind) !== [] || array_intersect($ownKind, self::pictureWords($words)) !== [] || array_intersect($kind, $ownAll) !== [];
         }));
     }
+
+    /** Words that hold a kind rather than name one: a set of bracelets is bracelets ("bracelet set", "סט צמידים"). */
+    private const PICTURE_CONTAINERS = ['set', 'stack', 'pair', 'pack', 'kit', 'bundle', 'duo', 'trio', 'combo', 'lot', 'סט', 'סטים', 'מארז', 'מארזי', 'זוג', 'זוגות', 'ערכה', 'ערכת', 'חבילה', 'חבילת'];
 
     /**
      * The noun a picture's word names a thing by, in one form: in Hebrew its first word without a plural or construct
      * ending ("נעלי", "נעליים": "נעל"), and the word after a construct too ("נעלי סניקרס": "נעל", "סניקרס"); in English
-     * its last word without a plural ("derby shoes": "shoe", "dresses": "dress").
+     * its last word without a plural ("derby shoes": "shoe", "dresses": "dress"). A set or a stack of something is that
+     * something ("bracelet stack": "bracelet").
      *
      * @return list<string>
      */
     private static function kindNouns(string $phrase): array
     {
-        $words = array_values(array_filter(array_map(fn (string $w): string => trim($w, "-'׳"), preg_split('/[^\p{L}\'׳-]+/u', mb_strtolower($phrase), -1, PREG_SPLIT_NO_EMPTY) ?: []), fn (string $w): bool => $w !== ''));
+        $words = self::phraseWords($phrase);
+        if (count($words) > 1 && preg_match('/\p{Hebrew}/u', $words[0]) === 1 && in_array($words[0], self::PICTURE_CONTAINERS, true)) {
+            array_shift($words);
+        }
+        while (count($words) > 1 && preg_match('/\p{Hebrew}/u', $words[0]) !== 1 && in_array((string) end($words), self::PICTURE_CONTAINERS, true)) {
+            array_pop($words);
+        }
         if ($words === []) {
             return [];
         }
-        $hebrew = fn (string $w): string => mb_strlen($w = (string) preg_replace('/(?:יים|ים|ות)$/u', '', (string) preg_replace('/יי$/u', 'י', $w))) > 3 ? (string) preg_replace('/[יהת]$/u', '', $w) : $w;
         if (preg_match('/\p{Hebrew}/u', $words[0]) === 1) {
-            $nouns = [$hebrew($words[0])];
+            $nouns = [self::oneForm($words[0])];
             if (isset($words[1]) && preg_match('/י$/u', $words[0]) === 1 && preg_match('/\p{Hebrew}/u', $words[1]) === 1) {
-                $nouns[] = $hebrew($words[1]);
+                $nouns[] = self::oneForm($words[1]);
             }
 
             return array_values(array_unique(array_filter($nouns, fn (string $n): bool => mb_strlen($n) >= 2)));
         }
-        $last = (string) preg_replace(['/(ss|x|ch|sh)es$/u', '/([^s])s$/u'], ['$1', '$1'], (string) end($words));
+        $last = self::oneForm((string) end($words));
 
         return mb_strlen($last) >= 3 ? [$last] : [];
+    }
+
+    /**
+     * Every word of a picture's words, each in one form: what the other's kind is looked for among.
+     *
+     * @param  list<string>  $phrases
+     * @return list<string>
+     */
+    private static function pictureWords(array $phrases): array
+    {
+        $out = [];
+        foreach ($phrases as $phrase) {
+            foreach (self::phraseWords($phrase) as $word) {
+                $out[] = self::oneForm($word);
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /** @return list<string> */
+    private static function phraseWords(string $phrase): array
+    {
+        return array_values(array_filter(array_map(fn (string $w): string => trim($w, "-'׳"), preg_split('/[^\p{L}\'׳-]+/u', mb_strtolower($phrase), -1, PREG_SPLIT_NO_EMPTY) ?: []), fn (string $w): bool => $w !== ''));
+    }
+
+    /** A Hebrew noun without its plural or construct ending ("נעליים": "נעל"), an English one without its plural ("shoes": "shoe"). */
+    private static function oneForm(string $word): string
+    {
+        if (preg_match('/\p{Hebrew}/u', $word) === 1) {
+            $word = (string) preg_replace('/(?:יים|ים|ות)$/u', '', (string) preg_replace('/יי$/u', 'י', $word));
+
+            return mb_strlen($word) > 3 ? (string) preg_replace('/[יהת]$/u', '', $word) : $word;
+        }
+
+        return (string) preg_replace(['/(ss|x|ch|sh)es$/u', '/([^s])s$/u'], ['$1', '$1'], $word);
     }
 
     /**
