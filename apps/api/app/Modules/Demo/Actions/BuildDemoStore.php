@@ -83,7 +83,8 @@ final class BuildDemoStore
         $settings = [
             'catalog.max_products' => (int) Settings::get('demo.max_products'),
             'catalog.max_content_items' => (int) Settings::get('demo.max_content'),
-            'ai.shop_monthly_cap_usd' => (float) Settings::get('demo.budget_usd'),
+            // as the team set it for this demo alone, else as for every demo
+            'ai.shop_monthly_cap_usd' => DemoSite::chosenBudget($site) ?? (float) Settings::get('demo.budget_usd'),
             'ai.shop_cap_stops_shoppers' => true,
             'search.photos_per_month' => (int) Settings::get('demo.photos'),
             'assistant.prepared_per_sync' => (int) Settings::get('demo.prepared_questions'),
@@ -98,6 +99,10 @@ final class BuildDemoStore
             'search.similar_by' => ['look' => 'picture', 'content' => 'meaning'][$matters] ?? 'both',
             'search.photo_match' => $matters === 'content' ? 'function' : 'look',
         ];
+        // a currency the team set (a store abroad, read in shekels from here): its prices in it
+        if (DemoSite::chosenCurrency($site) !== null) {
+            $settings['search.store_currency'] = true;
+        }
         foreach ($settings as $key => $value) {
             if (app(SettingRegistry::class)->has($key)) {
                 Settings::set($key, $value, $shop->id);

@@ -137,4 +137,26 @@ class DemoSite extends Model
     {
         return Features::enabled('demo.pictures');
     }
+
+    /** The most a demo's own budget may be set to, as the operator's demo.budget_usd. */
+    public const MOST_BUDGET_USD = 20.0;
+
+    /**
+     * The currency the team set for this demo (choices.currency): a store abroad whose site, read from here, shows
+     * shekels. Null when none was set, and the store's own is read.
+     */
+    public static function chosenCurrency(self $site): ?string
+    {
+        $currency = $site->choices['currency'] ?? null;
+
+        return is_string($currency) && preg_match('/^[A-Z]{3}$/', $currency) === 1 ? $currency : null;
+    }
+
+    /** The budget the team set for this demo alone (choices.budget_usd), within demo.budget_usd's bounds; else null. */
+    public static function chosenBudget(self $site): ?float
+    {
+        $budget = $site->choices['budget_usd'] ?? null;
+
+        return is_numeric($budget) ? max(0.2, min(self::MOST_BUDGET_USD, (float) $budget)) : null;
+    }
 }

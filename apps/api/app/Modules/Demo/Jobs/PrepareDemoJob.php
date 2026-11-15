@@ -61,15 +61,16 @@ final class PrepareDemoJob implements ShouldQueue
                 return;
             }
 
-            $tenant->runUnscoped(function () use ($shop, $read): void {
+            $tenant->runUnscoped(function () use ($shop, $read, $site): void {
                 $connection = StoreConnection::query()->where('shop_id', $shop->id)->first();
-                $connection?->forceFill(['site_info' => ['demo' => ['platform' => $read['platform'], 'currency' => $read['currency']]] + (array) $connection->site_info])->save();
+                $connection?->forceFill(['site_info' => ['demo' => ['platform' => $read['platform'], 'currency' => DemoSite::chosenCurrency($site) ?? $read['currency']]] + (array) $connection->site_info])->save();
             });
             $language = $site->choices['language'] ?? null;
             $shop->forceFill(array_filter([
                 'platform' => $read['platform'] === PublicSite::SHOPIFY ? ShopPlatform::Shopify : ShopPlatform::WooCommerce,
                 'name' => $read['title'],
-                'currency' => $read['currency'],
+                // as the team set it for this demo (a store abroad, read in shekels from here), else as its site says
+                'currency' => DemoSite::chosenCurrency($site) ?? $read['currency'],
                 // the language the store's content is in: as whoever asked chose it, else as its own site says
                 'content_locale' => $language ?? (in_array($read['locale'], ['he', 'en'], true) ? $read['locale'] : null),
             ]))->save();

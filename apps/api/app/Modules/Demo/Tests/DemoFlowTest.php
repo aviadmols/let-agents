@@ -126,6 +126,24 @@ final class DemoFlowTest extends TestCase
         $this->get('/demo/'.$site->token)->assertOk()->assertSee('data-demo-scan', false);
     }
 
+    public function test_a_demo_the_team_set_its_own_budget_and_currency_keeps_them_when_scanned_again(): void
+    {
+        // Jean Rachel, 15.11: an American store, read in shekels from here, scanned again with more to spend
+        $this->start();
+        $site = DemoSite::query()->sole();
+        $this->post('/demo/'.$site->token.'/verify', ['code' => Mail::sent(DemoMail::class)->first()->data['code']]);
+        $site->refresh()->forceFill(['choices' => ['budget_usd' => 12, 'currency' => 'USD'] + (array) $site->choices])->save();
+
+        app(RetryDemo::class)->again($site->refresh());
+
+        $shop = Shop::query()->whereKey($site->refresh()->shop_id)->sole();
+        $this->assertEquals([12.0, true], [Settings::get('ai.shop_monthly_cap_usd', $shop->id), Settings::get('search.store_currency', $shop->id)]);
+        $this->assertSame('USD', DemoSite::chosenCurrency($site));
+
+        $site->forceFill(['choices' => ['budget_usd' => 500, 'currency' => 'usd'] + (array) $site->choices])->save();
+        $this->assertEquals([DemoSite::MOST_BUDGET_USD, null], [DemoSite::chosenBudget($site), DemoSite::chosenCurrency($site)], 'never past the bounds of every demo; a currency is its code');
+    }
+
     public function test_the_ready_demo_shows_the_floating_search_and_ends_with_its_store_deleted(): void
     {
         $this->start();
