@@ -937,6 +937,64 @@ final class SearchCatalog
     }
 
     /**
+     * Of these, those whose main picture shows the same kind of thing as its own. Its picture's words name the kind first
+     * ("derby shoe", "sandals", "נעלי ספורט"); two kinds are one when they are named by the same noun ("slip-on shoe",
+     * "derby shoes"), or when either's noun is among the other's picture words. One whose picture was not read stays:
+     * nothing says it is another kind. A product whose own picture says nothing keeps them all.
+     *
+     * @param  list<string>  $externalIds
+     * @return list<string>
+     */
+    private static function seenKind(CatalogProduct $product, array $externalIds): array
+    {
+        $ownWords = array_values(array_filter((array) (RetrievalImage::query()->where('product_id', $product->id)->value('caption_words') ?? []), 'is_string'));
+        $ownKind = self::kindNouns((string) ($ownWords[0] ?? ''));
+        if ($ownKind === [] || $externalIds === []) {
+            return $externalIds;
+        }
+        $ownAll = array_merge(...array_map(fn (string $w): array => self::kindNouns($w), $ownWords));
+        $theirs = RetrievalImage::query()->whereIn('external_id', $externalIds)->get(['external_id', 'caption_words'])->keyBy(fn (RetrievalImage $r): string => (string) $r->external_id);
+
+        return array_values(array_filter($externalIds, function (string $id) use ($theirs, $ownKind, $ownAll): bool {
+            $words = array_values(array_filter((array) ($theirs->get($id)?->caption_words ?? []), 'is_string'));
+            $kind = self::kindNouns((string) ($words[0] ?? ''));
+            if ($kind === []) {
+                return true;
+            }
+            $all = array_merge(...array_map(fn (string $w): array => self::kindNouns($w), $words));
+
+            return array_intersect($kind, $ownKind) !== [] || array_intersect($ownKind, $all) !== [] || array_intersect($kind, $ownAll) !== [];
+        }));
+    }
+
+    /**
+     * The noun a picture's word names a thing by, in one form: in Hebrew its first word without a plural or construct
+     * ending ("נעלי", "נעליים": "נעל"), and the word after a construct too ("נעלי סניקרס": "נעל", "סניקרס"); in English
+     * its last word without a plural ("derby shoes": "shoe", "dresses": "dress").
+     *
+     * @return list<string>
+     */
+    private static function kindNouns(string $phrase): array
+    {
+        $words = array_values(array_filter(array_map(fn (string $w): string => trim($w, "-'׳"), preg_split('/[^\p{L}\'׳-]+/u', mb_strtolower($phrase), -1, PREG_SPLIT_NO_EMPTY) ?: []), fn (string $w): bool => $w !== ''));
+        if ($words === []) {
+            return [];
+        }
+        $hebrew = fn (string $w): string => mb_strlen($w = (string) preg_replace('/(?:יים|ים|ות)$/u', '', (string) preg_replace('/יי$/u', 'י', $w))) > 3 ? (string) preg_replace('/[יהת]$/u', '', $w) : $w;
+        if (preg_match('/\p{Hebrew}/u', $words[0]) === 1) {
+            $nouns = [$hebrew($words[0])];
+            if (isset($words[1]) && preg_match('/י$/u', $words[0]) === 1 && preg_match('/\p{Hebrew}/u', $words[1]) === 1) {
+                $nouns[] = $hebrew($words[1]);
+            }
+
+            return array_values(array_unique(array_filter($nouns, fn (string $n): bool => mb_strlen($n) >= 2)));
+        }
+        $last = (string) preg_replace(['/(ss|x|ch|sh)es$/u', '/([^s])s$/u'], ['$1', '$1'], (string) end($words));
+
+        return mb_strlen($last) >= 3 ? [$last] : [];
+    }
+
+    /**
      * Whether a picture shows a print: as its reader said (caption v8); before it said, by its words; no picture, none.
      * Vans, 2.11: a leopard backpack's "מנומר" was no print to the words, and its alike were the plain bags.
      */
@@ -1416,6 +1474,11 @@ final class SearchCatalog
             // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
             // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
             // what it wants ("עם יהלום"): only kind made a striped, a floral and a denim shirt a brown overshirt's alike (Story)
+            // Where its title does not say what it is (a model's name, "Chief"), what its picture shows it is: a shoe's alike
+            // are shoes, never sandals, even where the store types everything one way ("Fashion") (Naot, 15.11)
+            if ($looksLead && preg_match('/^\p{Hebrew}/u', trim((string) $product->title)) !== 1) {
+                $ids = self::seenKind($product, $ids);
+            }
             $ofKind = $ids;
             // and only what its pictures found near: one its words alone found is at most "maybe these". A kid's sneaker
             // was a man's boot's alike by "נעליים" and "נעלי" in their titles, and no picture near it (Chozen, 30.10)

@@ -350,6 +350,37 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'its reader saw no print on 302; 303, read before it said, still goes by its words');
     }
 
+    public function test_where_the_title_is_a_models_name_its_picture_says_what_its_alike_are(): void
+    {
+        // Naot, 15.11: "Chief", a man's derby shoe, had sandals for its alike: its title names no kind, and the store types
+        // every product "Fashion". Its picture says "derby shoe"; a sandal's says "sandals".
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach (['301' => ['derby shoe', 'black'], '302' => ['sandals', 'black leather', 'open toe'], '303' => ['lace-up shoes', 'brown']] as $id => $words) {
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                $product->update(['in_stock' => true, 'payload' => ['product_type' => 'Fashion']]);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $product->title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words, 'caption_pattern' => ['covers' => 'none']]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'a lace-up shoe is like a derby shoe; sandals are not');
+        $this->assertSame([], array_column((array) $this->similar('301', 2)->json('others'), 'external_id'), 'nor are they "maybe these"');
+
+        // a picture of the same kind named another way ("נעלי סניקרס", "סניקרס") is the same kind; one not read stays
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => ['נעלי סניקרס', 'לבן']]);
+            RetrievalImage::query()->where('external_id', '302')->update(['caption_words' => ['סניקרס', 'שחור']]);
+            RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => null]);
+        });
+        $this->travel(10)->minutes();
+        LoadedIndex::forget();
+
+        $this->assertSame(['302', '303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
+    }
+
     public function test_the_teams_word_keeps_two_products_apart_and_puts_two_together(): void
     {
         // a rule the team wrote and approved (Taxonomy): "301 is never like 302; 303 goes with it"
