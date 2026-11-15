@@ -966,6 +966,57 @@ final class SearchCatalog
         }));
     }
 
+    /** What its main picture says it is ("derby shoe": "shoe"), or [] when its picture was not read or says nothing. */
+    private static function pictureKind(CatalogProduct $product): array
+    {
+        $words = array_values(array_filter((array) (RetrievalImage::query()->where('product_id', $product->id)->value('caption_words') ?? []), 'is_string'));
+
+        return self::kindNouns((string) ($words[0] ?? ''));
+    }
+
+    /**
+     * Of these, those for its people: none that is for others only (a woman's sandal beside a man's). Where it says
+     * nothing of whom, or they say nothing, they stay.
+     *
+     * @param  list<string>  $externalIds
+     * @return list<string>
+     */
+    private function sameWhom(string $externalId, array $externalIds): array
+    {
+        $audiences = $this->audiencesOf([$externalId, ...$externalIds]);
+        $own = $audiences[$externalId] ?? [];
+
+        return $own === [] ? $externalIds : array_values(array_filter($externalIds, fn (string $id): bool => ($theirs = $audiences[$id] ?? []) === [] || array_intersect($theirs, $own) !== []));
+    }
+
+    /** A model of more products than this is a word of the store's, not a model ("Footbed"). */
+    private const MODEL_MOST = 20;
+
+    /**
+     * The same model in its other colours, as the store names them: what its title says before " - " ("Julius - BA6 Soft
+     * Black" and "Julius - 739 Buffallo" are "Julius", and so is "Julius"), in stock first. Never one kept apart.
+     *
+     * @param  array<string, array<string, mixed>>  $records
+     * @param  array<string, int>  $apart
+     * @return list<array<string, mixed>>
+     */
+    private static function sameModel(string $externalId, array $records, array $apart): array
+    {
+        $model = fn (string $title): string => mb_strtolower(trim(explode(' - ', $title)[0]));
+        $own = $model((string) ($records['p:'.$externalId]['title'] ?? ''));
+        if (mb_strlen($own) < 3) {
+            return [];
+        }
+        $same = array_values(array_filter($records, fn (array $r, string $key): bool => str_starts_with($key, 'p:') && $key !== 'p:'.$externalId
+            && ! isset($apart[substr($key, 2)]) && $model((string) ($r['title'] ?? '')) === $own, ARRAY_FILTER_USE_BOTH));
+        if (count($same) > self::MODEL_MOST) {
+            return [];
+        }
+        usort($same, fn (array $a, array $b): int => ($b['s'] ?? 0) <=> ($a['s'] ?? 0));
+
+        return $same;
+    }
+
     /** Words that hold a kind rather than name one: a set of bracelets is bracelets ("bracelet set", "סט צמידים"). */
     private const PICTURE_CONTAINERS = ['set', 'stack', 'pair', 'pack', 'kit', 'bundle', 'duo', 'trio', 'combo', 'lot', 'סט', 'סטים', 'מארז', 'מארזי', 'זוג', 'זוגות', 'ערכה', 'ערכת', 'חבילה', 'חבילת'];
 
@@ -1489,8 +1540,18 @@ final class SearchCatalog
                     $ids = [...array_slice($rest, 0, self::AGREE_AFTER), ...$agreed, ...array_slice($rest, self::AGREE_AFTER)];
                 }
             }
-            // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
-            $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
+            // Where its title is a model's name ("Chief", "Santa Barbara Womens - 215 Black Nubuck") and its picture says what it
+            // is, what it is is its picture's word, and whom it is for: never the store's categories, which in such a store are
+            // its collections and offers ("Orthotic Friendly", "Classic Collection"), and a store typing all alike ("Fashion"):
+            // they made a man's derby shoe's alike sandals, and left 61 of 300 sandals and shoes none at all (Naot, 15.11)
+            $byPicture = $looksLead && preg_match('/^\p{Hebrew}/u', trim((string) $product->title)) !== 1 && self::pictureKind($product) !== [];
+            if ($byPicture) {
+                $ids = $this->sameWhom($externalId, self::seenKind($product, array_map('strval', $ids)));
+                $near = [];
+            } else {
+                // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
+                $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
+            }
             $ids = array_values(array_unique([...$alike, ...array_filter($ids, fn (string $id): bool => ! isset($apart[$id]))]));
             $near = array_values(array_filter((array) $near, fn ($id): bool => ! isset($apart[(string) $id])));
             // covered in a print, what opens its title as it does in that print is its alike, of another kind of it too: a
@@ -1518,11 +1579,6 @@ final class SearchCatalog
             // leopard backpack's alike are leopard bags first, then the rest in the pictures' order
             // and they look like it, of its colour and plain beside plain, unless the question asks another colour or names
             // what it wants ("עם יהלום"): only kind made a striped, a floral and a denim shirt a brown overshirt's alike (Story)
-            // Where its title does not say what it is (a model's name, "Chief"), what its picture shows it is: a shoe's alike
-            // are shoes, never sandals, even where the store types everything one way ("Fashion") (Naot, 15.11)
-            if ($looksLead && preg_match('/^\p{Hebrew}/u', trim((string) $product->title)) !== 1) {
-                $ids = self::seenKind($product, $ids);
-            }
             $ofKind = $ids;
             // and only what its pictures found near: one its words alone found is at most "maybe these". A kid's sneaker
             // was a man's boot's alike by "נעליים" and "נעלי" in their titles, and no picture near it (Chozen, 30.10)
@@ -1589,7 +1645,9 @@ final class SearchCatalog
                 $records = array_values(array_filter($records, fn (array $r): bool => $young($audiences[substr((string) $r['id'], 2)] ?? []) === $young($ownFor)));
             }
 
-            $filedLead = $parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index);
+            // by its picture (a model's name for a title): weighed as a shopper sees it, its shape before its colour, even where
+            // its title names one: a black two-strap slide's alike were black sandals of any shape (Naot, 15.11)
+            $filedLead = ($parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index)) || ($byPicture && $own !== null);
             $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own), own: true);
@@ -1598,8 +1656,18 @@ final class SearchCatalog
                 // nearness, colour, print (which, and how much it covers), side and whom it is for, each weighed: no one of
                 // them decides alone (Vans, 12.11: a black striped tee 26th by picture came first by its colour alone)
                 $facets = (array) ($index['facets'] ?? []);
-                $seen = RetrievalImage::query()->whereIn('external_id', [$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])
-                    ->get(['external_id', 'caption_words'])->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => Colours::dominant(array_values((array) ($i->caption_words ?? [])), colourFirst: true)])->all();
+                $pictures = RetrievalImage::query()->whereIn('external_id', [$externalId, ...array_map(fn (array $r): string => substr((string) $r['id'], 2), $records)])
+                    ->get(['external_id', 'caption_words'])->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => array_values(array_filter((array) ($i->caption_words ?? []), 'is_string'))])->all();
+                $seen = array_map(fn (array $words): ?array => Colours::dominant($words, colourFirst: true), $pictures);
+                // its shape: its picture's words but its colours ("two-strap", "slide", "cork footbed", "buckle")
+                $shape = fn (array $words): array => array_values(array_filter(self::pictureWords($words), fn (string $w): bool => mb_strlen($w) >= 3 && Colours::mentions($w) === []));
+                $ownShape = $byPicture ? $shape($pictures[$externalId] ?? []) : [];
+                // only what sets it apart among them: "cork footbed" and "leather" are every sandal's, "two-strap" is its own
+                if ($ownShape !== []) {
+                    $held = array_count_values(array_merge(...array_map(fn (array $r): array => array_values(array_unique($shape($pictures[substr((string) $r['id'], 2)] ?? []))), $records)));
+                    $apartWords = array_values(array_filter($ownShape, fn (string $w): bool => ($held[$w] ?? 0) <= max(1, intdiv(count($records), 2))));
+                    $ownShape = $apartWords === [] ? $ownShape : $apartWords;
+                }
                 $ownFiled = self::filedColours($own, $facets);
                 $ownPrint = Patterns::of($own);
                 $ownTitle = (string) ($own['title'] ?? '');
@@ -1614,6 +1682,7 @@ final class SearchCatalog
                         'print' => AlikeScore::print($ownPrint, Patterns::of($r)),
                         'side' => BuildSearchIndex::contradicts($ownTitle, (string) ($r['title'] ?? '')) ? 0.0 : 1.0,
                         'audience' => AlikeScore::audience($ownFor, $audiences[$id] ?? []),
+                        'shape' => $ownShape === [] ? 0.0 : count(array_intersect($ownShape, $shape($pictures[$id] ?? []))) / count($ownShape),
                     ]);
                 }
                 $order = array_keys($records);
@@ -1626,6 +1695,15 @@ final class SearchCatalog
             }
             // In the order the code and their nearness gave, with no model: one that ordered them by their pictures (Rocks,
             // 28.10) kept the shopper waiting seconds on every first look (Aviad, 30.10). A photo's own search still asks it.
+            // The same model in its other colours first ("Julius", "Julius - BA6 Soft Black", "Julius - 739 Buffallo"): nothing
+            // looks more like it. Where its title is a model's name and its picture led, and only what else was asked allows.
+            if ($byPicture && $wants === null) {
+                $siblings = self::sameModel($externalId, $index['records'], $apart);
+                if ($siblings !== []) {
+                    $first = array_flip(array_map(fn (array $r): string => (string) $r['id'], $siblings));
+                    $records = [...$siblings, ...array_values(array_filter($records, fn (array $r): bool => ! isset($first[(string) $r['id']])))];
+                }
+            }
             $products = array_map(fn (array $r): array => $this->present($r), array_slice($records, 0, $limit));
 
             // what the team put together with it stays first, whatever the pictures or the colours said

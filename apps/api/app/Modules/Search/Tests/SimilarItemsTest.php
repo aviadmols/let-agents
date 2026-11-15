@@ -350,6 +350,36 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['302'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'its reader saw no print on 302; 303, read before it said, still goes by its words');
     }
 
+    public function test_by_its_picture_the_same_model_in_other_colours_first_then_its_shape_before_its_colour(): void
+    {
+        // Naot, 15.11: a black two-strap slide's alike were black sandals of other shapes, its own model in other colours
+        // nowhere, and a sandal filed otherwise by the store ("Product", not "Fashion") none at all
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            foreach ([
+                '301' => ['Santa Barbara - 215 Black Nubuck', 'Fashion', ['sandals', 'two-strap sandal', 'cork footbed', 'black']],
+                '302' => ['Tahoe', 'Fashion', ['sandals', 'toe-post sandal', 'cork footbed', 'black']],
+                '303' => ['Arizona', 'Product', ['sandals', 'two-strap sandal', 'cork footbed', 'brown']],
+            ] as $id => [$title, $type, $words]) {
+                $product = CatalogProduct::query()->where('external_id', $id)->sole();
+                $product->update(['title' => $title, 'in_stock' => true, 'payload' => ['product_type' => $type]]);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words, 'caption_pattern' => ['covers' => 'none']]);
+            }
+            // its own model in another colour, which no picture search found
+            CatalogProduct::query()->create([
+                'shop_id' => $this->shop->id, 'external_id' => '304', 'type' => 'simple', 'status' => 'publish', 'title' => 'Santa Barbara - 483 Crazy Horse',
+                'url' => 'https://www.store.test/p/304', 'image_url' => null, 'price' => '419.94', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true,
+                'hash' => 'h304', 'payload' => ['product_type' => 'Fashion'],
+            ]);
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        LoadedIndex::forget();
+
+        $this->assertSame(['304', '303', '302'], array_column($this->similar('301', 3)->json('products'), 'external_id'),
+            'its model in another colour; then a two-strap sandal, brown, before a black sandal on a toe post; the store\'s filing decides nothing');
+    }
+
     public function test_where_the_title_is_a_models_name_its_picture_says_what_its_alike_are(): void
     {
         // Naot, 15.11: "Chief", a man's derby shoe, had sandals for its alike: its title names no kind, and the store types
