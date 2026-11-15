@@ -1094,7 +1094,7 @@ final class SearchCatalog
             return [];
         }
         $rest = array_slice(array_values(array_diff(array_map(fn (string $key): string => substr($key, 2), array_filter(array_keys($index['records']), fn (string $key): bool => str_starts_with($key, 'p:'))), [...array_map('strval', $shown), $externalId])), 0, self::FILL_FROM);
-        $rest = $this->sameWhom($externalId, self::seenKind($product, array_map('strval', $rest), known: true), $index);
+        $rest = $this->sameWhom($externalId, $rest, $index);
         if ($rest === []) {
             return [];
         }
@@ -1103,19 +1103,64 @@ final class SearchCatalog
         $mods = self::kindModifiers($facets);
         $pictures = RetrievalImage::query()->whereIn('external_id', [$externalId, ...$rest])->get(['external_id', 'caption_words'])
             ->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => array_values(array_filter((array) ($i->caption_words ?? []), 'is_string'))])->all();
-        $ownMods = $mods($pictures[$externalId] ?? []);
-        $ownShape = $shape($pictures[$externalId] ?? []);
+        // its kind as its picture says it first, and the kinds its first words name ("clogs", "slip-on shoes")
+        $kinds = fn (array $words, int $phrases): array => array_values(array_unique(array_merge([], ...array_map(fn (string $p): array => self::kindNouns($p), array_slice($words, 0, $phrases)))));
+        $own = $pictures[$externalId] ?? [];
+        $ownKind = $kinds($own, 1);
+        $ownKinds = $kinds($own, self::KIND_PHRASES);
+        $ownMods = $mods($own);
+        $ownShape = $shape($own);
         $score = [];
-        foreach ($rest as $id) {
-            $score[$id] = [
-                (int) ($index['records']['p:'.$id]['s'] ?? 0),
-                count(array_intersect($ownMods, $mods($pictures[$id] ?? []))),
-                count(array_intersect($ownShape, $shape($pictures[$id] ?? []))),
-            ];
+        foreach ($rest as $at => $id) {
+            $theirs = $pictures[$id] ?? [];
+            // of its kind first; then of a kind its first words name too (a clog's "slip-on shoes" beside slip-on shoes); never
+            // one whose picture says nothing, nor another kind altogether
+            $tier = array_intersect($kinds($theirs, 1), $ownKind) !== [] ? 2 : (array_intersect($kinds($theirs, self::KIND_PHRASES), $ownKinds) !== [] ? 1 : 0);
+            if ($tier === 0) {
+                unset($rest[$at]);
+
+                continue;
+            }
+            $score[$id] = [$tier, (int) ($index['records']['p:'.$id]['s'] ?? 0), count(array_intersect($ownMods, $mods($theirs))), count(array_intersect($ownShape, $shape($theirs)))];
         }
+        $rest = array_values($rest);
         usort($rest, fn (string $a, string $b): int => [$score[$b], $a] <=> [$score[$a], $b]);
 
         return array_map(fn (string $id): array => $this->present($index['records']['p:'.$id]), array_slice($rest, 0, $need));
+    }
+
+    /** Fewer alike than this, after the fill, and "maybe these" are looked for (SimilarController shows them below as many). */
+    private const ALSO_WHEN_FEWER = 4;
+
+    /** "Maybe these" need this many of its picture's distinctive words. */
+    private const ALSO_SHAPE_WORDS = 2;
+
+    /**
+     * Where few are alike: products of its people near its picture that share at least ALSO_SHAPE_WORDS of the words its
+     * picture is described with beside its kind ("lace-up", "round toe", "grained leather": a man's boot and his lace-up
+     * shoes), for "maybe these", never shown as alike. In the pictures' order.
+     *
+     * @param  array<string, mixed>  $index
+     * @param  list<string>  $looks  external ids nearest its picture, nearest first
+     * @param  list<string>  $shown
+     * @return list<array<string, mixed>>
+     */
+    private function alsoByShape(string $externalId, array $index, array $looks, array $shown, int $limit): array
+    {
+        $candidates = array_values(array_diff(array_slice(array_map('strval', $looks), 0, self::DESCRIBED_POOL), [...array_map('strval', $shown), $externalId]));
+        $candidates = array_values(array_filter($this->sameWhom($externalId, $candidates, $index), fn (string $id): bool => isset($index['records']['p:'.$id])));
+        if ($candidates === []) {
+            return [];
+        }
+        $shape = self::shapeOf((array) ($index['facets'] ?? []));
+        $pictures = RetrievalImage::query()->whereIn('external_id', [$externalId, ...$candidates])->get(['external_id', 'caption_words'])
+            ->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => array_values(array_filter((array) ($i->caption_words ?? []), 'is_string'))])->all();
+        $kindOf = fn (array $words): array => self::kindNouns((string) ($words[0] ?? ''));
+        $ownShape = array_values(array_diff($shape($pictures[$externalId] ?? []), $kindOf($pictures[$externalId] ?? [])));
+        $kept = array_values(array_filter($candidates, fn (string $id): bool => ($pictures[$id] ?? []) !== []
+            && count(array_intersect($ownShape, array_diff($shape($pictures[$id]), $kindOf($pictures[$id])))) >= self::ALSO_SHAPE_WORDS));
+
+        return array_map(fn (string $id): array => $this->present($index['records']['p:'.$id]), array_slice($kept, 0, $limit));
     }
 
     /** What its main picture says it is ("derby shoe": "shoe"), or [] when its picture was not read or says nothing. */
@@ -1934,6 +1979,11 @@ final class SearchCatalog
             // the steps that took the rest away)
             if ($byPicture && $wants === null && ! $otherColour && count($products) < self::FILL_TO) {
                 $products = [...$products, ...$this->fillByKind($product, $externalId, $index, array_column($products, 'external_id'), min($limit, self::FILL_TO) - count($products))];
+                // still few: "maybe these", apart, of its people and near its picture and its described shape (a man's boot,
+                // and his lace-up shoes)
+                if (count($products) < self::ALSO_WHEN_FEWER && $others === []) {
+                    $others = $this->alsoByShape($externalId, $index, $looks, array_column($products, 'external_id'), $limit);
+                }
             }
 
             // what the team put together with it stays first, whatever the pictures or the colours said

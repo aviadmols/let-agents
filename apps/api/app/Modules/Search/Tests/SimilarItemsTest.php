@@ -410,6 +410,10 @@ final class SimilarItemsTest extends TestCase
         // its pictures find its own other colour and a sandal; another clog no picture search found fills in
         $make(['301' => ['Fiord', ['clogs', 'buckle strap']], '302' => ['Fiord - Black', ['clogs', 'buckle strap']], '303' => ['Rio', ['sandals']], '304' => ['Saloniki', ['clogs', 'mules']]]);
         $this->assertSame(['302', '304'], array_column($this->similar('301', 6)->json('products'), 'external_id'));
+
+        // no other clog: a slip-on shoe its own first words name ("clogs", "slip-on shoes"), never the sandal
+        $make(['301' => ['Fiord', ['clogs', 'slip-on shoes']], '302' => ['Fiord - Black', ['clogs', 'slip-on shoes']], '303' => ['Rio', ['sandals']], '304' => ['Eiger', ['slip-on shoe', 'leather']]]);
+        $this->assertSame(['302', '304'], array_column($this->similar('301', 6)->json('products'), 'external_id'));
     }
 
     public function test_by_its_picture_only_its_kind_and_its_people_and_the_rest_of_them_when_its_pictures_found_few(): void
