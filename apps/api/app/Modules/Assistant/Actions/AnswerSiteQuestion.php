@@ -171,7 +171,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27]];
 
     private const THREAD_QUESTION_CHARS = 300;
 

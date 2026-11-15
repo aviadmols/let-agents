@@ -51,7 +51,7 @@ final class AnswerQuestion
 
     public const ACTION = 'assistant.answer';
 
-    public const PROMPT_VERSION = 7;
+    public const PROMPT_VERSION = 8;
 
     /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
     private const STORE_CHARS = 2500;
@@ -131,7 +131,9 @@ final class AnswerQuestion
             // The team's own answers stay.
             // And one written before the team last changed its own lines: they may answer it now ("all our diamonds are natural").
             // And one kept in another language than the question's (lets-review-test-4, 15.11): no answer to it.
+            // And one written in another tone than the store chose since (assistant.answer_tone, its own words for it).
             if ($saved !== null && $saved->source !== 'team' && ($saved->prompt_version < self::PROMPT_VERSION || $this->storeLinesChangedSince($saved)
+                || (((array) $saved->flags)['tone'] ?? null) !== AnswerSiteQuestion::toneKey($shopId)
                 || (trim((string) $saved->answer) !== '' && ! AnswerLanguage::writtenIn((string) $saved->answer, AnswerLanguage::of($question, $locale))))) {
                 $saved->delete();
                 $saved = null;
@@ -241,7 +243,7 @@ final class AnswerQuestion
                     // the language to answer in, as code read it from the question; an answer in another is no answer (the
                     // site's assistant is asked next, AskController), never Hebrew to an English question (lets-review-test-4, 15.11)
                     $language = AnswerLanguage::of($question, $locale);
-                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, 'question' => $question, 'language' => AnswerLanguage::name($language)], $maxOutput, $effort, 'answer');
+                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, ...(($tone = AnswerSiteQuestion::tone($shopId)) === null ? [] : ['tone' => $tone]), 'question' => $question, 'language' => AnswerLanguage::name($language)], $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
 
                     $answer = mb_substr(trim((string) ($reply->data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
@@ -363,7 +365,8 @@ final class AnswerQuestion
             'output_tokens' => $output,
             'cost_usd' => round($cost, 6),
             'run_id' => $run->runId,
-            'flags' => $flags,
+            // the tone it was written in: written again when the store chooses another
+            'flags' => (array) $flags + ['tone' => AnswerSiteQuestion::toneKey((string) $saved->shop_id)],
             'last_asked_at' => now(),
         ])->save();
 

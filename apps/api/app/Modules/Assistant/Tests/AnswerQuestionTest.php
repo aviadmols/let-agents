@@ -79,6 +79,25 @@ final class AnswerQuestionTest extends TestCase
         $this->assertNotNull($this->inShop(fn () => AssistantAnswer::query()->sole())->shared_at);
     }
 
+    public function test_the_stores_tone_reaches_the_writer_and_a_new_tone_writes_the_answer_afresh(): void
+    {
+        $this->model->replies = [['about_product' => true], ['answer' => 'כן, מתאים לחוץ.', 'source' => 'store'], self::VERIFIED];
+        $this->ask('האם זה מתאים לחוץ?');
+        $this->assertStringNotContainsString('"tone"', $this->model->calls[1]['user'], 'the default tone adds nothing');
+
+        // The store chooses its own tone: the next shopper's answer is written in it, not served from memory.
+        Settings::set('assistant.answer_tone', 'brief', $this->shop->id);
+        Settings::set('assistant.answer_tone_note', 'קצר ועניני, בלי סימני קריאה https://x.test', $this->shop->id);
+        $this->model->replies = [['about_product' => true], ['answer' => 'כן.', 'source' => 'store'], self::VERIFIED];
+        $this->assertSame('model', $this->ask('האם זה מתאים לחוץ?', vid: 'anon-visitor2234567890abcd')->json('data.from'));
+        $writer = $this->model->calls[count($this->model->calls) - 2]['user'];
+        $this->assertStringContainsString('"style":"brief"', $writer);
+        $this->assertStringContainsString('קצר ועניני', $writer);
+        $this->assertStringNotContainsString('x.test', $writer, 'a link in the store\'s words never reaches the writer');
+
+        $this->assertSame('bank', $this->ask('האם זה מתאים לחוץ?', vid: 'anon-visitor3234567890abcd')->json('data.from'), 'and then it is from memory again');
+    }
+
     public function test_a_question_about_the_product_is_answered_once_and_then_from_memory(): void
     {
         // A shop may wait for more different shoppers before an answer is everyone's.
