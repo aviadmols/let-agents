@@ -3625,6 +3625,12 @@ final class AnswerSiteQuestion implements TriesQuestions
             return null;
         }
         ['min' => $min, 'max' => $max] = $this->priceRange($question);
+        // "cheaper than 150 dollars" says the price, not "the cheapest": the cheapest only when the words left of the
+        // price still ask it ("the cheapest sandals under 150"). Naot QA, 16.11: three sandals of fifteen in the range.
+        if (in_array($asks, ['cheapest', 'most_expensive'], true) && ($min !== null || $max !== null) && app()->bound(PriceRange::class)) {
+            $left = (string) (app(PriceRange::class)->read($question)['words'] ?? $question);
+            $asks = self::analysis($left, [])['asks'] === $asks ? $asks : 'in_range';
+        }
         $asks ??= $min !== null || $max !== null ? 'in_range' : null;
         // A range with another wish ("the biggest diamond", "the best for a gift") is not answered by price alone:
         // the writer chooses among the products inside it (withinPrice()).

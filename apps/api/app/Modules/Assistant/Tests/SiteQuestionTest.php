@@ -660,6 +660,10 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(['answered', 'code', []], [$data['outcome'], $data['from'], $data['picks']]);
         $this->assertSame(['805', '807', '806', '801', '802'], $data['set']['ids'], 'every earring up to 500 in stock, cheapest first');
         $this->assertStringStartsWith('5 ', $data['answer']);
+
+        // "cheaper than" is the price, not "the cheapest": every one in the range too; "the cheapest" stays three picks
+        $this->assertSame(['805', '807', '806', '801', '802'], $this->askWith('any earrings cheaper than 500 dollars?', ['801'])->json('data.set.ids'));
+        $this->assertSame(['805', '807', '806'], array_column($this->askWith('the cheapest earrings under 500 dollars', ['801'])->json('data.picks'), 'external_id'));
     }
 
     public function test_a_pick_whose_reason_is_marks_alone_shows_no_reason(): void
