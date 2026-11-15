@@ -434,6 +434,9 @@
     wordsOf(turn.q).forEach(function (w, i) {
       // a word that only asks for a filter ("בצבע") is neither missing nor what is shown
       if (ASKS_ONLY.test(w)) { return; }
+      // whom it is for, where the store says it in any form ("women" for "woman") or sells to it by default: no word missing
+      var whom = whomOf(E && E.normalize ? E.normalize(w) : w);
+      if (whom && whomKnown(whom)) { return; }
       if (E && E.normalize && words.indexOf(E.normalize(w)) >= 0 && read.indexOf(i) < 0) { typed.push(w); } else if (!STOP.test(w)) { kept.push(w); }
     });
     // "נעלים לגברים מנומרות": a word none of the products shown says, though the store has it elsewhere (a leopard bag):
@@ -450,7 +453,9 @@
     }
     // no product holds every word, and the server offers the parts that do (focus): said, with each part a press away
     // ("חולצה קצרה כחולה עם כיס": a long blue shirt was shown as if it were it, Vans 12.11)
-    if (!missing.length && !typed.length && held === 0 && total && turn.focus && (turn.focus.options || []).length) {
+    // (never for whom it is for, a word no product holds where the store sells to that side: "woman ring", Jean Rachel)
+    var whomAsked = wordsOf(turn.q).some(function (w) { var a = whomOf(E && E.normalize ? E.normalize(w) : w); return !!a && whomKnown(a); });
+    if (!missing.length && !typed.length && held === 0 && total && !whomAsked && turn.focus && (turn.focus.options || []).length) {
       return '<div data-unknown><p class="ls-note__text">' + esc(t('noneAll', { q: turn.q })) + '</p><div class="ls-chips" style="margin:6px 0 10px">' +
         turn.focus.options.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' +
         askCardHtml(turn.q, '', turn.askShown) + '</div>';
@@ -458,8 +463,8 @@
     var text = missing.length && shownList.length && rest.length ? t('noneSaid', { gone: missing.join(' '), kept: rest.join(' ') })
       : typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
       : typed.length ? t('notHere', { w: typed.join(' ') })
-      : held === 0 && total ? t('meaningOnly', { q: turn.q })
-      : held !== null && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
+      : held === 0 && total && !whomAsked ? t('meaningOnly', { q: turn.q })
+      : held !== null && !whomAsked && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
     if (!text) { return ''; }
     return '<div data-unknown>' + askCardHtml(turn.q, text, turn.askShown) + '</div>';
   }
@@ -483,7 +488,54 @@
     if (!typed.length || (typed.length < 2 && wordsOf(q).length < 2)) { return []; }
     var said = {};
     list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; }); }); });
-    return typed.filter(function (w) { return !wordForms(E.normalize(w)).some(function (f) { return said[f]; }); });
+    return typed.filter(function (w) {
+      var n = E.normalize(w), whom = whomOf(n);
+      if (whom) {
+        // whom it is for, in any of its forms ("woman", "women", "ladies", "נשים"): said where the results say any form of
+        // it; and unsaid only where they say nothing of anyone: a store that marks its few men's pieces "mens" sells the
+        // rest to women, and "woman ring" was told "woman is not on the site" (Jean Rachel, 16.11)
+        // and the store's own default: where none of its products is marked for this side and a few are marked for the
+        // other, the rest are this side's; a store marking all for one side still says the other is not there
+        return !WHOM[whom].some(function (f) { return said[f]; }) && !whomByDefault(whom);
+      }
+      return !wordForms(n).some(function (f) { return said[f]; });
+    });
+  }
+  // the words that say whom a product is for, in English and Hebrew, each form
+  var WHOM = {
+    women: ['woman', 'women', 'womens', 'ladies', 'lady', 'female', 'נשימ', 'נשים', 'אישה', 'לנשימ', 'לנשים', 'לאישה', 'נשי'],
+    men: ['man', 'men', 'mens', 'male', 'גבר', 'גברימ', 'גברים', 'לגברימ', 'לגברים', 'לגבר', 'גברי'],
+    kids: ['kid', 'kids', 'child', 'children', 'boys', 'girls', 'ילדימ', 'ילדים', 'לילדימ', 'לילדים', 'ילד', 'ילדה']
+  };
+  // whether a store sells to this side by default: none of its products marked for it, and fewer than a third marked for
+  // the other grown-up side (men's or women's)
+  var whomCounts = null, whomCountsOf = null;
+  function countWhom() {
+    if (whomCountsOf !== S.records) {
+      whomCountsOf = S.records; whomCounts = { women: 0, men: 0, kids: 0, all: 0 };
+      Object.keys(S.records || {}).forEach(function (k) {
+        var r = S.records[k];
+        if (!r || r.t !== 'product') { return; }
+        whomCounts.all++;
+        var words = {};
+        String(decode(r.title || '') + ' ' + (r.kw || '')).toLowerCase().replace(/['’]s\b/g, '').split(/[^a-z֐-׿]+/).forEach(function (w) { words[w] = 1; });
+        ['women', 'men', 'kids'].forEach(function (a) { if (WHOM[a].some(function (f) { return words[f]; })) { whomCounts[a]++; } });
+      });
+    }
+    return whomCounts;
+  }
+  function whomByDefault(whom) {
+    var other = whom === 'women' ? 'men' : whom === 'men' ? 'women' : null;
+    if (!other || !S.records) { return false; }
+    var n = countWhom();
+    return n.all > 0 && n[whom] === 0 && n[other] > 0 && n[other] < n.all / 3;
+  }
+  // whether the store says this side in any of its forms, or sells to it by default
+  function whomKnown(whom) { return !!S.records && (countWhom()[whom] > 0 || whomByDefault(whom)); }
+  function whomOf(w) {
+    w = String(w || '').toLowerCase().replace(/['’]s$/, '');
+    for (var a in WHOM) { if (WHOM[a].indexOf(w) >= 0) { return a; } }
+    return null;
   }
   // the words of a search the catalogue has nothing close to, as the server's unknownWords reads them
   function localUnknown(q) {

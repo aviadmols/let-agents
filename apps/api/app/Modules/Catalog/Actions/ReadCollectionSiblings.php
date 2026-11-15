@@ -115,10 +115,11 @@ final class ReadCollectionSiblings
                     }
                     $down = 0;
                     $html = (string) $page->body();
-                    // a page that shows none of the store's products not seen on the pages before is past its last (its
-                    // menus link the same few on every page)
+                    // a page that shows no product not seen on the pages before is past its last (its menus link the same
+                    // few on every page); any product of the site, not only those read: a demo reads some of a store, and
+                    // stopped at the first page of others (Jean Rachel, 16.11: 17 products grouped of hundreds)
                     preg_match_all('~href="([^"]*/products?/[^"?#/]+)~i', $html, $hrefs);
-                    $new = array_diff(array_unique(array_filter(array_map(fn (string $h): ?string => ($p = self::productPath($h)) !== null && isset($byPath[$p]) ? $p : null, $hrefs[1]))), array_keys($seen));
+                    $new = array_diff(array_unique(array_filter(array_map(fn (string $h): ?string => self::productPath($h), $hrefs[1]))), array_keys($seen));
                     if ($new === []) {
                         break;
                     }

@@ -78,15 +78,17 @@ final class CollectionSiblingsTest extends TestCase
 
             return Http::response(match (true) {
                 str_ends_with($request->url(), 'page=1') => self::PAGE_ONE,
-                str_ends_with($request->url(), 'page=2') => self::PAGE_TWO,
+                // products of the store this shop did not read (a demo reads some of a store): no reason to stop
+                str_ends_with($request->url(), 'page=2') => '<html><body><div class="grid"><a href="/products/not-read-1">a</a><a href="/products/not-read-2">b</a></div></body></html>',
+                str_ends_with($request->url(), 'page=3') => self::PAGE_TWO,
                 default => self::PAGE_THREE,
             });
         });
 
         $run = (new ReadCollectionSiblings(app(RecordsRuns::class), app(TenantContext::class), fn (int $ms) => null))->handle($shop->id);
 
-        $this->assertSame(['https://jean.test/collections/all?page=1', 'https://jean.test/collections/all?page=2', 'https://jean.test/collections/all?page=3'], $asked, 'until a page shows nothing new');
-        $this->assertSame(['pages' => 2, 'groups' => 2, 'products' => 5], array_intersect_key($run->output, array_flip(['pages', 'groups', 'products'])));
+        $this->assertSame(['https://jean.test/collections/all?page=1', 'https://jean.test/collections/all?page=2', 'https://jean.test/collections/all?page=3', 'https://jean.test/collections/all?page=4'], $asked, 'until a page shows nothing new');
+        $this->assertSame(['pages' => 3, 'groups' => 2, 'products' => 5], array_intersect_key($run->output, array_flip(['pages', 'groups', 'products'])));
         $rows = app(TenantContext::class)->run($shop->id, fn () => CatalogSibling::query()->get()->mapWithKeys(fn (CatalogSibling $s): array => [CatalogProduct::query()->whereKey($s->product_id)->value('external_id') => [$s->group_key, $s->label]])->all());
         $this->assertSame($rows['leaf-ring-citrine'][0], $rows['leaf-ring-peridot'][0], 'one ring in three stones, though no page shows all three together');
         $this->assertSame($rows['leaf-ring-citrine'][0], $rows['leaf-ring-amethyst'][0]);
