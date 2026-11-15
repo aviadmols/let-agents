@@ -7,7 +7,10 @@
       var mine = PAGE && String(PAGE.id) === id;
       BANKS[id] = json(API + '/widget/' + SITE + '/page?type=' + (mine ? PAGE.type : 'product') + '&id=' + encodeURIComponent(id) + '&locale=' + LANG + (previewKey ? '&preview=' + previewKey : '')).then(function (r) {
         var b = (r.body && (r.body.data || r.body)) || {};
-        if (mine) { learnFrom(b); }
+        // the page's own bank, as it is when the bank comes: the product page's row asks for it before the page is
+        // set (inlineField, at boot), and a bank told "not this page's" then was never learnt; the drawer opened from
+        // the row came up as the store's search, not about the product (Rocks, 15.11)
+        if (mine || (PAGE && String(PAGE.id) === id)) { learnFrom(b); }
         var ids = [];
         (b.sections || []).forEach(function (s) { (s.products || []).forEach(function (p) { ids.push(pid(p.id)); }); });
         return products(ids.concat([id]).slice(0, 12)).then(function () { BANK_READY[id] = b; return b; });
