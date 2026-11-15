@@ -92,10 +92,14 @@
   }
   function runSearch(turn, q) {
     announce(t('announceSearching'));
+    // the server asked while the store's index loads, not after it: the first search after the drawer opens waited for
+    // the whole index first (Rocks, 16.11: ~1s more). The results are read once both are in.
+    var spelling = S.spellingNext; S.spellingNext = false;
+    // the server counts this search, unless this tab already counted it (counted=1)
+    var asked = json(API + '/search/' + SITE + '?q=' + encodeURIComponent(q) + (isCounted(norm(q)) ? '&counted=1' : '') + (spelling ? '&spelling=1' : '') + visitQuery());
+    asked.catch(function () { /* read below, with the index */ });
     loadIndex().then(function () {
-      // the server counts this search, unless this tab already counted it (counted=1)
-      var spelling = S.spellingNext; S.spellingNext = false;
-      return json(API + '/search/' + SITE + '?q=' + encodeURIComponent(q) + (isCounted(norm(q)) ? '&counted=1' : '') + (spelling ? '&spelling=1' : '') + visitQuery());
+      return asked;
     }).then(function (r) {
       markCounted(norm(q)); rememberSearch(q);
       return r;
@@ -315,7 +319,7 @@
   var MC_HEX = { 'שחור': '#161616', 'לבנ': '#ffffff', 'אדומ': '#cf3a2e', 'כחול': '#2563c9', 'ירוק': '#2f8f4e', 'צהוב': '#f1c21b', 'אפור': '#8e8e94',
     'כתומ': '#ee7a1f', 'סגול': '#7b4bb7', 'ורוד': '#ec8fb3', 'כסופ': 'linear-gradient(135deg,#f4f4f5,#a6a6ac)', 'זהוב': 'linear-gradient(135deg,#f3d27a,#b4842a)',
     'שקופ': 'clear', 'חומ': '#7a4a28', 'בז': '#d9c4a0' };
-  var DOTS_SHOWN = 6, families = null, familiesOf = null;
+  var DOTS_MOST = 30, families = null, familiesOf = null;
   function familyOf(r) {
     if (!r || !r.cf) { return null; }
     if (familiesOf !== S.records) {
@@ -385,8 +389,8 @@
       });
     }
     if (out.length < 2) { return ''; }
-    return '<div class="ls-dots" role="group" aria-label="' + esc(t('colours')) + '">' + out.slice(0, DOTS_SHOWN).join('') +
-      (out.length > DOTS_SHOWN ? '<span class="ls-dots__more ls-num">+' + (out.length - DOTS_SHOWN) + '</span>' : '') + '</div>';
+    // every colour, in one row that scrolls sideways (never "+2" and a second line)
+    return '<div class="ls-dots" role="group" aria-label="' + esc(t('colours')) + '">' + out.slice(0, DOTS_MOST).join('') + '</div>';
   }
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
   function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" decoding="async" draggable="false">' : ''; }
