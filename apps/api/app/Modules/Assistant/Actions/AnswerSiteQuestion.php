@@ -44,6 +44,7 @@ use App\Modules\Assistant\Support\StoreVoice;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\Passages;
@@ -1498,7 +1499,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // Nothing at all is the same answer in every mode: decided before any choice is made.
         if ($found !== [] || $candidates !== []) {
             if ($mode === AnswerContext::DYNAMIC) {
-                $selection = $this->context->select($shopId, $question, $type, $candidates, $found);
+                $selection = $this->context->select($shopId, $question, $type, $candidates, $found, $viewing);
                 [$candidates, $found, $debug] = [$selection['products'], $selection['passages'], $selection['debug']];
             }
         }
@@ -1535,6 +1536,17 @@ final class AnswerSiteQuestion implements TriesQuestions
             $forModel = array_map(fn (array $entry): array => AnswerContext::fields($type, $entry, $productsByRef[$entry['ref']], $question), $forModel);
         }
 
+        // The product whose page the question was asked from, by its ref.
+        $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
+
+        // The sizes a product is made in and the one it is, for the product whose page it is, in either mode: "אפשר להגדיל
+        // למידה 59?" on a ring made 46 to 50 is answered from them, not from the store's general pages (Rocks, 15.11). And in
+        // dynamic mode for any product of a question of sizes or stock; full mode is otherwise given what it always was.
+        // Code's gate and the checker read them too (screen(), checkInput()).
+        $forModel = array_map(fn (array $entry): array => $entry['ref'] === $viewingRef || ($mode === AnswerContext::DYNAMIC && in_array($type, ['size', 'stock'], true))
+            ? $entry + self::sizesOf($productsByRef[$entry['ref']])
+            : $entry, $forModel);
+
         // and on each product, the least prices it is under, beside its own price: read in the list alone, a writer still
         // told "yes" for the ring of ₪650 one run in two (Rocks, 9.11)
         if (isset($analysis['price_minimums'])) {
@@ -1544,9 +1556,6 @@ final class AnswerSiteQuestion implements TriesQuestions
                 return $under === [] ? $entry : $entry + ['under_minimum' => $under];
             }, $forModel);
         }
-
-        // The product whose page the question was asked from, by its ref.
-        $viewingRef = $viewing === null ? null : array_search($viewing, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef), true);
 
         // "החנות פתוחה עכשיו": the store's own day and hour, only for a question that depends on when it is asked
         $now = AssistantAnswer::asksTheClock($question) ? self::clock($shopId) : null;
@@ -2810,6 +2819,9 @@ final class AnswerSiteQuestion implements TriesQuestions
         // A size or a measure the model was given in dynamic mode is in what it was given.
         if ($mode === AnswerContext::DYNAMIC) {
             $known .= "\n".json_encode($forModel, JSON_UNESCAPED_UNICODE);
+        } else {
+            // and in full mode the sizes it was given (prepare()): "אפשר להזמין אותה במידות 46 עד 50"
+            $known .= "\n".implode(' ', array_merge(...array_map(fn (array $p): array => [...(array) ($p['sizes'] ?? []), (string) ($p['current_size'] ?? '')], $forModel)));
         }
 
         // The products' prices as the writer was given them (forModel()): a sum in the answer is one of these, or it goes.
@@ -3032,7 +3044,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             'answer' => $answer,
         ] + (isset($prepared['now']) ? ['now' => $prepared['now']] : []) + [
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']] + (in_array($byRef[$ref]['from'] ?? null, self::OWN_WORD, true) ? ['from' => $byRef[$ref]['from']] : []), $cited),
-            'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank'])), $picks),
+            'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank']))
+                // the sizes it is made in and the one it is, as the writer had them: code's measures, not a claim to refuse
+                + self::sizesOf($productsByRef[$pick['ref']]), $picks),
             'analysis' => $analysis,
         ], JSON_UNESCAPED_UNICODE);
     }
@@ -3755,6 +3769,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         $products = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $shown)->get()->keyBy('external_id');
+        // the size each one's own page says it is, and the sizes it is made in, where the store keeps them outside its variants
+        $pages = CatalogProductChoice::query()->whereIn('product_id', $products->pluck('id'))->whereNotNull('size')->get(['product_id', 'size', 'sizes'])->keyBy('product_id');
         // A question about one product or two (from its page, a comparison) reads their descriptions
         // whole enough to say what is special; a list of results needs a line each.
         $aboutChars = count($shown) <= 2 ? 1500 : 300;
@@ -3778,7 +3794,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'price' => $product->price !== null ? (float) $product->price : null,
                 'currency' => (string) ($product->currency ?: 'ILS'),
                 'option_prices' => self::optionPrices($product),
-            ] + self::details($product);
+            ] + self::details($product, $pages->get($product->id));
         }
 
         return $out;
@@ -3800,13 +3816,6 @@ final class AnswerSiteQuestion implements TriesQuestions
         return '';
     }
 
-    /**
-     * What a product says besides its description, for the kinds of question that ask about it in
-     * dynamic mode: its options, its sizes, its measures, and which options are in stock. Full mode
-     * never sends these.
-     *
-     * @return array{sku: string, attributes: list<string>, sizes: list<string>, measures: list<string>, options_in_stock: list<string>}
-     */
     /** Choices a price depends on, at most this many, each with its price ("18 מ\"מ: ₪350"). */
     private const OPTION_PRICES = 12;
 
@@ -3835,7 +3844,13 @@ final class AnswerSiteQuestion implements TriesQuestions
         return count(array_unique($prices)) > 1 ? array_slice(array_values($out), 0, self::OPTION_PRICES) : [];
     }
 
-    private static function details(CatalogProduct $product): array
+    /**
+     * What a product says besides its description: its options, its sizes, its measures, which options are in stock,
+     * and the size its own page says it is (current_size), when the store keeps sizes outside its variants.
+     *
+     * @return array{sku: string, attributes: list<string>, sizes: list<string>, current_size: string|null, measures: list<string>, options_in_stock: list<string>}
+     */
+    private static function details(CatalogProduct $product, ?CatalogProductChoice $page = null): array
     {
         $attributes = array_map(fn (array $a): string => $a['name'].': '.implode(', ', $a['values']), $product->storeAttributes());
         $sizes = [];
@@ -3843,6 +3858,14 @@ final class AnswerSiteQuestion implements TriesQuestions
             if (preg_match('/^(size|מיד|גודל)/iu', (string) $attribute['name']) === 1) {
                 $sizes = [...$sizes, ...$attribute['values']];
             }
+        }
+
+        // A ring of one size whose page offers it a resize away ("מידה נוכחית: 48", "הגדלה ל 50"), read off its page
+        // (ReadPageChoices): the size it is and every size it is made in. Without them a writer asked "can it be made 59?"
+        // on the page of a ring made 46 to 50 answered from the store's general pages (Rocks, 15.11).
+        $current = $page?->size === null ? null : self::sizeText((float) $page->size);
+        if ($current !== null) {
+            $sizes = [...$sizes, ...array_map(fn ($size): string => self::sizeText((float) $size), (array) ($page->sizes ?: [$page->size]))];
         }
 
         $dimensions = (array) ($product->payload['dimensions'] ?? []);
@@ -3864,9 +3887,31 @@ final class AnswerSiteQuestion implements TriesQuestions
             'sku' => (string) $product->sku,
             'attributes' => $attributes,
             'sizes' => array_values(array_unique(array_map('strval', $sizes))),
+            'current_size' => $current,
             'measures' => array_map('trim', $measures),
             'options_in_stock' => array_values(array_unique(array_filter($inStock))),
         ];
+    }
+
+    /**
+     * A product's sizes as the writer and the checker are given them: the sizes it is made in, and the one its page
+     * says it is; none when it has none.
+     *
+     * @param  array<string, mixed>  $product  as candidates() read it
+     * @return array{sizes?: list<string>, current_size?: string}
+     */
+    private static function sizesOf(array $product): array
+    {
+        return array_filter([
+            'sizes' => array_values((array) ($product['sizes'] ?? [])),
+            'current_size' => $product['current_size'] ?? null,
+        ], fn ($v): bool => $v !== null && $v !== '' && $v !== []);
+    }
+
+    /** A size as a shopper reads it: 48, 52.5. */
+    private static function sizeText(float $size): string
+    {
+        return rtrim(rtrim(number_format($size, 2, '.', ''), '0'), '.');
     }
 
     /**

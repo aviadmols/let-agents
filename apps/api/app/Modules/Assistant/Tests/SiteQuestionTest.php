@@ -16,9 +16,11 @@ use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Assistant\Support\AnswerContext;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
 use App\Modules\Enrichment\Enums\FactKind;
@@ -879,6 +881,41 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('מברגה נטענת.', $input['products'][0]['about'] ?? null, 'the description reaches the writer');
         $this->assertSame('p1', $input['viewing'] ?? null, 'and it is told this is the product on the page');
         $this->assertSame(1, $this->inShop(fn () => AssistantAnswer::query()->count()), 'and nothing about this product is kept for the next one');
+    }
+
+    /**
+     * A ring of one size whose page offers it a resize away ("מידה נוכחית: 48", "הגדלה ל 50"), kept outside its
+     * variants and read off its page: asked "can it be made 59?" there, the writer and the checker have its sizes, in
+     * either mode, and the sizes it names stand (Rocks, 15.11: the answer was the store's general one). "להגדיל" reads as
+     * a store question, which in dynamic mode kept no product: the ring of the page stays all the same.
+     */
+    public function test_a_size_asked_on_a_rings_page_is_answered_from_the_sizes_its_page_offers(): void
+    {
+        $ring = $this->product('901', 'טבעת סוליטר משובצת אמרלד', 'טבעת זהב לבן 14 קארט, משקל 2.75 גרם.', [], ['price' => '2950.00', 'in_stock' => true]);
+        $this->product('902', 'טבעת בלי מידה מהעמוד', 'טבעת.', [], ['price' => '900.00', 'in_stock' => true]);
+        $this->inShop(fn () => CatalogProductChoice::query()->create(['shop_id' => $this->shop->id, 'product_id' => $ring->id, 'fields' => [], 'size' => 48, 'size_label' => 'מידה נוכחית', 'sizes' => [46, 47, 48, 49, 50]]));
+
+        foreach (['full', AnswerContext::DYNAMIC] as $mode) {
+            Settings::set('assistant.context_mode', $mode);
+            $this->calls = [];
+            $this->replies = [
+                ['found' => true, 'answer' => 'הטבעת הזו במידה 48, ואפשר להזמין אותה במידות 46 עד 50, כך שמידה 59 אינה אפשרית בה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'הטבעת שבעמוד']]],
+                ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+            ];
+
+            $data = $this->askWith('אפשר להגדיל למידה 59?', ['901', '902'], page: true)->assertOk()->json('data');
+
+            $writer = json_decode($this->calls[0]['user'], true);
+            $this->assertSame('p1', $writer['viewing'] ?? null, $mode);
+            $this->assertSame(['46', '47', '48', '49', '50'], $writer['products'][0]['sizes'] ?? null, $mode.': the sizes its page offers reach the writer');
+            $this->assertSame('48', $writer['products'][0]['current_size'] ?? null, $mode.': and the one it is');
+            $this->assertArrayNotHasKey('current_size', $writer['products'][1] ?? [], $mode.': a product whose page says no size has none');
+
+            $this->assertSame('answered', $data['outcome'], $mode);
+            $this->assertStringContainsString('46 עד 50', $data['answer'], $mode.': the sizes it was given are not taken out as made up');
+            $checker = json_decode($this->calls[1]['user'], true);
+            $this->assertSame(['46', '47', '48', '49', '50'], $checker['picks'][0]['sizes'] ?? null, $mode.': the checker reads them as code measured them');
+        }
     }
 
     public function test_a_product_page_question_is_the_stores_whatever_its_words_alone_seem_to_be_about(): void

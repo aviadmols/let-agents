@@ -103,12 +103,13 @@ final class AnswerContext
     /**
      * @param  list<array<string, mixed>>  $products  the products shown, in the order shown
      * @param  list<array<string, mixed>>  $passages  as found: knowledge first, then pages by title, then by meaning
+     * @param  string|null  $viewing  external id of the product whose page the question was asked on: always kept
      * @return array{products: list<array<string, mixed>>, passages: list<array<string, mixed>>, debug: array{products: list<array<string, mixed>>, passages: list<array<string, mixed>>}}
      */
-    public function select(string $shopId, string $question, string $type, array $products, array $passages): array
+    public function select(string $shopId, string $question, string $type, array $products, array $passages, ?string $viewing = null): array
     {
         $scored = $this->score($shopId, $question, $products);
-        [$keptProducts, $productDebug] = $this->products($shopId, $question, $type, $scored, $passages !== []);
+        [$keptProducts, $productDebug] = $this->products($shopId, $question, $type, $scored, $passages !== [], $viewing);
         $kept = array_flip(array_column($keptProducts, 'external_id'));
         [$keptPassages, $passageDebug] = $this->passages($question, $type, $passages, $kept);
 
@@ -201,7 +202,7 @@ final class AnswerContext
      * @param  list<array<string, mixed>>  $scored
      * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}
      */
-    private function products(string $shopId, string $question, string $type, array $scored, bool $hasPassages): array
+    private function products(string $shopId, string $question, string $type, array $scored, bool $hasPassages, ?string $viewing = null): array
     {
         $reasons = [];
 
@@ -247,6 +248,12 @@ final class AnswerContext
                     default => [false, 'after_biggest_drop'],
                 };
             }
+        }
+
+        // The product whose page it is stays, whatever the question's words: "אפשר להגדיל למידה 59?" reads as a store
+        // question (הגדלה), and every product went, the ring on the page among them (Rocks, 15.11).
+        if ($viewing !== null && isset($reasons[$viewing])) {
+            $reasons[$viewing] = [true, 'viewing'];
         }
 
         $kept = [];
