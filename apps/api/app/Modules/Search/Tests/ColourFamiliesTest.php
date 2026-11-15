@@ -6,9 +6,11 @@ use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\BuildProductVariants;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogSibling;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\Colours;
+use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,6 +24,29 @@ use Tests\TestCase;
 final class ColourFamiliesTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_what_a_picture_says_a_product_is_finds_it_first_where_its_title_is_a_models_name(): void
+    {
+        // Naot QA, 16.11: "wedge" led with flat sandals whose pictures had "a low wedge" among their details
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'en']);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach (['1' => ['Abbie', ['sandal', 'ankle strap', 'cork footbed', 'low wedge']], '2' => ['Acoustic', ['sandals', 'crossover strap', 'low wedge']],
+                '3' => ['Dynasty', ['sandal', 'wedge sandal', 'two straps']], '4' => ['טבעת זהב', ['טבעת', 'wedge']]] as $id => [$title, $words]) {
+                $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                    'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => (string) $id, 'title' => $title,
+                    'image_url' => "https://store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', (string) $id), 'caption_words' => $words]);
+            }
+        });
+
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $index = app(TenantContext::class)->run($shop->id, fn () => LoadedIndex::for($shop->id));
+        $items = array_column((array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['items'], null, 'id');
+
+        $this->assertSame('p:3', HebrewSearch::search($index['engine'], 'wedge')[0]['id'] ?? null, 'the wedge sandal before the sandals with a low wedge');
+        $this->assertArrayNotHasKey('tg', $items['p:4'], 'a title that says what it is gets no tag from its picture');
+    }
 
     public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void
     {

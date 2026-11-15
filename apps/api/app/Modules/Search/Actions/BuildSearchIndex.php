@@ -363,7 +363,9 @@ final class BuildSearchIndex
                 'url' => $product->url,
                 'img' => $product->image_url,
                 // its tags by meaning, apart from its words: weighed by how central each is ([[words, weight], …])
-                'tg' => $tagged[$product->id] ?? null,
+                // and, where its title is a model's name, what its picture says it is first ("wedge sandal"): found by it before
+                // a product whose picture only has "a low wedge" among its details (Naot QA, 16.11: "wedge" led with flat sandals)
+                'tg' => self::withPictureKind($tagged[$product->id] ?? null, $pictures->get($product->id), (string) $product->title),
                 'i2' => $this->secondPicture($product),
                 's' => $product->in_stock ? 1 : 0,
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
@@ -498,6 +500,36 @@ final class BuildSearchIndex
 
     /** One model's versions as the store links them, at most (ReadCollectionSiblings keeps no larger group). */
     private const LINKED_MAX = 20;
+
+    /** What a picture says a product is, as a tag of it: between a word of its name (1) and of its keywords. */
+    private const PICTURE_KIND_WEIGHT = 0.9;
+
+    /** How many of a picture's first words say what it is ("sandal", "wedge sandal"). */
+    private const PICTURE_KIND_PHRASES = 2;
+
+    /**
+     * Its tags by meaning, and, where its title is a model's name, its picture's first words: what the picture says it is.
+     *
+     * @param  list<array{0: string, 1: float}>|null  $tags
+     * @return list<array{0: string, 1: float}>|null
+     */
+    private static function withPictureKind(?array $tags, ?RetrievalImage $picture, string $title): ?array
+    {
+        if ($picture === null || ! self::modelTitled($title)) {
+            return $tags;
+        }
+        $out = $tags ?? [];
+        $have = array_flip(array_map(fn ($t): string => mb_strtolower((string) ($t[0] ?? '')), $out));
+        foreach (array_slice(array_values(array_filter((array) $picture->caption_words, 'is_string')), 0, self::PICTURE_KIND_PHRASES) as $phrase) {
+            $phrase = mb_strtolower(trim($phrase));
+            if ($phrase !== '' && ! isset($have[$phrase])) {
+                $out[] = [$phrase, self::PICTURE_KIND_WEIGHT];
+                $have[$phrase] = true;
+            }
+        }
+
+        return $out === [] ? null : $out;
+    }
 
     /** A title that is a model's name, not what the product is: it opens with no Hebrew word ("Chief", "Kayla - 034 Black Matte"). */
     private static function modelTitled(string $title): bool
