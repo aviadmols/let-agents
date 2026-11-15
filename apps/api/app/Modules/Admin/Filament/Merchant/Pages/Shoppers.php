@@ -2,8 +2,8 @@
 
 namespace App\Modules\Admin\Filament\Merchant\Pages;
 
-use App\Core\Facades\Features;
 use App\Core\Filament\HasPeriod;
+use App\Core\Filament\PageLink;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\SavedProducts;
 use App\Modules\Admin\Contracts\ShopperRequests;
@@ -18,7 +18,6 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\Url;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -251,9 +250,7 @@ final class Shoppers extends Page
     /** One visit, open over the visits log with every step in order. */
     public function visitUrl(int $id): ?string
     {
-        $route = 'filament.merchant.pages.sessions';
-
-        return Route::has($route) && Features::enabled('analytics.sessions', $this->shop()->id) ? route($route, ['tenant' => $this->shop(), 'session' => $id]) : null;
+        return PageLink::to('filament.merchant.pages.sessions', ['tenant' => $this->shop(), 'session' => $id]);
     }
 
     /** @return list<array{id: string, title: string, picture: string|null, saved: int, bought: int}> */
@@ -277,17 +274,13 @@ final class Shoppers extends Page
     /** Where the WhatsApp button is set up, for "No one's waiting". */
     public function whatsappUrl(): ?string
     {
-        $route = 'filament.merchant.pages.settings.whatsapp';
-
-        return Route::has($route) ? route($route, ['tenant' => $this->shop()]) : null;
+        return PageLink::to('filament.merchant.pages.settings.whatsapp', ['tenant' => $this->shop()]);
     }
 
-    /** The visits log (every visit, its steps and its address), behind "Every visit". */
+    /** The visits log (every visit, its steps and its address), behind "Every visit": none when the shop may not open it. */
     public function visitsLogUrl(): ?string
     {
-        $route = 'filament.merchant.pages.sessions';
-
-        return Route::has($route) ? route($route, ['tenant' => $this->shop()]) : null;
+        return PageLink::to('filament.merchant.pages.sessions', ['tenant' => $this->shop()]);
     }
 
     /** @return list<array{key: string, name: string|null, channel: string, question: string, at: CarbonInterface}> */

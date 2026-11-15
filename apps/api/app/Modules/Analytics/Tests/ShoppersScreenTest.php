@@ -2,6 +2,7 @@
 
 namespace App\Modules\Analytics\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Filament\Merchant\Pages\Shoppers;
 use App\Modules\Admin\Models\User;
@@ -130,6 +131,20 @@ final class ShoppersScreenTest extends TestCase
             ->assertSee('Searched with a photo')
             ->assertSee('Added to cart')
             ->assertSee('Returning shopper');
+    }
+
+    public function test_a_shop_whose_plan_has_no_visits_log_is_never_linked_to_it(): void
+    {
+        // Take Me Home, 15.11: "Every visit" led to a 403 inside the Shopify admin.
+        $this->merchant->forceFill(['locale' => 'he'])->save();
+        Features::override('analytics.sessions', false, $this->shop->id);
+
+        $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/shoppers")
+            ->assertOk()
+            ->assertSee('ביקורים אחרונים')
+            ->assertDontSee('כל הביקורים')
+            ->assertDontSee("/merchant/{$this->shop->slug}/sessions", false);
+        $this->actingAs($this->merchant)->get("/merchant/{$this->shop->slug}/sessions")->assertForbidden();
     }
 
     public function test_the_visits_without_a_search_show_on_the_toggle(): void
