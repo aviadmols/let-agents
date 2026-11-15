@@ -187,7 +187,7 @@
     if (turn.nothing || !turn.ids.length) {
       if (turn.tags && turn.tags.length) { return '<p class="ls-noanswer__text">' + esc(t('photoOnlyTags')) + '</p>' + tagRow(true); }
       return '<p class="ls-noanswer__text">' + (turn.seen ? esc(t('photoNothing', { seen: turn.seen })) : esc(t('photoNothingPlain'))) + '</p>' +
-        '<div class="ls-form__actions"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-photo>' + esc(t('photoAgain')) + '</button><button class="ls-btn ls-btn--secondary ls-btn--sm" data-ask="' + esc(LANG === 'he' ? 'מה מתאים לי מהחנות?' : 'What would suit me?') + '">' + esc(t('askWho', { name: CFG.assistant })) + '</button></div>';
+        '<div class="ls-form__actions"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-photo>' + esc(t('photoAgain')) + '</button><button class="ls-btn ls-btn--secondary ls-btn--sm" data-ask="' + esc(turn.seen ? t('photoAskLike', { seen: turn.seen }) : LANG === 'he' ? 'מה מתאים לי מהחנות?' : 'What would suit me?') + '">' + esc(t('askWho', { name: CFG.assistant })) + '</button></div>';
     }
     var off = Object.keys(turn.off).filter(function (k) { return turn.off[k]; }).map(Number);
     var list = turn.ids.map(rec).filter(Boolean);

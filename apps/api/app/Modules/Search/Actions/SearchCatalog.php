@@ -974,6 +974,44 @@ final class SearchCatalog
         return array_values(array_filter($externalIds, fn (string $id): bool => isset($kept[$id]) || isset($filed[$id])));
     }
 
+    /** Of the pictures described like a photo, at most this many are read for their kind. */
+    private const DESCRIBED_POOL = 120;
+
+    /**
+     * The products whose pictures are described as what a photo shows (its object and its details), of the kind it is
+     * ("slide sandals with two buckled straps": sandals, never a clog described with buckles too); nearest by the words
+     * first, its likeness to the photo after. Code over the pictures' descriptions read at the scan; one vector of the
+     * words, no model.
+     *
+     * @param  array<string, mixed>  $index
+     * @param  list<array{external_id: string, similarity: float}>  $hits  the shop's pictures nearest the photo
+     * @return list<array<string, mixed>>
+     */
+    private function describedLike(string $shopId, array $index, PhotoLook $look, array $hits, int $limit): array
+    {
+        $object = (string) $look->object;
+        // what it is, before what it is with ("slide sandals with two buckled straps", "טבעת עם אבן כחולה")
+        $head = trim((string) (preg_split('/\s+(?:with|in|and|of|on|for|עם|ב|של|ו)\s+/iu', $object)[0] ?? $object));
+        $kind = self::kindNouns($head);
+        if ($kind === []) {
+            return [];
+        }
+        $words = implode(', ', array_filter([$object, ...array_filter((array) $look->details, 'is_string')]));
+        $near = array_slice(app(PictureContent::class)->picturesNearWords($shopId, $words, self::PHOTO_ALL), 0, self::DESCRIBED_POOL);
+        $near = array_values(array_filter($near, fn (array $hit): bool => isset($index['records']['p:'.$hit['external_id']])));
+        if ($near === []) {
+            return [];
+        }
+        $kinds = RetrievalImage::query()->whereIn('external_id', array_column($near, 'external_id'))->get(['external_id', 'caption_words'])
+            ->mapWithKeys(fn (RetrievalImage $i): array => [(string) $i->external_id => self::kindNouns((string) (array_values(array_filter((array) ($i->caption_words ?? []), 'is_string'))[0] ?? ''))])->all();
+        $likeness = array_column($hits, 'similarity', 'external_id');
+        $kept = array_values(array_filter($near, fn (array $hit): bool => array_intersect($kinds[$hit['external_id']] ?? [], $kind) !== []));
+        usort($kept, fn (array $a, array $b): int => ($b['similarity'] + 0.5 * ($likeness[$b['external_id']] ?? 0)) <=> ($a['similarity'] + 0.5 * ($likeness[$a['external_id']] ?? 0)));
+
+        return array_map(fn (array $hit): array => $this->present($index['records']['p:'.$hit['external_id']])
+            + (isset($likeness[$hit['external_id']]) ? ['match' => (int) round(max(0, min(1, (float) $likeness[$hit['external_id']])) * 100)] : []), array_slice($kept, 0, $limit));
+    }
+
     /** What its main picture says it is ("derby shoe": "shoe"), or [] when its picture was not read or says nothing. */
     private static function pictureKind(CatalogProduct $product): array
     {
@@ -1837,10 +1875,16 @@ final class SearchCatalog
             // The photo was read and shows nothing the shop sells (a child, a landscape): nothing
             // looks like it, however close a white-background picture of a screw may score.
             if ($tags === []) {
-                $record && $this->counter->photo($shopId, 0);
-                $record && $this->keeper->handle($shopId, $bytes, $look, [], 0, visit: $visit);
+                // ...unless what it shows is what the shop's product pictures are described as, which no tag of the shop
+                // names (a store with no tags yet: Naot's demo, 16.11: "two-strap slide sandals, taupe suede" was
+                // "nothing like it in the store" beside its own Santa Barbara)
+                $products = $look->object === null || $look->failed ? [] : $this->describedLike($shopId, $index, $look, $hits, $perGroup);
+                $record && $this->counter->photo($shopId, count($products));
+                $record && $this->keeper->handle($shopId, $bytes, $look, $products, count($products), $cut, $visit);
 
-                return ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true] + $seen;
+                return $products === []
+                    ? ['total' => 0, 'groups' => ['product' => []], 'tags' => [], 'nothing' => true, 'searched' => true] + $seen
+                    : ['total' => count($products), 'groups' => ['product' => $products], 'tags' => [], 'searched' => true, 'close' => self::closeToPhoto($products, $shopId)] + $seen;
             }
 
             // The reader was asked and could not make the photo out: say so. Pictures alike in colour

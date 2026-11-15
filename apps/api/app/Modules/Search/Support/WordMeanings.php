@@ -27,7 +27,12 @@ final class WordMeanings
 
     public const ACTION = 'search.read_words';
 
-    public const PROMPT = 'word_meaning.v1';
+    /**
+     * v2: the word said plainly in the store's language first, then whether the store's word names exactly that, and only
+     * then is it read as the store's word: v1 read "נשים" as "unisex" in an English store that writes no "women" (Jean
+     * Rachel, 16.11), and men's necklaces were shown for women's. Any word, any language: nothing listed in code.
+     */
+    public const PROMPT = 'word_meaning.v2';
 
     public function __construct(
         private readonly ChatModel $chat,
@@ -52,6 +57,10 @@ final class WordMeanings
         }
 
         $saved = SearchWordMeaning::query()->where('word', $word)->first();
+        // an answer read with another version of the question is read again (once, within the day's words)
+        if ($saved !== null && ! str_ends_with((string) $saved->model, '@'.self::PROMPT)) {
+            $saved = null;
+        }
         if ($saved !== null) {
             if ($saved->term !== null && isset($byKey[HebrewSearch::normalize($saved->term)])) {
                 return $saved->term;
@@ -88,11 +97,12 @@ final class WordMeanings
         }
         Run::recordUsage($shopId, self::AGENT, self::ACTION, $provider->value, $model, $reply->inputTokens, $reply->outputTokens, $reply->costUsd($in, $out));
 
-        // code's gate: a word of the store's own, as the store writes it, or none
+        // code's gate: a word of the store's own, as the store writes it, that names exactly what the shopper's word does
+        // (same), or none
         $said = trim((string) ($reply->data['term'] ?? ''));
-        $term = $said === '' ? null : ($byKey[HebrewSearch::normalize($said)] ?? null);
+        $term = $said === '' || ($reply->data['same'] ?? false) !== true ? null : ($byKey[HebrewSearch::normalize($said)] ?? null);
         $term = $term !== null && HebrewSearch::normalize($term) === HebrewSearch::normalize($word) ? null : $term;
-        SearchWordMeaning::query()->updateOrCreate(['shop_id' => $shopId, 'word' => $word], ['term' => $term, 'words_hash' => $hash, 'model' => $model]);
+        SearchWordMeaning::query()->updateOrCreate(['shop_id' => $shopId, 'word' => $word], ['term' => $term, 'words_hash' => $hash, 'model' => mb_substr($model.'@'.self::PROMPT, 0, 120)]);
 
         return $term;
     }

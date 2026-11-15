@@ -68,6 +68,7 @@ final class OnboardingFoundTest extends TestCase
         // the scan under way: the products read, the pictures being looked at, the rest still to come
         FirstScan::start($shop);
         FirstScan::mark($shop->id, 'catalog', FirstScan::DONE);
+        FirstScan::mark($shop->id, 'siblings', FirstScan::DONE);
         FirstScan::mark($shop->id, 'sample', FirstScan::DONE);
         FirstScan::mark($shop->id, 'pictures', FirstScan::RUNNING);
 

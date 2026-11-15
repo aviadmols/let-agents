@@ -324,6 +324,35 @@ final class SearchByPhotoTest extends TestCase
         $this->assertSame([0], $scene['groups']['product'][0]['tags'], 'each product says which tags it belongs to');
     }
 
+    public function test_a_photo_no_tag_of_the_shop_names_finds_the_products_whose_pictures_are_described_like_it(): void
+    {
+        // Naot's demo, 16.11: "two-strap slide sandals, taupe suede" was "nothing like it in the store" beside its own
+        // Santa Barbara: the shop's categories are collections, and no tag of it names a sandal
+        $this->inShop(function (): void {
+            $collection = CatalogCategory::query()->create(['shop_id' => $this->shop->id, 'external_id' => 'k5', 'name' => 'Orthotic Friendly', 'path' => ['Orthotic Friendly'], 'depth' => 0, 'hash' => 'k5', 'product_count' => 3]);
+            foreach (['40' => ['Santa Barbara', ['slide sandal', 'two straps', 'suede']], '41' => ['Fiord', ['clogs', 'buckle strap', 'suede']], '42' => ['Austin', ['sandals', 'three straps']]] as $id => [$title, $words]) {
+                $this->shirt((string) $id, $title, [0.3, 0.3, 0.3]);
+                RetrievalImage::query()->where('external_id', (string) $id)->update(['caption_words' => $words]);
+                CatalogProduct::query()->where('external_id', (string) $id)->sole()->categories()->attach($collection->id);
+            }
+        });
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->reader(['object' => 'slide sandals with two buckled straps', 'details' => ['two buckle straps', 'taupe suede'], 'around' => [], 'sure' => 0.9, 'sellable' => true]);
+        $this->app->instance(PictureContent::class, new class implements PictureContent
+        {
+            public function picturesNearWords(string $shopId, string $text, int $limit): array
+            {
+                return [['external_id' => '41', 'similarity' => 0.7], ['external_id' => '40', 'similarity' => 0.65], ['external_id' => '42', 'similarity' => 0.5]];
+            }
+        });
+
+        $found = $this->upload()->assertOk()->json();
+
+        $this->assertSame(['40', '42'], array_column($found['groups']['product'], 'external_id'), 'the sandals described like it; never the clog with a buckle too');
+        $this->assertArrayNotHasKey('nothing', $found);
+    }
+
     public function test_a_ring_on_a_hand_is_matched_by_what_tells_it_apart_and_by_the_ring_alone(): void
     {
         $this->inShop(function (): void {

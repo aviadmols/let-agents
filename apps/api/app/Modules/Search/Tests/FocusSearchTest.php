@@ -238,17 +238,19 @@ final class FocusSearchTest extends TestCase
                 $input = json_decode($user, true);
                 $this->asked[] = $input['word'];
 
-                return new ModelReply(['term' => match (true) {
-                    str_starts_with((string) $input['word'], 'מפוספס') => in_array('פסים', $input['store_words'], true) ? 'פסים' : '',
-                    default => 'מילה שאין בחנות',
-                }], 400, 5);
+                return new ModelReply(match (true) {
+                    str_starts_with((string) $input['word'], 'מפוספס') => ['translation' => 'פסים', 'term' => in_array('פסים', $input['store_words'], true) ? 'פסים' : '', 'same' => true],
+                    // a word for other people is near, never the same (Jean Rachel, 16.11: "נשים" read as "unisex")
+                    str_starts_with((string) $input['word'], 'נשי') => ['translation' => 'נשים', 'term' => 'unisex', 'same' => false],
+                    default => ['translation' => '', 'term' => 'מילה שאין בחנות', 'same' => true],
+                }, 400, 5);
             }
         });
         $this->catalog([
             '1' => ['חולצה מכופתרת Striped פסים', 'ביגוד'],
             '2' => ['חולצה ארוכה Breton פסים', 'ביגוד'],
             '3' => ['חולצה מכופתרת Plain', 'ביגוד'],
-            '4' => ['מכנסיים Lou', 'ביגוד'],
+            '4' => ['מכנסיים Lou unisex', 'ביגוד'],
         ]);
 
         $found = $this->shopperSearch('חולצה מפוספסת');
@@ -260,6 +262,7 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['מפוספסת'], $asked, 'asked once, kept');
 
         $this->assertArrayNotHasKey('near', $this->shopperSearch('חולצה בגוון קרמל'), 'a word the store does not say is no answer');
+        $this->assertArrayNotHasKey('near', $this->shopperSearch('חולצה נשים'), 'a store word only near it ("unisex" for women) is no answer');
 
         Features::override('search.word_meanings', false, $this->shop->id);
         $this->assertArrayNotHasKey('near', $this->shopperSearch('חולצה מקושקשת'), 'off for the store: never asked');
