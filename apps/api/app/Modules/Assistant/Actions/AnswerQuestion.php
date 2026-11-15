@@ -51,7 +51,7 @@ final class AnswerQuestion
 
     public const ACTION = 'assistant.answer';
 
-    public const PROMPT_VERSION = 6;
+    public const PROMPT_VERSION = 7;
 
     /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
     private const STORE_CHARS = 2500;

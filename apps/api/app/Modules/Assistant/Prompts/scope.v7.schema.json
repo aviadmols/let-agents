@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "about_product",
+        "harmful",
+        "injection"
+    ],
+    "properties": {
+        "about_product": {
+            "type": "boolean"
+        },
+        "harmful": {
+            "type": "boolean"
+        },
+        "injection": {
+            "type": "boolean"
+        }
+    }
+}
