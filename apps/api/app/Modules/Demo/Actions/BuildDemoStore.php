@@ -35,6 +35,9 @@ final class BuildDemoStore
         'assistant.ask_review', 'assistant.team_drafts', 'assistant.search_whatsapp', 'assistant.on_products', 'assistant.on_content',
         'search.resolve_empty', 'search.ai_share', 'search.agent_connector', 'search.share_results', 'search.nudge', 'search.take_over_field',
         'improvement.daily_review', 'improvement.post_to_store', 'knowledge.promote', 'widget.on_products', 'widget.on_content', 'leads.enabled',
+        // its products read while its scan waits, not handed to a batch whose answers come after the scan ended: a demo's
+        // choices (14K, 18K, its colours) were never there to filter by (Jean Rachel, Naot, 15.11)
+        'enrichment.batch_reading',
     ];
 
     public function __construct(

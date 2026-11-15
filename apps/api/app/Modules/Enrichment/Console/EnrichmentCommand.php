@@ -103,7 +103,9 @@ final class EnrichmentCommand extends Command
     private function collect(): int
     {
         $shops = $this->option('scheduled')
-            ? Shop::query()->where('status', ShopStatus::Active)->orderBy('slug')->get()->filter(fn (Shop $shop): bool => Features::enabled('enrichment.batch_reading', $shop->id))
+            // a demo's too: a batch it handed over before its products were read at once has answers waiting (15.11)
+            ? Shop::query()->whereIn('status', [ShopStatus::Active, ShopStatus::Demo])->orderBy('slug')->get()
+                ->filter(fn (Shop $shop): bool => $shop->status === ShopStatus::Demo || Features::enabled('enrichment.batch_reading', $shop->id))
             : collect([$this->shop()])->filter();
 
         if ($shops->isEmpty()) {

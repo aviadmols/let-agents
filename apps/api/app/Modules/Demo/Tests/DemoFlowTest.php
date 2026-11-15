@@ -119,6 +119,7 @@ final class DemoFlowTest extends TestCase
         $this->assertEquals([300, (float) Settings::get('demo.budget_usd'), true, true, 'picture'],
             [Settings::get('catalog.max_products', $shop->id), Settings::get('ai.shop_monthly_cap_usd', $shop->id), Settings::get('ai.shop_cap_stops_shoppers', $shop->id), Settings::get('search.show_cart', $shop->id), Settings::get('search.similar_by', $shop->id)]);
         $this->assertFalse(Features::enabled('enrichment.nightly', $shop->id), 'nothing a night would do');
+        $this->assertFalse(Features::enabled('enrichment.batch_reading', $shop->id), 'its products read while its scan waits, never in a batch read after it');
         $this->assertTrue(Features::enabled('search.photos', $shop->id), 'looks matter: photo search');
         $this->assertTrue(Features::enabled('shortlist.wishlist', $shop->id), 'the wishlist a store would offer');
         $this->assertFalse(Features::enabled('shortlist.wishlist_phone', $shop->id), 'never a code by SMS from a demo');

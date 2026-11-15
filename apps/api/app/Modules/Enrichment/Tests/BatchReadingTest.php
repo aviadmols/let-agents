@@ -2,6 +2,7 @@
 
 namespace App\Modules\Enrichment\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Modules\Ai\Contracts\BatchChatModel;
 use App\Modules\Ai\Contracts\BatchRequest;
@@ -20,6 +21,7 @@ use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Runs\Models\Run;
+use App\Modules\Tenancy\Enums\ShopStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -126,6 +128,21 @@ final class BatchReadingTest extends TestCase
         $this->assertEqualsWithDelta((1000 * 0.3 + 100 * 2.5) / 1_000_000 * 0.5, (float) $usage[0]->cost_usd, 0.0000001, 'at half the price');
 
         $this->assertNull(app(CollectProviderBatches::class)->handle($this->shop->id), 'nothing waiting is not a run');
+    }
+
+    public function test_the_collector_every_ten_minutes_reads_a_demo_stores_batches_too(): void
+    {
+        // Jean Rachel and Naot, 15.11: a demo's batch was handed over and its answers never read, the collector
+        // taking active shops only: no 14K, 18K or colour to filter by
+        $this->product('1', 'מקדחה נטענת 1 18V', 'מקדחה חזקה לעבודות בית.', [$this->root]);
+        app(RunNightlyModelReading::class)->handle($this->shop->id, true);
+        $this->shop->forceFill(['status' => ShopStatus::Demo])->save();
+        Features::override('enrichment.batch_reading', false, $this->shop->id);
+        $this->provider->state = BatchState::ENDED;
+
+        $this->artisan('enrichment', ['step' => 'collect', '--scheduled' => true])->assertSuccessful();
+
+        $this->assertSame(BatchStatus::Completed, $this->inShop(fn () => EnrichmentBatch::query()->sole())->status);
     }
 
     public function test_the_first_scan_hands_over_every_unread_product_not_only_a_nights_share(): void
