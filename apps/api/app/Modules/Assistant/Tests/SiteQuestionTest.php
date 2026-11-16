@@ -592,6 +592,22 @@ final class SiteQuestionTest extends TestCase
         $this->assertArrayNotHasKey('choices', $released);
     }
 
+    public function test_a_reply_about_sale_items_in_a_returns_conversation_is_not_a_list_of_products_on_sale(): void
+    {
+        // Naot, 16.11: "what about sale items?" after "can I return or exchange it?" was answered by code "15 on sale now"
+        foreach (['771' => 'Mia sandal', '772' => 'Pixie sandal'] as $id => $title) {
+            $this->product((string) $id, $title, 'Sandal.', [], ['price' => '99.00', 'in_stock' => true, 'on_sale' => true]);
+        }
+        $thread = [['q' => 'Can I return or exchange it?', 'a' => 'Yes, within 30 days, unworn and in its box.']];
+        $this->replies = [
+            ['found' => true, 'answer' => 'Sale items can be exchanged within 30 days, not refunded.', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true],
+            ['decision' => 'approve', 'issues' => [], 'revised' => '', 'picks' => [], 'supported' => true, 'on_topic' => true, 'picks_fit' => true, 'safe' => true, 'injection' => false],
+        ];
+        $out = $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'what about sale items?', ['771', '772'], null, 'en', null, $thread));
+        $this->assertNotSame([], $this->calls, 'the writer reads it with the conversation');
+        $this->assertStringNotContainsString('on sale now', (string) ($out['result']['answer'] ?? ''));
+    }
+
     public function test_the_v29_checker_reads_the_conversation_and_the_released_one_does_not(): void
     {
         // a reply asked again in other words (Miss Nori, 16.11): the checker of v29 is given the conversation, to see what

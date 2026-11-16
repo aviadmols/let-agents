@@ -2698,8 +2698,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         return preg_match(self::TROUBLE, $question) === 1 && preg_match(self::ONLY_FINDING, $question) !== 1;
     }
 
-    /** What general knowledge never says: the store's own word (a price, stock, shipping, returns, payment, hours, "we"). */
-    private const STORE_FACT = '/[₪$€%]|ש["״׳\']ח|(?<![\p{L}])[ובהלמש]?(?:מחיר|מחירים|מלאי|משלוח|משלוחים|החזר|החזרה|החזרות|החזרים|החלפה|החלפות|אחריות|תשלום|תשלומים|זיכוי|שעות|פתוחים|פתוחה|סגורים|סגורה|אצלנו|שלנו|אנחנו|נשמח)(?![\p{L}])|\b(?:prices?|stock|shipping|delivery|returns?|refunds?|exchanges?|warranty|payments?|hours|open|closed|we|our|us)\b/iu';
+    /**
+     * What general knowledge never says: the store's own word (a price, stock, shipping, returns, payment, hours, "we").
+     * A percent only as a discount ("20% הנחה", "15% off"): a purity or a material in percent ("58.5% זהב", "100% merino")
+     * is the trade's measure, and "9K vs 14K" lost its figures for it (Rocks, 16.11).
+     */
+    private const STORE_FACT = '/[₪$€]|\d\s?%\s*(?:הנחה|off|discount)|(?:הנחה|discount)\s+(?:של\s+|of\s+)?(?:עד\s+|up\s+to\s+)?\d+\s?%|ש["״׳\']ח|(?<![\p{L}])[ובהלמש]?(?:מחיר|מחירים|מלאי|משלוח|משלוחים|החזר|החזרה|החזרות|החזרים|החלפה|החלפות|אחריות|תשלום|תשלומים|זיכוי|שעות|פתוחים|פתוחה|סגורים|סגורה|אצלנו|שלנו|אנחנו|נשמח)(?![\p{L}])|\b(?:prices?|stock|shipping|delivery|returns?|refunds?|exchanges?|warranty|payments?|hours|open|closed|we|our|us)\b/iu';
 
     /**
      * The sentences of the answer the writer marked as general knowledge (answer_site v24), kept only where they stand
@@ -3127,7 +3131,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  callable(string): bool  $bad
      * @return array{0: string, 1: int} what is left, and how many sentences went
      */
-    public static function withoutSentences(string $answer, callable $bad): array
+    public static function withoutSentences(string $answer, callable $bad, float $share = self::KEPT_SHARE): array
     {
         $parts = preg_split('/(\n+|(?<=[.!?])\s+)/u', $answer, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$answer];
         $left = '';
@@ -3145,7 +3149,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
         $left = trim($left);
 
-        return [$left === '' || mb_strlen($left) < 20 || mb_strlen($left) < mb_strlen($answer) * self::KEPT_SHARE ? '' : $left, $out];
+        // nothing worth showing: too short, too little of the answer, or only its closing offer ("תרצו ש…?")
+        $offerOnly = preg_match(self::OFFER, $left) === 1 && preg_match('/[.!?]\s+\S/u', $left) !== 1;
+
+        return [$left === '' || mb_strlen($left) < 20 || $offerOnly || mb_strlen($left) < mb_strlen($answer) * $share ? '' : $left, $out];
     }
 
     /**
@@ -3312,7 +3319,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         $injection = ($check['injection'] ?? false) === true;
         $issues = array_values(array_map(fn (array $i): array => array_filter([
             'text' => mb_substr(trim((string) ($i['text'] ?? '')), 0, 200),
-            'kind' => in_array($i['kind'] ?? null, ['unsupported', 'contradiction', 'numeric', 'unfit_pick', 'wrong_reason', 'off_topic', 'safety'], true) ? (string) $i['kind'] : 'unsupported',
+            // repeat, incomplete and stale_offer: verify_site v29's, logged as they are
+            'kind' => in_array($i['kind'] ?? null, ['unsupported', 'contradiction', 'numeric', 'unfit_pick', 'wrong_reason', 'off_topic', 'safety', 'repeat', 'incomplete', 'stale_offer'], true) ? (string) $i['kind'] : 'unsupported',
             'severity' => in_array($i['severity'] ?? null, ['minor', 'major', 'critical'], true) ? (string) $i['severity'] : 'major',
             'pick' => isset($i['pick']) ? mb_substr((string) $i['pick'], 0, 8) : null,
         ], fn ($v): bool => $v !== null && $v !== ''), array_slice(array_filter((array) ($check['issues'] ?? []), 'is_array'), 0, 6)));
@@ -3351,8 +3359,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $answer = $fix;
                 $revised = true;
             } elseif (array_diff(array_column($issues, 'severity'), ['minor']) !== []) {
-                // A material issue and no fix to put in its place: only the sentences the issues name go,
-                // the rest stays if enough is left; else the answer goes, the fitting picks stay.
+                // A material issue and no fix to put in its place: only the sentences the issues name go, and the
+                // rest stays, however short, while a sentence of it is left beside its offer: the checker said the
+                // answer stands in the main (a revise, not a reject). "עד 500" kept its necklace, not an empty answer
+                // beside its card (Miss Nori, 16.11). Else the answer goes, the fitting picks stay.
                 $faulty = array_values(array_filter(array_map(fn (array $i): string => $i['severity'] === 'minor' ? '' : mb_strtolower((string) ($i['text'] ?? '')), $issues), fn (string $t): bool => mb_strlen($t) >= 4));
                 $answer = $faulty === [] ? '' : self::withoutSentences($answer, function (string $sentence) use ($faulty): bool {
                     $sentence = mb_strtolower($sentence);
@@ -3363,7 +3373,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                     }
 
                     return false;
-                })[0];
+                }, 0.0)[0];
             }
         }
 
@@ -3742,6 +3752,13 @@ final class AnswerSiteQuestion implements TriesQuestions
         $asks = self::analysis($question, [])['asks'];
         // what is recommended most: the writer picks it by what the store's customers choose (analysis' popular_first)
         if ($asks === 'popular') {
+            return null;
+        }
+        // a reply naming no product in a conversation about the store's service ("and for sale items?" after the returns
+        // policy) asks on about that service: read with the conversation, never answered by code as a list of products on
+        // sale (Naot, 16.11: "15 on sale now" for "what about sale items?" after "can I return it?")
+        if ($this->conversation !== [] && self::named($question) === []
+            && self::asksOfTheStore((string) ($this->conversation[array_key_last($this->conversation)]['question'] ?? ''))) {
             return null;
         }
         ['min' => $min, 'max' => $max] = $this->priceRange($question);

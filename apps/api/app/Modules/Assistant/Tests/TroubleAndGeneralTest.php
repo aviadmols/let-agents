@@ -39,6 +39,30 @@ final class TroubleAndGeneralTest extends TestCase
 
         $this->assertSame([], AnswerSiteQuestion::general($answer, ['משפט שלא נמצא בתשובה.'])['general'], 'only what the answer says');
         $this->assertSame([], AnswerSiteQuestion::general('אצלנו המשלוח חינם. כדאי לבדוק בתיקיית הספאם.', ['אצלנו המשלוח חינם.'])['general']);
+
+        // a purity or a material in percent is the trade's measure, not the store's word: "9K vs 14K" lost its figures (Rocks,
+        // 16.11); a discount in percent still is the store's
+        $gold = 'הם נבדלים בכמות הזהב: 9K הוא 37.5% זהב טהור, ו־14K הוא 58.5% זהב טהור.';
+        $this->assertSame($gold, AnswerSiteQuestion::general($gold, ['9K הוא 37.5% זהב טהור, ו־14K הוא 58.5% זהב טהור.'])['answer']);
+        $this->assertSame(['Merino is a fine wool; a 100% merino shirt has no other fibre.'], AnswerSiteQuestion::general('Merino is a fine wool; a 100% merino shirt has no other fibre.', ['Merino is a fine wool; a 100% merino shirt has no other fibre.'])['general']);
+        $this->assertSame([], AnswerSiteQuestion::general('יש היום 20% הנחה על טבעות. כדאי למהר.', ['יש היום 20% הנחה על טבעות.'])['general']);
+        $this->assertSame([], AnswerSiteQuestion::general('Rings are 15% off today. Hurry.', ['Rings are 15% off today.'])['general']);
+    }
+
+    public function test_a_revision_with_no_fix_keeps_what_it_did_not_name(): void
+    {
+        // Miss Nori, 16.11: "revise" named the second sentence and gave no fix; what was left was under the share kept
+        // and the whole answer went, its card shown with no words
+        $answer = 'האפשרות היקרה ביותר עד 500 ש״ח היא שרשרת זהב אריאל ב־₪109. אם תרצו משהו זול יותר, יש גם חגורה וטי שירט ב־₪79 כל אחת, שמתאימות לכל יום ולכל סגנון. תרצו שאכוון אתכם לפריט הכי אלגנטי?';
+        $check = ['decision' => 'revise', 'revised' => '', 'safe' => true, 'injection' => false, 'picks' => [],
+            'issues' => [['text' => 'יש גם חגורה וטי שירט ב־₪79 כל אחת', 'kind' => 'off_topic', 'severity' => 'major']]];
+        $out = AnswerSiteQuestion::applyCheck($check, $answer, []);
+        $this->assertSame('האפשרות היקרה ביותר עד 500 ש״ח היא שרשרת זהב אריאל ב־₪109. תרצו שאכוון אתכם לפריט הכי אלגנטי?', $out['answer']);
+
+        // only the offer left is nothing to show
+        $check['issues'][0]['text'] = 'האפשרות היקרה ביותר עד 500 ש״ח היא שרשרת זהב אריאל ב־₪109';
+        $check['issues'][] = ['text' => 'יש גם חגורה וטי שירט ב־₪79 כל אחת', 'kind' => 'off_topic', 'severity' => 'major'];
+        $this->assertSame('', AnswerSiteQuestion::applyCheck($check, $answer, [])['answer']);
     }
 
     public function test_the_writer_is_given_what_its_prompt_reads_not_what_its_number_says(): void
