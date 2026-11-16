@@ -10,7 +10,7 @@ const base = process.argv[2];
 const expression = process.argv[3];
 const drawer = path.join(base, 'lets-search', 'drawer');
 const engine = fs.readFileSync(path.join(base, 'hebrew-search-engine.js'), 'utf8');
-const parts = ['02-words.js', '03-helpers.js', '11-filters.js', '12-search.js', '13-ask.js'].map((f) => fs.readFileSync(path.join(drawer, f), 'utf8')).join('\n');
+const parts = ['02-words.js', '03-helpers.js', '10-typing.js', '11-filters.js', '12-search.js', '13-ask.js'].map((f) => fs.readFileSync(path.join(drawer, f), 'utf8')).join('\n');
 
 const stub = `
   var win = window, doc = document, CFG = { assistant: 'AI' }, LANG = 'en', DIR = 'ltr', API = '', SITE = '', INPUT = { value: '' };
@@ -23,6 +23,7 @@ const stub = `
   function livePrice() { return null; } function regular() { return null; }
   function icon() { return ''; } function mark() { return ''; } function off() { return false; } function isPhone() { return false; }
   function render() {} function persist() {} function hours() { return {}; }
+  function isQuestion(q) { return !!(window.LA_ENGINE && window.LA_ENGINE.isQuestion && window.LA_ENGINE.isQuestion(String(q || ''))); }
 `;
 const ctx = { console, navigator: { language: 'en' }, location: { search: '', pathname: '/' } };
 ctx.document = { documentElement: { lang: 'en' }, createElement: () => ({ set innerHTML(v) { this.value = String(v); } }) };
@@ -30,6 +31,6 @@ ctx.window = { document: ctx.document, navigator: ctx.navigator, location: ctx.l
 ctx.window.window = ctx.window;
 vm.createContext(ctx);
 vm.runInContext(engine, ctx);
-vm.runInContext('(function () {' + stub + parts + '\n;window.T = { S: S, C: C, filtered: filtered, wouldCounts: wouldCounts, facetChips: facetChips, niceLabel: niceLabel, plainlySays: plainlySays, sized: sized, handsOver: handsOver, noteHtml: noteHtml, setCounted: setCounted, t: t };\n})();', ctx);
+vm.runInContext('(function () {' + stub + parts + '\n;window.T = { S: S, C: C, filtered: filtered, wouldCounts: wouldCounts, facetChips: facetChips, niceLabel: niceLabel, plainlySays: plainlySays, sized: sized, handsOver: handsOver, noteHtml: noteHtml, setCounted: setCounted, resultsHtml: resultsHtml, t: t };\n})();', ctx);
 ctx.T = ctx.window.T;
 process.stdout.write(JSON.stringify(vm.runInContext(expression, ctx)));

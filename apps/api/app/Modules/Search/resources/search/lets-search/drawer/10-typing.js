@@ -72,7 +72,7 @@
       lv.ids = ids; lv.server = true; lv.total = d.total || ids.length; lv.focus = d.focus || null; lv.loosened = d.loosened || null; if (byMeaning || d.near) { lv.near = d.near || null; }
       lv.single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       lv.singleBy = lv.single ? d.single.by : null;
-      lv.content = ((d.groups && d.groups.content) || []).slice(0, contentShown()); lv.cats = ((d.groups && d.groups.category) || []).slice(0, 4);
+      lv.content = ((d.groups && d.groups.content) || []).slice(0, contentShown(ids.length)); lv.cats = ((d.groups && d.groups.category) || []).slice(0, 4);
       lv.actions = d.actions || [];
       // Nothing by spelling, and the meaning pass still to come: still thinking, not "no results" yet
       // (it often finds what the store calls by another word). "No results" only once both found nothing.

@@ -90,6 +90,16 @@ class DrawerFiltersTest extends TestCase
         ));
     }
 
+    public function test_articles_and_pages_found_with_no_product_are_shown_not_nothing_found(): void
+    {
+        // Profimex, 16.11: 49 posts for "השקעה בנדל״ן", and the drawer showed only the card that asks the AI
+        $html = self::drawer("(function () { var x = turn('השקעה בנדלן', [], {}); x.content = [{ id: 'c:1', title: 'השקעה בנדל״ן – ניתוח מקרה', url: 'https://site.test/case/', kind: 'post' }, { id: 'c:2', title: 'אודותינו', url: 'https://site.test/about/', kind: 'page' }]; return T.resultsHtml(x); })()");
+        $this->assertStringContainsString('השקעה בנדל״ן – ניתוח מקרה', $html);
+        $this->assertStringContainsString('אודותינו', $html);
+        $this->assertStringNotContainsString('data-empty', $html, 'nothing found is not said over what was found, and Enter keeps the search');
+        $this->assertStringContainsString('data-empty', self::drawer("(function () { var x = turn('xyz', [], {}); x.content = []; return T.resultsHtml(x); })()"), 'and nothing at all still offers the AI');
+    }
+
     public function test_a_tag_all_in_capitals_or_small_letters_is_shown_in_title_case_and_a_brand_as_it_is(): void
     {
         $this->assertSame(['Sterling Silver', 'Mens Bracelets', 'Big-Bold', 'APMA Accepted', 'VANS', 'צמידים'], self::drawer(
