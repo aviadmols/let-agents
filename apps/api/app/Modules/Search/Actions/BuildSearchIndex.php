@@ -373,6 +373,8 @@ final class BuildSearchIndex
                 's' => $product->in_stock ? 1 : 0,
                 // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
                 'pr' => $product->price === null ? null : (int) round((float) $product->price),
+                // the price before a sale, shown struck through beside it where the store's live prices are not read
+                'rp' => $product->on_sale && $product->price !== null && $product->regular_price !== null && (float) $product->regular_price > (float) $product->price ? (int) round((float) $product->regular_price) : null,
                 'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
                 // No product of its kind (ProductKinds): its similar items are none, so the drawer offers none.
                 'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,
@@ -1309,6 +1311,30 @@ final class BuildSearchIndex
     /** A store's tags that file a page, not describe what it offers: never a filter value (Gil Travel's "blog"). */
     private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'all products', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
 
+    /**
+     * The tags the store keeps for its shop pages and campaigns, never a filter (search.hidden_tags: "Gift Guide, Vacation
+     * Shop"): a shopper filters by what a product is, and "Naot Hero Styles" is no such thing (Naot QA, 16.11). Lower case,
+     * each once.
+     *
+     * @return list<string>
+     */
+    public static function hiddenTags(string $setting): array
+    {
+        return array_values(array_unique(array_filter(array_map(fn (string $t): string => mb_strtolower(trim($t)), explode(',', $setting)), fn (string $t): bool => $t !== '')));
+    }
+
+    /** Whether a tag (lower case) is one of them, or starts with one ("gift guide > for her" of "gift guide"). */
+    public static function hidden(string $tag, array $hidden): bool
+    {
+        foreach ($hidden as $h) {
+            if ($tag === $h || (str_starts_with($tag, $h) && preg_match('/^[\s>\/\-:|]/u', mb_substr($tag, mb_strlen($h))) === 1)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** A tag written for the store's systems, not for a shopper: "low-stock-flagged", "shilav_p", "NewIn" (Shilav, 2.11). */
     private static function machineTag(string $tag): bool
     {
@@ -1384,11 +1410,12 @@ final class BuildSearchIndex
         // all in one case ("naotgivesback", "preorder", "FINALSALE") is a filter only where it is such a word ("sandals"),
         // else it is the store's code for itself (Naot QA, 16.11); a menu's path ("Gift Guide > For Her") never is
         $said = $this->saidWords();
+        $hidden = self::hiddenTags((string) Settings::get('search.hidden_tags', $this->tenant->id()));
         foreach (CatalogProduct::query()->active()->orderBy('id')->lazy(200) as $product) {
             $total++;
             foreach (array_unique(array_map(fn ($t): string => trim((string) $t), (array) ($product->payload['tags'] ?? []))) as $tag) {
                 $key = mb_strtolower($tag);
-                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true) || self::machineTag($tag)
+                if ($tag === '' || mb_strlen($tag) > 40 || isset($offered[$key]) || in_array($key, self::NOT_TAGS, true) || self::machineTag($tag) || self::hidden($key, $hidden)
                     || str_contains($tag, '>') || (preg_match('/^(?:[a-z]+|[A-Z]+)$/', $tag) === 1 && ! isset($said[rtrim($key, 's')]) && ! isset($said[$key]))
                     // a Hebrew store's shopper filters by Hebrew words: "SETHIT", "shilav_pc" are the store's own codes
                     || ($locale === 'he' && preg_match('/\p{Hebrew}/u', $tag) !== 1)

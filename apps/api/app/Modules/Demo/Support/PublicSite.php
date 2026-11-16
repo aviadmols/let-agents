@@ -56,16 +56,26 @@ final class PublicSite
             return null;
         }
 
+        $response = self::fetch($url, $query);
+        // A site that shuts the API's address (a security plugin's 403 on /wp-json/wp/v2/…) still answers it at WordPress's
+        // other address for it, ?rest_route=: Profimex's demo read no post and no page of its 507 and 129 (16.11)
+        if ($response === null && ! str_starts_with($path, 'http') && preg_match('~^/?wp-json(/.*)$~', $path, $api) === 1) {
+            $response = self::fetch('https://'.$host.'/', ['rest_route' => $api[1]] + $query);
+        }
+
+        return $response;
+    }
+
+    /** One request, as a demo asks: its own agent, a short wait; null unless it answered well. */
+    private static function fetch(string $url, array $query): ?Response
+    {
         try {
             $response = OutboundUrl::request($url)?->timeout(self::TIMEOUT)->connectTimeout(10)->withHeaders(['User-Agent' => self::AGENT, 'Accept-Language' => 'he,en;q=0.8'])->get($url, $query);
         } catch (Throwable) {
             return null;
         }
-        if ($response === null) {
-            return null;
-        }
 
-        return $response->successful() ? $response : null;
+        return $response !== null && $response->successful() ? $response : null;
     }
 
     /** JSON from the host, or null when it is not JSON (a store that hides its feed answers HTML). */

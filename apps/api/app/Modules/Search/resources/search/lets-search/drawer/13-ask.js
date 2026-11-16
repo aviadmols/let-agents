@@ -23,7 +23,7 @@
       extra = Object.assign({}, extra || {}, { thread: goesOn, previous: [] });
       mark = Object.assign({}, mark || {}, { thread: goesOn });
     }
-    var turn = addTurn(Object.assign({ kind: 'answer', q: q, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
+    var turn = addTurn(Object.assign({ kind: 'answer', q: q, shown: S.askAs && S.askAs !== q ? S.askAs : undefined, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
     announce(t('announceSearching'));
     var slow = setTimeout(function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (el) { el.textContent = t('slow'); } }, 8000);
     // about this product: the product page's own ask, so the answer is kept with the product (its questions,
@@ -214,6 +214,13 @@
     });
     return out;
   }
+  // the answer's words, a set's "(N)" the number of cards shown where the server's N is the set's
+  function setCounted(turn) {
+    var answer = turn.answer;
+    if (!turn.ids || !turn.ids.length || typeof answer !== 'string') { return answer; }
+    var shown = filtered(turn).length, all = turn.ids.length;
+    return shown === all || !shown ? answer : answer.replace(new RegExp('\\(' + all + '\\)'), '(' + shown + ')');
+  }
   function answerHtml(turn) {
     if (turn.loading) { return thinking(t('thinkingAsk')); }
     if (turn.error) { return errorHtml(turn); }
@@ -225,9 +232,12 @@
     if (turn.quoted) { return quotedHtml(turn) + myAi(turn); }
     var anim = fresh[turn.id] && turn.anim;
     var n = String(turn.answer || '').split(' ').length;
+    // a set's count as its cards show it: the server counts each version, the grid one card a model ("Gold necklaces (5)"
+    // over two cards: Jean Rachel QA, 16.11)
+    var said = setCounted(turn);
     // asked with typing mistakes: how the question was read, so the shopper sees what was answered
     var html = kitsHtml(turn) + (turn.corrected ? '<div class="ls-understood" dir="auto">' + esc(t('understood', { q: turn.corrected })) + '</div>' : '') +
-      '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(turn.answer, anim, (turn.picks || []).concat(turn.sources || []).map(function (p) { var r = p.id && rec(p.id); return { title: decode((r && r.title) || p.title || '').split(/\s[-–|]\s/)[0], url: (r && r.url) || p.url }; }).filter(function (p) { return p.title && p.url; })) + '</div>';
+      '<div class="ls-answer' + (anim ? ' ls-words' : '') + '">' + answerText(said, anim, (turn.picks || []).concat(turn.sources || []).map(function (p) { var r = p.id && rec(p.id); return { title: decode((r && r.title) || p.title || '').split(/\s[-–|]\s/)[0], url: (r && r.url) || p.url }; }).filter(function (p) { return p.title && p.url; })) + '</div>';
     // the page the question names, which the answer rests on ("מנויים"): a button to it
     if (turn.page && turn.page.url) { html += '<a class="ls-btn ls-btn--secondary ls-btn--sm ls-answer__page" href="' + esc(turn.page.url) + '">' + esc(t('goPage', { t: turn.page.title })) + '</a>'; }
     if (turn.picks && turn.picks.length) {
@@ -242,7 +252,9 @@
     html += alsoHtml(turn);
     html += relatedHtml(turn);
     // a page the shopper can open, never what Lets gathered of the store with no page of its own ("מה שהפוסטים…")
-    var src = (turn.sources || []).filter(function (s) { return s && ((s.title && s.url) || s.product); });
+    // ...and none under an answer that only hands over to the team: it rests on no page (QA, 16.11: "This is one for our
+    // team to check" said "From: Shipping & Returns")
+    var src = handsOver(turn.answer) ? [] : (turn.sources || []).filter(function (s) { return s && ((s.title && s.url) || s.product); });
     if (src.length) {
       html += '<div class="ls-source">' + icon('doc', 'ls-icon--sm') + esc(t('from')) + ' ' + src.slice(0, 2).map(function (s) { var r = s.product && rec(s.product); return '<a href="' + esc(s.url || (r && r.url) || '#') + '">' + esc(s.title || (r && decode(r.title).split('|')[0]) || '') + '</a>'; }).join(' · ') + '</div>';
     }
@@ -405,6 +417,13 @@
       if (q && !seen[q]) { seen[q] = 1; out.push(q); }
     });
     return out.slice(-3).join('\n');
+  }
+  // An answer every sentence of which says the pages do not settle it, or sends to the team ("This is one for our team to
+  // check. The store's team will be glad to help you."): it tells nothing a page said.
+  var TEAM = /(?:^|[^\p{L}])(?:our|the\s+store'?s?)\s+team(?![\p{L}])|צוות/iu;
+  function handsOver(answer) {
+    var parts = String(answer || '').replace(/([.!?])\s+/g, '$1\n').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    return parts.length > 0 && parts.every(function (s) { return PARTIAL.test(s) || GIVES_CONTACT.test(s) || TEAM.test(s); });
   }
   function partialHtml(turn) {
     var answer = String(turn.answer || ''), asked = WANTS_PERSON.test(String(turn.q || '')), contact = GIVES_CONTACT.test(answer);

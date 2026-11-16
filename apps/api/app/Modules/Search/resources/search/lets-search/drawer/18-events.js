@@ -4,7 +4,9 @@
   function askCardFor(q) {
     var want = String(q || '').trim().replace(/\s+/g, ' ');
     if (!want) { return null; }
-    var cards = D.querySelectorAll('[data-askcard]');
+    // only the card of words that found nothing: under results, Enter keeps the search, never asks the AI instead
+    // (QA, 16.11: "gold necklace" and Enter, with necklaces on screen, became "Show me gold necklace" to the AI)
+    var cards = D.querySelectorAll('[data-askcard][data-empty]');
     for (var i = cards.length - 1; i >= 0; i--) {
       if (String(cards[i].dataset.from || '').trim().replace(/\s+/g, ' ') === want && cards[i].offsetParent !== null) { return cards[i]; }
     }
@@ -241,7 +243,8 @@
       }
       return;
     }
-    if (d.ask) { e.preventDefault(); if (d.askcard !== undefined && d.from) { signalEvent('ask_after', d.from, ''); } submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); return; }
+    // "Search the site for me": the AI is asked "Show me …", the bubble says what the shopper typed (QA, 16.11)
+    if (d.ask) { e.preventDefault(); if (d.askcard !== undefined && d.from) { signalEvent('ask_after', d.from, ''); S.askAs = String(d.from).trim(); } submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); S.askAs = null; return; }
     if (d.savedAnswer) {
       e.preventDefault();
       var a = S.records[d.savedAnswer];

@@ -14,7 +14,7 @@
         var facet = S.facets[g], colours = groups[g].some(function (code) { return swatch(facet, facet.v[code % 1000]); });
         html += '<div class="ls-fgroup' + (colours ? ' ls-fgroup--colour' : '') + '"><div class="ls-fgroup__t">' + esc(facet.l) + '</div><div class="ls-chips">' + groups[g].map(function (code) {
           var v = facet.v[code % 1000];
-          return chip(v.l, onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(facet, v), fc.counts[code]);
+          return chip(niceLabel(facet, v.l), onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(facet, v), fc.counts[code]);
         }).join('') + '</div></div>';
       });
       LAYER.querySelector('.ls-layer__body').innerHTML = html;
@@ -22,6 +22,8 @@
       LAYER.querySelector('.ls-layer__foot').innerHTML = '<button class="ls-btn ls-btn--secondary" data-fclear>' + esc(t('clearAll')) + '</button><button class="ls-btn ls-btn--primary" data-layer-close' + (n ? '' : ' disabled') + '>' + esc(n ? t('showN', { n: n }) : t('noFilterMatch').split('.')[0]) + '</button>';
     }
     showLayer(t('filter'), '', '');
+    // closed, the search field has the keys again (a phone keeps its keyboard down: back to the button)
+    if (!isPhone()) { layerReturn = INPUT; }
     LAYER.onclick = function (e) {
       var s = e.target.closest('[data-fsort]');
       // handled here, so the drawer's own click handler doesn't toggle it a second time

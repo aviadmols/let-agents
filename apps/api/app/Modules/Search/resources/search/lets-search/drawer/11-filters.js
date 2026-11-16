@@ -13,7 +13,15 @@
   // A product's words and a value's patterns, read once each (memo): the filters ask them of every product on every key.
   function sayNorm(s) { var E = S.engine; try { return E && E.normalize ? E.normalize(String(s || '')) : String(s || ''); } catch (e) { return String(s || ''); } }
   var sayHay = memo(function (text) { return ' ' + wordsOf(sayNorm(text)).join(' ') + ' '; });
-  var sayParts = memo(function (label) { return wordsOf(sayNorm(label)).map(function (w) { return new RegExp(' [והבלמשכ]?' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ים|ות|ה|י|ת)? '); }); });
+  // an English word is said by its singular or its plural, as the search reads it (HebrewSearch::holdsToken): the store's
+  // tag "Sandals" is said by a product whose words say "sandal" (Naot QA, 16.11: men's sandals left out of "sandals for men")
+  var sayParts = memo(function (label) {
+    var E = S.engine, q = function (x) { return x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+    return wordsOf(sayNorm(label)).map(function (w) {
+      var one = E && E.singular && /^[a-z]{4,}$/.test(w) ? E.singular(w) : null;
+      return new RegExp(' [והבלמשכ]?' + q(w) + '(?:ימ|ים|ות|ה|י|ת)? ' + (one ? '| ' + q(one) + '(?:s|es)? ' : ''));
+    });
+  });
   function plainlySays(text, label) {
     var hay = sayHay(text), parts = sayParts(label);
     return parts.length > 0 && parts.every(function (re) { return re.test(hay); });
@@ -410,7 +418,16 @@
   function codesOn(c) { var o = {}; Object.keys(c.f).concat(Object.keys(c.auto || {})).forEach(function (k) { o[k] = 1; }); return Object.keys(o).map(Number); }
   // a size alone on a chip is a bare number ("59"): it says what it is ("מידה 59"); a letter size or a colour says itself
   // a size number says it is a size ("מידה 59"); a store field says which ("מחבר: סלע מאיר", not the category of that name)
-  function chipText(facet, value) { return facet && facet.k === 'variant_size' && /^\d/.test(String(value.l)) ? facet.l + ' ' + value.l : facet && /^field:/.test(facet.k) ? facet.l + ': ' + value.l : value.l; }
+  function chipText(facet, value) { return facet && facet.k === 'variant_size' && /^\d/.test(String(value.l)) ? facet.l + ' ' + value.l : facet && /^field:/.test(facet.k) ? facet.l + ': ' + value.l : niceLabel(facet, value.l); }
+  // A store's tag or category written all in capitals or all in small letters ("STERLING SILVER", "mens bracelets") shown
+  // in title case beside the others ("Sterling Silver"); one the store wrote in mixed case ("APMA Accepted") as it is, and
+  // a brand always as it is (Jean Rachel QA, 16.11)
+  function niceLabel(facet, label) {
+    var l = String(label == null ? '' : label);
+    if (!facet || !/^(store_tags|category|tag:)/.test(String(facet.k)) || !/[a-z]/i.test(l) || /[֐-׿]/.test(l)) { return l; }
+    if (l !== l.toUpperCase() && l !== l.toLowerCase()) { return l; }
+    return l.toLowerCase().replace(/(^|[\s\-\/(&+])([a-z])/g, function (m, a, b) { return a + b.toUpperCase(); });
+  }
   function valueOf(code) { var f = S.facets[Math.floor(code / 1000)]; return f ? { facet: f, value: f.v[code % 1000] } : null; }
   // the colour and size filters the index reads from products' variants (BuildSearchIndex::variantFacets)
   function variantFacet(g) { var f = S.facets && S.facets[g]; return !!(f && (f.k === 'variant_color' || f.k === 'variant_size')); }
@@ -504,7 +521,9 @@
   }
   function priceHtml(r) {
     if (off('price')) { return ''; }
-    var now = livePrice(r.id), shown = now != null ? now : r.pr, reg = regular(r.id);
+    // the price before the sale: the store's own, live; else the index's (rp), where the store's prices were not read
+    // (a demo, a page that does not answer): a sale card shows what it was (QA, 16.11)
+    var now = livePrice(r.id), shown = now != null ? now : r.pr, reg = now != null ? regular(r.id) : (typeof r.rp === 'number' && r.rp > shown ? r.rp : null);
     return shown == null ? '' : '<span class="ls-price" data-price="' + esc(pid(r.id)) + '">' + money(shown) + (reg ? '<s>' + money(reg) + '</s>' : '') + '</span>';
   }
 

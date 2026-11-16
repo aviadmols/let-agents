@@ -347,6 +347,8 @@
 /* ---------------------------------------------------------------- layer inside the drawer: filters, variants, upload, menu */
 .ls-layer-scrim { position: absolute; inset: 0; z-index: 8; background: rgb(11 11 12 / .18); opacity: 0; transition: opacity 240ms ease; }
 .ls-layer-scrim.is-on { opacity: 1; }
+/* closing (or closed): it never takes a press, so the next tap or key reaches the drawer at once (QA, 16.11) */
+.ls-layer-scrim:not(.is-on), .ls-layer:not(.is-on) { pointer-events: none; }
 .ls-layer {
   position: absolute; inset-inline: 0; inset-block-end: 0; z-index: 9; max-height: 86%; display: flex; flex-direction: column;
   background: var(--ls-bg); border-radius: 22px 22px 0 0; box-shadow: 0 -12px 40px -12px rgb(11 11 12 / .18);

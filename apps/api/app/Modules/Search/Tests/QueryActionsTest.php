@@ -87,6 +87,12 @@ final class QueryActionsTest extends TestCase
         $this->assertEquals(22, $ring['z']);
         $this->assertSame(1, $ring['sl']);
         $this->assertSame(20260201, $ring['d']);
+        // the price before the sale, struck through on its card where the store's live prices are not read (QA, 16.11)
+        $this->assertArrayNotHasKey('rp', $ring, 'no price before the sale known: nothing to strike through');
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '2')->update(['regular_price' => 650]));
+        $this->assertSame(650, collect($this->build()['items'])->firstWhere('id', 'p:2')['rp']);
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '1')->update(['regular_price' => 1200]));
+        $this->assertArrayNotHasKey('rp', collect($this->build()['items'])->firstWhere('id', 'p:1'), 'not on sale: its regular price is no sale');
         $this->assertContains('big', array_column($data['actions'], 'id'));
 
         Settings::set('search.size_attribute', '', $this->shop->id);

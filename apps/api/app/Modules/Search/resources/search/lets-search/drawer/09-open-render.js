@@ -38,14 +38,15 @@
       // (a search sent stays its turn; one only typed comes back in the field, its live results with it)
       // (the theme's own field opens us with what it holds, often nothing: "" is no words of its own)
       var back = !opts.about && !opts.text ? backTo() : null;
+      var restored = false;
       if (back) {
         var bt = back.tid ? turnById(back.tid) : null;
         if (bt) {
           bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt; }).concat([bt]); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null;
           // a search comes back with its words in the field, as they were left
-          if (bt.kind === 'results' && bt.q) { keepInField(bt.q); }
+          if (bt.kind === 'results' && bt.q) { keepInField(bt.q); restored = true; }
         }
-        else if (back.q) { opts.text = back.q; }
+        else if (back.q) { opts.text = back.q; restored = true; }
       }
       // "about this product" only from the product page's own search row; the header's search is the store's search
       if (opts.about && S.ctx && productAsks() && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
@@ -68,7 +69,9 @@
     var focusField = function () {
       if (opts.focus === false) { return; }
       INPUT.focus({ preventScroll: true });
-      try { var end = INPUT.value.length; INPUT.setSelectionRange(end, end); } catch (e) { /* not a text field */ }
+      // the words come back selected: typing replaces them, an arrow goes on from them (QA, 16.11: "ring" left in the field
+      // and "necklace" typed searched "ringnecklace")
+      try { var end = INPUT.value.length; INPUT.setSelectionRange(restored ? 0 : end, end); } catch (e) { /* not a text field */ }
       onType();
     };
     // typed on the page: the field takes the focus at once, inside the keystroke, so the next letters
@@ -155,7 +158,8 @@
   function credit() { return '<div class="ls-credit">' + mark() + '<a href="https://lets.co.il/" target="_blank" rel="noopener">' + esc(t('powered')) + '</a></div>'; }
   // On a product page the questions go with the product, invisibly: the field says so, nothing else does.
   function renderCtx() {
-    var ph = S.askMode && S.ctx && rec(S.ctx) ? t('placeholderProduct') : t('placeholder');
+    var top = chatTurns().filter(function (x) { return !x.prev; }).pop(), like = top && top.kind === 'similar' && !INPUT.value && rec(top.of);
+    var ph = S.askMode && S.ctx && rec(S.ctx) ? t('placeholderProduct') : like ? t('similarHead') + decode(like.title).split(/\s[-–|]\s/)[0] : t('placeholder');
     if (INPUT.placeholder !== ph) { INPUT.placeholder = ph; INPUT.setAttribute('aria-label', ph); }
   }
 

@@ -160,6 +160,11 @@
         var x = c.auto[code] && !c.f[code] && valueOf(code);
         if (!x || !x.value) { return false; }
         var asked = wordsOf(x.value.l);
+        // the store's tags are many to a product, none of them what it is instead of another: a sandal tagged "APMA
+        // Accepted" and not "Sandals" is still a sandal by its name or its picture (Naot QA, 16.11), never by a word of its
+        // description ("spring ring clasp" on a necklace is no "Ring": Jean Rachel)
+        // (its words whole only where no picture was read)
+        if (andGroup(g)) { var seen = tgWords(r); return plainlySays(decode(r.title || '') + ' ' + (seen || (f.some(function (o) { return Math.floor(o / 1000) === g; }) ? '' : r.kw || '')), x.value.l); }
         var own = f.filter(function (o) { return Math.floor(o / 1000) === g; }).some(function (o) {
           var v = valueOf(o);
           return !v || !v.value || !wordsOf(v.value.l).every(function (w) { return asked.indexOf(w) >= 0; });
@@ -177,7 +182,7 @@
           if (vgs.length && r.v && !r.v.some(function (x) { return (!stock || x[1] === 1) && vgs.every(function (g) { return groups[g].some(function (code) { return x[0].indexOf(code) >= 0; }); }); })) { return false; }
           return Object.keys(groups).every(function (g) {
             if (r.v && vgs.indexOf(g) >= 0) { return true; }
-            return all && together.indexOf(g) >= 0 ? groups[g].every(function (code) { return holds(r, code); }) : groups[g].some(function (code) { return holds(r, code); });
+            return (all && together.indexOf(g) >= 0) || andGroup(g) ? groups[g].every(function (code) { return holds(r, code); }) : groups[g].some(function (code) { return holds(r, code); });
           });
         });
       };
@@ -202,7 +207,14 @@
       out = out.map(function (r) { return { r: r, n: said(r) }; }).sort(function (a, b) { return (b.n - a.n) || ((a.r.pr || 0) - (b.r.pr || 0)) * (so === 'asc' ? 1 : -1); }).map(function (x) { return x.r; });
     }
     else if (so === 'new') { out = out.slice().sort(function (a, b) { return (b.d || 0) - (a.d || 0); }); }
-    else { out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1); }); }
+    else {
+      // a colour chosen or read ("black sandals"): what comes in that colour alone first, then what is it with another
+      // ("Oily Coal Combo", black and grey: Naot QA, 16.11), each in the search's order
+      // and a tag read from the words ("Sandals") first on what its own name or picture says it is: a clog the store files
+      // under "Men > Sandals" after the sandals (Naot QA, 16.11: "Fiord")
+      var pure = onlyColour(c), kind = seenAs(c);
+      out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || pure(b) - pure(a) || kind(b) - kind(a); });
+    }
     // two colours of one model under one name ("Kayla" and "Kayla"): one card, its colours its dots; nothing told them
     // apart (Naot QA, 15.11). Under names of their own ("Julius - BA6 Soft Black") each keeps its card.
     var named = {};
@@ -217,6 +229,37 @@
     });
     return out;
   }
+  // 1 for a product one of whose versions (in stock, when stock is asked) is only the colours chosen; a product with no
+  // versions, by its own colours; else 0. All 1 when no colour is chosen.
+  function onlyColour(c) {
+    var g = (S.facets || []).map(function (f) { return f.k; }).indexOf('variant_color');
+    var on = g < 0 ? [] : codesOn(c).filter(function (code) { return Math.floor(code / 1000) === g; });
+    if (!on.length) { return function () { return 1; }; }
+    var stock = onStock(c), mine = function (codes) { var cs = (codes || []).filter(function (x) { return Math.floor(x / 1000) === g; }); return cs.length > 0 && cs.every(function (x) { return on.indexOf(x) >= 0; }); };
+    return function (r) {
+      if (r.v && r.v.length) { return r.v.some(function (x) { return (!stock || x[1] === 1) && mine(x[0]); }) ? 1 : 0; }
+      return mine(r.f) ? 1 : 0;
+    };
+  }
+  // what its picture says it is: the index's tags by meaning, their words
+  function tgWords(r) { return Array.isArray(r.tg) ? r.tg.map(function (t) { return Array.isArray(t) ? t[0] : t; }).join(' ') : String(r.tg || ''); }
+  // 1 for a product whose title or picture's words (tg) say every store tag read from the search's words; all 1 when none
+  function seenAs(c) {
+    var labels = Object.keys(c.auto || {}).map(Number).filter(function (code) { return !c.f[code] && andGroup(Math.floor(code / 1000)); }).map(function (code) { var x = valueOf(code); return x && x.value ? x.value.l : null; }).filter(Boolean);
+    if (!labels.length) { return function () { return 1; }; }
+    return function (r) {
+      if (r._seenAs === undefined || r._seenAsOf !== labels.join('|')) {
+        var own = decode(r.title || '') + ' ' + tgWords(r);
+        r._seenAsOf = labels.join('|');
+        r._seenAs = labels.every(function (l) { return plainlySays(own, l); }) ? 1 : 0;
+      }
+      return r._seenAs;
+    };
+  }
+  // The store's tags narrow together: "Organic" and "Sterling Silver" is what is both, each one more chosen fewer, as the
+  // counts beside them say (Jean Rachel QA, 16.11: with Organic on, the other tags still counted the whole search). A
+  // colour, a size, a category is one of its values: any of them.
+  function andGroup(g) { var f = S.facets && S.facets[g]; return !!(f && f.k === 'store_tags'); }
   // The articles beside the results, narrowed by the filters on that articles carry too (a tag a post was given, the
   // index's f of a content record): "10 to 14 days" keeps the guides about such trips. A filter no article carries (a
   // price, a colour) narrows the products only, and leaves the articles as they were.
@@ -252,8 +295,11 @@
     var without = function (o, g) { var x = {}; Object.keys(o || {}).forEach(function (k) { if (Math.floor(k / 1000) !== g) { x[k] = o[k]; } }); return x; };
     try {
       Object.keys(seen).map(Number).forEach(function (code) {
-        var g = Math.floor(code / 1000);
-        c.f = without(f0, g); c.f[code] = true; c.auto = without(a0, g);
+        // a value read from the words is counted as it is applied, by its words too ("Women's" on, 9 shown, counted 8
+        // beside it: Jean Rachel QA, 16.11); a tag with the others chosen, within what they show
+        var g = Math.floor(code / 1000), and = andGroup(g);
+        c.f = and ? Object.assign({}, f0) : without(f0, g); c.auto = and ? Object.assign({}, a0) : without(a0, g);
+        if (a0[code] && !f0[code]) { c.auto[code] = true; } else { c.f[code] = true; }
         counts[code] = filtered(turn).length;
       });
       c.f = f0; c.auto = a0;
@@ -273,16 +319,26 @@
     // unless its attribute has a choice already, where it is another of them
     var chosenIn = {};
     codesOn(c).forEach(function (code) { chosenIn[Math.floor(code / 1000)] = true; });
+    // In the filter sheet (max 0) every value some result carries stays where it is, one that would show nothing greyed
+    // with its 0: a press never brings a new tag in under the finger, nor takes one away (Jean Rachel QA, 16.11: "Organic"
+    // pressed brought "STERLING SILVER" in under it). The row over the results offers only what narrows.
     var codes = Object.keys(counts).map(Number).filter(function (code) {
-      var facet = S.facets[Math.floor(code / 1000)], value = facet && facet.v[code % 1000];
-      return value && (onCode(c, code) || (counts[code] >= (max ? 2 : 1) && (chosenIn[Math.floor(code / 1000)] || counts[code] < now))) && !/^(אחר|other)$/i.test(value.l);
+      var g = Math.floor(code / 1000), facet = S.facets[g], value = facet && facet.v[code % 1000];
+      if (!value || /^(אחר|other)$/i.test(value.l)) { return false; }
+      if (onCode(c, code)) { return true; }
+      if (!max) { return (held[code] || 0) > 0; }
+      return counts[code] >= 2 && ((chosenIn[g] && !andGroup(g)) || counts[code] < now);
     });
     // what the words come close to naming first ("ספרי מופת" puts "ספרי מופת מתורגמים" in the row), then the most held.
     // A value chosen keeps its place, marked by its ✓ and its fill, never moved to the front (as Aviad asked, 11.11):
     // the order is the results', the same before and after a press.
     var near = {};
     codes.forEach(function (code) { near[code] = wordsSaid(turn.q || '', S.facets[Math.floor(code / 1000)].v[code % 1000].l).n; });
-    codes.sort(function (a, b) { return near[b] - near[a] || (Math.floor(a / 1000) === typeAt) - (Math.floor(b / 1000) === typeAt) || (held[b] || 0) - (held[a] || 0) || a - b; });
+    // The row over the results (max) offers first what splits them most evenly: a size nearly every one comes in tells
+    // little ("Size 48" first over men's sandals: QA, 16.11). The sheet keeps the most held first. Both read the results
+    // the search found, never what is chosen, so nothing moves on a press.
+    var split = function (code) { var h = held[code] || 0; return max ? Math.min(h, n - h) : h; };
+    codes.sort(function (a, b) { return near[b] - near[a] || (Math.floor(a / 1000) === typeAt) - (Math.floor(b / 1000) === typeAt) || split(b) - split(a) || (held[b] || 0) - (held[a] || 0) || a - b; });
     // one name once: "סלע מאיר" as a category and as a publisher is one chip, the first of them
     var named = {};
     codes = codes.filter(function (code) { var l = String(S.facets[Math.floor(code / 1000)].v[code % 1000].l).toLowerCase(); if (named[l] && !onCode(c, code)) { return false; } named[l] = true; return true; });
@@ -312,7 +368,7 @@
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }
   // its count in brackets, smaller: "38 (41)", never "38 41" read as a range of sizes (Vans QA, 16.11)
-  function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '" data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">(' + count + ')</span>' : '') + '</button>'; }
+  function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '"' + (count === 0 && !on ? ' disabled' : '') + ' data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">(' + count + ')</span>' : '') + '</button>'; }
   function sortLabel(s) { return s === 'asc' ? t('sortAsc') : s === 'desc' ? t('sortDesc') : s === 'new' ? t('sortNew') : t('sortRel'); }
 
   // first: the product the search showed in this card, kept while a colour dot turns the card to another (its dots
@@ -324,7 +380,7 @@
     first = first && typeof first === 'object' ? first : r;
     return '<article class="ls-card' + (r.s === 0 ? ' is-out' : '') + '" data-card="' + esc(id) + '"' + (first !== r ? ' data-first="' + esc(pid(first.id)) + '"' : '') + '>' +
       // the picture opens the product, as its name does
-      '<div class="ls-card__media"><a class="ls-card__link" href="' + esc(r.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || '') + '" alt="">' + pic2(r) + '</a>' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
+      '<div class="ls-card__media"><a class="ls-card__link" href="' + esc(r.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(sized(r.img, 480)) + '" alt="" loading="lazy" decoding="async">' + pic2(r) + '</a>' + (badge ? '<span class="ls-card__badge">' + esc(badge) + '</span>' : '') +
       '<span class="ls-card__heart">' + heartBtn(id, saved, true) + '</span></div>' +
       '<a class="ls-card__title" dir="auto" href="' + esc(r.url) + '">' + esc(decode(r.title)) + '</a>' + colourDots(r, first) +
       '<div class="ls-card__row">' + priceHtml(r) + (r.ns === 1 ? '' : '<button class="ls-card__similar" data-similar="' + esc(id) + '">' + esc(t('similar')) + '</button>') + '</div>' +
@@ -351,7 +407,7 @@
   }
   // a swatch of a version's own picture, where no colour tells it apart
   function imgDot(img, label, attrs) {
-    return '<button class="ls-dot ls-dot--img" style="--sw:url(&quot;' + esc(img) + '&quot;)" title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></button>';
+    return '<button class="ls-dot ls-dot--img" style="--sw:url(&quot;' + esc(sized(img, 64)) + '&quot;)" title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (attrs || '') + '></button>';
   }
   // the first colour the store's colour filter files a product in, with its swatch: {code, sw, label}, or null
   function filedSwatch(x) {
@@ -433,8 +489,15 @@
     // every colour, in one row that scrolls sideways (never "+2" and a second line)
     return '<div class="ls-dots" role="group" aria-label="' + esc(t('colours')) + '">' + out.slice(0, DOTS_MOST).join('') + '</div>';
   }
+  // A Shopify picture asked at the size it is shown (its CDN's width): a card is a few hundred pixels wide, the file the
+  // store uploaded often thousands (QA, 16.11: 162 pictures, 2.5MB in one visit). Any other address as it is.
+  function sized(url, w) {
+    var u = String(url || '');
+    if (!/^https?:\/\/(?:cdn\.shopify\.com\/|[^/]+\/cdn\/shop\/)/.test(u) || /[?&]width=\d+/.test(u)) { return u; }
+    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'width=' + w;
+  }
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
-  function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(r.i2) + '" alt="" decoding="async" draggable="false">' : ''; }
+  function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(sized(r.i2, 480)) + '" alt="" loading="lazy" decoding="async" draggable="false">' : ''; }
   function heartBtn(id, on, float) { if (SHORT && SHORT.heartResults === false) { return ''; } return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
   function buyBtn(r, cls) {
     var id = pid(r.id);
@@ -443,13 +506,27 @@
     if (off('cart')) { return r.url ? '<a class="ls-btn ls-btn--primary ' + cls + '" href="' + esc(r.url) + '">' + esc(t(S.config && S.config.cardAction === 'read_more' ? 'readMore' : 'orderPage')) + '</a>' : ''; }
     // sold out: its like in stock, or (none of its kind here) only that it is sold out
     if (r.s === 0) { return r.ns === 1 ? '<button class="ls-btn ls-btn--secondary ' + cls + '" disabled>' + esc(t('outStock')) + '</button>' : '<button class="ls-btn ls-btn--secondary ' + cls + '" data-similar="' + esc(id) + '">' + esc(t('similarInStock')) + '</button>'; }
-    if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + esc(t('options')) + '</button>'; }
-    return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
+    // added once, it says so wherever it shows: the results, the saved list, the similar items, an answer (QA, 16.11); a
+    // press still adds another
+    var added = !!inCart()[id];
+    if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + (added ? addedMark() + esc(t('added')) : esc(t('options'))) + '</button>'; }
+    return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"' + (added ? ' data-state="done"' : '') + '><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
+  }
+  // the products added to the cart in this visit (this tab), by product
+  function inCart() { if (!S.inCart) { S.inCart = store('session', 'ls_in_cart') || {}; } return S.inCart; }
+  function addedMark() { return '<svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>'; }
+  function markAdded(id) {
+    var k = String(pid(id));
+    inCart()[k] = 1;
+    store('session', 'ls_in_cart', S.inCart);
+    // the same product's other buttons on screen now, without drawing anything again
+    root.querySelectorAll('[data-add="' + k.replace(/["\\]/g, '') + '"]').forEach(function (b) { if (b.dataset.state !== 'busy') { b.dataset.state = 'done'; } });
+    root.querySelectorAll('[data-options="' + k.replace(/["\\]/g, '') + '"]').forEach(function (b) { b.innerHTML = addedMark() + esc(t('added')); });
   }
   function you(turn) {
     if (turn.kind === 'photo') { return '<div class="ls-you"><img class="ls-you__photo" src="' + esc(turn.src || '') + '" alt="' + esc(t('yourPhoto')) + '"></div>'; }
     if (turn.kind === 'similar' && turn.of) { return rec(turn.of) ? '<div class="ls-you ls-you--of">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' : ''; }
-    return turn.q ? '<div class="ls-you"><div class="ls-you__bubble" dir="auto">' + esc(turn.q) + '</div></div>' : '';
+    return turn.q ? '<div class="ls-you"><div class="ls-you__bubble" dir="auto">' + esc(turn.shown || turn.q) + '</div></div>' : '';
   }
   // the product the similar items are for: big enough to keep, compare against, or buy
   function ofHero(id, size, oos) {
@@ -477,7 +554,15 @@
   // ("חולצה" in a jewellery store), no product holding the words ("מדע בדיוני" in a store without science fiction), or only
   // a few of many. The AI one press away: "תראה לי <the words>" goes to the set finder, which reads the catalogue for it.
   var WEAK_HELD = 3, WEAK_TOTAL = 8;
+  // what the results are is said above them; the card that asks the AI comes under the products, never between the words
+  // and the products they searched for (QA, 16.11): turn.askBelow, read by resultsHtml
   function noteHtml(turn) {
+    turn.askBelow = false;
+    var note = noteText(turn);
+    turn.askBelow = !!note && !turn.askShown;
+    return note;
+  }
+  function noteText(turn) {
     var E = S.engine, total = (turn.ids || []).length, held = typeof turn.held === 'number' ? turn.held : null;
     // the words the store has nothing close to: the server's, even none (it read "מתנה לאשתי טבעת יהלום" as "טבעת יהלום",
     // "לאשתי" is whom it is for), or the engine's own while typing
@@ -513,15 +598,17 @@
     if (!missing.length && !typed.length && held === 0 && total && !whomAsked && turn.focus && (turn.focus.options || []).length) {
       return '<div data-unknown><p class="ls-note__text">' + esc(t('noneAll', { q: turn.q })) + '</p><div class="ls-chips" style="margin:6px 0 10px">' +
         turn.focus.options.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') + '</div>' +
-        askCardHtml(turn.q, '', turn.askShown) + '</div>';
+        askCardHtml(turn.q, '', true) + '</div>';
     }
-    var text = missing.length && shownList.length && rest.length ? t('noneSaid', { gone: missing.join(' '), kept: rest.join(' ') })
+    // the search as typed, and each word left out on its own: "No “sneakers for kids” right now … without “kids”", never
+    // "Nothing “kids” in “sneakers”" (QA, 16.11); several, each in its quotes
+    var text = missing.length && shownList.length && rest.length ? t('noneSaid', { q: String(turn.q || '').trim(), gone: missing.join(LANG === 'he' ? '", "' : '”, “'), kept: rest.join(' ') })
       : typed.length && total && kept.length ? t('showingFor', { kept: kept.join(' '), gone: typed.join(' ') })
       : typed.length ? t('notHere', { w: typed.join(' ') })
       : held === 0 && total && !whomAsked ? t('meaningOnly', { q: turn.q })
       : held !== null && !whomAsked && held < WEAK_HELD && total >= WEAK_TOTAL ? t('meaningMostly', { n: held }) : '';
     if (!text) { return ''; }
-    return '<div data-unknown>' + askCardHtml(turn.q, text, turn.askShown) + '</div>';
+    return '<div data-unknown>' + askCardHtml(turn.q, text, true) + '</div>';
   }
   // The words of a search, as typed, that no product shown says in its title or words (its tags, its picture's words),
   // a word in any of its forms: "לבנה" is "לבן", "בצד" is "צד", "pocket" is "pockets". Only for a search of two words or more.
@@ -608,17 +695,18 @@
   // Nothing found, or found only in part: the store's AI one press away, in the box the search box offers a question in
   // ("שאלו את … / the words"). It reads the whole catalogue for them ("תראה לי …": the set finder).
   // shown: the "ask" row is already above (a question being typed): the words only, never the same button twice
-  function askCardHtml(q, text, shown) {
+  function askCardHtml(q, text, shown, empty) {
     if (shown) { return text ? '<p class="ls-note__text">' + esc(text) + '</p>' : ''; }
-    return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') + askCard(q, false, askFind(q));
+    return (text ? '<p class="ls-note__text">' + esc(text) + '</p>' : '') + askCard(q, false, askFind(q, empty));
   }
   // the AI asked to find the words across the whole catalogue ("תראה לי …": the set finder), from the ask card or the row
   // "חפשו לי באתר": a few words of what is sought are asked to see ("תראה לי עגילי זהב"); a sentence, or a question, is
   // asked as the shopper wrote it, never "הראו לי" before it (as Aviad asked, 11.11); so is anything with markup in it
   // ("<img onerror>": Vans QA, 16.11). "הראו", in the plural: never as a man or as a woman.
-  function askFind(q) {
+  // empty: the words found nothing, so Enter in the field presses it (askCardFor); under results it waits for a press
+  function askFind(q, empty) {
     var s = String(q || '').replace(/[?؟.!\s]+$/, ''), asked = isQuestion(s) || s.trim().split(/\s+/).length >= 4 || /[<>{}=\\]/.test(s);
-    return 'data-askcard data-from="' + esc(q) + '" data-ask="' + esc(asked ? String(q || '').trim() : t('askFindQ', { q: s })) + '"';
+    return 'data-askcard' + (empty ? ' data-empty' : '') + ' data-from="' + esc(q) + '" data-ask="' + esc(asked ? String(q || '').trim() : t('askFindQ', { q: s })) + '"';
   }
   // nothing found by the words nor by their meaning: never "not found" (Tomer's ask card, 8.11), the store's popular
   // searches to start from, then the card that asks the AI
@@ -643,7 +731,7 @@
       } else if (!turn.askShown) {
         html += popularHtml();
       }
-      html += off('ask') ? '' : askCardHtml(turn.q, '', turn.askShown);
+      html += off('ask') ? '' : askCardHtml(turn.q, '', turn.askShown, true);
       return html;
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
@@ -672,7 +760,7 @@
     if (!guideFirst && !ga) { html += guidesHtml(guides, turn.q); }
     // results that may not be it: a quiet way to ask the store's AI to search the site (Tomer's ask card, 8.11), never
     // for a question already asked above (its card is there), and only when the shopper presses it
-    if (!off('ask') && !turn.askShown) { html += askSmall(askFind(turn.q)); }
+    if (!off('ask') && !turn.askShown) { html += turn.askBelow ? '<div style="margin-top:20px">' + askCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
     html += (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }

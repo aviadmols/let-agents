@@ -215,6 +215,7 @@
     return (holder && holder.querySelector('[data-after="' + id + '"]')) || BODY.querySelector('[data-after="' + id + '"]');
   }
   function afterAdd(id, btn) {
+    markAdded(id);
     // a card in a grid of cards: said in a toast, never a box that makes this card taller than its row (Vans QA, 16.11)
     var box = afterBox(id, btn);
     if (box && box.closest('.ls-grid .ls-card')) { toast(CFG.demo ? t('demoAdded') : (LANG === 'he' ? 'נוסף לעגלה שלכם' : 'Added to your cart')); return; }

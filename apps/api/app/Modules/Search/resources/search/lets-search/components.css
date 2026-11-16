@@ -232,6 +232,9 @@ a.ls-btn:not(.ls-btn--link) { text-decoration: none; }
 .ls-chip:active { transform: scale(.96); }
 .ls-chip .ls-icon { width: 16px; height: 16px; }
 .ls-chip[aria-pressed="true"] { background: var(--ls-accent); color: var(--ls-accent-fg); box-shadow: none; }
+/* a value that would show nothing with what is chosen: kept in its place, greyed */
+.ls-chip:disabled { opacity: .45; cursor: default; }
+.ls-chip:disabled:active { transform: none; }
 .ls-chip__check { width: 0; overflow: hidden; transition: width 200ms var(--lsp-ease-out); display: inline-flex; }
 .ls-chip[aria-pressed="true"] .ls-chip__check { width: 16px; }
 .ls-chip--quiet { box-shadow: none; background: var(--ls-bg-sunken); }
@@ -279,7 +282,8 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
 /* a version no colour tells apart (a ring in another stone): its own picture, a little larger to be seen */
 .ls-dot--img { width: 24px; height: 24px; background: #fff var(--sw) center / cover no-repeat; }
 .ls-dots__more { font-size: var(--lsp-text-xs, 12px); opacity: .7; }
-.ls-card__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* the price and its button at the foot of the card: a row of cards lines up whether a name takes one line or two, with dots or without (QA, 16.11) */
+.ls-card__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
 .ls-card__similar { font-size: var(--lsp-text-sm); font-weight: 600; color: var(--ls-fg-strong-muted); }
 /* sold out: the picture shown is dimmed, never the second one under it */
 .ls-card.is-out .ls-card__media img:not(.ls-pic2), .ls-card.is-out:hover .ls-pic2 { opacity: .45; }

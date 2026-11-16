@@ -61,7 +61,10 @@
       if (!sent && win.fetch) { win.fetch(url, { method: 'POST', body: body, keepalive: true, mode: 'no-cors', credentials: 'omit', headers: { 'Content-Type': 'text/plain' } }).catch(function () {}); }
     }
   }
-  setInterval(function () { learnFlush(false); visitFlush(false); }, 4000);
+  setInterval(function () { learnFlush(false); }, 4000);
+  // the visit's steps go together, every half minute, and whatever is left when the page is hidden or left: the page's
+  // first step once, soon after it opens (visitPage), not a request every few seconds (QA, 16.11: nine in a short visit)
+  setInterval(function () { visitFlush(false); }, 30000);
   doc.addEventListener('visibilitychange', function () { if (doc.visibilityState === 'hidden') { learnFlush(true); visitFlush(true); } });
   win.addEventListener('pagehide', function () { learnFlush(true); visitFlush(true); });
   // ---------------------------------------------------------------- the visit, for the shop's sessions screen

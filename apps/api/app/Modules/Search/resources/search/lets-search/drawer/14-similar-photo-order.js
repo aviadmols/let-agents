@@ -7,7 +7,9 @@
     S.tab = 'chat'; S.wide = null;
     // the similar items stand alone at the top; the search they came from waits behind the dashed line
     S.turns.forEach(function (x) { x.prev = true; });
-    S.showPrev = false; hideLive();
+    // the field leaves the words of the search before: it says whose like these are (renderCtx), and typing starts anew
+    // (QA, 16.11: "black sandals" stayed in the field over the like of a product)
+    S.showPrev = false; hideLive(); keepInField('');
     var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null, other: !!otherColour, asked: asked || null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
     BODY.scrollTop = 0;
