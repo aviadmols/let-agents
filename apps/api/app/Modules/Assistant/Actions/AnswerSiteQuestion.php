@@ -171,7 +171,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28]];
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -1164,6 +1164,24 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /**
+     * Whether a question asked on a product's page is about the store's range, not that product: a budget ("מתנה לאמא עד
+     * 1,500", "white gold earrings under 2,000") with no word pointing at the piece on the page ("זה", "הזו", "this", "it").
+     * Asked there, a gift for mom was answered with the ring on the page alone (Rocks, the comparison with Zipchat, 16.11).
+     */
+    public static function asksBeyondThePage(string $question): bool
+    {
+        if (! app()->bound(PriceRange::class)) {
+            return false;
+        }
+        $range = app(PriceRange::class)->read($question);
+        if (($range['min'] ?? null) === null && ($range['max'] ?? null) === null) {
+            return false;
+        }
+
+        return preg_match('/(?<!\p{L})(?:[ושלבמכ]?(?:זה|הזה|הזו|הזאת|זאת|אותה|אותו|המוצר|הפריט)|this|it|this\s+one)(?!\p{L})/iu', $question) !== 1;
+    }
+
+    /**
      * Whether a question asks whether the store has or does something ("אתם מחליפים סוללות לשעונים?", "יש לכם תיקונים?",
      * "do you engrave?"): its answer may be no, and a no opens with what the store does.
      */
@@ -1582,6 +1600,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         $byRef = [];
         foreach ($found as $i => $passage) {
+            // a passage cut off in the middle of a word ends at the word before: "רוקס אנד ג" was copied into an answer as
+            // the store's name (Rocks, the comparison with Zipchat, 16.11)
+            $passage['text'] = self::wholeWordsAtEnd((string) ($passage['text'] ?? ''));
             $byRef['s'.($i + 1)] = $passage;
         }
         $productsByRef = [];
@@ -2987,7 +3008,9 @@ final class AnswerSiteQuestion implements TriesQuestions
         // is known, so its numbers pass ("פי 10"), and an answer of it alone rests on it, citing no page.
         ['answer' => $answer, 'general' => $general] = self::general($answer, (array) ($data['general'] ?? []));
         $known .= $general === [] ? '' : "\n".implode("\n", $general);
-        $choices = $this->trouble ? self::choices($answer, (array) ($data['choices'] ?? [])) : [];
+        // a question back with choices to tap: for trouble (v24), and after products for an open wish (v28: "rings, necklaces or
+        // earrings?", as the Zipchat comparison showed, 16.11)
+        $choices = $this->trouble || self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'choices') ? self::choices($answer, (array) ($data['choices'] ?? [])) : [];
 
         // Code's checks on the answer, sentence by sentence (gate()); the picks stand or fall on their own.
         $trimmed = 0;
@@ -4321,7 +4344,27 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /**
-     * Code's gate on the picks: only products it offered, each once, at most three, each with why.
+     * A passage's text without the piece of a word it was cut in: a last word of one or two letters after a space, where the
+     * text ends on no mark that closes a sentence or a figure ("…רחוב שבזי 31, רוקס אנד ג": "…רוקס אנד"). Whole words stay.
+     */
+    public static function wholeWordsAtEnd(string $text): string
+    {
+        $trimmed = rtrim($text);
+        if ($trimmed === '' || preg_match('/[.!?:;,)"\'״׳\d]$/u', $trimmed) === 1) {
+            return $text;
+        }
+
+        return preg_match('/^(.*\S)\s+\p{L}{1,2}$/us', $trimmed, $m) === 1 ? $m[1] : $text;
+    }
+
+    /** The most picks an answer keeps: six for a writer that chooses among kinds for an open wish (v28 and on), else three. */
+    private function maxPicks(): int
+    {
+        return self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'choices') ? 6 : self::MAX_PICKS;
+    }
+
+    /**
+     * Code's gate on the picks: only products it offered, each once, at most maxPicks(), each with why.
      *
      * @param  array<int, mixed>  $raw
      * @param  array<string, array{external_id: string, title: string, about: string, category: string}>  $productsByRef
@@ -4346,7 +4389,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             $seen[$ref] = true;
             $out[] = ['ref' => $ref, 'external_id' => $productsByRef[$ref]['external_id'], 'title' => $productsByRef[$ref]['title'], 'why' => $why];
 
-            if (count($out) >= self::MAX_PICKS) {
+            if (count($out) >= $this->maxPicks()) {
                 break;
             }
         }

@@ -566,6 +566,47 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(2, $this->calls, 'in its language at once: no second writing');
     }
 
+    public function test_the_v28_writer_keeps_up_to_six_picks_and_asks_back_with_choices(): void
+    {
+        // the comparison with Zipchat, 16.11: one or two products for a gift, no question to narrow it; the v28 writer gives
+        // three to six of different kinds and a question with choices to tap; the released version keeps three, no choices
+        foreach (['981' => 'טבעת זהב עדינה', '982' => 'שרשרת זהב דקה', '983' => 'עגילי פנינה', '984' => 'צמיד זהב', '985' => 'תליון לב', '986' => 'טבעת יהלום'] as $id => $title) {
+            $this->product((string) $id, $title, 'תכשיט.', [], ['price' => '900.00', 'in_stock' => true]);
+        }
+        $reply = fn (): array => [
+            ['found' => true, 'answer' => 'למתנה לאמא יש לנו כמה כיוונים יפים. מה היא אוהבת יותר?', 'refs' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true,
+                'picks' => array_map(fn (int $i): array => ['ref' => 'p'.$i, 'why' => 'מתנה יפה'], range(1, 6)), 'choices' => ['טבעות', 'שרשראות', 'עגילים']],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $shown = ['981', '982', '983', '984', '985', '986'];
+
+        $this->replies = $reply();
+        $v28 = $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'מתנה לאמא', $shown, 28))['result'];
+        $this->assertCount(6, $v28['picks']);
+        $this->assertSame(['טבעות', 'שרשראות', 'עגילים'], $v28['choices'] ?? null);
+
+        $this->calls = [];
+        $this->replies = $reply();
+        $released = $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'מתנה לאמא', $shown))['result'];
+        $this->assertCount(3, $released['picks'], 'the released writer keeps three');
+        $this->assertArrayNotHasKey('choices', $released);
+    }
+
+    public function test_a_passage_cut_in_a_word_and_a_budget_asked_on_a_product_page(): void
+    {
+        // the comparison with Zipchat, 16.11: "רוקס אנד ג" copied as the store's name; a gift for mom answered with the ring
+        $this->assertSame('הכתובת: רחוב שבזי 31, רוקס אנד', AnswerSiteQuestion::wholeWordsAtEnd('הכתובת: רחוב שבזי 31, רוקס אנד ג'));
+        $this->assertSame('ניתן להחזיר תוך 14 יום.', AnswerSiteQuestion::wholeWordsAtEnd('ניתן להחזיר תוך 14 יום.'));
+        $this->assertSame('רחוב שבזי 31', AnswerSiteQuestion::wholeWordsAtEnd('רחוב שבזי 31'));
+        $this->assertSame('זהב צהוב וזהב לבן', AnswerSiteQuestion::wholeWordsAtEnd('זהב צהוב וזהב לבן'));
+
+        $this->assertTrue(AnswerSiteQuestion::asksBeyondThePage('מתנה לאמא עד 1,500 ש"ח'));
+        $this->assertTrue(AnswerSiteQuestion::asksBeyondThePage('עגילי זהב לבן במלאי עד 2,000'));
+        $this->assertFalse(AnswerSiteQuestion::asksBeyondThePage('יש את הטבעת הזו במידה 52?'), 'about the piece on the page');
+        $this->assertFalse(AnswerSiteQuestion::asksBeyondThePage('יש משהו דומה לזה עד 1,500?'), 'about this one');
+        $this->assertFalse(AnswerSiteQuestion::asksBeyondThePage('מה מדיניות ההחזרות?'), 'no budget');
+    }
+
     public function test_a_kept_answer_that_rests_on_product_pages_shows_those_products_as_its_cards(): void
     {
         // QA, 16.11: "שמלה שחורה לחתונה עד 200" recommended two dresses by name, citing their pages, and showed no card of

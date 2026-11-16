@@ -61,7 +61,11 @@ final class AskController
         // only where the store has its site's assistant on (assistant.on_search): one that turned it off keeps this page's alone
         $siteOn = $pageType === 'product' && Features::enabled('assistant.on_search', $connection->shop_id);
 
-        if ($siteOn && AnswerSiteQuestion::asksOfTheStore($question)) {
+        if ($siteOn && AnswerSiteQuestion::asksBeyondThePage($question)) {
+            // the store's range in a budget, not this piece: the site's assistant, as on any page (its kinds, its picks, more in
+            // the budget), the page's product no subject of it (Rocks, the comparison with Zipchat, 16.11)
+            $result = app(AnswerSiteQuestion::class)->handle($connection->shop_id, $question, $visitorHash, $locale, [], [], false);
+        } elseif ($siteOn && AnswerSiteQuestion::asksOfTheStore($question)) {
             $result = $site();
         } else {
             $result = $answer->handle($connection->shop_id, $pageType, $id, $question, $visitorHash, $locale);
