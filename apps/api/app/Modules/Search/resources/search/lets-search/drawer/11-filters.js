@@ -439,6 +439,13 @@
     if (l !== l.toUpperCase() && l !== l.toLowerCase()) { return l; }
     return l.toLowerCase().replace(/(^|[\s\-\/(&+])([a-z])/g, function (m, a, b) { return a + b.toUpperCase(); });
   }
+  // A value whose name opens others' in its filter ("זהב" beside "זהב צהוב", "זהב לבן") is all of them: said so where the
+  // values are listed, so its count, all of them, reads right (QA, 16.11: "זהב (1125)" beside "זהב צהוב" looked like one more)
+  function asWhole(facet, value, label) {
+    var l = String((value && value.l) || '');
+    var many = !!(l && facet && facet.v && facet.v.some(function (o) { return o && o.l !== l && String(o.l).indexOf(l + ' ') === 0; }));
+    return many ? t('allKinds', { v: label }) : label;
+  }
   function valueOf(code) { var f = S.facets[Math.floor(code / 1000)]; return f ? { facet: f, value: f.v[code % 1000] } : null; }
   // the colour and size filters the index reads from products' variants (BuildSearchIndex::variantFacets)
   function variantFacet(g) { var f = S.facets && S.facets[g]; return !!(f && (f.k === 'variant_color' || f.k === 'variant_size')); }

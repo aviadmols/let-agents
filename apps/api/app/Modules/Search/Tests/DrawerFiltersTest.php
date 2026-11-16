@@ -170,6 +170,13 @@ class DrawerFiltersTest extends TestCase
         $this->assertGreaterThan(1, preg_match_all('/class="ls-card[" ]/', self::drawer("(function () { var x = turn('Gold Ring', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'title'; return T.resultsHtml(x); })()")), 'a name still shows what else holds it');
     }
 
+    public function test_a_value_that_holds_others_of_its_filter_says_it_is_all_of_them(): void
+    {
+        // QA, 16.11: "זהב (1125)" beside "זהב צהוב" and "זהב לבן" looked like one more kind of gold, its count never moving
+        $labels = self::drawer("(function () { var f = { k: 'metal', l: 'Metal', v: [{ k: 'g', l: 'זהב' }, { k: 'y', l: 'זהב צהוב' }, { k: 'w', l: 'זהב לבן' }, { k: 's', l: 'כסף' }] }; return f.v.map(function (v) { return T.asWhole(f, v, v.l); }); })()");
+        $this->assertSame(['זהב (all kinds)', 'זהב צהוב', 'זהב לבן', 'כסף'], $labels);
+    }
+
     public function test_a_word_written_as_it_sounds_is_said_by_what_sounds_the_same(): void
     {
         // Miss Nori, 16.11: "מחנסים אדומים" showed the red trousers and said "מחנסים is not on the site"

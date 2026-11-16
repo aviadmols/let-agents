@@ -377,7 +377,7 @@
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
     if (fc.stock && !onStock(c)) { chips += chip(t('inStock'), false, 'stock', turn.id, false); }
     if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
-    sizesInOrder(fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED)).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), false, 'f:' + code, turn.id, false, swatch(f, v)); });
+    sizesInOrder(fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED)).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(asWhole(f, v, chipText(f, v)), false, 'f:' + code, turn.id, false, swatch(f, v)); });
     // the store's words close to what was typed, offered to choose (a chosen one is in the row under it)
     Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(capital(c.suggest[k].label), false, 'g:' + k, turn.id, false); } });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
