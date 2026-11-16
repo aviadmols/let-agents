@@ -323,6 +323,12 @@
         if (colour) { forms = withFamily(wordForms(E.normalize(done)).concat(forms)); }
       }
       var says = all.filter(function (r) { return colour ? holdsColour(r, colour, forms) : saysWord(r, forms); }).length;
+      // a colour none of the results is in: never a chip by another way of reading it (a "near" word gave the chip "לבנ",
+      // the word's own stem, over a grey shirt: Miss Nori, 16.11); said above the results as a colour let go is
+      if (colour && !says && !not) {
+        if (turn.letGo && turn.letGo.indexOf(w) < 0) { turn.letGo.push(w); }
+        return;
+      }
       // part typed and no product says it whole: the word it starts ("לוג": "לוגו"), named as the store says it
       var whole = !says && !not && i === words.length - 1 ? completed(all, n) : null;
       // a word the store does not write, read by meaning as one it does (the server's near: "מפוספס" is "פסים")
@@ -342,6 +348,8 @@
       // the store's subject, said by most of what it sells ("פטריה" in a store of mushroom formulas): it tells nothing
       // apart, and as a chip it narrowed "פטריה לכשב וריכוז" to the products whose words happen to say it
       if (!not && share > SUBJECT_SHARE) { return; }
+      // a word read as itself is shown as typed, never as its stem ("לבנ")
+      if (whole === n) { whole = null; }
       // shown as the store writes it: "לפוקוס" is "פוקוס", "וריכוז" is "ריכוז" (its prefix letter left out)
       var bare = !whole && n.length > 3 && !all.some(function (r) { return recForms(r)[n]; }) && all.some(function (r) { return recForms(r)[n.slice(1)]; }) ? word.slice(1) : word;
       // a search of one word: its chip says how it was read, and narrows nothing (what it found is that word's already:
