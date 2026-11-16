@@ -33,7 +33,9 @@ final class ContentDocuments implements DocumentSource
     {
         $lines = [];
 
-        foreach ((array) $content->terms as $taxonomy => $terms) {
+        // A page's or a post's categories and tags; what the store knows about itself keeps its reading's own state in
+        // `terms` ("Read: …", "Read_at: …"), never words of the store: they were found by meaning as if they were (16.11)
+        foreach ($content->type === CatalogContent::KNOWLEDGE ? [] : (array) $content->terms as $taxonomy => $terms) {
             // A term as a word, or as the store sends it whole ({id, name}): its name.
             $terms = array_filter(array_map(fn ($term): string => is_array($term) ? (string) ($term['name'] ?? $term['title'] ?? '') : (is_scalar($term) ? (string) $term : ''), (array) $terms));
 
@@ -42,7 +44,11 @@ final class ContentDocuments implements DocumentSource
             }
         }
 
-        $lines[] = (string) $content->excerpt;
+        // the excerpt only when it says something the body does not: an excerpt made of the body's first words, cut short
+        // ("…"), stood before the body in the same piece, the same text twice (Rocks, 16.11: 13 of 72 pieces of its posts)
+        if (! self::repeatsBody((string) $content->excerpt, (string) $content->body)) {
+            $lines[] = (string) $content->excerpt;
+        }
         $lines[] = (string) $content->body;
         array_push($lines, ...$notes);
 
@@ -52,5 +58,19 @@ final class ContentDocuments implements DocumentSource
             $content->title,
             implode("\n", array_filter(array_map('trim', $lines), fn (string $line): bool => $line !== '')),
         );
+    }
+
+    /** Whether an excerpt is only the body's opening words: its text, less a closing "…" or "[…]", is in the body. */
+    public static function repeatsBody(string $excerpt, string $body): bool
+    {
+        $plain = fn (string $s): string => trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($s), ENT_QUOTES | ENT_HTML5)));
+        $excerpt = trim((string) preg_replace('/\s*(?:\[\s*(?:…|\.\.\.)\s*\]|…|\.\.\.)\s*$/u', '', $plain($excerpt)));
+        if ($excerpt === '') {
+            return true;
+        }
+        // its first words are enough: an excerpt cut in a word holds a last word the body has whole
+        $head = mb_substr($excerpt, 0, min(120, max(20, mb_strlen($excerpt) - 15)));
+
+        return mb_strlen($head) >= 20 && mb_strpos($plain($body), $head) !== false;
     }
 }
