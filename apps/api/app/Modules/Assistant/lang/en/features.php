@@ -9,6 +9,10 @@ return [
         'label' => 'Free questions on article pages',
         'description' => 'A reader asks about the guide and is answered from the guide itself, including "sum this up for me". Questions already answered come back from memory with no model.',
     ],
+    'read_voice' => [
+        'label' => 'Reading the store’s tone in its scan',
+        'description' => 'In the store’s scan, a small model reads how the store writes to its customers (its product descriptions and posts) and sets the tone the assistant answers in. A tone the store chose itself never changes.',
+    ],
     'on_search' => [
         'label' => 'Questions in the search box',
         'description' => 'A shopper who types a question in the search and presses Enter gets an answer from the site pages, with the pages it came from. A saved answer shows while typing. No model is asked while typing.',

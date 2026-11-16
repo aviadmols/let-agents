@@ -29,6 +29,7 @@ use App\Modules\Assistant\Console\QualityCasesCommand;
 use App\Modules\Assistant\Console\ReadPostsCommand;
 use App\Modules\Assistant\Console\RetrievalBenchCommand;
 use App\Modules\Assistant\Console\ReviewAsksCommand;
+use App\Modules\Assistant\Console\VoiceCommand;
 use App\Modules\Assistant\Console\WriterBenchCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
 use App\Modules\Assistant\Contracts\TriesQuestions;
@@ -135,6 +136,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
         return [
             ReviewAsksCommand::class,
             KnowledgeCommand::class,
+            VoiceCommand::class,
             ReadPostsCommand::class,
             MendQuestionsCommand::class,
             CheckerReportCommand::class,

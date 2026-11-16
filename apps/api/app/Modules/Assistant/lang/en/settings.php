@@ -183,6 +183,30 @@ return [
         'label' => 'The tone in the store’s words',
         'description' => 'The store’s own free text about its voice, up to 400 characters, no links. The assistant fits its wording to it, nothing more.',
     ],
+    'voice_read' => [
+        'label' => 'The tone read in the scan',
+        'description' => 'What the store’s scan set as its tone (the style and its sentence), so a tone the store chose itself is never changed and the same texts are never read twice.',
+    ],
+    'voice_provider' => [
+        'label' => 'Provider of the tone reader',
+        'description' => 'The provider of the model that reads, in the scan, how the store writes to its customers and sets its assistant’s tone.',
+    ],
+    'voice_model' => [
+        'label' => 'Tone reader model',
+        'description' => 'A small model: one call a store, and again only when its texts change.',
+    ],
+    'voice_input_usd_per_million' => [
+        'label' => 'Input price per million tokens (tone)',
+        'description' => 'For the cost of reading the tone.',
+    ],
+    'voice_output_usd_per_million' => [
+        'label' => 'Output price per million tokens (tone)',
+        'description' => 'For the cost of reading the tone.',
+    ],
+    'voice_max_output_tokens' => [
+        'label' => 'Most output (tone)',
+        'description' => 'A style and a sentence or two.',
+    ],
     'no_answer' => [
         'label' => 'When the site has no answer',
         'description' => 'What the shopper sees when nothing was found: the team on WhatsApp (in opening hours, leaving details outside them), leaving details only, or just "not found".',
