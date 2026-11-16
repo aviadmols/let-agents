@@ -6,6 +6,7 @@ use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
@@ -93,6 +94,15 @@ final class QueryActionsTest extends TestCase
         $this->assertSame(650, collect($this->build()['items'])->firstWhere('id', 'p:2')['rp']);
         $this->inShop(fn () => CatalogProduct::query()->where('external_id', '1')->update(['regular_price' => 1200]));
         $this->assertArrayNotHasKey('rp', collect($this->build()['items'])->firstWhere('id', 'p:1'), 'not on sale: its regular price is no sale');
+        // choices that cost more than the price shown (a gift card of 250 to 3,000): its card says "from" (QA, 16.11)
+        $this->assertArrayNotHasKey('pf', collect($this->build()['items'])->firstWhere('id', 'p:2'));
+        $this->inShop(function (): void {
+            $ring = CatalogProduct::query()->where('external_id', '2')->sole();
+            foreach (['v1' => $ring->price, 'v2' => (float) $ring->price + 500] as $id => $price) {
+                CatalogVariant::query()->create(['shop_id' => $ring->shop_id, 'product_id' => $ring->id, 'external_id' => $id, 'price' => $price]);
+            }
+        });
+        $this->assertSame(1, collect($this->build()['items'])->firstWhere('id', 'p:2')['pf']);
         $this->assertContains('big', array_column($data['actions'], 'id'));
 
         Settings::set('search.size_attribute', '', $this->shop->id);

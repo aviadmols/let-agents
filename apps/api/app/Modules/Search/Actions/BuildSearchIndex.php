@@ -374,6 +374,9 @@ final class BuildSearchIndex
         $faceted = 0;
         // one model's versions as the store's own collection pages link them (ReadCollectionSiblings), with how they name each
         $siblings = CatalogSibling::query()->get(['product_id', 'group_key', 'label'])->keyBy('product_id');
+        // the products whose choices cost more than the price shown (a gift card of 250 to 3,000): their price is "from"
+        $ranged = CatalogVariant::query()->whereNotNull('price')->selectRaw('product_id, max(price) as hi, min(price) as lo')->groupBy('product_id')
+            ->havingRaw('max(price) > min(price)')->pluck('hi', 'product_id');
 
         foreach (CatalogProduct::query()->active()->with('categories:id,name')->orderBy('id')->lazy(200) as $product) {
             $read = $facets['products'][$product->id] ?? [];
@@ -404,6 +407,9 @@ final class BuildSearchIndex
                 'pr' => $product->price === null ? null : self::exact((float) $product->price),
                 // the price before a sale, shown struck through beside it where the store's live prices are not read
                 'rp' => $product->on_sale && $product->price !== null && $product->regular_price !== null && (float) $product->regular_price > (float) $product->price ? self::exact((float) $product->regular_price) : null,
+                // its choices cost more than the price shown: the card says "from" (QA, 16.11: a gift card of "₪250" under an
+                // answer about ₪3,000)
+                'pf' => $product->price !== null && isset($ranged[$product->id]) && (float) $ranged[$product->id] > (float) $product->price ? 1 : null,
                 'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
                 // No product of its kind (ProductKinds): its similar items are none, so the drawer offers none.
                 'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,

@@ -298,7 +298,7 @@
     html += rateHtml(turn);
     html += leadFlowHtml(turn);
     // the line to make sure with the team, unless the partial answer's offer already holds it
-    var h = hours(), link = !partialHtml(turn) && S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q);
+    var h = hours(), link = !partialHtml(turn) && S.config.askWhatsapp && h.open && wa(t('verify') + ' ' + turn.q + (productOf(turn) ? '\n' + t('askedAboutProduct', { t: productOf(turn).title }) + (productOf(turn).url ? '\n' + productOf(turn).url : '') : ''));
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html + myAi(turn);
   }
@@ -364,7 +364,7 @@
       return '<blockquote class="ls-quote" dir="auto">' + esc(qt.text) + (qt.title ? '<small>' + icon('doc', 'ls-icon--sm') + (qt.url ? '<a href="' + esc(qt.url) + '">' + esc(qt.title) + '</a>' : esc(qt.title)) + '</small>' : '') + '</blockquote>';
     }).join('');
     // WhatsApp only where the shop offers its team when there is no answer
-    var h = hours(), link = noAnswerOf(turn) === 'team' && h.open && wa(t('verify') + ' ' + turn.q);
+    var h = hours(), link = noAnswerOf(turn) === 'team' && h.open && wa(t('verify') + ' ' + turn.q + (productOf(turn) ? '\n' + t('askedAboutProduct', { t: productOf(turn).title }) + (productOf(turn).url ? '\n' + productOf(turn).url : '') : ''));
     if (link) { html += '<div class="ls-verify">' + esc(t('verify')) + ' <a href="' + esc(link) + '" target="_blank" rel="noopener">' + icon('whatsapp', 'ls-icon--sm') + esc(t('verifyLink')) + '</a></div>'; }
     return html;
   }
@@ -441,6 +441,24 @@
     });
     return out.slice(-3).join('\n');
   }
+  // The product a question was asked on (its own page's questions, or the drawer opened on its page): its name and address,
+  // for what the team is sent, so they know which product it is about (as Aviad asked, 16.11)
+  function productOf(turn) {
+    var id = (turn && turn.ctx) || S.ctx, r = id ? rec(id) : null;
+    return r && r.title ? { title: decode(r.title).trim(), url: r.url || '' } : null;
+  }
+  // The questions for the team, the product they are about first
+  function forTeam(turn, text) {
+    var p = productOf(turn);
+    return p ? t('askedAboutProduct', { t: p.title }) + '\n' + text : text;
+  }
+  // The store's WhatsApp message with the questions, and the product's name and address where it has their places; where it
+  // has none, they follow the questions
+  function waText(turn, text) {
+    var p = productOf(turn), tpl = S.config.whatsappMessage || ':question', has = /:product|:url/.test(tpl);
+    var out = tpl.replace(':question', text).replace(/:product/g, p ? p.title : '').replace(/:url/g, p ? p.url : '').replace(/[ \t]{2,}/g, ' ').trim();
+    return p && !has ? out + '\n' + t('askedAboutProduct', { t: p.title }) + (p.url ? '\n' + p.url : '') : out;
+  }
   // An answer every sentence of which says the pages do not settle it, or sends to the team ("This is one for our team to
   // check. The store's team will be glad to help you."): it tells nothing a page said.
   var TEAM = /(?:^|[^\p{L}])(?:our|the\s+store'?s?)\s+team(?![\p{L}])|צוות/iu;
@@ -452,7 +470,7 @@
     var answer = String(turn.answer || ''), asked = WANTS_PERSON.test(String(turn.q || '')), contact = GIVES_CONTACT.test(answer);
     if (!turn.answer || turn.leadFlow || (!PARTIAL.test(answer) && !asked && !contact) || noAnswerOf(turn) === 'none') { return ''; }
     if (turn.partialOpen || turn.lead) { return '<div class="ls-partial" style="margin-top:14px">' + noInfoHtml(turn, true) + '</div>'; }
-    var h = hours(), link = noAnswerOf(turn) === 'team' && h.open ? wa((S.config.whatsappMessage || ':question').replace(':question', subjectOf(turn)).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null;
+    var h = hours(), link = noAnswerOf(turn) === 'team' && h.open ? wa(waText(turn, subjectOf(turn))) : null;
     // an answer that already hands over to the team ("צוות החנות ישמח לעזור לכם", its phone) gets the buttons alone,
     // never the same said twice; one asked for a person says the team gets back to them
     var handed = !asked && (contact || /צוות\s+החנות\s+ישמח|הצוות\s+שלנו\s+ישמח|team\s+will\s+be\s+glad/i.test(answer));
@@ -464,7 +482,7 @@
   function noInfoHtml(turn, partial) {
     // what the shop offers when there is no answer (assistant.no_answer, sent with the reply): team (WhatsApp in
     // the opening hours, details outside them), details (always the form, never WhatsApp), none ("not found" only)
-    var offer = noAnswerOf(turn), h = hours(), link = offer === 'team' ? wa((S.config.whatsappMessage || ':question').replace(':question', turn.q).replace(/:product|:url/g, '').replace(/[ \t]{2,}/g, ' ').trim()) : null, html = '';
+    var offer = noAnswerOf(turn), h = hours(), link = offer === 'team' ? wa(waText(turn, turn.q)) : null, html = '';
     var form = leadFormOf(turn), own = partial ? t(WANTS_PERSON.test(String(turn.q || '')) ? 'talkAsk' : 'partialAsk') : turn.notFound ? String(turn.notFound) : '';
     if (turn.lead === 'done' || turn.lead === 'code') {
       html = '<div class="ls-done ls-focus-in"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div><div style="font-weight:500">' + esc(turn.leadPromise || t('leadDone', { name: turn.leadName || '', when: h.when || '' })) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(turn.leadVerified ? t('codeDone') : t('leadDoneSub', { shop: S.config.shopName || '' })) + '</div></div></div>' + (turn.lead === 'code' ? codeForm(turn) : '');
@@ -480,7 +498,7 @@
       // in the opening hours "the team is back" says nothing: only the question and the form
       // under a partial answer, the form the shopper asked for: no "the team is back" while it is open, one line asking
       html = ((offer === 'team' && !(partial && h.open)) || !h.open ? '<div class="ls-hours"><span class="ls-dot ls-dot--off"></span>' + esc(t('teamBack', { when: h.when || '' })) + '</div>' : '') +
-        '<p class="ls-noanswer__text">' + esc(partial ? t('leadAsk') : own ? own + ' ' + t('leadAsk') : t('leadText')) + '</p>' + (form ? shopLeadForm(turn, form, partial ? subjectOf(turn) : turn.q) : leadForm(turn, partial ? subjectOf(turn) : turn.q));
+        '<p class="ls-noanswer__text">' + esc(partial ? t('leadAsk') : own ? own + ' ' + t('leadAsk') : t('leadText')) + '</p>' + (form ? shopLeadForm(turn, form, forTeam(turn, partial ? subjectOf(turn) : turn.q)) : leadForm(turn, forTeam(turn, partial ? subjectOf(turn) : turn.q)));
     } else {
       html = '<p class="ls-noanswer__text">' + esc(own || t('noInfo')) + '</p>';
     }

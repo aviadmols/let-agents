@@ -538,6 +538,8 @@
     // the price before the sale: the store's own, live; else the index's (rp), where the store's prices were not read
     // (a demo, a page that does not answer): a sale card shows what it was (QA, 16.11)
     var now = livePrice(r.id), shown = now != null ? now : r.pr, reg = now != null ? regular(r.id) : (typeof r.rp === 'number' && r.rp > shown ? r.rp : null);
-    return shown == null ? '' : '<span class="ls-price" data-price="' + esc(pid(r.id)) + '">' + money(shown) + (reg ? '<s>' + money(reg) + '</s>' : '') + '</span>';
+    // its choices cost more (pf: a gift card of 250 to 3,000): "from" its price, never as if it were all it costs
+    var label = r.pf && !reg ? t('priceFrom', { min: money(shown) }) : money(shown);
+    return shown == null ? '' : '<span class="ls-price" data-price="' + esc(pid(r.id)) + '">' + esc(label).replace(/&amp;/g, '&') + (reg ? '<s>' + money(reg) + '</s>' : '') + '</span>';
   }
 
