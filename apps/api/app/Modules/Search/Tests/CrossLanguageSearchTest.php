@@ -40,7 +40,7 @@ final class CrossLanguageSearchTest extends TestCase
         $asked = &$this->asked;
         $this->app->instance(ChatModel::class, new class($asked) implements ChatModel
         {
-            private const SAYS = ['טבעת' => 'ring', 'זהב' => 'gold', 'צמיד' => 'bracelet', 'earrings' => 'עגילים', 'ring' => 'טבעת', 'shoes' => 'נעליים'];
+            private const SAYS = ['טבעת' => 'ring', 'זהב' => 'gold', 'צמיד' => 'bracelet', 'earrings' => 'עגילים', 'ring' => 'טבעת', 'shoes' => 'נעליים', 'vintage' => 'וינטג', 'cameo' => 'קמאו', 'pendant' => 'תליון'];
 
             private const SHY = ['צמידון' => 'bracelet', 'towels' => 'מגבת', 'כובע' => 'hat'];
 
@@ -107,6 +107,23 @@ final class CrossLanguageSearchTest extends TestCase
         $this->assertEqualsCanonicalizing(['1', '2', '3'], $this->found($shop, 'earrings'), 'every pair, not only the one saying "earrings"');
         $this->assertEqualsCanonicalizing(['4', '5'], $this->found($shop, 'טבעת'), 'a Hebrew word in a Hebrew store as it was');
         $this->assertNotContains('טבעת', $this->asked, 'and never asked about');
+    }
+
+    public function test_a_search_typed_whole_in_the_other_language_is_read_whole(): void
+    {
+        // Rocks QA, 16.11: "vintage cameo pendant" read two of its three words and showed 1,313 pieces; "תליון קמאו" the two
+        $shop = $this->store('he', [
+            '1' => ['תליון וינטג קמאו', 'תליונים'],
+            '2' => ['טבעת וינטג קמאו', 'טבעות'],
+            '3' => ['תליון זהב', 'תליונים'],
+            '4' => ['טבעת וינטג', 'טבעות'],
+            '5' => ['עגילי וינטג', 'עגילים'],
+            '6' => ['סיכה קמאו', 'סיכות'],
+            '7' => ['תליון כסף', 'תליונים'],
+            '8' => ['שרשרת זהב', 'שרשראות'],
+        ]);
+
+        $this->assertSame(['1'], $this->found($shop, 'vintage cameo pendant'), 'the vintage cameo pendant: every word counts');
     }
 
     public function test_the_word_most_of_the_store_says_is_a_word_to_read_as(): void

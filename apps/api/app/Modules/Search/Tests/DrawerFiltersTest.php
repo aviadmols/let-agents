@@ -100,6 +100,22 @@ class DrawerFiltersTest extends TestCase
         $this->assertStringContainsString('data-empty', self::drawer("(function () { var x = turn('xyz', [], {}); x.content = []; return T.resultsHtml(x); })()"), 'and nothing at all still offers the AI');
     }
 
+    public function test_only_answers_on_screen_are_already_told(): void
+    {
+        // QA, 16.11: "what is your return policy?" answered "We also offer exchanges within 60 days." alone: the same
+        // question's answer of an earlier opening, hidden behind the dashed line, was sent as told
+        $this->assertSame(['shipping?'], self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'what is your return policy?', answer: 'Returns within 30 days.', prev: true }, { id: 'b', kind: 'answer', q: 'shipping?', answer: 'Shipping takes 3 days.' }, { id: 'c', kind: 'answer', q: 'now', loading: true }]; return T.toldOnScreen('c').map(function (x) { return x.q; }); })()"));
+    }
+
+    public function test_the_exact_match_is_shown_once_and_a_word_chip_starts_with_a_capital(): void
+    {
+        $html = self::drawer("(function () { var x = turn('Gold Ring', [8], {}); x.single = '8'; return T.resultsHtml(x); })()");
+        $this->assertSame(1, substr_count($html, 'ls-exact__tag'));
+        $this->assertSame(0, substr_count($html, 'class="ls-card'), 'the exact match, not again as a card in a grid under it');
+        $this->assertStringNotContainsString('ls-grid', $html);
+        $this->assertSame(['Boots', 'נעליים', 'Old skool'], self::drawer("[T.capital('boots'), T.capital('נעליים'), T.capital('old skool')]"));
+    }
+
     public function test_a_tag_all_in_capitals_or_small_letters_is_shown_in_title_case_and_a_brand_as_it_is(): void
     {
         $this->assertSame(['Sterling Silver', 'Mens Bracelets', 'Big-Bold', 'APMA Accepted', 'VANS', 'צמידים'], self::drawer(

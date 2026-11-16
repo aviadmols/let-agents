@@ -364,7 +364,7 @@
     if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
     sizesInOrder(fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED)).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(chipText(f, v), false, 'f:' + code, turn.id, false, swatch(f, v)); });
     // the store's words close to what was typed, offered to choose (a chosen one is in the row under it)
-    Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(c.suggest[k].label, false, 'g:' + k, turn.id, false); } });
+    Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(capital(c.suggest[k].label), false, 'g:' + k, turn.id, false); } });
     return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }
   // its count in brackets, smaller: "38 (41)", never "38 41" read as a range of sizes (Vans QA, 16.11)
@@ -722,6 +722,10 @@
     if (turn.single && rec(turn.single)) {
       var s = rec(turn.single);
       html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku && turn.singleBy === 'sku' ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
+      // the product of the exact match once: not again in the grid under it ("1 product" twice: QA, 16.11); alone, no grid
+      var one = String(pid(s.id));
+      list = list.filter(function (r) { return String(pid(r.id)) !== one; });
+      if (!list.length && total) { return html + (off('ask') || turn.askShown ? '' : askSmall(askFind(turn.q))); }
     }
     // no product, and articles or pages found: those, with the quiet way to ask under them, never "nothing found" over
     // what was found (Profimex, 16.11: 49 posts for "השקעה בנדל״ן", the drawer showed only the card that asks the AI)

@@ -77,6 +77,13 @@ final class SearchCatalog
     /** Words a search does not know, read as the store's word they mean (search.word_meanings), at most. */
     private const NEAR_WORDS = 2;
 
+    /**
+     * ...and in the store's other alphabet, at most: a search typed whole in it is read whole ("vintage cameo pendant" in a
+     * Hebrew store read two of its three words, and showed 1,313 pieces for the two cameo pendants: Rocks QA, 16.11). Each
+     * word is asked once, at a pause, and kept.
+     */
+    private const FOREIGN_WORDS = 4;
+
     /** A search that found nothing is tried again without one word, this many words at most (loosened()). */
     private const LOOSE_TRIES = 3;
 
@@ -603,7 +610,7 @@ final class SearchCatalog
             $foreign = $reads ? HebrewSearch::foreignWords($query, (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he')) : [];
             $toRead = array_values(array_unique([...$unknown, ...$foreign]));
             if ($toRead !== [] && $reads) {
-                foreach (array_slice($toRead, 0, self::NEAR_WORDS) as $word) {
+                foreach (array_slice($toRead, 0, $foreign !== [] ? self::FOREIGN_WORDS : self::NEAR_WORDS) as $word) {
                     $term = app(WordMeanings::class)->read($shopId, $index, HebrewSearch::withFinals((string) $word));
                     if ($term !== null) {
                         $nearWords[(string) $word] = $term;

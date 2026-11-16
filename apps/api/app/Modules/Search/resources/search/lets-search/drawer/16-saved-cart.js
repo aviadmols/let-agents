@@ -218,7 +218,8 @@
     markAdded(id);
     // a card in a grid of cards: said in a toast, never a box that makes this card taller than its row (Vans QA, 16.11)
     var box = afterBox(id, btn);
-    if (box && box.closest('.ls-grid .ls-card')) { toast(CFG.demo ? t('demoAdded') : (LANG === 'he' ? 'נוסף לעגלה שלכם' : 'Added to your cart')); return; }
+    // (and the exact match's card, as the grid under it says it: QA, 16.11)
+    if (box && box.closest('.ls-grid .ls-card, .ls-exact')) { toast(CFG.demo ? t('demoAdded') : (LANG === 'he' ? 'נוסף לעגלה שלכם' : 'Added to your cart')); return; }
     if (!box) { return; }
     // a demo says it is one: added, as a store would show it, with no cart to go to
     box.innerHTML = CFG.demo ? '<div class="ls-added ls-focus-in">' + icon('cart', 'ls-icon--sm') + '<span style="flex:1">' + esc(t('demoAdded')) + '</span></div>'

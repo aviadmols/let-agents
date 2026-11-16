@@ -10,14 +10,21 @@
   // making it bigger or smaller ("אפשר להגדיל למידה 59?"): on a product's page, that product; how far depends on it (Rocks
   // 15.11: asked in the search box it went as the store's question, without the ring, and a general answer came back)
   var RESIZES_IT = /(^|[^֐-׿a-z])[ול]?(להגדיל|להגדל|להקטין|להקטנ|הגדלה|הגדלת|הקטנה|הקטנת|התאמת\s+מידה|שינוי\s+מידה|resiz)/i;
+  // the last three answers on screen, but this one: what the shopper was already told
+  function toldOnScreen(id) {
+    return S.turns.filter(function (x) { return x.kind === 'answer' && !x.prev && x.id !== id && x.answer; }).slice(-3)
+      .map(function (x) { return { q: String(x.q || '').slice(0, 300), a: String(x.answer || '').slice(0, 1200) }; });
+  }
   function askTurn(q, extra, about, mark) {
     if (about && S.ctx && (LIKE_THIS.test(q) || OTHER_COLOUR.test(q))) { similarTurn(S.ctx, null, null, OTHER_COLOUR.test(q), q); return; }
     var prev = S.turns.slice().reverse().filter(function (x) { return x.kind === 'results' && x.ids; })[0];
     // a question asked right after an answer, in the box or by a chip, goes on the same conversation, as a reply does
     // ("האם אפשר להחליף או לשדרג?" after "יש לי תכשיט שנרכש לפני 4 שנים", Rocks 12.11): the server reads it with what
     // was asked and answered before. A search in between starts a new one.
+    // only a conversation on screen: one behind the dashed line ("load the previous conversation") is not gone on with
+    // (QA, 16.11: "what is your return policy?" answered as the rest of a conversation of the day before, "We also...")
     var last = S.turns[S.turns.length - 1];
-    var lastSaid = last && last.kind === 'answer' && !last.loading ? String(last.answer || last.said || last.notFound || '') : '';
+    var lastSaid = last && !last.prev && last.kind === 'answer' && !last.loading ? String(last.answer || last.said || last.notFound || '') : '';
     if (!(extra && extra.thread) && lastSaid) {
       var goesOn = (last.thread || []).concat([{ q: String(last.q || '').slice(0, 300), a: lastSaid.slice(0, 1200) }]).slice(-3);
       extra = Object.assign({}, extra || {}, { thread: goesOn, previous: [] });
@@ -68,15 +75,17 @@
     // what this visit's answers already told the shopper, for a question of its own: the server leaves it out of the
     // answer (never told twice in one visit, Rocks 12.11); one on the same conversation carries the conversation instead
     if (!(extra && extra.thread)) {
-      var said = S.turns.filter(function (x) { return x.kind === 'answer' && x.id !== turn.id && x.answer; }).slice(-3)
-        .map(function (x) { return { q: String(x.q || '').slice(0, 300), a: String(x.answer || '').slice(0, 1200) }; });
+      // what the shopper sees now: answers hidden behind the dashed line are not "already told" (the same QA: the 30 days,
+      // the return shipping and the refund were left out as told, in turns the shopper did not see)
+      var said = toldOnScreen(turn.id);
       if (said.length) { body.said = said; }
     }
     visitStep('ask', { label: String(q).slice(0, 200) });
     // The same question again in this visit is answered from what this browser kept (Tomer's ask card, 8.11): no second
     // call to the AI. Only answers that answered are kept, by the question, the product it is about and the products it
     // was asked over ("מה הכי זול?" after another search is another question); a reply in a conversation is never kept.
-    var keepKey = extra ? null : [body.page ? 'page' : '', (body.products || []).slice(0, 12).join(','), (body.previous || []).join(','), String(q).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?؟.!]+$/, '')].join('|');
+    // (nor one written around what was already told: it is no answer to the question on its own)
+    var keepKey = extra || body.said ? null : [body.page ? 'page' : '', (body.products || []).slice(0, 12).join(','), (body.previous || []).join(','), String(q).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?؟.!]+$/, '')].join('|');
     var kept = keepKey ? (store('session', 'ls_answers') || {}) : {};
     (keepKey && kept[keepKey] ? Promise.resolve({ ok: true, body: kept[keepKey] }) : again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})), wait: 90000 }); }).then(function (r) {
       var d0 = r.ok && r.body ? (r.body.data || r.body) : null;

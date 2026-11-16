@@ -31,6 +31,6 @@ ctx.window = { document: ctx.document, navigator: ctx.navigator, location: ctx.l
 ctx.window.window = ctx.window;
 vm.createContext(ctx);
 vm.runInContext(engine, ctx);
-vm.runInContext('(function () {' + stub + parts + '\n;window.T = { S: S, C: C, filtered: filtered, wouldCounts: wouldCounts, facetChips: facetChips, niceLabel: niceLabel, plainlySays: plainlySays, sized: sized, handsOver: handsOver, noteHtml: noteHtml, setCounted: setCounted, resultsHtml: resultsHtml, t: t };\n})();', ctx);
+vm.runInContext('(function () {' + stub + parts + '\n;window.T = { S: S, C: C, filtered: filtered, wouldCounts: wouldCounts, facetChips: facetChips, niceLabel: niceLabel, plainlySays: plainlySays, sized: sized, handsOver: handsOver, noteHtml: noteHtml, setCounted: setCounted, resultsHtml: resultsHtml, toldOnScreen: toldOnScreen, capital: capital, t: t };\n})();', ctx);
 ctx.T = ctx.window.T;
 process.stdout.write(JSON.stringify(vm.runInContext(expression, ctx)));

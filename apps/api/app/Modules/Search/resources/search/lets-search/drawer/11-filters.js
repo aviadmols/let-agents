@@ -419,6 +419,8 @@
   // a size alone on a chip is a bare number ("59"): it says what it is ("מידה 59"); a letter size or a colour says itself
   // a size number says it is a size ("מידה 59"); a store field says which ("מחבר: סלע מאיר", not the category of that name)
   function chipText(facet, value) { return facet && facet.k === 'variant_size' && /^\d/.test(String(value.l)) ? facet.l + ' ' + value.l : facet && /^field:/.test(facet.k) ? facet.l + ': ' + value.l : niceLabel(facet, value.l); }
+  // a word read as a chip, as the filters beside it are written: "Boots" beside "Men", never "boots" (QA, 16.11)
+  function capital(label) { var l = String(label == null ? '' : label); return /^[a-z]/.test(l) ? l.charAt(0).toUpperCase() + l.slice(1) : l; }
   // A store's tag or category written all in capitals or all in small letters ("STERLING SILVER", "mens bracelets") shown
   // in title case beside the others ("Sterling Silver"); one the store wrote in mixed case ("APMA Accepted") as it is, and
   // a brand always as it is (Jean Rachel QA, 16.11)
@@ -455,8 +457,8 @@
   function activeRow(turn) {
     var c = C(turn), pills = [];
     codesOn(c).forEach(function (code) { var x = valueOf(code); if (x && x.value) { pills.push({ key: 'f:' + code, label: chipText(x.facet, x.value), auto: !c.f[code], sw: swatch(x.facet, x.value) }); } });
-    Object.keys(c.words || {}).forEach(function (k) { pills.push({ key: 'w:' + k, label: c.words[k].label, auto: true }); });
-    Object.keys(c.picked || {}).forEach(function (k) { pills.push({ key: 'g:' + k, label: c.picked[k].label, auto: false }); });
+    Object.keys(c.words || {}).forEach(function (k) { pills.push({ key: 'w:' + k, label: capital(c.words[k].label), auto: true }); });
+    Object.keys(c.picked || {}).forEach(function (k) { pills.push({ key: 'g:' + k, label: capital(c.picked[k].label), auto: false }); });
     if (onStock(c)) { pills.push({ key: 'stock', label: t('inStock'), auto: !c.stock && !!c.saidStock }); }
     if (onSale(c)) { pills.push({ key: 'sale', label: t('onSale'), auto: !c.sale }); }
     if (!pills.length) { return ''; }

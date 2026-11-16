@@ -62,9 +62,10 @@
     }
   }
   setInterval(function () { learnFlush(false); }, 4000);
-  // the visit's steps go together, every half minute, and whatever is left when the page is hidden or left: the page's
-  // first step once, soon after it opens (visitPage), not a request every few seconds (QA, 16.11: nine in a short visit)
-  setInterval(function () { visitFlush(false); }, 30000);
+  // the visit's steps go together: the page's first step once, soon after it opens (visitPage), the rest when the page
+  // is hidden or left (or twenty of them, or five minutes on one page), never a request every few seconds (QA, 16.11:
+  // nine in a short visit, then eight with a send every half minute)
+  setInterval(function () { visitFlush(false); }, 300000);
   doc.addEventListener('visibilitychange', function () { if (doc.visibilityState === 'hidden') { learnFlush(true); visitFlush(true); } });
   win.addEventListener('pagehide', function () { learnFlush(true); visitFlush(true); });
   // ---------------------------------------------------------------- the visit, for the shop's sessions screen
