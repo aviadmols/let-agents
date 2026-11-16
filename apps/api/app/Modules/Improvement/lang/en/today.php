@@ -20,5 +20,7 @@ return [
     'gap' => [
         'text' => 'Shoppers look for it and the store has no page about it yet.',
         'action' => 'See the idea',
+        'write' => 'Write the page with AI',
+        'writing' => 'Writing the page. In a few minutes it will wait for you in Suggestions, to read and approve.',
     ],
 ];

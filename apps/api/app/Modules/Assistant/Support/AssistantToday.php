@@ -4,6 +4,7 @@ namespace App\Modules\Assistant\Support;
 
 use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Contracts\TodayImprovements;
+use App\Modules\Assistant\Actions\TeamAnswers;
 use App\Modules\Assistant\Filament\Merchant\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -45,12 +46,28 @@ final class AssistantToday implements TodayImprovements
             pictures: $answer->product_id !== null && isset($pictures[$answer->product_id]) ? [(string) $pictures[$answer->product_id]] : [],
             impact: (int) $answer->asked_count,
             kind: 'question',
+            // answered where it waits, in the side panel, as the questions screen answers it (as Aviad asked, 16.11)
+            suggestion: ['type' => 'write'],
+            editable: true,
         ))->all();
     }
 
+    /** The owner's answer, written where the question waits: shown to the next shopper, as the questions screen saves it. */
     public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
     {
-        return null;
+        if (! str_starts_with($key, 'question:')) {
+            return null;
+        }
+        $answer = AssistantAnswer::query()->whereKey(substr($key, 9))->first();
+        if ($answer === null) {
+            return null;
+        }
+
+        return match (app(TeamAnswers::class)->answer($answer, (string) $text)) {
+            'saved' => __('assistant::today.open.done'),
+            'marked' => __('assistant::ui.questions.fill_marked'),
+            default => __('assistant::today.open.short'),
+        };
     }
 
     /** "Not relevant": the question is hidden, as the questions screen hides one; it no longer waits. */

@@ -38,6 +38,16 @@ return [
         'more_products' => '{1} And 1 more product.|[2,*] And :n more products.',
     ],
     'typed' => ['typed' => 'What exactly they typed', 'asked' => 'How they asked'],
+    // the side panel a card opens in: everything about it, and what to do, without leaving the list
+    'panel' => [
+        'close' => 'Close',
+        'why' => 'Why it matters',
+        'touches' => 'How much it touches',
+        'answer' => 'Your answer',
+        'answer_hint' => 'Write it as you would answer a customer. Everyone who asks from now on gets it.',
+        'publish' => 'Publish the answer',
+        'full' => 'Open the full screen',
+    ],
     'not_relevant' => 'Not relevant',
     'dismissed' => 'Done. We won’t suggest it again.',
     'waiting' => [

@@ -44,6 +44,9 @@ final class Improvements extends Page
     /** @var array<string, string> the drafts as the owner edits them, by the fix's key hashed (a key has ":" Livewire reads as a path) */
     public array $drafts = [];
 
+    /** The fix open in the side panel, by its key: a card that is more than a tap opens there, never on another screen. */
+    public ?string $panel = null;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
     protected static string|UnitEnum|null $navigationGroup = null;
@@ -121,6 +124,39 @@ final class Improvements extends Page
         return substr(sha1($key), 0, 16);
     }
 
+    /**
+     * "See the idea", "Write the answer": the card opens in a side panel with all of it (why, how many, what shoppers typed,
+     * the suggestion) and what to do there, the list behind it as it was (as Aviad asked, 16.11). The full screen stays a
+     * link inside it.
+     */
+    public function openPanel(string $key): void
+    {
+        $fix = $this->panelFix($key);
+        $this->panel = $fix === null ? null : $key;
+        // its answer box bound from the start: the drafted answer, else empty
+        if ($fix !== null && $fix->editable) {
+            $this->drafts[self::draftKey($key)] ??= (string) ($fix->suggestion['answer'] ?? '');
+        }
+    }
+
+    public function closePanel(): void
+    {
+        $this->panel = null;
+    }
+
+    /** The fix the side panel shows, while it still waits; null when none or gone. */
+    public function panelFix(?string $key = null): ?TodayFix
+    {
+        $key ??= $this->panel;
+        foreach ($key === null ? [] : $this->fixes() as $fix) {
+            if ($fix->key === $key) {
+                return $fix;
+            }
+        }
+
+        return null;
+    }
+
     /** The one tap: approved as the owner left the suggestion (an edited answer too); the card leaves, the next one moves up. */
     public function approve(string $key): void
     {
@@ -128,6 +164,10 @@ final class Improvements extends Page
         $said = app(Today::class)->approve($this->shop(), $key, Auth::id(), is_string($text) && trim($text) !== '' ? trim($text) : null);
         unset($this->drafts[self::draftKey($key)]);
         $this->fixesCache = null;
+        // done there: the side panel closes on the list
+        if ($this->panel === $key) {
+            $this->panel = null;
+        }
         $said === null
             ? Notification::make()->warning()->title(__('admin::today.todo.gone'))->send()
             : Notification::make()->success()->title($said)->send();
@@ -138,6 +178,7 @@ final class Improvements extends Page
     {
         app(Today::class)->dismiss($this->shop(), $key, Auth::id());
         $this->fixesCache = null;
+        $this->panel = $this->panel === $key ? null : $this->panel;
         Notification::make()->success()->title(__('admin::improvements.dismissed'))->send();
     }
 
@@ -146,6 +187,7 @@ final class Improvements extends Page
     {
         app(Today::class)->later($this->shop(), $key, Auth::id());
         $this->fixesCache = null;
+        $this->panel = $this->panel === $key ? null : $this->panel;
     }
 
     /** Undo a fix Lets made on its own. */

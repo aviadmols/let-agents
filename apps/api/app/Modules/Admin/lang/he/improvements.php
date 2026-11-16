@@ -38,6 +38,16 @@ return [
         'more_products' => '{1} ועוד מוצר אחד.|[2,*] ועוד :n מוצרים.',
     ],
     'typed' => ['typed' => 'מה בדיוק הקלידו', 'asked' => 'איך שאלו'],
+    // the side panel a card opens in (as Aviad asked, 16.11): everything about it, and what to do, without leaving the list
+    'panel' => [
+        'close' => 'סגירה',
+        'why' => 'למה זה חשוב',
+        'touches' => 'כמה זה נוגע',
+        'answer' => 'התשובה שלכם',
+        'answer_hint' => 'כתבו את התשובה כמו שהייתם עונים ללקוח. היא תופיע לכל מי שישאל מעכשיו.',
+        'publish' => 'לפרסם את התשובה',
+        'full' => 'למסך המלא',
+    ],
     'not_relevant' => 'לא רלוונטי',
     'dismissed' => 'בוצע. לא נציע את זה שוב.',
     'waiting' => [

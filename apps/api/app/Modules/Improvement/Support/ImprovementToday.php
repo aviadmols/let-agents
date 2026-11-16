@@ -2,15 +2,19 @@
 
 namespace App\Modules\Improvement\Support;
 
+use App\Core\Facades\Settings;
 use App\Core\Localization\Money;
 use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Improvement\Actions\DecideProposal;
 use App\Modules\Improvement\Filament\Merchant\Pages\SiteSuggestions;
+use App\Modules\Improvement\Jobs\DraftPostJob;
+use App\Modules\Improvement\Models\ImprovementPostWrite;
 use App\Modules\Improvement\Models\ImprovementProposal;
 use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -70,7 +74,8 @@ final class ImprovementToday implements TodayImprovements
                     // a page is more than a tap: it waits behind a quick fix of the same weight
                     impact: intdiv($demand, 2),
                     kind: 'idea',
-                    suggestion: ['type' => 'idea'],
+                    // its side panel's action: the page written in the background, to approve in Suggestions
+                    suggestion: ['type' => 'idea', 'write' => __('improvement::today.gap.write')],
                     typed: $typed,
                 ),
             };
@@ -82,6 +87,11 @@ final class ImprovementToday implements TodayImprovements
     public function approve(Shop $shop, string $key, ?int $userId, ?string $text = null): ?string
     {
         $proposal = $this->proposal($key);
+        // a page the store lacks: written in the background, as the suggestions screen asks for it, and waits there to be
+        // read and approved (from the side panel the idea opens in: as Aviad asked, 16.11)
+        if ($proposal !== null && $proposal->kind === ImprovementProposal::CONTENT_GAP) {
+            return $this->writePage($shop, $proposal);
+        }
         if ($proposal === null || ! in_array($proposal->kind, [ImprovementProposal::SYNONYM, ImprovementProposal::FAQ], true)) {
             return null;
         }
@@ -110,6 +120,21 @@ final class ImprovementToday implements TodayImprovements
     public function wins(Shop $shop, int $limit): array
     {
         return [];
+    }
+
+    /** The page drafted by the writer in the background, within the month's pages, once at a time. */
+    private function writePage(Shop $shop, ImprovementProposal $proposal): string
+    {
+        if (Cache::has(DraftPostJob::WRITING.$proposal->id)) {
+            return __('improvement::today.gap.writing');
+        }
+        if ((int) Settings::get('improvement.posts_per_month', (string) $shop->id) - ImprovementPostWrite::thisMonth() <= 0) {
+            return __('improvement::ui.post.cap_reached');
+        }
+        Cache::put(DraftPostJob::WRITING.$proposal->id, now()->timestamp, now()->addSeconds(DraftPostJob::WRITING_SECONDS));
+        DraftPostJob::dispatch((string) $shop->id, (string) $proposal->id);
+
+        return __('improvement::today.gap.writing');
     }
 
     private function proposal(string $key): ?ImprovementProposal

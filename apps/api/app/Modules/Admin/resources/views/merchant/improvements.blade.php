@@ -113,7 +113,8 @@
                                         @if ($fix->oneTap)
                                             <button type="button" class="lp-d-btn lp-d-btn-ink" wire:click="approve(@js($fix->key))" wire:loading.attr="disabled" wire:target="approve"><span>{{ $fix->action }}</span></button>
                                         @elseif ($fix->url)
-                                            <a class="lp-d-btn lp-d-btn-ink" href="{{ $fix->url }}"><span>{{ $fix->action }}</span></a>
+                                            {{-- more than a tap: it opens in the side panel, the list stays behind it (as Aviad asked, 16.11) --}}
+                                            <button type="button" class="lp-d-btn lp-d-btn-ink" wire:click="openPanel(@js($fix->key))" data-open-panel="{{ $fix->key }}"><span>{{ $fix->action }}</span></button>
                                         @endif
                                         @if ($fix->secondary)<a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $fix->secondary['url'] }}">{{ $fix->secondary['label'] }}</a>@endif
                                         <span class="lp-d-spacer"></span>
@@ -188,5 +189,93 @@
                 </section>
             </aside>
         </div>
+
+        {{-- The side panel a card opens in: all of it, and what to do there, the list behind it as it was --}}
+        @if ($open = $this->panelFix())
+            @php($s = $open->suggestion)
+            @php($dk = \App\Modules\Admin\Filament\Merchant\Pages\Improvements::draftKey($open->key))
+            @php($writes = $open->kind === 'question' && in_array($s['type'] ?? 'write', ['write', 'answer'], true))
+            <div class="lp-imp-panel" wire:key="panel-{{ $dk }}" data-panel="{{ $open->key }}" x-data x-on:keydown.escape.window="$wire.closePanel()">
+                <button type="button" class="lp-imp-panel-scrim" wire:click="closePanel" aria-label="{{ $t('panel.close') }}" tabindex="-1"></button>
+                <aside class="lp-imp-panel-box" role="dialog" aria-modal="true" aria-labelledby="lp-imp-panel-title" x-init="$nextTick(() => $el.focus())" tabindex="-1">
+                    <header class="lp-imp-panel-head">
+                        <span class="lp-d-chip lp-d-chip-{{ $chips[$open->chip] ?? 'quiet' }}">{{ __('admin::today.chips.'.$open->chip) }}</span>
+                        <button type="button" class="lp-imp-panel-x" wire:click="closePanel" aria-label="{{ $t('panel.close') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                    </header>
+                    <div class="lp-imp-panel-body">
+                        <h2 class="lp-imp-panel-title" id="lp-imp-panel-title" dir="auto">{{ $open->title }}</h2>
+                        @if ($open->count > 0)
+                            <div class="lp-imp-panel-count"><b class="lp-d-num">{{ number_format($open->count) }}</b> {{ trans_choice('admin::improvements.units.'.$open->unit, $open->count) }}</div>
+                        @endif
+                        <section class="lp-imp-panel-sec">
+                            <h3>{{ $t('panel.why') }}</h3>
+                            <p>{{ $open->text }}</p>
+                        </section>
+                        @if ($open->pictures !== [])
+                            <div class="lp-imp-panel-pics">@foreach ($open->pictures as $pic)<img src="{{ $pic }}" alt="" loading="lazy" onerror="this.remove()">@endforeach</div>
+                        @endif
+                        @if ($open->typed !== [])
+                            <section class="lp-imp-panel-sec">
+                                <h3>{{ $open->kind === 'question' ? $t('typed.asked') : $t('typed.typed') }}</h3>
+                                <div class="lp-d-typed">@foreach ($open->typed as $ty)<span dir="auto">{{ $ty['text'] }} <b class="lp-d-num">{{ number_format($ty['n']) }}</b></span>@endforeach</div>
+                            </section>
+                        @endif
+
+                        @if ($writes)
+                            {{-- the answer written here, published as written: every next shopper who asks gets it --}}
+                            <section class="lp-imp-panel-sec" x-data="{ text: $wire.entangle('drafts.{{ $dk }}') }">
+                                <h3>{{ $t('panel.answer') }}</h3>
+                                <textarea class="lp-d-answer" rows="6" dir="auto" x-model="text" aria-label="{{ $t('panel.answer') }}"></textarea>
+                                <p class="lp-imp-panel-hint">{{ $t('panel.answer_hint') }}</p>
+                                <div class="lp-imp-panel-do">
+                                    <button type="button" class="lp-d-btn lp-d-btn-ink" wire:click="approve(@js($open->key))" wire:loading.attr="disabled" wire:target="approve" x-bind:disabled="! (text || '').trim()"><span>{{ $t('panel.publish') }}</span></button>
+                                </div>
+                            </section>
+                        @elseif (($s['type'] ?? null) === 'idea' && ($s['write'] ?? '') !== '')
+                            <div class="lp-imp-panel-do">
+                                <button type="button" class="lp-d-btn lp-d-btn-ink" wire:click="approve(@js($open->key))" wire:loading.attr="disabled" wire:target="approve"><span>{{ $s['write'] }}</span></button>
+                            </div>
+                        @endif
+                    </div>
+                    <footer class="lp-imp-panel-foot">
+                        @if ($open->url)<a class="lp-d-btn lp-d-btn-line lp-d-btn-sm" href="{{ $open->url }}">{{ $t('panel.full') }}</a>@endif
+                        <span class="lp-d-spacer"></span>
+                        @if ($open->kind === 'idea')
+                            <button type="button" class="lp-d-ghost" wire:click="later(@js($open->key))">{{ __('admin::today.todo.later') }}</button>
+                        @else
+                            <button type="button" class="lp-d-ghost" wire:click="dismiss(@js($open->key))">{{ $t('not_relevant') }}</button>
+                        @endif
+                    </footer>
+                </aside>
+            </div>
+        @endif
     </div>
+
+    {{-- the side panel's own look, here with it (the merchant stylesheet stays as it is) --}}
+    <style>
+        .fi-panel-merchant .lp-imp-panel { position: fixed; inset: 0; z-index: 60; }
+        .fi-panel-merchant .lp-imp-panel-scrim { position: absolute; inset: 0; width: 100%; border: 0; background: rgb(11 11 12 / .32); animation: lp-imp-fade .24s ease both; cursor: default; }
+        .fi-panel-merchant .lp-imp-panel-box { position: absolute; inset-block: 0; inset-inline-end: 0; width: min(520px, 100%); display: flex; flex-direction: column; background: var(--lp-d-ground, #f6f6f4); color: var(--lp-d-ink, #111); box-shadow: -18px 0 48px -16px rgb(0 0 0 / .28); outline: none; animation: lp-imp-in-ltr .34s var(--lp-d-ease, cubic-bezier(.32,.72,0,1)) both; }
+        [dir="rtl"] .fi-panel-merchant .lp-imp-panel-box, .fi-panel-merchant[dir="rtl"] .lp-imp-panel-box { animation-name: lp-imp-in-rtl; box-shadow: 18px 0 48px -16px rgb(0 0 0 / .28); }
+        .fi-panel-merchant .lp-imp-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px 8px; }
+        .fi-panel-merchant .lp-imp-panel-x { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--lp-d-card, #fff); border: 0; cursor: pointer; }
+        .fi-panel-merchant .lp-imp-panel-x svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+        .fi-panel-merchant .lp-imp-panel-body { flex: 1; min-height: 0; overflow: auto; padding: 6px 22px 22px; display: grid; gap: 18px; align-content: start; }
+        .fi-panel-merchant .lp-imp-panel-title { font-size: 24px; line-height: 1.3; font-weight: 600; margin: 0; }
+        .fi-panel-merchant .lp-imp-panel-count { font-size: 14px; color: var(--lp-d-muted, #666); }
+        .fi-panel-merchant .lp-imp-panel-count b { font-size: 22px; color: var(--lp-d-ink, #111); margin-inline-end: 4px; }
+        .fi-panel-merchant .lp-imp-panel-sec { display: grid; gap: 8px; background: var(--lp-d-card, #fff); border-radius: 18px; padding: 16px 18px; }
+        .fi-panel-merchant .lp-imp-panel-sec h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--lp-d-muted, #666); }
+        .fi-panel-merchant .lp-imp-panel-sec p { margin: 0; font-size: 15px; line-height: 1.6; }
+        .fi-panel-merchant .lp-imp-panel-hint { font-size: 13px !important; color: var(--lp-d-muted, #666); }
+        .fi-panel-merchant .lp-imp-panel-pics { display: flex; gap: 8px; flex-wrap: wrap; }
+        .fi-panel-merchant .lp-imp-panel-pics img { width: 72px; height: 72px; object-fit: cover; border-radius: 12px; background: var(--lp-d-card, #fff); }
+        .fi-panel-merchant .lp-imp-panel-do { display: flex; gap: 10px; flex-wrap: wrap; }
+        .fi-panel-merchant .lp-imp-panel-do .lp-d-btn[disabled] { opacity: .45; cursor: default; }
+        .fi-panel-merchant .lp-imp-panel-foot { display: flex; align-items: center; gap: 10px; padding: 14px 22px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--lp-d-line, #e5e5e5); }
+        @keyframes lp-imp-fade { from { opacity: 0; } }
+        @keyframes lp-imp-in-ltr { from { transform: translateX(104%); } }
+        @keyframes lp-imp-in-rtl { from { transform: translateX(-104%); } }
+        @media (prefers-reduced-motion: reduce) { .fi-panel-merchant .lp-imp-panel-box, .fi-panel-merchant .lp-imp-panel-scrim { animation: none; } }
+    </style>
 </x-filament-panels::page>
