@@ -566,6 +566,31 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(2, $this->calls, 'in its language at once: no second writing');
     }
 
+    public function test_a_kept_answer_that_rests_on_product_pages_shows_those_products_as_its_cards(): void
+    {
+        // QA, 16.11: "שמלה שחורה לחתונה עד 200" recommended two dresses by name, citing their pages, and showed no card of
+        // them: the storefront filled the place with other dresses
+        $this->product('991', 'שמלת מקסי דיאנה | שחור', 'שמלה.', [], ['price' => '189.00', 'in_stock' => true]);
+        $this->product('992', 'שמלת מיני אלישיה | שחור', 'שמלה.', [], ['price' => '149.00', 'in_stock' => true]);
+        $urls = ['991' => 'https://store.test/p/diana', '992' => 'https://store.test/p/alicia'];
+        $this->inShop(fn () => collect($urls)->each(fn (string $url, string $id) => CatalogProduct::query()->where('external_id', $id)->update(['url' => $url])));
+        $this->travel(1)->minutes();
+        $question = 'איזה בורג מתאים לדק?';
+        $this->replies = [
+            ['found' => true, 'answer' => 'לדק כדאי בורג נירוסטה.', 'refs' => ['s2'], 'picks' => [['ref' => 'p1', 'why' => 'מתאים לדק']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->assertSame('model', $this->ask($question)->json('data.from'));
+        // kept, as such an answer is: no pick of its own, its products cited as its sources
+        $this->inShop(fn () => AssistantAnswer::query()->where('question_key', Question::key($question))->update(['picks' => json_encode([]),
+            'sources' => json_encode([['title' => 'שמלת מיני אלישיה | שחור', 'url' => $urls['992'], 'type' => 'product'], ['title' => 'שמלת מקסי דיאנה | שחור', 'url' => $urls['991'], 'type' => 'product']])]));
+
+        $data = $this->ask($question)->json('data');
+
+        $this->assertSame('bank', $data['from']);
+        $this->assertSame(['992', '991'], array_column($data['picks'], 'external_id'), 'the products it rests on, in the order cited');
+    }
+
     public function test_an_answer_kept_in_another_language_than_the_question_is_not_served(): void
     {
         $this->inShop(fn () => AssistantAnswer::query()->create(['shop_id' => $this->shop->id, 'question' => 'What is your return policy?', 'question_key' => Question::key('What is your return policy?'),
@@ -814,7 +839,7 @@ final class SiteQuestionTest extends TestCase
         $this->assertEqualsCanonicalizing(['טבעות עד 1,500', 'שרשראות עד 1,500', 'עגילים עד 1,500'], array_column($data['related'], 'name'));
         // a kind is offered by a shopper's word: never a store's inner code, never in another language (Miss Nori, 16.11: "PANTS עד 250")
         $readable = new \ReflectionMethod(AnswerSiteQuestion::class, 'readableKind');
-        foreach ([['SUIT-PANTS', 'מתנה עד 250', false], ['SHIRT', 'מתנה עד 250', false], ['Rings', 'מתנה עד 250', false], ['טבעות', 'מתנה עד 250', true], ['Rings', 'a gift under 250', true], ['Gift Sets', 'a gift under 250', true]] as [$name, $question, $ok]) {
+        foreach ([['SUIT-PANTS', 'מתנה עד 250', false], ['SHIRT', 'מתנה עד 250', false], ['Rings', 'מתנה עד 250', false], ['טבעות', 'מתנה עד 250', true], ['Rings', 'a gift under 250', true], ['Gift Sets', 'a gift under 250', true], ['T-Shirts', 'a gift under 250', true], ['NEWYEAR26', 'שמלה שחורה לחתונה', false], ['KIDSDRESS', 'שמלה שחורה לחתונה', false], ['01/07/2025', 'שמלה שחורה לחתונה', false], ['kids_dress', 'a dress', false], ['שמלות ערב', 'שמלה שחורה לחתונה', true]] as [$name, $question, $ok]) {
             $this->assertSame($ok, $readable->invoke(null, $name, $question), $name);
         }
 

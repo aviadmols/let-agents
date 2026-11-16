@@ -747,7 +747,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'answer' => $saved->source === 'team' ? self::endsWhole((string) $saved->answer) : StoreVoice::plural(self::endsWhole((string) $saved->answer)),
                 'from' => 'bank',
                 'sources' => (array) $saved->sources,
-                'picks' => $this->present((array) $saved->picks),
+                'picks' => $this->present((array) $saved->picks ?: self::picksFromSources((array) $saved->sources)),
                 'answer_id' => $saved->id,
             ] + $this->describedFor((array) ($saved->flags['names'] ?? []), (array) $saved->picks);
         }
@@ -2167,7 +2167,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 $result = $refusal === null
-                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored) + $this->wishRows($stored, $corrected ?? $question, $locale)
+                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored ?: self::picksFromSources($sources)), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored) + $this->wishRows($stored, $corrected ?? $question, $locale)
                         + ($choices === [] ? [] : ['choices' => $choices])
                     : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
                         : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
@@ -3837,6 +3837,32 @@ final class AnswerSiteQuestion implements TriesQuestions
         return implode(' ', $kept);
     }
 
+    /**
+     * The products an answer rests on, as its picks, where it picked none: an answer that recommends two dresses by name and
+     * cites their pages showed no card of them, and the storefront filled the place with what the question's words found,
+     * other dresses (QA, 16.11: "שמלה שחורה לחתונה עד 200"). By their pages' addresses, in the order cited.
+     *
+     * @param  list<array<string, mixed>>  $sources
+     * @return list<array{external_id: string, title: string, why: string}>
+     */
+    private static function picksFromSources(array $sources): array
+    {
+        $urls = array_values(array_unique(array_filter(array_map(fn ($s): string => is_array($s) && ($s['type'] ?? null) === 'product' ? (string) ($s['url'] ?? '') : '', $sources))));
+        if ($urls === []) {
+            return [];
+        }
+        $products = CatalogProduct::query()->whereNull('removed_at')->whereIn('url', $urls)->get(['external_id', 'title', 'url'])->keyBy('url');
+        $picks = [];
+        foreach ($urls as $url) {
+            $product = $products->get($url);
+            if ($product !== null) {
+                $picks[] = ['external_id' => (string) $product->external_id, 'title' => (string) $product->title, 'why' => ''];
+            }
+        }
+
+        return array_slice($picks, 0, self::MAX_PICKS);
+    }
+
     /** A gift card or a voucher by its name: money to spend in the store, not merchandise. */
     private static function giftCard(string $title): bool
     {
@@ -3859,7 +3885,8 @@ final class AnswerSiteQuestion implements TriesQuestions
     private static function readableKind(string $name, string $question): bool
     {
         $name = trim($name);
-        if ($name === '' || mb_strlen($name) > 40 || preg_match('/^[A-Z0-9 _\-\/&.]+$/', $name) === 1 || preg_match('/[_\-\/]/', $name) === 1 && preg_match('/\s/', $name) !== 1) {
+        // a code: all capitals ("SUIT-PANTS", "NEWYEAR26"), an underscore, or a date ("01/07/2025"); "T-Shirts" is a word
+        if ($name === '' || mb_strlen($name) > 40 || preg_match('/^[A-Z0-9 _\-\/&.]+$/', $name) === 1 || str_contains($name, '_') || preg_match('/\d{1,4}[\/.\-]\d{1,2}/', $name) === 1) {
             return false;
         }
 
@@ -4442,11 +4469,13 @@ final class AnswerSiteQuestion implements TriesQuestions
             // a name a shopper reads, here too: never a collection's address or a menu's path
             $names = array_column(RelatedGroups::chips(array_map(fn (string $name): array => ['kind' => 'tag', 'id' => $name, 'name' => $name, 'count' => 0], $names)), 'name');
 
-            return array_map(fn (string $name): array => ['name' => $name], array_slice($names, 0, RelatedGroups::MAX));
+            return array_map(fn (string $name): array => ['name' => $name], array_slice(array_values(array_filter($names, fn (string $n): bool => self::readableKind($n, $question))), 0, RelatedGroups::MAX));
         }
 
+        // only names a shopper reads: never the store's inner tags (QA, 16.11: "NEWYEAR26", "KIDSDRESS", "01/07/2025")
         return self::aboutProducts($question)
-            ? array_map(fn (array $g): array => ['name' => $g['name']], RelatedGroups::chips(RelatedGroups::for($shopId, $question)['groups']))
+            ? array_values(array_filter(array_map(fn (array $g): array => ['name' => $g['name']], RelatedGroups::chips(RelatedGroups::for($shopId, $question)['groups'])),
+                fn (array $g): bool => self::readableKind((string) $g['name'], $question)))
             : [];
     }
 

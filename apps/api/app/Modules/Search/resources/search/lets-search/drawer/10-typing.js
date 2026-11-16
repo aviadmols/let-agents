@@ -215,7 +215,8 @@
   // on it as the selected option); nothing is asked on its own, so no search spends anything. act: the button's data-*.
   function askCard(q, active, act) {
     return '<div class="ls-askcard"><p class="ls-askcard__kicker"><span class="ls-askcard__mark">' + mark() + '</span>' + esc(t('askKicker')) + '</p>' +
-      '<p class="ls-askcard__q" dir="auto">“' + esc(String(q || '').replace(/[“”"]/g, '')) + '”</p>' +
+      // the words in quotes that read right in their direction: curly ones turn about in Hebrew (QA, 16.11)
+      '<p class="ls-askcard__q" dir="auto">' + (/[֐-׿]/.test(String(q || '')) ? '"' : '“') + esc(String(q || '').replace(/[“”"]/g, '')) + (/[֐-׿]/.test(String(q || '')) ? '"' : '”') + '</p>' +
       '<button class="ls-askcard__btn' + (active ? ' is-active' : '') + '" data-opt ' + act + '><span>' + esc(t('askBtn')) + '</span></button>' +
       '<p class="ls-askcard__sub">' + esc(t('askSub', { name: CFG.assistant })) + '</p></div>';
   }
