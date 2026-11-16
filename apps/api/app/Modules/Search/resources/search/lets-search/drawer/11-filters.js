@@ -310,17 +310,19 @@
       // part typed and no product says it whole: the word it starts ("לוג": "לוגו"), named as the store says it
       var whole = !says && !not && i === words.length - 1 ? completed(all, n) : null;
       // a word the store does not write, read by meaning as one it does (the server's near: "מפוספס" is "פסים")
-      var near = !says && !whole ? nearTerm(turn, n) : null;
+      // ...or a word in the store's other language that a few products say all the same (their pictures' tags read in it):
+      // what says either ("טבעת" in an English store is every "ring", not the seven tagged in Hebrew: Jean Rachel, 16.11)
+      var near = !whole ? nearTerm(turn, n) : null, alsoForms = [];
       if (near) {
         var nf = wordForms(E.normalize(near));
-        if (all.some(function (r) { return saysWord(r, nf); })) { whole = near; }
+        if (all.some(function (r) { return saysWord(r, nf); })) { whole = near; alsoForms = says ? forms : []; }
       }
       // typed with a slip: the store's word the search read it as ("ראישי": "ריישי", Mycolivia 26.10)
       var slip = !says && !whole ? typoOf(n) : null;
       if (slip && all.some(function (r) { return saysWord(r, wordForms(slip)); })) { whole = slip; }
       if (!says && !whole) { return; }
       if (not && says === all.length) { return; }
-      var useForms = whole ? wordForms(whole) : forms, share = storeShare(useForms);
+      var useForms = whole ? wordForms(whole).concat(alsoForms) : forms, share = storeShare(useForms);
       // the store's subject, said by most of what it sells ("פטריה" in a store of mushroom formulas): it tells nothing
       // apart, and as a chip it narrowed "פטריה לכשב וריכוז" to the products whose words happen to say it
       if (!not && share > SUBJECT_SHARE) { return; }

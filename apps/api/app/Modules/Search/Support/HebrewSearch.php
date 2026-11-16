@@ -172,6 +172,23 @@ final class HebrewSearch
         return $out;
     }
 
+    /**
+     * The words of a query written in another alphabet than the store's language: Hebrew in an English store, English in
+     * a Hebrew one. A few products may say them all the same (a picture's tags read in the other language, a title's
+     * English word), and the store's own word for them is read (WordMeanings) so the search finds what the store calls
+     * it too: Jean Rachel, 16.11, "טבעת" found the eight rings tagged in Hebrew of 180; Rocks, "earrings" six of hundreds.
+     * The same skips as unknownWords.
+     *
+     * @return list<string>
+     */
+    public static function foreignWords(string $query, string $locale): array
+    {
+        $alphabet = $locale === 'he' ? '/^[a-z]+$/' : '/^[א-ת]+$/u';
+
+        return array_values(array_filter(explode(' ', self::normalize($query)), fn (string $word): bool => mb_strlen($word) >= 3
+            && preg_match($alphabet, $word) === 1 && ! in_array($word, self::FILLER, true) && ! in_array($word, self::DESCRIBES, true) && ! in_array($word, self::GENERIC, true)));
+    }
+
     public static function aboutWords(array $index, string $query): string
     {
         $words = array_filter(explode(' ', self::normalize($query)), fn (string $w): bool => $w !== '' && ! in_array($w, self::FILLER, true));
@@ -1439,6 +1456,14 @@ final class HebrewSearch
                     $score = max($score, 0.86);
                 }
 
+                // an English word and its plural are one word ("rings" and "ring", "dresses" and "dress", "babies" and "baby"),
+                // by the language's own endings, nothing listed: Jean Rachel QA, 16.11, "rings" found the few titles saying
+                // "rings" (and earrings by meaning) where "ring" found every ring
+                if ($length >= 3 && $candidate !== $variant && preg_match('/^[a-z]+$/', $variant) === 1 && preg_match('/^[a-z]+$/', $candidate) === 1
+                    && self::singular($candidate) === self::singular($variant)) {
+                    $score = max($score, 0.85);
+                }
+
                 if ($colour !== null && self::colorOf($candidate) === $colour) {
                     $score = max($score, 0.95);
                 }
@@ -1477,6 +1502,19 @@ final class HebrewSearch
      *
      * @param  list<string>  $typed
      */
+    /** An English plural's singular by its ending: "rings" "ring", "boxes" "box", "babies" "baby"; "dress" stays. */
+    public static function singular(string $word): string
+    {
+        return match (true) {
+            strlen($word) < 4 || preg_match('/^[a-z]+$/', $word) !== 1 => $word,
+            preg_match('/[^aeiou]ies$/', $word) === 1 => substr($word, 0, -3).'y',
+            preg_match('/(ss|sh|ch|x|z)es$/', $word) === 1 => substr($word, 0, -2),
+            preg_match('/(ss|us|is)$/', $word) === 1 => $word,
+            str_ends_with($word, 's') => substr($word, 0, -1),
+            default => $word,
+        };
+    }
+
     private static function formOf(string $candidate, array $typed): bool
     {
         foreach ($typed as $word) {

@@ -86,6 +86,14 @@
     }
     return edits + (a.length - i) + (b.length - j) === 1;
   }
+  /** An English plural's singular by its ending: "rings" "ring", "boxes" "box", "babies" "baby"; "dress" stays (HebrewSearch::singular). */
+  function singular(word) {
+    if (word.length < 4 || !LATIN_WORD.test(word)) { return word; }
+    if (/[^aeiou]ies$/.test(word)) { return word.slice(0, -3) + 'y'; }
+    if (/(ss|sh|ch|x|z)es$/.test(word)) { return word.slice(0, -2); }
+    if (/(ss|us|is)$/.test(word)) { return word; }
+    return /s$/.test(word) ? word.slice(0, -1) : word;
+  }
   function skeleton(word) {
     if (!HEBREW_WORD.test(word)) {
       return word;
@@ -280,6 +288,11 @@
         // store writes as typed (the server's closeWords). Naot QA, 16.11: "blak sandels" left "blak" not on the site
         if (length >= 4 && LATIN_WORD.test(variant) && LATIN_WORD.test(candidate) && candidate !== variant && Math.abs(candidate.length - length) <= 1 && !Object.prototype.hasOwnProperty.call(index.holders, variant) && oneEditApart(variant, candidate)) {
           score = Math.max(score, 0.86);
+        }
+        // an English word and its plural are one word ("rings" and "ring", "babies" and "baby"), as the server reads them
+        // (HebrewSearch::singular). Jean Rachel QA, 16.11: "rings" found the few titles saying "rings"
+        if (length >= 3 && candidate !== variant && LATIN_WORD.test(variant) && LATIN_WORD.test(candidate) && singular(candidate) === singular(variant)) {
+          score = Math.max(score, 0.85);
         }
         if (colour !== null && colorOf(candidate) === colour) {
           score = Math.max(score, 0.95);
@@ -1363,6 +1376,7 @@
 
   return {
     normalize: normalize,
+    singular: singular,
     stem: stem,
     sound: sound,
     fromKeyboard: fromKeyboard,

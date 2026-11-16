@@ -51,6 +51,17 @@ final class WordMeanings
         if ($words === []) {
             return null;
         }
+        // "none" was read in the store's language: a store whose language changed reads its words again (Jean Rachel, 16.11:
+        // built in Hebrew, then English, its Hebrew "צמיד" kept the "none" read when the store's language was Hebrew). A
+        // Hebrew store's hash is the words' alone, as it was, so nothing it read is read again.
+        $hash = $locale === 'he' ? $hash : substr(hash('sha256', $hash.'|'.$locale), 0, 20);
+        // and the words most of its products say, a store's own word too ("shoes" in a shoe store); a store that has some
+        // reads its "none" again once
+        $subjects = array_values(array_diff(StoreWords::subjects($shopId, $index), $words));
+        if ($subjects !== []) {
+            $words = [...$subjects, ...$words];
+            $hash = substr(hash('sha256', $hash.'|'.implode('|', $subjects)), 0, 20);
+        }
         $byKey = [];
         foreach ($words as $w) {
             $byKey[HebrewSearch::normalize($w)] ??= $w;

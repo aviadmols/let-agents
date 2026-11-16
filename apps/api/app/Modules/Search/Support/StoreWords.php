@@ -35,6 +35,43 @@ final class StoreWords
         return self::$read[$key];
     }
 
+    /** @var array<string, list<string>> index key => its subject words */
+    private static array $subjects = [];
+
+    /**
+     * The words most of a store's products say, which its words leave out as telling nothing apart ("נעליים" on 156 of
+     * Vans' 300): what a shopper's word may still mean ("shoes" in Vans is "נעליים", and found nothing: 16.11). Read
+     * beside the store's words where a word is matched to one (WordMeanings), never where words are grouped.
+     *
+     * @param  array<string, mixed>  $index  the loaded index
+     * @return list<string>
+     */
+    public static function subjects(string $shopId, array $index): array
+    {
+        $key = $shopId.':'.(string) ($index['hash'] ?? '');
+        if (! isset(self::$subjects[$key])) {
+            $said = [];
+            $products = 0;
+            foreach ((array) ($index['records'] ?? []) as $item) {
+                if (! is_array($item) || ($item['t'] ?? null) !== 'product') {
+                    continue;
+                }
+                $products++;
+                $tags = array_map(fn ($tag): string => (string) (is_array($tag) ? ($tag[0] ?? '') : $tag), is_array($item['tg'] ?? null) ? $item['tg'] : [(string) ($item['tg'] ?? '')]);
+                foreach (array_unique(explode(' ', HebrewSearch::normalize((string) ($item['title'] ?? '').' '.(string) ($item['kw'] ?? '').' '.implode(' ', $tags)))) as $word) {
+                    if (mb_strlen($word) >= 3 && preg_match('/^\p{L}+$/u', $word) === 1 && ! HebrewSearch::isFiller($word)) {
+                        $said[$word] = ($said[$word] ?? 0) + 1;
+                    }
+                }
+            }
+            $most = array_filter($said, fn (int $n): bool => $n >= self::MIN_PRODUCTS && $n > max(self::MIN_PRODUCTS, $products * self::MAX_SHARE));
+            uksort($most, fn (string|int $a, string|int $b): int => [$most[$b], (string) $a] <=> [$most[$a], (string) $b]);
+            self::$subjects = [$key => array_map(fn (string|int $w): string => HebrewSearch::withFinals((string) $w), array_keys($most))];
+        }
+
+        return self::$subjects[$key];
+    }
+
     /** Rare forms read beside a store's words, at most. */
     private const RARE_MAX = 800;
 

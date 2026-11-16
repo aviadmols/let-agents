@@ -32,6 +32,7 @@ use App\Modules\Search\Support\PhotoPlacer;
 use App\Modules\Search\Support\SearchTrace;
 use App\Modules\Search\Support\SimilarWants;
 use App\Modules\Search\Support\WordMeanings;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -597,8 +598,12 @@ final class SearchCatalog
             // by a small model among the store's own words, once per word (WordMeanings): at a pause or on Enter only.
             // What says that word is found with the rest, and the word is no longer "not found".
             $nearWords = [];
-            if ($unknown !== [] && $this->readWords && Features::enabled('search.word_meanings', $shopId)) {
-                foreach (array_slice($unknown, 0, self::NEAR_WORDS) as $word) {
+            $reads = $byMeaning && $this->readWords && Features::enabled('search.word_meanings', $shopId);
+            // a word in another alphabet than the store's is read too, though a few products say it (HebrewSearch::foreignWords)
+            $foreign = $reads ? HebrewSearch::foreignWords($query, (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he')) : [];
+            $toRead = array_values(array_unique([...$unknown, ...$foreign]));
+            if ($toRead !== [] && $reads) {
+                foreach (array_slice($toRead, 0, self::NEAR_WORDS) as $word) {
                     $term = app(WordMeanings::class)->read($shopId, $index, HebrewSearch::withFinals((string) $word));
                     if ($term !== null) {
                         $nearWords[(string) $word] = $term;
@@ -607,7 +612,14 @@ final class SearchCatalog
                 $unknown = array_values(array_diff($unknown, array_keys($nearWords)));
             }
             $termHits = [];
-            foreach ($nearWords as $term) {
+            // several words, some read as the store's: the words searched as the store writes them, every word counting ("טבעת
+            // זהב" is "ring gold", gold rings, never every ring and every gold piece); each word alone when nothing holds all
+            if ($nearWords !== [] && str_contains($query, ' ')) {
+                $translated = implode(' ', array_map(fn (string $w): string => HebrewSearch::normalize($nearWords[$w] ?? $w), explode(' ', HebrewSearch::normalize($query))));
+                $allHeld = self::whole(self::either($index['engine'], $translated));
+                $termHits = array_values(array_filter(array_map('strval', array_keys($allHeld)), fn (string $id): bool => str_starts_with($id, 'p:')));
+            }
+            foreach ($termHits === [] ? $nearWords : [] as $term) {
                 foreach (HebrewSearch::search($index['engine'], $term) as $hit) {
                     if (str_starts_with((string) $hit['id'], 'p:') && ! in_array($hit['id'], $termHits, true)) {
                         $termHits[] = (string) $hit['id'];
