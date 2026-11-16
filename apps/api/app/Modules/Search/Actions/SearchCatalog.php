@@ -412,8 +412,14 @@ final class SearchCatalog
         if (isset($result['ids']) && is_array($result['ids'])) {
             $products = array_values(array_filter($result['ids'], fn ($id): bool => str_starts_with((string) $id, 'p:')));
             $ranked = $rank(array_map('strval', $products));
+            // each product's place taken by the next in colour order (a loop: an arrow function's counter never moved, and
+            // every place showed the first: Miss Nori, 16.11)
             $next = 0;
-            $result['ids'] = array_map(fn ($id) => str_starts_with((string) $id, 'p:') ? $ranked[$next++] : $id, $result['ids']);
+            foreach ($result['ids'] as $at => $id) {
+                if (str_starts_with((string) $id, 'p:')) {
+                    $result['ids'][$at] = $ranked[$next++];
+                }
+            }
         }
 
         return $result;

@@ -93,6 +93,9 @@ final class ColourFamiliesTest extends TestCase
         $ids = array_column($found['groups']['product'], 'external_id');
         $this->assertSame(['אדומים'], $found['loosened']['left'] ?? null);
         $this->assertSame('4', $ids[0], 'burgundy is red: nearest the colour asked');
+        $this->assertSame('p:4', $found['ids'][0]);
+        $this->assertSame(array_values(array_unique($found['ids'])), $found['ids'], 'each product once, in the ids the drawer shows as in the shown ones');
+        $this->assertCount(4, $found['ids'], 'the four trousers');
         $this->assertNotContains('5', $ids, 'a red shirt is no trouser');
 
         // red shorts: trousers, by what their picture says they are, and what is shown
