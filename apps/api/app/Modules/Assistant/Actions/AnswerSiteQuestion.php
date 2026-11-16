@@ -114,8 +114,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * 12 and 13 of 15 as v22, 15 and 12 as v26, answered 74.6% against 76.4%, the one change both runs agree on "מה
      * ההבדל בין GH ל-VS?" answered (v22 never); Rocks live, 86 cases with 31 off the store's topic (asis-live2 twice
      * against v26-live): 45 of 46 in each, none of the 31 answered, supported 71.7 and 76.4 against 82.4.
+     *
+     * v29 (answer_site, scope_site and verify_site together) released 16.11, as Aviad asked, on 38 real conversations
+     * from 8 stores, each answered by v26 and by v29 on the same frozen turns (docs/reports/2026-11-16-ai-improvements.md):
+     * a reply naming no subject keeps the conversation's, how-to answers give the fee, the deadline and the way to
+     * arrange, the store's contact when the answer sends the shopper to it, no stale offer; the checker reads the
+     * conversation.
      */
-    public const PROMPT_VERSION = 26;
+    public const PROMPT_VERSION = 29;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -3754,10 +3760,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($asks === 'popular') {
             return null;
         }
-        // a reply naming no product in a conversation about the store's service ("and for sale items?" after the returns
-        // policy) asks on about that service: read with the conversation, never answered by code as a list of products on
-        // sale (Naot, 16.11: "15 on sale now" for "what about sale items?" after "can I return it?")
-        if ($this->conversation !== [] && self::named($question) === []
+        // a reply in a conversation about the store's service ("and for sale items?" after the returns policy) most often
+        // asks on about that service: the writer reads it with the conversation, never code as a list of products on sale
+        // (Naot, 16.11: "15 on sale now" for "what about sale items?" after "can I return it?"). Whether it names a product
+        // is no test: "sale" is a category in many stores, "items" a word of any question.
+        if ($this->conversation !== []
             && self::asksOfTheStore((string) ($this->conversation[array_key_last($this->conversation)]['question'] ?? ''))) {
             return null;
         }

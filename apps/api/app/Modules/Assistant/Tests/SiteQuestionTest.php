@@ -595,15 +595,21 @@ final class SiteQuestionTest extends TestCase
     public function test_a_reply_about_sale_items_in_a_returns_conversation_is_not_a_list_of_products_on_sale(): void
     {
         // Naot, 16.11: "what about sale items?" after "can I return or exchange it?" was answered by code "15 on sale now"
-        foreach (['771' => 'Mia sandal', '772' => 'Pixie sandal'] as $id => $title) {
-            $this->product((string) $id, $title, 'Sandal.', [], ['price' => '99.00', 'in_stock' => true, 'on_sale' => true]);
+        // more on sale than code ever lists by name, as at Naot: code's answer would be the whole set, "N on sale now"
+        $shown = [];
+        foreach (['Mia', 'Pixie', 'Acacia', 'Kayla', 'Lagoon', 'Tahiti'] as $i => $name) {
+            $this->product((string) (771 + $i), $name.' sandal', 'Sandal.', [], ['price' => (string) (90 + $i).'.00', 'in_stock' => true, 'on_sale' => true]);
+            $shown[] = (string) (771 + $i);
         }
-        $thread = [['q' => 'Can I return or exchange it?', 'a' => 'Yes, within 30 days, unworn and in its box.']];
-        $this->replies = [
+        $writer = fn (): array => [
             ['found' => true, 'answer' => 'Sale items can be exchanged within 30 days, not refunded.', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true],
             ['decision' => 'approve', 'issues' => [], 'revised' => '', 'picks' => [], 'supported' => true, 'on_topic' => true, 'picks_fit' => true, 'safe' => true, 'injection' => false],
         ];
-        $out = $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'what about sale items?', ['771', '772'], null, 'en', null, $thread));
+
+        // after a question about returns, the writer reads it with the conversation
+        $this->replies = $writer();
+        $thread = [['q' => 'Can I return or exchange it?', 'a' => 'Yes, within 30 days, unworn and in its box.']];
+        $out = $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'what about sale items?', $shown, null, 'en', null, $thread));
         $this->assertNotSame([], $this->calls, 'the writer reads it with the conversation');
         $this->assertStringNotContainsString('on sale now', (string) ($out['result']['answer'] ?? ''));
     }
@@ -626,8 +632,8 @@ final class SiteQuestionTest extends TestCase
 
         $this->calls = [];
         $this->replies = $reply();
-        $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'לאן שולחים?', ['991'], null, 'he', null, $thread));
-        $this->assertArrayNotHasKey('conversation', $checkerSaw(), 'the released checker as it was');
+        $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'לאן שולחים?', ['991'], 26, 'he', null, $thread, ['verify_site' => 19]));
+        $this->assertArrayNotHasKey('conversation', $checkerSaw(), 'the checker before v29 as it was');
     }
 
     public function test_a_passage_cut_in_a_word_and_a_budget_asked_on_a_product_page(): void
