@@ -55,7 +55,9 @@
     turn.id = turn.id || uid();
     // once something is asked or searched, "about this product" steps back with the conversation before it
     // (as Aviad asked, 2026-10-18): the new answer stands alone, the product's block waits behind the line
-    if (turn.kind !== 'about' && turn.kind !== 'note') { S.turns.forEach(function (x) { if (x.kind === 'about' && !x.prev) { x.prev = true; } }); }
+    // ...unless it is asked about that very product: its block stays, under the answer (QA, 16.11: "על המוצר הזה" went away
+    // with the first question about it)
+    if (turn.kind !== 'about' && turn.kind !== 'note') { S.turns.forEach(function (x) { if (x.kind === 'about' && !x.prev && !(turn.ctx && x.id === turn.ctx)) { x.prev = true; } }); }
     S.turns.push(turn);
     fresh[turn.id] = 1;
     // the last search for products sent is what the next opening shows (open(), backTo()); after a question, nothing
