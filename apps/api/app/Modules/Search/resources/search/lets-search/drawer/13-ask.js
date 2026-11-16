@@ -260,7 +260,7 @@
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, buy: 0, s: 1 };
         return '<li class="ls-pick' + (anim ? ' ls-focus-in' : '') + '" style="--i:' + (anim ? Math.round(n * 28 / 110) + i : 0) + '"><a class="ls-pick__media" href="' + esc(r.url || p.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(r.img || p.image || '') + '" alt=""></a><div>' +
           '<a class="ls-pick__title" dir="auto" href="' + esc(r.url || p.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(r.title || p.title)) + '</a>' + (/[\p{L}\p{N}]/u.test(String(p.why || '')) ? '<div class="ls-pick__why">' + esc(p.why) + '</div>' : '') +
-          '<div class="ls-pick__row">' + priceHtml(r) + '<span style="display:flex;gap:4px;align-items:center">' + heartBtn(pid(r.id), S.saved.indexOf(pid(r.id)) >= 0) + buyBtn(r, 'ls-btn--sm') + '</span></div><div data-after="' + esc(pid(r.id)) + '"></div></div></li>';
+          '<div class="ls-pick__row"><span class="ls-pick__price">' + priceHtml(r) + similarLink(r) + '</span><span style="display:flex;gap:4px;align-items:center">' + heartBtn(pid(r.id), S.saved.indexOf(pid(r.id)) >= 0) + buyBtn(r, 'ls-btn--sm') + '</span></div><div data-after="' + esc(pid(r.id)) + '"></div></div></li>';
       }).join('') + '</ol>';
     }
     html += setHtml(turn);

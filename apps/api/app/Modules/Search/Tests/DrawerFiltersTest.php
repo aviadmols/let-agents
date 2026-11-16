@@ -139,6 +139,16 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame(['Boots', 'נעליים', 'Old skool'], self::drawer("[T.capital('boots'), T.capital('נעליים'), T.capital('old skool')]"));
     }
 
+    public function test_the_products_an_answer_shows_offer_their_similar_items(): void
+    {
+        // as Aviad asked, 16.11: the books an answer recommends, and the row under it, a press away from their like
+        $this->assertStringContainsString('data-similar="1"', self::drawer("T.similarLink(S.records['p:1'])"));
+        $this->assertSame('', self::drawer("(function () { S.records['p:40'] = { id: 'p:40', t: 'product', title: 'Gift Card', ns: 1 }; return T.similarLink(S.records['p:40']); })()"), 'none where it has no like of its kind');
+        $this->assertSame('', self::drawer("T.similarLink({ id: 'p:999', title: 'not in the index' })"));
+        $row = self::drawer("T.miniRow([{ id: 'p:1' }, { id: 'p:2' }], true)");
+        $this->assertSame(2, substr_count($row, 'data-similar='), 'each product of the row under an answer');
+    }
+
     public function test_a_tag_all_in_capitals_or_small_letters_is_shown_in_title_case_and_a_brand_as_it_is(): void
     {
         $this->assertSame(['Sterling Silver', 'Mens Bracelets', 'Big-Bold', 'APMA Accepted', 'VANS', 'צמידים'], self::drawer(

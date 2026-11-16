@@ -123,7 +123,7 @@
       '<div class="ls-mini-row">' + list.slice(0, 6).map(function (p) {
         var r = rec(p.id) || { id: p.id, title: p.title, url: p.url, img: p.image, pr: p.price };
         var card = '<a class="ls-mini" href="' + esc(r.url || p.url) + '" data-pid="' + esc(pid(p.id)) + '" draggable="false"><img class="ls-mini__img" src="' + esc(r.img || p.image) + '" alt="" decoding="async" draggable="false">' + pic2(r) + '<span class="ls-mini__t" dir="auto">' + esc(decode(r.title || p.title)) + '</span>' + priceHtml(r) + '</a>';
-        return buy && rec(p.id) ? '<div class="ls-mini-buy">' + card + buyBtn(r, 'ls-btn--sm') + '</div>' : card;
+        return buy && rec(p.id) ? '<div class="ls-mini-buy">' + card + similarLink(r) + buyBtn(r, 'ls-btn--sm') + '</div>' : card;
       }).join('') + '</div>' +
       '<button class="ls-ibtn ls-ibtn--sm ls-ibtn--float ls-slider__btn ls-slider__btn--next" type="button" data-slide="1" aria-label="' + esc(t('slideNext')) + '">' + icon('fwd', 'ls-icon--sm') + '</button></div>';
   }

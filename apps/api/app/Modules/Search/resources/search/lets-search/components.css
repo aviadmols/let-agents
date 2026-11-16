@@ -364,6 +364,8 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
 .ls-pick__title { font-size: var(--lsp-text-md); font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ls-pick__why { margin-top: 4px; font-size: var(--lsp-text-sm); color: var(--ls-fg-strong-muted); line-height: 1.45; }
 .ls-pick__row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* the price, and "Similar" beside it, as on a result's card */
+.ls-pick__price { display: inline-flex; align-items: baseline; gap: 12px; min-width: 0; }
 
 /* the pages an answer rests on: plain words in a line that wraps where it must, never a column of broken names */
 .ls-source { display: block; margin-top: 14px; font-size: var(--lsp-text-sm); line-height: 1.6; color: var(--ls-fg-muted); }

@@ -512,6 +512,10 @@
     if (r.buy !== 1) { return '<button class="ls-btn ls-btn--secondary ' + cls + '" data-options="' + esc(id) + '">' + (added ? addedMark() + esc(t('added')) : esc(t('options'))) + '</button>'; }
     return '<button class="ls-btn ls-btn--primary ' + cls + ' ls-add" data-add="' + esc(id) + '"' + (added ? ' data-state="done"' : '') + '><span class="ls-add__label">' + esc(t('add')) + '</span><span class="ls-add__busy">' + mark(true) + '</span><span class="ls-add__done"><svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>' + esc(t('added')) + '</span></button>';
   }
+  // "Similar" beside a product an answer shows (its picks, the row of products under it), as on a result's card: the
+  // like of it a press away (as Aviad asked, 16.11). None for a product with no like of its kind (ns), nor one not in
+  // the index; a store with similar items off hides it (.no-similar)
+  function similarLink(r) { return r && r.id && rec(r.id) && r.ns !== 1 ? '<button class="ls-card__similar" type="button" data-similar="' + esc(pid(r.id)) + '">' + esc(t('similar')) + '</button>' : ''; }
   // the products added to the cart in this visit (this tab), by product
   function inCart() { if (!S.inCart) { S.inCart = store('session', 'ls_in_cart') || {}; } return S.inCart; }
   // drawn, as an added cart button's is: hidden, it took its place and "Added" stood off the button's centre (16.11)
