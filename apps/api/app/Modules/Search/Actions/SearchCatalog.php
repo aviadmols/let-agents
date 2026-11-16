@@ -356,8 +356,9 @@ final class SearchCatalog
             if ($kinds !== []) {
                 $tried = self::keptToKinds($tried, $index, $kinds);
             }
-            // products only: a guide that names a word is no nearest product
-            if (($tried['counts']['product'] ?? 0) > 0) {
+            // products only: a guide that names a word is no nearest product; nor what a word the store does not know found by
+            // its letters ("אופניים חשמליות" without "חשמליות" showed seven pieces near "אופניים", none a bicycle: Rocks QA)
+            if (($tried['counts']['product'] ?? 0) > 0 && ($tried['unknown'] ?? []) === []) {
                 $found[] = $rung + ['result' => $tried];
             }
         }

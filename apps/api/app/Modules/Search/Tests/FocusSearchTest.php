@@ -322,17 +322,24 @@ final class FocusSearchTest extends TestCase
         // Rocks QA, 16.11: "אופניים חשמליות" in a jewellery store offered "אופניים (7)", seven pieces its letters came near
         // ("פנינים", "תלויים", "חלולים"), none a bicycle
         $this->catalog([
-            '1' => ['עגילי פנינים זהב', 'עגילים'],
-            '2' => ['עגילים תלויים זהב', 'עגילים'],
-            '3' => ['עגילי חישוק חלולים', 'עגילים'],
-            '4' => ['טבעת זהב צהוב', 'טבעות'],
-            '5' => ['שרשרת כסף', 'שרשראות'],
+            '1' => ['עגילי פנינים, זהב ויהלומים מספר 7156', 'עגילים'],
+            '2' => ['עגילי וינטאג תלויים, זהב 14K - מקט 1272', 'עגילים'],
+            '3' => ['תליון לב חלול 1.5X1.3 סמ - מקט 16949', 'תליונים'],
+            '4' => ['עגילי וינטג תלויים מוטיב עגול בקוטר 2 סמ', 'עגילים'],
+            '5' => ['עגילי חישוק קלאסים חלולים בעובי 3.2 ממ', 'עגילים'],
+            '6' => ['עגיל בודד פתית שלג משובץ יהלומים טבעיים', 'עגילים'],
+            '7' => ['עגילי חישוק חלולים איטלקיים, אובליים', 'עגילים'],
+            '8' => ['טבעת זהב צהוב', 'טבעות'],
+            '9' => ['שרשרת כסף', 'שרשראות'],
         ]);
 
         $result = $this->search('אופניים חשמליות');
         foreach ((array) ($result['focus']['options'] ?? []) as $option) {
             $this->assertNotContains($option['query'], ['אופניימ', 'חשמליות'], 'no word of the search the store does not know');
         }
+        // ...nor shown as the nearest there is, a word left out: what is left is a word it does not know either
+        $this->assertNull($result['loosened'] ?? null);
+        $this->assertSame([], array_column($result['groups']['product'], 'external_id'), 'nothing: the drawer says so and offers the AI');
         // the rule, as Rocks met it: the choice of the unknown word goes, a choice of known words stays
         $this->assertSame([['query' => 'טבעת זהב', 'count' => 4]], SearchCatalog::knownChoices([['query' => 'אופניימ', 'count' => 7], ['query' => 'טבעת זהב', 'count' => 4]], ['אופניימ', 'חשמליות']));
         $this->assertSame([], SearchCatalog::knownChoices([['query' => 'אופניים', 'count' => 7]], ['אופניימ']), 'as the store writes it or normalized');
