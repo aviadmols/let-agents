@@ -436,6 +436,109 @@ final class SearchCatalog
     }
 
     /**
+     * The words as the store writes them, where those as typed hold nothing together: a colour written without its vowel
+     * letter ("אדמים", which "אדם" in a name holds, is "אדומים"), a word the store does not write as the nearest it does, in
+     * its family's own form ("מיכנסים": "מכנסיים"). Null when nothing changes or the words so written hold nothing either.
+     *
+     * @param  array<string, mixed>  $index  as LoadedIndex keeps it
+     * @return array{query: string, count: int}|null
+     */
+    private static function respelled(array $index, string $query): ?array
+    {
+        $engine = (array) ($index['engine'] ?? []);
+        $known = array_flip(array_map('strval', (array) ($engine['list'] ?? [])));
+        $families = [];
+        foreach ((array) ($index['families'] ?? []) as $family) {
+            foreach ((array) $family as $member) {
+                $families[(string) $member] ??= (string) ($family[0] ?? $member);
+            }
+        }
+        $words = array_values(array_filter(explode(' ', HebrewSearch::normalize($query))));
+        $out = [];
+        foreach ($words as $word) {
+            $out[] = self::respelledWord($engine, $known, $families, $word);
+        }
+        if ($out === $words) {
+            return null;
+        }
+        $fixed = implode(' ', $out);
+        $count = count(array_filter(HebrewSearch::search($engine, $fixed), fn (array $hit): bool => ($hit['full'] ?? false) && str_starts_with((string) $hit['id'], 'p:')));
+
+        return $count > 0 ? ['query' => self::written($fixed), 'count' => $count] : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $engine
+     * @param  array<string, int>  $known  the words the store writes
+     * @param  array<string, string>  $families  each word of a family => the family's own form
+     */
+    private static function respelledWord(array $engine, array $known, array $families, string $word): string
+    {
+        if (mb_strlen($word) < 3 || preg_match('/^\p{Hebrew}+$/u', $word) !== 1 || HebrewSearch::colorOf($word) !== null) {
+            return $word;
+        }
+        // a colour with a vowel letter more or less ("אדמים", "שחרים", "כחלה"): Hebrew writes them both ways
+        $letters = mb_str_split($word);
+        for ($at = 1; $at < count($letters); $at++) {
+            foreach (['ו', 'י'] as $vowel) {
+                $with = implode('', array_merge(array_slice($letters, 0, $at), [$vowel], array_slice($letters, $at)));
+                if (HebrewSearch::colorOf($with) !== null) {
+                    return $with;
+                }
+            }
+            if (in_array($letters[$at], ['ו', 'י'], true)) {
+                $without = implode('', array_merge(array_slice($letters, 0, $at), array_slice($letters, $at + 1)));
+                if (HebrewSearch::colorOf($without) !== null) {
+                    return $without;
+                }
+            }
+        }
+        if (isset($known[$word])) {
+            return $word;
+        }
+        // a word the store does not write: the nearest it does, in its family's own form
+        $close = HebrewSearch::closeWords($engine, $word);
+        arsort($close);
+        $best = (string) (array_key_first($close) ?? '');
+
+        return $best !== '' && ($close[$best] ?? 0) >= 0.5 ? ($families[$best] ?? $best) : $word;
+    }
+
+    /**
+     * The narrower searches offered, each counted as pressing it shows it: only what is in stock, where some of the store's
+     * products are not (the drawer opens such a search "in stock"); one with none in stock left out.
+     *
+     * @param  array<string, mixed>  $index
+     * @param  list<array{query: string, count: int}>  $options
+     * @return list<array{query: string, count: int}>
+     */
+    private static function countedInStock(array $index, array $options): array
+    {
+        $records = (array) ($index['records'] ?? []);
+        $stockSaid = array_any($records, fn ($r): bool => is_array($r) && ($r['t'] ?? null) === 'product' && ($r['s'] ?? 1) === 0);
+        if (! $stockSaid) {
+            return $options;
+        }
+        $out = [];
+        foreach ($options as $option) {
+            $ids = array_unique(array_column(array_filter(HebrewSearch::search((array) $index['engine'], HebrewSearch::normalize((string) $option['query'])),
+                fn (array $hit): bool => ($hit['full'] ?? false) && str_starts_with((string) $hit['id'], 'p:')), 'id'));
+            $count = count(array_filter($ids, fn (string $id): bool => ($records[$id]['s'] ?? 1) === 1));
+            if ($count > 0) {
+                $out[] = ['query' => $option['query'], 'count' => $count];
+            }
+        }
+
+        return $out;
+    }
+
+    /** Normalized words as they are written: a final letter at each word's end ("מכנסיימ": "מכנסיים"). */
+    private static function written(string $normalized): string
+    {
+        return (string) preg_replace_callback('/[מנצפכ](?=\s|$)/u', fn (array $m): string => ['מ' => 'ם', 'נ' => 'ן', 'צ' => 'ץ', 'פ' => 'ף', 'כ' => 'ך'][$m[0]], $normalized);
+    }
+
+    /**
      * A search's products, those whose colour is nearest the one wanted first (colourNear), each side in the order it had:
      * its shown products and its ids alike, every other result where it was.
      *
@@ -679,6 +782,16 @@ final class SearchCatalog
             }
             // No product holds every word ("מקדחה בצבע שחור"): the narrower searches that do find, to choose from.
             $focus = $minPrice === null && $maxPrice === null && $days === null && $without === [] && $actions['ids'] === [] && ! $asks ? HebrewSearch::focus($index['engine'], $query) : [];
+            // ...the words as the store writes them first, where they find what the typed ones did not ("מיכנסים אדמים":
+            // "מכנסיים אדומים", never the slips themselves as what to choose: QA, 16.11)
+            if ($focus !== [] && ($respelled = self::respelled($index, $query)) !== null) {
+                array_unshift($focus, $respelled);
+            }
+            // each counted as pressing it shows it: in stock, where the store says what is (the drawer's own "in stock" then)
+            // (QA, 16.11: "מיכנסים (73)" showed 67)
+            if ($focus !== []) {
+                $focus = self::countedInStock($index, $focus);
+            }
 
             // A sentence ("מה הכי טוב למברגה ביתית וזולה") holds words no product has: search
             // what it is about instead, so a question finds the products it asks about.

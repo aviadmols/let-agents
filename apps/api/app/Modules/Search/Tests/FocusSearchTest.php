@@ -56,6 +56,22 @@ final class FocusSearchTest extends TestCase
         $this->assertNull($result['focus'], 'something holds every word: nothing to choose');
     }
 
+    public function test_words_typed_with_slips_are_offered_as_the_store_writes_them_first(): void
+    {
+        // QA, 16.11: "מיכנסים אדמים" offered "מיכנסים (73)" and "אדמים (1)" ("אדם", a name in a title), never "מכנסיים אדומים"
+        $this->catalog([
+            '1' => ['מכנסיים רחבים אדומים', 'מכנסיים'],
+            '2' => ['מכנסיים שחורים', 'מכנסיים'],
+            '3' => ['מכנסיים לבנים', 'מכנסיים'],
+            '4' => ['חולצת סריג אדם', 'חולצות'],
+            '5' => ['חולצה אדומה', 'חולצות'],
+        ]);
+
+        $options = $this->search('מיכנסים אדמים')['focus']['options'] ?? [];
+
+        $this->assertSame(['query' => 'מכנסיים אדומים', 'count' => 1], $options[0] ?? null);
+    }
+
     public function test_a_kind_alone_shows_what_is_it_before_what_is_made_for_it(): void
     {
         // Shilav, 2.11: "עגלה" opened with pillows "לעגלה", the strollers among them
