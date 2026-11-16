@@ -116,7 +116,10 @@
       var d = (r.body && r.body.data) || r.body || {};
       // asked about the product on its own page (its questions, or a reply to an answer there): the answer is about that
       // product, so no products are shown beside it, neither the assistant's picks nor others (as Aviad asked, 1.11)
-      if (turn.ctx) { d.picks = []; d.set = null; d.named = null; }
+      // ...unless the answer is a set of the store's ("עגילי זהב לבן במלאי עד 2,000" on a ring's page): "20 in your price"
+      // with nothing under it (Rocks QA, 16.11). Its set is what it says.
+      var storeSet = d.from === 'code' && d.set && d.set.ids && d.set.ids.length;
+      if (turn.ctx && !storeSet) { d.picks = []; d.set = null; d.named = null; }
       var picks = (d.picks || []).map(function (p) { return { id: pid(p.external_id || p.id), why: p.why, title: p.title, url: p.url, image: p.image }; });
       turn.askId = d.ask_id ? String(d.ask_id) : null;
       // a whole set asked to see ("תציג לי את ספריית שיבולת"): every product of it as a grid, a question to narrow it by, and the search for more
