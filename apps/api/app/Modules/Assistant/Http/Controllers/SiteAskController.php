@@ -53,7 +53,11 @@ final class SiteAskController
         }
 
         // The visitor only counts toward a daily limit, as a hash salted per shop, like analytics.
-        $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products, $previous, $page, $thread);
+        // the currency the storefront's cards show prices in, and its sign as they write it: the answer's prices so
+        // (an older drawer sends none, and the product's own currency stays)
+        $currency = is_array($body) && is_string($body['currency'] ?? null) ? strtoupper($body['currency']) : null;
+        $sign = is_array($body) && is_string($body['currency_sign'] ?? null) ? $body['currency_sign'] : null;
+        $result = $answer->handle($connection->shop_id, $question, hash('sha256', $connection->shop_id.'|'.$visitor), $locale, $products, $previous, $page, $thread, $currency, $sign, is_array($body) && ! empty($body['sign_after']));
 
         // What this visit already told the shopper is not told again (Rocks, 12.11): the conversation of a reply, or, for a
         // question of its own in the same drawer, the answers before it (`said`), read for this alone and kept nowhere.

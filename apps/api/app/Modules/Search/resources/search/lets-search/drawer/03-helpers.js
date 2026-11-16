@@ -32,8 +32,18 @@
       var foreign = CFG.currency && CFG.shopCurrency && CFG.currency !== CFG.shopCurrency;
       try { return e.formatMoney(Math.round(Number(n) * 100), foreign ? '' : CFG.moneyFormat, CFG.currency || 'ILS', LANG); } catch (x) { /* plain */ }
     }
-    var text = Number(n).toLocaleString(LANG === 'he' ? 'he-IL' : 'en-US', { maximumFractionDigits: 2 }), cur = S && (S.cur || storeCurrency());
+    // two decimals unless whole ("202.46", "99.50", "250"), as the assistant writes a price (Money::price)
+    var whole = Number(n) === Math.floor(Number(n));
+    var text = Number(n).toLocaleString(LANG === 'he' ? 'he-IL' : 'en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 }), cur = S && (S.cur || storeCurrency());
     return cur ? (cur.prefix || '') + text + (cur.suffix || '') : '₪' + text;
+  }
+  // How the cards write a price, for the assistant to write its prices the same (Naot QA, 16.11: "AUD 202.46" over a card
+  // of "$202"): the currency's code, and the sign money() puts beside a number, before it or after it
+  function priceLike() {
+    var code = String((SHOPIFY && CFG.currency) || (S && S.config && S.config.currency) || 'ILS').toUpperCase();
+    var shown = String(money(1) || '').replace(/[\u200e\u200f\u00a0]/g, ' ').trim(), m = /^(.*?)\s*1(?:[.,]0+)?\s*(.*?)$/.exec(shown);
+    if (!m || (!m[1] && !m[2]) || (m[1] && m[2])) { return { currency: code }; }
+    return { currency: code, currency_sign: (m[1] || m[2]).trim(), sign_after: !m[1] };
   }
   // the store's own currency, as the index says it (a site with no Store API: a content site, a demo), its symbol
   // where the language puts it; null for shekels or none, so ₪ stays as it was

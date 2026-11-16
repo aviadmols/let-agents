@@ -100,6 +100,15 @@ final class QueryActionsTest extends TestCase
         $this->assertContains('cheapest', array_column($this->build()['actions'], 'id'));
     }
 
+    public function test_a_price_is_kept_exact_as_the_store_sells_it(): void
+    {
+        // Naot QA, 16.11: the card said "$202", the answer beside it "202.46"
+        $this->inShop(fn () => CatalogProduct::query()->where('external_id', '3')->update(['price' => 202.46]));
+        $items = collect($this->build()['items']);
+        $this->assertSame(202.46, $items->firstWhere('id', 'p:3')['pr']);
+        $this->assertSame(900, $items->firstWhere('id', 'p:1')['pr'], 'a whole price stays a whole number');
+    }
+
     public function test_the_server_sorts_filters_and_searches_either_side(): void
     {
         Settings::set('search.size_attribute', 'diameter', $this->shop->id);

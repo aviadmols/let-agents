@@ -31,8 +31,9 @@
       requestAnimationFrame(function () { R.classList.add('is-open'); SCRIM.classList.add('is-open'); D.classList.add('is-open'); placePill(); });
       doc.documentElement.style.overflow = 'hidden';
       try { win.history.pushState({ lets: 1 }, ''); } catch (e) { /* file:// */ }
-      // every opening starts clean: what was searched or asked before waits behind the dashed line
-      S.turns.forEach(function (x) { x.prev = true; });
+      // every opening starts clean: what was searched or asked before waits behind the dashed line, an earlier
+      // conversation (hidden as the shopper types, a turn is still this one's: "ומה עם מוצרים במבצע?" goes on with it)
+      S.turns.forEach(function (x) { x.prev = true; x.earlier = true; });
       S.showPrev = false;
       // except the search the shopper left through one of its results: opened again, it is there as it was
       // (a search sent stays its turn; one only typed comes back in the field, its live results with it)
@@ -58,7 +59,7 @@
     // the line that loads the previous conversation (everything asked before, on this page too, waits there)
     if (opts.about && S.ctx) {
       var ab = S.turns.filter(function (x) { return x.kind === 'about' && x.id === S.ctx; }).pop();
-      S.turns.forEach(function (x) { x.prev = x !== ab; });
+      S.turns.forEach(function (x) { x.prev = x !== ab; if (x !== ab) { x.earlier = true; } });
       if (ab) { S.turns = S.turns.filter(function (x) { return x !== ab; }).concat([ab]); }
       S.showPrev = false; S.tab = 'chat'; S.wide = null; BODY.scrollTop = 0;
     }

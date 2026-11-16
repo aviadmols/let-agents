@@ -178,7 +178,7 @@ final class AnswerSiteQuestion implements TriesQuestions
     private const THREAD_ANSWER_CHARS = 700;
 
     /** A reply that says any of these speaks of price itself, and keeps no price from the conversation before it. */
-    private const PRICE_WORDS = '/מחיר|יקר|זול|תקציב|שקל|ש["״]?ח|₪|\d|price|cheap|expensive|budget|cost/iu';
+    private const PRICE_WORDS = '/מחיר|(?<!\p{L})[והבלמשכ]{0,2}(?:יקר|זול)\p{L}{0,3}(?!\p{L})|תקציב|שקל|ש["״]?ח|₪|\d|price|cheap|expensive|budget|cost/iu';
 
     /** The run of the second look's other wordings of a question, by the small model. */
     public const SIMILAR_ACTION = 'assistant.similar_questions';
@@ -333,6 +333,34 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** The language the question being asked is answered in (AnswerLanguage), he or en. */
     private string $language = 'en';
 
+    /**
+     * The currency the storefront shows its prices in, as its cards show them (the drawer sends it): the answer's prices in
+     * it, never another's ("AUD 202.46" over a card of "$202": Naot QA, 16.11). Null: each product's own.
+     */
+    private ?string $shownCurrency = null;
+
+    /** ...and its sign as the cards write it ("$", "₪", "A$"), before the amount or after it; null: Money's. */
+    private ?string $shownSign = null;
+
+    private bool $signAfter = false;
+
+    /** A price as the storefront's cards write it: their sign, where they put it, and two decimals unless whole. */
+    private function shownPrice(float $amount, string $currency): string
+    {
+        return self::priceAs($amount, $this->shownCurrency ?? $currency, $this->shownSign, $this->signAfter);
+    }
+
+    /** A price in a currency, with the sign the storefront writes it with (before it, or after), else Money's. */
+    public static function priceAs(float $amount, string $currency, ?string $sign = null, bool $after = false): string
+    {
+        if ($sign === null || $sign === '') {
+            return Money::price($amount, $currency);
+        }
+        $number = number_format($amount, $amount == floor($amount) ? 0 : 2);
+
+        return $after ? $number.' '.$sign : $sign.$number;
+    }
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
@@ -347,12 +375,18 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<string>  $products  external ids of the products the shopper was shown, best first
      * @param  list<string>  $previous  external ids of the products the conversation's turn before showed
      * @param  list<array{q?: mixed, a?: mixed}>  $thread  a reply to an answer: the questions and answers before it, oldest first
+     * @param  string|null  $currency  the currency the storefront's cards show prices in (ISO code), or null
      * @return array<string, mixed> outcome: answered, no_match, no_info, out_of_scope, invalid, limit or
      *                              unavailable; from: bank, model or none; with sources, picks, ask_id and whatsapp;
      *                              context: "previous" when the question was answered about the turn before
      */
-    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false, array $thread = []): array
+    public function handle(string $shopId, string $question, string $visitorHash, string $locale = 'he', array $products = [], array $previous = [], bool $fromPage = false, array $thread = [], ?string $currency = null, ?string $sign = null, bool $signAfter = false): array
     {
+        // set on every call: one instance may answer another shop's question next
+        $this->shownCurrency = $currency !== null && preg_match('/^[A-Z]{3}$/', $currency) === 1 ? $currency : null;
+        $sign = $sign === null ? '' : trim($sign);
+        $this->shownSign = $sign !== '' && mb_strlen($sign) <= 4 && preg_match('/[\p{L}\p{N}\p{Sc}]/u', $sign) === 1 && preg_match('/[\d<>"\'{}]/', $sign) !== 1 ? $sign : null;
+        $this->signAfter = $this->shownSign !== null && $signAfter;
         $question = Question::clean($question, (int) Settings::get('assistant.max_question_chars', $shopId));
         // A reply to an answer ("כמה פעמים כדאי לקחת אותה?" after one about cordyceps): the topic check writes it to stand
         // alone with the conversation (scope_site v8), and the pages, the writer and the checker read that; the writer
@@ -3299,8 +3333,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         uasort($priced, fn (array $a, array $b): int => $a['price'] <=> $b['price']);
         $text = mb_strtolower($question);
         $asks = match (true) {
-            preg_match('/זול|במחיר\s+נמוך|הכי\s+משתלם|cheap|budget/u', $text) === 1 => 'cheapest',
-            preg_match('/יקר|expensive/u', $text) === 1 => 'most_expensive',
+            // a word, never letters inside one: "סניקרס" holds "יקר", and "יש לכם נעלי סניקרס לילדים?" was answered with the
+            // dearest of them (Vans QA, 16.11)
+            preg_match('/(?<!\p{L})[והבלמשכ]{0,2}זול\p{L}{0,3}(?!\p{L})|במחיר\s+נמוך|הכי\s+משתלם|\bcheap|\bbudget/u', $text) === 1 => 'cheapest',
+            preg_match('/(?<!\p{L})[והבלמשכ]{0,2}יקר\p{L}{0,3}(?!\p{L})|\bexpensive/u', $text) === 1 => 'most_expensive',
             preg_match('/מבצע|הנחה|sale|discount/u', $text) === 1 => 'on_sale',
             self::asksPopular($text) => 'popular',
             default => null,
@@ -3858,7 +3894,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'brand' => $p['brand'] ?? null,
                 'in_stock' => $p['in_stock'],
                 'on_sale' => $p['on_sale'] ?: null,
-                'price' => ($p['price'] ?? 0) > 0 ? Money::price((float) $p['price'], (string) ($p['currency'] ?? 'ILS')) : null,
+                'price' => ($p['price'] ?? 0) > 0 ? $this->shownPrice((float) $p['price'], (string) ($p['currency'] ?? 'ILS')) : null,
                 'option_prices' => ($p['option_prices'] ?? []) ?: null,
                 'price_rank' => isset($rank[$ref]) ? $rank[$ref] + 1 : null,
             ], fn ($v): bool => $v !== null && $v !== '');
@@ -3938,7 +3974,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'on_sale' => (bool) $product->on_sale,
                 'price' => $product->price !== null ? (float) $product->price : null,
                 'currency' => (string) ($product->currency ?: 'ILS'),
-                'option_prices' => self::optionPrices($product),
+                'option_prices' => self::optionPrices($product, fn (float $amount, string $currency): string => $this->shownPrice($amount, $currency)),
             ] + self::details($product, $pages->get($product->id));
         }
 
@@ -3970,9 +4006,10 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @return list<string>
      */
-    private static function optionPrices(CatalogProduct $product): array
+    private static function optionPrices(CatalogProduct $product, ?callable $format = null): array
     {
         $currency = (string) ($product->currency ?: 'ILS');
+        $format ??= fn (float $amount, string $currency): string => Money::price($amount, $currency);
         $out = [];
         $prices = [];
 
@@ -3983,7 +4020,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 continue;
             }
             $prices[] = (float) $price;
-            $out[$choice] = $choice.': '.Money::price((float) $price, $currency);
+            $out[$choice] = $choice.': '.$format((float) $price, $currency);
         }
 
         return count(array_unique($prices)) > 1 ? array_slice(array_values($out), 0, self::OPTION_PRICES) : [];

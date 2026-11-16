@@ -12,8 +12,17 @@
   var RESIZES_IT = /(^|[^֐-׿a-z])[ול]?(להגדיל|להגדל|להקטין|להקטנ|הגדלה|הגדלת|הקטנה|הקטנת|התאמת\s+מידה|שינוי\s+מידה|resiz)/i;
   // the last three answers on screen, but this one: what the shopper was already told
   function toldOnScreen(id) {
-    return S.turns.filter(function (x) { return x.kind === 'answer' && !x.prev && x.id !== id && x.answer; }).slice(-3)
+    return S.turns.filter(function (x) { return x.kind === 'answer' && !x.earlier && x.id !== id && x.answer; }).slice(-3)
       .map(function (x) { return { q: String(x.q || '').slice(0, 300), a: String(x.answer || '').slice(0, 1200) }; });
+  }
+  // The conversation a question goes on with: the answer it was asked right after, with that answer's own conversation
+  // (the last three), or null. Only this opening's: one of an earlier opening or page, behind the dashed line, is not
+  // gone on with ("what is your return policy?" answered as the rest of the day before's, "We also...": QA, 16.11); one
+  // hidden as the shopper types the next question is ("ומה עם מוצרים במבצע?" after the men's sandals: Naot QA, 16.11).
+  function conversationGoingOn() {
+    var last = S.turns[S.turns.length - 1];
+    var said = last && !last.earlier && last.kind === 'answer' && !last.loading ? String(last.answer || last.said || last.notFound || '') : '';
+    return said ? (last.thread || []).concat([{ q: String(last.q || '').slice(0, 300), a: said.slice(0, 1200) }]).slice(-3) : null;
   }
   function askTurn(q, extra, about, mark) {
     if (about && S.ctx && (LIKE_THIS.test(q) || OTHER_COLOUR.test(q))) { similarTurn(S.ctx, null, null, OTHER_COLOUR.test(q), q); return; }
@@ -21,12 +30,8 @@
     // a question asked right after an answer, in the box or by a chip, goes on the same conversation, as a reply does
     // ("האם אפשר להחליף או לשדרג?" after "יש לי תכשיט שנרכש לפני 4 שנים", Rocks 12.11): the server reads it with what
     // was asked and answered before. A search in between starts a new one.
-    // only a conversation on screen: one behind the dashed line ("load the previous conversation") is not gone on with
-    // (QA, 16.11: "what is your return policy?" answered as the rest of a conversation of the day before, "We also...")
-    var last = S.turns[S.turns.length - 1];
-    var lastSaid = last && !last.prev && last.kind === 'answer' && !last.loading ? String(last.answer || last.said || last.notFound || '') : '';
-    if (!(extra && extra.thread) && lastSaid) {
-      var goesOn = (last.thread || []).concat([{ q: String(last.q || '').slice(0, 300), a: lastSaid.slice(0, 1200) }]).slice(-3);
+    var goesOn = extra && extra.thread ? null : conversationGoingOn();
+    if (goesOn) {
       extra = Object.assign({}, extra || {}, { thread: goesOn, previous: [] });
       mark = Object.assign({}, mark || {}, { thread: goesOn });
     }
@@ -67,7 +72,8 @@
     // on a product's page, a question in the search box that points at it ("האם אפשר לשריין את המוצר הזה?", Rocks 9.11:
     // answered for no product) is about that product, as one asked from its page
     var onPage = S.ctx && (turn.ctx || (!shown.length && (POINTS_AT_IT.test(q) || RESIZES_IT.test(q))));
-    var body = { question: q, vid: visitor(), locale: LANG, products: onPage ? [pid(S.ctx)] : shown };
+    // and how the cards write a price: the answer's prices so, never another currency or format beside a card
+    var body = Object.assign({ question: q, vid: visitor(), locale: LANG, products: onPage ? [pid(S.ctx)] : shown }, priceLike());
     if (onPage) { body.page = 1; }
     // the turn before's products, from a product page or after a search still on screen: "מה הכי זול?" or "איזה מהם?"
     // is about them (the server decides by the question's words whether it is); never a search behind the dashed line

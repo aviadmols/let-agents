@@ -91,6 +91,18 @@ final class HeldKindTest extends TestCase
         $this->assertSame($answer, AnswerSiteQuestion::withLeastPrice($answer, $minimums, 'p1', ['s2'], $byRef));
     }
 
+    public function test_the_cheapest_or_the_dearest_is_asked_by_a_word_never_by_letters_inside_one(): void
+    {
+        // Vans QA, 16.11: "סניקרס" holds "יקר", and "יש לכם נעלי סניקרס לילדים?" was answered with the dearest of them
+        $asks = fn (string $q): ?string => AnswerSiteQuestion::analysis($q, [])['asks'];
+        $this->assertNull($asks('יש לכם נעלי סניקרס לילדים?'));
+        $this->assertSame('most_expensive', $asks('מה הכי יקר?'));
+        $this->assertSame('most_expensive', $asks('הטבעת היקרה ביותר'));
+        $this->assertSame('cheapest', $asks('סניקרס זולות לילדים'));
+        $this->assertSame('cheapest', $asks('what is the cheapest ring?'));
+        $this->assertSame('on_sale', $asks('ומה עם מוצרים במבצע?'));
+    }
+
     public function test_products_whose_own_titles_say_a_word_of_the_question_are_brought(): void
     {
         $titles = [

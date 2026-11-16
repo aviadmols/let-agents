@@ -371,10 +371,11 @@ final class BuildSearchIndex
                 'tg' => self::withPictureKind($tagged[$product->id] ?? null, $looksMatter ? $pictures->get($product->id) : null, (string) $product->title),
                 'i2' => $this->secondPicture($product),
                 's' => $product->in_stock ? 1 : 0,
-                // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words.
-                'pr' => $product->price === null ? null : (int) round((float) $product->price),
+                // The price, for "עד 2500 ש״ח": filtering only, never part of a product's words. Exact, as the store sells it
+                // and as the assistant says it: a card of "$202" beside "202.46" in the answer was no price at all (Naot QA)
+                'pr' => $product->price === null ? null : self::exact((float) $product->price),
                 // the price before a sale, shown struck through beside it where the store's live prices are not read
-                'rp' => $product->on_sale && $product->price !== null && $product->regular_price !== null && (float) $product->regular_price > (float) $product->price ? (int) round((float) $product->regular_price) : null,
+                'rp' => $product->on_sale && $product->price !== null && $product->regular_price !== null && (float) $product->regular_price > (float) $product->price ? self::exact((float) $product->regular_price) : null,
                 'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
                 // No product of its kind (ProductKinds): its similar items are none, so the drawer offers none.
                 'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,
@@ -1310,6 +1311,14 @@ final class BuildSearchIndex
 
     /** A store's tags that file a page, not describe what it offers: never a filter value (Gil Travel's "blog"). */
     private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'all products', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
+
+    /** A price as it is: whole as a whole number (250), else to the cent (202.46). */
+    private static function exact(float $price): int|float
+    {
+        $cents = round($price, 2);
+
+        return $cents == floor($cents) ? (int) $cents : $cents;
+    }
 
     /**
      * The tags the store keeps for its shop pages and campaigns, never a filter (search.hidden_tags: "Gift Guide, Vacation

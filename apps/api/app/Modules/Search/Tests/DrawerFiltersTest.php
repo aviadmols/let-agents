@@ -100,11 +100,34 @@ class DrawerFiltersTest extends TestCase
         $this->assertStringContainsString('data-empty', self::drawer("(function () { var x = turn('xyz', [], {}); x.content = []; return T.resultsHtml(x); })()"), 'and nothing at all still offers the AI');
     }
 
-    public function test_only_answers_on_screen_are_already_told(): void
+    public function test_only_this_openings_answers_are_already_told(): void
     {
         // QA, 16.11: "what is your return policy?" answered "We also offer exchanges within 60 days." alone: the same
-        // question's answer of an earlier opening, hidden behind the dashed line, was sent as told
-        $this->assertSame(['shipping?'], self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'what is your return policy?', answer: 'Returns within 30 days.', prev: true }, { id: 'b', kind: 'answer', q: 'shipping?', answer: 'Shipping takes 3 days.' }, { id: 'c', kind: 'answer', q: 'now', loading: true }]; return T.toldOnScreen('c').map(function (x) { return x.q; }); })()"));
+        // question's answer of an earlier opening, hidden behind the dashed line, was sent as told. One hidden as the
+        // shopper types the next question is this opening's still
+        $this->assertSame(['typing hid it', 'shipping?'], self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'what is your return policy?', answer: 'Returns within 30 days.', prev: true, earlier: true }, { id: 'x', kind: 'answer', q: 'typing hid it', answer: 'Yes.', prev: true }, { id: 'b', kind: 'answer', q: 'shipping?', answer: 'Shipping takes 3 days.' }, { id: 'c', kind: 'answer', q: 'now', loading: true }]; return T.toldOnScreen('c').map(function (x) { return x.q; }); })()"));
+    }
+
+    public function test_a_question_after_an_answer_goes_on_with_its_conversation_unless_it_is_of_an_earlier_opening(): void
+    {
+        // Naot QA, 16.11: "ומה עם מוצרים במבצע?" typed after the men's sandals' answer: typing hid the answer, and the
+        // question went alone ("9 on sale now" of the whole store). Hidden as one types, it is gone on with
+        $this->assertSame([['q' => 'Which sandals do you have for men?', 'a' => "Men's sandals (11):"]], self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'Which sandals do you have for men?', answer: \"Men's sandals (11):\", prev: true }]; return T.conversationGoingOn(); })()"));
+        // its own conversation with it, the last three
+        $this->assertCount(3, self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'q3', answer: 'a3', thread: [{ q: 'q1', a: 'a1' }, { q: 'q2', a: 'a2' }] }]; return T.conversationGoingOn(); })()"));
+        // an earlier opening's answer, a search in between, an answer still loading: a question of its own
+        $this->assertNull(self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'old', answer: 'old answer', prev: true, earlier: true }]; return T.conversationGoingOn(); })()"));
+        $this->assertNull(self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'q', answer: 'a' }, { id: 'b', kind: 'results', q: 'boots', ids: [] }]; return T.conversationGoingOn(); })()"));
+        $this->assertNull(self::drawer("(function () { S.turns = [{ id: 'a', kind: 'answer', q: 'q', loading: true }]; return T.conversationGoingOn(); })()"));
+    }
+
+    public function test_a_card_writes_a_price_exactly_and_tells_the_assistant_how(): void
+    {
+        // Naot QA, 16.11: "AUD 202.46" in the answer, "$202" on its card. The card exact, two decimals unless whole; the
+        // assistant told the currency and the sign the cards write
+        $this->assertSame(['$202.46', '$99.50', '$250', ['currency' => 'USD', 'currency_sign' => '$', 'sign_after' => false]], self::drawer("(function () { S.config = { currency: 'USD' }; return [T.money(202.46), T.money(99.5), T.money(250), T.priceLike()]; })()"));
+        $this->assertSame(['₪1,250', ['currency' => 'ILS', 'currency_sign' => '₪', 'sign_after' => false]], self::drawer('(function () { S.config = {}; return [T.money(1250), T.priceLike()]; })()'));
+        $this->assertSame(['currency' => 'EUR', 'currency_sign' => '€', 'sign_after' => true], self::drawer("(function () { S.config = { currency: 'EUR' }; S.cur = { prefix: '', suffix: ' €' }; return T.priceLike(); })()"));
     }
 
     public function test_the_exact_match_is_shown_once_and_a_word_chip_starts_with_a_capital(): void

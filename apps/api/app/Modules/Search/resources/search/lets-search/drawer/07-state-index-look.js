@@ -13,7 +13,8 @@
   function blankC() { return { f: {}, sort: '', stock: false, sale: false, no: {}, auto: {}, at: {}, words: {}, suggest: {}, picked: {} }; }
   if (WISH.wish.length) { S.saved = WISH.wish.slice(); } else if (S.saved.length) { WISH.wish = S.saved.slice(); WISH.pending = S.saved.slice(); wishSave(); }
   // what was asked on earlier pages is kept, but hidden on this one until asked for (the dashed line at the bottom)
-  S.turns.forEach(function (x) { x.prev = true; });
+  // (earlier: of another page or opening, never a conversation the next question goes on with, nor what it was told)
+  S.turns.forEach(function (x) { x.prev = true; x.earlier = true; });
   var fresh = {}; // turn ids that animate in this render only
   var BOOTED = false; // the page is hooked: a look that changes after this re-hooks and redraws what is on it
   var OOS = { host: null, watching: false, state: null, text: null }; // the product page's row for a product sold out

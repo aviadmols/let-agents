@@ -1292,10 +1292,31 @@ final class SiteQuestionTest extends TestCase
      * @param  list<string>  $products
      * @param  list<string>  $previous  what the drawer's turn before showed
      */
-    private function askWith(string $question, array $products, array $previous = [], bool $page = false): TestResponse
+    private function askWith(string $question, array $products, array $previous = [], bool $page = false, array $extra = []): TestResponse
     {
         return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
-        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products] + ($previous === [] ? [] : ['previous' => $previous]) + ($page ? ['page' => 1] : []), JSON_UNESCAPED_UNICODE));
+        ], content: json_encode(['question' => $question, 'vid' => self::VID, 'locale' => 'he', 'products' => $products] + ($previous === [] ? [] : ['previous' => $previous]) + ($page ? ['page' => 1] : []) + $extra, JSON_UNESCAPED_UNICODE));
+    }
+
+    public function test_the_answers_prices_are_written_as_the_storefronts_cards_write_them(): void
+    {
+        // Naot QA, 16.11: the answer said "AUD 202.46", its card "$202". The writer is given each price as the cards write
+        // it (the currency and sign the drawer sends), so what it quotes is what the card beside it says
+        $this->product('972', 'Arthur Sandal', 'A leather sandal.', [], ['price' => '202.46', 'currency' => 'AUD', 'in_stock' => true]);
+        $this->replies = [
+            ['found' => true, 'answer' => 'Arthur Sandal is $202.46.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'the sandal']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->askWith('How much is the Arthur sandal?', ['972'], [], false, ['currency' => 'USD', 'currency_sign' => '$']);
+        $this->assertSame('$202.46', json_decode($this->calls[0]['user'], true)['products'][0]['price'], 'the cards\' sign, never "AUD 202.46"');
+
+        // a sign the cards put after the number, and an older drawer that sends none: the product's own, as before
+        $this->assertSame(['202.46 €', 'AUD 202.46', '₪350', '$1,299.90'], [
+            AnswerSiteQuestion::priceAs(202.46, 'EUR', '€', true),
+            AnswerSiteQuestion::priceAs(202.46, 'AUD'),
+            AnswerSiteQuestion::priceAs(350.0, 'ILS', '₪'),
+            AnswerSiteQuestion::priceAs(1299.9, 'USD', '$'),
+        ]);
     }
 }
