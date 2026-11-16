@@ -592,6 +592,28 @@ final class SiteQuestionTest extends TestCase
         $this->assertArrayNotHasKey('choices', $released);
     }
 
+    public function test_the_v29_checker_reads_the_conversation_and_the_released_one_does_not(): void
+    {
+        // a reply asked again in other words (Miss Nori, 16.11): the checker of v29 is given the conversation, to see what
+        // the answer must not say or offer again; the released checker is given what it was always given
+        $this->product('991', 'חולצת כותנה', 'חולצה.', [], ['price' => '100.00', 'in_stock' => true]);
+        $thread = [['q' => 'מה לעשות כדי להחזיר את המוצר?', 'a' => 'אפשר להחזיר בחנות או בשליח. תרצו שנפרט מה צריך להכין?']];
+        $reply = fn (): array => [
+            ['found' => true, 'answer' => 'את החולצה שולחים לחנות שלנו.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'החולצה שנשאלה']], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true],
+            ['decision' => 'approve', 'issues' => [], 'revised' => '', 'picks' => [['ref' => 'p1', 'fits' => true, 'why' => '']], 'supported' => true, 'on_topic' => true, 'picks_fit' => true, 'safe' => true, 'injection' => false],
+        ];
+        $checkerSaw = fn (): array => json_decode((string) collect($this->calls)->last()['user'], true);
+
+        $this->replies = $reply();
+        $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'לאן שולחים?', ['991'], 29, 'he', null, $thread, ['scope_site' => 29, 'verify_site' => 29]));
+        $this->assertSame('מה לעשות כדי להחזיר את המוצר?', $checkerSaw()['conversation'][0]['question'] ?? null);
+
+        $this->calls = [];
+        $this->replies = $reply();
+        $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'לאן שולחים?', ['991'], null, 'he', null, $thread));
+        $this->assertArrayNotHasKey('conversation', $checkerSaw(), 'the released checker as it was');
+    }
+
     public function test_a_passage_cut_in_a_word_and_a_budget_asked_on_a_product_page(): void
     {
         // the comparison with Zipchat, 16.11: "רוקס אנד ג" copied as the store's name; a gift for mom answered with the ring

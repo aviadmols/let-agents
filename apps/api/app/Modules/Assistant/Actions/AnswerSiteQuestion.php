@@ -3232,10 +3232,14 @@ final class AnswerSiteQuestion implements TriesQuestions
             ? [['ref' => $viewing, 'title' => (string) $productsByRef[$viewing]['title'], 'why' => '']]
             : $picks;
 
+        // a reply's conversation, for a checker that reads it (verify_site v29): what this answer must not say or offer again
+        $conversation = $this->conversation !== [] && self::promptReads('verify_site', $this->promptVersions['verify_site'] ?? self::releasedVersion('verify_site'), 'conversation')
+            ? ['conversation' => $this->conversation] : [];
+
         return (string) json_encode([
             'question' => $question,
             'answer' => $answer,
-        ] + (isset($prepared['now']) ? ['now' => $prepared['now']] : []) + [
+        ] + $conversation + (isset($prepared['now']) ? ['now' => $prepared['now']] : []) + [
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']] + (in_array($byRef[$ref]['from'] ?? null, self::OWN_WORD, true) ? ['from' => $byRef[$ref]['from']] : []), $cited),
             'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank']))
                 // the sizes it is made in and the one it is, as the writer had them: code's measures, not a claim to refuse
