@@ -11,7 +11,7 @@
     INPUT.value = ''; FIELD.classList.remove('has-text'); hideLive();
     S.tab = 'chat'; S.wide = null;
     if (kind === 'ask' && off('ask') && !(about || S.askMode)) { kind = 'search'; }
-    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q)))) { S.keptQ = null; askTurn(q, null, about || S.askMode); return blurPhone(); }
+    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q) || repliesToChat(q)))) { S.keptQ = null; askTurn(q, null, about || S.askMode); return blurPhone(); }
     // a search stays in the field as it was typed: back in the field, the shopper goes on from it (as Aviad asked,
     // 2026-10-21). The same words again ask nothing: their results are already on screen.
     keepInField(q);
@@ -27,6 +27,16 @@
     blurPhone();
   }
   function blurPhone() { if (isPhone()) { INPUT.blur(); } }
+  // A reply to the conversation on screen, typed in the main box: a question (its mark, or as the engine reads one), or a
+  // sentence that goes on from what was said (opening with "ו": "ומה עם עגילי פנינים לאמא שלי? באותו תקציב"). It goes to the
+  // AI with the conversation, never to a search of its words (QA, 16.11: its budget and its subject were lost)
+  function repliesToChat(q) {
+    q = String(q || '').trim();
+    if (!q || !conversationGoingOn()) { return false; }
+    var words = q.split(/\s+/);
+    // ...in English too: "and the same in gold", "what about earrings for my mom"
+    return isQuestion(q) || /[?؟]/.test(q) || (words.length >= 2 && (/^ו[֐-׿]{2,}/.test(words[0] || '') || /^(and|also|plus|what about|how about)\s/i.test(q)));
+  }
   // the words of the search on screen, left in the field; typing on from them is a new search, as always
   function keepInField(q) {
     S.keptQ = q || null;
@@ -593,6 +603,11 @@
     // and a value the words named that none of the results has, let go (readTags): said first
     var letGo = (turn.letGo || []).filter(function (w) { return !ASKS_ONLY.test(w) && !STOP.test(w); });
     var shownList = filtered(turn), missing = typed.length ? [] : letGo.concat(unsaid(turn.q, shownList, read, turn.near).filter(function (w) { return letGo.indexOf(w) < 0; }));
+    // in a sentence, only words the store has elsewhere are said left out: one no product of it holds ("ומה", "באותו",
+    // "תקציב") is no thing it lacks, and listed it showed the search's own workings (QA, 16.11: "…בלי 'ומה', 'שלי', 'באותו',
+    // 'תקציב'"). A short search says each word it lacks ("שעון רולקס": no Rolex; "sneakers for kids": none for kids)
+    var sentence = wordsOf(turn.q).length > 3;
+    missing = missing.filter(function (w) { return !sentence || !E || !E.normalize || storeShare(withFamily(wordForms(E.normalize(w)))) > 0; });
     var rest = missing.length ? kept.filter(function (w) { return missing.indexOf(w) < 0; }) : [];
     // "מה זה ספרי פנטזיה?": the books are shown, and it says so; "פנטזיה" is not on the site
     // nothing as asked: the server searched looser, and says what it left out; the other way it found is a press away

@@ -296,14 +296,17 @@ final class SearchCatalog
             return $result;
         }
         $facets = (array) ($index['facets'] ?? []);
+        // whom it is for, and the store's category the words name (a tour's "israel"): what it is, never left out
         $whomSaid = array_map(fn (array $n): string => HebrewSearch::normalize((string) $n['said']), array_filter(HebrewSearch::facets($raw, $facets, $index),
-            fn (array $n): bool => in_array((string) ($facets[intdiv((int) $n['code'], 1000)]['k'] ?? ''), self::WHOM_FACETS, true)));
+            fn (array $n): bool => in_array((string) ($facets[intdiv((int) $n['code'], 1000)]['k'] ?? ''), [...self::WHOM_FACETS, 'category'], true)));
         // the nouns of the store's own kinds of product (its type filter's names, each by its first word: "פוליש", "מכונת שטיפה",
         // never the "עץ" of "דבק לעץ"): what it is, wherever typed. "מכונת פוליש" left without "פוליש" is every machine
         // (Gueta, 10.11: the pressure washers, as if asked for)
         $kindWords = [];
         foreach ($facets as $facet) {
-            if (($facet['k'] ?? null) === 'type') {
+            // ...and of its categories the same way ("Israel Tours": a tour's "israel" is what it is, never left out for another
+            // country's tours)
+            if (in_array($facet['k'] ?? null, ['type', 'category'], true)) {
                 foreach ((array) ($facet['v'] ?? []) as $value) {
                     $noun = explode(' ', HebrewSearch::normalize((string) ($value['l'] ?? '')), 2)[0];
                     if (mb_strlen($noun) >= 3 && preg_match('/^\p{L}+$/u', $noun) === 1) {
@@ -324,6 +327,10 @@ final class SearchCatalog
             if ($first === null) {
                 $first = $at;
 
+                continue;
+            }
+            // nor a price's own parts: "ש״ח" left out of "טבעת יהלום עד מחיר 1500 ש״ח" lost what was left of its price (Rocks QA)
+            if (HebrewSearch::pricePart($word)) {
                 continue;
             }
             if (array_filter($whomSaid, fn (string $s): bool => $s !== '' && str_contains($plain, $s)) !== []) {
@@ -392,7 +399,16 @@ final class SearchCatalog
     {
         $words = explode(' ', HebrewSearch::normalize($query));
         $last = (string) end($words);
-        if (mb_strlen($last) < 3 || preg_match('/^\p{Hebrew}+$/u', $last) !== 1 || HebrewSearch::colorOf($last) !== null) {
+        // a colour in any language: the Hebrew forms the search reads, else a colour Colours knows ("blue", "navy")
+        $colourOf = function (string $w): ?array {
+            if (($base = HebrewSearch::colorOf($w)) !== null) {
+                return [$base, $base];
+            }
+            $named = array_values(array_filter(Colours::mentions($w), fn (array $m): bool => $m['group'] !== 'metal'));
+
+            return $named === [] ? null : [(string) $named[0]['family'], $w];
+        };
+        if (mb_strlen($last) < 3 || preg_match('/^\p{L}+$/u', $last) !== 1 || $colourOf($last) !== null) {
             return $query;
         }
         $colours = [];
@@ -402,17 +418,19 @@ final class SearchCatalog
                 return $query;
             }
             if (str_starts_with($word, $last)) {
-                $colour = HebrewSearch::colorOf($word);
+                $colour = $colourOf($word);
                 if ($colour === null) {
                     return $query;
                 }
-                $colours[$colour] = true;
+                // the family's shortest word the store writes ("blue" before "blues")
+                $was = $colours[$colour[0]] ?? null;
+                $colours[$colour[0]] = $was === null || mb_strlen($colour[1]) < mb_strlen($was) ? $colour[1] : $was;
             }
         }
         if (count($colours) !== 1) {
             return $query;
         }
-        $words[count($words) - 1] = (string) array_key_first($colours);
+        $words[count($words) - 1] = (string) reset($colours);
 
         return implode(' ', $words);
     }

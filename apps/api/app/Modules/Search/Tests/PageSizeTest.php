@@ -12,6 +12,8 @@ use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /**
@@ -77,6 +79,40 @@ final class PageSizeTest extends TestCase
         $this->assertSame([$at * 1000 + 1], array_values(array_filter($index['records']['p:2']['f'] ?? [], fn (int $c): bool => intdiv($c, 1000) === $at)));
         $this->assertSame([$at * 1000 + 1], array_column(HebrewSearch::facets('טבעת רובי מידה 54', $index['facets']), 'code'));
         $this->assertSame('טבעת רובי', HebrewSearch::withoutFacetWords($index, 'טבעת רובי מידה 54'), 'searched as the filter, not as words');
+        // an age is no size (QA, 16.11: "מתנה לאמא שלי בת 60" became the size 60), in the browser as on the server
+        $this->assertSame([$at * 1000 + 1], array_column(HebrewSearch::facets('טבעת רובי 54', $index['facets']), 'code'), 'a size typed alone is still the size');
+        $this->assertSame([], array_column(HebrewSearch::facets('טבעת לאמא שלי בת 54', $index['facets']), 'code'));
+        $this->assertSame([], array_column(HebrewSearch::facets('טבעת לילד בן 54', $index['facets']), 'code'));
+        $this->assertSame([], array_column(HebrewSearch::facets('טבעת לגיל 54', $index['facets']), 'code'));
+        // in English too
+        $this->assertSame([], array_column(HebrewSearch::facets('a ring for my mom aged 54', $index['facets']), 'code'));
+        $this->assertSame([], array_column(HebrewSearch::facets('a ring for my mom 54 years old', $index['facets']), 'code'));
+        $this->assertSame([$at * 1000 + 1], array_column(HebrewSearch::facets('ring size 54', $index['facets']), 'code'));
+        $js = self::engine("JSON.stringify(E.readFacets('טבעת לאמא שלי בת 54', ".json_encode($index['facets'], JSON_UNESCAPED_UNICODE).').map(function (r) { return r.code; }))');
+        if ($js !== null) {
+            $this->assertSame('[]', $js, 'the browser reads it the same');
+        }
+    }
+
+    /** An expression over the browser's engine (E), run in Node; null where Node is not installed. */
+    private static function engine(string $expression): ?string
+    {
+        $node = (new ExecutableFinder)->find('node');
+        if ($node === null) {
+            return null;
+        }
+        $script = 'var E = require('.json_encode(str_replace('\\', '/', dirname(__DIR__).'/resources/search/hebrew-search-engine.js')).'); process.stdout.write('.$expression.');';
+        // from a file: the engine is longer than a command line may be on Windows
+        $file = tempnam(sys_get_temp_dir(), 'engine');
+        file_put_contents($file, $script);
+        try {
+            $process = new Process([$node, $file]);
+            $process->mustRun();
+
+            return trim($process->getOutput());
+        } finally {
+            @unlink($file);
+        }
     }
 
     public function test_a_ring_the_store_resizes_is_found_in_every_size_its_page_offers(): void

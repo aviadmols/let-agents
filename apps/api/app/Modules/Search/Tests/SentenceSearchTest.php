@@ -78,6 +78,11 @@ final class SentenceSearchTest extends TestCase
         $this->assertSame($this->search('טבעת זהב צהוב')['ids'], $this->search('טבעת זהב צהו')['ids']);
         // two letters are no start of a word yet
         $this->assertNotSame($this->search('טבעת זהב צהוב')['ids'], $this->search('טבעת זהב צה')['ids']);
+        // in English as in Hebrew; and never where the start is also another word's
+        $complete = new \ReflectionMethod(SearchCatalog::class, 'colourCompleted');
+        $this->assertSame('ring blue', $complete->invoke(null, ['list' => ['ring', 'blue', 'blues']], 'ring blu'));
+        $this->assertSame('ring blu', $complete->invoke(null, ['list' => ['ring', 'blue', 'blush']], 'ring blu'), '"blush" is no colour word here');
+        $this->assertSame('ring re', $complete->invoke(null, ['list' => ['ring', 'red']], 'ring re'));
     }
 
     public function test_a_value_read_from_the_words_is_what_a_product_carries(): void

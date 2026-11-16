@@ -113,6 +113,18 @@ final class ContentFiltersTest extends TestCase
         // Rocks, 16.11: "מעל ל 4500 ש״ח" was read as a budget of 4500 (its "ל" broke "מעל"), and rings under it were shown
         $this->assertSame(['טבעת זהב צהוב עם אבן אדומה', 4500.0, null], HebrewSearch::priceRange('טבעת זהב צהוב עם אבן אדומה מחיר מעל ל 4500 ש"ח'));
         $this->assertSame(['טבעת', 4500.0, null], HebrewSearch::priceRange('טבעת מעל ל-4500'));
+        // the word for price between the top and the amount (Rocks QA, 16.11: "עד מחיר 1500 ש״ח" unread, "עד" searched as a word)
+        $this->assertSame(['טבעת יהלום', null, 1500.0], HebrewSearch::priceRange('טבעת יהלום עד מחיר 1500 ש״ח'));
+        $this->assertSame(['שרשרת', 500.0, null], HebrewSearch::priceRange('שרשרת מעל תקציב של 500'));
+        $this->assertSame(['rings', null, 300.0], HebrewSearch::priceRange('rings under price of 300'));
+        $this->assertSame(['rings', null, 300.0], HebrewSearch::priceRange('rings up to a price of 300'));
+        $this->assertSame(['a gift for my mom aged 60', null, 300.0], HebrewSearch::priceRange('a gift for my mom aged 60 up to 300$'));
+        // an age is no price's bottom (QA, 16.11: "בת 60 עד 3000 שקל" was read as 60 to 3,000)
+        $this->assertSame(['מתנה לאמא שלי בת 60', null, 3000.0], HebrewSearch::priceRange('מתנה לאמא שלי בת 60 עד 3000 שקל'));
+        $this->assertSame(['טבעת', 2000.0, 2500.0], HebrewSearch::priceRange('טבעת 2000 עד 2500 שקל'));
+        $this->assertTrue(HebrewSearch::pricePart('ש״ח'));
+        $this->assertTrue(HebrewSearch::pricePart('1500'));
+        $this->assertFalse(HebrewSearch::pricePart('שחור'));
         $this->assertSame(['טבעת', null, 2000.0], HebrewSearch::priceRange('טבעת עד ל-2000'));
         $this->assertSame(['טבעת', 3000.0, null], HebrewSearch::priceRange('טבעת החל מ-3000'));
     }

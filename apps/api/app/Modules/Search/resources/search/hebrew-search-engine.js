@@ -828,6 +828,10 @@
   var READ_LATIN = /^[a-z]+$/;
   var READ_HEBREW = /^[א-ת]+$/;
   var READ_SIZE_WORD = /^(?:[ובה]?מיד[הת]|size)$/;
+  // a word that says the number after it is an age ("בת 60", "לגיל 3", "aged 60"): no size and no price (the server's)
+  var READ_AGE_WORD = /^(?:[ו]?ב[נת]|[ולב]?גיל|aged?)$/;
+  // ...or the word after it does ("60 years old", "בת 60 שנים"): the server's READ_AGE_AFTER
+  var READ_AGE_AFTER = /^(?:years?|yrs|yo|שנימ|שנה)$/;
   var READ_DAYS = /^(?:day|days|ימימ|יומ)$/;
   var READ_NIGHTS = /^(?:night|nights|לילות|לילה)$/;
   var READ_OTHER = /^(?:אחר|other)$/;
@@ -1175,7 +1179,11 @@
         var guessed = value.lw.every(function (w, k) {
           return placed.ks.indexOf(k) !== -1 || (!prepared.attributes[core(w)] && ((prepared.many[value.g][core(w)] || 0) >= 3 || (of >= 3 && n >= 2 && n >= of - 1)));
         });
-        if (!value.grouped && n === of) {
+        // "מתנה לאמא שלי בת 60": an age, never the size 60 (QA, 16.11)
+        if (!value.grouped && n === of && of === 1 && /^\d+$/.test(value.lw[0])
+          && ((placed.at[0] > 0 && READ_AGE_WORD.test(tw[placed.at[0] - 1])) || READ_AGE_AFTER.test(tw[placed.at[0] + 1] || ''))) {
+          read = null;
+        } else if (!value.grouped && n === of) {
           // "מידה 54": the word for size goes with the size it names
           read = of === 1 && placed.at[0] > 0 && READ_SIZE_WORD.test(tw[placed.at[0] - 1])
             ? { at: [placed.at[0] - 1, placed.at[0]], tiers: [0, placed.tiers[0]], part: false }

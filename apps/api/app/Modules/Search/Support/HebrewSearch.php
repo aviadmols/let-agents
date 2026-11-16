@@ -264,6 +264,15 @@ final class HebrewSearch
 
     private const PRICE_CURRENCY = '(?:\s*(?:'.self::CURRENCY.'))?';
 
+    /** Whether a word is a currency or an amount ("ש״ח", "$", "1500"): part of a price, never a word of what is asked. */
+    public static function pricePart(string $word): bool
+    {
+        return preg_match('/\d/u', $word) === 1 || preg_match('/^(?:'.self::CURRENCY.')$/iu', trim($word)) === 1;
+    }
+
+    /** The word for price or budget between a top or a bottom and its amount ("עד מחיר", "מעל תקציב של", "under price of"). */
+    private const PRICE_WORD = '(?:(?:a\s+)?(?:[בהו]?מחיר|[בהו]?תקציב|price|budget)(?:\s+של|\s+of)?\s*)?';
+
     /** A top: "עד", "under", "max price", "price up to" (the word "price" between the top and the amount, or before both). */
     private const PRICE_TOP = 'עד\s*ל[-־]?|עד|מתחת\s*ל[-־]?|מתחת|פחות\s*מ[-־]?|לא\s+יותר\s+מ-?|under|below|up\s+to|less\s+than|no\s+more\s+than|cheaper\s+than|max(?:imum)?(?:\s+(?:price|budget))?(?:\s+of)?|(?:price|budget)\s+(?:up\s+to|under|below|max(?:imum)?|of\s+up\s+to)';
 
@@ -345,10 +354,11 @@ final class HebrewSearch
             '/\s(?:[והבלמשכ]?בין|between)\s*'.$num.$cur.'\s*(?:ל-?|and|to|עד|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
             '/\s(?:מ-?|מ־|from)\s*'.$num.$cur.'\s*(?:עד|to|-|–)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
             '/\s'.$num.$cur.'\s*(?:-|–|עד|to)\s*'.$num.$cur.'(?=\s)/iu' => 'both',
-            // a top
-            '/\s(?:'.self::PRICE_TOP.')\s*'.$num.$cur.'(?=\s)/iu' => 'max',
+            // a top, the word for price between it and the amount or not ("עד מחיר 1500 ש״ח": the price went unread and "עד"
+            // was searched as a word, Rocks QA 16.11)
+            '/\s(?:'.self::PRICE_TOP.')\s*'.self::PRICE_WORD.$num.$cur.'(?=\s)/iu' => 'max',
             // a bottom
-            '/\s(?:'.self::PRICE_BOTTOM.')\s*'.$num.$cur.'(?=\s)/iu' => 'min',
+            '/\s(?:'.self::PRICE_BOTTOM.')\s*'.self::PRICE_WORD.$num.$cur.'(?=\s)/iu' => 'min',
         ];
 
         foreach ($patterns as $pattern => $kind) {
@@ -358,6 +368,12 @@ final class HebrewSearch
 
             // A bare "14-18" with no currency is a size or a karat, not a price.
             if ($kind === 'both' && ! preg_match('/ש|₪|nis|ils|\$|usd|dollar|€|eur|£|בין|between|מ|from/iu', $m[0]) && min($amount($m, 1), $amount($m, 3)) < 100) {
+                continue;
+            }
+            // ...nor is a small first number with no currency of its own a price's bottom when the currency is the second's
+            // alone: "מתנה לאמא שלי בת 60 עד 3000 שקל" was read as 60 to 3,000 (QA, 16.11); "עד 3000" is read as the top below
+            if ($kind === 'both' && $pattern === array_key_last(array_filter($patterns, fn (string $k): bool => $k === 'both'))
+                && $amount($m, 1) < 100 && preg_match('/^\s*'.$num.'\s*(?:'.self::CURRENCY.'|[$€£₪])/iu', $m[0]) !== 1) {
                 continue;
             }
 
@@ -554,6 +570,12 @@ final class HebrewSearch
     private const READ_HOW = ['exact', 'form', 'family', 'vowels', 'sound', 'slip'];
 
     private const READ_SIZE_WORD = '/^(?:[ובה]?מיד[הת]|size)$/u';
+
+    /** A word that says the number after it is an age ("בת 60", "לגיל 3", "aged 60"): no size and no price. The same in the browser. */
+    public const READ_AGE_WORD = '/^(?:[ו]?ב[נת]|[ולב]?גיל|aged?)$/u';
+
+    /** ...or the word after it does ("60 years old", "בת 60 שנים"). The same in the browser. */
+    public const READ_AGE_AFTER = '/^(?:years?|yrs|yo|שנימ|שנה)$/u';
 
     private const READ_DAYS = '/^(?:day|days|ימימ|יומ)$/u';
 
@@ -995,7 +1017,11 @@ final class HebrewSearch
                         $guessed = false;
                     }
                 }
-                if (! $value['grouped'] && $n === $of) {
+                // "מתנה לאמא שלי בת 60": an age, never the size 60 (QA, 16.11)
+                if (! $value['grouped'] && $n === $of && $of === 1 && preg_match('/^\d+$/', $lw[0]) === 1
+                    && (($placed['at'][0] > 0 && preg_match(self::READ_AGE_WORD, $tw[$placed['at'][0] - 1]) === 1) || preg_match(self::READ_AGE_AFTER, $tw[$placed['at'][0] + 1] ?? '') === 1)) {
+                    $read = null;
+                } elseif (! $value['grouped'] && $n === $of) {
                     // "מידה 54": the word for size goes with the size it names
                     $read = $of === 1 && $placed['at'][0] > 0 && preg_match(self::READ_SIZE_WORD, $tw[$placed['at'][0] - 1]) === 1
                         ? ['at' => [$placed['at'][0] - 1, $placed['at'][0]], 'tiers' => [0, $placed['tiers'][0]], 'part' => false]

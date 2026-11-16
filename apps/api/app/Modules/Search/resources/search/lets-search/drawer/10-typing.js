@@ -31,10 +31,12 @@
     if (S.tab !== 'chat' || S.wide) { S.tab = 'chat'; S.wide = null; render(); }
     // on a product page the words ask about the product, and the product's information stays as it is;
     // only words that read as a product search switch to the results
-    if (aboutProduct(q)) { askOnly(q); return; }
+    if (aboutProduct(q) || repliesToChat(q)) { askOnly(q); return; }
     var was = S.live, isNew = !was || !SUG.classList.contains('is-on');
     // a new search starts clean: what was on screen (results, similar items, answers) waits behind the dashed line
-    if (!was && S.turns.some(function (x) { return !x.prev; })) { S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; persist(); render(); }
+    // ...unless it may be a reply to the conversation still being typed ("ומה…"): the conversation stays where it is
+    var mayReply = conversationGoingOn() && (/^ו[֐-׿]{2,}/.test(q) || /^(and|also|plus|what|how)\b/i.test(q));
+    if (!was && !mayReply && S.turns.some(function (x) { return !x.prev; })) { S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; persist(); render(); }
     if (!was || was.q !== q) {
       var local = hits(q).filter(function (r) { return r.t === 'product'; });
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
