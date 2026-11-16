@@ -105,6 +105,16 @@ final class HeldKindTest extends TestCase
         // every word that tells them apart, else the rarest
         $this->assertSame(['1'], AnswerSiteQuestion::ownWordHolders('יש עגילי כסף?', $titles));
         $this->assertSame(['4'], AnswerSiteQuestion::ownWordHolders('יש לכם פלטינה?', $titles));
+        // none holding every word: those holding most of the question's words first, not the rarest word's alone (Rocks QA,
+        // 16.11: the one gift card, whose title alone says "מתנה", was the only product for the pearls in yellow gold)
+        $gift = [
+            '10' => 'כרטיס מתנה דיגיטלי',
+            '11' => 'עגילי פנינים זהב צהוב 14K',
+            '12' => 'שרשרת פנינים זהב צהוב',
+            '13' => 'צמיד פנינים כסף',
+            '14' => 'טבעת זהב צהוב',
+        ];
+        $this->assertSame(['11', '12', '14', '10', '13'], AnswerSiteQuestion::ownWordHolders('מתנה לאמא עד ₪1,500, זהב צהוב ופנינים', $gift));
         // a word in no title, or a question of none: nothing brought
         $this->assertSame([], AnswerSiteQuestion::ownWordHolders('יש לכם תכשיטי טיטניום?', $titles));
         $this->assertSame([], AnswerSiteQuestion::ownWordHolders('מה שעות הפתיחה?', $titles));

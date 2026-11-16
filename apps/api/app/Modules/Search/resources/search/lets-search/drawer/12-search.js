@@ -514,7 +514,8 @@
   }
   // the products added to the cart in this visit (this tab), by product
   function inCart() { if (!S.inCart) { S.inCart = store('session', 'ls_in_cart') || {}; } return S.inCart; }
-  function addedMark() { return '<svg class="ls-icon ls-icon--sm ls-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>'; }
+  // drawn, as an added cart button's is: hidden, it took its place and "Added" stood off the button's centre (16.11)
+  function addedMark() { return '<svg class="ls-icon ls-icon--sm ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg>'; }
   function markAdded(id) {
     var k = String(pid(id));
     inCart()[k] = 1;

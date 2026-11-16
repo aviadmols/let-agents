@@ -3485,8 +3485,31 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         $every = array_values(array_intersect(...array_values($by)));
         if ($every === []) {
-            uasort($by, fn (array $a, array $b): int => count($a) <=> count($b));
-            $every = array_values((array) reset($by));
+            // none holds them all: those holding most of the question's words first, the common ones too, then the rarer
+            // word's. Not the rarest word's alone: "מתנה לאמא עד ₪1,500, זהב צהוב ופנינים" brought the one gift card,
+            // whose title alone says "מתנה", over the pearls in yellow gold (Rocks QA, 16.11)
+            $words = Question::words($question);
+            $rarity = [];
+            foreach ($by as $ids) {
+                foreach ($ids as $id) {
+                    $rarity[$id] = min($rarity[$id] ?? PHP_INT_MAX, count($ids));
+                }
+            }
+            $place = array_flip(array_map('strval', array_keys($titles)));
+            $score = [];
+            // each word once: a word and its stem ("מתנה", "תנה") held by one title are one word of the question
+            usort($words, fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+            foreach (array_keys($rarity) as $id) {
+                $held = [];
+                foreach ($words as $w) {
+                    if ($holds((string) $titles[$id], $w) && array_filter($held, fn (string $h): bool => str_contains($h, $w)) === []) {
+                        $held[] = $w;
+                    }
+                }
+                $score[$id] = count($held);
+            }
+            $every = array_map('strval', array_keys($rarity));
+            usort($every, fn (string $a, string $b): int => [$score[$b], $rarity[$a], $place[$a] ?? 0] <=> [$score[$a], $rarity[$b], $place[$b] ?? 0]);
         }
 
         return array_slice($every, 0, self::OWN_WORD_SHOWN);
