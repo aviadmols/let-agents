@@ -126,7 +126,7 @@ final class TradeTermsTest extends TestCase
 
         $this->assertSame('succeeded', $run->status->value);
         $this->assertSame([AiProviderName::OpenAi, AiProviderName::Anthropic], array_column($this->calls, 'provider'), 'the other family checks');
-        $this->assertSame(file_get_contents(__DIR__.'/../Prompts/trade_terms.v1.md'), $this->calls[0]['system']);
+        $this->assertSame(file_get_contents(__DIR__.'/../Prompts/trade_terms.v'.BuildTradeGlossary::PROMPT_VERSION.'.md'), $this->calls[0]['system']);
         $checked = array_column(json_decode($this->calls[1]['user'], true)['terms'], 'term');
         $this->assertNotContains('GH', $checked, 'code drops a line with a sum before the checker sees it');
         $this->assertCount(count(array_unique($checked)), $checked);
@@ -171,6 +171,19 @@ final class TradeTermsTest extends TestCase
         $this->assertStringNotContainsString('כותנה', $body);
         $this->assertSame([], $this->knowledge('האם זה 100% כותנה?'));
         $this->inShop(fn () => app(BuildShopKnowledge::class)->showTerm('כותנה'));
+
+        // Written with another prompt: its words decided again, all but the team's line
+        $this->inShop(function (): void {
+            $state = app(BuildShopKnowledge::class)->termState();
+            app(BuildShopKnowledge::class)->terms($state['rows'], $state['seen'], BuildTradeGlossary::PROMPT_VERSION - 1);
+        });
+        $this->calls = [];
+        app(BuildTradeGlossary::class)->handle($this->shop->id);
+        $sent = array_column(json_decode($this->calls[0]['user'], true)['candidates'], 'term');
+        $this->assertContains('VS', $sent, 'what the model wrote is written again');
+        $this->assertNotContains('14K', $sent, 'what the team wrote is never sent');
+        $this->assertStringContainsString('- 14K: זהב 14 קראט: 58.5% זהב טהור.', (string) $this->entry()->body);
+        $this->assertSame(BuildTradeGlossary::PROMPT_VERSION, $this->inShop(fn (): int => app(BuildShopKnowledge::class)->termState()['version']));
         $this->assertStringContainsString('- כותנה: ', (string) $this->entry()->body);
 
         // Off for the store: none of it is read, but a quality run tries it in its own process.

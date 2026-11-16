@@ -512,7 +512,7 @@ final class BuildShopKnowledge
     /**
      * The bank of terms as last written, and every word already decided (kept, dropped or not a term).
      *
-     * @return array{rows: list<array{key: string, term: string, text: string, state: string, from?: string, model?: string, at?: string}>, seen: list<string>}
+     * @return array{rows: list<array{key: string, term: string, text: string, state: string, from?: string, model?: string, at?: string}>, seen: list<string>, version: int}
      */
     public function termState(): array
     {
@@ -521,6 +521,8 @@ final class BuildShopKnowledge
         return [
             'rows' => array_values(array_filter((array) ($terms['rows'] ?? []), fn ($r): bool => is_array($r) && isset($r['key'], $r['term'], $r['text'], $r['state']))),
             'seen' => array_values(array_map('strval', (array) ($terms['seen'] ?? []))),
+            // the prompt the words were decided with: another one decides them again
+            'version' => (int) ($terms['version'] ?? 0),
         ];
     }
 
@@ -531,13 +533,13 @@ final class BuildShopKnowledge
      * @param  list<array<string, mixed>>  $rows
      * @param  list<string>  $seen
      */
-    public function terms(array $rows, array $seen): void
+    public function terms(array $rows, array $seen, ?int $version = null): void
     {
         usort($rows, fn (array $a, array $b): int => strcmp((string) $a['key'], (string) $b['key']));
         $seen = array_values(array_unique($seen));
         sort($seen);
         $lines = array_map(fn (array $r): string => '- '.$r['term'].': '.$r['text'], array_values(array_filter($rows, fn (array $r): bool => $r['state'] !== 'hidden')));
-        $state = ['rows' => $rows, 'seen' => $seen, 'written_at' => now()->toIso8601String()];
+        $state = ['rows' => $rows, 'seen' => $seen, 'version' => $version ?? $this->termState()['version'], 'written_at' => now()->toIso8601String()];
 
         if ($lines === [] && $this->row(self::TERMS) === null) {
             CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => self::TERMS, 'title' => '', 'body' => '', 'terms' => $state, 'hash' => hash('sha256', ''), 'removed_at' => now(), 'synced_at' => now()]);

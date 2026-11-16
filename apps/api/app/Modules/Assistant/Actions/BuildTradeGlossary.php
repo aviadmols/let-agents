@@ -43,7 +43,8 @@ final class BuildTradeGlossary
 
     public const ACTION = 'assistant.write_terms';
 
-    public const PROMPT_VERSION = 1;
+    // v2: what is measured and agreed only, never which is harder or better (Rocks, 16.11: the checker dropped 9K for it)
+    public const PROMPT_VERSION = 2;
 
     /** Words sent to the writer in one run, at most, and of one source. */
     private const CANDIDATES = 160;
@@ -116,6 +117,11 @@ final class BuildTradeGlossary
         }
 
         $state = $this->knowledge->termState();
+        // decided with another prompt: written again, all but what the team wrote or hid
+        if ($state['version'] !== self::PROMPT_VERSION) {
+            $state['rows'] = array_values(array_filter($state['rows'], fn (array $r): bool => $r['state'] !== 'ai'));
+            $state['seen'] = [];
+        }
         $rows = $state['rows'];
         $seen = array_flip($state['seen']);
         foreach ($rows as $row) {
@@ -177,7 +183,7 @@ final class BuildTradeGlossary
         $counts['terms'] = count($rows);
 
         // every word sent is decided: kept, dropped by the checker, or not a term; none is sent again
-        $this->knowledge->terms($rows, [...$state['seen'], ...array_map(fn (array $c): string => self::key($c['term']), array_values($sent))]);
+        $this->knowledge->terms($rows, [...$state['seen'], ...array_map(fn (array $c): string => self::key($c['term']), array_values($sent))], self::PROMPT_VERSION);
         $run->output($counts)->summary('assistant::runs.terms_written', ['new' => (string) $counts['kept'], 'terms' => (string) count(array_filter($rows, fn (array $r): bool => $r['state'] !== 'hidden'))]);
     }
 
