@@ -27,6 +27,7 @@ use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchSynonym;
+use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\ShownQuestion;
@@ -182,14 +183,23 @@ final class BuildSearchIndex
      * And the first word of each of its picture's other phrases, after the store's: the pieces a set is made of ("חליפת
      * ווידלג וסוויטשירט", its picture "סוויטשירט", "מכנסיים רחבים": trousers too, Miss Nori 16.11). The picture names only
      * the product, never what the model wears with it (caption v8; none of Miss Nori's 158 tops names trousers), nor what is
-     * only drawn on it (shown()).
+     * only drawn on it (shown()). Only where its own title names one of those pieces, as a set's does ("וסוויטשירט") or a
+     * pendant sold with its chain ("תליון עם שרשרת"): a pendant photographed on a chain is no necklace (Rocks: 364 of its 372
+     * pendants' words say "שרשרת").
      */
     private static function kindStems(CatalogProduct $product, ?RetrievalImage $picture = null): array
     {
         $phrases = $picture === null ? [] : array_values(array_filter(self::shown($picture),
             fn (string $phrase): bool => HebrewSearch::colorOf(HebrewSearch::normalize($phrase)) === null));
         $seen = array_slice($phrases, 0, self::PICTURE_KIND_PHRASES);
-        $pieces = array_map(fn (string $phrase): string => explode(' ', trim($phrase))[0], array_slice($phrases, self::PICTURE_KIND_PHRASES));
+        // a piece is a thing, never a colour or a metal, read by its whole phrase ("זהב צהוב": "זהב" in "תליון לב זהב" is no
+        // second piece)
+        $things = array_filter(array_slice($phrases, self::PICTURE_KIND_PHRASES), fn (string $phrase): bool => Colours::mentions($phrase) === []);
+        $pieces = array_values(array_filter(array_map(fn (string $phrase): string => HebrewSearch::normalize(explode(' ', trim($phrase))[0]), $things),
+            fn (string $w): bool => mb_strlen($w) >= 3 && HebrewSearch::colorOf($w) === null));
+        $title = ' '.HebrewSearch::normalize((string) $product->title).' ';
+        $set = array_any($pieces, fn (string $w): bool => preg_match('/ [והב]?'.preg_quote($w, '/').' /u', $title) === 1);
+        $pieces = $set ? $pieces : [];
         $names = [...$seen, (string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
             ...$product->categories->pluck('name')->map(fn ($n): string => (string) $n)->all(), ...$pieces];
         $stems = [];

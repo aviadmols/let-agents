@@ -111,6 +111,34 @@ final class ColourFamiliesTest extends TestCase
         $this->assertNotContains('5', array_column($found['groups']['product'], 'external_id'), 'still no red top, whatever its picture shows beside it');
     }
 
+    public function test_a_pendant_photographed_on_a_chain_is_no_necklace_unless_its_title_says_it_comes_with_one(): void
+    {
+        // Rocks: 364 of its 372 pendants' words say "שרשרת" (the chain they are photographed on); only a title that names a
+        // piece of what its picture shows (a set, "תליון עם שרשרת") makes those pieces kinds of it
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'he']);
+        Features::override('search.semantic', false, $shop->id);
+        Features::override('search.pictures', false, $shop->id);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach (['1' => ['שרשרת זהב דקה', ['שרשרת', 'זהב צהוב', 'חוליות דקות']], '2' => ['שרשרת חוליות זהב', ['שרשרת', 'חוליות', 'זהב צהוב']],
+                '3' => ['תליון לב זהב', ['תליון', 'לב', 'שרשרת דקה', 'זהב צהוב']], '4' => ['תליון כוכב עם שרשרת', ['תליון', 'כוכב', 'שרשרת דקה', 'זהב צהוב']],
+                '5' => ['טבעת זהב', ['טבעת', 'זהב צהוב']], '6' => ['טבעת יהלום', ['טבעת', 'יהלום']], '7' => ['טבעת חותם', ['טבעת', 'חותם']], '8' => ['עגילי זהב', ['עגילים', 'זהב']],
+                '9' => ['עגילי חישוק', ['עגילים', 'חישוק']], '10' => ['צמיד זהב', ['צמיד', 'זהב']]] as $id => [$title, $words]) {
+                $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                    'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => (string) $id, 'title' => $title,
+                    'image_url' => "https://store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', (string) $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($shop->id);
+
+        $found = array_column(app(SearchCatalog::class)->handle($shop->id, 'שרשרת זהב', count: false)['groups']['product'], 'external_id');
+
+        $this->assertContains('1', $found);
+        $this->assertContains('4', $found, 'a pendant whose title says it comes with a chain');
+        $this->assertNotContains('3', $found, 'a pendant photographed on a chain is no necklace');
+    }
+
     public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void
     {
         // Naot QA, 16.11: "Naot Footwear Australia" and "Naot Footwear Industries", one brand, a filter that narrows nothing
