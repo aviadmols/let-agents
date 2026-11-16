@@ -812,6 +812,11 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame([], array_intersect($picked, $data['named']['ids']), 'what was picked is not shown twice');
         $this->assertNotContains('971', $data['named']['ids'], 'no gift card among the range');
         $this->assertEqualsCanonicalizing(['טבעות עד 1,500', 'שרשראות עד 1,500', 'עגילים עד 1,500'], array_column($data['related'], 'name'));
+        // a kind is offered by a shopper's word: never a store's inner code, never in another language (Miss Nori, 16.11: "PANTS עד 250")
+        $readable = new \ReflectionMethod(AnswerSiteQuestion::class, 'readableKind');
+        foreach ([['SUIT-PANTS', 'מתנה עד 250', false], ['SHIRT', 'מתנה עד 250', false], ['Rings', 'מתנה עד 250', false], ['טבעות', 'מתנה עד 250', true], ['Rings', 'a gift under 250', true], ['Gift Sets', 'a gift under 250', true]] as [$name, $question, $ok]) {
+            $this->assertSame($ok, $readable->invoke(null, $name, $question), $name);
+        }
 
         // a wish that names a kind ("טבעת עדינה ליום הולדת עד 1500") is chosen among what its words name, as before
         $this->calls = [];

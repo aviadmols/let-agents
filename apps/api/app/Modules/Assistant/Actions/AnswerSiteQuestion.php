@@ -3853,6 +3853,20 @@ final class AnswerSiteQuestion implements TriesQuestions
     private const WISH_KINDS = 5;
 
     /**
+     * Whether a kind's name reads as a shopper's word: not an inner code ("SUIT-PANTS", "SHIRT"), and in the language the
+     * question is asked in (a Hebrew question is offered no English kinds).
+     */
+    private static function readableKind(string $name, string $question): bool
+    {
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 40 || preg_match('/^[A-Z0-9 _\-\/&.]+$/', $name) === 1 || preg_match('/[_\-\/]/', $name) === 1 && preg_match('/\s/', $name) !== 1) {
+            return false;
+        }
+
+        return preg_match('/\p{Hebrew}/u', $question) !== 1 || preg_match('/\p{Hebrew}/u', $name) === 1;
+    }
+
+    /**
      * Under the answer to a wish: more of the range inside its price than the writer picked ("more options in your budget"),
      * and its kinds to choose by, each a search inside the price ("טבעות עד 1,500"): a tap shows that kind, as asked
      * (as Aviad asked, 16.11: Kimonix shows eight and asks earrings, rings or necklaces). Code, no model.
@@ -3924,7 +3938,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             $type = trim((string) ($product->payload['product_type'] ?? ''));
             $kind = mb_strtolower($type) ?: mb_strtolower(implode('/', $path));
             $kinds[$kind][] = [(float) ($popular[(string) $product->external_id] ?? 0), $at, (string) $product->external_id];
-            $names[$kind] ??= $type !== '' ? $type : trim((string) (end($path) ?: ''));
+            // its name as a shopper reads it: the store's type, else its category, in the shopper's language and never an
+            // inner code (Miss Nori's types are "SHIRT", "SUIT-PANTS": the buttons said "PANTS עד 250", 16.11)
+            $names[$kind] ??= array_values(array_filter([$type, trim((string) (end($path) ?: ''))], fn (string $n): bool => self::readableKind($n, $question)))[0] ?? '';
         }
         foreach ($kinds as &$ids) {
             usort($ids, fn (array $a, array $b): int => [$b[0], $a[1]] <=> [$a[0], $b[1]]);
