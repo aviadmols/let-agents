@@ -1341,6 +1341,13 @@ final class AnswerSiteQuestion implements TriesQuestions
                 };
                 $rows = explode("\n", $text);
                 $said = array_values(array_filter($rows, $speaks));
+                // a question about a product, a term or a search is given the team's rows that speak of it, never the
+                // rest (parking and Layaway for "what is a carat?", Rocks 16.11); one about the store keeps them all, its
+                // address and hours among them. Tried in a quality run before it is on (assistant.team_rows_by_type).
+                if (config('assistant.team_rows_by_type') === true && ! self::asksOfTheStore($question)) {
+                    $rows = $said;
+                    $said = [];
+                }
                 if ($said !== [] && count($said) < count($rows)) {
                     $first[] = $passage($whole($said));
                     $rows = array_values(array_filter($rows, fn (string $row): bool => ! $speaks($row)));
