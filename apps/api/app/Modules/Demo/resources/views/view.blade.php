@@ -17,8 +17,10 @@
         html, body { height: 100%; }
         body { margin: 0; display: flex; flex-direction: column; background: #f6f6f7; color: #0b0b0c; font-family: "Google Sans", "Heebo", system-ui, sans-serif; }
         .bar { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 18px; background: #0b0b0c; color: #fff; font-size: 14px; }
-        .bar b { font-weight: 600; }
-        .bar .mark { width: 12px; height: 16px; display: inline-grid; grid-template-rows: 1fr 1fr; vertical-align: -2px; margin-inline-end: 6px; }
+        .bar b { font-weight: 600; line-height: 1.2; }
+        /* the mark and the title on one line, both centred on it */
+        .bar > span:first-child { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+        .bar .mark { flex: none; width: 12px; height: 16px; display: inline-grid; grid-template-rows: 1fr 1fr; }
         .bar .mark::before, .bar .mark::after { content: ""; background: #e2ff78; }
         .bar .mark::before { border-radius: 0 0 50% 50% / 0 0 100% 100%; }
         .bar .mark::after { border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
