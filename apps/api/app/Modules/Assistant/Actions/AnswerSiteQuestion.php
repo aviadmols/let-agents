@@ -228,7 +228,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         BuildShopKnowledge::REPEATED => 'every_product_page',
         // What the posts say about the store: a post, as the writer is told of any page.
         BuildShopKnowledge::POSTS => null,
+        // The store's bank of trade terms, written by one family and checked by the other (BuildTradeGlossary): a page.
+        BuildShopKnowledge::TERMS => null,
     ];
+
+    /** Lines of the bank of terms, of those whose term the question names. */
+    private const TERM_LINES = 4;
 
     /** Lines of what the posts say, of those that speak of the question. */
     private const POST_LINES = 8;
@@ -1306,6 +1311,15 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
             }
 
+            // the bank of terms: only the lines whose term the question names ("מה זה 14K?"), never one a word of its
+            // explanation shares with the question ("זהב" in a budget question)
+            if ($entry->external_id === BuildShopKnowledge::TERMS) {
+                // on for the store, or tried in a quality run's own process before it is (QualityBaselineCommand --terms)
+                $text = Features::enabled('assistant.trade_terms', $shopId) || config('assistant.try_terms') === true
+                    ? implode("\n", array_slice(BuildTradeGlossary::named($question, explode("\n", $text)), 0, self::TERM_LINES))
+                    : '';
+            }
+
             $passage = fn (string $text): array => ['source' => 'content', 'source_id' => (string) $entry->id, 'external_id' => null, 'title' => (string) $entry->title, 'text' => mb_substr($text, 0, self::KNOWLEDGE_CHARS), 'similarity' => 1.0, 'kind' => 'knowledge', 'from' => self::WRITTEN_BY[(string) $entry->external_id] ?? null];
 
             // what the team wrote: its rows that speak of the question a passage of their own, first, so the writer reads
@@ -1341,7 +1355,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             if ($text !== '') {
                 $first[] = $passage($text)
                     // Cut to what speaks of the question: kept for a question about a product too.
-                    + ($entry->external_id === BuildShopKnowledge::POSTS ? ['speaks' => true] : []);
+                    + (in_array($entry->external_id, [BuildShopKnowledge::POSTS, BuildShopKnowledge::TERMS], true) ? ['speaks' => true] : []);
             }
             foreach ($more as $piece) {
                 $first[] = $passage($piece);

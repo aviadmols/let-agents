@@ -47,6 +47,9 @@ class CatalogContent extends Model
     /** External ids of content the platform wrote for the store itself; a sync never removes them. */
     public const OWN_PREFIX = 'la:';
 
+    /** Of those, content its owner reads line by line itself, never found by meaning (a store's bank of trade terms). */
+    public const QUIET_PREFIX = self::OWN_PREFIX.'quiet-';
+
     protected $guarded = ['id'];
 
     protected function casts(): array

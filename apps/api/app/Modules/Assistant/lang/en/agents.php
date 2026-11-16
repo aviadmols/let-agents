@@ -4,6 +4,7 @@ return [
     'answerer' => 'Shopper question answerer',
     'site_answerer' => 'Answers questions from the search box',
     'ask_reviewer' => 'Reviews the search questions every day',
+    'term_writer' => 'Writes the store\'s bank of trade terms',
     'post_reader' => 'Reads the store\'s posts and articles',
     'voice_reader' => 'Reads the store\'s tone of voice',
     'team_helper' => 'Drafts the team answers',

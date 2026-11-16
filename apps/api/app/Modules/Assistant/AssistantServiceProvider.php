@@ -29,6 +29,7 @@ use App\Modules\Assistant\Console\QualityCasesCommand;
 use App\Modules\Assistant\Console\ReadPostsCommand;
 use App\Modules\Assistant\Console\RetrievalBenchCommand;
 use App\Modules\Assistant\Console\ReviewAsksCommand;
+use App\Modules\Assistant\Console\TermsCommand;
 use App\Modules\Assistant\Console\VoiceCommand;
 use App\Modules\Assistant\Console\WriterBenchCommand;
 use App\Modules\Assistant\Contracts\SuggestsQuestions;
@@ -128,6 +129,15 @@ final class AssistantServiceProvider extends ModuleServiceProvider
                 ->withoutOverlapping()
                 ->onOneServer()
                 ->runInBackground();
+
+            // At night: the trade terms of new products and of what shoppers asked the meaning of, each word once.
+            $schedule->command('assistant:terms --all')
+                ->dailyAt('04:10')
+                ->timezone('Asia/Jerusalem')
+                ->name('assistant:terms')
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->runInBackground();
         });
     }
 
@@ -138,6 +148,7 @@ final class AssistantServiceProvider extends ModuleServiceProvider
             KnowledgeCommand::class,
             VoiceCommand::class,
             ReadPostsCommand::class,
+            TermsCommand::class,
             MendQuestionsCommand::class,
             CheckerReportCommand::class,
             CheckerCompareCommand::class,

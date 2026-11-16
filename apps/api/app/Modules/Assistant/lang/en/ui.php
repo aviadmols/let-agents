@@ -134,6 +134,7 @@ Answer: :answer',
             'own' => 'About the store, from the store team',
             'team' => 'The store team\'s answers to shoppers\' questions',
             'posts' => 'What the site\'s posts and articles say about the store',
+            'terms' => 'Trade terms: a general explanation',
         ],
         'repeated' => [
             'title' => 'What every product page shows',

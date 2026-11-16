@@ -17,7 +17,8 @@ final class ContentDocuments implements DocumentSource
 
     public function documents(string $shopId): iterable
     {
-        foreach (CatalogContent::query()->active()->orderBy('id')->lazy(100)->chunk(100) as $batch) {
+        // content its owner reads line by line itself is never found by meaning (CatalogContent::QUIET_PREFIX)
+        foreach (CatalogContent::query()->active()->where('external_id', 'not like', CatalogContent::QUIET_PREFIX.'%')->orderBy('id')->lazy(100)->chunk(100) as $batch) {
             // What the reading took from each post (its takeaways), after its own text.
             $notes = ProductDocuments::notes(ChunkSource::Content, $batch->map(fn (CatalogContent $c): string => (string) $c->id)->values()->all());
 

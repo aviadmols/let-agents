@@ -84,7 +84,16 @@
                                     @endif
                                     @if (in_array($demo->status, ['scanning', 'ready', 'failed', 'expired'], true))
                                         @if (in_array($demo->status, ['scanning', 'ready'], true)) · @endif
-                                        <x-filament::link tag="button" size="sm" color="warning" wire:click="rescan(@js($demo->id))" wire:confirm="{{ $t('rescan_confirm') }}">{{ $t('rescan') }}</x-filament::link>
+                                        {{-- asked on the row itself, never by the browser's dialog: a browser told to stop a site's dialogs
+                                             cancels it silently, and "Scan again" did nothing (Aviad, 16.11) --}}
+                                        <span x-data="{ sure: false }" data-rescan>
+                                            <x-filament::link tag="button" size="sm" color="warning" x-show="!sure" x-on:click="sure = true">{{ $t('rescan') }}</x-filament::link>
+                                            <span x-show="sure" x-cloak style="white-space:normal;display:inline-block;max-width:320px">
+                                                <span style="font-size:12px">{{ $t('rescan_confirm') }}</span>
+                                                <x-filament::link tag="button" size="sm" color="warning" wire:click="rescan(@js($demo->id))" wire:loading.attr="disabled" x-on:click="sure = false">{{ $t('rescan_yes') }}</x-filament::link>
+                                                · <x-filament::link tag="button" size="sm" color="gray" x-on:click="sure = false">{{ $t('rescan_no') }}</x-filament::link>
+                                            </span>
+                                        </span>
                                     @endif
                                     · <x-filament::link tag="button" size="sm" color="danger" wire:click="remove(@js($demo->id))" wire:confirm="{{ $t('delete_confirm') }}">{{ $t('delete') }}</x-filament::link>
                                 </td>

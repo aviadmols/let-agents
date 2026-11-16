@@ -51,6 +51,12 @@ final class BuildShopKnowledge
 
     public const POSTS = CatalogContent::OWN_PREFIX.'knowledge-posts';
 
+    /** The store's bank of the terms of its trade (BuildTradeGlossary), a line each, the team's edits kept. */
+    public const TERMS = CatalogContent::QUIET_PREFIX.'knowledge-terms';
+
+    /** A term's line, as the team may write it. */
+    public const MAX_TERM_TEXT = 400;
+
     /** The pause between two pages, and before the one try again after "too many requests". */
     private const PAUSE_MS = 1000;
 
@@ -501,6 +507,87 @@ final class BuildShopKnowledge
         $terms['hidden'] = array_values(array_unique([...(array) ($terms['hidden'] ?? []), RepeatedText::key($fact)]));
         $row->forceFill(['terms' => $terms])->save();
         $this->posts((array) ($terms['read'] ?? []));
+    }
+
+    /**
+     * The bank of terms as last written, and every word already decided (kept, dropped or not a term).
+     *
+     * @return array{rows: list<array{key: string, term: string, text: string, state: string, from?: string, model?: string, at?: string}>, seen: list<string>}
+     */
+    public function termState(): array
+    {
+        $terms = (array) ($this->row(self::TERMS)?->terms ?? []);
+
+        return [
+            'rows' => array_values(array_filter((array) ($terms['rows'] ?? []), fn ($r): bool => is_array($r) && isset($r['key'], $r['term'], $r['text'], $r['state']))),
+            'seen' => array_values(array_map('strval', (array) ($terms['seen'] ?? []))),
+        ];
+    }
+
+    /**
+     * Writes the bank: the lines not hidden, "- term: text", sorted by term so the same bank is the same text. Kept when
+     * every line is hidden, removed from what the assistant reads, so its words are not asked about again.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  list<string>  $seen
+     */
+    public function terms(array $rows, array $seen): void
+    {
+        usort($rows, fn (array $a, array $b): int => strcmp((string) $a['key'], (string) $b['key']));
+        $seen = array_values(array_unique($seen));
+        sort($seen);
+        $lines = array_map(fn (array $r): string => '- '.$r['term'].': '.$r['text'], array_values(array_filter($rows, fn (array $r): bool => $r['state'] !== 'hidden')));
+        $state = ['rows' => $rows, 'seen' => $seen, 'written_at' => now()->toIso8601String()];
+
+        if ($lines === [] && $this->row(self::TERMS) === null) {
+            CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => self::TERMS, 'title' => '', 'body' => '', 'terms' => $state, 'hash' => hash('sha256', ''), 'removed_at' => now(), 'synced_at' => now()]);
+
+            return;
+        }
+
+        $this->put(self::TERMS, 'terms', implode("\n", $lines), $state);
+    }
+
+    /** The team's own line for a term: kept as written, never written over by the next reading. */
+    public function editTerm(string $key, string $text): bool
+    {
+        $text = trim((string) preg_replace('/\s+/u', ' ', mb_substr($text, 0, self::MAX_TERM_TEXT)));
+
+        return $text !== '' && $this->changeTerm($key, fn (array $r): array => [...$r, 'text' => $text, 'state' => 'edited', 'at' => now()->toIso8601String()]);
+    }
+
+    /** A term the team does not want told: out of the answers, never written again. */
+    public function hideTerm(string $key): bool
+    {
+        return $this->changeTerm($key, fn (array $r): array => [...$r, 'state' => 'hidden']);
+    }
+
+    /** A hidden term told again, as it was last written. */
+    public function showTerm(string $key): bool
+    {
+        return $this->changeTerm($key, fn (array $r): array => [...$r, 'state' => ($r['edited'] ?? false) === true ? 'edited' : 'ai']);
+    }
+
+    /** @param callable(array<string, mixed>): array<string, mixed> $change */
+    private function changeTerm(string $key, callable $change): bool
+    {
+        $state = $this->termState();
+        $found = false;
+        $rows = array_map(function (array $r) use ($key, $change, &$found): array {
+            if ($r['key'] !== $key) {
+                return $r;
+            }
+            $found = true;
+            $changed = $change($r);
+
+            return $changed['state'] === 'edited' ? [...$changed, 'edited' => true] : $changed;
+        }, $state['rows']);
+
+        if ($found) {
+            $this->terms($rows, $state['seen']);
+        }
+
+        return $found;
     }
 
     /** The team's answers to shoppers, one question and answer after another. */

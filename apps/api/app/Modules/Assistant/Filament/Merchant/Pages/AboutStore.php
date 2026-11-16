@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Filament\Merchant\Pages;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\LocksShopToPanelTenant;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\KnowledgeProducts;
@@ -44,7 +45,12 @@ final class AboutStore extends OperatorAboutStore
         return $user instanceof User && $shop !== null && ($user->is_operator || $user->canEditShop($shop));
     }
 
-    public const TABS = ['pages', 'products', 'notes', 'rules'];
+    public const TABS = ['pages', 'products', 'notes', 'rules', 'terms'];
+
+    /** The term whose explanation is being edited, and its words. */
+    public ?string $editingTerm = null;
+
+    public string $editTermText = '';
 
     private const STRIP = 12;
 
@@ -90,7 +96,7 @@ final class AboutStore extends OperatorAboutStore
         parent::mount();
         // the knowledge centre's old tabs (general, posts, found) are the pages tab now
         $this->tab = in_array($this->tab, self::TABS, true) ? $this->tab : 'pages';
-        $this->limits = ['pages' => 6, 'posts' => 5, 'found' => 5, 'notes' => 20, 'rules' => 10] + $this->limits;
+        $this->limits = ['pages' => 6, 'posts' => 5, 'found' => 5, 'notes' => 20, 'rules' => 10, 'terms' => 30] + $this->limits;
     }
 
     /** The operator's actions name its own tabs (posts after a post is added): they are the pages tab here. */
@@ -118,6 +124,68 @@ final class AboutStore extends OperatorAboutStore
     {
         parent::addInfo();
         $this->tab = 'notes';
+    }
+
+    /** Whether the store has a bank of trade terms: its tab shows only then. */
+    public function hasTerms(): bool
+    {
+        return $this->shop !== null && Features::enabled('assistant.trade_terms', (string) $this->shop);
+    }
+
+    /**
+     * The store's bank of trade terms, as the team sees it: those told first, by term, then those it hid.
+     *
+     * @return list<array{key: string, term: string, text: string, state: string}>
+     */
+    public function termRows(): array
+    {
+        if (! $this->hasTerms()) {
+            return [];
+        }
+        $rows = app(TenantContext::class)->run((string) $this->shop, fn (): array => app(BuildShopKnowledge::class)->termState()['rows']);
+        usort($rows, fn (array $a, array $b): int => [$a['state'] === 'hidden', mb_strtolower((string) $a['term'])] <=> [$b['state'] === 'hidden', mb_strtolower((string) $b['term'])]);
+
+        return array_map(fn (array $r): array => ['key' => (string) $r['key'], 'term' => (string) $r['term'], 'text' => (string) $r['text'], 'state' => (string) $r['state']], $rows);
+    }
+
+    public function startTerm(string $key): void
+    {
+        $row = collect($this->termRows())->firstWhere('key', $key);
+        $this->editingTerm = $row === null || ! $this->mayFixLines() ? null : $key;
+        $this->editTermText = (string) ($row['text'] ?? '');
+    }
+
+    public function cancelTerm(): void
+    {
+        $this->editingTerm = null;
+        $this->editTermText = '';
+    }
+
+    /** The team's own explanation of a term: told as written, never written over. */
+    public function saveTerm(): void
+    {
+        if ($this->editingTerm === null || ! $this->mayFixLines()) {
+            return;
+        }
+        $key = $this->editingTerm;
+        $text = $this->editTermText;
+        app(TenantContext::class)->run((string) $this->shop, fn (): bool => app(BuildShopKnowledge::class)->editTerm($key, $text));
+        $this->cancelTerm();
+        Notification::make()->success()->title(__('assistant::store_knowledge.terms.saved'))->send();
+    }
+
+    public function hideTerm(string $key): void
+    {
+        if ($this->mayFixLines()) {
+            app(TenantContext::class)->run((string) $this->shop, fn (): bool => app(BuildShopKnowledge::class)->hideTerm(mb_substr($key, 0, 80)));
+        }
+    }
+
+    public function showTerm(string $key): void
+    {
+        if ($this->mayFixLines()) {
+            app(TenantContext::class)->run((string) $this->shop, fn (): bool => app(BuildShopKnowledge::class)->showTerm(mb_substr($key, 0, 80)));
+        }
     }
 
     /** A product picked from the row: what was understood of it opens beside. */

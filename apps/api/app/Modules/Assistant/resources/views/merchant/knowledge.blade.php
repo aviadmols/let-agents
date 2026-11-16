@@ -12,6 +12,8 @@
     @php($pages = $this->pages())
     @php($rules = $this->rules())
     @php($knows = $this->knows())
+    @php($terms = $this->termRows())
+    @php($hasTerms = $this->hasTerms())
 
     <div class="lp-page lp-d" data-store-knowledge>
         <div class="lp-d-grid">
@@ -52,7 +54,7 @@
             <div class="lp-d-know">
                 <div>
                     <div class="lp-d-ktabs" role="tablist" aria-label="{{ $t('tabs.label') }}">
-                        @foreach (['pages' => count($pages), 'products' => $knows['products'], 'notes' => count($own) + count($texts), 'rules' => count($rules)] as $key => $count)
+                        @foreach (['pages' => count($pages), 'products' => $knows['products'], 'notes' => count($own) + count($texts), 'rules' => count($rules)] + ($hasTerms ? ['terms' => collect($terms)->where('state', '!=', 'hidden')->count()] : []) as $key => $count)
                             <button type="button" role="tab" wire:click="show(@js($key))" aria-selected="{{ $this->tab === $key ? 'true' : 'false' }}" data-tab="{{ $key }}"><span>{{ $t('tabs.'.$key) }}</span><span class="lp-d-ktabs-n lp-d-num">{{ number_format($count) }}</span></button>
                         @endforeach
                     </div>
@@ -280,6 +282,47 @@
                                 @endif
                             @endforelse
                         </section>
+                    @elseif ($this->tab === 'terms' && $hasTerms)
+                        {{-- the store's bank of trade terms: each explained, edited or hidden by the team; the assistant answers from it --}}
+                        <section class="lp-d-card" data-pane="terms">
+                            <p class="lp-d-card-sub lp-d-rules-sub">{{ $t('terms.sub') }}</p>
+                            @forelse (array_slice($terms, 0, $this->limits['terms']) as $term)
+                                <div class="lp-d-srow" data-term="{{ $term['key'] }}" data-state="{{ $term['state'] }}" wire:key="term-{{ md5($term['key']) }}">
+                                    <span class="lp-d-srow-ic">{!! $penIcon !!}</span>
+                                    <span class="lp-d-srow-main">
+                                        @if ($this->editingTerm === $term['key'])
+                                            <form class="lp-d-text-edit" wire:submit="saveTerm">
+                                                <b dir="auto">{{ $term['term'] }}</b>
+                                                <textarea wire:model="editTermText" rows="3" maxlength="{{ \App\Modules\Assistant\Actions\BuildShopKnowledge::MAX_TERM_TEXT }}" dir="auto" aria-label="{{ $term['term'] }}"></textarea>
+                                                <span><button type="submit" class="lp-d-btn lp-d-btn-ink lp-d-btn-sm" wire:loading.attr="disabled" wire:target="saveTerm">{{ $t('notes.save') }}</button>
+                                                <button type="button" class="lp-d-ghost" wire:click="cancelTerm">{{ $t('notes.cancel') }}</button></span>
+                                            </form>
+                                        @else
+                                            <b dir="auto">{{ $term['term'] }}</b>
+                                            <p class="lp-d-text-body" dir="auto" @if ($term['state'] === 'hidden') style="opacity: .55" @endif>{{ $term['text'] }}</p>
+                                            @if ($term['state'] !== 'ai')
+                                                <span class="lp-d-srow-l">{{ $term['state'] === 'hidden' ? $t('terms.hidden') : $t('terms.edited') }}</span>
+                                            @endif
+                                        @endif
+                                    </span>
+                                    @if ($this->editingTerm !== $term['key'] && $this->mayFixLines())
+                                        @if ($term['state'] === 'hidden')
+                                            <button type="button" class="lp-d-ghost" wire:click="showTerm(@js($term['key']))">{{ $t('terms.show') }}</button>
+                                        @else
+                                            <button type="button" class="lp-d-ghost" wire:click="startTerm(@js($term['key']))">{{ $t('notes.edit') }}</button>
+                                            <button type="button" class="lp-d-ghost" wire:click="hideTerm(@js($term['key']))">{{ $t('terms.hide') }}</button>
+                                        @endif
+                                    @endif
+                                </div>
+                            @empty
+                                <div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('terms.zero') }}</b><span>{{ $t('terms.zero_text') }}</span></div>
+                            @endforelse
+                            @if (count($terms) > $this->limits['terms'])
+                                <button type="button" class="lp-d-ghost lp-d-srow-more" wire:click="more('terms')">{{ __('assistant::ui.centre.more', ['n' => count($terms) - $this->limits['terms']]) }}</button>
+                            @endif
+                        </section>
+                    @elseif ($this->tab === 'terms')
+                        <section class="lp-d-card" data-pane="terms"><div class="lp-d-zero"><span class="lp-d-zero-mark">{!! $mark !!}</span><b>{{ $t('terms.zero') }}</b><span>{{ $t('terms.zero_text') }}</span></div></section>
                     @else
                         {{-- the rules of the store's products: written in its words, read into a plan, approved before anything changes --}}
                         @php($reading = collect($rules)->contains(fn (array $r): bool => $r['status'] === 'reading'))

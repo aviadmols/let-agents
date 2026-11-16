@@ -104,7 +104,8 @@ final class PrepareStoreAnswers
      */
     public function questions(string $locale): array
     {
-        $pages = CatalogContent::query()->active()->whereIn('type', ['page', CatalogContent::KNOWLEDGE])->orderBy('id')->get(['title', 'body']);
+        // the bank of trade terms is general knowledge, never a topic the store talks about (CatalogContent::QUIET_PREFIX)
+        $pages = CatalogContent::query()->active()->whereIn('type', ['page', CatalogContent::KNOWLEDGE])->where('external_id', 'not like', CatalogContent::QUIET_PREFIX.'%')->orderBy('id')->get(['title', 'body']);
         $plain = fn (string $text): string => strtr(mb_strtolower($text), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
         $text = $plain($pages->map(fn (CatalogContent $p): string => $p->title."\n".$p->body)->implode("\n"));
 

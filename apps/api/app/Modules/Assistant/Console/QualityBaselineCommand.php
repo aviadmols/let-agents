@@ -33,6 +33,7 @@ final class QualityBaselineCommand extends Command
         {--set=* : run: a setting for this run only, as key=value (assistant.site_check_effort=low); put back after}
         {--live : run: on today\'s catalogue and pages instead of each case\'s frozen data}
         {--label= : run: a name for the run, to find it again}
+        {--terms : run: the store\'s bank of trade terms read in this run alone, its flag off for shoppers}
         {--kind=all : run: baseline (real questions), regression (cases with expectations), or all}
         {--runs= : compare: two runs, by ID or label, as a,b}
         {--answers : compare: every case with both answers, before and after, and the products each showed}';
@@ -63,6 +64,11 @@ final class QualityBaselineCommand extends Command
 
         if ($overrides === null) {
             return self::FAILURE;
+        }
+
+        // the bank of terms tried in this process only: shoppers keep the store's flag as it is
+        if ($this->option('terms')) {
+            config(['assistant.try_terms' => true]);
         }
 
         // the real questions, the cases with expectations (the conversations), or both: one run, one number

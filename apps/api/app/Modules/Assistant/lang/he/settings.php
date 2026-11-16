@@ -336,6 +336,50 @@ return [
         'label' => 'כמה פוסטים חדשים או ששונו נקראים בכל לילה',
         'description' => 'השאר מחכים ללילה הבא. פוסט שלא השתנה לא נקרא שוב.',
     ],
+    'terms_writer_provider' => [
+        'label' => 'ספק המודל שכותב את בנק המונחים',
+        'description' => 'משפחה אחרת מהבודק.',
+    ],
+    'terms_writer_model' => [
+        'label' => 'המודל שכותב את בנק המונחים',
+        'description' => 'למשל gpt-5.4-mini.',
+    ],
+    'terms_writer_input_usd_per_million' => [
+        'label' => 'מחיר קלט של כותב המונחים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'terms_writer_output_usd_per_million' => [
+        'label' => 'מחיר פלט של כותב המונחים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'terms_writer_max_output_tokens' => [
+        'label' => 'אורך התשובה של כותב המונחים',
+        'description' => 'עד כמה טוקנים לכל ריצה.',
+    ],
+    'terms_check_provider' => [
+        'label' => 'ספק המודל שבודק את בנק המונחים',
+        'description' => 'משפחה אחרת מהכותב.',
+    ],
+    'terms_check_model' => [
+        'label' => 'המודל שבודק את בנק המונחים',
+        'description' => 'למשל claude-haiku-4-5.',
+    ],
+    'terms_check_input_usd_per_million' => [
+        'label' => 'מחיר קלט של בודק המונחים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'terms_check_output_usd_per_million' => [
+        'label' => 'מחיר פלט של בודק המונחים, למיליון טוקנים',
+        'description' => 'לפי המחירון של הספק.',
+    ],
+    'terms_check_max_output_tokens' => [
+        'label' => 'אורך התשובה של בודק המונחים',
+        'description' => 'עד כמה טוקנים לכל ריצה.',
+    ],
+    'terms_max' => [
+        'label' => 'כמה מונחים לכל היותר בבנק של חנות',
+        'description' => 'מונחים שהצוות הסתיר לא נספרים. 0 לא כותב מונחים.',
+    ],
     'team_drafts_per_day' => [
         'label' => 'טיוטות AI לתשובות ביום',
         'description' => 'כמה פעמים ביום הצוות של חנות יכול לבקש טיוטה. טיוטה שכבר נוסחה לאותה שאלה ואותן מילים חוזרת בלי מודל.',

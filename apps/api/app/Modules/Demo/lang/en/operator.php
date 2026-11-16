@@ -20,6 +20,8 @@ return [
     'extend' => 'Extend',
     'rescan' => 'Scan again',
     'rescan_confirm' => 'Delete this demo\'s store with all it read, and build and scan it again? Its link stays the same, and a new email goes out when it is ready.',
+    'rescan_yes' => 'Yes, scan again',
+    'rescan_no' => 'Cancel',
     'rescanning' => 'The demo is deleted and its scan starts again.',
     'delete' => 'Delete',
     'delete_confirm' => 'Delete this demo from the list? Its store is deleted with everything read from the site, and its link stops working.',

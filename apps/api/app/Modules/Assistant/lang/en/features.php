@@ -9,6 +9,10 @@ return [
         'label' => 'Free questions on article pages',
         'description' => 'A reader asks about the guide and is answered from the guide itself, including "sum this up for me". Questions already answered come back from memory with no model.',
     ],
+    'trade_terms' => [
+        'label' => 'A bank of trade terms for every store',
+        'description' => 'In the scan and every night, code gathers from the store\'s data the words that may be terms of its trade (codes in product titles, materials, values the products are sold by, and what shoppers asked the meaning of). One model writes a short explanation for each, and a model of another family keeps only what is correct. The assistant uses an explanation only when the question names its term. A word checked once is never sent again.',
+    ],
     'read_voice' => [
         'label' => 'Reading the store’s tone in its scan',
         'description' => 'In the store’s scan, a small model reads how the store writes to its customers (its product descriptions and posts) and sets the tone the assistant answers in. A tone the store chose itself never changes.',

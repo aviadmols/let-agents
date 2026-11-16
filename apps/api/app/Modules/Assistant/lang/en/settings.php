@@ -336,6 +336,50 @@ return [
         'label' => 'How many new or changed posts are read each night',
         'description' => 'The rest wait for the next night. A post that did not change is not read again.',
     ],
+    'terms_writer_provider' => [
+        'label' => 'Provider of the model that writes the bank of terms',
+        'description' => 'Another family than the checker.',
+    ],
+    'terms_writer_model' => [
+        'label' => 'The model that writes the bank of terms',
+        'description' => 'For example gpt-5.4-mini.',
+    ],
+    'terms_writer_input_usd_per_million' => [
+        'label' => 'Input price of the term writer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'terms_writer_output_usd_per_million' => [
+        'label' => 'Output price of the term writer, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'terms_writer_max_output_tokens' => [
+        'label' => 'Length of the term writer\'s reply',
+        'description' => 'Tokens per run at most.',
+    ],
+    'terms_check_provider' => [
+        'label' => 'Provider of the model that checks the bank of terms',
+        'description' => 'Another family than the writer.',
+    ],
+    'terms_check_model' => [
+        'label' => 'The model that checks the bank of terms',
+        'description' => 'For example claude-haiku-4-5.',
+    ],
+    'terms_check_input_usd_per_million' => [
+        'label' => 'Input price of the term checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'terms_check_output_usd_per_million' => [
+        'label' => 'Output price of the term checker, per million tokens',
+        'description' => 'From the price list of the provider.',
+    ],
+    'terms_check_max_output_tokens' => [
+        'label' => 'Length of the term checker\'s reply',
+        'description' => 'Tokens per run at most.',
+    ],
+    'terms_max' => [
+        'label' => 'The most terms in a store\'s bank',
+        'description' => 'Terms the team hid are not counted. 0 writes no terms.',
+    ],
     'team_drafts_per_day' => [
         'label' => 'AI answer drafts a day',
         'description' => 'How many drafts a store team may ask for a day. A draft already written for the same question and words comes back without a model.',

@@ -415,7 +415,10 @@ final class DemoFlowTest extends TestCase
         $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 12, 'read_at' => now(), 'scan_at' => now(), 'emailed_at' => now()])->save();
         Queue::fake();
 
-        app(Demos::class)->rescan($site->id);
+        // pressed on the screen, as the team does (Aviad, 16.11: "Scan again" did nothing)
+        Filament::setCurrentPanel(Filament::getPanel('operator'));
+        $this->actingAs(User::factory()->operator()->create());
+        Livewire::test(Demos::class)->assertOk()->call('rescan', $site->id)->assertHasNoErrors();
 
         $site->refresh();
         $this->assertSame([DemoSite::SCANNING, null, null, null], [$site->status, $site->read_at, $site->emailed_at, $site->expires_at]);

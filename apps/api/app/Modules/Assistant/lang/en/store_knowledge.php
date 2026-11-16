@@ -21,6 +21,18 @@ return [
         'products' => 'Products',
         'notes' => 'What you added',
         'rules' => 'Rules',
+        'terms' => 'Term bank',
+    ],
+
+    'terms' => [
+        'sub' => 'Terms of your trade, each with a short explanation. When a shopper asks about one, the assistant answers from here. Edit any explanation or hide a term; what you write stays as you wrote it.',
+        'edited' => 'Edited by you',
+        'hidden' => 'Hidden: the assistant does not use it',
+        'hide' => 'Hide',
+        'show' => 'Bring back',
+        'saved' => 'Explanation saved',
+        'zero' => 'No terms yet',
+        'zero_text' => 'After the store is scanned, the trade terms of your field appear here, each with a short explanation.',
     ],
 
     'pages' => [

@@ -49,6 +49,9 @@ final class FirstScan
         // How the store writes to its customers, read into the tone its assistant answers in, unless it chose one
         // (ReadShopVoice; as Aviad asked, 16.11): one small call, read again only when its texts change.
         'voice' => ['assistant:voice', ['shop' => '{shop}']],
+        // The terms of the store's trade, from its own data, each explained by one family and checked by the other
+        // (BuildTradeGlossary; as Aviad asked, 16.11): only words not decided before, so a scan again costs nothing.
+        'terms' => ['assistant:terms', ['shop' => '{shop}']],
         'posts' => ['assistant:read-posts', ['shop' => '{shop}']],
         // How every product looks, before the catalog is divided: the vocabulary writer counts what
         // the pictures show, and the products step reads it as the last source of a product's looks.
@@ -88,6 +91,7 @@ final class FirstScan
         'site' => ['catalog.read_site_pages'],
         'knowledge' => ['assistant.read_repeated', 'enrichment.read_promises', 'enrichment.read_content', 'assistant.check_own_knowledge'],
         'voice' => ['assistant.read_voice'],
+        'terms' => ['assistant.write_terms'],
         'posts' => ['assistant.read_posts', 'enrichment.match_article_products', 'enrichment.audit_content'],
         'pictures' => ['retrieval.build_image_index', 'retrieval.caption_images'],
         'structure' => ['enrichment.build_structure', 'enrichment.propose_schema', 'enrichment.discover_schema', 'enrichment.score_schema', 'enrichment.import_vocabulary'],

@@ -18,7 +18,7 @@ final class OnboardingScan implements ShopScan
         'images' => ['pictures'],
         'pages' => ['site', 'posts', 'pages'],
         'tags' => ['structure', 'products', 'search', 'tags', 'check'],
-        'knowledge' => ['knowledge', 'voice'],
+        'knowledge' => ['knowledge', 'voice', 'terms'],
     ];
 
     public function progress(Shop $shop): ?array

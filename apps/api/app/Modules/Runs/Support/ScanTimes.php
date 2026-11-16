@@ -26,6 +26,7 @@ final class ScanTimes
         'site' => [null, 180],
         'knowledge' => [null, 240],
         'voice' => [null, 20],
+        'terms' => [null, 60],
         'posts' => [4.0, 300],
         'pictures' => [1.5, 300],
         'structure' => [null, 420],

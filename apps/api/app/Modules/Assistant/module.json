@@ -22,6 +22,10 @@
             "default": true
         },
         {
+            "name": "trade_terms",
+            "default": false
+        },
+        {
             "name": "prepare_answers",
             "default": true
         },
@@ -780,6 +784,107 @@
             "unit": "posts"
         },
         {
+            "name": "terms_writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "terms_writer_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "terms_writer_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "terms_writer_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "terms_writer_max_output_tokens",
+            "type": "int",
+            "default": 4000,
+            "min": 200,
+            "max": 8000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "terms_check_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "terms_check_model",
+            "type": "string",
+            "default": "claude-haiku-4-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "terms_check_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "terms_check_output_usd_per_million",
+            "type": "float",
+            "default": 5,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "terms_check_max_output_tokens",
+            "type": "int",
+            "default": 1500,
+            "min": 200,
+            "max": 8000,
+            "scope": "global",
+            "unit": "tokens"
+        },
+        {
+            "name": "terms_max",
+            "type": "int",
+            "default": 40,
+            "min": 0,
+            "max": 150,
+            "scope": "shop",
+            "unit": "items"
+        },
+        {
             "name": "team_drafts_per_day",
             "type": "int",
             "default": 40,
@@ -960,6 +1065,44 @@
             ],
             "run": {
                 "command": "assistant:read-posts",
+                "shop_argument": "shop"
+            }
+        },
+        {
+            "name": "term_writer",
+            "action": "write_terms",
+            "when": "04:10",
+            "features": [
+                "trade_terms"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "terms_writer_provider",
+                    "model": "terms_writer_model",
+                    "prices": [
+                        "terms_writer_input_usd_per_million",
+                        "terms_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "trade_terms"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "terms_check_provider",
+                    "model": "terms_check_model",
+                    "prices": [
+                        "terms_check_input_usd_per_million",
+                        "terms_check_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "trade_terms_check"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "assistant:terms",
                 "shop_argument": "shop"
             }
         },
