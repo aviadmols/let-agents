@@ -626,6 +626,10 @@ final class SearchCatalog
                 $allHeld = self::whole(self::either($index['engine'], $translated));
                 $termHits = array_values(array_filter(array_map('strval', array_keys($allHeld)), fn (string $id): bool => str_starts_with($id, 'p:')));
             }
+            // What holds every word as the store writes them is what the words found, first, as the same words typed in the
+            // store's language would show it: "gold hoop earrings" had its 56 hoops behind solitaires the meaning brought
+            // nearer, and "עגילי חישוק זהב" showed the hoops (Rocks QA, 16.11). Each word alone is still only near.
+            $translatedHeld = $termHits;
             foreach ($termHits === [] ? $nearWords : [] as $term) {
                 foreach (HebrewSearch::search($index['engine'], $term) as $hit) {
                     if (str_starts_with((string) $hit['id'], 'p:') && ! in_array($hit['id'], $termHits, true)) {
@@ -773,7 +777,7 @@ final class SearchCatalog
             if (isset($held)) {
                 $guided = array_values(array_filter($guided, fn (string $id): bool => isset($held[$id])));
             }
-            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided, $described, $termHits], [...$pinned, ...$subject], [1.0, 1.0, self::GUIDED_WEIGHT, self::DESCRIBED_WEIGHT, 1.0]);
+            $ranked = $this->merge($spelling, [$meaning, $pictures, $guided, $described, $termHits], [...$pinned, ...$subject, ...($translatedHeld ?? [])], [1.0, 1.0, self::GUIDED_WEIGHT, self::DESCRIBED_WEIGHT, 1.0]);
             // The guides by meaning after those the words found, each once.
             $ranked = [...$ranked, ...array_values(array_diff(array_column($guides, 'id'), $ranked))];
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
@@ -825,7 +829,9 @@ final class SearchCatalog
             // in a shirt's picture words), in stock and colour order kept within each (Story, 25.10)
             // a description, never a question about a kind ("איזה עץ לפרגולה?": the wood before a bracket that names wood
             // and pergola both) nor what the search already put first
-            if ($scattered !== null && ! $asks && $pinned === [] && $subject === []) {
+            // ...nor a search that holds whole in the store's words once read ("gold hoop earrings" as "עגילי חישוק זהב"): its
+            // English words said by a solitaire's title ("gold earrings") would put it before the hoops
+            if ($scattered !== null && ! $asks && $pinned === [] && $subject === [] && ($translatedHeld ?? []) === []) {
                 $groups['product'] = self::bySaidWords($groups['product'], $scattered);
             }
             // "נעלי משבצות": what its picture shows covered in the print asked for first, what has it on one part next, what
@@ -892,12 +898,18 @@ final class SearchCatalog
                     : [];
             }
 
+            // never a choice of a word the store does not know: "אופניים חשמליות" in a jewellery store offered "אופניים (7)",
+            // seven pieces its letters came near ("פנינים", "תלויים"), none a bicycle (Rocks QA, 16.11)
+            $focus = self::knownChoices($focus, $unknown);
             // With the choices, the category the words found first, as a way in of its own.
             $focus = $focus === [] ? null : ['options' => $focus, 'category' => array_intersect_key($groups['category'][0] ?? [], array_flip(['title', 'url', 'products'])) ?: null];
 
             // held: how many products hold every word as typed. None: what is shown is only what is nearest by meaning,
             // and the drawer says so, with the AI one press away, rather than showing it as if it were what was asked for.
-            return ['query' => $query, 'unknown' => $unknown, 'held' => count(self::whole($spelling)), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts]
+            return ['query' => $query, 'unknown' => $unknown, 'held' => max(count(self::whole($spelling)), count($translatedHeld ?? [])), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts]
+                // the price the words asked for, as it was applied, and the words without it: the drawer shows it as a filter
+                // of its own, which taken off searches the rest ("שרשרת זהב עד 1000 שקל" showed no sign of its price: Rocks QA)
+                + ($minPrice === null && $maxPrice === null ? [] : ['price' => ['min' => $minPrice, 'max' => $maxPrice, 'rest' => trim($priced)]])
                 // the words read by meaning as the store writes them ("מפוספס": "פסים"), for the drawer to show as it reads them
                 + ($nearWords === [] ? [] : ['near' => array_map(fn (string $w, string $t): array => ['word' => $w, 'term' => $t], array_keys($nearWords), array_values($nearWords))]);
         });
@@ -3123,6 +3135,18 @@ final class SearchCatalog
      * @param  list<float>  $weights  each of $others' weight, 1 when not given
      * @return list<string>
      */
+    /**
+     * The narrower searches offered, less any holding a word the store does not know (unknownWords, normalized).
+     *
+     * @param  list<array{query: string, count: int}>  $options
+     * @param  list<string>  $unknown
+     * @return list<array{query: string, count: int}>
+     */
+    public static function knownChoices(array $options, array $unknown): array
+    {
+        return array_values(array_filter($options, fn (array $o): bool => array_intersect(explode(' ', HebrewSearch::normalize((string) ($o['query'] ?? ''))), $unknown) === []));
+    }
+
     private function merge(array $spelling, array $others, array $pinned = [], array $weights = []): array
     {
         $exact = [];

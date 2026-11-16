@@ -149,6 +149,31 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame(2, substr_count($row, 'data-similar='), 'each product of the row under an answer');
     }
 
+    public function test_a_price_asked_for_is_a_filter_shown_and_never_a_word_missing(): void
+    {
+        // Rocks QA, 16.11: "שרשרת זהב עד 1000 שקל" said "without 'שקל'", its price applied, and showed no sign of the price
+        $note = self::drawer("(function () { S.records['p:50'] = { id: 'p:50', t: 'product', title: 'שרשרת זהב 14K', s: 1, kw: 'שרשרת זהב' }; S.records['p:51'] = { id: 'p:51', t: 'product', title: 'שרשרת זהב לבן', s: 1, kw: 'שרשרת זהב' }; var x = turn('שרשרת זהב עד 1000 שקל', [50, 51], {}); x.unknown = []; return T.noteHtml(x); })()");
+        $this->assertStringNotContainsString('שקל', $note);
+        $this->assertStringContainsString('Up to ₪1,000', self::drawer("(function () { S.config = {}; var x = turn('שרשרת זהב עד 1000 שקל', [], {}); x.price = { min: null, max: 1000, rest: 'שרשרת זהב' }; return T.activeRow(x); })()"));
+        $this->assertStringContainsString('data-chip="price"', self::drawer("(function () { var x = turn('שרשרת עד 500', [], {}); x.price = { min: 100, max: 500, rest: 'שרשרת' }; return T.activeRow(x); })()"));
+    }
+
+    public function test_a_code_typed_shows_its_product_alone(): void
+    {
+        // Rocks QA, 16.11: the SKU's ring, then two bracelets
+        $html = self::drawer("(function () { var x = turn('61574', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'sku'; return T.resultsHtml(x); })()");
+        $this->assertSame(1, substr_count($html, 'ls-exact__tag'));
+        $this->assertSame(0, substr_count($html, 'class="ls-card'));
+        $this->assertGreaterThan(0, substr_count(self::drawer("(function () { var x = turn('Gold Ring', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'title'; return T.resultsHtml(x); })()"), 'class="ls-card'), 'a name still shows what else holds it');
+    }
+
+    public function test_a_word_read_in_the_stores_language_is_said_by_what_says_its_reading(): void
+    {
+        // Rocks QA, 16.11: "gold hoop earrings" over the hoops was told "without hoop"
+        $note = self::drawer("(function () { S.records['p:60'] = { id: 'p:60', t: 'product', title: 'עגילי חישוק זהב', s: 1, kw: 'עגילים חישוק זהב' }; S.records['p:61'] = { id: 'p:61', t: 'product', title: 'עגילי חישוק זהב לבן', s: 1, kw: 'עגילים חישוק זהב' }; var x = turn('gold hoop earrings', [60, 61], {}); x.unknown = []; x.near = [{ word: 'hoop', term: 'חישוק' }, { word: 'gold', term: 'זהב' }, { word: 'earrings', term: 'עגילים' }]; return T.noteHtml(x); })()");
+        $this->assertStringNotContainsString('hoop', $note);
+    }
+
     public function test_a_tag_all_in_capitals_or_small_letters_is_shown_in_title_case_and_a_brand_as_it_is(): void
     {
         $this->assertSame(['Sterling Silver', 'Mens Bracelets', 'Big-Bold', 'APMA Accepted', 'VANS', 'צמידים'], self::drawer(

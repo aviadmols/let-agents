@@ -19,7 +19,7 @@
     // kept as it is only once the meaning pass, when one was coming, has answered: Enter before it asks the
     // server again, with the meaning, instead of showing "no results" and dropping what the meaning finds
     if (lv && lv.server && (lv.meant || !lv.willMean)) {
-      addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, focus: lv.focus, single: lv.single, singleBy: lv.singleBy, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
+      addTurn({ kind: 'results', q: q, loading: false, ids: lv.ids, total: lv.total, price: lv.price || null, focus: lv.focus, single: lv.single, singleBy: lv.singleBy, content: lv.content, cats: lv.cats, actions: lv.actions, c: carried });
       // kept without asking the server again, so it is counted here (once per tab, as a pause would)
       countSearch(q, lv.ids.length);
       announce(t('announceResults', { n: lv.ids.length }));
@@ -66,7 +66,11 @@
   // with the words left, in the same place, with the filters the shopper chose and the ones they took off; the field
   // says the same words. Nothing left: the search is closed, and the drawer is ready for a new one.
   function dropWords(turn, places) {
-    var q = wordsOf(turn.q).filter(function (w, i) { return places.indexOf(i) < 0; }).join(' ');
+    searchAgainWith(turn, wordsOf(turn.q).filter(function (w, i) { return places.indexOf(i) < 0; }).join(' '));
+  }
+  // the search again with these words, in the same place (a filter taken off with its words: a word, a price)
+  function searchAgainWith(turn, q) {
+    q = String(q || '').trim();
     if (turn === S.live) { INPUT.value = q; onType(); return; }
     var inField = INPUT.value.trim() === String(turn.q || '').trim();
     if (!q) {
@@ -79,7 +83,7 @@
     }
     var c = C(turn);
     turn.c = Object.assign(blankC(), { f: c.f, no: c.no, sort: c.sort, stock: c.stock, sale: c.sale });
-    Object.assign(turn, { q: q, loading: true, ids: [], more: null, limit: S.wide === turn.id ? STEP : null, single: null, focus: null, content: [], cats: [] });
+    Object.assign(turn, { q: q, loading: true, ids: [], more: null, limit: S.wide === turn.id ? STEP : null, single: null, focus: null, content: [], cats: [], price: null });
     if (inField) { keepInField(q); }
     keepBack(q, turn.id, S.wide === turn.id);
     update(turn, {});
@@ -124,7 +128,7 @@
       var d = got.d, ids = got.ids;
       var single = d.single && (d.single.external_id || d.single.id) ? pid(d.single.external_id || d.single.id) : null;
       return products(ids.slice(0, 8)).then(function () {
-        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, near: d.near || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, contentShown(ids.length)), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
+        update(turn, { loading: false, ids: ids, total: d.total || ids.length, unknown: d.unknown || null, held: typeof d.held === 'number' ? d.held : null, focus: d.focus || null, loosened: d.loosened || null, near: d.near || null, price: d.price || null, single: single, singleBy: single ? d.single.by : null, content: ((d.groups && d.groups.content) || []).slice(0, contentShown(ids.length)), cats: ((d.groups && d.groups.category) || []).slice(0, 3) });
         announce(t('announceResults', { n: ids.length }));
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -358,7 +362,7 @@
   // is shown once, in the row under it with its × (activeRow), never a second time here with a ✓ (as Aviad asked, 1.11)
   var OFFERED = 4;
   function chipRow(turn) {
-    var fc = facetChips(turn, 99), c = C(turn), act = activeFilters(c);
+    var fc = facetChips(turn, 99), c = C(turn), act = activeFilters(c) + (turn.price ? 1 : 0);
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
     if (fc.stock && !onStock(c)) { chips += chip(t('inStock'), false, 'stock', turn.id, false); }
     if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
@@ -588,7 +592,7 @@
     // said, never shown as if they were it (as Aviad asked, 2026-10-25)
     // and a value the words named that none of the results has, let go (readTags): said first
     var letGo = (turn.letGo || []).filter(function (w) { return !ASKS_ONLY.test(w) && !STOP.test(w); });
-    var shownList = filtered(turn), missing = typed.length ? [] : letGo.concat(unsaid(turn.q, shownList, read).filter(function (w) { return letGo.indexOf(w) < 0; }));
+    var shownList = filtered(turn), missing = typed.length ? [] : letGo.concat(unsaid(turn.q, shownList, read, turn.near).filter(function (w) { return letGo.indexOf(w) < 0; }));
     var rest = missing.length ? kept.filter(function (w) { return missing.indexOf(w) < 0; }) : [];
     // "מה זה ספרי פנטזיה?": the books are shown, and it says so; "פנטזיה" is not on the site
     // nothing as asked: the server searched looser, and says what it left out; the other way it found is a press away
@@ -624,9 +628,11 @@
     return out;
   }
   // words that ask for a filter, an order or a price, never what a product says: "בצבע", "במידה", "הכי זולה", "במבצע"
-  var ASKS_ONLY = /^([והבל]?(צבע|גוון|מידה|מידות|מבצע|מחיר|זול|זולה|זולים|זולות|יקר|יקרה|יקרים|יקרות)|הכי|ביותר|עד|מעל|מתחת|size|colou?rs?|cheap(er|est)?|expensive|sale|price|under|over|for|with|without|and)$/i;
+  // (and a currency: "עד 1000 שקל" was told "without שקל", its price applied all the same: Rocks QA, 16.11)
+  var ASKS_ONLY = /^([והבל]?(שקל|שקלים|שח|דולר|דולרים|יורו|צבע|גוון|מידה|מידות|מבצע|מחיר|זול|זולה|זולים|זולות|יקר|יקרה|יקרים|יקרות)|הכי|ביותר|עד|מעל|מתחת|shekels?|nis|ils|dollars?|usd|aud|eur|euros?|size|colou?rs?|cheap(er|est)?|expensive|sale|price|under|over|for|with|without|and)$/i;
   // read: where the words that set a filter were typed ("קובע", read as the filter "כובע"): never missing
-  function unsaid(q, list, read) {
+  // near: the words the server read as the store writes them ([{word, term}]): said where what is shown says the term
+  function unsaid(q, list, read, near) {
     var E = S.engine;
     if (!E || !E.normalize || !list.length) { return []; }
     var typed = wordsOf(q).filter(function (w, i) { return (read || []).indexOf(i) < 0 && w.length >= 3 && !STOP.test(w) && !ASKS_ONLY.test(w) && !/\d/.test(w); });
@@ -645,6 +651,10 @@
         // other, the rest are this side's; a store marking all for one side still says the other is not there
         return !WHOM[whom].some(function (f) { return said[f]; }) && !whomByDefault(whom);
       }
+      // a word in the other language, read as the store's ("hoop": "חישוק"), is said by what says that: "gold hoop earrings"
+      // over the hoops was told "without hoop" (Rocks QA, 16.11)
+      var term = (near || []).filter(function (x) { return x && x.word === n && x.term; })[0];
+      if (term && wordForms(E.normalize(String(term.term))).some(function (f) { return said[f]; })) { return false; }
       return !wordForms(n).some(function (f) { return said[f]; });
     });
   }
@@ -730,7 +740,9 @@
       // the product of the exact match once: not again in the grid under it ("1 product" twice: QA, 16.11); alone, no grid
       var one = String(pid(s.id));
       list = list.filter(function (r) { return String(pid(r.id)) !== one; });
-      if (!list.length && total) { return html + (off('ask') || turn.askShown ? '' : askSmall(askFind(turn.q))); }
+      // a code typed is that product: nothing after it (Rocks QA, 16.11: two bracelets after the SKU's own ring); a name
+      // still shows what else holds it
+      if ((!list.length && total) || turn.singleBy === 'sku') { return html + (off('ask') || turn.askShown ? '' : askSmall(askFind(turn.q))); }
     }
     // no product, and articles or pages found: those, with the quiet way to ask under them, never "nothing found" over
     // what was found (Profimex, 16.11: 49 posts for "השקעה בנדל״ן", the drawer showed only the card that asks the AI)

@@ -40,7 +40,7 @@ final class CrossLanguageSearchTest extends TestCase
         $asked = &$this->asked;
         $this->app->instance(ChatModel::class, new class($asked) implements ChatModel
         {
-            private const SAYS = ['טבעת' => 'ring', 'זהב' => 'gold', 'צמיד' => 'bracelet', 'earrings' => 'עגילים', 'ring' => 'טבעת', 'shoes' => 'נעליים', 'vintage' => 'וינטג', 'cameo' => 'קמאו', 'pendant' => 'תליון'];
+            private const SAYS = ['טבעת' => 'ring', 'זהב' => 'gold', 'צמיד' => 'bracelet', 'earrings' => 'עגילים', 'ring' => 'טבעת', 'shoes' => 'נעליים', 'vintage' => 'וינטג', 'cameo' => 'קמאו', 'pendant' => 'תליון', 'gold' => 'זהב', 'hoop' => 'חישוק'];
 
             private const SHY = ['צמידון' => 'bracelet', 'towels' => 'מגבת', 'כובע' => 'hat'];
 
@@ -124,6 +124,26 @@ final class CrossLanguageSearchTest extends TestCase
         ]);
 
         $this->assertSame(['1'], $this->found($shop, 'vintage cameo pendant'), 'the vintage cameo pendant: every word counts');
+    }
+
+    public function test_what_holds_every_translated_word_comes_first_and_counts_as_found(): void
+    {
+        // Rocks QA, 16.11: "gold hoop earrings" read every word ("חישוק", "זהב", "עגילים") and still showed solitaires first,
+        // what its English words and the meaning came near, over the 56 hoops "עגילי חישוק זהב" shows
+        $shop = $this->store('he', [
+            '1' => ['עגילי סוליטר gold earrings', 'עגילים'],
+            '2' => ['עגילי סוליטר יהלום gold', 'עגילים'],
+            '3' => ['עגילי חישוק זהב', 'עגילים'],
+            '4' => ['עגילי חישוק זהב לבן', 'עגילים'],
+            '5' => ['טבעת זהב', 'טבעות'],
+            '6' => ['שרשרת כסף', 'שרשראות'],
+            '7' => ['צמיד חישוק כסף', 'צמידים'],
+            '8' => ['טבעת כסף', 'טבעות'],
+        ]);
+
+        $found = $this->search($shop, 'gold hoop earrings');
+        $this->assertSame(['p:3', 'p:4'], array_slice(array_values(array_filter($found['ids'], fn (string $id): bool => str_starts_with($id, 'p:'))), 0, 2), 'the gold hoop earrings first');
+        $this->assertSame(2, $found['held'], 'and found as the words, not only near them');
     }
 
     public function test_the_word_most_of_the_store_says_is_a_word_to_read_as(): void

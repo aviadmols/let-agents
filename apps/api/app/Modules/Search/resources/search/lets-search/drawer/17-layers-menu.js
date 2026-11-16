@@ -55,6 +55,14 @@
   // true when the filter took its words with it and the search runs again (dropWords)
   function applyChip(turn, key) {
     var c = C(turn), words = null;
+    // the price taken off: the rest of the words searched, in the same place (no words left: the search closes)
+    if (key === 'price') {
+      var rest = turn.price ? String(turn.price.rest || '') : String(turn.q || '');
+      signalEvent('chip_off', turn.q, 'price');
+      turn.price = null;
+      searchAgainWith(turn, rest);
+      return true;
+    }
     if (key === 'stock') {
       if (c.autoStock) { c.autoStock = false; c.no.stock = true; if (c.saidStock) { words = saidAt(turn.q, /^במלאי$/, ['in', 'stock']); } } else { c.stock = !c.stock; }
     } else if (key === 'sale') {

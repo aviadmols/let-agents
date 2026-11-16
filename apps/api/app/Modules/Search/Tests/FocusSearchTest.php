@@ -317,6 +317,27 @@ final class FocusSearchTest extends TestCase
         $this->assertSame(['21'], $content, 'the guide about black screwdrivers, not the black cart');
     }
 
+    public function test_a_word_the_store_does_not_know_is_never_offered_to_narrow_by(): void
+    {
+        // Rocks QA, 16.11: "אופניים חשמליות" in a jewellery store offered "אופניים (7)", seven pieces its letters came near
+        // ("פנינים", "תלויים", "חלולים"), none a bicycle
+        $this->catalog([
+            '1' => ['עגילי פנינים זהב', 'עגילים'],
+            '2' => ['עגילים תלויים זהב', 'עגילים'],
+            '3' => ['עגילי חישוק חלולים', 'עגילים'],
+            '4' => ['טבעת זהב צהוב', 'טבעות'],
+            '5' => ['שרשרת כסף', 'שרשראות'],
+        ]);
+
+        $result = $this->search('אופניים חשמליות');
+        foreach ((array) ($result['focus']['options'] ?? []) as $option) {
+            $this->assertNotContains($option['query'], ['אופניימ', 'חשמליות'], 'no word of the search the store does not know');
+        }
+        // the rule, as Rocks met it: the choice of the unknown word goes, a choice of known words stays
+        $this->assertSame([['query' => 'טבעת זהב', 'count' => 4]], SearchCatalog::knownChoices([['query' => 'אופניימ', 'count' => 7], ['query' => 'טבעת זהב', 'count' => 4]], ['אופניימ', 'חשמליות']));
+        $this->assertSame([], SearchCatalog::knownChoices([['query' => 'אופניים', 'count' => 7]], ['אופניימ']), 'as the store writes it or normalized');
+    }
+
     public function test_when_nothing_holds_every_word_the_narrower_searches_are_offered(): void
     {
         $this->catalog([
